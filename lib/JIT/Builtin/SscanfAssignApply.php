@@ -167,17 +167,40 @@ final class SscanfAssignApply
         $boolBb = $fn->appendBasicBlock('sscanf_apply_tag_bool');
         $stringBb = $fn->appendBasicBlock('sscanf_apply_tag_string');
         $defaultBb = $fn->appendBasicBlock('sscanf_apply_tag_default');
+        $checkLong = $fn->appendBasicBlock('sscanf_apply_check_long');
+        $checkDouble = $fn->appendBasicBlock('sscanf_apply_check_double');
+        $checkBool = $fn->appendBasicBlock('sscanf_apply_check_bool');
+        $checkString = $fn->appendBasicBlock('sscanf_apply_check_string');
 
-        $context->builder->switch_(
-            $tag,
-            $defaultBb,
-            [
-                $i8->constInt(self::TAG_NULL, false) => $nullBb,
-                $i8->constInt(self::TAG_LONG, false) => $longBb,
-                $i8->constInt(self::TAG_DOUBLE, false) => $doubleBb,
-                $i8->constInt(self::TAG_BOOL, false) => $boolBb,
-                $i8->constInt(self::TAG_STRING, false) => $stringBb,
-            ]
+        // php-llvm Builder has no switch_; cascade icmp/branchIf (#21109).
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(self::TAG_NULL, false)),
+            $nullBb,
+            $checkLong
+        );
+        $context->builder->positionAtEnd($checkLong);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(self::TAG_LONG, false)),
+            $longBb,
+            $checkDouble
+        );
+        $context->builder->positionAtEnd($checkDouble);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(self::TAG_DOUBLE, false)),
+            $doubleBb,
+            $checkBool
+        );
+        $context->builder->positionAtEnd($checkBool);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(self::TAG_BOOL, false)),
+            $boolBb,
+            $checkString
+        );
+        $context->builder->positionAtEnd($checkString);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(self::TAG_STRING, false)),
+            $stringBb,
+            $defaultBb
         );
 
         $writeNull = $context->lookupFunction('__value__writeNull');

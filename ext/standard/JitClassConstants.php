@@ -110,7 +110,7 @@ final class JitClassConstants
                     $context,
                     JITVariable::TYPE_NATIVE_DOUBLE,
                     JITVariable::KIND_VALUE,
-                    $context->getTypeFromString('double')->constFloat($resolved->toFloat())
+                    $context->getTypeFromString('double')->constReal($resolved->toFloat())
                 );
                 HashTableHelper::setAtStringKey($context, $ht, $keyStr, $jit);
 

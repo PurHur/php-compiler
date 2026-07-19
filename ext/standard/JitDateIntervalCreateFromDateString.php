@@ -118,7 +118,7 @@ final class JitDateIntervalCreateFromDateString
                 $context,
                 JITVariable::TYPE_NATIVE_DOUBLE,
                 JITVariable::KIND_VALUE,
-                $dbl->constFloat($parsed['f'])
+                $dbl->constReal($parsed['f'])
             ),
             JITVariable::TYPE_NATIVE_DOUBLE
         );

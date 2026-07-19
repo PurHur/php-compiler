@@ -94,6 +94,9 @@ final class LibcExtern
             'nextafter' => [$dbl, false, [$dbl, $dbl]],
             'hypot' => [$dbl, false, [$dbl, $dbl]],
             'sqrt' => [$dbl, false, [$dbl]],
+            // VmFloatCompare NestedJIT (#21109 / #9976) — math.h
+            'isnan' => [$i32, false, [$dbl]],
+            'isinf' => [$i32, false, [$dbl]],
         ];
 
         foreach ($specs as $name => [$ret, $vararg, $params]) {

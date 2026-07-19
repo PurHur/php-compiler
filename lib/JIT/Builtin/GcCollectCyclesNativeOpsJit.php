@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -20,21 +22,23 @@ final class GcCollectCyclesNativeOpsJit
     {
         GcCollectCyclesRuntime::ensureLinked($context);
 
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $voidpp = $context->getTypeFromString('void**');
         $objPtrTy = $context->getTypeFromString('__object__*');
 
-        $objI64 = $context->builder->pointerCast($objPtr->getValue(), $i64);
-        $obj = $context->builder->pointerCast($objI64, $objPtrTy);
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $objPtrTy
+        );
         $base = $context->builder->pointerCast($obj, $i8p);
         $headerSize = self::objectHeaderSizeConst($context);
         $slotOff = $context->builder->add(
             $headerSize,
             $context->builder->mul(
-                $context->builder->zext($slotIndex->getValue(), $sizeT),
+                $context->builder->zext(self::i64FromVar($context, $slotIndex), $sizeT),
                 $sizeT->constInt(8, false)
             )
         );
@@ -56,7 +60,11 @@ final class GcCollectCyclesNativeOpsJit
 
         $i64 = $context->getTypeFromString('int64');
         $objPtrTy = $context->getTypeFromString('__object__*');
-        $obj = $context->builder->pointerCast($objPtr->getValue(), $objPtrTy);
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $objPtrTy
+        );
         $refcount = self::loadObjectRefcount($context, $obj);
 
         return $context->builder->sext($refcount, $i64);
@@ -67,10 +75,14 @@ final class GcCollectCyclesNativeOpsJit
         GcCollectCyclesRuntime::ensureLinked($context);
 
         $i8p = $context->getTypeFromString('int8*');
-        $objI64 = $objPtr->getValue();
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $i8p
+        );
         $context->builder->call(
             $context->lookupFunction('phpc_gc_free_object'),
-            $context->builder->pointerCast($objI64, $i8p)
+            $obj
         );
     }
 
@@ -79,9 +91,14 @@ final class GcCollectCyclesNativeOpsJit
         GcCollectCyclesRuntime::ensureLinked($context);
 
         $i8p = $context->getTypeFromString('int8*');
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $i8p
+        );
         $context->builder->call(
             $context->lookupFunction('phpc_destruct_try_invoke'),
-            $context->builder->pointerCast($objPtr->getValue(), $i8p)
+            $obj
         );
     }
 
@@ -90,9 +107,14 @@ final class GcCollectCyclesNativeOpsJit
         GcCollectCyclesRuntime::ensureLinked($context);
 
         $i8p = $context->getTypeFromString('int8*');
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $i8p
+        );
         $context->builder->call(
             $context->lookupFunction('phpc_object_release_storage'),
-            $context->builder->pointerCast($objPtr->getValue(), $i8p)
+            $obj
         );
     }
 
@@ -101,9 +123,12 @@ final class GcCollectCyclesNativeOpsJit
         GcCollectCyclesRuntime::ensureLinked($context);
 
         $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
         $objPtrTy = $context->getTypeFromString('__object__*');
-        $obj = $context->builder->pointerCast($objPtr->getValue(), $objPtrTy);
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $objPtrTy
+        );
         $constructed = self::loadObjectConstructed($context, $obj);
 
         return $context->builder->icmp(
@@ -118,7 +143,11 @@ final class GcCollectCyclesNativeOpsJit
         GcCollectCyclesRuntime::ensureLinked($context);
 
         $objPtrTy = $context->getTypeFromString('__object__*');
-        $obj = $context->builder->pointerCast($objPtr->getValue(), $objPtrTy);
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $objPtrTy
+        );
         $context->builder->call(
             $context->lookupFunction('__object__invoke_destructor'),
             $obj
@@ -130,9 +159,14 @@ final class GcCollectCyclesNativeOpsJit
         GcCollectCyclesRuntime::ensureLinked($context);
 
         $i8p = $context->getTypeFromString('int8*');
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $i8p
+        );
         $context->builder->call(
             $context->lookupFunction('phpc_gc_notify_object_freed'),
-            $context->builder->pointerCast($objPtr->getValue(), $i8p)
+            $obj
         );
     }
 
@@ -141,10 +175,31 @@ final class GcCollectCyclesNativeOpsJit
         GcCollectCyclesRuntime::ensureLinked($context);
 
         $i8p = $context->getTypeFromString('int8*');
+        $obj = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $objPtr),
+            $i8p
+        );
         $context->builder->call(
             $context->lookupFunction('__mm__free'),
-            $context->builder->pointerCast($objPtr->getValue(), $i8p)
+            $obj
         );
+    }
+
+    /** Nested-helper i64 / KIND_VARIABLE long slot → i64 (#21109). */
+    private static function i64FromVar(Context $context, JITVariable $var): Value
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type) {
+            $raw = $var->value;
+            $ty = $context->getStringFromType($raw->typeOf());
+            if ('int64' === $ty || 'long long' === $ty) {
+                return $raw;
+            }
+
+            return $context->builder->load($raw);
+        }
+
+        return JitLongArg::lower($context, $var, 'phpc_gc native pointer');
     }
 
     private static function loadObjectConstructed(Context $context, Value $obj): Value

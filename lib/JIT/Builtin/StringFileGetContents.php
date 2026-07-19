@@ -42,7 +42,7 @@ final class StringFileGetContents
         self::implement($context);
     }
 
-    private static function implement(Context $context): void
+    public static function implement(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {
             return;
