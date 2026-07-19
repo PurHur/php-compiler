@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** putenv() — set/unset process environment (VM; JIT/AOT via libc putenv). */
+/** putenv() — set/unset process environment (VM; JIT/AOT via GetenvJitHelper + libc mirror). */
 final class putenv_ extends Internal
 {
     public function __construct()
