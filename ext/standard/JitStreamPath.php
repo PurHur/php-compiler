@@ -20,16 +20,13 @@ final class JitStreamPath
         int $argIndex = 0,
         string $paramName = 'filename'
     ): Value {
-        // Z_PARAM_PATH: null→"" even on 8.4 forward profile; empty path → ValueError (#19145, ext/standard/image.c).
+        // Null → TypeError on PROFILE=8.4 before empty-path ValueError (#21062, #21076; #20474).
         $path = JitStringBuiltinArg::lowerPath(
             $context,
             $arg,
             $function,
             $argIndex,
-            $paramName,
-            'string',
-            null,
-            true
+            $paramName
         );
         JitStringBuiltinArg::rejectEmpty($context, $arg, $path, PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
 
