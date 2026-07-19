@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5883 |
-| Phase A inventory files (M2 ratio SSOT) | 5883 |
+| PHP files on vm.php path | 5899 |
+| Phase A inventory files (M2 ratio SSOT) | 5899 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17792 |
+| Source constructs flagged (warnings) | 17856 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 96 |
+| `ext/intl/Module.php` | 0 | 112 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -891,6 +891,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intl_get_error_code.php` | 0 | 1 |
 | `ext/intl/intl_get_error_message.php` | 0 | 1 |
 | `ext/intl/intl_is_failure.php` | 0 | 1 |
+| `ext/intl/intlcal_add.php` | 0 | 3 |
+| `ext/intl/intlcal_clear.php` | 0 | 3 |
+| `ext/intl/intlcal_create_instance.php` | 0 | 3 |
+| `ext/intl/intlcal_equals.php` | 0 | 3 |
+| `ext/intl/intlcal_field_difference.php` | 0 | 3 |
+| `ext/intl/intlcal_from_date_time.php` | 0 | 3 |
+| `ext/intl/intlcal_get.php` | 0 | 3 |
+| `ext/intl/intlcal_get_now.php` | 0 | 3 |
+| `ext/intl/intlcal_get_time.php` | 0 | 3 |
+| `ext/intl/intlcal_get_time_zone.php` | 0 | 3 |
+| `ext/intl/intlcal_get_type.php` | 0 | 3 |
+| `ext/intl/intlcal_is_set.php` | 0 | 3 |
+| `ext/intl/intlcal_roll.php` | 0 | 3 |
+| `ext/intl/intlcal_set.php` | 0 | 3 |
+| `ext/intl/intlcal_set_time.php` | 0 | 3 |
+| `ext/intl/intlcal_to_date_time.php` | 0 | 3 |
 | `ext/intl/locale_accept_from_http.php` | 0 | 2 |
 | `ext/intl/locale_canonicalize.php` | 0 | 3 |
 | `ext/intl/locale_compose.php` | 0 | 2 |
@@ -11583,22 +11599,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new datefmt_localtime (line 197)
 - new datefmt_get_error_code (line 198)
 - new datefmt_get_error_message (line 199)
-- new grapheme_strlen (line 228)
-- new grapheme_substr (line 229)
-- new grapheme_strpos (line 230)
-- new grapheme_str_contains (line 231)
-- new grapheme_strstr (line 232)
-- new grapheme_stristr (line 233)
-- new grapheme_stripos (line 234)
-- new grapheme_strrpos (line 235)
-- new grapheme_strripos (line 236)
-- new grapheme_extract (line 237)
-- new grapheme_levenshtein (line 238)
-- new grapheme_str_split (line 239)
-- new grapheme_strimwidth (line 240)
-- new intl_get_error_code (line 241)
-- new intl_get_error_message (line 242)
-- new intl_is_failure (line 243)
+- new intlcal_create_instance (line 205)
+- new intlcal_get_now (line 206)
+- new intlcal_from_date_time (line 207)
+- new intlcal_get (line 208)
+- new intlcal_set (line 209)
+- new intlcal_get_type (line 210)
+- new intlcal_add (line 211)
+- new intlcal_roll (line 212)
+- new intlcal_clear (line 213)
+- new intlcal_is_set (line 214)
+- new intlcal_equals (line 215)
+- new intlcal_get_time (line 216)
+- new intlcal_set_time (line 217)
+- new intlcal_get_time_zone (line 218)
+- new intlcal_to_date_time (line 219)
+- new intlcal_field_difference (line 220)
+- new grapheme_strlen (line 251)
+- new grapheme_substr (line 252)
+- new grapheme_strpos (line 253)
+- new grapheme_str_contains (line 254)
+- new grapheme_strstr (line 255)
+- new grapheme_stristr (line 256)
+- new grapheme_stripos (line 257)
+- new grapheme_strrpos (line 258)
+- new grapheme_strripos (line 259)
+- new grapheme_extract (line 260)
+- new grapheme_levenshtein (line 261)
+- new grapheme_str_split (line 262)
+- new grapheme_strimwidth (line 263)
+- new intl_get_error_code (line 264)
+- new intl_get_error_message (line 265)
+- new intl_is_failure (line 266)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12468,6 +12500,118 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/intl_is_failure.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/intl/intlcal_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 57)
+- 2 class method(s)
+
+### `ext/intl/intlcal_clear.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 59)
+- 2 class method(s)
+
+### `ext/intl/intlcal_create_instance.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Error (line 65)
+- 2 class method(s)
+
+### `ext/intl/intlcal_equals.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 64)
+- 2 class method(s)
+
+### `ext/intl/intlcal_field_difference.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 79)
+- 2 class method(s)
+
+### `ext/intl/intlcal_from_date_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Error (line 81)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 61)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_now.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 41)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_time_zone.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_type.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/intlcal_is_set.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/intlcal_roll.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 57)
+- 2 class method(s)
+
+### `ext/intl/intlcal_set.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 74)
+- 2 class method(s)
+
+### `ext/intl/intlcal_set_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 68)
+- 2 class method(s)
+
+### `ext/intl/intlcal_to_date_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
 - 2 class method(s)
 
 ### `ext/intl/locale_accept_from_http.php`

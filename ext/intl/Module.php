@@ -200,6 +200,27 @@ class Module extends ModuleAbstract
             ]
             : [];
 
+        $intlcal = IntlExtensionPolicy::advertisesIntlCalendar()
+            ? [
+                new intlcal_create_instance(),
+                new intlcal_get_now(),
+                new intlcal_from_date_time(),
+                new intlcal_get(),
+                new intlcal_set(),
+                new intlcal_get_type(),
+                new intlcal_add(),
+                new intlcal_roll(),
+                new intlcal_clear(),
+                new intlcal_is_set(),
+                new intlcal_equals(),
+                new intlcal_get_time(),
+                new intlcal_set_time(),
+                new intlcal_get_time_zone(),
+                new intlcal_to_date_time(),
+                new intlcal_field_difference(),
+            ]
+            : [];
+
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
                 ...$functions,
@@ -211,6 +232,7 @@ class Module extends ModuleAbstract
                 ...$transliterator,
                 ...$resourcebundle,
                 ...$datefmt,
+                ...$intlcal,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
             ];
         }
@@ -225,6 +247,7 @@ class Module extends ModuleAbstract
             ...$transliterator,
             ...$resourcebundle,
             ...$datefmt,
+            ...$intlcal,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),
