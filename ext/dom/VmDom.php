@@ -186,6 +186,9 @@ final class VmDom
 
     public const PROP_SYSTEM_ID = 'systemId';
 
+    /** DOMDocumentType::$internalSubset — libxml intSubset dump or null (php-src documenttype.c; #21000). */
+    public const PROP_INTERNAL_SUBSET = 'internalSubset';
+
     public const PROP_ENTITIES = 'entities';
 
     public const PROP_NOTATIONS = 'notations';
@@ -567,6 +570,7 @@ final class VmDom
         $doctype->properties[] = new ClassProperty(self::PROP_NAME, null, $strProto);
         $doctype->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, null, $strProto);
         $doctype->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, null, $strProto);
+        $doctype->properties[] = new ClassProperty(self::PROP_INTERNAL_SUBSET, $nullProto, $strProto);
         $doctype->properties[] = new ClassProperty(self::PROP_ENTITIES, $nullProto, $objProto);
         $doctype->properties[] = new ClassProperty(self::PROP_NOTATIONS, $nullProto, $objProto);
         $ctx->classes[self::CLASS_DOCUMENT_TYPE] = $doctype;
@@ -827,6 +831,7 @@ final class VmDom
         $state->nodeName = $qualifiedName;
         $state->publicId = $publicId;
         $state->systemId = $systemId;
+        $state->internalSubset = null;
         DomRegistry::attach($entry, $state);
         self::initDocumentTypePropertySlots($entry, $qualifiedName, $publicId, $systemId);
         $entitiesMap = self::createNamedNodeMap($ctx, [], $entry);
@@ -4134,10 +4139,11 @@ final class VmDom
     private static function parseDoctypeElementDeclarations(string $xml): array
     {
         $declared = [];
-        if (!preg_match('/<!DOCTYPE\s+\S+\s*\[(.*)\]\s*>/s', $xml, $doctype)) {
+        $subset = self::extractDoctypeInternalSubset($xml);
+        if (null === $subset) {
             return $declared;
         }
-        if (!preg_match_all('/<!ELEMENT\s+(\S+)\s+/', $doctype[1], $matches)) {
+        if (!preg_match_all('/<!ELEMENT\s+(\S+)\s+/', $subset, $matches)) {
             return $declared;
         }
         foreach ($matches[1] as $name) {
@@ -4183,10 +4189,11 @@ final class VmDom
     private static function parseDoctypeIdAttributes(string $xml): array
     {
         $idAttrs = [];
-        if (!preg_match('/<!DOCTYPE\s+\S+\s*\[(.*)\]\s*>/s', $xml, $doctype)) {
+        $subset = self::extractDoctypeInternalSubset($xml);
+        if (null === $subset) {
             return $idAttrs;
         }
-        if (!preg_match_all('/<!ATTLIST\s+(\S+)\s+(\S+)\s+ID\b/', $doctype[1], $matches, PREG_SET_ORDER)) {
+        if (!preg_match_all('/<!ATTLIST\s+(\S+)\s+(\S+)\s+ID\b/', $subset, $matches, PREG_SET_ORDER)) {
             return $idAttrs;
         }
         foreach ($matches as $match) {
@@ -4217,11 +4224,43 @@ final class VmDom
 
     private static function extractDoctypeInternalSubset(string $xml): ?string
     {
-        if (!preg_match('/<!DOCTYPE\s+\S+\s*\[(.*)\]\s*>/s', $xml, $match)) {
+        // Optional PUBLIC/SYSTEM external ID before brackets (php-src / libxml; #21000).
+        if (!preg_match(
+            '/<!DOCTYPE\s+\S+(?:\s+PUBLIC\s+"[^"]*"\s+"[^"]*"|\s+SYSTEM\s+"[^"]*")?\s*\[(.*)\]\s*>/is',
+            $xml,
+            $match
+        )) {
             return null;
         }
 
         return $match[1];
+    }
+
+    /**
+     * Serialize internal subset like libxml intSubset dump (php-src documenttype.c; #21000).
+     *
+     * Markup declarations get a trailing newline; comments are concatenated without one.
+     * Empty / whitespace-only subsets → null.
+     */
+    private static function formatDoctypeInternalSubsetProperty(string $raw): ?string
+    {
+        $trimmed = trim($raw);
+        if ('' === $trimmed) {
+            return null;
+        }
+        if (!preg_match_all('/<!--.*?-->|<![^>]*>/s', $trimmed, $matches)) {
+            return null;
+        }
+        $out = '';
+        foreach ($matches[0] as $token) {
+            if (str_starts_with($token, '<!--')) {
+                $out .= $token;
+            } else {
+                $out .= $token."\n";
+            }
+        }
+
+        return '' === $out ? null : $out;
     }
 
     private static function populateDoctypeInternalSubset(
@@ -4231,6 +4270,14 @@ final class VmDom
         string $xml
     ): void {
         $subset = self::extractDoctypeInternalSubset($xml);
+        $formatted = null !== $subset ? self::formatDoctypeInternalSubsetProperty($subset) : null;
+        $doctypeState = DomRegistry::state($doctype);
+        $doctypeState->internalSubset = $formatted;
+        if (null === $formatted) {
+            $doctype->getProperty(self::PROP_INTERNAL_SUBSET)->null();
+        } else {
+            $doctype->getProperty(self::PROP_INTERNAL_SUBSET)->string($formatted);
+        }
         if (null === $subset) {
             return;
         }
@@ -4383,7 +4430,6 @@ final class VmDom
             }
         }
 
-        $doctypeState = DomRegistry::state($doctype);
         $entitiesMap = self::createNamedNodeMap($ctx, $entityIds, $doctype);
         $doctypeState->entitiesMapId = $entitiesMap->toObject()->id;
         $doctype->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
@@ -7897,6 +7943,8 @@ final class VmDom
         $entry->getProperty(self::PROP_NAME)->string($qualifiedName);
         $entry->getProperty(self::PROP_PUBLIC_ID)->string($publicId);
         $entry->getProperty(self::PROP_SYSTEM_ID)->string($systemId);
+        // createDocumentType / empty subset → null (php-src documenttype.c; #21000).
+        $entry->getProperty(self::PROP_INTERNAL_SUBSET)->null();
         self::initNodePropertySlots($entry);
     }
 

@@ -45,6 +45,11 @@ final class DomNodeState
 
     public ?string $systemId = null;
 
+    /**
+     * Serialized DTD internal subset (libxml intSubset dump), or null when absent (#21000).
+     */
+    public ?string $internalSubset = null;
+
     /** Root element local name for documents. */
     public ?string $documentElementName = null;
 

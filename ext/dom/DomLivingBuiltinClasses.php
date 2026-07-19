@@ -130,6 +130,7 @@ final class DomLivingBuiltinClasses
         $documentType->properties[] = new ClassProperty(VmDom::PROP_NAME, null, $strProto);
         $documentType->properties[] = new ClassProperty(VmDom::PROP_PUBLIC_ID, null, $strProto);
         $documentType->properties[] = new ClassProperty(VmDom::PROP_SYSTEM_ID, null, $strProto);
+        $documentType->properties[] = new ClassProperty(VmDom::PROP_INTERNAL_SUBSET, $nullProto, $strProto);
         $documentType->properties[] = new ClassProperty(VmDom::PROP_ENTITIES, $nullProto, $objProto);
         $documentType->properties[] = new ClassProperty(VmDom::PROP_NOTATIONS, $nullProto, $objProto);
         // ChildNode methods — php-src implementation-alias DOMElement::{remove,before,after,replaceWith}.
