@@ -973,6 +973,8 @@
         "ext/intl/resourcebundle_count.php",
         "ext/intl/resourcebundle_create.php",
         "ext/intl/resourcebundle_get.php",
+        "ext/intl/resourcebundle_get_error_code.php",
+        "ext/intl/resourcebundle_get_error_message.php",
         "ext/intl/resourcebundle_locales.php",
         "ext/intl/transliterator_create.php",
         "ext/intl/transliterator_create_from_rules.php",
@@ -6139,9 +6141,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5905,
+        "inventory_files": 5907,
         "excluded": 0,
-        "eligible": 5905,
+        "eligible": 5907,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

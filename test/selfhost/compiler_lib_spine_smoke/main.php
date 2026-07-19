@@ -5953,6 +5953,8 @@ require_once __DIR__.'/../../../ext/intl/locale_get_display_variant.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_count.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_create.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_get.php';
+require_once __DIR__.'/../../../ext/intl/resourcebundle_get_error_code.php';
+require_once __DIR__.'/../../../ext/intl/resourcebundle_get_error_message.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_locales.php';
 require_once __DIR__.'/../../../ext/intl/intlcal_add.php';
 require_once __DIR__.'/../../../ext/intl/intlcal_clear.php';
