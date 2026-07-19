@@ -16,6 +16,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\ext\standard\VmHttpBuildQuery;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmStreamContext;
+use PHPCompiler\ext\standard\VmUserCall;
 
 /**
  * SoapClient VM class — v1 local WSDL + file/HTTP transport (php-src ext/soap/soap.c; #20037, #20183, #20293).
@@ -25,6 +26,7 @@ use PHPCompiler\ext\standard\VmStreamContext;
  * With options['trace'], __getLastRequestHeaders / __getLastResponseHeaders capture HTTP header blocks.
  * options['exceptions']=false returns SoapFault objects instead of throwing (#20293).
  * options['classmap'] maps SOAP type names (xsi:type local name) to PHP classes (#21044).
+ * options['typemap'] from_xml/to_xml string callbacks (#21046).
  */
 final class VmSoapClient
 {
@@ -161,6 +163,10 @@ final class VmSoapClient
         if (isset($options['classmap']) && \is_array($options['classmap'])) {
             $state->classmap = self::normalizeClassmap($options['classmap']);
         }
+        // php-src SoapClient ctor: typemap [{type_ns,type_name,from_xml,to_xml}] (#21046).
+        if (isset($options['typemap']) && \is_array($options['typemap'])) {
+            $state->typemap = self::normalizeTypemap($options['typemap']);
+        }
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -254,14 +260,20 @@ final class VmSoapClient
     ): Variable {
         $state = self::state($object);
         try {
-            $request = self::buildRequest($state, $name, $arguments);
+            $request = self::buildRequest($state, $name, $arguments, $ctx);
             $state->lastRequest = $request;
 
             $action = $state->uri !== '' ? \rtrim($state->uri, '/').'/'.$name : $name;
             $response = self::doRequest($object, $request, $state->location, $action, $state->soapVersion, $frame);
             $state->lastResponse = $response;
 
-            $decoded = self::decodeResponse($response, $name, $state->features, $state->classmap);
+            $decoded = self::decodeResponse(
+                $response,
+                $name,
+                $state->features,
+                $state->classmap,
+                $state->typemap
+            );
 
             return self::importValue($decoded, $ctx);
         } catch (\SoapFault $e) {
@@ -997,8 +1009,12 @@ final class VmSoapClient
     /**
      * @param list<mixed> $arguments
      */
-    private static function buildRequest(SoapClientState $state, string $name, array $arguments): string
-    {
+    private static function buildRequest(
+        SoapClientState $state,
+        string $name,
+        array $arguments,
+        ?Context $ctx = null
+    ): string {
         $ns = $state->uri !== '' ? $state->uri : 'http://example.com/';
         $envelopeNs = SoapConstants::SOAP_1_2 === $state->soapVersion
             ? 'http://www.w3.org/2003/05/soap-envelope'
@@ -1008,17 +1024,23 @@ final class VmSoapClient
         $paramsXml = '';
         $args = $arguments;
         // Zend wraps document/literal params; RPC often uses a single array of named params.
-        if (1 === \count($args) && \is_array($args[0]) && !\array_is_list($args[0])) {
+        // Do not unwrap SoapVar property bags (enc_stype/enc_value) used by typemap to_xml (#21046).
+        if (
+            1 === \count($args)
+            && \is_array($args[0])
+            && !\array_is_list($args[0])
+            && null === self::soapVarShape($args[0])
+        ) {
             $args = $args[0];
         }
         if (\is_array($args) && !\array_is_list($args)) {
             foreach ($args as $key => $value) {
-                $paramsXml .= self::encodeParam((string) $key, $value);
+                $paramsXml .= self::encodeParam((string) $key, $value, $state, $ctx);
             }
         } else {
             $i = 0;
             foreach ($args as $value) {
-                $paramsXml .= self::encodeParam('param'.$i, $value);
+                $paramsXml .= self::encodeParam('param'.$i, $value, $state, $ctx);
                 ++$i;
             }
         }
@@ -1099,9 +1121,35 @@ final class VmSoapClient
         return '    <'.$tag.$attrs.'>'.$inner.'</'.$tag.'>'."\n";
     }
 
-    private static function encodeParam(string $name, mixed $value): string
-    {
+    private static function encodeParam(
+        string $name,
+        mixed $value,
+        ?SoapClientState $state = null,
+        ?Context $ctx = null
+    ): string {
         $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'param';
+        // SoapVar-shaped export + typemap to_xml (#21046; php_encoding.c to_xml_user).
+        if (null !== $state && null !== $ctx && [] !== $state->typemap) {
+            $soapVar = self::soapVarShape($value);
+            if (null !== $soapVar) {
+                $entry = self::findTypemapEntry(
+                    $state->typemap,
+                    $soapVar['stype'],
+                    $soapVar['ns']
+                );
+                if (null !== $entry && null !== $entry['to_xml']) {
+                    $xmlFrag = self::invokeTypemapToXml($ctx, $entry['to_xml'], $soapVar['value']);
+                    if (null !== $xmlFrag && '' !== $xmlFrag) {
+                        // to_xml returns a full element; wrap under the param tag name when needed.
+                        if (\str_starts_with(\ltrim($xmlFrag), '<')) {
+                            return $xmlFrag;
+                        }
+
+                        return '<'.$tag.'>'.\htmlspecialchars($xmlFrag, \ENT_XML1).'</'.$tag.'>';
+                    }
+                }
+            }
+        }
         if (null === $value) {
             return '<'.$tag.' xsi:nil="true"/>';
         }
@@ -1117,13 +1165,80 @@ final class VmSoapClient
         if (\is_array($value)) {
             $inner = '';
             foreach ($value as $k => $v) {
-                $inner .= self::encodeParam(\is_int($k) ? 'item' : (string) $k, $v);
+                $inner .= self::encodeParam(\is_int($k) ? 'item' : (string) $k, $v, $state, $ctx);
             }
 
             return '<'.$tag.'>'.$inner.'</'.$tag.'>';
         }
 
         return '<'.$tag.' xsi:type="xsd:string">'.\htmlspecialchars((string) $value, \ENT_XML1).'</'.$tag.'>';
+    }
+
+    /**
+     * Detect SoapVar property bag after VmJson export.
+     *
+     * @return array{stype: string, ns: string, value: mixed}|null
+     */
+    private static function soapVarShape(mixed $value): ?array
+    {
+        if ($value instanceof \stdClass) {
+            $value = (array) $value;
+        }
+        if (!\is_array($value)) {
+            return null;
+        }
+        if (!\array_key_exists('enc_stype', $value) && !\array_key_exists('enc_value', $value)) {
+            return null;
+        }
+        $stype = isset($value['enc_stype']) && \is_string($value['enc_stype']) ? $value['enc_stype'] : '';
+        $ns = isset($value['enc_ns']) && \is_string($value['enc_ns']) ? $value['enc_ns'] : '';
+        if ('' === $stype) {
+            return null;
+        }
+
+        return [
+            'stype' => $stype,
+            'ns' => $ns,
+            'value' => $value['enc_value'] ?? null,
+        ];
+    }
+
+    /**
+     * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     *
+     * @return array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}|null
+     */
+    private static function findTypemapEntry(array $typemap, string $typeName, string $typeNs): ?array
+    {
+        foreach ($typemap as $entry) {
+            if ($entry['type_name'] !== $typeName) {
+                continue;
+            }
+            if ('' !== $entry['type_ns'] && '' !== $typeNs && $entry['type_ns'] !== $typeNs) {
+                continue;
+            }
+
+            return $entry;
+        }
+
+        return null;
+    }
+
+    private static function invokeTypemapToXml(Context $ctx, string $callback, mixed $value): ?string
+    {
+        try {
+            $fn = VmUserCall::resolveStringCallback($ctx, $callback);
+        } catch (\Throwable) {
+            return null;
+        }
+        $arg = self::importJsonLike($value, $ctx);
+        $result = VmUserCall::invokeOne($ctx, $fn, $arg);
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_STRING === $result->type) {
+            return $result->toString();
+        }
+
+        return null;
     }
 
     /**
@@ -1147,13 +1262,59 @@ final class VmSoapClient
     }
 
     /**
-     * @param array<string, string> $classmap
+     * @param array<mixed> $raw
+     *
+     * @return list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}>
+     */
+    private static function normalizeTypemap(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $entry) {
+            if ($entry instanceof \stdClass) {
+                $entry = (array) $entry;
+            }
+            if (!\is_array($entry)) {
+                continue;
+            }
+            $typeName = isset($entry['type_name']) && \is_string($entry['type_name'])
+                ? $entry['type_name']
+                : '';
+            if ('' === $typeName) {
+                continue;
+            }
+            $typeNs = isset($entry['type_ns']) && \is_string($entry['type_ns'])
+                ? $entry['type_ns']
+                : '';
+            $fromXml = isset($entry['from_xml']) && \is_string($entry['from_xml']) && '' !== $entry['from_xml']
+                ? $entry['from_xml']
+                : null;
+            $toXml = isset($entry['to_xml']) && \is_string($entry['to_xml']) && '' !== $entry['to_xml']
+                ? $entry['to_xml']
+                : null;
+            if (null === $fromXml && null === $toXml) {
+                continue;
+            }
+            $out[] = [
+                'type_ns' => $typeNs,
+                'type_name' => $typeName,
+                'from_xml' => $fromXml,
+                'to_xml' => $toXml,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, string>                                                                 $classmap
+     * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
      */
     private static function decodeResponse(
         string $response,
         string $name,
         int $features = 0,
-        array $classmap = []
+        array $classmap = [],
+        array $typemap = []
     ): mixed {
         $dom = new \DOMDocument();
         if (!@$dom->loadXML($response)) {
@@ -1201,7 +1362,8 @@ final class VmSoapClient
                 $children[$child->localName ?? $child->nodeName] = self::domElementToValue(
                     $child,
                     $singleElementArrays,
-                    $classmap
+                    $classmap,
+                    $typemap
                 );
             }
         }
@@ -1212,17 +1374,25 @@ final class VmSoapClient
             return \reset($children);
         }
 
-        return self::maybeMappedObject($responseEl, $children, $classmap);
+        return self::maybeMappedObject($responseEl, $children, $classmap, $typemap);
     }
 
     /**
-     * @param array<string, string> $classmap
+     * @param array<string, string>                                                                 $classmap
+     * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
      */
     private static function domElementToValue(
         \DOMElement $el,
         bool $singleElementArrays = false,
-        array $classmap = []
+        array $classmap = [],
+        array $typemap = []
     ): mixed {
+        // typemap from_xml wins over structural decode (#21046; to_zval_user).
+        $typemapHit = self::matchTypemapFromXml($el, $typemap);
+        if (null !== $typemapHit) {
+            return $typemapHit;
+        }
+
         $childElements = [];
         foreach ($el->childNodes as $child) {
             if ($child instanceof \DOMElement) {
@@ -1245,9 +1415,9 @@ final class VmSoapClient
                 if (!\is_array($map[$key]) || !\array_is_list($map[$key])) {
                     $map[$key] = [$map[$key]];
                 }
-                $map[$key][] = self::domElementToValue($child, $singleElementArrays, $classmap);
+                $map[$key][] = self::domElementToValue($child, $singleElementArrays, $classmap, $typemap);
             } else {
-                $map[$key] = self::domElementToValue($child, $singleElementArrays, $classmap);
+                $map[$key] = self::domElementToValue($child, $singleElementArrays, $classmap, $typemap);
             }
             if ('item' !== $key) {
                 $list = false;
@@ -1265,17 +1435,49 @@ final class VmSoapClient
             }
         }
 
-        return self::maybeMappedObject($el, $map, $classmap);
+        return self::maybeMappedObject($el, $map, $classmap, $typemap);
+    }
+
+    /**
+     * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     */
+    private static function matchTypemapFromXml(\DOMElement $el, array $typemap): ?SoapTypemapFromXml
+    {
+        if ([] === $typemap) {
+            return null;
+        }
+        [$typeName, $typeNs] = self::xsiTypeNameAndNs($el);
+        if (null === $typeName) {
+            return null;
+        }
+        $entry = self::findTypemapEntry($typemap, $typeName, $typeNs ?? '');
+        if (null === $entry || null === $entry['from_xml']) {
+            return null;
+        }
+        $xml = $el->ownerDocument !== null
+            ? (string) $el->ownerDocument->saveXML($el)
+            : $el->C14N();
+
+        return new SoapTypemapFromXml($entry['from_xml'], $xml);
     }
 
     /**
      * php-src to_zval_object_ex: classmap keyed by type_str / xsi:type local name (#21044).
      *
-     * @param array<string, mixed>  $props
-     * @param array<string, string> $classmap
+     * @param array<string, mixed>                                                                  $props
+     * @param array<string, string>                                                                 $classmap
+     * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
      */
-    private static function maybeMappedObject(\DOMElement $el, array $props, array $classmap): mixed
-    {
+    private static function maybeMappedObject(
+        \DOMElement $el,
+        array $props,
+        array $classmap,
+        array $typemap = []
+    ): mixed {
+        $typemapHit = self::matchTypemapFromXml($el, $typemap);
+        if (null !== $typemapHit) {
+            return $typemapHit;
+        }
         if ([] !== $classmap) {
             $typeName = self::xsiTypeLocalName($el);
             if (null !== $typeName && isset($classmap[$typeName])) {
@@ -1286,30 +1488,46 @@ final class VmSoapClient
         return (object) $props;
     }
 
-    private static function xsiTypeLocalName(\DOMElement $el): ?string
+    /**
+     * @return array{0: ?string, 1: ?string} [localName, namespaceURI]
+     */
+    private static function xsiTypeNameAndNs(\DOMElement $el): array
     {
         $xsi = $el->getAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'type');
         if ('' === $xsi) {
-            // Some fixtures omit xmlns:xsi and use a prefixed attribute only.
             $xsi = $el->getAttribute('xsi:type');
         }
         if ('' === $xsi) {
-            return null;
+            return [null, null];
         }
         $pos = \strrpos($xsi, ':');
         if (false !== $pos) {
-            return \substr($xsi, $pos + 1);
+            $prefix = \substr($xsi, 0, $pos);
+            $local = \substr($xsi, $pos + 1);
+            $ns = $el->lookupNamespaceURI($prefix);
+
+            return [$local, $ns !== null && '' !== $ns ? $ns : null];
         }
 
-        return $xsi;
+        return [$xsi, null];
+    }
+
+    private static function xsiTypeLocalName(\DOMElement $el): ?string
+    {
+        [$local] = self::xsiTypeNameAndNs($el);
+
+        return $local;
     }
 
     private static function importValue(mixed $value, Context $ctx): Variable
     {
+        if ($value instanceof SoapTypemapFromXml) {
+            return self::importTypemapFromXml($value, $ctx);
+        }
         if ($value instanceof SoapMappedObject) {
             return self::importMappedObject($value, $ctx);
         }
-        // Nested SoapMappedObject cannot survive json_encode — walk the tree (#21044).
+        // Nested SoapMappedObject / typemap cannot survive json_encode — walk the tree (#21044).
         if ($value instanceof \stdClass || \is_array($value)) {
             return self::importDecodedTree($value, $ctx);
         }
@@ -1322,11 +1540,23 @@ final class VmSoapClient
         return $var;
     }
 
+    private static function importTypemapFromXml(SoapTypemapFromXml $mapped, Context $ctx): Variable
+    {
+        $fn = VmUserCall::resolveStringCallback($ctx, $mapped->callback);
+        $arg = new Variable();
+        $arg->string($mapped->xml);
+
+        return VmUserCall::invokeOne($ctx, $fn, $arg);
+    }
+
     /**
      * @param \stdClass|array<mixed> $value
      */
     private static function importDecodedTree(mixed $value, Context $ctx): Variable
     {
+        if ($value instanceof SoapTypemapFromXml) {
+            return self::importTypemapFromXml($value, $ctx);
+        }
         if ($value instanceof SoapMappedObject) {
             return self::importMappedObject($value, $ctx);
         }
@@ -1463,7 +1693,65 @@ final class VmSoapClient
             throw new \TypeError('SoapClient::__soapCall(): Argument #2 ($arguments) must be of type array');
         }
 
-        return VmJson::export($argsVar, $frame?->vmContext ?? null, null, $frame);
+        return self::exportArgTree($argsVar, $frame);
+    }
+
+    /**
+     * Export __soapCall argv with SoapVar → enc_* bags for typemap to_xml (#21046).
+     */
+    private static function exportArgTree(Variable $var, ?Frame $frame): mixed
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $obj = $var->toObject();
+            if (\strtolower($obj->class->name) === 'soapvar') {
+                return [
+                    'enc_type' => $obj->hasProperty('enc_type')
+                        ? self::exportArgTree($obj->getProperty('enc_type'), $frame)
+                        : null,
+                    'enc_value' => $obj->hasProperty('enc_value')
+                        ? self::exportArgTree($obj->getProperty('enc_value'), $frame)
+                        : null,
+                    'enc_stype' => $obj->hasProperty('enc_stype')
+                        ? self::exportArgTree($obj->getProperty('enc_stype'), $frame)
+                        : null,
+                    'enc_ns' => $obj->hasProperty('enc_ns')
+                        ? self::exportArgTree($obj->getProperty('enc_ns'), $frame)
+                        : null,
+                    'enc_name' => $obj->hasProperty('enc_name')
+                        ? self::exportArgTree($obj->getProperty('enc_name'), $frame)
+                        : null,
+                    'enc_namens' => $obj->hasProperty('enc_namens')
+                        ? self::exportArgTree($obj->getProperty('enc_namens'), $frame)
+                        : null,
+                ];
+            }
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            $assoc = [];
+            $list = [];
+            $isList = true;
+            $i = 0;
+            foreach ($var->toArray()->iterateKeyed(true) as [$key, $value]) {
+                $k = $key->resolveIndirect();
+                $exported = self::exportArgTree($value, $frame);
+                if (Variable::TYPE_INTEGER === $k->type && $k->toInt() === $i) {
+                    $list[] = $exported;
+                    ++$i;
+                } else {
+                    $isList = false;
+                }
+                if (Variable::TYPE_STRING === $k->type) {
+                    $assoc[$k->toString()] = $exported;
+                } elseif (Variable::TYPE_INTEGER === $k->type) {
+                    $assoc[$k->toInt()] = $exported;
+                }
+            }
+
+            return $isList ? $list : $assoc;
+        }
+
+        return VmJson::export($var, $frame?->vmContext ?? null, null, $frame);
     }
 }
 
@@ -1538,6 +1826,13 @@ final class SoapClientState
      */
     public array $classmap = [];
 
+    /**
+     * php-src typemap entries (#21046).
+     *
+     * @var list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}>
+     */
+    public array $typemap = [];
+
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
     public int $style = SoapConstants::SOAP_RPC;
@@ -1581,6 +1876,20 @@ final class SoapMappedObject
     public function __construct(
         public readonly string $className,
         public readonly array $properties,
+    ) {
+    }
+}
+
+/**
+ * Decode-time stand-in for typemap from_xml (php-src to_zval_user; #21046).
+ *
+ * @internal
+ */
+final class SoapTypemapFromXml
+{
+    public function __construct(
+        public readonly string $callback,
+        public readonly string $xml,
     ) {
     }
 }
