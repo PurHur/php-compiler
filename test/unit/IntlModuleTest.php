@@ -249,6 +249,38 @@ PHP;
         );
     }
 
+    public function test_breakiterator_codepoint_via_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerBreakIterator($runtime->vmContext);
+        $code = <<<'PHP'
+<?php
+echo (int) class_exists('IntlCodePointBreakIterator', false), "\n";
+echo (int) method_exists('IntlBreakIterator', 'createCodePointInstance'), "\n";
+$bi = IntlBreakIterator::createCodePointInstance();
+echo get_class($bi), "\n";
+$bi->setText("A\u{1F600}B");
+$out = [];
+for ($p = $bi->first(); $p !== IntlBreakIterator::DONE; $p = $bi->next()) {
+    $out[] = $p;
+}
+echo json_encode($out), "\n";
+$bi2 = IntlBreakIterator::createCodePointInstance();
+$bi2->setText("A\u{1F600}B");
+$bi2->first();
+echo $bi2->getLastCodePoint(), "\n";
+echo $bi2->next(), ':', $bi2->getLastCodePoint(), "\n";
+echo $bi2->next(), ':', $bi2->getLastCodePoint(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_breakiterator_codepoint.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "1\n1\nIntlCodePointBreakIterator\n[0,1,5,6]\n-1\n1:65\n5:128512\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_locale_display_methods_via_vm(): void
     {
         if (!IntlExtensionPolicy::advertisesLocale()) {

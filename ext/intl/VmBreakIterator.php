@@ -15,21 +15,28 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * IntlBreakIterator / IntlRuleBasedBreakIterator / IntlPartsIterator — ICU ubrk_* via FFI + ASCII fallback (#6188).
+ * IntlBreakIterator / IntlRuleBasedBreakIterator / IntlCodePointBreakIterator / IntlPartsIterator —
+ * ICU ubrk_* via FFI + ASCII/code-point fallback (#6188 / #20822).
  *
- * php-src: ext/intl/breakiterator/breakiterator_class.c, breakiterator_methods.c, breakiterator_iterators.c
+ * php-src: ext/intl/breakiterator/breakiterator_class.c, breakiterator_methods.c,
+ * codepointiterator_internal.cpp, breakiterator_iterators.c
  * ICU: unicode/ubrk.h — versioned ubrk_open_N / ubrk_first_N / ubrk_next_N / ubrk_close_N
  */
 final class VmBreakIterator
 {
     public const CLASS_LC = 'intlbreakiterator';
     public const RULE_BASED_LC = 'intlrulebasedbreakiterator';
+    public const CODE_POINT_LC = 'intlcodepointbreakiterator';
     public const PARTS_LC = 'intlpartsiterator';
     public const DONE = -1;
+    /** U_SENTINEL — php-src CodePointBreakIterator::lastCodePoint after first()/last()/DONE. */
+    public const LAST_CODE_POINT_SENTINEL = -1;
     private const UBRK_CHARACTER = 0;
     private const UBRK_WORD = 1;
     private const UBRK_LINE = 2;
     private const UBRK_SENTENCE = 3;
+    /** Synthetic type — not an ICU UBRK_*; UTF-8 code-point boundaries (#20822). */
+    private const UBRK_CODE_POINT = -10;
     /** ULOC_ACTUAL_LOCALE / ULOC_VALID_LOCALE — php-src Locale::ACTUAL_LOCALE / VALID_LOCALE */
     private const ULOC_ACTUAL_LOCALE = 0;
     private const ULOC_VALID_LOCALE = 1;
@@ -96,6 +103,18 @@ final class VmBreakIterator
         self::installInstanceMethods($rb, $pub);
         $ctx->classes[self::RULE_BASED_LC] = $rb;
 
+        $cp = new ClassEntry('IntlCodePointBreakIterator');
+        $cp->isInternal = true;
+        $cp->parentLc = self::CLASS_LC;
+        self::installConstants($cp);
+        $cp->properties[] = new ClassProperty(self::PROP_HANDLE, null, $strProto);
+        self::installFactories($cp, $pubStatic);
+        self::installInstanceMethods($cp, $pub);
+        $cp->methods['getlastcodepoint'] = new BreakIteratorGetLastCodePoint();
+        $cp->methodVisibility['getlastcodepoint'] = $pub;
+        $cp->methodNames['getlastcodepoint'] = 'getLastCodePoint';
+        $ctx->classes[self::CODE_POINT_LC] = $cp;
+
         $parts = new ClassEntry('IntlPartsIterator');
         $parts->isInternal = true;
         $parts->properties[] = new ClassProperty(self::PROP_HANDLE, null, $strProto);
@@ -129,6 +148,7 @@ final class VmBreakIterator
         $factories = [
             'createwordinstance' => [new BreakIteratorCreateWordInstance(), 'createWordInstance'],
             'createcharacterinstance' => [new BreakIteratorCreateCharacterInstance(), 'createCharacterInstance'],
+            'createcodepointinstance' => [new BreakIteratorCreateCodePointInstance(), 'createCodePointInstance'],
             'createlineinstance' => [new BreakIteratorCreateLineInstance(), 'createLineInstance'],
             'createsentenceinstance' => [new BreakIteratorCreateSentenceInstance(), 'createSentenceInstance'],
             'createtitleinstance' => [new BreakIteratorCreateTitleInstance(), 'createTitleInstance'],
@@ -167,7 +187,8 @@ final class VmBreakIterator
 
     public static function createInstance(Context $ctx, int $type, ?string $locale): ?ObjectEntry
     {
-        $class = $ctx->classes[self::RULE_BASED_LC] ?? null;
+        $classLc = self::UBRK_CODE_POINT === $type ? self::CODE_POINT_LC : self::RULE_BASED_LC;
+        $class = $ctx->classes[$classLc] ?? null;
         if (null === $class) {
             return null;
         }
@@ -182,6 +203,7 @@ final class VmBreakIterator
             'boundaries' => [0],
             'parts' => null,
             'index' => 0,
+            'lastCodePoint' => self::LAST_CODE_POINT_SENTINEL,
             'errorCode' => IntlError::U_ZERO_ERROR,
             'errorMessage' => 'U_ZERO_ERROR',
         ];
@@ -200,8 +222,18 @@ final class VmBreakIterator
         }
         $obj = $receiver->toObject();
         $lc = strtolower($obj->class->name);
-        if (self::CLASS_LC !== $lc && self::RULE_BASED_LC !== $lc) {
+        if (self::CLASS_LC !== $lc && self::RULE_BASED_LC !== $lc && self::CODE_POINT_LC !== $lc) {
             throw new \LogicException('Expected IntlBreakIterator instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireCodePointBreakIterator(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $obj = self::requireBreakIterator($frame, $receiver);
+        if (self::CODE_POINT_LC !== strtolower($obj->class->name)) {
+            throw new \LogicException('Expected IntlCodePointBreakIterator instance');
         }
 
         return $obj;
@@ -229,6 +261,7 @@ final class VmBreakIterator
         $st['text'] = $text;
         $st['boundaries'] = self::computeBoundaries((int) $st['type'], (string) $st['locale'], $text);
         $st['pos'] = $st['boundaries'][0] ?? 0;
+        $st['lastCodePoint'] = self::LAST_CODE_POINT_SENTINEL;
         self::clearObjectError($obj);
         IntlError::clear();
 
@@ -249,6 +282,7 @@ final class VmBreakIterator
     {
         $st = &self::stateRef($obj);
         $st['pos'] = $st['boundaries'][0] ?? 0;
+        $st['lastCodePoint'] = self::LAST_CODE_POINT_SENTINEL;
 
         return (int) $st['pos'];
     }
@@ -258,6 +292,7 @@ final class VmBreakIterator
         $st = &self::stateRef($obj);
         $bounds = $st['boundaries'];
         $st['pos'] = $bounds[\count($bounds) - 1] ?? 0;
+        $st['lastCodePoint'] = self::LAST_CODE_POINT_SENTINEL;
 
         return (int) $st['pos'];
     }
@@ -267,35 +302,32 @@ final class VmBreakIterator
         return (int) self::stateRef($obj)['pos'];
     }
 
+    public static function getLastCodePoint(ObjectEntry $obj): int
+    {
+        $st = self::stateRef($obj);
+
+        return (int) ($st['lastCodePoint'] ?? self::LAST_CODE_POINT_SENTINEL);
+    }
+
     public static function nextPos(ObjectEntry $obj, ?int $offset = null): int
     {
         $st = &self::stateRef($obj);
         $bounds = $st['boundaries'];
-        if (null !== $offset) {
-            foreach ($bounds as $b) {
-                if ($b > $offset) {
-                    $st['pos'] = $b;
-                    self::clearObjectError($obj);
-                    IntlError::clear();
-
-                    return (int) $b;
-                }
-            }
-            $st['pos'] = self::DONE;
-            self::clearObjectError($obj);
-            IntlError::clear();
-
-            return self::DONE;
-        }
-        $cur = (int) $st['pos'];
+        $from = null !== $offset ? $offset : (int) $st['pos'];
         foreach ($bounds as $b) {
-            if ($b > $cur) {
+            if ($b > $from) {
                 $st['pos'] = $b;
+                $st['lastCodePoint'] = self::codePointBetween((string) $st['text'], $from, (int) $b);
+                self::clearObjectError($obj);
+                IntlError::clear();
 
                 return (int) $b;
             }
         }
         $st['pos'] = self::DONE;
+        $st['lastCodePoint'] = self::LAST_CODE_POINT_SENTINEL;
+        self::clearObjectError($obj);
+        IntlError::clear();
 
         return self::DONE;
     }
@@ -312,7 +344,13 @@ final class VmBreakIterator
             }
             $prev = (int) $b;
         }
-        $st['pos'] = $prev;
+        if (self::DONE === $prev) {
+            $st['pos'] = self::DONE;
+            $st['lastCodePoint'] = self::LAST_CODE_POINT_SENTINEL;
+        } else {
+            $st['lastCodePoint'] = self::codePointBetween((string) $st['text'], $prev, $cur);
+            $st['pos'] = $prev;
+        }
 
         return $prev;
     }
@@ -331,7 +369,13 @@ final class VmBreakIterator
             }
             $prev = $b;
         }
-        $st['pos'] = $prev;
+        if (self::DONE === $prev) {
+            $st['pos'] = self::DONE;
+            $st['lastCodePoint'] = self::LAST_CODE_POINT_SENTINEL;
+        } else {
+            $st['lastCodePoint'] = self::codePointEndingAt((string) $st['text'], $prev);
+            $st['pos'] = $prev;
+        }
         self::clearObjectError($obj);
         IntlError::clear();
 
@@ -364,6 +408,9 @@ final class VmBreakIterator
             }
         }
         $st['pos'] = $atOrAfter;
+        if (self::UBRK_CODE_POINT === (int) $st['type']) {
+            $st['lastCodePoint'] = self::LAST_CODE_POINT_SENTINEL;
+        }
         self::clearObjectError($obj);
         IntlError::clear();
 
@@ -477,6 +524,10 @@ final class VmBreakIterator
     /** @return list<int> */
     private static function computeBoundaries(int $type, string $locale, string $text): array
     {
+        if (self::UBRK_CODE_POINT === $type) {
+            // Never use UBRK_CHARACTER (grapheme clusters) — code points only (#20822).
+            return self::fallbackBoundaries(self::UBRK_CODE_POINT, $text);
+        }
         $icu = self::icuBoundaries($type, $locale, $text);
         if (null !== $icu) {
             return $icu;
@@ -535,7 +586,7 @@ final class VmBreakIterator
         if (0 === $len) {
             return [0];
         }
-        if (self::UBRK_CHARACTER === $type) {
+        if (self::UBRK_CHARACTER === $type || self::UBRK_CODE_POINT === $type) {
             $bounds = [0];
             $i = 0;
             while ($i < $len) {
@@ -685,6 +736,61 @@ C;
     public static function typeCharacter(): int { return self::UBRK_CHARACTER; }
     public static function typeLine(): int { return self::UBRK_LINE; }
     public static function typeSentence(): int { return self::UBRK_SENTENCE; }
+    public static function typeCodePoint(): int { return self::UBRK_CODE_POINT; }
+
+    /**
+     * Decode the single UTF-8 code point spanning [$from, $to) (php-src UTEXT_NEXT32).
+     */
+    private static function codePointBetween(string $text, int $from, int $to): int
+    {
+        if ($from < 0 || $to <= $from || $from >= \strlen($text)) {
+            return self::LAST_CODE_POINT_SENTINEL;
+        }
+        $slice = substr($text, $from, $to - $from);
+        $cp = self::utf8CodePointAt($slice, 0);
+
+        return null === $cp ? self::LAST_CODE_POINT_SENTINEL : $cp;
+    }
+
+    /** Code point that ends at byte offset $end (for preceding). */
+    private static function codePointEndingAt(string $text, int $end): int
+    {
+        if ($end <= 0 || $end > \strlen($text)) {
+            return self::LAST_CODE_POINT_SENTINEL;
+        }
+        $i = $end - 1;
+        while ($i > 0 && (\ord($text[$i]) & 0xC0) === 0x80) {
+            --$i;
+        }
+
+        return self::codePointBetween($text, $i, $end);
+    }
+
+    private static function utf8CodePointAt(string $s, int $i): ?int
+    {
+        $len = \strlen($s);
+        if ($i >= $len) {
+            return null;
+        }
+        $c = \ord($s[$i]);
+        if ($c < 0x80) {
+            return $c;
+        }
+        if (($c & 0xE0) === 0xC0 && $i + 1 < $len) {
+            return (($c & 0x1F) << 6) | (\ord($s[$i + 1]) & 0x3F);
+        }
+        if (($c & 0xF0) === 0xE0 && $i + 2 < $len) {
+            return (($c & 0x0F) << 12) | ((\ord($s[$i + 1]) & 0x3F) << 6) | (\ord($s[$i + 2]) & 0x3F);
+        }
+        if (($c & 0xF8) === 0xF0 && $i + 3 < $len) {
+            return (($c & 0x07) << 18)
+                | ((\ord($s[$i + 1]) & 0x3F) << 12)
+                | ((\ord($s[$i + 2]) & 0x3F) << 6)
+                | (\ord($s[$i + 3]) & 0x3F);
+        }
+
+        return 0xFFFD;
+    }
 
     public static function coerceLocaleArg(?Variable $arg): ?string
     {
@@ -739,6 +845,35 @@ final class BreakIteratorCreateCharacterInstance extends BreakIteratorFactoryMet
     public function __construct() { parent::__construct('createCharacterInstance'); }
     protected function breakType(): int { return VmBreakIterator::typeCharacter(); }
 }
+
+/** IntlBreakIterator::createCodePointInstance() — php-src codepointiterator; #20822. */
+final class BreakIteratorCreateCodePointInstance extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('createCodePointInstance');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlBreakIterator::createCodePointInstance() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        $ctx = $frame->vmContext ?? null;
+        if (null === $ctx) {
+            throw new \LogicException('IntlBreakIterator factory requires VM context');
+        }
+        $obj = VmBreakIterator::createInstance($ctx, VmBreakIterator::typeCodePoint(), null);
+        if (null !== $frame->returnVar) {
+            null === $obj ? $frame->returnVar->null() : $frame->returnVar->object($obj);
+        }
+    }
+}
+
 final class BreakIteratorCreateLineInstance extends BreakIteratorFactoryMethod
 {
     public function __construct() { parent::__construct('createLineInstance'); }
@@ -786,6 +921,30 @@ final class BreakIteratorGetText extends VmClassMethod
         $text = VmBreakIterator::getText($obj);
         if (null !== $frame->returnVar) {
             null === $text ? $frame->returnVar->null() : $frame->returnVar->string($text);
+        }
+    }
+}
+
+/** IntlCodePointBreakIterator::getLastCodePoint() — php-src codepointiterator_methods.cpp; #20822. */
+final class BreakIteratorGetLastCodePoint extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getLastCodePoint');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlCodePointBreakIterator::getLastCodePoint() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $obj = VmBreakIterator::requireCodePointBreakIterator($frame, $frame->calledArgs[0]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmBreakIterator::getLastCodePoint($obj));
         }
     }
 }

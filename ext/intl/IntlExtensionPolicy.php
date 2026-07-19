@@ -194,7 +194,7 @@ final class IntlExtensionPolicy
     }
 
     /**
-     * IntlBreakIterator / IntlRuleBasedBreakIterator / IntlPartsIterator — require loaded ext/intl (#6188, #19670).
+     * IntlBreakIterator / IntlRuleBasedBreakIterator / IntlCodePointBreakIterator / IntlPartsIterator — require loaded ext/intl (#6188, #19670, #20822).
      */
     public static function advertisesBreakIterator(): bool
     {
