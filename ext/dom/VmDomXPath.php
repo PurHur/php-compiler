@@ -674,6 +674,26 @@ final class VmDomXPath
 
             return self::collectDescendantAttributeNodes($ctx, $document, $matches[1], $namespaces, null, null);
         }
+        // //tag[@attr='v']/@name — predicate then attribute axis (#21148).
+        if (preg_match(
+            '~^//([*\w][\w:-]*)\[@([^\]=]+)=["\']([^"\']*)["\']\]/@([\w.-]+)$~',
+            $expression,
+            $matches
+        )) {
+            $document = self::ownerDocumentOrSelf($context) ?? $context;
+            $elementIds = self::collectDescendantElements($document, $matches[1], $namespaces);
+            $elementIds = array_values(array_filter(
+                $elementIds,
+                static fn (int $id): bool => self::elementAttributeEquals(
+                    DomRegistry::entry($id),
+                    $matches[2],
+                    $matches[3],
+                    $namespaces
+                )
+            ));
+
+            return self::attributeIdsFromElementIds($ctx, $elementIds, $matches[4], $namespaces);
+        }
         // //tag/@attr or //tag[n]/@attr — document-scoped (#21125).
         if (preg_match('~^//([*\w][\w:-]*)(?:\[(\d+)\])?/@([\w.-]+)$~', $expression, $matches)) {
             $position = isset($matches[2]) && '' !== $matches[2] ? (int) $matches[2] : null;
@@ -688,8 +708,42 @@ final class VmDomXPath
                 $position
             );
         }
+        // /seg/.../@attr — absolute element path then attribute step (#21148).
+        if (preg_match('~^/(.+)/@([\w.-]+)$~', $expression, $matches)) {
+            $elementIds = self::evaluateAbsolutePath($context, $matches[1], $namespaces);
+
+            return self::attributeIdsFromElementIds($ctx, $elementIds, $matches[2], $namespaces);
+        }
 
         return null;
+    }
+
+    /**
+     * @param list<int>             $elementIds
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function attributeIdsFromElementIds(
+        Context $ctx,
+        array $elementIds,
+        string $attrName,
+        array $namespaces
+    ): array {
+        $attrIds = [];
+        foreach ($elementIds as $elementId) {
+            $element = DomRegistry::entry($elementId);
+            if (null === $element || !VmDom::isElement($element)) {
+                continue;
+            }
+            $attr = self::attributeNodeFromElement($ctx, $element, $attrName, $namespaces);
+            if (null === $attr) {
+                continue;
+            }
+            $attrIds[] = $attr->id;
+        }
+
+        return $attrIds;
     }
 
     /**
@@ -2174,11 +2228,12 @@ final class VmDomXPath
                 $quote = $ch;
                 continue;
             }
-            if ('(' === $ch) {
+            // Skip ops inside () calls and [] predicates (#21148 — [@id="…"] is not a comparison).
+            if ('(' === $ch || '[' === $ch) {
                 ++$depth;
                 continue;
             }
-            if (')' === $ch) {
+            if (')' === $ch || ']' === $ch) {
                 --$depth;
                 continue;
             }
@@ -2225,11 +2280,11 @@ final class VmDomXPath
                 $quote = $ch;
                 continue;
             }
-            if ('(' === $ch) {
+            if ('(' === $ch || '[' === $ch) {
                 ++$depth;
                 continue;
             }
-            if (')' === $ch) {
+            if (')' === $ch || ']' === $ch) {
                 --$depth;
                 continue;
             }
@@ -2305,11 +2360,11 @@ final class VmDomXPath
                 $quote = $ch;
                 continue;
             }
-            if ('(' === $ch) {
+            if ('(' === $ch || '[' === $ch) {
                 ++$depth;
                 continue;
             }
-            if (')' === $ch) {
+            if (')' === $ch || ']' === $ch) {
                 --$depth;
                 continue;
             }
@@ -2818,12 +2873,12 @@ final class VmDomXPath
                 $buf .= $ch;
                 continue;
             }
-            if ('(' === $ch) {
+            if ('(' === $ch || '[' === $ch) {
                 ++$depth;
                 $buf .= $ch;
                 continue;
             }
-            if (')' === $ch) {
+            if (')' === $ch || ']' === $ch) {
                 --$depth;
                 $buf .= $ch;
                 continue;
