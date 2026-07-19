@@ -26,6 +26,9 @@ final class VmUri
     public const CLASS_WHATWG_URL_VALIDATION_ERROR = 'uri\\whatwg\\urlvalidationerror';
     public const CLASS_WHATWG_URL_VALIDATION_ERROR_TYPE = 'uri\\whatwg\\urlvalidationerrortype';
     public const CLASS_WHATWG_URL_HOST_TYPE = 'uri\\whatwg\\urlhosttype';
+    public const CLASS_RFC3986_URI_BUILDER = 'uri\\rfc3986\\uribuilder';
+    public const CLASS_RFC3986_URI_TYPE = 'uri\\rfc3986\\uritype';
+    public const CLASS_RFC3986_URI_HOST_TYPE = 'uri\\rfc3986\\urihosttype';
 
     /** WHATWG special schemes (url.spec.whatwg.org/#is-special). */
     public const SPECIAL_SCHEMES = ['ftp', 'file', 'http', 'https', 'ws', 'wss'];
@@ -35,6 +38,9 @@ final class VmUri
 
     /** @var array<int, array<string, mixed>> */
     private static array $whatWgState = [];
+
+    /** @var array<int, array<string, mixed>> */
+    private static array $builderState = [];
 
     /**
      * @return array{scheme: ?string, userinfo: ?string, host: ?string, port: ?int, path: string, query: ?string, fragment: ?string}|null
@@ -415,6 +421,157 @@ final class VmUri
     public static function whatWgState(ObjectEntry $object): array
     {
         return self::$whatWgState[$object->id] ?? throw new \LogicException('Url state missing');
+    }
+
+    /**
+     * Classify RFC 3986 UriType for getUriType() (#20950).
+     *
+     * @param array<string, mixed> $state
+     *
+     * @return 'Uri'|'NetworkPathReference'|'AbsolutePathReference'|'RelativePathReference'
+     */
+    public static function rfc3986UriType(array $state): string
+    {
+        $scheme = $state['scheme'] ?? null;
+        if (\is_string($scheme) && '' !== $scheme) {
+            return 'Uri';
+        }
+        $host = $state['host'] ?? null;
+        if (null !== $host) {
+            return 'NetworkPathReference';
+        }
+        $path = (string) ($state['path'] ?? '');
+        if (str_starts_with($path, '/')) {
+            return 'AbsolutePathReference';
+        }
+
+        return 'RelativePathReference';
+    }
+
+    /**
+     * Classify RFC 3986 host type for getHostType() (#20950).
+     *
+     * @return 'IPv4'|'IPv6'|'IPvFuture'|'RegisteredName'|null
+     */
+    public static function rfc3986HostType(?string $host): ?string
+    {
+        if (null === $host) {
+            return null;
+        }
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            $inner = substr($host, 1, -1);
+            if (str_starts_with(strtolower($inner), 'v')) {
+                return 'IPvFuture';
+            }
+
+            return 'IPv6';
+        }
+        if ('' !== $host && false !== filter_var($host, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV4)) {
+            return 'IPv4';
+        }
+
+        return 'RegisteredName';
+    }
+
+    public static function rfc3986Resolve(Context $ctx, ObjectEntry $base, string $ref): Variable
+    {
+        $resolved = self::resolveWhatWgParts(self::rfc3986State($base), $ref);
+        if (null === $resolved) {
+            throw new \Uri\InvalidUriException('Unable to resolve URI');
+        }
+
+        return self::newRfc3986UriVariable($ctx, $resolved);
+    }
+
+    public static function emptyBuilderState(): array
+    {
+        return [
+            'scheme' => null,
+            'username' => null,
+            'password' => null,
+            'userinfo' => null,
+            'host' => null,
+            'port' => null,
+            'path' => '',
+            'query' => null,
+            'fragment' => null,
+        ];
+    }
+
+    public static function newUriBuilderVariable(Context $ctx): Variable
+    {
+        $class = self::requireClass($ctx, self::CLASS_RFC3986_URI_BUILDER, 'Uri\\Rfc3986\\UriBuilder');
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        self::$builderState[$entry->id] = self::emptyBuilderState();
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    public static function builderState(ObjectEntry $object): array
+    {
+        return self::$builderState[$object->id] ?? throw new \LogicException('UriBuilder state missing');
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    public static function builderApply(ObjectEntry $object, array $overrides): void
+    {
+        $state = self::builderState($object);
+        foreach ($overrides as $key => $value) {
+            $state[$key] = $value;
+        }
+        if (\array_key_exists('userinfo', $overrides)) {
+            $ui = $overrides['userinfo'];
+            if (null === $ui || '' === $ui) {
+                $state['username'] = null;
+                $state['password'] = null;
+                $state['userinfo'] = null;
+            } elseif (\is_string($ui)) {
+                $colon = strpos($ui, ':');
+                if (false === $colon) {
+                    $state['username'] = $ui;
+                    $state['password'] = null;
+                } else {
+                    $state['username'] = substr($ui, 0, $colon);
+                    $state['password'] = substr($ui, $colon + 1);
+                }
+                $state['userinfo'] = self::composeUserinfo($state['username'], $state['password']);
+            }
+        }
+        if (\array_key_exists('scheme', $overrides) && \is_string($state['scheme'])) {
+            $state['scheme'] = strtolower($state['scheme']);
+        }
+        self::$builderState[$object->id] = $state;
+    }
+
+    public static function builderReset(ObjectEntry $object): void
+    {
+        self::$builderState[$object->id] = self::emptyBuilderState();
+    }
+
+    public static function builderBuild(Context $ctx, ObjectEntry $builder, ?ObjectEntry $baseUri): Variable
+    {
+        $state = self::builderState($builder);
+        if (null !== $baseUri) {
+            $empty = self::emptyBuilderState();
+            $merged = self::rfc3986State($baseUri);
+            foreach ($state as $key => $value) {
+                if (($empty[$key] ?? null) !== $value) {
+                    $merged[$key] = $value;
+                }
+            }
+            $merged['userinfo'] = self::composeUserinfo(
+                isset($merged['username']) && \is_string($merged['username']) ? $merged['username'] : null,
+                isset($merged['password']) && \is_string($merged['password']) ? $merged['password'] : null
+            );
+            $state = $merged;
+        }
+
+        return self::newRfc3986UriVariable($ctx, $state);
     }
 
     private static function requireClass(Context $ctx, string $lc, string $label): ClassEntry

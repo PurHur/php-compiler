@@ -27,6 +27,7 @@ final class BuiltinClasses
         self::registerExceptions($ctx);
         self::registerEnums($ctx);
         self::registerRfc3986Uri($ctx);
+        self::registerRfc3986UriBuilder($ctx);
         self::registerWhatWgUrl($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
@@ -206,12 +207,46 @@ final class BuiltinClasses
             'withquery' => new Rfc3986UriWithQuery(),
             'withfragment' => new Rfc3986UriWithFragment(),
             'withuserinfo' => new Rfc3986UriWithUserInfo(),
+            'geturitype' => new Rfc3986UriGetUriType(),
+            'gethosttype' => new Rfc3986UriGetHostType(),
+            'resolve' => new Rfc3986UriResolve(),
+            'equals' => new Rfc3986UriEquals(),
         ] as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
         }
 
         $ctx->classes[VmUri::CLASS_RFC3986_URI] = $entry;
+    }
+
+    private static function registerRfc3986UriBuilder(Context $ctx): void
+    {
+        if (isset($ctx->classes[VmUri::CLASS_RFC3986_URI_BUILDER])) {
+            return;
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry = new ClassEntry('Uri\\Rfc3986\\UriBuilder');
+        $ctor = new Rfc3986UriBuilderConstruct();
+        $entry->constructor = $ctor;
+        $entry->methods['__construct'] = $ctor;
+        $entry->methodVisibility['__construct'] = $pub;
+        foreach ([
+            'reset' => new Rfc3986UriBuilderReset(),
+            'setscheme' => new Rfc3986UriBuilderSetScheme(),
+            'setuserinfo' => new Rfc3986UriBuilderSetUserInfo(),
+            'sethost' => new Rfc3986UriBuilderSetHost(),
+            'setport' => new Rfc3986UriBuilderSetPort(),
+            'setpath' => new Rfc3986UriBuilderSetPath(),
+            'setquery' => new Rfc3986UriBuilderSetQuery(),
+            'setfragment' => new Rfc3986UriBuilderSetFragment(),
+            'build' => new Rfc3986UriBuilderBuild(),
+        ] as $name => $method) {
+            $entry->methods[$name] = $method;
+            $entry->methodVisibility[$name] = $pub;
+        }
+
+        $ctx->classes[VmUri::CLASS_RFC3986_URI_BUILDER] = $entry;
     }
 
     private static function registerWhatWgUrl(Context $ctx): void
