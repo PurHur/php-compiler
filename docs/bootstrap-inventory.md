@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5977 |
-| Phase A inventory files (M2 ratio SSOT) | 5977 |
+| PHP files on vm.php path | 5987 |
+| Phase A inventory files (M2 ratio SSOT) | 5987 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18326 |
+| Source constructs flagged (warnings) | 18366 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -845,7 +845,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 160 |
+| `ext/intl/Module.php` | 0 | 170 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -934,9 +934,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intlcal_get_day_of_week_type.php` | 0 | 3 |
 | `ext/intl/intlcal_get_error_code.php` | 0 | 3 |
 | `ext/intl/intlcal_get_error_message.php` | 0 | 3 |
+| `ext/intl/intlcal_get_first_day_of_week.php` | 0 | 3 |
 | `ext/intl/intlcal_get_greatest_minimum.php` | 0 | 3 |
+| `ext/intl/intlcal_get_keyword_values_for_locale.php` | 0 | 3 |
 | `ext/intl/intlcal_get_least_maximum.php` | 0 | 3 |
+| `ext/intl/intlcal_get_locale.php` | 0 | 3 |
 | `ext/intl/intlcal_get_maximum.php` | 0 | 3 |
+| `ext/intl/intlcal_get_minimal_days_in_first_week.php` | 0 | 3 |
 | `ext/intl/intlcal_get_minimum.php` | 0 | 3 |
 | `ext/intl/intlcal_get_now.php` | 0 | 3 |
 | `ext/intl/intlcal_get_repeated_wall_time_option.php` | 0 | 3 |
@@ -945,10 +949,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intlcal_get_time_zone.php` | 0 | 3 |
 | `ext/intl/intlcal_get_type.php` | 0 | 3 |
 | `ext/intl/intlcal_get_weekend_transition.php` | 0 | 3 |
+| `ext/intl/intlcal_in_daylight_time.php` | 0 | 3 |
+| `ext/intl/intlcal_is_equivalent_to.php` | 0 | 3 |
+| `ext/intl/intlcal_is_lenient.php` | 0 | 3 |
 | `ext/intl/intlcal_is_set.php` | 0 | 3 |
 | `ext/intl/intlcal_is_weekend.php` | 0 | 3 |
 | `ext/intl/intlcal_roll.php` | 0 | 3 |
 | `ext/intl/intlcal_set.php` | 0 | 3 |
+| `ext/intl/intlcal_set_first_day_of_week.php` | 0 | 3 |
+| `ext/intl/intlcal_set_lenient.php` | 0 | 3 |
+| `ext/intl/intlcal_set_minimal_days_in_first_week.php` | 0 | 3 |
 | `ext/intl/intlcal_set_repeated_wall_time_option.php` | 0 | 3 |
 | `ext/intl/intlcal_set_skipped_wall_time_option.php` | 0 | 3 |
 | `ext/intl/intlcal_set_time.php` | 0 | 3 |
@@ -11852,34 +11862,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new intlcal_set_skipped_wall_time_option (line 255)
 - new intlcal_get_error_code (line 256)
 - new intlcal_get_error_message (line 257)
-- new intltz_get_gmt (line 259)
-- new intltz_create_time_zone (line 260)
-- new intltz_create_default (line 261)
-- new intltz_get_id (line 262)
-- new intltz_get_display_name (line 263)
-- new intltz_get_raw_offset (line 264)
-- new intltz_get_dst_savings (line 265)
-- new intltz_from_date_time_zone (line 266)
-- new intltz_to_date_time_zone (line 267)
-- new intltz_get_canonical_id (line 268)
-- new intltz_get_region (line 269)
-- new grapheme_strlen (line 300)
-- new grapheme_substr (line 301)
-- new grapheme_strpos (line 302)
-- new grapheme_str_contains (line 303)
-- new grapheme_strstr (line 304)
-- new grapheme_stristr (line 305)
-- new grapheme_stripos (line 306)
-- new grapheme_strrpos (line 307)
-- new grapheme_strripos (line 308)
-- new grapheme_extract (line 309)
-- new grapheme_levenshtein (line 310)
-- new grapheme_str_split (line 311)
-- new grapheme_strimwidth (line 312)
-- new intl_get_error_code (line 313)
-- new intl_get_error_message (line 314)
-- new intl_is_failure (line 315)
-- new intl_error_name (line 316)
+- new intlcal_get_locale (line 259)
+- new intlcal_is_lenient (line 260)
+- new intlcal_set_lenient (line 261)
+- new intlcal_in_daylight_time (line 262)
+- new intlcal_get_first_day_of_week (line 263)
+- new intlcal_set_first_day_of_week (line 264)
+- new intlcal_get_minimal_days_in_first_week (line 265)
+- new intlcal_set_minimal_days_in_first_week (line 266)
+- new intlcal_get_keyword_values_for_locale (line 267)
+- new intlcal_is_equivalent_to (line 268)
+- new intltz_get_gmt (line 270)
+- new intltz_create_time_zone (line 271)
+- new intltz_create_default (line 272)
+- new intltz_get_id (line 273)
+- new intltz_get_display_name (line 274)
+- new intltz_get_raw_offset (line 275)
+- new intltz_get_dst_savings (line 276)
+- new intltz_from_date_time_zone (line 277)
+- new intltz_to_date_time_zone (line 278)
+- new intltz_get_canonical_id (line 279)
+- new intltz_get_region (line 280)
+- new grapheme_strlen (line 311)
+- new grapheme_substr (line 312)
+- new grapheme_strpos (line 313)
+- new grapheme_str_contains (line 314)
+- new grapheme_strstr (line 315)
+- new grapheme_stristr (line 316)
+- new grapheme_stripos (line 317)
+- new grapheme_strrpos (line 318)
+- new grapheme_strripos (line 319)
+- new grapheme_extract (line 320)
+- new grapheme_levenshtein (line 321)
+- new grapheme_str_split (line 322)
+- new grapheme_strimwidth (line 323)
+- new intl_get_error_code (line 324)
+- new intl_get_error_message (line 325)
+- new intl_is_failure (line 326)
+- new intl_error_name (line 327)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -13128,11 +13148,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 60)
 - 2 class method(s)
 
+### `ext/intl/intlcal_get_first_day_of_week.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
+- 2 class method(s)
+
 ### `ext/intl/intlcal_get_greatest_minimum.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - new Error (line 61)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_keyword_values_for_locale.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 63)
 - 2 class method(s)
 
 ### `ext/intl/intlcal_get_least_maximum.php`
@@ -13142,7 +13176,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 61)
 - 2 class method(s)
 
+### `ext/intl/intlcal_get_locale.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 61)
+- 2 class method(s)
+
 ### `ext/intl/intlcal_get_maximum.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_minimal_days_in_first_week.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
@@ -13205,6 +13253,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 61)
 - 2 class method(s)
 
+### `ext/intl/intlcal_in_daylight_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 54)
+- 2 class method(s)
+
+### `ext/intl/intlcal_is_equivalent_to.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 62)
+- 2 class method(s)
+
+### `ext/intl/intlcal_is_lenient.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 54)
+- 2 class method(s)
+
 ### `ext/intl/intlcal_is_set.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13231,6 +13300,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
 - new Error (line 74)
+- 2 class method(s)
+
+### `ext/intl/intlcal_set_first_day_of_week.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/intlcal_set_lenient.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 57)
+- 2 class method(s)
+
+### `ext/intl/intlcal_set_minimal_days_in_first_week.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 56)
 - 2 class method(s)
 
 ### `ext/intl/intlcal_set_repeated_wall_time_option.php`
