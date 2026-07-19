@@ -241,6 +241,18 @@ class Module extends ModuleAbstract
                 new intlcal_get_minimum(),
                 new intlcal_get_maximum(),
                 new intlcal_get_available_locales(),
+                // IntlTimeZone procedural aliases (php-src timezone.stub.php @alias; #20859)
+                new intltz_get_gmt(),
+                new intltz_create_time_zone(),
+                new intltz_create_default(),
+                new intltz_get_id(),
+                new intltz_get_display_name(),
+                new intltz_get_raw_offset(),
+                new intltz_get_dst_savings(),
+                new intltz_from_date_time_zone(),
+                new intltz_to_date_time_zone(),
+                new intltz_get_canonical_id(),
+                new intltz_get_region(),
             ]
             : [];
 
