@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\VM\BuiltinClasses;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
@@ -70,6 +71,9 @@ final class DomLivingBuiltinClasses
         // Dom\AdjacentPosition — insertAdjacent* where (php-src php_dom.stub.php; #20782).
         DomAdjacentPositionEnum::register($ctx);
 
+        // Dom\ParentNode / Dom\ChildNode — living interfaces (php-src php_dom.stub.php; #20961).
+        self::registerParentAndChildNodeInterfaces($ctx);
+
         // Dom\NamespaceInfo — getInScopeNamespaces / getDescendantNamespaces entries (#20924).
         $nsInfo = new ClassEntry('Dom\\NamespaceInfo');
         $nsInfo->isInternal = true;
@@ -108,6 +112,7 @@ final class DomLivingBuiltinClasses
         $documentType = new ClassEntry('Dom\\DocumentType');
         $documentType->isInternal = true;
         $documentType->parentLc = VmDomLiving::CLASS_NODE;
+        $documentType->interfaces[] = VmDomLiving::CLASS_CHILD_NODE;
         $strProto = new Variable(Variable::TYPE_STRING);
         $documentType->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
         $documentType->properties[] = new ClassProperty(VmDom::PROP_NAME, null, $strProto);
@@ -115,12 +120,19 @@ final class DomLivingBuiltinClasses
         $documentType->properties[] = new ClassProperty(VmDom::PROP_SYSTEM_ID, null, $strProto);
         $documentType->properties[] = new ClassProperty(VmDom::PROP_ENTITIES, $nullProto, $objProto);
         $documentType->properties[] = new ClassProperty(VmDom::PROP_NOTATIONS, $nullProto, $objProto);
+        // ChildNode methods — php-src implementation-alias DOMElement::{remove,before,after,replaceWith}.
+        self::copySelectedMethods(
+            $ctx->classes[VmDom::CLASS_ELEMENT] ?? null,
+            $documentType,
+            ['remove', 'before', 'after', 'replacewith']
+        );
         $ctx->classes[VmDomLiving::CLASS_DOCUMENT_TYPE] = $documentType;
 
         // Dom\CharacterData / Text / Comment / CDATA / PI / Attr / DocumentFragment / NamedNodeMap (#20948).
         $characterData = new ClassEntry('Dom\\CharacterData');
         $characterData->isInternal = true;
         $characterData->parentLc = VmDomLiving::CLASS_NODE;
+        $characterData->interfaces[] = VmDomLiving::CLASS_CHILD_NODE;
         $characterData->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
         $characterData->properties[] = new ClassProperty(VmDom::PROP_DATA, null, $strProto);
         $characterData->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
@@ -177,6 +189,7 @@ final class DomLivingBuiltinClasses
         $fragment = new ClassEntry('Dom\\DocumentFragment');
         $fragment->isInternal = true;
         $fragment->parentLc = VmDomLiving::CLASS_NODE;
+        $fragment->interfaces[] = VmDomLiving::CLASS_PARENT_NODE;
         $fragment->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
         $fragment->properties[] = new ClassProperty(VmDom::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
         $fragment->properties[] = new ClassProperty(VmDom::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);
@@ -207,6 +220,8 @@ final class DomLivingBuiltinClasses
         $element = new ClassEntry('Dom\\Element');
         $element->isInternal = true;
         $element->parentLc = VmDomLiving::CLASS_NODE;
+        $element->interfaces[] = VmDomLiving::CLASS_PARENT_NODE;
+        $element->interfaces[] = VmDomLiving::CLASS_CHILD_NODE;
         $element->properties[] = new ClassProperty(VmDom::PROP_TEXT_CONTENT, $nullProto, new Variable(Variable::TYPE_STRING));
         // Living Standard string props (php-src php_dom.stub.php Dom\Element; #20532).
         $strProto = new Variable(Variable::TYPE_STRING);
@@ -310,6 +325,7 @@ final class DomLivingBuiltinClasses
         $document = new ClassEntry('Dom\\Document');
         $document->isInternal = true;
         $document->parentLc = VmDomLiving::CLASS_NODE;
+        $document->interfaces[] = VmDomLiving::CLASS_PARENT_NODE;
         $document->properties[] = new ClassProperty(VmDomLiving::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         self::copySelectedMethods(
             $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
@@ -397,6 +413,41 @@ final class DomLivingBuiltinClasses
             $xmlDocument->methodNames['savexmlfile'] = 'saveXmlFile';
         }
         $ctx->classes[VmDomLiving::CLASS_XML_DOCUMENT] = $xmlDocument;
+    }
+
+    /**
+     * Register Dom\ParentNode / Dom\ChildNode (php-src ext/dom/php_dom.stub.php; #20961).
+     *
+     * Interfaces are independent (ChildNode does not extend ParentNode — unlike legacy
+     * DOMChildNode quirk in ZendDeclaredInterfaces).
+     */
+    private static function registerParentAndChildNodeInterfaces(Context $ctx): void
+    {
+        if (!isset($ctx->classes[VmDomLiving::CLASS_PARENT_NODE])) {
+            $parentNode = new ClassEntry('Dom\\ParentNode');
+            $parentNode->isInternal = true;
+            $parentNode->isInterface = true;
+            BuiltinClasses::registerBuiltinInterfaceMethods($parentNode, [
+                'append',
+                'prepend',
+                'replaceChildren',
+                'querySelector',
+                'querySelectorAll',
+            ]);
+            $ctx->classes[VmDomLiving::CLASS_PARENT_NODE] = $parentNode;
+        }
+        if (!isset($ctx->classes[VmDomLiving::CLASS_CHILD_NODE])) {
+            $childNode = new ClassEntry('Dom\\ChildNode');
+            $childNode->isInternal = true;
+            $childNode->isInterface = true;
+            BuiltinClasses::registerBuiltinInterfaceMethods($childNode, [
+                'remove',
+                'before',
+                'after',
+                'replaceWith',
+            ]);
+            $ctx->classes[VmDomLiving::CLASS_CHILD_NODE] = $childNode;
+        }
     }
 
     /** Share classic DOM* method handlers with living Dom\* types (#20418). */

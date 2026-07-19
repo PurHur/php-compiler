@@ -21,6 +21,12 @@ final class VmDomLiving
 {
     public const CLASS_NODE = 'dom\\node';
 
+    /** php-src Dom\ParentNode (ext/dom/php_dom.stub.php; #20961). */
+    public const CLASS_PARENT_NODE = 'dom\\parentnode';
+
+    /** php-src Dom\ChildNode (ext/dom/php_dom.stub.php; #20961). */
+    public const CLASS_CHILD_NODE = 'dom\\childnode';
+
     public const CLASS_ELEMENT = 'dom\\element';
 
     public const CLASS_HTML_ELEMENT = 'dom\\htmlelement';
