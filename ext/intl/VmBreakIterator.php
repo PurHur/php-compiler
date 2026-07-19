@@ -145,6 +145,10 @@ final class VmBreakIterator
 
         $parts = new ClassEntry('IntlPartsIterator');
         $parts->isInternal = true;
+        // php-src partiter / breakiterator_iterators.cpp — implements Iterator (#20985).
+        if (isset($ctx->classes['iterator'])) {
+            $parts->interfaces[] = 'iterator';
+        }
         $parts->properties[] = new ClassProperty(self::PROP_HANDLE, null, $strProto);
         foreach (self::partsIteratorConstants() as $name => $value) {
             $lc = strtolower($name);
