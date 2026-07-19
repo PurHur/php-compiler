@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
@@ -16,14 +17,18 @@ use PHPCfg\Func as CfgFunc;
 
 /**
  * Transliterator create/transliterate/createFromRules/createInverse/listIDs — ICU utrans_* via FFI
- * + Latin-ASCII PHP fallback (#6139, #20719).
+ * + Latin-ASCII PHP fallback (#6139, #20719, #20915).
  *
- * php-src: ext/intl/transliterator/transliterator_methods.c
- * ICU: unicode/utrans.h — utrans_openU / utrans_openInverse / utrans_openIDs / utrans_transUChars
+ * php-src: ext/intl/transliterator/transliterator_methods.c / transliterator_class.c
+ * ICU: unicode/utrans.h — utrans_openU / utrans_openInverse / utrans_openIDs / utrans_transUChars /
+ * utrans_getUnicodeID (public readonly $id)
  */
 final class VmTransliterator
 {
     public const CLASS_LC = 'transliterator';
+
+    /** php-src Transliterator::$id (transliterator.stub.php; #20915). */
+    public const PROP_ID = 'id';
 
     public const FORWARD = 0;
     public const REVERSE = 1;
@@ -57,6 +62,9 @@ final class VmTransliterator
 
         $entry = new ClassEntry('Transliterator');
         $entry->isInternal = true;
+        // php-src Transliterator historically allows dynamic props (zend_std); also unlocks
+        // get_object_vars() for declared public $id (#20915, collectObjectVarsForBuiltin).
+        $entry->allowsDynamicProperties = true;
         foreach (self::classConstants() as $name => $value) {
             $lc = strtolower($name);
             $const = new Variable(Variable::TYPE_INTEGER);
@@ -66,6 +74,17 @@ final class VmTransliterator
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+        // public readonly string $id — php-src transliterator.stub.php / utrans_getUnicodeID (#20915).
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $strProto->string('');
+        $entry->properties[] = new ClassProperty(
+            self::PROP_ID,
+            null,
+            $strProto,
+            true,
+            $pub,
+            self::CLASS_LC
+        );
         $methods = [
             'create' => [new TransliteratorCreate(), $pubStatic],
             'createfromrules' => [new TransliteratorCreateFromRules(), $pubStatic],
@@ -289,9 +308,12 @@ final class VmTransliterator
         string $op
     ): ObjectEntry {
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        // Match php-src transliterator_object_construct: property from utrans_getUnicodeID (#20915).
+        $displayId = self::unicodeIdFromHandle($handle) ?? $id;
+        $object->getProperty(self::PROP_ID)->string($displayId);
         $object->constructed = true;
         self::$state[$object->id] = [
-            'id' => $id,
+            'id' => $displayId,
             'handle' => $handle,
             'use_fallback' => $fallback,
             'errorCode' => IntlError::U_ZERO_ERROR,
@@ -307,6 +329,35 @@ final class VmTransliterator
         }
 
         return $object;
+    }
+
+    /**
+     * php-src transliterator_object_construct — utrans_getUnicodeID → UTF-8 $id property.
+     *
+     * @param object|null $handle UTransliterator*
+     */
+    private static function unicodeIdFromHandle(?object $handle): ?string
+    {
+        if (null === $handle) {
+            return null;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'utrans_getUnicodeID'.self::$symSuffix;
+        try {
+            $len = $ffi->new('int32_t');
+            $len->cdata = 0;
+            $uchars = $ffi->$fn($handle, \FFI::addr($len));
+            if (null === $uchars) {
+                return null;
+            }
+
+            return self::uCharsToUtf8($uchars, (int) $len->cdata);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private static function setObjectError(ObjectEntry $tr, int $code, string $message): void
@@ -698,6 +749,7 @@ const UChar *uenum_unext{$suffix}(UEnumeration *en, int32_t *resultLength, UErro
 void uenum_close{$suffix}(UEnumeration *en);
 void utrans_close{$suffix}(UTransliterator *trans);
 void utrans_transUChars{$suffix}(const UTransliterator *trans, UChar *text, int32_t *textLength, int32_t textCapacity, int32_t start, int32_t *limit, UErrorCode *status);
+const UChar *utrans_getUnicodeID{$suffix}(const UTransliterator *trans, int32_t *resultLength);
 C;
     }
 }
