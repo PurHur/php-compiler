@@ -78,12 +78,11 @@ final class VmString
      * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222, #19254, #19318).
      *
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
-     * wordwrap/str_pad, unserialize/substr, substr_compare, bin2hex, str_increment/str_decrement,
+     * wordwrap/str_pad, unserialize/substr, substr_compare, str_increment/str_decrement,
      * and other typed string builtins use this guard (php-src ext/standard/string.c, var_unserializer.c).
-     * trim/ltrim/rtrim/chop, str_repeat/str_shuffle/ucfirst/lcfirst/ucwords, and
-     * strlen/strtolower/strtoupper/strrev coerce null with deprecation on forward profile
-     * (php_trim / string.c, re-#18850 #19983 #19998 #20007).
-     * bin2hex is Z_PARAM_STR TypeError on 8.4 (#20154), not soft-null.
+     * trim/ltrim/rtrim/chop, str_repeat/str_shuffle/ucfirst/lcfirst/ucwords,
+     * strlen/strtolower/strtoupper/strrev, and md5/sha1/crc32/bin2hex/hash($data) coerce null with
+     * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181).
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare is Z_PARAM_STR TypeError on 8.4 (#20164), not soft-null.
      */
@@ -96,8 +95,9 @@ final class VmString
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
      * Used by trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
-     * strlen/strtolower/strtoupper/strrev (#20007), and HTML/escape htmlspecialchars/htmlentities/
-     * addslashes/stripslashes/nl2br/quotemeta (+ decode siblings) (#21180).
+     * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data) (#21181),
+     * and HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/nl2br/quotemeta
+     * (+ decode siblings) (#21180).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

@@ -1,5 +1,5 @@
 --TEST--
-stdlib Z_PARAM_STR builtins — null TypeError/coerce mix on 8.4 JIT (#19161/#19309/#19319)
+stdlib Z_PARAM_STR builtins — null TypeError/coerce mix on 8.4 JIT (#19161/#19309/#21181)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -26,10 +26,10 @@ foreach ([
 }
 ?>
 --EXPECT--
-nl2br: ''
+nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
 str_shuffle: ''
 str_rot13: str_rot13(): Argument #1 ($string) must be of type string, null given
-crc32: crc32(): Argument #1 ($string) must be of type string, null given
+crc32: 0
 convert_uuencode: convert_uuencode(): Argument #1 ($string) must be of type string, null given
 hebrev: hebrev(): Argument #1 ($string) must be of type string, null given
-quoted_printable_encode: ''
+quoted_printable_encode: quoted_printable_encode(): Argument #1 ($string) must be of type string, null given

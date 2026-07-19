@@ -1,5 +1,5 @@
 --TEST--
-stdlib strlen/case/rev soft-null; bin2hex TypeError on 8.4 forward JIT (#20007/#20154)
+stdlib strlen/case/rev/bin2hex soft-null DEP+coerce on 8.4 JIT (#20007/#21181)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -10,4 +10,4 @@ strlen: uncaught 0
 strtolower: uncaught ''
 strtoupper: uncaught ''
 strrev: uncaught ''
-bin2hex: bin2hex(): Argument #1 ($string) must be of type string, null given
+bin2hex: uncaught ''

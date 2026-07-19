@@ -1,10 +1,11 @@
 --TEST--
-AOT: sha1(null) — TypeError on 8.4 forward profile (#19255, ext/standard/sha1.c)
+AOT: sha1(null) — empty digest on 8.4 (#21181, reverts #19255)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-sha1(null);
+error_reporting(E_ALL & ~E_DEPRECATED);
+echo sha1(null), "\n";
+?>
 --EXPECT--
---EXPECT_EXIT--
-255
+da39a3ee5e6b4b0d3255bfef95601890afd80709

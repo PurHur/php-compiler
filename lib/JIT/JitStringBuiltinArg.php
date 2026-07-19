@@ -108,8 +108,9 @@ final class JitStringBuiltinArg
      * Soft-null string args — coerce+deprecate on forward profile (not Z_PARAM_STR TypeError).
      *
      * trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
-     * strlen/strtolower/strtoupper/strrev (#20007), and HTML/escape htmlspecialchars/htmlentities/
-     * addslashes/stripslashes/nl2br/quotemeta (+ decode siblings) (#21180).
+     * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data) (#21181),
+     * and HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/nl2br/quotemeta
+     * (+ decode siblings) (#21180).
      */
     public static function lowerTrimFamilyString(
         Context $context,
