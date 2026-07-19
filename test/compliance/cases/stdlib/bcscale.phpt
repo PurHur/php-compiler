@@ -9,11 +9,13 @@ if (!function_exists('bcscale')) {
 echo bcscale(), "\n";
 echo bcscale(3), "\n";
 echo bcscale(), "\n";
+echo bcscale(null), "\n";
 echo bcadd('1.234', '5'), "\n";
 echo "ok\n";
 --EXPECT--
 0
 0
+3
 3
 6.234
 ok

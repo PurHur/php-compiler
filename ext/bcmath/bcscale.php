@@ -8,10 +8,14 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmMath;
 use PHPLLVM\Value;
 
-/** bcscale() — set or get default bcmath scale (php-src ext/bcmath/bcmath.c; issue #3365). */
+/**
+ * bcscale() — set or get default bcmath scale (php-src ext/bcmath/bcmath.c; issue #3365).
+ *
+ * Signature: bcscale(?int $scale = null): int — explicit null is the getter (#20974).
+ */
 final class bcscale extends Internal
 {
     public function __construct()
@@ -23,17 +27,15 @@ final class bcscale extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc > 1) {
-            throw new \LogicException('bcscale() accepts zero or one argument in this compiler build');
+            throw new \ArgumentCountError('bcscale() expects at most 1 argument, '.$argc.' given');
         }
-        $scale = null;
         if (1 === $argc) {
-            $var = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $var->type) {
-                throw new \LogicException('bcscale() scale must be an integer in this compiler build');
-            }
-            $scale = $var->toInt();
+            // Z_PARAM_LONG_OR_NULL — null means get current scale (php-src bcmath.stub.php; #20974).
+            $scale = VmMath::parseNullableIntBuiltinArgForFrame($frame, 0, 'bcscale', 1, 'scale');
+            $result = VmBcmath::scale($scale);
+        } else {
+            $result = VmBcmath::scale();
         }
-        $result = VmBcmath::scale($scale);
         if (null === $frame->returnVar) {
             return;
         }
