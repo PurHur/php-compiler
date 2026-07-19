@@ -933,10 +933,14 @@
         "ext/intl/numfmt_get_error_message.php",
         "ext/intl/numfmt_get_locale.php",
         "ext/intl/numfmt_get_pattern.php",
+        "ext/intl/numfmt_get_symbol.php",
+        "ext/intl/numfmt_get_text_attribute.php",
         "ext/intl/numfmt_parse.php",
         "ext/intl/numfmt_parse_currency.php",
         "ext/intl/numfmt_set_attribute.php",
         "ext/intl/numfmt_set_pattern.php",
+        "ext/intl/numfmt_set_symbol.php",
+        "ext/intl/numfmt_set_text_attribute.php",
         "ext/intl/resourcebundle_count.php",
         "ext/intl/resourcebundle_create.php",
         "ext/intl/resourcebundle_get.php",
@@ -6107,9 +6111,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5873,
+        "inventory_files": 5877,
         "excluded": 0,
-        "eligible": 5873,
+        "eligible": 5877,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
