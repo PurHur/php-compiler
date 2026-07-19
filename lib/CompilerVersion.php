@@ -2509,23 +2509,29 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ get_error_handler() / get_exception_handler() (ext/standard/basic_functions.c; #17644).
+     * PHP 8.5+ get_error_handler() / get_exception_handler() (ext/standard/basic_functions.c; #17644, #21175).
      *
-     * Callable under forward profile via {@see languageProfileVersion()}; withheld on 8.4.0-dev reference profile.
+     * Withheld on 8.4.0-dev / PROFILE=8.4 so function_exists matches Zend ≤8.4. Enable via
+     * stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5` forward profile.
+     * php-src: ext/standard/basic_functions.stub.php (PHP-8.5).
      */
     public static function supportsGetHandlerIntrospection(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
-    }
-
-    /** get_error_handler()/get_exception_handler() visible to function_exists() — stable runtime or forward 8.4+. */
-    public static function advertisesGetHandlerIntrospection(): bool
-    {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
             return true;
         }
 
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /** get_error_handler()/get_exception_handler() visible to function_exists() — stable 8.5+ or PROFILE=8.5. */
+    public static function advertisesGetHandlerIntrospection(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**

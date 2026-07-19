@@ -1,7 +1,7 @@
 --TEST--
-Stdlib: get_error_handler()/get_exception_handler() round-trip (#17644, ext/standard/basic_functions.c)
+Stdlib: get_error_handler()/get_exception_handler() round-trip (#17644, #21175, ext/standard/basic_functions.c)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 declare(strict_types=1);

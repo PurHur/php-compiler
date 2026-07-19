@@ -1,7 +1,7 @@
 --TEST--
-AOT: set_error_handler() then get_error_handler() round-trip (#17671, ext/standard/basic_functions.c)
+AOT: set_error_handler() then get_error_handler() round-trip (#17671, #21175, ext/standard/basic_functions.c)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 declare(strict_types=1);

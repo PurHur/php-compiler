@@ -233,7 +233,14 @@ class AotTest extends BaseTest
                 continue;
             }
             if (!CompilerVersion::supportsGetHandlerIntrospection()
-                && (str_contains($name, 'get_error_handler') || str_contains($name, 'get_exception_handler'))) {
+                && (str_contains($name, 'get_error_handler') || str_contains($name, 'get_exception_handler'))
+                && !str_contains($name, 'get_error_handler_phantom')
+                && !str_contains($name, 'get_error_handler_forward_85')
+                && !str_contains($name, 'get_error_handler_forward85')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetHandlerIntrospection()
+                && str_contains($name, 'get_error_handler_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsStreamSupports()
