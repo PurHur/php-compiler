@@ -46,6 +46,7 @@ function collectCapabilities(string $root): array
         'uuid' => new PHPCompiler\ext\uuid\Module(),
         'enchant' => new PHPCompiler\ext\enchant\Module(),
         'odbc' => new PHPCompiler\ext\odbc\Module(),
+        'dba' => new PHPCompiler\ext\dba\Module(),
         'mailparse' => new PHPCompiler\ext\mailparse\Module(),
         'redis' => new PHPCompiler\ext\redis\Module(),
         'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),

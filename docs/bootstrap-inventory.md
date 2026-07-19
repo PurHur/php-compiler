@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6101 |
-| Phase A inventory files (M2 ratio SSOT) | 6101 |
+| PHP files on vm.php path | 6117 |
+| Phase A inventory files (M2 ratio SSOT) | 6117 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18979 |
+| Source constructs flagged (warnings) | 19028 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -176,6 +176,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_unescape.php` | 0 | 3 |
 | `ext/curl/curl_upkeep.php` | 0 | 2 |
 | `ext/curl/curl_version.php` | 0 | 2 |
+| `ext/dba/BuiltinClasses.php` | 0 | 1 |
+| `ext/dba/DbaExtensionPolicy.php` | 0 | 1 |
+| `ext/dba/DbaFunction.php` | 0 | 1 |
+| `ext/dba/Module.php` | 0 | 10 |
+| `ext/dba/VmDbaConnection.php` | 0 | 4 |
+| `ext/dba/VmDbaCore.php` | 0 | 2 |
+| `ext/dba/VmDbaFlatfile.php` | 0 | 1 |
+| `ext/dba/dba_close.php` | 0 | 2 |
+| `ext/dba/dba_delete.php` | 0 | 3 |
+| `ext/dba/dba_exists.php` | 0 | 3 |
+| `ext/dba/dba_fetch.php` | 0 | 3 |
+| `ext/dba/dba_handlers.php` | 0 | 5 |
+| `ext/dba/dba_insert.php` | 0 | 3 |
+| `ext/dba/dba_open.php` | 0 | 3 |
+| `ext/dba/dba_popen.php` | 0 | 3 |
+| `ext/dba/dba_replace.php` | 0 | 3 |
 | `ext/dom/AttrIsId.php` | 0 | 2 |
 | `ext/dom/AttrRename.php` | 0 | 2 |
 | `ext/dom/BuiltinClasses.php` | 0 | 1 |
@@ -5407,7 +5423,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 104 |
+| `lib/Runtime.php` | 0 | 105 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -7054,6 +7070,118 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
 - 1 class method(s)
+
+### `ext/dba/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dba/DbaExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/dba/DbaFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dba/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new dba_open (line 40)
+- new dba_popen (line 41)
+- new dba_close (line 42)
+- new dba_insert (line 43)
+- new dba_replace (line 44)
+- new dba_fetch (line 45)
+- new dba_exists (line 46)
+- new dba_delete (line 47)
+- new dba_handlers (line 48)
+- 3 class method(s)
+
+### `ext/dba/VmDbaConnection.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 39)
+- new ObjectEntry (line 56)
+- new Variable (line 67)
+- 7 class method(s)
+
+### `ext/dba/VmDbaCore.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 200)
+- 16 class method(s)
+
+### `ext/dba/VmDbaFlatfile.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
+### `ext/dba/dba_close.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/dba/dba_delete.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_exists.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_fetch.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_handlers.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new HashTable (line 44)
+- new Variable (line 46)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_insert.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_open.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_popen.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_replace.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+- 1 closure(s)
 
 ### `ext/dom/AttrIsId.php`
 
@@ -44339,29 +44467,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sqlite3\Module (line 275)
 - new ext\pgsql\Module (line 276)
 - new ext\odbc\Module (line 277)
-- new ext\mailparse\Module (line 278)
-- new ext\enchant\Module (line 279)
-- new ext\pdo\Module (line 280)
-- new ext\phar\Module (line 281)
-- new ext\uri\Module (line 282)
-- new ext\uuid\Module (line 283)
-- new ext\uploadprogress\Module (line 284)
-- new ext\apcu\Module (line 285)
-- new ext\sysvshm\Module (line 286)
-- new ext\sysvsem\Module (line 287)
-- new ext\sysvmsg\Module (line 288)
-- new ext\reflection\Module (line 289)
-- new ext\standard\Module (line 290)
-- new JIT (line 366)
-- new JITContext (line 380)
-- new SealedClassPreprocessor (line 446)
-- new StaticClassPreprocessor (line 449)
-- new SourcePreprocessor\PropertyHooks (line 452)
-- new State (line 593)
-- new ReflectionProperty (line 620)
-- new ReflectionProperty (line 623)
-- new LintCompiler (line 1034)
-- new Variable (line 1164)
+- new ext\dba\Module (line 278)
+- new ext\mailparse\Module (line 279)
+- new ext\enchant\Module (line 280)
+- new ext\pdo\Module (line 281)
+- new ext\phar\Module (line 282)
+- new ext\uri\Module (line 283)
+- new ext\uuid\Module (line 284)
+- new ext\uploadprogress\Module (line 285)
+- new ext\apcu\Module (line 286)
+- new ext\sysvshm\Module (line 287)
+- new ext\sysvsem\Module (line 288)
+- new ext\sysvmsg\Module (line 289)
+- new ext\reflection\Module (line 290)
+- new ext\standard\Module (line 291)
+- new JIT (line 367)
+- new JITContext (line 381)
+- new SealedClassPreprocessor (line 447)
+- new StaticClassPreprocessor (line 450)
+- new SourcePreprocessor\PropertyHooks (line 453)
+- new State (line 594)
+- new ReflectionProperty (line 621)
+- new ReflectionProperty (line 624)
+- new LintCompiler (line 1035)
+- new Variable (line 1165)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
