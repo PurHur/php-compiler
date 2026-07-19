@@ -158,6 +158,27 @@ final class BuiltinClasses
         $entry->methods['getpattern'] = new IntlDateFormatterGetPattern();
         $entry->methodVisibility['getpattern'] = $pub;
         $entry->methodNames['getpattern'] = 'getPattern';
+        $entry->methods['parse'] = new IntlDateFormatterParse();
+        $entry->methodVisibility['parse'] = $pub;
+        $entry->methodNames['parse'] = 'parse';
+        $entry->methods['parsetocalendar'] = new IntlDateFormatterParseToCalendar();
+        $entry->methodVisibility['parsetocalendar'] = $pub;
+        $entry->methodNames['parsetocalendar'] = 'parseToCalendar';
+        $entry->methods['localtime'] = new IntlDateFormatterLocaltime();
+        $entry->methodVisibility['localtime'] = $pub;
+        $entry->methodNames['localtime'] = 'localtime';
+        $entry->methods['gettimezone'] = new IntlDateFormatterGetTimeZone();
+        $entry->methodVisibility['gettimezone'] = $pub;
+        $entry->methodNames['gettimezone'] = 'getTimeZone';
+        $entry->methods['settimezone'] = new IntlDateFormatterSetTimeZone();
+        $entry->methodVisibility['settimezone'] = $pub;
+        $entry->methodNames['settimezone'] = 'setTimeZone';
+        $entry->methods['geterrorcode'] = new IntlDateFormatterGetErrorCode();
+        $entry->methodVisibility['geterrorcode'] = $pub;
+        $entry->methodNames['geterrorcode'] = 'getErrorCode';
+        $entry->methods['geterrormessage'] = new IntlDateFormatterGetErrorMessage();
+        $entry->methodVisibility['geterrormessage'] = $pub;
+        $entry->methodNames['geterrormessage'] = 'getErrorMessage';
         $ctx->classes[VmIntlDateFormatter::CLASS_LC] = $entry;
     }
 

@@ -17,6 +17,9 @@ final class IntlError
     /** php-src / ICU U_ILLEGAL_ARGUMENT_ERROR */
     public const U_ILLEGAL_ARGUMENT_ERROR = 1;
 
+    /** php-src / ICU U_PARSE_ERROR */
+    public const U_PARSE_ERROR = 9;
+
     /** php-src U_USING_FALLBACK_WARNING — not a failure for intl_is_failure() */
     public const U_USING_FALLBACK_WARNING = -128;
 
