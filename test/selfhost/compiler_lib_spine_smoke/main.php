@@ -6079,6 +6079,17 @@ require_once __DIR__.'/../../../ext/ffi/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/ffi/FfiExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/ffi/Module.php';
 require_once __DIR__.'/../../../ext/ffi/VmFFI.php';
+require_once __DIR__.'/../../../ext/dom/DocumentImportLegacyNode.php';
+require_once __DIR__.'/../../../ext/intl/LocaleAddLikelySubtags.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayKeyword.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayKeywordValue.php';
+require_once __DIR__.'/../../../ext/intl/LocaleIsRightToLeft.php';
+require_once __DIR__.'/../../../ext/intl/LocaleMinimizeSubtags.php';
+require_once __DIR__.'/../../../ext/intl/locale_add_likely_subtags.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_keyword.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_keyword_value.php';
+require_once __DIR__.'/../../../ext/intl/locale_is_right_to_left.php';
+require_once __DIR__.'/../../../ext/intl/locale_minimize_subtags.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
