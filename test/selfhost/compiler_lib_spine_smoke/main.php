@@ -875,6 +875,8 @@ require_once __DIR__.'/../../../ext/intl/VmSpoofchecker.php';
 require_once __DIR__.'/../../../ext/intl/VmTransliterator.php';
 require_once __DIR__.'/../../../ext/intl/VmUConverter.php';
 require_once __DIR__.'/../../../ext/intl/collator_create.php';
+require_once __DIR__.'/../../../ext/intl/collator_compare.php';
+require_once __DIR__.'/../../../ext/intl/collator_get_sort_key.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_extract.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_levenshtein.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_str_contains.php';

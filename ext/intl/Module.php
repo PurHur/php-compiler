@@ -110,7 +110,11 @@ class Module extends ModuleAbstract
             : [];
 
         $collator = IntlExtensionPolicy::advertisesCollator()
-            ? [new collator_create()]
+            ? [
+                new collator_create(),
+                new collator_compare(),
+                new collator_get_sort_key(),
+            ]
             : [];
 
         $msgfmt = IntlExtensionPolicy::advertisesMessageFormatter()

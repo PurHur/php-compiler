@@ -126,7 +126,10 @@ final class VmCollator
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+        $construct = new CollatorConstruct();
+        $entry->constructor = $construct;
         $methods = [
+            '__construct' => [$construct, $pub, '__construct'],
             'create' => [new CollatorCreate(), $pubStatic, 'create'],
             'compare' => [new CollatorCompare(), $pub, 'compare'],
             'asort' => [new CollatorAsort(), $pub, 'asort'],
@@ -159,9 +162,19 @@ final class VmCollator
         if (!isset($ctx->classes[self::CLASS_LC])) {
             throw new \Error('Class "Collator" not found');
         }
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        self::bind($object, $locale);
+
+        return $object;
+    }
+
+    /**
+     * Collator::__construct / create shared init — registers ICU handle state (#20753).
+     */
+    public static function bind(ObjectEntry $object, string $locale): void
+    {
         $locale = '' !== $locale ? $locale : VmLocale::getDefault();
         $handle = self::openCollator($locale);
-        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
         self::$state[$object->id] = [
             'locale' => $locale,
@@ -181,8 +194,6 @@ final class VmCollator
         } elseif (IntlError::U_ZERO_ERROR === IntlError::getCode()) {
             IntlError::clear();
         }
-
-        return $object;
     }
 
     /**
@@ -948,6 +959,35 @@ void ucol_setAttribute{$suffix}(UCollator *coll, UColAttribute attr, UColAttribu
 int32_t ucol_getSortKey{$suffix}(const UCollator *coll, const UChar *source, int32_t sourceLength, uint8_t *result, int32_t resultLength);
 const char *ucol_getLocaleByType{$suffix}(const UCollator *coll, ULocDataLocaleType type, UErrorCode *status);
 C;
+    }
+}
+
+/** Collator::__construct() — php-src collator_create / new Collator (#20753). */
+final class CollatorConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'Collator::__construct() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmCollator::isCollatorObject($receiver->toObject())) {
+            throw new \Error('Collator::__construct() called on incompatible object');
+        }
+        $locale = $argc >= 2
+            ? VmCollator::coerceLocaleArg($frame->calledArgs[1], 'Collator::__construct', 1)
+            : '';
+        VmCollator::bind($receiver->toObject(), $locale);
     }
 }
 
