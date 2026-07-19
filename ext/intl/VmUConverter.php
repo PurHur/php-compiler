@@ -131,6 +131,8 @@ final class VmUConverter
             'getdestinationtype' => [new UConverterGetDestinationType(), 'getDestinationType', false],
             'getsubstchars' => [new UConverterGetSubstChars(), 'getSubstChars', false],
             'setsubstchars' => [new UConverterSetSubstChars(), 'setSubstChars', false],
+            'setsourceencoding' => [new UConverterSetSourceEncoding(), 'setSourceEncoding', false],
+            'setdestinationencoding' => [new UConverterSetDestinationEncoding(), 'setDestinationEncoding', false],
             'reasontext' => [new UConverterReasonText(), 'reasonText', true],
             'transcode' => [new UConverterTranscode(), 'transcode', true],
             'getavailable' => [new UConverterGetAvailable(), 'getAvailable', true],
@@ -257,6 +259,122 @@ final class VmUConverter
         }
 
         return $state['dest'];
+    }
+
+    /**
+     * UConverter::setSourceEncoding() — php-src converter.c php_converter_do_set_encoding (#20881).
+     */
+    public static function setSourceEncoding(ObjectEntry $object, string $encoding): bool
+    {
+        return self::setEncodingSlot($object, 'src', $encoding);
+    }
+
+    /**
+     * UConverter::setDestinationEncoding() — php-src converter.c php_converter_do_set_encoding (#20881).
+     */
+    public static function setDestinationEncoding(ObjectEntry $object, string $encoding): bool
+    {
+        return self::setEncodingSlot($object, 'dest', $encoding);
+    }
+
+    /**
+     * Shared setter for source/destination converters (php-src php_converter_set_encoding).
+     *
+     * @param 'src'|'dest' $slot
+     */
+    private static function setEncodingSlot(ObjectEntry $object, string $slot, string $encoding): bool
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state) {
+            throw new \Error(
+                'src' === $slot
+                    ? 'UConverter::setSourceEncoding() called on uninitialized UConverter'
+                    : 'UConverter::setDestinationEncoding() called on uninitialized UConverter'
+            );
+        }
+
+        // php-src intl_errors_reset before attempting ucnv_open
+        self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+        self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
+
+        $resolved = self::resolveConverterName($encoding);
+        if (null === $resolved) {
+            self::$state[$object->id]['errorCode'] = self::U_FILE_ACCESS_ERROR;
+            self::$state[$object->id]['errorMessage'] =
+                'ucnv_open() returned error 4: U_FILE_ACCESS_ERROR: U_FILE_ACCESS_ERROR';
+
+            return false;
+        }
+
+        if ('src' === $slot) {
+            self::$state[$object->id]['src'] = $resolved;
+            self::$state[$object->id]['srcOk'] = true;
+            self::$state[$object->id]['substChars'] = self::defaultSubstChars($resolved);
+        } else {
+            self::$state[$object->id]['dest'] = $resolved;
+            self::$state[$object->id]['destOk'] = true;
+        }
+        $st = self::$state[$object->id];
+        self::$state[$object->id]['openOk'] = $st['srcOk'] && $st['destOk'];
+
+        return true;
+    }
+
+    /**
+     * Open encoding via ICU when available (canonical ucnv_getName); else CharsetEngine / iconv.
+     */
+    private static function resolveConverterName(string $encoding): ?string
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $open = 'ucnv_open'.self::$symSuffix;
+            $getName = 'ucnv_getName'.self::$symSuffix;
+            $close = 'ucnv_close'.self::$symSuffix;
+            try {
+                $status = $ffi->new('UErrorCode');
+                $status->cdata = 0;
+                $cnv = $ffi->$open($encoding, \FFI::addr($status));
+                $code = (int) $status->cdata;
+                // U_AMBIGUOUS_ALIAS_WARNING is negative (ICU warning); only positive codes fail.
+                if ($code > 0 || null === $cnv) {
+                    if (null !== $cnv) {
+                        $ffi->$close($cnv);
+                    }
+
+                    return null;
+                }
+                $nameStatus = $ffi->new('UErrorCode');
+                $nameStatus->cdata = 0;
+                $namePtr = $ffi->$getName($cnv, \FFI::addr($nameStatus));
+                $canonical = self::ffiCString($namePtr);
+                $ffi->$close($cnv);
+                if (null !== $canonical && '' !== $canonical && (int) $nameStatus->cdata <= 0) {
+                    return $canonical;
+                }
+
+                return $encoding;
+            } catch (\Throwable) {
+                // fall through to CharsetEngine
+            }
+        }
+
+        $resolved = VmIconv::resolveIconvEncoding($encoding, true);
+        if (null === CharsetEngine::parseEncodingSpec($resolved)) {
+            return null;
+        }
+
+        // Prefer a stable display form close to ICU for common aliases (latin1 → ISO-8859-1).
+        $upper = strtoupper(str_replace('_', '-', $resolved));
+        if (in_array($upper, ['LATIN1', 'LATIN-1', 'ISO88591', 'ISO-8859-1', 'CP819'], true)
+            || in_array(strtoupper(str_replace(['-', '_'], '', $encoding)), ['LATIN1', 'ISO88591', 'CP819'], true)) {
+            return 'ISO-8859-1';
+        }
+        if (in_array(strtoupper(str_replace(['-', '_'], '', $encoding)), ['UTF8', 'UTF-8', 'CP1208'], true)
+            || 'UTF8' === strtoupper(str_replace(['-', '_'], '', $resolved))) {
+            return 'UTF-8';
+        }
+
+        return $resolved;
     }
 
     /**
@@ -597,6 +715,7 @@ uint16_t ucnv_countStandards{$suffix}(void);
 const char *ucnv_getStandard{$suffix}(uint16_t n, UErrorCode *pErrorCode);
 UConverter *ucnv_open{$suffix}(const char *converterName, UErrorCode *err);
 void ucnv_close{$suffix}(UConverter *converter);
+const char *ucnv_getName{$suffix}(const UConverter *converter, UErrorCode *err);
 UConverterType ucnv_getType{$suffix}(const UConverter *converter);
 C;
     }
@@ -935,6 +1054,70 @@ final class UConverterSetSubstChars extends VmClassMethod
             'chars'
         );
         $ok = VmUConverter::setSubstChars($object, $chars);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** UConverter::setSourceEncoding() — php-src ext/intl/converter (#20881). */
+final class UConverterSetSourceEncoding extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setSourceEncoding');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::setSourceEncoding() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setSourceEncoding()');
+        $encoding = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'UConverter::setSourceEncoding',
+            0,
+            'encoding'
+        );
+        $ok = VmUConverter::setSourceEncoding($object, $encoding);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** UConverter::setDestinationEncoding() — php-src ext/intl/converter (#20881). */
+final class UConverterSetDestinationEncoding extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setDestinationEncoding');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::setDestinationEncoding() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setDestinationEncoding()');
+        $encoding = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'UConverter::setDestinationEncoding',
+            0,
+            'encoding'
+        );
+        $ok = VmUConverter::setDestinationEncoding($object, $encoding);
         if (null === $frame->returnVar) {
             return;
         }
