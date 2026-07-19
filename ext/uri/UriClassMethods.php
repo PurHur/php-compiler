@@ -611,6 +611,354 @@ final class Rfc3986UriWithUserInfo extends Rfc3986UriGetter
     }
 }
 
+final class Rfc3986UriGetUriType extends Rfc3986UriGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getUriType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\Rfc3986\\Uri::getUriType() requires VM context');
+        $case = VmUri::rfc3986UriType($this->receiverState($frame));
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ctx, $case): void {
+            VmUri::writeEnumCase($ctx, VmUri::CLASS_RFC3986_URI_TYPE, $case, $ret);
+        });
+    }
+}
+
+final class Rfc3986UriGetHostType extends Rfc3986UriGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getHostType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\Rfc3986\\Uri::getHostType() requires VM context');
+        $host = $this->receiverState($frame)['host'] ?? null;
+        $case = VmUri::rfc3986HostType(\is_string($host) || null === $host ? $host : null);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ctx, $case): void {
+            if (null === $case) {
+                $ret->null();
+            } else {
+                VmUri::writeEnumCase($ctx, VmUri::CLASS_RFC3986_URI_HOST_TYPE, $case, $ret);
+            }
+        });
+    }
+}
+
+final class Rfc3986UriResolve extends Rfc3986UriGetter
+{
+    public function __construct()
+    {
+        parent::__construct('resolve');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\Rfc3986\\Uri::resolve() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\Uri::resolve() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $uri = VmReflection::stringArg($frame->calledArgs[1], 'Uri\\Rfc3986\\Uri::resolve() uri', 0);
+        $next = VmUri::rfc3986Resolve($ctx, $self, $uri);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+final class Rfc3986UriEquals extends Rfc3986UriGetter
+{
+    public function __construct()
+    {
+        parent::__construct('equals');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\Uri::equals() expects at least 1 argument, 0 given');
+        }
+        $left = $this->receiverState($frame);
+        $otherVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $otherVar->type) {
+            throw new \TypeError(
+                'Uri\\Rfc3986\\Uri::equals(): Argument #1 ($uri) must be of type Uri\\Rfc3986\\Uri'
+            );
+        }
+        $otherObj = $otherVar->toObject();
+        if (VmUri::CLASS_RFC3986_URI !== strtolower($otherObj->class->name)) {
+            throw new \TypeError(
+                'Uri\\Rfc3986\\Uri::equals(): Argument #1 ($uri) must be of type Uri\\Rfc3986\\Uri, '
+                .$otherObj->class->name.' given'
+            );
+        }
+        $right = VmUri::rfc3986State($otherObj);
+        $includeFragment = false;
+        if (\count($frame->calledArgs) >= 3) {
+            $mode = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $mode->type) {
+                $includeFragment = 'IncludeFragment' === ($mode->toObject()->enumCaseName ?? '');
+            }
+        }
+        $eq = VmUri::composeUrlString($left, $includeFragment)
+            === VmUri::composeUrlString($right, $includeFragment);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($eq): void {
+            $ret->bool($eq);
+        });
+    }
+}
+
+final class Rfc3986UriBuilderConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('Uri\\Rfc3986\\UriBuilder::__construct() called without $this');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        VmUri::builderReset($self);
+        $self->constructed = true;
+    }
+}
+
+abstract class Rfc3986UriBuilderMethod extends VmClassMethod
+{
+    protected function receiver(Frame $frame): ObjectEntry
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException($this->getName().'() called without $this');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException($this->getName().'() called without $this');
+        }
+
+        return $self->toObject();
+    }
+
+    protected function returnSelf(Frame $frame): void
+    {
+        $selfVar = $frame->calledArgs[0]->resolveIndirect();
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($selfVar): void {
+            $ret->copyFrom($selfVar);
+        });
+    }
+}
+
+final class Rfc3986UriBuilderReset extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('reset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        VmUri::builderReset($this->receiver($frame));
+        $this->returnSelf($frame);
+    }
+}
+
+final class Rfc3986UriBuilderSetScheme extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setScheme');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\UriBuilder::setScheme() expects exactly 1 argument, 0 given');
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $scheme = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $scheme = VmReflection::stringArg($arg, 'Uri\\Rfc3986\\UriBuilder::setScheme() scheme', 0);
+        }
+        VmUri::builderApply($this->receiver($frame), ['scheme' => $scheme]);
+        $this->returnSelf($frame);
+    }
+}
+
+final class Rfc3986UriBuilderSetUserInfo extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setUserInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\UriBuilder::setUserInfo() expects exactly 1 argument, 0 given');
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $userinfo = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $userinfo = VmReflection::stringArg($arg, 'Uri\\Rfc3986\\UriBuilder::setUserInfo() userInfo', 0);
+        }
+        VmUri::builderApply($this->receiver($frame), ['userinfo' => $userinfo]);
+        $this->returnSelf($frame);
+    }
+}
+
+final class Rfc3986UriBuilderSetHost extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setHost');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\UriBuilder::setHost() expects exactly 1 argument, 0 given');
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $host = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $host = VmReflection::stringArg($arg, 'Uri\\Rfc3986\\UriBuilder::setHost() host', 0);
+        }
+        VmUri::builderApply($this->receiver($frame), ['host' => $host]);
+        $this->returnSelf($frame);
+    }
+}
+
+final class Rfc3986UriBuilderSetPort extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setPort');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\UriBuilder::setPort() expects exactly 1 argument, 0 given');
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $port = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            if (Variable::TYPE_INTEGER === $arg->type) {
+                $port = $arg->toInt();
+            } elseif (Variable::TYPE_FLOAT === $arg->type) {
+                $port = (int) $arg->toFloat();
+            } else {
+                throw new \TypeError(
+                    'Uri\\Rfc3986\\UriBuilder::setPort(): Argument #1 ($port) must be of type ?int, '
+                    .EnumCaseSupport::typeNameForVariable($arg).' given'
+                );
+            }
+        }
+        VmUri::builderApply($this->receiver($frame), ['port' => $port]);
+        $this->returnSelf($frame);
+    }
+}
+
+final class Rfc3986UriBuilderSetPath extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setPath');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\UriBuilder::setPath() expects exactly 1 argument, 0 given');
+        }
+        $path = VmReflection::stringArg($frame->calledArgs[1], 'Uri\\Rfc3986\\UriBuilder::setPath() path', 0);
+        VmUri::builderApply($this->receiver($frame), ['path' => $path]);
+        $this->returnSelf($frame);
+    }
+}
+
+final class Rfc3986UriBuilderSetQuery extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setQuery');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\UriBuilder::setQuery() expects exactly 1 argument, 0 given');
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $query = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $query = VmReflection::stringArg($arg, 'Uri\\Rfc3986\\UriBuilder::setQuery() query', 0);
+        }
+        VmUri::builderApply($this->receiver($frame), ['query' => $query]);
+        $this->returnSelf($frame);
+    }
+}
+
+final class Rfc3986UriBuilderSetFragment extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFragment');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\UriBuilder::setFragment() expects exactly 1 argument, 0 given');
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $fragment = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $fragment = VmReflection::stringArg($arg, 'Uri\\Rfc3986\\UriBuilder::setFragment() fragment', 0);
+        }
+        VmUri::builderApply($this->receiver($frame), ['fragment' => $fragment]);
+        $this->returnSelf($frame);
+    }
+}
+
+final class Rfc3986UriBuilderBuild extends Rfc3986UriBuilderMethod
+{
+    public function __construct()
+    {
+        parent::__construct('build');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\Rfc3986\\UriBuilder::build() requires VM context');
+        $builder = $this->receiver($frame);
+        $base = null;
+        if (\count($frame->calledArgs) >= 2) {
+            $arg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $arg->type) {
+                if (Variable::TYPE_OBJECT !== $arg->type) {
+                    throw new \TypeError(
+                        'Uri\\Rfc3986\\UriBuilder::build(): Argument #1 ($baseUrl) must be of type ?Uri\\Rfc3986\\Uri'
+                    );
+                }
+                $base = $arg->toObject();
+            }
+        }
+        $uri = VmUri::builderBuild($ctx, $builder, $base);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($uri): void {
+            $ret->copyFrom($uri);
+        });
+    }
+}
+
 /** Uri\WhatWg\Url::parse() — VM (#9051). */
 final class WhatWgUrlParse extends VmClassMethod
 {
