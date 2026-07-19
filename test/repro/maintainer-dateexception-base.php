@@ -1,13 +1,6 @@
 <?php
-// Repro for #7277 — DateException base class (ext/date/php_date.h).
-
-echo 'DateException: ', class_exists('DateException', false) ? 'yes' : 'no', "\n";
-echo 'DateInvalidTimeZoneException sub: ', is_subclass_of('DateInvalidTimeZoneException', 'DateException') ? 'yes' : 'no', "\n";
-echo 'DateMalformedIntervalException sub: ', is_subclass_of('DateMalformedIntervalException', 'DateException') ? 'yes' : 'no', "\n";
-echo 'DateMalformedPeriodException sub: ', is_subclass_of('DateMalformedPeriodException', 'DateException') ? 'yes' : 'no', "\n";
-
-try {
-    throw new DateInvalidTimeZoneException('tz test');
-} catch (DateException $e) {
-    echo "catch DateInvalidTimeZoneException as DateException: ok\n";
-}
+// Repro for #7277 / #20779 — DateException hierarchy roots (php-src names).
+echo 'DateMalformedIntervalStringException sub: ', is_subclass_of('DateMalformedIntervalStringException', 'DateException') ? 'yes' : 'no', "\n";
+echo 'DateMalformedPeriodStringException sub: ', is_subclass_of('DateMalformedPeriodStringException', 'DateException') ? 'yes' : 'no', "\n";
+echo 'phantom IntervalException: ', class_exists('DateMalformedIntervalException', false) ? 'yes' : 'no', "\n";
+echo 'phantom PeriodException: ', class_exists('DateMalformedPeriodException', false) ? 'yes' : 'no', "\n";

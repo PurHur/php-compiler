@@ -55,11 +55,10 @@ final class ThrowableManifest
 
     public const LC_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
 
-    public const LC_DATE_MALFORMED_INTERVAL_EXCEPTION = 'datemalformedintervalexception';
+    /** php-src ext/date/php_date.stub.php — DateMalformedIntervalStringException (#20779). */
+    public const LC_DATE_MALFORMED_INTERVAL_STRING_EXCEPTION = 'datemalformedintervalstringexception';
 
     public const LC_DATE_MALFORMED_STRING = 'datemalformedstring';
-
-    public const LC_DATE_MALFORMED_PERIOD_EXCEPTION = 'datemalformedperiodexception';
 
     public const LC_DATE_ERROR = 'dateerror';
 
@@ -125,8 +124,7 @@ final class ThrowableManifest
         'DateInvalidTimeZoneException' => 'DateException',
         'DateInvalidOperationException' => 'DateException',
         'DateMalformedStringException' => 'DateException',
-        'DateMalformedIntervalException' => 'DateException',
-        'DateMalformedPeriodException' => 'DateException',
+        'DateMalformedIntervalStringException' => 'DateException',
         'DateMalformedPeriodStringException' => 'DateException',
         'Error' => null,
         'DateError' => 'Error',
@@ -206,12 +204,14 @@ final class ThrowableManifest
             'DateInvalidTimeZoneException',
             'DateInvalidOperationException',
             'DateMalformedStringException',
-            'DateMalformedIntervalException',
-            'DateMalformedPeriodException',
+            'DateMalformedIntervalStringException',
             'DateMalformedPeriodStringException',
             'DateError',
             'DateObjectError',
             'DateRangeError' => CompilerVersion::advertisesDateExceptionHierarchy(),
+            // Non-php-src phantom names from #7129/#15382 — never advertise (#20779).
+            'DateMalformedIntervalException',
+            'DateMalformedPeriodException' => false,
             'RequestParseBodyException' => CompilerVersion::advertisesRequestParseBodyExceptionClass(),
             'SQLite3Exception' => \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass(),
             'PDOException' => \PHPCompiler\ext\pdo\PdoExtensionPolicy::advertisesExceptionClass(),

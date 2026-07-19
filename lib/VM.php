@@ -9197,8 +9197,6 @@ restart:
             return $this->dispatchVmDateMalformedIntervalException($e, $callerFrame);
         } catch (VM\NativeDateMalformedPeriodStringException $e) {
             return $this->dispatchVmDateMalformedPeriodStringException($e, $callerFrame);
-        } catch (VM\NativeDateMalformedPeriodException $e) {
-            return $this->dispatchVmDateMalformedPeriodException($e, $callerFrame);
         } catch (VM\NativeDateRangeError $e) {
             return $this->dispatchVmDateRangeError($e, $callerFrame);
         } catch (VM\NativeDateObjectError $e) {
@@ -9838,31 +9836,14 @@ restart:
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
-    /** Bridge malformed DateInterval specs from date builtins into user catch handlers (#7129, #15382). */
+    /** Bridge malformed DateInterval specs into DateMalformedIntervalStringException (#20779). */
     private function dispatchVmDateMalformedIntervalException(
         VM\NativeDateMalformedIntervalException $error,
         Frame $frame
     ): ?Frame
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
-        $thrown = VM\BuiltinExceptionSupport::materializeDateMalformedIntervalException(
-            $this->context,
-            $error->getMessage(),
-            $file,
-            $line
-        );
-
-        return $this->dispatchBuiltinThrowable($frame, $thrown);
-    }
-
-    /** Bridge malformed DatePeriod specs from date builtins into user catch handlers (#7129, #15382). */
-    private function dispatchVmDateMalformedPeriodException(
-        VM\NativeDateMalformedPeriodException $error,
-        Frame $frame
-    ): ?Frame
-    {
-        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
-        $thrown = VM\BuiltinExceptionSupport::materializeDateMalformedPeriodException(
+        $thrown = VM\BuiltinExceptionSupport::materializeDateMalformedIntervalStringException(
             $this->context,
             $error->getMessage(),
             $file,

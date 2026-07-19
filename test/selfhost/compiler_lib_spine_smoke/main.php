@@ -5700,7 +5700,6 @@ require_once __DIR__.'/../../../lib/VM/NamedArgs.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateInvalidOperationException.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateInvalidTimeZoneException.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateMalformedIntervalException.php';
-require_once __DIR__.'/../../../lib/VM/NativeDateMalformedPeriodException.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateMalformedPeriodStringException.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateMalformedStringException.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateObjectError.php';
