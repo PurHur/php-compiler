@@ -821,7 +821,7 @@ final class PDOLastInsertId extends PdoClassMethod
     }
 }
 
-/** PDO::quote(string $string, int $type = PARAM_STR): string|false — sqlite %Q (#19861). */
+/** PDO::quote(string $string, int $type = PARAM_STR): string|false — sqlite %Q (#19861); null TypeError on 8.4 (#21080). */
 final class PDOQuote extends PdoClassMethod
 {
     public function __construct()
