@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * Host introspection — pure PHP via {@see VmHostPure} (#3465, #5022, #12169).
  *
- * Mirrors {@see JitGethostname} — no Zend host-PHP gethostname() delegation on VM.
+ * SSOT for VM + JIT {@see GethostnameJitHelper} — no Zend host-PHP gethostname() delegation.
  *
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(gethostname)
  */

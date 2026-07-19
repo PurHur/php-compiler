@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6124 |
-| Phase A inventory files (M2 ratio SSOT) | 6124 |
+| PHP files on vm.php path | 6105 |
+| Phase A inventory files (M2 ratio SSOT) | 6105 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19058 |
+| Source constructs flagged (warnings) | 18984 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -176,29 +176,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_unescape.php` | 0 | 3 |
 | `ext/curl/curl_upkeep.php` | 0 | 2 |
 | `ext/curl/curl_version.php` | 0 | 2 |
-| `ext/dba/BuiltinClasses.php` | 0 | 1 |
-| `ext/dba/DbaExtensionPolicy.php` | 0 | 1 |
-| `ext/dba/DbaFunction.php` | 0 | 1 |
-| `ext/dba/Module.php` | 0 | 16 |
-| `ext/dba/VmDbaConnection.php` | 0 | 4 |
-| `ext/dba/VmDbaCore.php` | 0 | 3 |
-| `ext/dba/VmDbaFlatfile.php` | 0 | 1 |
-| `ext/dba/VmDbaInifile.php` | 0 | 1 |
-| `ext/dba/dba_close.php` | 0 | 2 |
-| `ext/dba/dba_delete.php` | 0 | 3 |
-| `ext/dba/dba_exists.php` | 0 | 3 |
-| `ext/dba/dba_fetch.php` | 0 | 3 |
-| `ext/dba/dba_firstkey.php` | 0 | 3 |
-| `ext/dba/dba_handlers.php` | 0 | 5 |
-| `ext/dba/dba_insert.php` | 0 | 3 |
-| `ext/dba/dba_key_split.php` | 0 | 5 |
-| `ext/dba/dba_list.php` | 0 | 5 |
-| `ext/dba/dba_nextkey.php` | 0 | 3 |
-| `ext/dba/dba_open.php` | 0 | 3 |
-| `ext/dba/dba_optimize.php` | 0 | 3 |
-| `ext/dba/dba_popen.php` | 0 | 3 |
-| `ext/dba/dba_replace.php` | 0 | 3 |
-| `ext/dba/dba_sync.php` | 0 | 3 |
 | `ext/dom/AttrIsId.php` | 0 | 2 |
 | `ext/dom/AttrRename.php` | 0 | 2 |
 | `ext/dom/BuiltinClasses.php` | 0 | 1 |
@@ -2045,6 +2022,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetenvLookupJitHelper.php` | 0 | 1 |
 | `ext/standard/GethostbyaddrJitHelper.php` | 0 | 1 |
 | `ext/standard/GethostbynamelJitHelper.php` | 0 | 1 |
+| `ext/standard/GethostnameJitHelper.php` | 0 | 1 |
 | `ext/standard/GetimagesizeJitHelper.php` | 0 | 1 |
 | `ext/standard/GetoptEngine.php` | 0 | 1 |
 | `ext/standard/GetoptJitHelper.php` | 0 | 1 |
@@ -2262,6 +2240,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitGethostbyname.php` | 0 | 1 |
 | `ext/standard/JitGethostbynamel.php` | 0 | 1 |
 | `ext/standard/JitGethostname.php` | 0 | 1 |
+| `ext/standard/JitGethostnameKernel.php` | 0 | 1 |
 | `ext/standard/JitGetimagesize.php` | 0 | 3 |
 | `ext/standard/JitGetopt.php` | 0 | 3 |
 | `ext/standard/JitGetrusage.php` | 0 | 1 |
@@ -2612,7 +2591,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/MkdirJitHelper.php` | 0 | 1 |
 | `ext/standard/MktimeJitHelper.php` | 0 | 1 |
 | `ext/standard/ModfJitHelper.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 849 |
+| `ext/standard/Module.php` | 0 | 850 |
 | `ext/standard/ModuleRegistry.php` | 0 | 2 |
 | `ext/standard/MultisortJitHelper.php` | 0 | 2 |
 | `ext/standard/NCompareJitHelper.php` | 0 | 1 |
@@ -3679,6 +3658,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/phpc_gc_native_object_refcount.php` | 0 | 1 |
 | `ext/standard/phpc_gc_notify_object_freed_native.php` | 0 | 1 |
 | `ext/standard/phpc_getenv_kernel.php` | 0 | 1 |
+| `ext/standard/phpc_gethostname_kernel.php` | 0 | 1 |
 | `ext/standard/phpc_hypot_kernel.php` | 0 | 1 |
 | `ext/standard/phpc_match_unhandled_operand_is_object.php` | 0 | 1 |
 | `ext/standard/phpc_mm_free_native.php` | 0 | 1 |
@@ -4909,6 +4889,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGetdate.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetenvAll.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGethostname.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetrusage.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetrusageRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGettext.php` | 0 | 1 |
@@ -5430,7 +5411,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 105 |
+| `lib/Runtime.php` | 0 | 104 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -7077,176 +7058,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
 - 1 class method(s)
-
-### `ext/dba/BuiltinClasses.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/dba/DbaExtensionPolicy.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/dba/DbaFunction.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/dba/Module.php`
-
-**Warnings** (review for bootstrap subset):
-- new dba_open (line 40)
-- new dba_popen (line 41)
-- new dba_close (line 42)
-- new dba_insert (line 43)
-- new dba_replace (line 44)
-- new dba_fetch (line 45)
-- new dba_exists (line 46)
-- new dba_delete (line 47)
-- new dba_handlers (line 48)
-- new dba_firstkey (line 49)
-- new dba_nextkey (line 50)
-- new dba_list (line 51)
-- new dba_optimize (line 52)
-- new dba_sync (line 53)
-- new dba_key_split (line 54)
-- 3 class method(s)
-
-### `ext/dba/VmDbaConnection.php`
-
-**Warnings** (review for bootstrap subset):
-- new ClassEntry (line 39)
-- new ObjectEntry (line 56)
-- new Variable (line 67)
-- 7 class method(s)
-
-### `ext/dba/VmDbaCore.php`
-
-**Warnings** (review for bootstrap subset):
-- new Error (line 284)
-- 21 class method(s)
-- 2 closure(s)
-
-### `ext/dba/VmDbaFlatfile.php`
-
-**Warnings** (review for bootstrap subset):
-- 9 class method(s)
-
-### `ext/dba/VmDbaInifile.php`
-
-**Warnings** (review for bootstrap subset):
-- 12 class method(s)
-
-### `ext/dba/dba_close.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- 1 class method(s)
-
-### `ext/dba/dba_delete.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_exists.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_fetch.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_firstkey.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_handlers.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new HashTable (line 44)
-- new Variable (line 46)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_insert.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_key_split.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
-- new HashTable (line 41)
-- new Variable (line 43)
-- 2 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_list.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- new HashTable (line 33)
-- new Variable (line 35)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_nextkey.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_open.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_optimize.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_popen.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_replace.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/dba/dba_sync.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- 1 class method(s)
-- 1 closure(s)
 
 ### `ext/dom/AttrIsId.php`
 
@@ -22272,6 +22083,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/GethostnameJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/GetimagesizeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23428,6 +23244,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/JitGethostname.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitGethostnameKernel.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -25873,276 +25694,277 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new phpc_native_environ_mirror_into_ht (line 668)
 - new phpc_rename_kernel (line 669)
 - new phpc_chdir_kernel (line 670)
-- new phpc_getenv_kernel (line 671)
-- new phpc_readfile_kernel (line 672)
-- new phpc_file_put_contents_kernel (line 673)
-- new phpc_stat_mode_kernel (line 674)
-- new phpc_access_kernel (line 675)
-- new phpc_fpow_kernel (line 676)
-- new phpc_nextafter_kernel (line 677)
-- new phpc_hypot_kernel (line 678)
-- new phpc_sqrt_kernel (line 679)
-- new sys_get_temp_dir (line 680)
-- new sys_getloadavg (line 681)
-- new openlog (line 682)
-- new syslog (line 683)
-- new closelog (line 684)
-- new tempnam (line 685)
-- new tmpfile (line 686)
-- new getcwd_ (line 687)
-- new get_include_path (line 688)
-- new set_include_path (line 689)
-- new stream_resolve_include_path (line 690)
-- new gethostname (line 691)
-- new net_get_interfaces (line 692)
-- new gethostbynamel (line 693)
-- new gethostbyname (line 694)
-- new gethostbyaddr (line 695)
-- new checkdnsrr (line 696)
+- new phpc_gethostname_kernel (line 671)
+- new phpc_getenv_kernel (line 672)
+- new phpc_readfile_kernel (line 673)
+- new phpc_file_put_contents_kernel (line 674)
+- new phpc_stat_mode_kernel (line 675)
+- new phpc_access_kernel (line 676)
+- new phpc_fpow_kernel (line 677)
+- new phpc_nextafter_kernel (line 678)
+- new phpc_hypot_kernel (line 679)
+- new phpc_sqrt_kernel (line 680)
+- new sys_get_temp_dir (line 681)
+- new sys_getloadavg (line 682)
+- new openlog (line 683)
+- new syslog (line 684)
+- new closelog (line 685)
+- new tempnam (line 686)
+- new tmpfile (line 687)
+- new getcwd_ (line 688)
+- new get_include_path (line 689)
+- new set_include_path (line 690)
+- new stream_resolve_include_path (line 691)
+- new gethostname (line 692)
+- new net_get_interfaces (line 693)
+- new gethostbynamel (line 694)
+- new gethostbyname (line 695)
+- new gethostbyaddr (line 696)
 - new checkdnsrr (line 697)
-- new dns_get_mx (line 698)
-- new dns_get_record (line 699)
-- new getmxrr (line 700)
-- new long2ip (line 701)
-- new ip2long (line 702)
-- new inet_ntop (line 703)
-- new inet_pton (line 704)
-- new getprotobyname (line 705)
-- new getprotobynumber (line 706)
-- new getservbyname (line 707)
-- new getservbyport (line 708)
-- new chdir_ (line 709)
-- new chroot_ (line 710)
-- new putenv_ (line 711)
-- new ini_set_ (line 712)
+- new checkdnsrr (line 698)
+- new dns_get_mx (line 699)
+- new dns_get_record (line 700)
+- new getmxrr (line 701)
+- new long2ip (line 702)
+- new ip2long (line 703)
+- new inet_ntop (line 704)
+- new inet_pton (line 705)
+- new getprotobyname (line 706)
+- new getprotobynumber (line 707)
+- new getservbyname (line 708)
+- new getservbyport (line 709)
+- new chdir_ (line 710)
+- new chroot_ (line 711)
+- new putenv_ (line 712)
 - new ini_set_ (line 713)
-- new ini_get_ (line 714)
-- new ini_get_all (line 715)
-- new ini_restore (line 716)
-- new ini_parse_quantity (line 717)
-- new parse_ini_string (line 718)
-- new parse_ini_file (line 719)
-- new error_reporting (line 720)
-- new error_log (line 721)
-- new define_ (line 722)
-- new defined_ (line 723)
-- new constant_ (line 724)
-- new class_constants_ (line 725)
-- new get_defined_constants_ (line 726)
-- new get_defined_vars_ (line 727)
-- new get_declared_variables_ (line 728)
-- new get_declared_interfaces_ (line 729)
-- new get_declared_classes_ (line 730)
-- new get_declared_traits_ (line 731)
-- new get_declared_attributes_ (line 732)
-- new get_declared_functions_ (line 733)
-- new get_defined_functions_ (line 734)
-- new get_included_files_ (line 735)
+- new ini_set_ (line 714)
+- new ini_get_ (line 715)
+- new ini_get_all (line 716)
+- new ini_restore (line 717)
+- new ini_parse_quantity (line 718)
+- new parse_ini_string (line 719)
+- new parse_ini_file (line 720)
+- new error_reporting (line 721)
+- new error_log (line 722)
+- new define_ (line 723)
+- new defined_ (line 724)
+- new constant_ (line 725)
+- new class_constants_ (line 726)
+- new get_defined_constants_ (line 727)
+- new get_defined_vars_ (line 728)
+- new get_declared_variables_ (line 729)
+- new get_declared_interfaces_ (line 730)
+- new get_declared_classes_ (line 731)
+- new get_declared_traits_ (line 732)
+- new get_declared_attributes_ (line 733)
+- new get_declared_functions_ (line 734)
+- new get_defined_functions_ (line 735)
 - new get_included_files_ (line 736)
-- new debug_backtrace (line 737)
-- new debug_print_backtrace (line 738)
-- new get_debug_backtrace (line 739)
-- new class_exists_ (line 740)
-- new class_alias (line 741)
-- new create_lazy_ghost (line 743)
-- new create_lazy_proxy (line 744)
-- new class_has_lazy_object_initializer (line 745)
-- new class_has_lazy_object_uninitializer (line 746)
-- new enum_exists_ (line 748)
-- new unitenum_exists_ (line 749)
-- new interface_exists_ (line 750)
-- new trait_exists_ (line 751)
-- new class_uses_ (line 752)
-- new class_uses_recursive (line 753)
-- new class_implements_ (line 754)
-- new class_parents_ (line 755)
-- new function_exists (line 756)
-- new is_callable (line 757)
-- new call_user_func (line 758)
-- new call_user_func_array (line 759)
-- new func_get_arg (line 760)
-- new func_get_args (line 761)
-- new func_num_args (line 762)
-- new method_exists_ (line 763)
-- new class_meth_exists_ (line 764)
-- new class_has_method_ (line 766)
-- new class_has_property_ (line 767)
-- new class_has_constant_ (line 768)
-- new property_exists_ (line 770)
-- new attribute_exists_ (line 771)
-- new get_object_vars_ (line 772)
-- new get_mangled_object_vars_ (line 773)
-- new get_object_id (line 774)
-- new spl_object_id (line 775)
-- new spl_object_hash (line 776)
-- new get_class_ (line 777)
-- new get_called_class_ (line 778)
-- new get_class_vars_ (line 779)
-- new get_class_methods_ (line 780)
-- new get_parent_class_ (line 781)
-- new is_a_ (line 782)
-- new is_subclass_of_ (line 783)
-- new assert_ (line 784)
-- new assert_options (line 785)
-- new trigger_error_ (line 786)
-- new user_error (line 787)
-- new compiler_language_warning_ (line 788)
-- new set_error_handler_ (line 789)
-- new restore_error_handler_ (line 790)
-- new get_error_handler_ (line 792)
-- new set_exception_handler (line 794)
-- new restore_exception_handler (line 795)
-- new get_exception_handler (line 797)
-- new error_get_last (line 799)
-- new error_clear_last (line 800)
-- new exif_tagname (line 801)
-- new eval_ (line 802)
-- new phpc_deploy_path (line 803)
-- new compiler_is_superglobal_name (line 804)
-- new __compiler_libcrypt (line 805)
-- new __compiler_password_random_bytes (line 806)
-- new phpc_match_unhandled_operand_is_object (line 807)
-- new phpc_clone_with_begin (line 808)
-- new phpc_clone_with_end (line 809)
-- new phpc_clone_with_reinit (line 810)
-- new extract_ (line 811)
-- new compact_ (line 812)
-- new scandir (line 813)
-- new opendir (line 814)
-- new dir_ (line 815)
-- new readdir (line 816)
-- new closedir (line 817)
-- new rewinddir (line 818)
-- new glob_ (line 819)
-- new gzcompress (line 820)
-- new gzdecode (line 821)
-- new gzdeflate (line 822)
-- new gzencode (line 823)
-- new gzinflate (line 824)
-- new gzuncompress (line 825)
-- new gzopen (line 826)
-- new gzwrite (line 827)
-- new gzputs (line 828)
-- new gzread (line 829)
-- new gzgetc (line 830)
-- new gzgets (line 831)
-- new gzseek (line 832)
-- new gztell (line 833)
-- new gzrewind (line 834)
-- new gzeof (line 835)
-- new gzclose (line 836)
-- new readgzfile (line 837)
-- new gzfile (line 838)
-- new gzpassthru (line 839)
-- new zlib_encode (line 840)
-- new zlib_decode (line 841)
-- new deflate_init (line 842)
-- new deflate_add (line 843)
-- new inflate_init (line 844)
-- new inflate_add (line 845)
-- new inflate_get_status (line 846)
-- new inflate_get_read_len (line 847)
-- new zlib_get_coding_type (line 848)
-- new fnmatch (line 849)
-- new time (line 850)
-- new getmypid (line 851)
-- new getmyuid (line 852)
-- new getmygid (line 853)
-- new get_current_user (line 854)
-- new get_cfg_var (line 855)
-- new php_ini_loaded_file (line 856)
-- new php_ini_scanned_files (line 857)
-- new zend_thread_id (line 858)
-- new getmygrgid (line 859)
-- new getmyinode (line 860)
-- new getlastmod (line 861)
-- new getrusage (line 862)
-- new cli_get_process_title (line 863)
-- new cli_set_process_title (line 864)
-- new proc_nice (line 865)
-- new memory_get_peak_usage (line 866)
-- new memory_get_usage (line 867)
-- new memory_reset_peak_usage (line 868)
-- new microtime (line 869)
-- new gettimeofday (line 870)
-- new hrtime (line 871)
-- new clock_gettime (line 872)
-- new phpversion (line 873)
-- new php_sapi_name (line 874)
-- new getopt (line 875)
-- new php_uname (line 876)
-- new phpinfo (line 877)
-- new phpcredits (line 878)
-- new zend_version (line 879)
-- new version_compare (line 880)
-- new extension_loaded (line 881)
-- new get_loaded_extensions (line 882)
-- new get_extension_funcs (line 883)
-- new date (line 884)
-- new timezone_version_get (line 885)
-- new timezone_identifiers_list (line 886)
-- new timezone_abbreviations_list (line 887)
-- new timezone_name_from_abbr (line 888)
-- new timezone_open (line 889)
-- new timezone_name_get (line 890)
-- new timezone_offset_get (line 891)
-- new date_offset_get (line 892)
-- new date_format (line 893)
-- new date_timestamp_get (line 894)
-- new date_timestamp_set (line 895)
-- new date_date_set (line 896)
-- new date_isodate_set (line 897)
-- new date_time_set (line 898)
-- new date_timezone_get (line 899)
-- new date_timezone_set (line 900)
-- new date_get_last_errors (line 901)
-- new timezone_location_get (line 902)
-- new timezone_transitions_get (line 903)
-- new gmdate (line 904)
-- new strftime (line 905)
-- new gmstrftime (line 906)
-- new strptime (line 907)
-- new getdate (line 908)
-- new gmgetdate (line 909)
-- new gmmktime (line 910)
-- new mktime (line 911)
-- new strtotime (line 912)
-- new checkdate (line 913)
-- new date_default_timezone_get (line 914)
-- new date_default_timezone_set (line 915)
-- new localtime (line 916)
-- new localeconv (line 917)
-- new idate (line 918)
-- new date_sun_info (line 919)
-- new date_interval_format (line 920)
-- new date_interval_create_from_date_string (line 921)
-- new date_create (line 922)
-- new date_create_immutable (line 923)
-- new date_create_from_format (line 924)
-- new date_create_immutable_from_format (line 925)
-- new date_parse (line 926)
-- new date_parse_from_format (line 927)
-- new date_add (line 928)
-- new date_sub (line 929)
-- new date_modify (line 930)
-- new date_diff (line 931)
-- new date_sunrise (line 932)
-- new date_sunset (line 933)
-- new sleep (line 934)
-- new set_time_limit (line 935)
-- new setlocale (line 936)
-- new nl_langinfo (line 937)
-- new ignore_user_abort (line 938)
-- new connection_aborted (line 939)
-- new spl_autoload (line 940)
-- new spl_autoload_extensions (line 941)
-- new spl_autoload_functions (line 942)
-- new spl_autoload_register (line 943)
-- new spl_autoload_unregister (line 944)
-- new spl_autoload_call (line 945)
-- new time_nanosleep (line 946)
-- new time_sleep_until (line 947)
-- new usleep (line 948)
+- new get_included_files_ (line 737)
+- new debug_backtrace (line 738)
+- new debug_print_backtrace (line 739)
+- new get_debug_backtrace (line 740)
+- new class_exists_ (line 741)
+- new class_alias (line 742)
+- new create_lazy_ghost (line 744)
+- new create_lazy_proxy (line 745)
+- new class_has_lazy_object_initializer (line 746)
+- new class_has_lazy_object_uninitializer (line 747)
+- new enum_exists_ (line 749)
+- new unitenum_exists_ (line 750)
+- new interface_exists_ (line 751)
+- new trait_exists_ (line 752)
+- new class_uses_ (line 753)
+- new class_uses_recursive (line 754)
+- new class_implements_ (line 755)
+- new class_parents_ (line 756)
+- new function_exists (line 757)
+- new is_callable (line 758)
+- new call_user_func (line 759)
+- new call_user_func_array (line 760)
+- new func_get_arg (line 761)
+- new func_get_args (line 762)
+- new func_num_args (line 763)
+- new method_exists_ (line 764)
+- new class_meth_exists_ (line 765)
+- new class_has_method_ (line 767)
+- new class_has_property_ (line 768)
+- new class_has_constant_ (line 769)
+- new property_exists_ (line 771)
+- new attribute_exists_ (line 772)
+- new get_object_vars_ (line 773)
+- new get_mangled_object_vars_ (line 774)
+- new get_object_id (line 775)
+- new spl_object_id (line 776)
+- new spl_object_hash (line 777)
+- new get_class_ (line 778)
+- new get_called_class_ (line 779)
+- new get_class_vars_ (line 780)
+- new get_class_methods_ (line 781)
+- new get_parent_class_ (line 782)
+- new is_a_ (line 783)
+- new is_subclass_of_ (line 784)
+- new assert_ (line 785)
+- new assert_options (line 786)
+- new trigger_error_ (line 787)
+- new user_error (line 788)
+- new compiler_language_warning_ (line 789)
+- new set_error_handler_ (line 790)
+- new restore_error_handler_ (line 791)
+- new get_error_handler_ (line 793)
+- new set_exception_handler (line 795)
+- new restore_exception_handler (line 796)
+- new get_exception_handler (line 798)
+- new error_get_last (line 800)
+- new error_clear_last (line 801)
+- new exif_tagname (line 802)
+- new eval_ (line 803)
+- new phpc_deploy_path (line 804)
+- new compiler_is_superglobal_name (line 805)
+- new __compiler_libcrypt (line 806)
+- new __compiler_password_random_bytes (line 807)
+- new phpc_match_unhandled_operand_is_object (line 808)
+- new phpc_clone_with_begin (line 809)
+- new phpc_clone_with_end (line 810)
+- new phpc_clone_with_reinit (line 811)
+- new extract_ (line 812)
+- new compact_ (line 813)
+- new scandir (line 814)
+- new opendir (line 815)
+- new dir_ (line 816)
+- new readdir (line 817)
+- new closedir (line 818)
+- new rewinddir (line 819)
+- new glob_ (line 820)
+- new gzcompress (line 821)
+- new gzdecode (line 822)
+- new gzdeflate (line 823)
+- new gzencode (line 824)
+- new gzinflate (line 825)
+- new gzuncompress (line 826)
+- new gzopen (line 827)
+- new gzwrite (line 828)
+- new gzputs (line 829)
+- new gzread (line 830)
+- new gzgetc (line 831)
+- new gzgets (line 832)
+- new gzseek (line 833)
+- new gztell (line 834)
+- new gzrewind (line 835)
+- new gzeof (line 836)
+- new gzclose (line 837)
+- new readgzfile (line 838)
+- new gzfile (line 839)
+- new gzpassthru (line 840)
+- new zlib_encode (line 841)
+- new zlib_decode (line 842)
+- new deflate_init (line 843)
+- new deflate_add (line 844)
+- new inflate_init (line 845)
+- new inflate_add (line 846)
+- new inflate_get_status (line 847)
+- new inflate_get_read_len (line 848)
+- new zlib_get_coding_type (line 849)
+- new fnmatch (line 850)
+- new time (line 851)
+- new getmypid (line 852)
+- new getmyuid (line 853)
+- new getmygid (line 854)
+- new get_current_user (line 855)
+- new get_cfg_var (line 856)
+- new php_ini_loaded_file (line 857)
+- new php_ini_scanned_files (line 858)
+- new zend_thread_id (line 859)
+- new getmygrgid (line 860)
+- new getmyinode (line 861)
+- new getlastmod (line 862)
+- new getrusage (line 863)
+- new cli_get_process_title (line 864)
+- new cli_set_process_title (line 865)
+- new proc_nice (line 866)
+- new memory_get_peak_usage (line 867)
+- new memory_get_usage (line 868)
+- new memory_reset_peak_usage (line 869)
+- new microtime (line 870)
+- new gettimeofday (line 871)
+- new hrtime (line 872)
+- new clock_gettime (line 873)
+- new phpversion (line 874)
+- new php_sapi_name (line 875)
+- new getopt (line 876)
+- new php_uname (line 877)
+- new phpinfo (line 878)
+- new phpcredits (line 879)
+- new zend_version (line 880)
+- new version_compare (line 881)
+- new extension_loaded (line 882)
+- new get_loaded_extensions (line 883)
+- new get_extension_funcs (line 884)
+- new date (line 885)
+- new timezone_version_get (line 886)
+- new timezone_identifiers_list (line 887)
+- new timezone_abbreviations_list (line 888)
+- new timezone_name_from_abbr (line 889)
+- new timezone_open (line 890)
+- new timezone_name_get (line 891)
+- new timezone_offset_get (line 892)
+- new date_offset_get (line 893)
+- new date_format (line 894)
+- new date_timestamp_get (line 895)
+- new date_timestamp_set (line 896)
+- new date_date_set (line 897)
+- new date_isodate_set (line 898)
+- new date_time_set (line 899)
+- new date_timezone_get (line 900)
+- new date_timezone_set (line 901)
+- new date_get_last_errors (line 902)
+- new timezone_location_get (line 903)
+- new timezone_transitions_get (line 904)
+- new gmdate (line 905)
+- new strftime (line 906)
+- new gmstrftime (line 907)
+- new strptime (line 908)
+- new getdate (line 909)
+- new gmgetdate (line 910)
+- new gmmktime (line 911)
+- new mktime (line 912)
+- new strtotime (line 913)
+- new checkdate (line 914)
+- new date_default_timezone_get (line 915)
+- new date_default_timezone_set (line 916)
+- new localtime (line 917)
+- new localeconv (line 918)
+- new idate (line 919)
+- new date_sun_info (line 920)
+- new date_interval_format (line 921)
+- new date_interval_create_from_date_string (line 922)
+- new date_create (line 923)
+- new date_create_immutable (line 924)
+- new date_create_from_format (line 925)
+- new date_create_immutable_from_format (line 926)
+- new date_parse (line 927)
+- new date_parse_from_format (line 928)
+- new date_add (line 929)
+- new date_sub (line 930)
+- new date_modify (line 931)
+- new date_diff (line 932)
+- new date_sunrise (line 933)
+- new date_sunset (line 934)
+- new sleep (line 935)
+- new set_time_limit (line 936)
+- new setlocale (line 937)
+- new nl_langinfo (line 938)
+- new ignore_user_abort (line 939)
+- new connection_aborted (line 940)
+- new spl_autoload (line 941)
+- new spl_autoload_extensions (line 942)
+- new spl_autoload_functions (line 943)
+- new spl_autoload_register (line 944)
+- new spl_autoload_unregister (line 945)
+- new spl_autoload_call (line 946)
+- new time_nanosleep (line 947)
+- new time_sleep_until (line 948)
+- new usleep (line 949)
 - 6 class method(s)
 - 1 closure(s)
 
@@ -32820,6 +32642,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/phpc_getenv_kernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/standard/phpc_gethostname_kernel.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -41218,6 +41045,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
 
+### `lib/JIT/Builtin/StringGethostname.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/StringGetrusage.php`
 
 **Warnings** (review for bootstrap subset):
@@ -43198,69 +43030,69 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ErrorHandler (line 578)
 - new Scope (line 598)
 - new Call\ExternalMethod (line 648)
-- new Builtin\IsNullFn (line 907)
 - new Builtin\IsNullFn (line 908)
-- new Call\SplObjectStorageMethod (line 909)
+- new Builtin\IsNullFn (line 909)
 - new Call\SplObjectStorageMethod (line 910)
 - new Call\SplObjectStorageMethod (line 911)
 - new Call\SplObjectStorageMethod (line 912)
 - new Call\SplObjectStorageMethod (line 913)
 - new Call\SplObjectStorageMethod (line 914)
-- new Call\WeakReferenceCreate (line 916)
-- new Call\WeakReferenceGet (line 917)
-- new Call\WeakMapMethod (line 918)
+- new Call\SplObjectStorageMethod (line 915)
+- new Call\WeakReferenceCreate (line 917)
+- new Call\WeakReferenceGet (line 918)
 - new Call\WeakMapMethod (line 919)
 - new Call\WeakMapMethod (line 920)
 - new Call\WeakMapMethod (line 921)
 - new Call\WeakMapMethod (line 922)
-- new Call\ReflectionClassConstruct (line 924)
-- new Call\ReflectionObjectConstruct (line 925)
-- new Call\ReflectionClassGetName (line 926)
-- new Call\ReflectionClassGetShortName (line 927)
-- new Call\ReflectionClassGetAttributes (line 928)
-- new Call\ReflectionClassGetMethod (line 929)
-- new Call\ReflectionClassGetReflectionConstant (line 930)
-- new Call\ReflectionClassIsFinal (line 931)
-- new Call\ReflectionClassIsIterateable (line 932)
-- new Call\ReflectionClassNewLazyProxy (line 934)
-- new Call\ReflectionClassNewLazyGhost (line 935)
-- new Call\ReflectionClassCreateLazyGhost (line 936)
-- new Call\ReflectionClassCreateLazyProxy (line 937)
-- new Call\ReflectionPropertyConstruct (line 939)
-- new Call\ReflectionPropertyGetAttributes (line 940)
-- new Call\ReflectionConstantConstruct (line 941)
-- new Call\ReflectionConstantGetAttributes (line 942)
-- new Call\ReflectionMethodGetAttributes (line 943)
-- new Call\ReflectionParameterIsSensitiveParameter (line 945)
-- new Call\ReflectionFunctionGetNamedArguments (line 948)
-- new Call\ReflectionMethodGetNamedArguments (line 949)
-- new Call\ReflectionAttributeGetName (line 951)
-- new Call\ReflectionAttributeNewInstance (line 952)
-- new Call\ReflectionEnumConstruct (line 953)
-- new Call\ReflectionEnumGetName (line 954)
-- new Call\ReflectionEnumHasCase (line 955)
-- new Call\ReflectionEnumGetCase (line 956)
-- new Call\ReflectionEnumIsBacked (line 957)
-- new Call\ReflectionEnumUnitCaseGetName (line 958)
+- new Call\WeakMapMethod (line 923)
+- new Call\ReflectionClassConstruct (line 925)
+- new Call\ReflectionObjectConstruct (line 926)
+- new Call\ReflectionClassGetName (line 927)
+- new Call\ReflectionClassGetShortName (line 928)
+- new Call\ReflectionClassGetAttributes (line 929)
+- new Call\ReflectionClassGetMethod (line 930)
+- new Call\ReflectionClassGetReflectionConstant (line 931)
+- new Call\ReflectionClassIsFinal (line 932)
+- new Call\ReflectionClassIsIterateable (line 933)
+- new Call\ReflectionClassNewLazyProxy (line 935)
+- new Call\ReflectionClassNewLazyGhost (line 936)
+- new Call\ReflectionClassCreateLazyGhost (line 937)
+- new Call\ReflectionClassCreateLazyProxy (line 938)
+- new Call\ReflectionPropertyConstruct (line 940)
+- new Call\ReflectionPropertyGetAttributes (line 941)
+- new Call\ReflectionConstantConstruct (line 942)
+- new Call\ReflectionConstantGetAttributes (line 943)
+- new Call\ReflectionMethodGetAttributes (line 944)
+- new Call\ReflectionParameterIsSensitiveParameter (line 946)
+- new Call\ReflectionFunctionGetNamedArguments (line 949)
+- new Call\ReflectionMethodGetNamedArguments (line 950)
+- new Call\ReflectionAttributeGetName (line 952)
+- new Call\ReflectionAttributeNewInstance (line 953)
+- new Call\ReflectionEnumConstruct (line 954)
+- new Call\ReflectionEnumGetName (line 955)
+- new Call\ReflectionEnumHasCase (line 956)
+- new Call\ReflectionEnumGetCase (line 957)
+- new Call\ReflectionEnumIsBacked (line 958)
 - new Call\ReflectionEnumUnitCaseGetName (line 959)
-- new Call\ExceptionGetMessage (line 960)
-- new Call\DatePeriodCreateFromISO8601String (line 966)
-- new Call\DatePeriodIteratorMethod (line 968)
-- new Call\DateTimeFormat (line 971)
+- new Call\ReflectionEnumUnitCaseGetName (line 960)
+- new Call\ExceptionGetMessage (line 961)
+- new Call\DatePeriodCreateFromISO8601String (line 967)
+- new Call\DatePeriodIteratorMethod (line 969)
 - new Call\DateTimeFormat (line 972)
-- new Result (line 1315)
-- new Result (line 1337)
-- new Variable (line 1938)
-- new Variable (line 2075)
-- new Variable (line 2301)
-- new Variable (line 2359)
-- new VMVariable (line 2497)
-- new VMVariable (line 2513)
-- new VMVariable (line 2519)
-- new VMVariable (line 2525)
-- new VMVariable (line 2536)
-- new Variable (line 2566)
-- new Variable (line 2606)
+- new Call\DateTimeFormat (line 973)
+- new Result (line 1316)
+- new Result (line 1338)
+- new Variable (line 1939)
+- new Variable (line 2076)
+- new Variable (line 2302)
+- new Variable (line 2360)
+- new VMVariable (line 2498)
+- new VMVariable (line 2514)
+- new VMVariable (line 2520)
+- new VMVariable (line 2526)
+- new VMVariable (line 2537)
+- new Variable (line 2567)
+- new Variable (line 2607)
 - 102 class method(s)
 - 28 closure(s)
 
@@ -44532,30 +44364,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sqlite3\Module (line 275)
 - new ext\pgsql\Module (line 276)
 - new ext\odbc\Module (line 277)
-- new ext\dba\Module (line 278)
-- new ext\mailparse\Module (line 279)
-- new ext\enchant\Module (line 280)
-- new ext\pdo\Module (line 281)
-- new ext\phar\Module (line 282)
-- new ext\uri\Module (line 283)
-- new ext\uuid\Module (line 284)
-- new ext\uploadprogress\Module (line 285)
-- new ext\apcu\Module (line 286)
-- new ext\sysvshm\Module (line 287)
-- new ext\sysvsem\Module (line 288)
-- new ext\sysvmsg\Module (line 289)
-- new ext\reflection\Module (line 290)
-- new ext\standard\Module (line 291)
-- new JIT (line 367)
-- new JITContext (line 381)
-- new SealedClassPreprocessor (line 447)
-- new StaticClassPreprocessor (line 450)
-- new SourcePreprocessor\PropertyHooks (line 453)
-- new State (line 594)
-- new ReflectionProperty (line 621)
-- new ReflectionProperty (line 624)
-- new LintCompiler (line 1035)
-- new Variable (line 1165)
+- new ext\mailparse\Module (line 278)
+- new ext\enchant\Module (line 279)
+- new ext\pdo\Module (line 280)
+- new ext\phar\Module (line 281)
+- new ext\uri\Module (line 282)
+- new ext\uuid\Module (line 283)
+- new ext\uploadprogress\Module (line 284)
+- new ext\apcu\Module (line 285)
+- new ext\sysvshm\Module (line 286)
+- new ext\sysvsem\Module (line 287)
+- new ext\sysvmsg\Module (line 288)
+- new ext\reflection\Module (line 289)
+- new ext\standard\Module (line 290)
+- new JIT (line 366)
+- new JITContext (line 380)
+- new SealedClassPreprocessor (line 446)
+- new StaticClassPreprocessor (line 449)
+- new SourcePreprocessor\PropertyHooks (line 452)
+- new State (line 593)
+- new ReflectionProperty (line 620)
+- new ReflectionProperty (line 623)
+- new LintCompiler (line 1034)
+- new Variable (line 1164)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
