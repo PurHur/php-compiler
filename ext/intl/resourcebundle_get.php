@@ -46,7 +46,7 @@ final class resourcebundle_get extends Internal
             ));
         }
         $index = VmResourceBundle::coerceIndexArg($frame->calledArgs[1], 'resourcebundle_get', 1);
-        $result = VmResourceBundle::get($receiver->toObject(), $index);
+        $result = VmResourceBundle::get($frame->vmContext, $receiver->toObject(), $index);
         if (null === $frame->returnVar) {
             return;
         }
@@ -57,6 +57,16 @@ final class resourcebundle_get extends Internal
         }
         if (\is_int($result)) {
             $frame->returnVar->int($result);
+
+            return;
+        }
+        if ($result instanceof \PHPCompiler\VM\ObjectEntry) {
+            $frame->returnVar->object($result);
+
+            return;
+        }
+        if ($result instanceof \PHPCompiler\VM\HashTable) {
+            $frame->returnVar->array($result);
 
             return;
         }

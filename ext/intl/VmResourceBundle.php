@@ -16,14 +16,24 @@ use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * ResourceBundle create/get/locales/errors — ICU ures_* via thin FFI (#6187, #20739).
+ * ResourceBundle create/get/locales/errors — ICU ures_* via thin FFI (#6187, #20739, #20916).
  *
  * php-src: ext/intl/resourcebundle/resourcebundle_class.cpp
- * ICU: unicode/ures.h — ures_open_N / ures_getStringByKey_N / ures_openAvailableLocales_N / ures_close_N
+ *          ext/intl/resourcebundle/resourcebundle_iterator.cpp
+ *          ext/intl/resourcebundle/resourcebundle.cpp (extract_value)
+ * ICU: unicode/ures.h — ures_open / ures_getSize / ures_getByIndex / ures_getKey / …
  */
 final class VmResourceBundle
 {
     public const CLASS_LC = 'resourcebundle';
+
+    /** ICU UResType — unicode/ures.h */
+    private const URES_STRING = 0;
+    private const URES_BINARY = 1;
+    private const URES_TABLE = 2;
+    private const URES_INT = 7;
+    private const URES_ARRAY = 8;
+    private const URES_INT_VECTOR = 14;
 
     /**
      * @var array<int, array{
@@ -51,8 +61,13 @@ final class VmResourceBundle
 
         $entry = new ClassEntry('ResourceBundle');
         $entry->isInternal = true;
-        // php-src ResourceBundle implements Countable (#20781).
-        $entry->interfaces[] = 'countable';
+        // php-src ResourceBundle implements IteratorAggregate, Countable (#20781, #20916).
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $entry->interfaces[] = 'iteratoraggregate';
+        }
+        if (isset($ctx->classes['countable'])) {
+            $entry->interfaces[] = 'countable';
+        }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry->methods['create'] = new ResourceBundleCreate();
@@ -153,9 +168,9 @@ final class VmResourceBundle
     }
 
     /**
-     * @return string|int|null null = missing/failed lookup (php-src returns null)
+     * @return string|int|ObjectEntry|HashTable|null null = missing/failed lookup (php-src returns null)
      */
-    public static function get(ObjectEntry $bundle, string $index)
+    public static function get(Context $ctx, ObjectEntry $bundle, string $index)
     {
         $state = self::$state[$bundle->id] ?? null;
         if (null === $state) {
@@ -170,12 +185,12 @@ final class VmResourceBundle
         self::clearObjectError($bundle);
         IntlError::clear();
         if (null !== $state['handle']) {
-            $str = self::getStringByKey($state['handle'], $index);
-            if (null !== $str) {
+            $extracted = self::extractByKey($ctx, $state['handle'], $index);
+            if (null !== $extracted) {
                 self::clearObjectError($bundle);
                 IntlError::clear();
 
-                return $str;
+                return $extracted;
             }
             // Fall through for Version when key lookup fails with warning-only.
         }
@@ -198,11 +213,12 @@ final class VmResourceBundle
         if (null === $state) {
             return 0;
         }
-        if ($state['fallback']) {
+        if ($state['fallback'] || null === $state['handle']) {
             return 1; // synthetic Version key
         }
-        // v1: do not enumerate full ICU tree — report at least Version presence.
-        return 1;
+        $size = self::uresGetSize($state['handle']);
+
+        return $size >= 0 ? $size : 1;
     }
 
     public static function getErrorCode(ObjectEntry $bundle): int
@@ -220,7 +236,8 @@ final class VmResourceBundle
     }
 
     /**
-     * ResourceBundle::getIterator() — php-src returns InternalIterator; expose ArrayIterator over top-level keys (#20739).
+     * ResourceBundle::getIterator() — php-src InternalIterator over ures_getByIndex (#20916).
+     * Snapshot into ArrayIterator (same observable foreach keys/values for tables/arrays).
      */
     public static function getIterator(Context $ctx, ObjectEntry $bundle): ObjectEntry
     {
@@ -228,13 +245,7 @@ final class VmResourceBundle
         if (null === $class) {
             throw new \LogicException('ArrayIterator is not registered in this compiler build');
         }
-        $ht = new HashTable();
-        $version = self::peekVersion($bundle);
-        if (null !== $version) {
-            $v = new Variable();
-            $v->string($version);
-            $ht->add('Version', $v);
-        }
+        $ht = self::buildEntriesHashTable($ctx, $bundle);
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         ArrayIteratorBuiltin::init($entry, $ht);
@@ -295,25 +306,154 @@ final class VmResourceBundle
         self::$state[$bundle->id]['errorMessage'] = 'U_ZERO_ERROR';
     }
 
-    private static function peekVersion(ObjectEntry $bundle): ?string
-    {
-        $state = self::$state[$bundle->id] ?? null;
-        if (null === $state) {
-            return null;
-        }
-        if (null !== $state['handle']) {
-            $str = self::getStringByKey($state['handle'], 'Version');
-            if (null !== $str) {
-                return $str;
-            }
-        }
-
-        return self::fallbackVersion();
-    }
-
     private static function fallbackVersion(): string
     {
         return '40';
+    }
+
+    /**
+     * Build a HashTable of top-level entries (table keys or array indices) — php-src iterator.
+     */
+    private static function buildEntriesHashTable(Context $ctx, ObjectEntry $bundle): HashTable
+    {
+        $ht = new HashTable();
+        $state = self::$state[$bundle->id] ?? null;
+        if (null === $state) {
+            return $ht;
+        }
+        if ($state['fallback'] || null === $state['handle']) {
+            $v = new Variable();
+            $v->string(self::fallbackVersion());
+            $ht->add('Version', $v);
+
+            return $ht;
+        }
+        $handle = $state['handle'];
+        $size = self::uresGetSize($handle);
+        if ($size <= 0) {
+            return $ht;
+        }
+        $isTable = self::URES_TABLE === self::uresGetType($handle);
+        for ($i = 0; $i < $size; ++$i) {
+            $pair = self::extractByIndex($ctx, $handle, $i, $isTable);
+            if (null === $pair) {
+                continue;
+            }
+            [$key, $value] = $pair;
+            $var = new Variable();
+            if (\is_int($value)) {
+                $var->int($value);
+            } elseif (\is_string($value)) {
+                $var->string($value);
+            } elseif ($value instanceof ObjectEntry) {
+                $var->object($value);
+            } elseif ($value instanceof HashTable) {
+                $var->array($value);
+            } else {
+                continue;
+            }
+            if (\is_int($key)) {
+                $ht->append($var);
+            } else {
+                $ht->add($key, $var);
+            }
+        }
+
+        return $ht;
+    }
+
+    /**
+     * @return array{0: int|string, 1: string|int|ObjectEntry|HashTable}|null
+     */
+    private static function extractByIndex(Context $ctx, object $handle, int $index, bool $isTable): ?array
+    {
+        $child = self::uresGetByIndex($handle, $index);
+        if (null === $child) {
+            return null;
+        }
+        $key = $isTable ? self::uresGetKey($child) : $index;
+        if ($isTable && (null === $key || '' === $key)) {
+            $key = (string) $index;
+        }
+        $value = self::extractChildValue($ctx, $child);
+        if (null === $value) {
+            return null;
+        }
+
+        return [$key, $value];
+    }
+
+    /**
+     * @return string|int|ObjectEntry|HashTable|null
+     */
+    private static function extractByKey(Context $ctx, object $handle, string $key)
+    {
+        $child = self::uresGetByKey($handle, $key);
+        if (null === $child) {
+            // Legacy string-only path (Version via ures_getStringByKey / getVersionNumber).
+            return self::getStringByKey($handle, $key);
+        }
+
+        return self::extractChildValue($ctx, $child);
+    }
+
+    /**
+     * php-src resourcebundle_extract_value — consume $child (close or transfer ownership).
+     *
+     * @return string|int|ObjectEntry|HashTable|null
+     */
+    private static function extractChildValue(Context $ctx, object $child)
+    {
+        $type = self::uresGetType($child);
+        switch ($type) {
+            case self::URES_STRING:
+                $str = self::uresGetString($child);
+                self::uresClose($child);
+
+                return $str;
+            case self::URES_BINARY:
+                $bin = self::uresGetBinary($child);
+                self::uresClose($child);
+
+                return $bin;
+            case self::URES_INT:
+                $int = self::uresGetInt($child);
+                self::uresClose($child);
+
+                return $int;
+            case self::URES_INT_VECTOR:
+                $vec = self::uresGetIntVector($child);
+                self::uresClose($child);
+
+                return $vec;
+            case self::URES_ARRAY:
+            case self::URES_TABLE:
+                return self::wrapHandle($ctx, $child);
+            default:
+                self::uresClose($child);
+
+                return null;
+        }
+    }
+
+    /** @param object $handle */
+    private static function wrapHandle(Context $ctx, object $handle): ObjectEntry
+    {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            throw new \Error('Class "ResourceBundle" not found');
+        }
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        $object->constructed = true;
+        self::$state[$object->id] = [
+            'locale' => '',
+            'bundle' => null,
+            'handle' => $handle,
+            'fallback' => false,
+            'errorCode' => IntlError::U_ZERO_ERROR,
+            'errorMessage' => 'U_ZERO_ERROR',
+        ];
+
+        return $object;
     }
 
     /**
@@ -391,6 +531,224 @@ final class VmResourceBundle
             return $rb;
         } catch (\Throwable) {
             return null;
+        }
+    }
+
+    /** @param object $handle */
+    private static function uresGetSize(object $handle): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $fn = 'ures_getSize'.self::$symSuffix;
+        try {
+            return (int) $ffi->$fn($handle);
+        } catch (\Throwable) {
+            return -1;
+        }
+    }
+
+    /** @param object $handle */
+    private static function uresGetType(object $handle): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $fn = 'ures_getType'.self::$symSuffix;
+        try {
+            return (int) $ffi->$fn($handle);
+        } catch (\Throwable) {
+            return -1;
+        }
+    }
+
+    /** @param object $handle */
+    private static function uresGetKey(object $handle): ?string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'ures_getKey'.self::$symSuffix;
+        try {
+            $key = $ffi->$fn($handle);
+            if (null === $key) {
+                return null;
+            }
+
+            return \is_string($key) ? $key : \FFI::string($key);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @param object $parent @return object|null */
+    private static function uresGetByIndex(object $parent, int $index): ?object
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'ures_getByIndex'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $child = $ffi->$fn($parent, $index, null, \FFI::addr($status));
+            if (null === $child || (int) $status->cdata > 0) {
+                return null;
+            }
+
+            return $child;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @param object $parent @return object|null */
+    private static function uresGetByKey(object $parent, string $key): ?object
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'ures_getByKey'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $child = $ffi->$fn($parent, $key, null, \FFI::addr($status));
+            if (null === $child || (int) $status->cdata > 0) {
+                return null;
+            }
+
+            return $child;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @param object $handle */
+    private static function uresGetString(object $handle): ?string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'ures_getString'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $len = $ffi->new('int32_t');
+            $len->cdata = 0;
+            $ptr = $ffi->$fn($handle, \FFI::addr($len), \FFI::addr($status));
+            if ((int) $status->cdata > 0 || null === $ptr) {
+                return null;
+            }
+            $n = (int) $len->cdata;
+            if ($n <= 0) {
+                return '';
+            }
+
+            return self::uCharsToUtf8($ptr, $n);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @param object $handle */
+    private static function uresGetBinary(object $handle): ?string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'ures_getBinary'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $len = $ffi->new('int32_t');
+            $len->cdata = 0;
+            $ptr = $ffi->$fn($handle, \FFI::addr($len), \FFI::addr($status));
+            if ((int) $status->cdata > 0 || null === $ptr) {
+                return null;
+            }
+            $n = (int) $len->cdata;
+            if ($n <= 0) {
+                return '';
+            }
+
+            return \FFI::string($ptr, $n);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @param object $handle */
+    private static function uresGetInt(object $handle): ?int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'ures_getInt'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $val = (int) $ffi->$fn($handle, \FFI::addr($status));
+            if ((int) $status->cdata > 0) {
+                return null;
+            }
+
+            return $val;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @param object $handle @return HashTable|null */
+    private static function uresGetIntVector(object $handle): ?HashTable
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'ures_getIntVector'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $len = $ffi->new('int32_t');
+            $len->cdata = 0;
+            $ptr = $ffi->$fn($handle, \FFI::addr($len), \FFI::addr($status));
+            if ((int) $status->cdata > 0 || null === $ptr) {
+                return null;
+            }
+            $n = (int) $len->cdata;
+            $ht = new HashTable();
+            for ($i = 0; $i < $n; ++$i) {
+                $v = new Variable();
+                $v->int((int) $ptr[$i]);
+                $ht->append($v);
+            }
+
+            return $ht;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @param object $handle */
+    private static function uresClose(object $handle): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        $fn = 'ures_close'.self::$symSuffix;
+        try {
+            $ffi->$fn($handle);
+        } catch (\Throwable) {
+            // ignore
         }
     }
 
@@ -505,12 +863,22 @@ final class VmResourceBundle
         return <<<C
 typedef int32_t UErrorCode;
 typedef uint16_t UChar;
+typedef unsigned char uint8_t;
 typedef struct UResourceBundle UResourceBundle;
 typedef struct UEnumeration UEnumeration;
 UResourceBundle *ures_open{$suffix}(const char *path, const char *locale, UErrorCode *status);
 void ures_close{$suffix}(UResourceBundle *resB);
+int32_t ures_getSize{$suffix}(const UResourceBundle *resB);
+int32_t ures_getType{$suffix}(const UResourceBundle *resB);
+const char *ures_getKey{$suffix}(const UResourceBundle *resB);
+UResourceBundle *ures_getByIndex{$suffix}(const UResourceBundle *resB, int32_t indexR, UResourceBundle *fillIn, UErrorCode *status);
+UResourceBundle *ures_getByKey{$suffix}(const UResourceBundle *resB, const char *inKey, UResourceBundle *fillIn, UErrorCode *status);
 const char *ures_getVersionNumber{$suffix}(const UResourceBundle *resB);
+const UChar *ures_getString{$suffix}(const UResourceBundle *resB, int32_t *len, UErrorCode *status);
 const UChar *ures_getStringByKey{$suffix}(const UResourceBundle *resB, const char *key, int32_t *len, UErrorCode *status);
+const uint8_t *ures_getBinary{$suffix}(const UResourceBundle *resB, int32_t *len, UErrorCode *status);
+int32_t ures_getInt{$suffix}(const UResourceBundle *resB, UErrorCode *status);
+const int32_t *ures_getIntVector{$suffix}(const UResourceBundle *resB, int32_t *len, UErrorCode *status);
 UEnumeration *ures_openAvailableLocales{$suffix}(const char *packageName, UErrorCode *status);
 int32_t uenum_count{$suffix}(UEnumeration *en, UErrorCode *status);
 const char *uenum_next{$suffix}(UEnumeration *en, int32_t *resultLength, UErrorCode *status);
@@ -577,7 +945,7 @@ final class ResourceBundleGet extends VmClassMethod
             throw new \Error('ResourceBundle::get() called on incompatible object');
         }
         $index = VmResourceBundle::coerceIndexArg($frame->calledArgs[1], 'ResourceBundle::get', 1);
-        $result = VmResourceBundle::get($receiver->toObject(), $index);
+        $result = VmResourceBundle::get($frame->vmContext, $receiver->toObject(), $index);
         if (null === $frame->returnVar) {
             return;
         }
@@ -588,6 +956,16 @@ final class ResourceBundleGet extends VmClassMethod
         }
         if (\is_int($result)) {
             $frame->returnVar->int($result);
+
+            return;
+        }
+        if ($result instanceof ObjectEntry) {
+            $frame->returnVar->object($result);
+
+            return;
+        }
+        if ($result instanceof HashTable) {
+            $frame->returnVar->array($result);
 
             return;
         }
