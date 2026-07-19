@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6072 |
-| Phase A inventory files (M2 ratio SSOT) | 6072 |
+| PHP files on vm.php path | 6073 |
+| Phase A inventory files (M2 ratio SSOT) | 6073 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18888 |
+| Source constructs flagged (warnings) | 18892 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -177,6 +177,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_upkeep.php` | 0 | 2 |
 | `ext/curl/curl_version.php` | 0 | 2 |
 | `ext/dom/AttrIsId.php` | 0 | 2 |
+| `ext/dom/AttrRename.php` | 0 | 2 |
 | `ext/dom/BuiltinClasses.php` | 0 | 1 |
 | `ext/dom/CharacterDataAppendData.php` | 0 | 1 |
 | `ext/dom/CharacterDataDeleteData.php` | 0 | 1 |
@@ -237,7 +238,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 3 |
 | `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
-| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 136 |
+| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 137 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadJitHelper.php` | 0 | 1 |
@@ -420,7 +421,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
 | `ext/dom/TokenListValues.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 412 |
+| `ext/dom/VmDom.php` | 0 | 414 |
 | `ext/dom/VmDomCollectionDimension.php` | 0 | 1 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 42 |
@@ -3474,7 +3475,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/halt_compiler_.php` | 0 | 3 |
 | `ext/standard/hash_.php` | 0 | 6 |
 | `ext/standard/hash_equals.php` | 0 | 1 |
-| `ext/standard/hash_hkdf.php` | 0 | 2 |
+| `ext/standard/hash_hkdf.php` | 0 | 1 |
 | `ext/standard/hash_hmac.php` | 0 | 5 |
 | `ext/standard/hash_hmac_algos.php` | 0 | 2 |
 | `ext/standard/hash_pbkdf2.php` | 0 | 1 |
@@ -7034,6 +7035,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 25)
 - 1 class method(s)
 
+### `ext/dom/AttrRename.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
 ### `ext/dom/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7410,91 +7417,92 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 196)
 - new ClassProperty (line 198)
 - new Variable (line 198)
-- new ClassEntry (line 202)
-- new ClassProperty (line 206)
-- new ClassProperty (line 207)
-- new ClassProperty (line 208)
-- new ClassProperty (line 209)
-- new Variable (line 209)
+- new AttrRename (line 201)
+- new ClassEntry (line 206)
+- new ClassProperty (line 210)
 - new ClassProperty (line 211)
-- new ElementQuerySelector (line 214)
-- new ElementQuerySelectorAll (line 217)
-- new ClassEntry (line 222)
-- new ClassProperty (line 231)
-- new Variable (line 231)
-- new ClassEntry (line 236)
-- new ClassProperty (line 248)
-- new Variable (line 248)
-- new ClassEntry (line 253)
-- new ClassProperty (line 256)
-- new ClassProperty (line 257)
-- new ClassProperty (line 258)
-- new ClassProperty (line 259)
-- new ClassEntry (line 263)
-- new ClassProperty (line 266)
-- new ClassEntry (line 270)
-- new ClassProperty (line 273)
-- new ClassProperty (line 274)
-- new ClassProperty (line 275)
-- new ClassEntry (line 279)
-- new ClassProperty (line 284)
-- new Variable (line 284)
-- new ClassProperty (line 286)
+- new ClassProperty (line 212)
+- new ClassProperty (line 213)
+- new Variable (line 213)
+- new ClassProperty (line 215)
+- new ElementQuerySelector (line 218)
+- new ElementQuerySelectorAll (line 221)
+- new ClassEntry (line 226)
+- new ClassProperty (line 235)
+- new Variable (line 235)
+- new ClassEntry (line 240)
+- new ClassProperty (line 252)
+- new Variable (line 252)
+- new ClassEntry (line 257)
+- new ClassProperty (line 260)
+- new ClassProperty (line 261)
+- new ClassProperty (line 262)
+- new ClassProperty (line 263)
+- new ClassEntry (line 267)
+- new ClassProperty (line 270)
+- new ClassEntry (line 274)
+- new ClassProperty (line 277)
+- new ClassProperty (line 278)
+- new ClassProperty (line 279)
+- new ClassEntry (line 283)
+- new ClassProperty (line 288)
 - new Variable (line 288)
-- new ClassProperty (line 289)
 - new ClassProperty (line 290)
-- new ClassProperty (line 291)
-- new ClassProperty (line 292)
+- new Variable (line 292)
+- new ClassProperty (line 293)
 - new ClassProperty (line 294)
-- new ClassProperty (line 300)
-- new ElementClosest (line 303)
-- new ElementMatches (line 306)
-- new ElementQuerySelector (line 309)
-- new ElementQuerySelectorAll (line 312)
-- new ElementGetElementsByClassName (line 315)
-- new ElementGetInScopeNamespaces (line 318)
-- new ElementGetDescendantNamespaces (line 321)
-- new ElementRename (line 324)
-- new ClassEntry (line 329)
-- new ClassEntry (line 336)
-- new ClassProperty (line 345)
-- new Variable (line 345)
-- new ClassProperty (line 346)
-- new Variable (line 346)
-- new ClassEntry (line 352)
-- new ClassProperty (line 361)
-- new Variable (line 361)
-- new HtmlCollectionNamedItem (line 363)
-- new ClassEntry (line 369)
-- new ClassProperty (line 378)
-- new Variable (line 378)
-- new ClassEntry (line 383)
-- new LivingXPathConstruct (line 385)
-- new ClassEntry (line 392)
-- new ClassProperty (line 396)
-- new ClassProperty (line 398)
-- new DocumentGetElementsByClassName (line 406)
-- new DocumentImportLegacyNode (line 410)
-- new ClassEntry (line 415)
-- new ClassProperty (line 418)
-- new ClassProperty (line 419)
-- new ClassProperty (line 420)
-- new HtmlDocumentCreateFromString (line 421)
-- new HtmlDocumentCreateEmpty (line 424)
-- new HtmlDocumentCreateFromFile (line 427)
-- new HtmlDocumentGetElementById (line 430)
-- new HtmlDocumentQuerySelector (line 433)
-- new HtmlDocumentQuerySelectorAll (line 436)
-- new HtmlDocumentSaveHtml (line 439)
-- new ClassEntry (line 456)
-- new ClassProperty (line 459)
-- new ClassProperty (line 460)
-- new Variable (line 463)
-- new XmlDocumentCreateFromString (line 465)
-- new XmlDocumentCreateFromFile (line 468)
-- new XmlDocumentCreateEmpty (line 471)
-- new ClassEntry (line 496)
-- new ClassEntry (line 509)
+- new ClassProperty (line 295)
+- new ClassProperty (line 296)
+- new ClassProperty (line 298)
+- new ClassProperty (line 304)
+- new ElementClosest (line 307)
+- new ElementMatches (line 310)
+- new ElementQuerySelector (line 313)
+- new ElementQuerySelectorAll (line 316)
+- new ElementGetElementsByClassName (line 319)
+- new ElementGetInScopeNamespaces (line 322)
+- new ElementGetDescendantNamespaces (line 325)
+- new ElementRename (line 328)
+- new ClassEntry (line 333)
+- new ClassEntry (line 340)
+- new ClassProperty (line 349)
+- new Variable (line 349)
+- new ClassProperty (line 350)
+- new Variable (line 350)
+- new ClassEntry (line 356)
+- new ClassProperty (line 365)
+- new Variable (line 365)
+- new HtmlCollectionNamedItem (line 367)
+- new ClassEntry (line 373)
+- new ClassProperty (line 382)
+- new Variable (line 382)
+- new ClassEntry (line 387)
+- new LivingXPathConstruct (line 389)
+- new ClassEntry (line 396)
+- new ClassProperty (line 400)
+- new ClassProperty (line 402)
+- new DocumentGetElementsByClassName (line 410)
+- new DocumentImportLegacyNode (line 414)
+- new ClassEntry (line 419)
+- new ClassProperty (line 422)
+- new ClassProperty (line 423)
+- new ClassProperty (line 424)
+- new HtmlDocumentCreateFromString (line 425)
+- new HtmlDocumentCreateEmpty (line 428)
+- new HtmlDocumentCreateFromFile (line 431)
+- new HtmlDocumentGetElementById (line 434)
+- new HtmlDocumentQuerySelector (line 437)
+- new HtmlDocumentQuerySelectorAll (line 440)
+- new HtmlDocumentSaveHtml (line 443)
+- new ClassEntry (line 460)
+- new ClassProperty (line 463)
+- new ClassProperty (line 464)
+- new Variable (line 467)
+- new XmlDocumentCreateFromString (line 469)
+- new XmlDocumentCreateFromFile (line 472)
+- new XmlDocumentCreateEmpty (line 475)
+- new ClassEntry (line 500)
+- new ClassEntry (line 513)
 - 4 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
@@ -8905,14 +8913,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 10182)
 - new DOMException (line 10193)
 - new DOMException (line 10198)
-- new DOMException (line 10220)
-- new DOMException (line 10225)
-- new DOMException (line 10228)
-- new DOMException (line 10231)
-- new DOMException (line 10260)
-- new Error (line 11301)
-- new Error (line 11305)
-- 448 class method(s)
+- new DOMException (line 10224)
+- new DOMException (line 10245)
+- new DOMException (line 10303)
+- new DOMException (line 10308)
+- new DOMException (line 10311)
+- new DOMException (line 10314)
+- new DOMException (line 10343)
+- new Error (line 11384)
+- new Error (line 11388)
+- 449 class method(s)
 - 3 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -8981,24 +8991,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 143)
-- new ObjectEntry (line 217)
-- new ObjectEntry (line 235)
-- new DOMException (line 264)
-- new Variable (line 267)
-- new DOMException (line 307)
-- new DOMException (line 395)
-- new DOMException (line 400)
-- new DOMException (line 407)
-- new DOMException (line 438)
-- new DOMException (line 450)
-- new Exception (line 597)
-- new DOMException (line 623)
-- new Variable (line 629)
-- new Variable (line 663)
-- new ObjectEntry (line 1184)
-- new HashTable (line 1208)
-- new Variable (line 1210)
-- 53 class method(s)
+- new ObjectEntry (line 223)
+- new ObjectEntry (line 241)
+- new DOMException (line 270)
+- new Variable (line 273)
+- new DOMException (line 313)
+- new DOMException (line 401)
+- new DOMException (line 406)
+- new DOMException (line 413)
+- new DOMException (line 444)
+- new DOMException (line 456)
+- new Exception (line 603)
+- new DOMException (line 629)
+- new Variable (line 635)
+- new Variable (line 669)
+- new ObjectEntry (line 1202)
+- new HashTable (line 1226)
+- new Variable (line 1228)
+- 55 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -31568,8 +31578,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hash_hkdf.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 108)
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/hash_hmac.php`
 
@@ -40513,8 +40522,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamSocketPairRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 206)
-- 10 class method(s)
+- new JIT (line 172)
+- 8 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamSync.php`
