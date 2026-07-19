@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Inventory / user-script AOT must link stream lifecycle+read via NestedJIT (#13137, #20966, #20982).
+ * Inventory / user-script AOT must link stream lifecycle+read+bucket via NestedJIT (#13137, #20966, #20982, #20998).
  *
  * @group aot-lint
  */
@@ -31,6 +31,8 @@ final class StandaloneDefineBuiltinsStreamAbiTest extends TestCase
         $this->assertStringNotContainsString('StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit', $context);
         $this->assertStringContainsString('StreamReadRuntime::ensureLinked', $context);
         $this->assertStringNotContainsString('StreamReadRuntime::ensureDeferredStubsForInventoryEmit', $context);
+        $this->assertStringContainsString('StreamBucket::ensureLinked', $context);
+        $this->assertStringNotContainsString('JitStreamBucketKernel::ensureDeferredStubsForInventoryEmit', $context);
     }
 
     public function testUserScriptAotStreamReadNestedJitLinks(): void

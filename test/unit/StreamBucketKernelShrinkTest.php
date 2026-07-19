@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\StreamBucketJitHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * stream_bucket_* ABI bridges quarantined in ext/standard (#9380, #19712).
+ * stream_bucket_* ABI bridges — always NestedJIT StreamBucketJitHelper (#9380, #20998).
  */
 final class StreamBucketKernelShrinkTest extends TestCase
 {
@@ -22,21 +22,26 @@ final class StreamBucketKernelShrinkTest extends TestCase
         $this->assertStringNotContainsString('StreamBucketRuntime', $runtime);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelAlwaysNestedJitNoThinStubFork(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamBucketKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitStreamBucketKernel', $source);
         $this->assertStringContainsString('__compiler_stream_bucket_register', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('StreamBucketJitHelper', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('ensureDeferredStubsForInventoryEmit', $source);
+        $this->assertStringNotContainsString('shouldDeferInventoryEmitStubs', $source);
+        $this->assertStringNotContainsString('implementDeferredResourceProbeStubs', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('GLOBAL_BUCKET_ACTIVE', $source);
         $this->assertStringNotContainsString('emitBucketRegister', $source);
-        $this->assertLessThan(400, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelNotBuiltinRuntime(): void

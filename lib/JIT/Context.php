@@ -1022,11 +1022,12 @@ class Context {
         Builtin\ErrorHandlerJitRuntime::ensureStandaloneBodies($this);
         Builtin\ExceptionHandlerJitRuntime::ensureStandaloneBodies($this);
         if (!$this->isUserScriptAot()) {
-            // NestedJIT StreamLifecycle/StreamRead helpers during thin init (peer StreamIo #20943 / #20966 / #20982).
+            // NestedJIT StreamLifecycle/StreamRead/StreamBucket helpers during thin init
+            // (peer StreamIo #20943 / #20966 / #20982 / #20998).
             Builtin\StreamLifecycleRuntime::ensureLinked($this);
             Builtin\StreamReadRuntime::ensureLinked($this);
+            Builtin\StreamBucket::ensureLinked($this);
         }
-        \PHPCompiler\ext\standard\JitStreamBucketKernel::ensureDeferredStubsForInventoryEmit($this);
         Builtin\AssertFail::ensureStandaloneBodies($this);
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
         Builtin\ObOutputRuntime::ensureLinked($this);

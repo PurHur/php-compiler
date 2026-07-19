@@ -4,23 +4,25 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
-use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\BasicBlock;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for stream_bucket_* via StreamBucketJitHelper PHP (#9380, #19712).
+ * JIT/AOT embed + thin standalone link for stream_bucket_* via StreamBucketJitHelper PHP (#9380, #20998).
  *
- * Quarantined from lib/JIT/Builtin/StreamBucketRuntime — {@see \PHPCompiler\JIT\Builtin\StreamBucket}
- * stays the thin orchestrator. Call-site lowering stays in {@see JitStreamBucket}.
+ * Always NestedJIT {@see StreamBucketJitHelper} (StreamRead #20982 / StreamLifecycle #20966 shape —
+ * no constant-0 / deferred probe stub fork). Call-site lowering stays in {@see JitStreamBucket}.
  *
- * Replaces slot-table LLVM globals (~550 LOC). SSOT: {@see \PHPCompiler\ext\standard\StreamBucketJitHelper}.
- * php-src: ext/standard/streams.c — stream_bucket_new, brigade helpers
+ * SSOT: {@see StreamBucketJitHelper}
+ * php-src: ext/standard/streamsfuncs.c — stream_bucket_new, brigade helpers
  */
 final class JitStreamBucketKernel
 {
@@ -69,16 +71,12 @@ final class JitStreamBucketKernel
 
     public static function ensureLinked(Context $context): void
     {
-        self::registerDeclarations($context);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::implement($context);
-        }
+        self::implement($context);
     }
 
-    /** Standalone AOT: emit bucket runtime into the module during Context init (#6323). */
+    /** Standalone AOT: emit bucket runtime into the module during Context init (#6323, #20998). */
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::registerDeclarations($context);
         self::implement($context);
     }
 
@@ -91,6 +89,16 @@ final class JitStreamBucketKernel
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of StreamBucketJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
         $probe = $context->module->getNamedFunction('__compiler_stream_bucket_register');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -98,6 +106,7 @@ final class JitStreamBucketKernel
             return;
         }
 
+        self::registerDeclarations($context);
         $restore = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_stream_bucket_register', self::implementRegisterBridge(...));
@@ -273,7 +282,7 @@ final class JitStreamBucketKernel
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamBucketJitHelper compile (#9380)');
+            throw new \LogicException($logical.' missing after StreamBucketJitHelper compile (#20998)');
         }
 
         return $fn;
@@ -281,33 +290,12 @@ final class JitStreamBucketKernel
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamBucketJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StreamBucketJitHelper.php parseAndCompile failed (#9380)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9380)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20998'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -336,53 +324,6 @@ final class JitStreamBucketKernel
 
             return;
         }
-        $context->builder->clearInsertionPosition();
-    }
-
-    /** Thin standalone AOT + Context standalone init — stubs without NestedJIT (#20553 / peer #20308). */
-    public static function shouldDeferInventoryEmitStubs(Context $context): bool
-    {
-        return $context->isThinStandaloneAotMain() || StreamIoRuntime::isStandaloneInitPhase();
-    }
-
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        if (!self::shouldDeferInventoryEmitStubs($context)) {
-            return;
-        }
-        self::implementDeferredResourceProbeStubs($context);
-    }
-
-    public static function implementDeferredResourceProbeStubs(Context $context): void
-    {
-        $restore = self::captureInsertBlock($context);
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        foreach (['__compiler_is_bucket_resource', '__compiler_is_brigade_resource'] as $name) {
-            self::implementI32I64RetStub($context, $name, $zero);
-        }
-        self::registerLinkedRuntime($context);
-        self::restoreInsertBlock($context, $restore);
-    }
-
-    private static function implementI32I64RetStub(Context $context, string $name, Value $ret): void
-    {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
-
-            return;
-        }
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $fn = $probe ?? $context->module->addFunction(
-            $name,
-            $context->context->functionType($i32, false, $i64)
-        );
-        $entry = $fn->appendBasicBlock('stream_bucket_probe_stub');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($ret);
-        $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
     }
 }
