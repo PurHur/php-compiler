@@ -119,7 +119,8 @@ OLD_INV="$(echo "$OLD_INV" | xargs)"
 echo "    ${OLD_SPINE}/${OLD_INV} -> ${NEW_SPINE}/${NEW_INV}"
 if [[ "$OLD_SPINE" != "$NEW_SPINE" || "$OLD_INV" != "$NEW_INV" ]]; then
   FOOTNOTE_FILES=(README.md docs/pages/development-status.md docs/self-host-target.md
-    docs/bootstrap-selfhost.md docs/roadmap-wave3.md docs/pages/index.html)
+    docs/bootstrap-selfhost.md docs/roadmap-wave3.md docs/pages/index.html
+    docs/bootstrap-generations.md docs/pages/missing-implementation.html)
   sed -i \
     -e "s/\*\*${OLD_SPINE}\*\* \/ \*\*${OLD_INV}\*\*/**${NEW_SPINE}** \/ **${NEW_INV}**/g" \
     -e "s/\*\*${OLD_SPINE}\/${OLD_INV}\*\*/**${NEW_SPINE}\/${NEW_INV}**/g" \
