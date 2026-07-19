@@ -64,7 +64,7 @@ final class AttributeRegistryLookupRuntime
             if (!\is_string($key) || !\is_array($names)) {
                 continue;
             }
-            $keyLit = $context->constantFromString($key);
+            $keyLit = $context->bytePtr($context->constantFromString($key));
             $cmp = $context->builder->call($strcasecmp, $classCstr, $keyLit);
             $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
             $count = $sizeT->constInt(\count($names), false);
@@ -88,13 +88,12 @@ final class AttributeRegistryLookupRuntime
         $classCstr = $fn->getParam(0);
         $idx = $fn->getParam(1);
         $strcasecmp = $context->lookupFunction('strcasecmp');
-        $empty = $context->constantFromString('');
-        $result = $context->builder->pointerCast($empty, $i8p);
+        $result = $context->bytePtr($context->constantFromString(''));
         foreach (self::decodeClassNames($classNamesJson) as $key => $names) {
             if (!\is_string($key) || !\is_array($names)) {
                 continue;
             }
-            $keyLit = $context->constantFromString($key);
+            $keyLit = $context->bytePtr($context->constantFromString($key));
             $cmp = $context->builder->call($strcasecmp, $classCstr, $keyLit);
             $classMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
             foreach ($names as $nameIdx => $name) {
@@ -107,7 +106,7 @@ final class AttributeRegistryLookupRuntime
                     $sizeT->constInt((int) $nameIdx, false)
                 );
                 $match = $context->builder->and($classMatch, $idxMatch);
-                $nameLit = $context->builder->pointerCast($context->constantFromString($name), $i8p);
+                $nameLit = $context->bytePtr($context->constantFromString($name));
                 $result = $context->builder->select($match, $nameLit, $result);
             }
         }
@@ -134,14 +133,14 @@ final class AttributeRegistryLookupRuntime
             if (!\is_string($classKey) || !\is_array($methods)) {
                 continue;
             }
-            $classLit = $context->constantFromString($classKey);
+            $classLit = $context->bytePtr($context->constantFromString($classKey));
             $classCmp = $context->builder->call($strcasecmp, $classCstr, $classLit);
             $classMatch = $context->builder->icmp(Builder::INT_EQ, $classCmp, $i32->constInt(0, false));
             foreach ($methods as $methodKey => $names) {
                 if (!\is_string($methodKey) || !\is_array($names)) {
                     continue;
                 }
-                $methodLit = $context->constantFromString($methodKey);
+                $methodLit = $context->bytePtr($context->constantFromString($methodKey));
                 $methodCmp = $context->builder->call($strcasecmp, $methodCstr, $methodLit);
                 $methodMatch = $context->builder->icmp(Builder::INT_EQ, $methodCmp, $i32->constInt(0, false));
                 $match = $context->builder->and($classMatch, $methodMatch);
@@ -168,20 +167,19 @@ final class AttributeRegistryLookupRuntime
         $methodCstr = $fn->getParam(1);
         $idx = $fn->getParam(2);
         $strcasecmp = $context->lookupFunction('strcasecmp');
-        $empty = $context->constantFromString('');
-        $result = $context->builder->pointerCast($empty, $i8p);
+        $result = $context->bytePtr($context->constantFromString(''));
         foreach (self::decodeMethodNames($methodNamesJson) as $classKey => $methods) {
             if (!\is_string($classKey) || !\is_array($methods)) {
                 continue;
             }
-            $classLit = $context->constantFromString($classKey);
+            $classLit = $context->bytePtr($context->constantFromString($classKey));
             $classCmp = $context->builder->call($strcasecmp, $classCstr, $classLit);
             $classMatch = $context->builder->icmp(Builder::INT_EQ, $classCmp, $i32->constInt(0, false));
             foreach ($methods as $methodKey => $names) {
                 if (!\is_string($methodKey) || !\is_array($names)) {
                     continue;
                 }
-                $methodLit = $context->constantFromString($methodKey);
+                $methodLit = $context->bytePtr($context->constantFromString($methodKey));
                 $methodCmp = $context->builder->call($strcasecmp, $methodCstr, $methodLit);
                 $methodMatch = $context->builder->icmp(Builder::INT_EQ, $methodCmp, $i32->constInt(0, false));
                 $cm = $context->builder->and($classMatch, $methodMatch);
@@ -195,7 +193,7 @@ final class AttributeRegistryLookupRuntime
                         $sizeT->constInt((int) $nameIdx, false)
                     );
                     $match = $context->builder->and($cm, $idxMatch);
-                    $nameLit = $context->builder->pointerCast($context->constantFromString($name), $i8p);
+                    $nameLit = $context->bytePtr($context->constantFromString($name));
                     $result = $context->builder->select($match, $nameLit, $result);
                 }
             }
