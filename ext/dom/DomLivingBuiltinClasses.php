@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\standard\ThrowableManifest;
 use PHPCompiler\VM\BuiltinClasses;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
@@ -73,6 +74,17 @@ final class DomLivingBuiltinClasses
 
         // Dom\ParentNode / Dom\ChildNode — living interfaces (php-src php_dom.stub.php; #20961).
         self::registerParentAndChildNodeInterfaces($ctx);
+
+        // Dom\DOMException — php-src stub: legacy DOMException is @alias Dom\DOMException (#20983).
+        // Share the ThrowableManifest DOMException ClassEntry (class_alias() rejects internals).
+        $domException = $ctx->classes[ThrowableManifest::LC_DOM_EXCEPTION] ?? null;
+        if (null !== $domException
+            && !isset($ctx->classes[VmDomLiving::CLASS_DOM_EXCEPTION])
+            && !isset($ctx->classAliases[VmDomLiving::CLASS_DOM_EXCEPTION])
+        ) {
+            $ctx->classes[VmDomLiving::CLASS_DOM_EXCEPTION] = $domException;
+            $ctx->classAliases[VmDomLiving::CLASS_DOM_EXCEPTION] = ThrowableManifest::LC_DOM_EXCEPTION;
+        }
 
         // Dom\NamespaceInfo — getInScopeNamespaces / getDescendantNamespaces entries (#20924).
         $nsInfo = new ClassEntry('Dom\\NamespaceInfo');
@@ -216,6 +228,33 @@ final class DomLivingBuiltinClasses
         $namedNodeMap->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
         self::copyMethods($ctx->classes[VmDom::CLASS_NAMED_NODE_MAP] ?? null, $namedNodeMap);
         $ctx->classes[VmDomLiving::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
+
+        // Dom\Entity / EntityReference / Notation — DTD leaf nodes (#20983).
+        $entity = new ClassEntry('Dom\\Entity');
+        $entity->isInternal = true;
+        $entity->parentLc = VmDomLiving::CLASS_NODE;
+        $entity->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        $entity->properties[] = new ClassProperty(VmDom::PROP_PUBLIC_ID, $nullProto, $strProto);
+        $entity->properties[] = new ClassProperty(VmDom::PROP_SYSTEM_ID, $nullProto, $strProto);
+        $entity->properties[] = new ClassProperty(VmDom::PROP_NOTATION_NAME, $nullProto, $strProto);
+        self::copyMethods($ctx->classes[VmDom::CLASS_ENTITY] ?? null, $entity);
+        $ctx->classes[VmDomLiving::CLASS_ENTITY] = $entity;
+
+        $entityRef = new ClassEntry('Dom\\EntityReference');
+        $entityRef->isInternal = true;
+        $entityRef->parentLc = VmDomLiving::CLASS_NODE;
+        $entityRef->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        self::copyMethods($ctx->classes[VmDom::CLASS_ENTITY_REFERENCE] ?? null, $entityRef);
+        $ctx->classes[VmDomLiving::CLASS_ENTITY_REFERENCE] = $entityRef;
+
+        $notation = new ClassEntry('Dom\\Notation');
+        $notation->isInternal = true;
+        $notation->parentLc = VmDomLiving::CLASS_NODE;
+        $notation->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        $notation->properties[] = new ClassProperty(VmDom::PROP_PUBLIC_ID, $nullProto, $strProto);
+        $notation->properties[] = new ClassProperty(VmDom::PROP_SYSTEM_ID, $nullProto, $strProto);
+        self::copyMethods($ctx->classes[VmDom::CLASS_NOTATION] ?? null, $notation);
+        $ctx->classes[VmDomLiving::CLASS_NOTATION] = $notation;
 
         $element = new ClassEntry('Dom\\Element');
         $element->isInternal = true;
