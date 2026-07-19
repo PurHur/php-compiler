@@ -62,6 +62,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -5903,6 +5904,20 @@ require_once __DIR__.'/../../../ext/apcu/apcu_delete.php';
 require_once __DIR__.'/../../../ext/apcu/apcu_exists.php';
 require_once __DIR__.'/../../../ext/apcu/apcu_fetch.php';
 require_once __DIR__.'/../../../ext/apcu/apcu_store.php';
+require_once __DIR__.'/../../../ext/intl/IntlDateFormatterFormatObject.php';
+require_once __DIR__.'/../../../ext/intl/VmIntlDatePatternGenerator.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_format_object.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetAllVariants.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayLanguage.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayRegion.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayScript.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayVariant.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_all_variants.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_language.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_region.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_script.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_variant.php';
+require_once __DIR__.'/../../../ext/intl/resourcebundle_count.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -5935,15 +5950,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/intl/LocaleGetAllVariants.php';
-require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayLanguage.php';
-require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayRegion.php';
-require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayScript.php';
-require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayVariant.php';
-require_once __DIR__.'/../../../ext/intl/locale_get_all_variants.php';
-require_once __DIR__.'/../../../ext/intl/locale_get_display_language.php';
-require_once __DIR__.'/../../../ext/intl/locale_get_display_region.php';
-require_once __DIR__.'/../../../ext/intl/locale_get_display_script.php';
-require_once __DIR__.'/../../../ext/intl/locale_get_display_variant.php';
-require_once __DIR__.'/../../../ext/intl/resourcebundle_count.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
