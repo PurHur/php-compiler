@@ -908,6 +908,7 @@
         "ext/intl/numfmt_format.php",
         "ext/intl/numfmt_format_currency.php",
         "ext/intl/numfmt_parse.php",
+        "ext/intl/resourcebundle_count.php",
         "ext/intl/transliterator_create.php",
         "ext/intl/transliterator_create_from_rules.php",
         "ext/intl/transliterator_create_inverse.php",
@@ -6075,9 +6076,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5841,
+        "inventory_files": 5842,
         "excluded": 0,
-        "eligible": 5841,
+        "eligible": 5842,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

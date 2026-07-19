@@ -5937,4 +5937,5 @@ require_once __DIR__.'/../../../ext/intl/locale_get_display_language.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_region.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_script.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_variant.php';
+require_once __DIR__.'/../../../ext/intl/resourcebundle_count.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
