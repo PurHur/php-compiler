@@ -51,8 +51,51 @@ final class IniRuntime
         self::implement($context);
     }
 
+    /**
+     * Thin AOT link fillers for Type::register empty `__compiler_ini_*` shells (#20361).
+     *
+     * Full NestedJIT of IniJitHelper pulls `__compiler_sprintf` and other helpers that are
+     * not yet in the thin helper-runtime TU. Stubs write false / no-op so TypeError paths
+     * (null option under PROFILE=8.4) and HelloWorld-shaped links resolve; real NestedJIT
+     * still runs via {@see implement} outside thin standalone AOT.
+     *
+     * Does not NestedJIT SilenceRuntime / sprintf — only fills the four ini ABI symbols.
+     */
+    public static function ensureThinAotLinkStubs(Context $context): void
+    {
+        $restoreBlock = self::captureInsertBlock($context);
+        self::ensureGlobals($context);
+        self::ensureValueWriters($context);
+        self::implementIfMissing($context, '__compiler_ini_get', self::implementIniGetFalseStub(...));
+        self::implementIfMissing($context, '__compiler_ini_cfg_get', self::implementIniGetFalseStub(...));
+        self::implementIfMissing($context, '__compiler_ini_set', self::implementIniSetFalseStub(...));
+        self::implementIfMissing($context, '__compiler_ini_restore', self::implementIniRestoreNopStub(...));
+        foreach (
+            [
+                '__compiler_ini_get',
+                '__compiler_ini_cfg_get',
+                '__compiler_ini_set',
+                '__compiler_ini_restore',
+            ] as $name
+        ) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                throw new \LogicException($name.' missing after IniRuntime thin AOT stub (#20361)');
+            }
+            $context->registerFunction($name, $fn);
+        }
+        self::restoreInsertBlock($context, $restoreBlock);
+        $context->builder->clearInsertionPosition();
+    }
+
     public static function implement(Context $context): void
     {
+        if ($context->isThinStandaloneAotMain()) {
+            self::ensureThinAotLinkStubs($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_ini_get');
         $cfgProbe = $context->module->getNamedFunction('__compiler_ini_cfg_get');
         if (null !== $probe && $probe->countBasicBlocks() > 0
@@ -126,6 +169,39 @@ final class IniRuntime
             ),
             default => throw new \LogicException('Unknown ini JIT ABI: '.$name),
         };
+    }
+
+    private static function implementIniGetFalseStub(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ini_get_thin_stub');
+        $context->builder->positionAtEnd($entry);
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $fn->getParam(1),
+            $i32->constInt(0, false)
+        );
+        $context->builder->returnVoid();
+    }
+
+    private static function implementIniSetFalseStub(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ini_set_thin_stub');
+        $context->builder->positionAtEnd($entry);
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $fn->getParam(2),
+            $i32->constInt(0, false)
+        );
+        $context->builder->returnVoid();
+    }
+
+    private static function implementIniRestoreNopStub(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ini_restore_thin_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnVoid();
     }
 
     private static function implementIniGetBridge(Context $context, LlvmFunction $fn): void
