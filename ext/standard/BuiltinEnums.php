@@ -42,9 +42,97 @@ final class BuiltinEnums
         if (CompilerVersion::supportsArrayPadTypeEnum()) {
             self::registerArrayPadType($ctx);
         }
+        if (CompilerVersion::supportsStreamErrorApi()) {
+            self::registerStreamErrorCode($ctx);
+            self::registerStreamErrorMode($ctx);
+            self::registerStreamErrorStore($ctx);
+        }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
+    }
+
+    /**
+     * PHP 8.6 StreamErrorCode unit enum (main/streams/stream_errors.stub.php; #21020).
+     */
+    private static function registerStreamErrorCode(Context $ctx): void
+    {
+        if (isset($ctx->classes['streamerrorcode'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('StreamErrorCode');
+        $entry->isEnum = true;
+
+        foreach ([
+            'None', 'Generic',
+            'ReadFailed', 'WriteFailed', 'SeekFailed', 'SeekNotSupported', 'FlushFailed', 'TruncateFailed',
+            'ConnectFailed', 'BindFailed', 'ListenFailed', 'AcceptFailed', 'NotWritable', 'NotReadable',
+            'Disabled', 'NotFound', 'PermissionDenied', 'AlreadyExists', 'InvalidPath', 'PathTooLong',
+            'OpenFailed', 'CreateFailed', 'DupFailed', 'UnlinkFailed', 'RenameFailed', 'MkdirFailed',
+            'RmdirFailed', 'StatFailed', 'MetaFailed', 'ChmodFailed', 'ChownFailed', 'CopyFailed',
+            'TouchFailed', 'InvalidMode', 'InvalidMeta', 'ModeNotSupported', 'Readonly', 'RecursionDetected',
+            'NotImplemented', 'NoOpener', 'PersistentNotSupported', 'WrapperNotFound', 'WrapperDisabled',
+            'ProtocolUnsupported', 'WrapperRegistrationFailed', 'WrapperUnregistrationFailed',
+            'WrapperRestorationFailed',
+            'FilterNotFound', 'FilterFailed',
+            'CastFailed', 'CastNotSupported', 'MakeSeekableFailed', 'BufferedDataLost',
+            'NetworkSendFailed', 'NetworkRecvFailed', 'SslNotSupported', 'ResumptionFailed',
+            'SocketPathTooLong', 'OobNotSupported', 'ProtocolError', 'InvalidUrl', 'InvalidResponse',
+            'InvalidHeader', 'InvalidParam', 'RedirectLimit', 'AuthFailed', 'TimeOut',
+            'ArchivingFailed', 'EncodingFailed', 'DecodingFailed', 'InvalidFormat',
+            'AllocationFailed', 'TemporaryFileFailed',
+            'LockFailed', 'LockNotSupported',
+            'UserspaceNotImplemented', 'UserspaceInvalidReturn', 'UserspaceCallFailed',
+        ] as $name) {
+            self::registerPureEnumCase($entry, $name);
+        }
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $ctx->classes['streamerrorcode'] = $entry;
+        $ctx->enums['streamerrorcode'] = true;
+    }
+
+    /**
+     * PHP 8.6 StreamErrorMode unit enum (main/streams/stream_errors.stub.php; #21020).
+     */
+    private static function registerStreamErrorMode(Context $ctx): void
+    {
+        if (isset($ctx->classes['streamerrormode'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('StreamErrorMode');
+        $entry->isEnum = true;
+        foreach (['Error', 'Exception', 'Silent'] as $name) {
+            self::registerPureEnumCase($entry, $name);
+        }
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+        $ctx->classes['streamerrormode'] = $entry;
+        $ctx->enums['streamerrormode'] = true;
+    }
+
+    /**
+     * PHP 8.6 StreamErrorStore unit enum (main/streams/stream_errors.stub.php; #21020).
+     */
+    private static function registerStreamErrorStore(Context $ctx): void
+    {
+        if (isset($ctx->classes['streamerrorstore'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('StreamErrorStore');
+        $entry->isEnum = true;
+        foreach (['Auto', 'None', 'NonTerminating', 'Terminating', 'All'] as $name) {
+            self::registerPureEnumCase($entry, $name);
+        }
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+        $ctx->classes['streamerrorstore'] = $entry;
+        $ctx->enums['streamerrorstore'] = true;
     }
 
     /**

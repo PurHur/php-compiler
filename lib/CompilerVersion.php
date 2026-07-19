@@ -1472,6 +1472,29 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.6+ stream error store API — stream_last_errors()/stream_clear_errors() + StreamError* types (#21020).
+     *
+     * Withheld on ≤8.5 profiles (matches Zend phantom gate). Enable via stable 8.6.0+ or
+     * explicit `PHP_COMPILER_PROFILE=8.6` forward profile.
+     * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_last_errors / stream_clear_errors)
+     * php-src: main/streams/stream_errors.stub.php
+     */
+    public static function supportsStreamErrorApi(): bool
+    {
+        if (version_compare(self::VERSION, '8.6.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.6.0', '>=');
+    }
+
+    /** stream_last_errors()/stream_clear_errors() visible to function_exists() — profile ≥ 8.6 (#21020). */
+    public static function advertisesStreamErrorApi(): bool
+    {
+        return self::supportsStreamErrorApi();
+    }
+
+    /**
      * PHP 8.4+ STREAM_SUPPORT_READ/WRITE constants (ext/standard/streams.c, issue #16846).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
