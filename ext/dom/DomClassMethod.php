@@ -187,9 +187,15 @@ abstract class DomClassMethod extends VmClassMethod
         }
         $object = $var->toObject();
         $classLc = strtolower($object->class->name);
-        if (VmDom::CLASS_DOCUMENT === $classLc) {
+        if (VmDom::CLASS_DOCUMENT === $classLc
+            || VmDomLiving::CLASS_HTML_DOCUMENT === $classLc
+            || VmDomLiving::CLASS_XML_DOCUMENT === $classLc
+            || VmDomLiving::CLASS_DOCUMENT === $classLc
+        ) {
             VmDom::ensureDocument($object);
-        } elseif (VmDom::CLASS_DOCUMENT_FRAGMENT === $classLc) {
+        } elseif (VmDom::CLASS_DOCUMENT_FRAGMENT === $classLc
+            || VmDomLiving::CLASS_DOCUMENT_FRAGMENT === $classLc
+        ) {
             VmDom::ensureDocumentFragment($object);
         }
         if (!VmDom::isDomNode($object)) {
