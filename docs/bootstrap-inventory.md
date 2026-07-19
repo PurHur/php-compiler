@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5842 |
-| Phase A inventory files (M2 ratio SSOT) | 5842 |
+| PHP files on vm.php path | 5843 |
+| Phase A inventory files (M2 ratio SSOT) | 5843 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17503 |
+| Source constructs flagged (warnings) | 17507 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -831,7 +831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 56 |
+| `ext/intl/Module.php` | 0 | 57 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -898,6 +898,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/numfmt_format.php` | 0 | 3 |
 | `ext/intl/numfmt_format_currency.php` | 0 | 3 |
 | `ext/intl/numfmt_parse.php` | 0 | 3 |
+| `ext/intl/numfmt_parse_currency.php` | 0 | 3 |
 | `ext/intl/resourcebundle_count.php` | 0 | 3 |
 | `ext/intl/transliterator_create.php` | 0 | 3 |
 | `ext/intl/transliterator_create_from_rules.php` | 0 | 3 |
@@ -11446,33 +11447,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new numfmt_create (line 123)
 - new numfmt_format (line 124)
 - new numfmt_parse (line 125)
-- new numfmt_format_currency (line 126)
-- new msgfmt_create (line 132)
-- new msgfmt_format (line 133)
-- new msgfmt_format_message (line 134)
-- new transliterator_create (line 140)
-- new transliterator_create_from_rules (line 141)
-- new transliterator_create_inverse (line 142)
-- new transliterator_list_ids (line 143)
-- new transliterator_transliterate (line 144)
-- new transliterator_get_error_code (line 145)
-- new transliterator_get_error_message (line 146)
-- new resourcebundle_count (line 151)
-- new grapheme_strlen (line 177)
-- new grapheme_substr (line 178)
-- new grapheme_strpos (line 179)
-- new grapheme_str_contains (line 180)
-- new grapheme_strstr (line 181)
-- new grapheme_stristr (line 182)
-- new grapheme_stripos (line 183)
-- new grapheme_strrpos (line 184)
-- new grapheme_extract (line 185)
-- new grapheme_levenshtein (line 186)
-- new grapheme_str_split (line 187)
-- new grapheme_strimwidth (line 188)
-- new intl_get_error_code (line 189)
-- new intl_get_error_message (line 190)
-- new intl_is_failure (line 191)
+- new numfmt_parse_currency (line 126)
+- new numfmt_format_currency (line 127)
+- new msgfmt_create (line 133)
+- new msgfmt_format (line 134)
+- new msgfmt_format_message (line 135)
+- new transliterator_create (line 141)
+- new transliterator_create_from_rules (line 142)
+- new transliterator_create_inverse (line 143)
+- new transliterator_list_ids (line 144)
+- new transliterator_transliterate (line 145)
+- new transliterator_get_error_code (line 146)
+- new transliterator_get_error_message (line 147)
+- new resourcebundle_count (line 152)
+- new grapheme_strlen (line 178)
+- new grapheme_substr (line 179)
+- new grapheme_strpos (line 180)
+- new grapheme_str_contains (line 181)
+- new grapheme_strstr (line 182)
+- new grapheme_stristr (line 183)
+- new grapheme_stripos (line 184)
+- new grapheme_strrpos (line 185)
+- new grapheme_extract (line 186)
+- new grapheme_levenshtein (line 187)
+- new grapheme_str_split (line 188)
+- new grapheme_strimwidth (line 189)
+- new intl_get_error_code (line 190)
+- new intl_get_error_message (line 191)
+- new intl_is_failure (line 192)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12298,6 +12300,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/numfmt_parse_currency.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 58)
 - 2 class method(s)
 
 ### `ext/intl/resourcebundle_count.php`
