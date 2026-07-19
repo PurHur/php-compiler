@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_get_md_methods() — registered digest names (#6228, ext/openssl/openssl.c).
+ * openssl_get_md_methods() — registered digest names (#6228 VM, #21103 JIT/AOT NestedJIT; ext/openssl/openssl.c).
  */
 final class openssl_get_md_methods extends Internal
 {
@@ -45,8 +45,13 @@ final class openssl_get_md_methods extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_get_md_methods() is not implemented for JIT in this compiler build (issue #6228)'
-        );
+        $argc = \count($args);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(
+                'openssl_get_md_methods() expects at most 1 argument, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslMethods::mdMethods($context, $args[0] ?? null);
     }
 }

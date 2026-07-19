@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6073 |
-| Phase A inventory files (M2 ratio SSOT) | 6073 |
+| PHP files on vm.php path | 6080 |
+| Phase A inventory files (M2 ratio SSOT) | 6080 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18896 |
+| Source constructs flagged (warnings) | 18907 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1252,14 +1252,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslDigest.php` | 0 | 1 |
 | `ext/openssl/JitOpensslEncrypt.php` | 0 | 1 |
+| `ext/openssl/JitOpensslMethods.php` | 0 | 1 |
+| `ext/openssl/JitOpensslMethodsKernel.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 65 |
+| `ext/openssl/Module.php` | 0 | 67 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslDigestJitHelper.php` | 0 | 1 |
 | `ext/openssl/OpensslEncryptJitHelper.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
 | `ext/openssl/OpensslFunction.php` | 0 | 1 |
+| `ext/openssl/OpensslMethodsJitHelper.php` | 0 | 1 |
 | `ext/openssl/OpensslSignJitHelper.php` | 0 | 1 |
 | `ext/openssl/VmOpenssl.php` | 0 | 7 |
 | `ext/openssl/VmOpensslCipherNative.php` | 0 | 1 |
@@ -1296,9 +1299,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_error_string.php` | 0 | 2 |
 | `ext/openssl/openssl_free_key.php` | 0 | 2 |
 | `ext/openssl/openssl_get_cert_locations.php` | 0 | 2 |
-| `ext/openssl/openssl_get_cipher_methods.php` | 0 | 2 |
+| `ext/openssl/openssl_get_cipher_methods.php` | 0 | 3 |
 | `ext/openssl/openssl_get_curve_names.php` | 0 | 2 |
-| `ext/openssl/openssl_get_md_methods.php` | 0 | 2 |
+| `ext/openssl/openssl_get_md_methods.php` | 0 | 3 |
 | `ext/openssl/openssl_get_privatekey.php` | 0 | 2 |
 | `ext/openssl/openssl_get_publickey.php` | 0 | 2 |
 | `ext/openssl/openssl_open.php` | 0 | 2 |
@@ -1339,6 +1342,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
+| `ext/openssl/phpc_openssl_cipher_methods_kernel.php` | 0 | 1 |
+| `ext/openssl/phpc_openssl_md_methods_kernel.php` | 0 | 1 |
 | `ext/pcntl/Module.php` | 0 | 28 |
 | `ext/pcntl/PcntlConstants.php` | 0 | 1 |
 | `ext/pcntl/PcntlHostBridge.php` | 0 | 2 |
@@ -4681,6 +4686,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/OpensslDigestRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/OpensslEncryptCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslEncryptRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/OpensslMethodsCrypto.php` | 0 | 1 |
+| `lib/JIT/Builtin/OpensslMethodsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslSignCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslSignRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
@@ -15658,6 +15665,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/openssl/JitOpensslMethods.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/openssl/JitOpensslMethodsKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/openssl/JitOpensslSign.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15677,59 +15694,61 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_public_decrypt (line 43)
 - new openssl_get_cipher_methods (line 44)
 - new openssl_get_md_methods (line 45)
-- new openssl_get_cert_locations (line 46)
-- new openssl_get_curve_names (line 47)
-- new openssl_pkey_new (line 48)
-- new openssl_pkey_get_private (line 49)
-- new openssl_get_privatekey (line 50)
-- new openssl_pkey_get_public (line 51)
-- new openssl_get_publickey (line 52)
-- new openssl_pkey_get_details (line 53)
-- new openssl_pkey_export (line 54)
-- new openssl_pkey_export_to_file (line 55)
-- new openssl_pkey_derive (line 56)
-- new openssl_dh_compute_key (line 57)
-- new openssl_cipher_iv_length (line 58)
-- new openssl_cipher_key_length (line 59)
-- new openssl_digest (line 60)
-- new openssl_pbkdf2 (line 61)
-- new openssl_x509_read (line 62)
-- new openssl_x509_parse (line 63)
-- new openssl_x509_fingerprint (line 64)
-- new openssl_x509_export (line 65)
-- new openssl_x509_export_to_file (line 66)
-- new openssl_pkcs12_read (line 67)
-- new openssl_pkcs12_export (line 68)
-- new openssl_pkcs12_export_to_file (line 69)
-- new openssl_pkcs7_sign (line 70)
-- new openssl_pkcs7_verify (line 71)
-- new openssl_pkcs7_encrypt (line 72)
-- new openssl_pkcs7_decrypt (line 73)
-- new openssl_pkcs7_read (line 74)
-- new openssl_cms_sign (line 75)
-- new openssl_cms_verify (line 76)
-- new openssl_cms_encrypt (line 77)
-- new openssl_cms_decrypt (line 78)
-- new openssl_cms_read (line 79)
-- new openssl_x509_verify (line 80)
-- new openssl_x509_check_private_key (line 81)
-- new openssl_x509_checkpurpose (line 82)
-- new openssl_x509_free (line 83)
-- new openssl_csr_new (line 84)
-- new openssl_csr_export (line 85)
-- new openssl_csr_export_to_file (line 86)
-- new openssl_csr_sign (line 87)
-- new openssl_csr_get_subject (line 88)
-- new openssl_csr_get_public_key (line 89)
-- new openssl_free_key (line 90)
-- new openssl_pkey_free (line 91)
-- new openssl_spki_new (line 92)
-- new openssl_spki_verify (line 93)
-- new openssl_spki_export (line 94)
-- new openssl_spki_export_challenge (line 95)
-- new openssl_seal (line 96)
-- new openssl_open (line 97)
-- new openssl_error_string (line 98)
+- new phpc_openssl_cipher_methods_kernel (line 46)
+- new phpc_openssl_md_methods_kernel (line 47)
+- new openssl_get_cert_locations (line 48)
+- new openssl_get_curve_names (line 49)
+- new openssl_pkey_new (line 50)
+- new openssl_pkey_get_private (line 51)
+- new openssl_get_privatekey (line 52)
+- new openssl_pkey_get_public (line 53)
+- new openssl_get_publickey (line 54)
+- new openssl_pkey_get_details (line 55)
+- new openssl_pkey_export (line 56)
+- new openssl_pkey_export_to_file (line 57)
+- new openssl_pkey_derive (line 58)
+- new openssl_dh_compute_key (line 59)
+- new openssl_cipher_iv_length (line 60)
+- new openssl_cipher_key_length (line 61)
+- new openssl_digest (line 62)
+- new openssl_pbkdf2 (line 63)
+- new openssl_x509_read (line 64)
+- new openssl_x509_parse (line 65)
+- new openssl_x509_fingerprint (line 66)
+- new openssl_x509_export (line 67)
+- new openssl_x509_export_to_file (line 68)
+- new openssl_pkcs12_read (line 69)
+- new openssl_pkcs12_export (line 70)
+- new openssl_pkcs12_export_to_file (line 71)
+- new openssl_pkcs7_sign (line 72)
+- new openssl_pkcs7_verify (line 73)
+- new openssl_pkcs7_encrypt (line 74)
+- new openssl_pkcs7_decrypt (line 75)
+- new openssl_pkcs7_read (line 76)
+- new openssl_cms_sign (line 77)
+- new openssl_cms_verify (line 78)
+- new openssl_cms_encrypt (line 79)
+- new openssl_cms_decrypt (line 80)
+- new openssl_cms_read (line 81)
+- new openssl_x509_verify (line 82)
+- new openssl_x509_check_private_key (line 83)
+- new openssl_x509_checkpurpose (line 84)
+- new openssl_x509_free (line 85)
+- new openssl_csr_new (line 86)
+- new openssl_csr_export (line 87)
+- new openssl_csr_export_to_file (line 88)
+- new openssl_csr_sign (line 89)
+- new openssl_csr_get_subject (line 90)
+- new openssl_csr_get_public_key (line 91)
+- new openssl_free_key (line 92)
+- new openssl_pkey_free (line 93)
+- new openssl_spki_new (line 94)
+- new openssl_spki_verify (line 95)
+- new openssl_spki_export (line 96)
+- new openssl_spki_export_challenge (line 97)
+- new openssl_seal (line 98)
+- new openssl_open (line 99)
+- new openssl_error_string (line 100)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -15758,6 +15777,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `ext/openssl/OpensslFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/openssl/OpensslMethodsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -15999,6 +16023,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- new ArgumentCountError (line 50)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_get_curve_names.php`
@@ -16011,6 +16036,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- new ArgumentCountError (line 50)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_get_privatekey.php`
@@ -16263,6 +16289,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - 3 class method(s)
+
+### `ext/openssl/phpc_openssl_cipher_methods_kernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/openssl/phpc_openssl_md_methods_kernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/pcntl/Module.php`
 
@@ -39806,6 +39842,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 10 class method(s)
 - 4 closure(s)
 
+### `lib/JIT/Builtin/OpensslMethodsCrypto.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/OpensslMethodsRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/OpensslSignCrypto.php`
 
 **Warnings** (review for bootstrap subset):
@@ -42809,69 +42855,69 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ErrorHandler (line 578)
 - new Scope (line 598)
 - new Call\ExternalMethod (line 648)
-- new Builtin\IsNullFn (line 902)
-- new Builtin\IsNullFn (line 903)
-- new Call\SplObjectStorageMethod (line 904)
-- new Call\SplObjectStorageMethod (line 905)
-- new Call\SplObjectStorageMethod (line 906)
+- new Builtin\IsNullFn (line 905)
+- new Builtin\IsNullFn (line 906)
 - new Call\SplObjectStorageMethod (line 907)
 - new Call\SplObjectStorageMethod (line 908)
 - new Call\SplObjectStorageMethod (line 909)
-- new Call\WeakReferenceCreate (line 911)
-- new Call\WeakReferenceGet (line 912)
-- new Call\WeakMapMethod (line 913)
-- new Call\WeakMapMethod (line 914)
-- new Call\WeakMapMethod (line 915)
+- new Call\SplObjectStorageMethod (line 910)
+- new Call\SplObjectStorageMethod (line 911)
+- new Call\SplObjectStorageMethod (line 912)
+- new Call\WeakReferenceCreate (line 914)
+- new Call\WeakReferenceGet (line 915)
 - new Call\WeakMapMethod (line 916)
 - new Call\WeakMapMethod (line 917)
-- new Call\ReflectionClassConstruct (line 919)
-- new Call\ReflectionObjectConstruct (line 920)
-- new Call\ReflectionClassGetName (line 921)
-- new Call\ReflectionClassGetShortName (line 922)
-- new Call\ReflectionClassGetAttributes (line 923)
-- new Call\ReflectionClassGetMethod (line 924)
-- new Call\ReflectionClassGetReflectionConstant (line 925)
-- new Call\ReflectionClassIsFinal (line 926)
-- new Call\ReflectionClassIsIterateable (line 927)
-- new Call\ReflectionClassNewLazyProxy (line 929)
-- new Call\ReflectionClassNewLazyGhost (line 930)
-- new Call\ReflectionClassCreateLazyGhost (line 931)
-- new Call\ReflectionClassCreateLazyProxy (line 932)
-- new Call\ReflectionPropertyConstruct (line 934)
-- new Call\ReflectionPropertyGetAttributes (line 935)
-- new Call\ReflectionConstantConstruct (line 936)
-- new Call\ReflectionConstantGetAttributes (line 937)
-- new Call\ReflectionMethodGetAttributes (line 938)
-- new Call\ReflectionParameterIsSensitiveParameter (line 940)
-- new Call\ReflectionFunctionGetNamedArguments (line 943)
-- new Call\ReflectionMethodGetNamedArguments (line 944)
-- new Call\ReflectionAttributeGetName (line 946)
-- new Call\ReflectionAttributeNewInstance (line 947)
-- new Call\ReflectionEnumConstruct (line 948)
-- new Call\ReflectionEnumGetName (line 949)
-- new Call\ReflectionEnumHasCase (line 950)
-- new Call\ReflectionEnumGetCase (line 951)
-- new Call\ReflectionEnumIsBacked (line 952)
-- new Call\ReflectionEnumUnitCaseGetName (line 953)
-- new Call\ReflectionEnumUnitCaseGetName (line 954)
-- new Call\ExceptionGetMessage (line 955)
-- new Call\DatePeriodCreateFromISO8601String (line 961)
-- new Call\DatePeriodIteratorMethod (line 963)
-- new Call\DateTimeFormat (line 966)
-- new Call\DateTimeFormat (line 967)
-- new Result (line 1308)
-- new Result (line 1329)
-- new Variable (line 1930)
-- new Variable (line 2067)
-- new Variable (line 2293)
-- new Variable (line 2351)
-- new VMVariable (line 2489)
-- new VMVariable (line 2505)
-- new VMVariable (line 2511)
-- new VMVariable (line 2517)
-- new VMVariable (line 2528)
-- new Variable (line 2558)
-- new Variable (line 2598)
+- new Call\WeakMapMethod (line 918)
+- new Call\WeakMapMethod (line 919)
+- new Call\WeakMapMethod (line 920)
+- new Call\ReflectionClassConstruct (line 922)
+- new Call\ReflectionObjectConstruct (line 923)
+- new Call\ReflectionClassGetName (line 924)
+- new Call\ReflectionClassGetShortName (line 925)
+- new Call\ReflectionClassGetAttributes (line 926)
+- new Call\ReflectionClassGetMethod (line 927)
+- new Call\ReflectionClassGetReflectionConstant (line 928)
+- new Call\ReflectionClassIsFinal (line 929)
+- new Call\ReflectionClassIsIterateable (line 930)
+- new Call\ReflectionClassNewLazyProxy (line 932)
+- new Call\ReflectionClassNewLazyGhost (line 933)
+- new Call\ReflectionClassCreateLazyGhost (line 934)
+- new Call\ReflectionClassCreateLazyProxy (line 935)
+- new Call\ReflectionPropertyConstruct (line 937)
+- new Call\ReflectionPropertyGetAttributes (line 938)
+- new Call\ReflectionConstantConstruct (line 939)
+- new Call\ReflectionConstantGetAttributes (line 940)
+- new Call\ReflectionMethodGetAttributes (line 941)
+- new Call\ReflectionParameterIsSensitiveParameter (line 943)
+- new Call\ReflectionFunctionGetNamedArguments (line 946)
+- new Call\ReflectionMethodGetNamedArguments (line 947)
+- new Call\ReflectionAttributeGetName (line 949)
+- new Call\ReflectionAttributeNewInstance (line 950)
+- new Call\ReflectionEnumConstruct (line 951)
+- new Call\ReflectionEnumGetName (line 952)
+- new Call\ReflectionEnumHasCase (line 953)
+- new Call\ReflectionEnumGetCase (line 954)
+- new Call\ReflectionEnumIsBacked (line 955)
+- new Call\ReflectionEnumUnitCaseGetName (line 956)
+- new Call\ReflectionEnumUnitCaseGetName (line 957)
+- new Call\ExceptionGetMessage (line 958)
+- new Call\DatePeriodCreateFromISO8601String (line 964)
+- new Call\DatePeriodIteratorMethod (line 966)
+- new Call\DateTimeFormat (line 969)
+- new Call\DateTimeFormat (line 970)
+- new Result (line 1311)
+- new Result (line 1332)
+- new Variable (line 1933)
+- new Variable (line 2070)
+- new Variable (line 2296)
+- new Variable (line 2354)
+- new VMVariable (line 2492)
+- new VMVariable (line 2508)
+- new VMVariable (line 2514)
+- new VMVariable (line 2520)
+- new VMVariable (line 2531)
+- new Variable (line 2561)
+- new Variable (line 2601)
 - 102 class method(s)
 - 28 closure(s)
 

@@ -762,6 +762,9 @@ class Context {
             // Hash algos always-helper NestedJIT leaves (#20652).
             'phpc_hash_algos_kernel',
             'phpc_hash_hmac_algos_kernel',
+            // Openssl methods always-helper NestedJIT leaves (#21103).
+            'phpc_openssl_cipher_methods_kernel',
+            'phpc_openssl_md_methods_kernel',
             // Hash crypto always-helper NestedJIT EVP leaves (#21026).
             'phpc_hash_crypto_hash',
             'phpc_hash_crypto_hmac',
