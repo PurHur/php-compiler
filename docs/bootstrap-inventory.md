@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5843 |
-| Phase A inventory files (M2 ratio SSOT) | 5843 |
+| PHP files on vm.php path | 5844 |
+| Phase A inventory files (M2 ratio SSOT) | 5844 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17507 |
+| Source constructs flagged (warnings) | 17512 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -235,7 +235,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 3 |
 | `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
-| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 53 |
+| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 54 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadJitHelper.php` | 0 | 1 |
@@ -412,7 +412,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 42 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
-| `ext/dom/VmDomLiving.php` | 0 | 15 |
+| `ext/dom/VmDomLiving.php` | 0 | 16 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 4 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
@@ -425,6 +425,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/XPathRegisterPhpFunctionNS.php` | 0 | 2 |
 | `ext/dom/XPathRegisterPhpFunctions.php` | 0 | 1 |
 | `ext/dom/XmlDocumentCreateEmpty.php` | 0 | 2 |
+| `ext/dom/XmlDocumentCreateFromFile.php` | 0 | 3 |
 | `ext/dom/XmlDocumentCreateFromString.php` | 0 | 3 |
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
 | `ext/dom/ns_import_simplexml.php` | 0 | 2 |
@@ -7164,7 +7165,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 226)
 - new ClassProperty (line 229)
 - new XmlDocumentCreateFromString (line 230)
-- new XmlDocumentCreateEmpty (line 233)
+- new XmlDocumentCreateFromFile (line 233)
+- new XmlDocumentCreateEmpty (line 236)
 - 3 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
@@ -8581,10 +8583,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 280)
 - new DOMException (line 311)
 - new DOMException (line 323)
-- new DOMException (line 436)
-- new Variable (line 442)
-- new Variable (line 476)
-- 36 class method(s)
+- new Exception (line 465)
+- new DOMException (line 487)
+- new Variable (line 493)
+- new Variable (line 527)
+- 38 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -8692,6 +8695,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+- 1 closure(s)
+
+### `ext/dom/XmlDocumentCreateFromFile.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 2 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/XmlDocumentCreateFromString.php`

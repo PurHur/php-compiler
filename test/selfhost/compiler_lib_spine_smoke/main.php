@@ -477,6 +477,7 @@ require_once __DIR__.'/../../../ext/dom/XPathRegisterNamespace.php';
 require_once __DIR__.'/../../../ext/dom/XPathRegisterPhpFunctionNS.php';
 require_once __DIR__.'/../../../ext/dom/XPathRegisterPhpFunctions.php';
 require_once __DIR__.'/../../../ext/dom/XmlDocumentCreateEmpty.php';
+require_once __DIR__.'/../../../ext/dom/XmlDocumentCreateFromFile.php';
 require_once __DIR__.'/../../../ext/dom/XmlDocumentCreateFromString.php';
 require_once __DIR__.'/../../../ext/dom/dom_import_simplexml.php';
 require_once __DIR__.'/../../../ext/dom/ns_import_simplexml.php';

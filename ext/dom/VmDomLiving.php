@@ -417,7 +417,7 @@ final class VmDomLiving
         if ('' === $source) {
             throw new \ValueError('Dom\\XMLDocument::createFromString(): Argument #1 ($source) must not be empty');
         }
-        self::assertValidXmlParseOptions($options);
+        self::assertValidXmlParseOptions($options, 'Dom\\XMLDocument::createFromString()');
         if (null !== $overrideEncoding) {
             self::assertValidDocumentEncoding(
                 $overrideEncoding,
@@ -427,6 +427,57 @@ final class VmDomLiving
             );
         }
 
+        return self::loadXmlDocumentFromSource($ctx, $source, $options, $overrideEncoding, $frame);
+    }
+
+    /**
+     * Dom\XMLDocument::createFromFile() — php-src ext/dom/xml_document.c load_from_helper(DOM_LOAD_FILE) (#20808).
+     */
+    public static function createXmlFromFile(
+        Context $ctx,
+        string $path,
+        int $options = 0,
+        ?string $overrideEncoding = null,
+        ?Frame $frame = null
+    ): Variable {
+        if ('' === $path) {
+            throw new \ValueError('Dom\\XMLDocument::createFromFile(): Argument #1 ($path) must not be empty');
+        }
+        // php-src xml_document.c — percent-encoded NUL rejected for file paths.
+        if (false !== strpos($path, '%00')) {
+            throw new \ValueError(
+                'Dom\\XMLDocument::createFromFile(): Argument #1 ($path) must not contain percent-encoded NUL bytes'
+            );
+        }
+        self::assertValidXmlParseOptions($options, 'Dom\\XMLDocument::createFromFile()');
+        if (null !== $overrideEncoding) {
+            self::assertValidDocumentEncoding(
+                $overrideEncoding,
+                'Dom\\XMLDocument::createFromFile()',
+                3,
+                'overrideEncoding'
+            );
+        }
+
+        $contents = \PHPCompiler\ext\standard\VmFsReadNative::read($path);
+        if (false === $contents) {
+            // php-src: zend_throw_exception_ex(NULL, 0, "Cannot open file '%s'", source);
+            throw new \Exception("Cannot open file '".$path."'");
+        }
+
+        return self::loadXmlDocumentFromSource($ctx, $contents, $options, $overrideEncoding, $frame);
+    }
+
+    /**
+     * Shared parse path for Dom\XMLDocument::createFromString / createFromFile (#19581, #20808).
+     */
+    private static function loadXmlDocumentFromSource(
+        Context $ctx,
+        string $source,
+        int $options,
+        ?string $overrideEncoding,
+        ?Frame $frame
+    ): Variable {
         $document = self::allocateXmlDocument($ctx);
         if (null !== $overrideEncoding) {
             DomRegistry::state($document)->encoding = $overrideEncoding;
@@ -676,7 +727,7 @@ final class VmDomLiving
     }
 
     /** php-src ext/dom/xml_document.c check_options_validity(). */
-    private static function assertValidXmlParseOptions(int $options): void
+    private static function assertValidXmlParseOptions(int $options, string $method): void
     {
         $allowed = LibxmlConstants::LIBXML_RECOVER
             | LibxmlConstants::LIBXML_NOENT
@@ -694,7 +745,7 @@ final class VmDomLiving
             | LibxmlConstants::LIBXML_PARSEHUGE
             | LibxmlConstants::LIBXML_BIGLINES;
         if (0 !== ($options & ~$allowed)) {
-            throw new \ValueError('Dom\\XMLDocument::createFromString(): Argument #2 ($options) contains invalid flags (allowed flags: LIBXML_RECOVER, LIBXML_NOENT, LIBXML_DTDLOAD, LIBXML_DTDATTR, LIBXML_DTDVALID, LIBXML_NOERROR, LIBXML_NOWARNING, LIBXML_NOBLANKS, LIBXML_NSCLEAN, LIBXML_NOCDATA, LIBXML_NONET, LIBXML_PEDANTIC, LIBXML_COMPACT, LIBXML_PARSEHUGE, LIBXML_BIGLINES)');
+            throw new \ValueError($method.': Argument #2 ($options) contains invalid flags (allowed flags: LIBXML_RECOVER, LIBXML_NOENT, LIBXML_DTDLOAD, LIBXML_DTDATTR, LIBXML_DTDVALID, LIBXML_NOERROR, LIBXML_NOWARNING, LIBXML_NOBLANKS, LIBXML_NSCLEAN, LIBXML_NOCDATA, LIBXML_NONET, LIBXML_PEDANTIC, LIBXML_COMPACT, LIBXML_PARSEHUGE, LIBXML_BIGLINES)');
         }
     }
 
