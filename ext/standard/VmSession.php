@@ -864,6 +864,15 @@ final class VmSession
 
     private static function generateId(): string
     {
+        if (SessionUserHandler::isActiveModule()) {
+            $vm = VM::running();
+            if (null !== $vm) {
+                $custom = SessionUserHandler::createSid($vm->context);
+                if (null !== $custom && '' !== $custom) {
+                    return self::sanitizeId($custom);
+                }
+            }
+        }
         $sidLength = 26;
         $bitsPerChar = 5;
 
