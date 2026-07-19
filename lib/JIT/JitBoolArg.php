@@ -68,7 +68,7 @@ final class JitBoolArg
             );
         }
         if (Variable::TYPE_STRING === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $contextLabel, 'string');
+            return self::coerceNativeStringToBool($context, $context->helper->loadValue($arg));
         }
         if (Variable::TYPE_VALUE === $arg->type) {
             return self::lowerBoxedCoerce($context, $arg, $contextLabel, true);
@@ -328,17 +328,38 @@ final class JitBoolArg
         return $phi;
     }
 
+    /**
+     * php-src convert_to_boolean for IS_STRING — empty / "0" → false (#4293).
+     */
+    private static function coerceNativeStringToBool(Context $context, Value $strPtr): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i8 = $context->getTypeFromString('int8');
+        $len = $context->builder->load($context->builder->structGep($strPtr, $map['length']));
+        $zeroLen = $context->builder->icmp(
+            Builder::INT_EQ,
+            $len,
+            $len->typeOf()->constInt(0, false)
+        );
+        $data = $context->builder->structGep($strPtr, $map['value']);
+        $first = $context->builder->load($data);
+        $isZeroChar = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(1, false)),
+            $context->builder->icmp(Builder::INT_EQ, $first, $i8->constInt(\ord('0'), false))
+        );
+        $isFalse = $context->builder->or($zeroLen, $isZeroChar);
+
+        return $context->builder->select(
+            $isFalse,
+            $context->constantFromBool(false),
+            $context->constantFromBool(true)
+        );
+    }
+
     private static function coerceStringLiteral(string $literal, string $contextLabel): bool
     {
-        $lower = strtolower($literal);
-        if (\in_array($lower, ['1', 'true', 'on', 'yes'], true)) {
-            return true;
-        }
-        if (\in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
-            return false;
-        }
-
-        throw new \LogicException(self::typeErrorMessage($contextLabel, 'string'));
+        // php-src convert_to_boolean / zend_is_true for strings (Z_PARAM_BOOL; #4293).
+        return '' !== $literal && '0' !== $literal;
     }
 
     private static function emitTypeErrorAndAbort(

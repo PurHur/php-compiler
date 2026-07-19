@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringNl2br;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -37,7 +38,8 @@ final class nl2br extends Internal
         $subject = self::vmStringArg($frame, 0, 'string');
         $useXhtml = true;
         if (2 === $argc) {
-            $useXhtml = self::resolveUseXhtmlBool($frame, 1);
+            // Z_PARAM_BOOL — convert_to_boolean incl. null→false (#4293, php-src string.c).
+            $useXhtml = VmMath::parseBoolBuiltinArgForFrame($frame, 1, 'nl2br', 2, 'use_xhtml');
         }
         BuiltinExecute::writeReturn(
             $frame,
@@ -57,7 +59,8 @@ final class nl2br extends Internal
         if (null !== $strLit && (1 === $argc || null !== $flagLit)) {
             $useXhtml = true;
             if (null !== $flagLit) {
-                $useXhtml = self::coerceUseXhtmlStringLiteral($flagLit);
+                // Same convert_to_boolean string rule as VmMath::parseBoolBuiltinArg (#4293).
+                $useXhtml = '' !== $flagLit && '0' !== $flagLit;
             }
 
             return $context->builder->load(
@@ -70,7 +73,7 @@ final class nl2br extends Internal
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {
             $useXhtmlI8 = $context->builder->zExt(
-                $this->jitBool($context, $args[1], 'nl2br(): Argument #2 ($use_xhtml)'),
+                JitBoolArg::lowerCoerceZParamBool($context, $args[1], 'nl2br', 'use_xhtml', 2),
                 $i8
             );
         }
@@ -97,67 +100,6 @@ final class nl2br extends Internal
             $argIndex,
             $paramName
         );
-    }
-
-    private static function resolveUseXhtmlBool(Frame $frame, int $argIndex): bool
-    {
-        $flag = $frame->calledArgs[$argIndex]->resolveIndirect();
-
-        return self::coerceUseXhtmlOperand($flag, $argIndex);
-    }
-
-    /**
-     * php-src Z_PARAM_BOOL coercion for nl2br() use_xhtml (#5056).
-     */
-    private static function coerceUseXhtmlOperand(Variable $flag, int $argIndex): bool
-    {
-        $label = sprintf('nl2br(): Argument #%d ($use_xhtml)', $argIndex + 1);
-        switch ($flag->type) {
-            case Variable::TYPE_BOOLEAN:
-                return $flag->toBool();
-            case Variable::TYPE_INTEGER:
-                return 0 !== $flag->toInt();
-            case Variable::TYPE_FLOAT:
-                return 0.0 !== $flag->toFloat();
-            case Variable::TYPE_STRING:
-                return self::coerceUseXhtmlStringLiteral($flag->toString());
-            case Variable::TYPE_ARRAY:
-                throw new \TypeError($label.' must be of type bool, array given');
-            case Variable::TYPE_OBJECT:
-                throw new \TypeError($label.' must be of type bool, '.self::vmTypeName($flag->type).' given');
-            case Variable::TYPE_NULL:
-                throw new \TypeError($label.' must be of type bool, null given');
-            default:
-                throw new \TypeError($label.' must be of type bool, '.self::vmTypeName($flag->type).' given');
-        }
-    }
-
-    private static function coerceUseXhtmlStringLiteral(string $literal): bool
-    {
-        $lower = strtolower($literal);
-        if (\in_array($lower, ['1', 'true', 'on', 'yes'], true)) {
-            return true;
-        }
-        if (\in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
-            return false;
-        }
-
-        throw new \TypeError('nl2br(): Argument #2 ($use_xhtml) must be of type bool, string given');
-    }
-
-    private static function vmTypeName(int $type): string
-    {
-        return match ($type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            Variable::TYPE_RESOURCE => 'resource',
-            default => 'mixed',
-        };
     }
 
 }
