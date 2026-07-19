@@ -187,6 +187,8 @@ class Module extends ModuleAbstract
                 new resourcebundle_get(),
                 new resourcebundle_locales(),
                 new resourcebundle_count(),
+                new resourcebundle_get_error_code(),
+                new resourcebundle_get_error_message(),
             ]
             : [];
 

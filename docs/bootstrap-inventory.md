@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5905 |
-| Phase A inventory files (M2 ratio SSOT) | 5905 |
+| PHP files on vm.php path | 5907 |
+| Phase A inventory files (M2 ratio SSOT) | 5907 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17958 |
+| Source constructs flagged (warnings) | 17966 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 118 |
+| `ext/intl/Module.php` | 0 | 120 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -963,6 +963,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/resourcebundle_count.php` | 0 | 3 |
 | `ext/intl/resourcebundle_create.php` | 0 | 3 |
 | `ext/intl/resourcebundle_get.php` | 0 | 3 |
+| `ext/intl/resourcebundle_get_error_code.php` | 0 | 3 |
+| `ext/intl/resourcebundle_get_error_message.php` | 0 | 3 |
 | `ext/intl/resourcebundle_locales.php` | 0 | 5 |
 | `ext/intl/transliterator_create.php` | 0 | 3 |
 | `ext/intl/transliterator_create_from_rules.php` | 0 | 3 |
@@ -11600,49 +11602,51 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new resourcebundle_get (line 187)
 - new resourcebundle_locales (line 188)
 - new resourcebundle_count (line 189)
-- new datefmt_create (line 195)
-- new datefmt_format (line 196)
-- new datefmt_format_object (line 197)
-- new datefmt_parse (line 198)
-- new datefmt_localtime (line 199)
-- new datefmt_get_error_code (line 200)
-- new datefmt_get_error_message (line 201)
-- new datefmt_get_pattern (line 202)
-- new datefmt_set_pattern (line 203)
-- new datefmt_get_timezone (line 204)
-- new datefmt_set_timezone (line 205)
-- new intlcal_create_instance (line 211)
-- new intlcal_get_now (line 212)
-- new intlcal_from_date_time (line 213)
-- new intlcal_get (line 214)
-- new intlcal_set (line 215)
-- new intlcal_get_type (line 216)
-- new intlcal_add (line 217)
-- new intlcal_roll (line 218)
-- new intlcal_clear (line 219)
-- new intlcal_is_set (line 220)
-- new intlcal_equals (line 221)
-- new intlcal_get_time (line 222)
-- new intlcal_set_time (line 223)
-- new intlcal_get_time_zone (line 224)
-- new intlcal_to_date_time (line 225)
-- new intlcal_field_difference (line 226)
-- new grapheme_strlen (line 257)
-- new grapheme_substr (line 258)
-- new grapheme_strpos (line 259)
-- new grapheme_str_contains (line 260)
-- new grapheme_strstr (line 261)
-- new grapheme_stristr (line 262)
-- new grapheme_stripos (line 263)
-- new grapheme_strrpos (line 264)
-- new grapheme_strripos (line 265)
-- new grapheme_extract (line 266)
-- new grapheme_levenshtein (line 267)
-- new grapheme_str_split (line 268)
-- new grapheme_strimwidth (line 269)
-- new intl_get_error_code (line 270)
-- new intl_get_error_message (line 271)
-- new intl_is_failure (line 272)
+- new resourcebundle_get_error_code (line 190)
+- new resourcebundle_get_error_message (line 191)
+- new datefmt_create (line 197)
+- new datefmt_format (line 198)
+- new datefmt_format_object (line 199)
+- new datefmt_parse (line 200)
+- new datefmt_localtime (line 201)
+- new datefmt_get_error_code (line 202)
+- new datefmt_get_error_message (line 203)
+- new datefmt_get_pattern (line 204)
+- new datefmt_set_pattern (line 205)
+- new datefmt_get_timezone (line 206)
+- new datefmt_set_timezone (line 207)
+- new intlcal_create_instance (line 213)
+- new intlcal_get_now (line 214)
+- new intlcal_from_date_time (line 215)
+- new intlcal_get (line 216)
+- new intlcal_set (line 217)
+- new intlcal_get_type (line 218)
+- new intlcal_add (line 219)
+- new intlcal_roll (line 220)
+- new intlcal_clear (line 221)
+- new intlcal_is_set (line 222)
+- new intlcal_equals (line 223)
+- new intlcal_get_time (line 224)
+- new intlcal_set_time (line 225)
+- new intlcal_get_time_zone (line 226)
+- new intlcal_to_date_time (line 227)
+- new intlcal_field_difference (line 228)
+- new grapheme_strlen (line 259)
+- new grapheme_substr (line 260)
+- new grapheme_strpos (line 261)
+- new grapheme_str_contains (line 262)
+- new grapheme_strstr (line 263)
+- new grapheme_stristr (line 264)
+- new grapheme_stripos (line 265)
+- new grapheme_strrpos (line 266)
+- new grapheme_strripos (line 267)
+- new grapheme_extract (line 268)
+- new grapheme_levenshtein (line 269)
+- new grapheme_str_split (line 270)
+- new grapheme_strimwidth (line 271)
+- new intl_get_error_code (line 272)
+- new intl_get_error_message (line 273)
+- new intl_is_failure (line 274)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -13086,6 +13090,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 33)
 - new Error (line 68)
+- 2 class method(s)
+
+### `ext/intl/resourcebundle_get_error_code.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 53)
+- 2 class method(s)
+
+### `ext/intl/resourcebundle_get_error_message.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 53)
 - 2 class method(s)
 
 ### `ext/intl/resourcebundle_locales.php`
