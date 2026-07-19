@@ -867,6 +867,14 @@
         "ext/intl/VmUConverter.php",
         "ext/intl/collator_compare.php",
         "ext/intl/collator_create.php",
+        "ext/intl/collator_get_attribute.php",
+        "ext/intl/collator_get_error_code.php",
+        "ext/intl/collator_get_error_message.php",
+        "ext/intl/collator_get_locale.php",
+        "ext/intl/collator_get_sort_key.php",
+        "ext/intl/collator_get_strength.php",
+        "ext/intl/collator_set_attribute.php",
+        "ext/intl/collator_set_strength.php",
         "ext/intl/datefmt_format_object.php",
         "ext/intl/grapheme_extract.php",
         "ext/intl/grapheme_levenshtein.php",
@@ -6087,9 +6095,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5853,
+        "inventory_files": 5864,
         "excluded": 0,
-        "eligible": 5853,
+        "eligible": 5864,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
