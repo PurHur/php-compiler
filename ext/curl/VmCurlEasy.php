@@ -142,8 +142,35 @@ final class VmCurlEasy
 
             return true;
         }
+        if (CurlConstants::CURLOPT_BINARYTRANSFER === $option
+            || CurlConstants::CURLOPT_SAFE_UPLOAD === $option
+        ) {
+            // PHP-only historical options — accept and ignore (php-src ext/curl/interface.c).
+            return true;
+        }
 
-        return true;
+        // Forward remaining CURLOPT_* to libcurl (#21137).
+        $optType = CurlConstants::easyOptionType($option);
+        if (2 === $optType) {
+            // CURLOPTTYPE_FUNCTIONPOINT — callables not yet lowered; accept without fatal.
+            return true;
+        }
+        if (1 === $optType || 4 === $optType) {
+            // OBJECTPOINT / BLOB — string path (POSTFIELDS array multipart still TODO).
+            if (Variable::TYPE_ARRAY === $value->resolveIndirect()->type) {
+                // Zend builds multipart from array POSTFIELDS; keep soft-true until implemented.
+                return CurlConstants::CURLOPT_POSTFIELDS === $option;
+            }
+            $str = VmString::coerceStringBuiltinArg($value, 'curl_setopt', 2, 'value');
+            $rc = VmCurlNative::easySetoptString($native, $option, $str);
+
+            return CurlConstants::CURLE_OK === $rc;
+        }
+        // LONG / OFF_T
+        $long = self::toLongOption($value, 'curl_setopt');
+        $rc = VmCurlNative::easySetoptLong($native, $option, $long);
+
+        return CurlConstants::CURLE_OK === $rc;
     }
 
     public static function setoptArray(ObjectEntry $easy, Variable $optionsVar, Frame $frame): bool
@@ -645,6 +672,26 @@ final class VmCurlEasy
         }
 
         return (bool) $value->toBool();
+    }
+
+    /** Coerce CURLOPT long/bool values like php-src zend_parse_parameters "l" (#21137). */
+    private static function toLongOption(Variable $value, string $function): int
+    {
+        $value = $value->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #3 ($value) must not be an enum case',
+                $function
+            ));
+        }
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_NULL === $value->type) {
+            return 0;
+        }
+
+        return VmMath::parseIntBuiltinArg($value, $function, 2, 'value');
     }
 
     /** @return list<string> */

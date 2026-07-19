@@ -80,10 +80,14 @@ echo CURLOPT_URL;
 echo (int) defined('CURLE_OK');
 echo (int) defined('CURLINFO_HTTP_CODE');
 echo (int) defined('CURLPAUSE_ALL');
+echo (int) defined('CURLOPT_TIMEOUT');
+echo CURLOPT_TIMEOUT;
+echo (int) defined('CURLOPT_FOLLOWLOCATION');
+echo CURLOPT_FOLLOWLOCATION;
 PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('11111111111111110002111', ob_get_clean());
+        self::assertSame('11111111111111110002111113152', ob_get_clean());
     }
 }

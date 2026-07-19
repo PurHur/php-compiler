@@ -346,7 +346,7 @@ class AotTest extends BaseTest
                 continue;
             }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlEasyCompliance($name)
-                && str_contains($name, 'curl_setopt_array')
+                && (str_contains($name, 'curl_setopt_array') || str_contains($name, 'curl_opt_constants'))
                 && !str_contains($name, 'curl_easy_phantom')) {
                 continue;
             }
