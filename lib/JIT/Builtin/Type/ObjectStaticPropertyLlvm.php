@@ -68,7 +68,7 @@ final class ObjectStaticPropertyLlvm
         }
         if (Variable::TYPE_NATIVE_DOUBLE === $entry['type']) {
             $context->builder->store(
-                $context->getTypeFromString('double')->constReal(0.0, false),
+                $context->getTypeFromString('double')->constReal(0.0),
                 $global
             );
 

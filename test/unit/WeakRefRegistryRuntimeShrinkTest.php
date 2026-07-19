@@ -78,4 +78,17 @@ final class WeakRefRegistryRuntimeShrinkTest extends TestCase
         $this->assertSame(0, WeakRefRegistryJitHelper::refCount());
         $this->assertSame(0, WeakRefRegistryJitHelper::mapCount());
     }
+
+    /** Phantom JIT\Variable::getValue() abort (#21109). */
+    public function testWeakRefNativeOpsDoNotCallPhantomGetValue(): void
+    {
+        $weak = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/WeakRefNativeOpsJit.php');
+        $gc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesNativeOpsJit.php');
+        $this->assertStringNotContainsString('->getValue()', $weak);
+        $this->assertStringNotContainsString('->getValue()', $gc);
+        $this->assertStringContainsString('i64FromVar', $weak);
+        $this->assertStringContainsString('i64FromVar', $gc);
+        $this->assertStringContainsString('JitNestedHelperCoerce::i64ToTypedPtr', $weak);
+        $this->assertStringContainsString('JitNestedHelperCoerce::i64ToTypedPtr', $gc);
+    }
 }

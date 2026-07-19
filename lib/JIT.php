@@ -16088,7 +16088,12 @@ class JIT {
         }
         if (
             JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod($methodLc)
-            && ('phpcompiler\\vm\\hashtable' === $declaringClassLc || 'object' === $declaringClassLc)
+            && (
+                'phpcompiler\\vm\\hashtable' === $declaringClassLc
+                || 'object' === $declaringClassLc
+                // Outer user enums can leak into NestedJIT receiver userType (#21109).
+                || JIT\NestedJitCompileScope::isActive()
+            )
         ) {
             if (!JIT\NestedVmHashTableMethodLlvm::ensureMethod($this->context, $methodLc)) {
                 return false;

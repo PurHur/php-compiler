@@ -1427,24 +1427,21 @@ class Type extends Builtin {
     }
 
     public function initialize(): void {
-        if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType) {
-            Sscanf::ensureLinked($this->context);
-            StringFormat::ensureLinked($this->context);
-            StringStripTags::ensureLinked($this->context);
-        }
+        // Eager NestedJIT ensureLinked on EMBED during Type::initialize is fragile
+        // (#20930, #21109): after NativeOps getValue() fix, Sscanf/ObGzhandler abort
+        // or segfault mid-init. Link on first use (peer PendingHeaders / STANDALONE #12910).
         HttpResponseCode::implement($this->context);
         ObOutput::registerExternals($this->context);
-        if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType) {
-            ObGzhandler::ensureLinked($this->context);
-            ObOutputRuntime::ensureLinked($this->context);
-        }
         // Thin user-script AOT: lazy-link PendingHeaders on first header()/headers_list use
         // — NestedJIT during Type::initialize segfaults (#20930, peer #13571).
         if (!$this->context->isThinStandaloneAotMain()) {
             PendingHeadersRuntime::ensureLinked($this->context);
         }
-        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-            // Remaining runtimes link lazily via Context::defineBuiltins ensureStandaloneBodies (#12910).
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
+            || Builtin::LOAD_TYPE_EMBED === $this->loadType
+        ) {
+            // Remaining runtimes link lazily via ensureLinked / ensureStandaloneBodies
+            // (#12910, #21109).
             return;
         }
         PowIntRuntime::ensureLinked($this->context);

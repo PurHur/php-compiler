@@ -378,7 +378,7 @@ final class JitSpaceshipCompareKernel
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $dbl = $context->getTypeFromString('double');
-        $zeroDbl = $dbl->constFloat(0.0);
+        $zeroDbl = $dbl->constReal(0.0);
 
         $boolLeftCases = [
             [self::TYPE_LONG, fn () => $context->builder->sitofp(
@@ -531,7 +531,7 @@ final class JitSpaceshipCompareKernel
             $i64->constInt(0, false),
             self::spaceshipNumberString(
                 $context,
-                $context->getTypeFromString('double')->constFloat(0.0),
+                $context->getTypeFromString('double')->constReal(0.0),
                 $str,
                 $numOnLeft
             )
@@ -547,7 +547,15 @@ final class JitSpaceshipCompareKernel
         $i64 = $context->getTypeFromString('int64');
         $one = $i64->constInt(1, true);
 
-        return $context->builder->select($isEnum, $one, self::longSpaceship($context, self::i64FromI32($context, self::TYPE_OBJECT), self::i64FromI32($context, self::TYPE_STRING)));
+        return $context->builder->select(
+            $isEnum,
+            $one,
+            self::longSpaceship(
+                $context,
+                $i64->constInt(self::TYPE_OBJECT, false),
+                $i64->constInt(self::TYPE_STRING, false)
+            )
+        );
     }
 
     private static function emitObjectCompareSpaceshipBridge(Context $context, LlvmFunction $fn): void

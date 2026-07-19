@@ -131,6 +131,9 @@ final class GcCollectCyclesRuntime
 
     private static int $blockSuffix = 0;
 
+    /** Re-entrancy guard: NativeOps call ensureLinked while NestedJIT compiles helpers (#21109). */
+    private static int $implementDepth = 0;
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -182,6 +185,14 @@ final class GcCollectCyclesRuntime
 
     public static function implement(Context $context): void
     {
+        if (self::$implementDepth > 0) {
+            // Mid NestedJIT helper compile: declare call targets only — do not clear insert (#21109).
+            self::declareHelperNativeCallTargets($context);
+            self::ensureExternals($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('phpc_destruct_delref_allowed');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -189,29 +200,55 @@ final class GcCollectCyclesRuntime
             return;
         }
 
-        self::$blockSuffix = 0;
-        WeakRefRegistryRuntime::ensureLinked($context);
-        GcToggleRuntime::ensureLinked($context);
-        if (self::usesPhpRegistry($context)) {
-            self::ensureRegistryJitHelperCompiled($context);
-            self::ensureShutdownJitHelperCompiled($context);
-            self::ensureTryInvokeJitHelperCompiled($context);
-            self::ensureReleaseStorageJitHelperCompiled($context);
+        ++self::$implementDepth;
+        try {
+            self::$blockSuffix = 0;
+            // Declare before helper NestedJIT so NativeOps can emit calls (#21109).
+            self::declareHelperNativeCallTargets($context);
+            self::ensureExternals($context);
+            WeakRefRegistryRuntime::ensureLinked($context);
+            GcToggleRuntime::ensureLinked($context);
+            if (self::usesPhpRegistry($context)) {
+                self::ensureRegistryJitHelperCompiled($context);
+                self::ensureShutdownJitHelperCompiled($context);
+                self::ensureTryInvokeJitHelperCompiled($context);
+                self::ensureReleaseStorageJitHelperCompiled($context);
+            }
+            self::ensureDestructAllowDelrefJitHelperCompiled($context);
+            self::ensureGlobals($context);
+            self::ensureExternals($context);
+            self::ensureInternalDeclarations($context);
+
+            self::implementAllowDelrefBridge($context);
+            self::implementDestructDelrefAllowedBridge($context);
+            self::implementGcRegister($context);
+            self::implementGcUnregister($context);
+            self::implementDestructTryInvoke($context);
+            self::implementRunShutdownDestructors($context);
+            GcCollectCyclesCollectRuntime::implementCollectBridge($context);
+
+            self::registerLinkedRuntime($context);
+        } finally {
+            --self::$implementDepth;
         }
-        self::ensureDestructAllowDelrefJitHelperCompiled($context);
-        self::ensureGlobals($context);
-        self::ensureExternals($context);
-        self::ensureInternalDeclarations($context);
+    }
 
-        self::implementAllowDelrefBridge($context);
-        self::implementDestructDelrefAllowedBridge($context);
-        self::implementGcRegister($context);
-        self::implementGcUnregister($context);
-        self::implementDestructTryInvoke($context);
-        self::implementRunShutdownDestructors($context);
-        GcCollectCyclesCollectRuntime::implementCollectBridge($context);
+    /**
+     * Forward-declare LLVM symbols that NestedJIT GC helpers call via NativeOps (#21109).
+     */
+    private static function declareHelperNativeCallTargets(Context $context): void
+    {
+        $void = $context->getTypeFromString('void');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
 
-        self::registerLinkedRuntime($context);
+        self::declareFunction($context, 'phpc_destruct_try_invoke', $void, [$i8p]);
+        self::declareFunction($context, 'phpc_gc_notify_object_freed', $void, [$i8p]);
+        self::declareFunction($context, 'phpc_object_release_storage', $void, [$i8p]);
+        self::declareFunction($context, 'phpc_gc_register', $void, [$i8p, $i32]);
+        self::declareFunction($context, 'phpc_gc_unregister', $void, [$i8p]);
+        self::declareFunction($context, 'phpc_gc_run_shutdown_destructors', $void, []);
+        // __mm__free / __object__invoke_destructor are registered by other runtimes.
     }
 
     private static function implementAllowDelrefBridge(Context $context): void

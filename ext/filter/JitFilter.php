@@ -1047,8 +1047,8 @@ final class JitFilter
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $dblTy = $context->getTypeFromString('double');
-        $zero = $dblTy->constFloat(0.0, false);
-        $one = $dblTy->constFloat(1.0, false);
+        $zero = $dblTy->constReal(0.0);
+        $one = $dblTy->constReal(1.0);
         $isZero = $context->builder->fcmp(Builder::REAL_OEQ, $doubleVal, $zero);
         $isOne = $context->builder->fcmp(Builder::REAL_OEQ, $doubleVal, $one);
 
