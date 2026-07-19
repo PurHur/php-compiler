@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** locale_canonicalize() — php-src alias of Locale::canonicalize (#20738). */
+/** locale_canonicalize() — php-src alias of Locale::canonicalize (#20738, AOT #20760). */
 final class locale_canonicalize extends Internal
 {
     public function execute(Frame $frame): void
@@ -41,6 +41,12 @@ final class locale_canonicalize extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \RuntimeException('locale_canonicalize() JIT lowering not implemented; use VM');
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'locale_canonicalize() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitLocaleParser::canonicalize($context, $args[0], 'locale_canonicalize');
     }
 }

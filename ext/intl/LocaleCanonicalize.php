@@ -6,9 +6,12 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPLLVM\Value;
 
-/** Locale::canonicalize() — php-src locale_canonicalize (#20738). */
+/** Locale::canonicalize() — php-src locale_canonicalize (#20738, AOT #20760). */
 final class LocaleCanonicalize extends VmClassMethod
 {
     public function __construct()
@@ -39,5 +42,16 @@ final class LocaleCanonicalize extends VmClassMethod
             return;
         }
         $frame->returnVar->string($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        if (1 !== \count($args)) {
+            throw new \ArgumentCountError(
+                'Locale::canonicalize() expects exactly 1 argument, '.\count($args).' given'
+            );
+        }
+
+        return JitLocaleParser::canonicalize($context, $args[0], 'Locale::canonicalize');
     }
 }
