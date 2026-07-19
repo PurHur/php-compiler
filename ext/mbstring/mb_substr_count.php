@@ -30,7 +30,7 @@ final class mb_substr_count extends Internal
                 $argc
             ));
         }
-        $haystack = VmString::coerceStringBuiltinArg(
+        $haystack = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_substr_count',
             0,
@@ -39,7 +39,7 @@ final class mb_substr_count extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceStringBuiltinArg(
+        $needle = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[1],
             'mb_substr_count',
             1,

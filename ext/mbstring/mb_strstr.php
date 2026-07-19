@@ -32,7 +32,8 @@ final class mb_strstr extends Internal
                 $argc
             ));
         }
-        $haystack = VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21061, mbstring.c).
+        $haystack = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_strstr',
             0,
@@ -41,7 +42,7 @@ final class mb_strstr extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceStringBuiltinArg(
+        $needle = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[1],
             'mb_strstr',
             1,

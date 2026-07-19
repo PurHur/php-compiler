@@ -33,7 +33,8 @@ final class mb_convert_case extends Internal
                 $argc
             ));
         }
-        $source = VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21061, mbstring.c).
+        $source = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_convert_case',
             0,

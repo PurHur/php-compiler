@@ -59,7 +59,8 @@ final class JitMbConvertCase
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_convert_case', 0, 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21061).
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'mb_convert_case', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
 
         return match ($mode) {

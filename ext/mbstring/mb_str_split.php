@@ -32,7 +32,7 @@ final class mb_str_split extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceStringBuiltinArg(
+        $string = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_str_split',
             0,

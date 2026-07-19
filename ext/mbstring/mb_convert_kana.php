@@ -32,7 +32,7 @@ final class mb_convert_kana extends Internal
             return;
         }
 
-        $str = VmString::coerceStringBuiltinArg(
+        $str = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_convert_kana',
             0,
@@ -40,7 +40,7 @@ final class mb_convert_kana extends Internal
         );
         $option = null;
         if ($argc >= 2) {
-            $option = VmString::coerceStringBuiltinArg(
+            $option = VmString::coerceZparamStrBuiltinArg(
                 $frame->calledArgs[1],
                 'mb_convert_kana',
                 1,

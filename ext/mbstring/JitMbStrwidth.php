@@ -30,7 +30,8 @@ final class JitMbStrwidth
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_strwidth', 0, 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21061).
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'mb_strwidth', 0, 'string');
         if (2 === $argc) {
             if (JITVariable::TYPE_STRING !== $args[1]->type) {
                 throw new \LogicException('mb_strwidth() encoding must be a string literal in this compiler build');

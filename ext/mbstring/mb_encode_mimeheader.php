@@ -31,7 +31,7 @@ final class mb_encode_mimeheader extends Internal
                 $argc
             ));
         }
-        $str = VmString::coerceStringBuiltinArg(
+        $str = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_encode_mimeheader',
             0,

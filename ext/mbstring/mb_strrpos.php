@@ -37,7 +37,7 @@ final class mb_strrpos extends Internal
                 max(\array_keys($frame->calledArgs)) + 1
             ));
         }
-        $haystack = VmString::coerceStringBuiltinArg(
+        $haystack = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_strrpos',
             0,
@@ -46,7 +46,7 @@ final class mb_strrpos extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceStringBuiltinArg(
+        $needle = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[1],
             'mb_strrpos',
             1,
