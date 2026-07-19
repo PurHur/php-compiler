@@ -13,9 +13,9 @@ use PHPCompiler\VM\Context;
  *
  * Locale / IntlDateFormatter / IntlDatePatternGenerator / IntlCalendar / IntlTimeZone /
  * NumberFormatter / Normalizer / Collator / MessageFormatter / Transliterator / ResourceBundle /
- * IntlBreakIterator / IntlChar / UConverter / Spoofchecker / IntlException all gate on
- * {@see IntlExtensionPolicy} advertisement (no phantom class_exists; #6366, #6171, #6139, #6188,
- * #20035, #20740).
+ * IntlBreakIterator / IntlCodePointBreakIterator / IntlChar / UConverter / Spoofchecker / IntlException
+ * all gate on {@see IntlExtensionPolicy} advertisement (no phantom class_exists; #6366, #6171, #6139,
+ * #6188, #20035, #20740, #20822).
  */
 final class BuiltinClasses
 {
