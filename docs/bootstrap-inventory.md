@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5953 |
-| Phase A inventory files (M2 ratio SSOT) | 5953 |
+| PHP files on vm.php path | 5964 |
+| Phase A inventory files (M2 ratio SSOT) | 5964 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18230 |
+| Source constructs flagged (warnings) | 18277 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -845,7 +845,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 136 |
+| `ext/intl/Module.php` | 0 | 147 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -854,7 +854,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmCollator.php` | 0 | 55 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
-| `ext/intl/VmIntlCalendar.php` | 0 | 140 |
+| `ext/intl/VmIntlCalendar.php` | 0 | 143 |
 | `ext/intl/VmIntlChar.php` | 0 | 109 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 25 |
 | `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
@@ -941,6 +941,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intlcal_set_time.php` | 0 | 3 |
 | `ext/intl/intlcal_set_time_zone.php` | 0 | 3 |
 | `ext/intl/intlcal_to_date_time.php` | 0 | 3 |
+| `ext/intl/intltz_create_default.php` | 0 | 3 |
+| `ext/intl/intltz_create_time_zone.php` | 0 | 3 |
+| `ext/intl/intltz_from_date_time_zone.php` | 0 | 3 |
+| `ext/intl/intltz_get_canonical_id.php` | 0 | 3 |
+| `ext/intl/intltz_get_display_name.php` | 0 | 3 |
+| `ext/intl/intltz_get_dst_savings.php` | 0 | 3 |
+| `ext/intl/intltz_get_gmt.php` | 0 | 3 |
+| `ext/intl/intltz_get_id.php` | 0 | 3 |
+| `ext/intl/intltz_get_raw_offset.php` | 0 | 3 |
+| `ext/intl/intltz_get_region.php` | 0 | 3 |
+| `ext/intl/intltz_to_date_time_zone.php` | 0 | 3 |
 | `ext/intl/locale_accept_from_http.php` | 0 | 2 |
 | `ext/intl/locale_canonicalize.php` | 0 | 3 |
 | `ext/intl/locale_compose.php` | 0 | 2 |
@@ -11815,23 +11826,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new intlcal_get_minimum (line 241)
 - new intlcal_get_maximum (line 242)
 - new intlcal_get_available_locales (line 243)
-- new grapheme_strlen (line 274)
-- new grapheme_substr (line 275)
-- new grapheme_strpos (line 276)
-- new grapheme_str_contains (line 277)
-- new grapheme_strstr (line 278)
-- new grapheme_stristr (line 279)
-- new grapheme_stripos (line 280)
-- new grapheme_strrpos (line 281)
-- new grapheme_strripos (line 282)
-- new grapheme_extract (line 283)
-- new grapheme_levenshtein (line 284)
-- new grapheme_str_split (line 285)
-- new grapheme_strimwidth (line 286)
-- new intl_get_error_code (line 287)
-- new intl_get_error_message (line 288)
-- new intl_is_failure (line 289)
-- new intl_error_name (line 290)
+- new intltz_get_gmt (line 245)
+- new intltz_create_time_zone (line 246)
+- new intltz_create_default (line 247)
+- new intltz_get_id (line 248)
+- new intltz_get_display_name (line 249)
+- new intltz_get_raw_offset (line 250)
+- new intltz_get_dst_savings (line 251)
+- new intltz_from_date_time_zone (line 252)
+- new intltz_to_date_time_zone (line 253)
+- new intltz_get_canonical_id (line 254)
+- new intltz_get_region (line 255)
+- new grapheme_strlen (line 286)
+- new grapheme_substr (line 287)
+- new grapheme_strpos (line 288)
+- new grapheme_str_contains (line 289)
+- new grapheme_strstr (line 290)
+- new grapheme_stristr (line 291)
+- new grapheme_stripos (line 292)
+- new grapheme_strrpos (line 293)
+- new grapheme_strripos (line 294)
+- new grapheme_extract (line 295)
+- new grapheme_levenshtein (line 296)
+- new grapheme_str_split (line 297)
+- new grapheme_strimwidth (line 298)
+- new intl_get_error_code (line 299)
+- new intl_get_error_message (line 300)
+- new intl_is_failure (line 301)
+- new intl_error_name (line 302)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12014,125 +12036,128 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IntlCalendarBefore (line 208)
 - new IntlCalendarAfter (line 209)
 - new IntlCalendarSetDate (line 210)
-- new IntlCalendarSetTimeZone (line 211)
-- new IntlCalendarGetMaximum (line 212)
-- new IntlCalendarGetMinimum (line 213)
-- new IntlCalendarGetActualMaximum (line 214)
-- new IntlCalendarGetActualMinimum (line 215)
-- new IntlCalendarIsWeekend (line 216)
-- new IntlCalendarIsEquivalentTo (line 217)
-- new IntlCalendarGetDayOfWeekType (line 218)
-- new IntlCalendarInDaylightTime (line 219)
-- new IntlCalendarGetLocale (line 220)
-- new IntlCalendarIsLenient (line 221)
-- new IntlCalendarSetLenient (line 222)
-- new IntlCalendarGetFirstDayOfWeek (line 223)
-- new IntlCalendarSetFirstDayOfWeek (line 224)
-- new IntlCalendarGetMinimalDaysInFirstWeek (line 225)
-- new IntlCalendarSetMinimalDaysInFirstWeek (line 226)
-- new IntlCalendarGetWeekendTransition (line 227)
-- new IntlCalendarGetLeastMaximum (line 228)
-- new IntlCalendarGetGreatestMinimum (line 229)
-- new IntlCalendarGetKeywordValuesForLocale (line 230)
-- new IntlCalendarGetAvailableLocales (line 231)
-- new IntlCalendarGetErrorCode (line 232)
-- new IntlCalendarGetErrorMessage (line 233)
-- new IntlCalendarGetRepeatedWallTimeOption (line 234)
-- new IntlCalendarSetRepeatedWallTimeOption (line 235)
-- new IntlCalendarGetSkippedWallTimeOption (line 236)
-- new IntlCalendarSetSkippedWallTimeOption (line 237)
-- new Error (line 258)
-- new ObjectEntry (line 262)
-- new ObjectEntry (line 579)
-- new ObjectEntry (line 607)
-- new ArgumentCountError (line 1525)
-- new ArgumentCountError (line 1570)
-- new Error (line 1578)
-- new ArgumentCountError (line 1612)
-- new Error (line 1620)
-- new ArgumentCountError (line 1663)
-- new Error (line 1671)
-- new ArgumentCountError (line 1698)
-- new Error (line 1706)
-- new ArgumentCountError (line 1733)
-- new Error (line 1741)
-- new ArgumentCountError (line 1776)
-- new Error (line 1784)
-- new ArgumentCountError (line 1811)
-- new ArgumentCountError (line 1835)
-- new Error (line 1843)
-- new ArgumentCountError (line 1867)
-- new Error (line 1875)
-- new ArgumentCountError (line 1900)
-- new Error (line 1908)
-- new ArgumentCountError (line 1934)
-- new Error (line 1942)
-- new ArgumentCountError (line 1964)
-- new Error (line 1972)
-- new ArgumentCountError (line 1999)
-- new Error (line 2007)
-- new ArgumentCountError (line 2034)
-- new ArgumentCountError (line 2096)
-- new Error (line 2104)
-- new ArgumentCountError (line 2146)
-- new Error (line 2150)
-- new ArgumentCountError (line 2169)
-- new Error (line 2173)
-- new ArgumentCountError (line 2192)
-- new Error (line 2196)
-- new ArgumentCountError (line 2213)
-- new Error (line 2217)
-- new ArgumentCountError (line 2234)
-- new Error (line 2238)
-- new ArgumentCountError (line 2256)
-- new Error (line 2260)
-- new ArgumentCountError (line 2278)
-- new Error (line 2282)
-- new ArgumentCountError (line 2300)
-- new Error (line 2304)
-- new ArgumentCountError (line 2323)
-- new Error (line 2327)
-- new ArgumentCountError (line 2355)
-- new Error (line 2359)
-- new ArgumentCountError (line 2378)
-- new Error (line 2382)
-- new ArgumentCountError (line 2400)
-- new Error (line 2404)
-- new ArgumentCountError (line 2421)
-- new Error (line 2425)
-- new ArgumentCountError (line 2442)
-- new Error (line 2446)
-- new ArgumentCountError (line 2461)
-- new Error (line 2465)
-- new ArgumentCountError (line 2482)
-- new Error (line 2486)
-- new ArgumentCountError (line 2501)
-- new Error (line 2505)
-- new ArgumentCountError (line 2522)
-- new Error (line 2526)
-- new ArgumentCountError (line 2541)
-- new Error (line 2545)
-- new ArgumentCountError (line 2563)
-- new Error (line 2567)
-- new ArgumentCountError (line 2582)
-- new Error (line 2586)
-- new ArgumentCountError (line 2604)
-- new Error (line 2608)
-- new ArgumentCountError (line 2625)
-- new Error (line 2629)
-- new ArgumentCountError (line 2646)
-- new Error (line 2650)
-- new ArgumentCountError (line 2667)
-- new Error (line 2671)
-- new ArgumentCountError (line 2688)
-- new Error (line 2692)
-- new ArgumentCountError (line 2710)
-- new Error (line 2714)
-- new ArgumentCountError (line 2732)
-- new Error (line 2736)
-- new ArgumentCountError (line 2754)
-- new ArgumentCountError (line 2775)
-- 106 class method(s)
+- new IntlCalendarSetDateTime (line 211)
+- new IntlCalendarSetTimeZone (line 212)
+- new IntlCalendarGetMaximum (line 213)
+- new IntlCalendarGetMinimum (line 214)
+- new IntlCalendarGetActualMaximum (line 215)
+- new IntlCalendarGetActualMinimum (line 216)
+- new IntlCalendarIsWeekend (line 217)
+- new IntlCalendarIsEquivalentTo (line 218)
+- new IntlCalendarGetDayOfWeekType (line 219)
+- new IntlCalendarInDaylightTime (line 220)
+- new IntlCalendarGetLocale (line 221)
+- new IntlCalendarIsLenient (line 222)
+- new IntlCalendarSetLenient (line 223)
+- new IntlCalendarGetFirstDayOfWeek (line 224)
+- new IntlCalendarSetFirstDayOfWeek (line 225)
+- new IntlCalendarGetMinimalDaysInFirstWeek (line 226)
+- new IntlCalendarSetMinimalDaysInFirstWeek (line 227)
+- new IntlCalendarGetWeekendTransition (line 228)
+- new IntlCalendarGetLeastMaximum (line 229)
+- new IntlCalendarGetGreatestMinimum (line 230)
+- new IntlCalendarGetKeywordValuesForLocale (line 231)
+- new IntlCalendarGetAvailableLocales (line 232)
+- new IntlCalendarGetErrorCode (line 233)
+- new IntlCalendarGetErrorMessage (line 234)
+- new IntlCalendarGetRepeatedWallTimeOption (line 235)
+- new IntlCalendarSetRepeatedWallTimeOption (line 236)
+- new IntlCalendarGetSkippedWallTimeOption (line 237)
+- new IntlCalendarSetSkippedWallTimeOption (line 238)
+- new Error (line 259)
+- new ObjectEntry (line 263)
+- new ObjectEntry (line 580)
+- new ObjectEntry (line 608)
+- new ArgumentCountError (line 1526)
+- new ArgumentCountError (line 1571)
+- new Error (line 1579)
+- new ArgumentCountError (line 1613)
+- new Error (line 1621)
+- new ArgumentCountError (line 1664)
+- new Error (line 1672)
+- new ArgumentCountError (line 1699)
+- new Error (line 1707)
+- new ArgumentCountError (line 1734)
+- new Error (line 1742)
+- new ArgumentCountError (line 1777)
+- new Error (line 1785)
+- new ArgumentCountError (line 1812)
+- new ArgumentCountError (line 1836)
+- new Error (line 1844)
+- new ArgumentCountError (line 1868)
+- new Error (line 1876)
+- new ArgumentCountError (line 1901)
+- new Error (line 1909)
+- new ArgumentCountError (line 1935)
+- new Error (line 1943)
+- new ArgumentCountError (line 1965)
+- new Error (line 1973)
+- new ArgumentCountError (line 2000)
+- new Error (line 2008)
+- new ArgumentCountError (line 2035)
+- new ArgumentCountError (line 2097)
+- new Error (line 2105)
+- new ArgumentCountError (line 2147)
+- new Error (line 2151)
+- new ArgumentCountError (line 2170)
+- new Error (line 2174)
+- new ArgumentCountError (line 2193)
+- new Error (line 2197)
+- new ArgumentCountError (line 2218)
+- new Error (line 2225)
+- new ArgumentCountError (line 2252)
+- new Error (line 2256)
+- new ArgumentCountError (line 2273)
+- new Error (line 2277)
+- new ArgumentCountError (line 2295)
+- new Error (line 2299)
+- new ArgumentCountError (line 2317)
+- new Error (line 2321)
+- new ArgumentCountError (line 2339)
+- new Error (line 2343)
+- new ArgumentCountError (line 2362)
+- new Error (line 2366)
+- new ArgumentCountError (line 2394)
+- new Error (line 2398)
+- new ArgumentCountError (line 2417)
+- new Error (line 2421)
+- new ArgumentCountError (line 2439)
+- new Error (line 2443)
+- new ArgumentCountError (line 2460)
+- new Error (line 2464)
+- new ArgumentCountError (line 2481)
+- new Error (line 2485)
+- new ArgumentCountError (line 2500)
+- new Error (line 2504)
+- new ArgumentCountError (line 2521)
+- new Error (line 2525)
+- new ArgumentCountError (line 2540)
+- new Error (line 2544)
+- new ArgumentCountError (line 2561)
+- new Error (line 2565)
+- new ArgumentCountError (line 2580)
+- new Error (line 2584)
+- new ArgumentCountError (line 2602)
+- new Error (line 2606)
+- new ArgumentCountError (line 2621)
+- new Error (line 2625)
+- new ArgumentCountError (line 2643)
+- new Error (line 2647)
+- new ArgumentCountError (line 2664)
+- new Error (line 2668)
+- new ArgumentCountError (line 2685)
+- new Error (line 2689)
+- new ArgumentCountError (line 2706)
+- new Error (line 2710)
+- new ArgumentCountError (line 2727)
+- new Error (line 2731)
+- new ArgumentCountError (line 2749)
+- new Error (line 2753)
+- new ArgumentCountError (line 2771)
+- new Error (line 2775)
+- new ArgumentCountError (line 2793)
+- new ArgumentCountError (line 2814)
+- 107 class method(s)
 
 ### `ext/intl/VmIntlChar.php`
 
@@ -13124,6 +13149,83 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/intltz_create_default.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 41)
+- 2 class method(s)
+
+### `ext/intl/intltz_create_time_zone.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 49)
+- 2 class method(s)
+
+### `ext/intl/intltz_from_date_time_zone.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 52)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_canonical_id.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 64)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_display_name.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 90)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_dst_savings.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 53)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_gmt.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 41)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_id.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 53)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_raw_offset.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 53)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_region.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/intltz_to_date_time_zone.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 59)
 - 2 class method(s)
 
 ### `ext/intl/locale_accept_from_http.php`
