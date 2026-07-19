@@ -20,7 +20,8 @@ use PHPCfg\Func as CfgFunc;
  * IntlCalendar — Gregorian field get/set via zoneinfo (php-src calendar_*; #6151, #20756).
  *
  * Subset: createInstance, get/set, getTimeZone, getTime/setTime, getType, getNow,
- * add/roll/clear/isSet/equals, toDateTime/fromDateTime, fieldDifference.
+ * add/roll/clear/isSet/equals, toDateTime/fromDateTime, fieldDifference,
+ * before/after, setDate/setTimeZone, field bounds, weekend, wall-time options (#20851).
  * ICU field constants match UCalendarDateFields (unicode/ucal.h).
  */
 final class VmIntlCalendar
@@ -77,13 +78,26 @@ final class VmIntlCalendar
     public const DECEMBER = 11;
     public const UNDECIMBER = 12;
 
+    /** UCalendarWallTimeOption — php-src / ICU ucal.h */
+    public const WALLTIME_LAST = 0;
+    public const WALLTIME_FIRST = 1;
+    public const WALLTIME_NEXT_VALID = 2;
+
+    /** UCalendarWeekdayType */
+    public const DOW_TYPE_WEEKDAY = 0;
+    public const DOW_TYPE_WEEKEND = 1;
+    public const DOW_TYPE_WEEKEND_ONSET = 2;
+    public const DOW_TYPE_WEEKEND_CEASE = 3;
+
     /**
      * @var array<int, array{
      *   timezone: string,
      *   locale: string,
      *   timestamp: int,
      *   millisecond: int,
-     *   unsetFields: array<int, true>
+     *   unsetFields: array<int, true>,
+     *   repeatedWallTimeOption: int,
+     *   skippedWallTimeOption: int
      * }>
      */
     private static array $state = [];
@@ -137,6 +151,13 @@ final class VmIntlCalendar
             'NOVEMBER' => self::NOVEMBER,
             'DECEMBER' => self::DECEMBER,
             'UNDECIMBER' => self::UNDECIMBER,
+            'WALLTIME_LAST' => self::WALLTIME_LAST,
+            'WALLTIME_FIRST' => self::WALLTIME_FIRST,
+            'WALLTIME_NEXT_VALID' => self::WALLTIME_NEXT_VALID,
+            'DOW_TYPE_WEEKDAY' => self::DOW_TYPE_WEEKDAY,
+            'DOW_TYPE_WEEKEND' => self::DOW_TYPE_WEEKEND,
+            'DOW_TYPE_WEEKEND_ONSET' => self::DOW_TYPE_WEEKEND_ONSET,
+            'DOW_TYPE_WEEKEND_CEASE' => self::DOW_TYPE_WEEKEND_CEASE,
         ];
     }
 
@@ -174,6 +195,23 @@ final class VmIntlCalendar
             'equals' => [new IntlCalendarEquals(), 'equals', $pub],
             'todatetime' => [new IntlCalendarToDateTime(), 'toDateTime', $pub],
             'fielddifference' => [new IntlCalendarFieldDifference(), 'fieldDifference', $pub],
+            'before' => [new IntlCalendarBefore(), 'before', $pub],
+            'after' => [new IntlCalendarAfter(), 'after', $pub],
+            'setdate' => [new IntlCalendarSetDate(), 'setDate', $pub],
+            'settimezone' => [new IntlCalendarSetTimeZone(), 'setTimeZone', $pub],
+            'getmaximum' => [new IntlCalendarGetMaximum(), 'getMaximum', $pub],
+            'getminimum' => [new IntlCalendarGetMinimum(), 'getMinimum', $pub],
+            'getactualmaximum' => [new IntlCalendarGetActualMaximum(), 'getActualMaximum', $pub],
+            'getactualminimum' => [new IntlCalendarGetActualMinimum(), 'getActualMinimum', $pub],
+            'isweekend' => [new IntlCalendarIsWeekend(), 'isWeekend', $pub],
+            'isequivalentto' => [new IntlCalendarIsEquivalentTo(), 'isEquivalentTo', $pub],
+            'getdayofweektype' => [new IntlCalendarGetDayOfWeekType(), 'getDayOfWeekType', $pub],
+            'geterrorcode' => [new IntlCalendarGetErrorCode(), 'getErrorCode', $pub],
+            'geterrormessage' => [new IntlCalendarGetErrorMessage(), 'getErrorMessage', $pub],
+            'getrepeatedwalltimeoption' => [new IntlCalendarGetRepeatedWallTimeOption(), 'getRepeatedWallTimeOption', $pub],
+            'setrepeatedwalltimeoption' => [new IntlCalendarSetRepeatedWallTimeOption(), 'setRepeatedWallTimeOption', $pub],
+            'getskippedwalltimeoption' => [new IntlCalendarGetSkippedWallTimeOption(), 'getSkippedWallTimeOption', $pub],
+            'setskippedwalltimeoption' => [new IntlCalendarSetSkippedWallTimeOption(), 'setSkippedWallTimeOption', $pub],
         ];
         foreach ($methods as $lc => [$handler, $name, $vis]) {
             $entry->methods[$lc] = $handler;
@@ -206,6 +244,8 @@ final class VmIntlCalendar
             'timestamp' => VmDate::time(),
             'millisecond' => 0,
             'unsetFields' => [],
+            'repeatedWallTimeOption' => self::WALLTIME_LAST,
+            'skippedWallTimeOption' => self::WALLTIME_LAST,
         ];
         IntlError::clear();
 
@@ -909,6 +949,257 @@ final class VmIntlCalendar
             'millisecond' => $ms,
         ];
     }
+
+    public static function before(ObjectEntry $a, ObjectEntry $b): bool
+    {
+        $ta = self::getTime($a);
+        $tb = self::getTime($b);
+        if (false === $ta || false === $tb) {
+            return false;
+        }
+
+        return $ta < $tb;
+    }
+
+    public static function after(ObjectEntry $a, ObjectEntry $b): bool
+    {
+        $ta = self::getTime($a);
+        $tb = self::getTime($b);
+        if (false === $ta || false === $tb) {
+            return false;
+        }
+
+        return $ta > $tb;
+    }
+
+    public static function isEquivalentTo(ObjectEntry $a, ObjectEntry $b): bool
+    {
+        $sa = self::$state[$a->id] ?? null;
+        $sb = self::$state[$b->id] ?? null;
+        if (null === $sa || null === $sb) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_is_equivalent_to: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+
+        return $sa['timezone'] === $sb['timezone'];
+    }
+
+    public static function setTimeZoneId(ObjectEntry $cal, string $timezoneId): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_set_time_zone: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $state['timezone'] = $timezoneId;
+        IntlError::clear();
+
+        return true;
+    }
+
+    /** @return int|false */
+    public static function getMaximum(ObjectEntry $cal, int $field)
+    {
+        return self::fieldBound($cal, $field, true, false);
+    }
+
+    /** @return int|false */
+    public static function getMinimum(ObjectEntry $cal, int $field)
+    {
+        return self::fieldBound($cal, $field, false, false);
+    }
+
+    /** @return int|false */
+    public static function getActualMaximum(ObjectEntry $cal, int $field)
+    {
+        return self::fieldBound($cal, $field, true, true);
+    }
+
+    /** @return int|false */
+    public static function getActualMinimum(ObjectEntry $cal, int $field)
+    {
+        return self::fieldBound($cal, $field, false, true);
+    }
+
+    /** @return int|false */
+    private static function fieldBound(ObjectEntry $cal, int $field, bool $maximum, bool $actual)
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_maximum: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if ($field < 0 || $field >= self::FIELD_FIELD_COUNT) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_maximum: invalid field: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+        $parts = self::parts($state['timezone'], $state['timestamp'], $state['millisecond']);
+
+        return match ($field) {
+            self::FIELD_ERA => $maximum ? 1 : 0,
+            self::FIELD_YEAR, self::FIELD_EXTENDED_YEAR, self::FIELD_YEAR_WOY => $maximum ? 292278994 : 1,
+            self::FIELD_MONTH => $maximum ? 11 : 0,
+            self::FIELD_WEEK_OF_YEAR => $maximum ? 53 : 1,
+            self::FIELD_WEEK_OF_MONTH, self::FIELD_DAY_OF_WEEK_IN_MONTH => $maximum ? 5 : 0,
+            self::FIELD_DATE, self::FIELD_DAY_OF_MONTH => $maximum
+                ? ($actual ? self::daysInMonth($parts['year'], $parts['month']) : 31)
+                : 1,
+            self::FIELD_DAY_OF_YEAR => $maximum ? (($parts['year'] % 4 === 0 && ($parts['year'] % 100 !== 0 || $parts['year'] % 400 === 0)) ? 366 : 365) : 1,
+            self::FIELD_DAY_OF_WEEK, self::FIELD_DOW_LOCAL => $maximum ? 7 : 1,
+            self::FIELD_AM_PM => $maximum ? 1 : 0,
+            self::FIELD_HOUR => $maximum ? 11 : 0,
+            self::FIELD_HOUR_OF_DAY => $maximum ? 23 : 0,
+            self::FIELD_MINUTE, self::FIELD_SECOND => $maximum ? 59 : 0,
+            self::FIELD_MILLISECOND => $maximum ? 999 : 0,
+            self::FIELD_ZONE_OFFSET => $maximum ? 50400000 : -50400000,
+            self::FIELD_DST_OFFSET => $maximum ? 7200000 : 0,
+            self::FIELD_JULIAN_DAY => $maximum ? 213503982 : 1,
+            self::FIELD_MILLISECONDS_IN_DAY => $maximum ? 86399999 : 0,
+            self::FIELD_IS_LEAP_MONTH => $maximum ? 1 : 0,
+            default => false,
+        };
+    }
+
+    public static function isWeekend(ObjectEntry $cal, ?float $timestampMs): bool
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_is_weekend: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if (null === $timestampMs) {
+            $ts = $state['timestamp'];
+        } else {
+            $ts = (int) floor($timestampMs / 1000.0);
+        }
+        $dow = ((int) VmDateTimeNative::format($ts, 0, $state['timezone'], 'w')) + 1;
+        IntlError::clear();
+
+        return self::DOW_SUNDAY === $dow || self::DOW_SATURDAY === $dow;
+    }
+
+    /** @return int|false */
+    public static function getDayOfWeekType(ObjectEntry $cal, int $dayOfWeek)
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_day_of_week_type: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if ($dayOfWeek < self::DOW_SUNDAY || $dayOfWeek > self::DOW_SATURDAY) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_day_of_week_type: invalid day of week: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+        if (self::DOW_SUNDAY === $dayOfWeek || self::DOW_SATURDAY === $dayOfWeek) {
+            return self::DOW_TYPE_WEEKEND;
+        }
+
+        return self::DOW_TYPE_WEEKDAY;
+    }
+
+    public static function getErrorCode(ObjectEntry $cal): int|false
+    {
+        if (!isset(self::$state[$cal->id])) {
+            return false;
+        }
+
+        return IntlError::getCode();
+    }
+
+    public static function getErrorMessage(ObjectEntry $cal): string|false
+    {
+        if (!isset(self::$state[$cal->id])) {
+            return false;
+        }
+        $msg = IntlError::getMessage();
+
+        return '' === $msg ? 'U_ZERO_ERROR' : $msg;
+    }
+
+    public static function getRepeatedWallTimeOption(ObjectEntry $cal): int
+    {
+        $state = self::$state[$cal->id] ?? null;
+
+        return null === $state ? self::WALLTIME_LAST : $state['repeatedWallTimeOption'];
+    }
+
+    public static function setRepeatedWallTimeOption(ObjectEntry $cal, int $option): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            return false;
+        }
+        if ($option < self::WALLTIME_LAST || $option > self::WALLTIME_NEXT_VALID) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_set_repeated_wall_time_option: invalid option: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $state['repeatedWallTimeOption'] = $option;
+        IntlError::clear();
+
+        return true;
+    }
+
+    public static function getSkippedWallTimeOption(ObjectEntry $cal): int
+    {
+        $state = self::$state[$cal->id] ?? null;
+
+        return null === $state ? self::WALLTIME_LAST : $state['skippedWallTimeOption'];
+    }
+
+    public static function setSkippedWallTimeOption(ObjectEntry $cal, int $option): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            return false;
+        }
+        if ($option < self::WALLTIME_LAST || $option > self::WALLTIME_NEXT_VALID) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_set_skipped_wall_time_option: invalid option: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $state['skippedWallTimeOption'] = $option;
+        IntlError::clear();
+
+        return true;
+    }
 }
 
 /** IntlCalendar::createInstance() — php-src intlcal_create_instance (#6151). */
@@ -1533,5 +1824,381 @@ final class IntlCalendarFieldDifference extends VmClassMethod
             return;
         }
         $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::before() — php-src intlcal_before (#20851). */
+final class IntlCalendarBefore extends VmClassMethod
+{
+    public function __construct() { parent::__construct('before'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::before() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::before() called on incompatible object');
+        }
+        $other = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $other->type || !VmIntlCalendar::isCalendarObject($other->toObject())) {
+            throw new \TypeError('IntlCalendar::before(): Argument #1 ($other) must be of type IntlCalendar, '.\PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($other).' given');
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool(VmIntlCalendar::before($receiver->toObject(), $other->toObject()));
+    }
+}
+
+/** IntlCalendar::after() — php-src intlcal_after (#20851). */
+final class IntlCalendarAfter extends VmClassMethod
+{
+    public function __construct() { parent::__construct('after'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::after() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::after() called on incompatible object');
+        }
+        $other = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $other->type || !VmIntlCalendar::isCalendarObject($other->toObject())) {
+            throw new \TypeError('IntlCalendar::after(): Argument #1 ($other) must be of type IntlCalendar, '.\PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($other).' given');
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool(VmIntlCalendar::after($receiver->toObject(), $other->toObject()));
+    }
+}
+
+/** IntlCalendar::setDate() — php-src IntlCalendar::setDate (#20851). */
+final class IntlCalendarSetDate extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setDate'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (4 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::setDate() expects exactly 3 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::setDate() called on incompatible object');
+        }
+        $year = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::setDate', 1, 'year');
+        $month = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'IntlCalendar::setDate', 2, 'month');
+        $day = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[3], 'IntlCalendar::setDate', 3, 'dayOfMonth');
+        VmIntlCalendar::setDate($receiver->toObject(), $year, $month, $day, null, null, null);
+    }
+}
+
+/** IntlCalendar::setTimeZone() — php-src intlcal_set_time_zone (#20851). */
+final class IntlCalendarSetTimeZone extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setTimeZone'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::setTimeZone() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::setTimeZone() called on incompatible object');
+        }
+        $tz = VmIntlTimeZone::resolveTimezoneOperand($frame->calledArgs[1], $frame->vmContext, 'IntlCalendar::setTimeZone', 1);
+        $ok = VmIntlCalendar::setTimeZoneId($receiver->toObject(), $tz);
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::getMaximum() — php-src intlcal_get_maximum (#20851). */
+final class IntlCalendarGetMaximum extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getMaximum'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getMaximum() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getMaximum() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getMaximum', 1, 'field');
+        $result = VmIntlCalendar::getMaximum($receiver->toObject(), $field);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::getMinimum() — php-src intlcal_get_minimum (#20851). */
+final class IntlCalendarGetMinimum extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getMinimum'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getMinimum() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getMinimum() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getMinimum', 1, 'field');
+        $result = VmIntlCalendar::getMinimum($receiver->toObject(), $field);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::getActualMaximum() — php-src intlcal_get_actual_maximum (#20851). */
+final class IntlCalendarGetActualMaximum extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getActualMaximum'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getActualMaximum() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getActualMaximum() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getActualMaximum', 1, 'field');
+        $result = VmIntlCalendar::getActualMaximum($receiver->toObject(), $field);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::getActualMinimum() — php-src intlcal_get_actual_minimum (#20851). */
+final class IntlCalendarGetActualMinimum extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getActualMinimum'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getActualMinimum() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getActualMinimum() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getActualMinimum', 1, 'field');
+        $result = VmIntlCalendar::getActualMinimum($receiver->toObject(), $field);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::isWeekend() — php-src intlcal_is_weekend (#20851). */
+final class IntlCalendarIsWeekend extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isWeekend'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        $userArgc = max(0, $argc - 1);
+        if ($userArgc > 1) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::isWeekend() expects at most 1 argument, %d given', $userArgc));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::isWeekend() called on incompatible object');
+        }
+        $timestampMs = null;
+        if (2 === $argc) {
+            $tsArg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $tsArg->type) {
+                if (Variable::TYPE_INTEGER === $tsArg->type) {
+                    $timestampMs = (float) $tsArg->toInt();
+                } elseif (Variable::TYPE_FLOAT === $tsArg->type) {
+                    $timestampMs = $tsArg->toFloat();
+                } else {
+                    $timestampMs = (float) VmIntlDateFormatter::coerceIntArg($tsArg, 'IntlCalendar::isWeekend', 1, 'timestamp');
+                }
+            }
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool(VmIntlCalendar::isWeekend($receiver->toObject(), $timestampMs));
+    }
+}
+
+/** IntlCalendar::isEquivalentTo() — php-src intlcal_is_equivalent_to (#20851). */
+final class IntlCalendarIsEquivalentTo extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isEquivalentTo'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::isEquivalentTo() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::isEquivalentTo() called on incompatible object');
+        }
+        $other = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $other->type || !VmIntlCalendar::isCalendarObject($other->toObject())) {
+            throw new \TypeError('IntlCalendar::isEquivalentTo(): Argument #1 ($other) must be of type IntlCalendar, '.\PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($other).' given');
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool(VmIntlCalendar::isEquivalentTo($receiver->toObject(), $other->toObject()));
+    }
+}
+
+/** IntlCalendar::getDayOfWeekType() — php-src intlcal_get_day_of_week_type (#20851). */
+final class IntlCalendarGetDayOfWeekType extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getDayOfWeekType'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getDayOfWeekType() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getDayOfWeekType() called on incompatible object');
+        }
+        $dow = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getDayOfWeekType', 1, 'dayOfWeek');
+        $result = VmIntlCalendar::getDayOfWeekType($receiver->toObject(), $dow);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::getErrorCode() — php-src intlcal_get_error_code (#20851). */
+final class IntlCalendarGetErrorCode extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getErrorCode'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getErrorCode() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getErrorCode() called on incompatible object');
+        }
+        $code = VmIntlCalendar::getErrorCode($receiver->toObject());
+        if (null === $frame->returnVar) { return; }
+        if (false === $code) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($code);
+    }
+}
+
+/** IntlCalendar::getErrorMessage() — php-src intlcal_get_error_message (#20851). */
+final class IntlCalendarGetErrorMessage extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getErrorMessage'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getErrorMessage() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getErrorMessage() called on incompatible object');
+        }
+        $msg = VmIntlCalendar::getErrorMessage($receiver->toObject());
+        if (null === $frame->returnVar) { return; }
+        if (false === $msg) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->string($msg);
+    }
+}
+
+/** IntlCalendar::getRepeatedWallTimeOption() — php-src intlcal_get_repeated_wall_time_option (#20851). */
+final class IntlCalendarGetRepeatedWallTimeOption extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getRepeatedWallTimeOption'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getRepeatedWallTimeOption() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getRepeatedWallTimeOption() called on incompatible object');
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->int(VmIntlCalendar::getRepeatedWallTimeOption($receiver->toObject()));
+    }
+}
+
+/** IntlCalendar::setRepeatedWallTimeOption() — php-src intlcal_set_repeated_wall_time_option (#20851). */
+final class IntlCalendarSetRepeatedWallTimeOption extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setRepeatedWallTimeOption'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::setRepeatedWallTimeOption() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::setRepeatedWallTimeOption() called on incompatible object');
+        }
+        $option = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::setRepeatedWallTimeOption', 1, 'option');
+        $ok = VmIntlCalendar::setRepeatedWallTimeOption($receiver->toObject(), $option);
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::getSkippedWallTimeOption() — php-src intlcal_get_skipped_wall_time_option (#20851). */
+final class IntlCalendarGetSkippedWallTimeOption extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getSkippedWallTimeOption'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getSkippedWallTimeOption() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getSkippedWallTimeOption() called on incompatible object');
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->int(VmIntlCalendar::getSkippedWallTimeOption($receiver->toObject()));
+    }
+}
+
+/** IntlCalendar::setSkippedWallTimeOption() — php-src intlcal_set_skipped_wall_time_option (#20851). */
+final class IntlCalendarSetSkippedWallTimeOption extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setSkippedWallTimeOption'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::setSkippedWallTimeOption() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::setSkippedWallTimeOption() called on incompatible object');
+        }
+        $option = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::setSkippedWallTimeOption', 1, 'option');
+        $ok = VmIntlCalendar::setSkippedWallTimeOption($receiver->toObject(), $option);
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool($ok);
     }
 }
