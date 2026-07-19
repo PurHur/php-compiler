@@ -70,25 +70,25 @@ final class JitJsonDecode
 
     public static function decodeRuntime(Context $context, JITVariable $json): Value
     {
-        return self::decodeRuntimeString(
+        StringJsonDecode::ensureLinked($context);
+        $jsonString = JitStringBuiltinArg::lowerZparamStr(
             $context,
-            JsonStringOperandArg::jitJson($context, $json, 'json_decode')
+            $json,
+            'json_decode',
+            0,
+            'json'
         );
+
+        return self::decodeRuntimeString($context, $jsonString);
     }
 
     public static function decodeRuntimeString(Context $context, Value $jsonString): Value
     {
-        StringJsonDecode::ensureLinked($context);
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
+        // __compiler_json_decode returns __value__* (Unserialize #20785 / #20829 ABI).
+        return $context->builder->call(
             $context->lookupFunction('__compiler_json_decode'),
-            $jsonString,
-            $ptr
+            $jsonString
         );
-
-        return $ptr;
     }
 
     public static function decodeRuntimeObjectMode(Context $context, JITVariable $json): Value

@@ -1259,9 +1259,10 @@ class Type extends Builtin {
             $fntypeJsonEncodeArray
         );
         $this->context->registerFunction('__compiler_json_encode_array', $fnJsonEncodeArray);
+        // Returns __value__* (Unserialize #20785 / #20829) — not void+out-pointer.
         $fnJsonDecode = $this->context->module->addFunction(
             '__compiler_json_decode',
-            $this->context->context->functionType($void, false, $strPtr, $valuePtr)
+            $this->context->context->functionType($valuePtr, false, $strPtr)
         );
         $this->context->registerFunction('__compiler_json_decode', $fnJsonDecode);
         $fntypeJsonLastError = $this->context->context->functionType($i64, false);

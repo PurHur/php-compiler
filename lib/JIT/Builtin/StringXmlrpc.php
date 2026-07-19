@@ -179,11 +179,11 @@ final class StringXmlrpc
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        $context->builder->call(
+        $decoded = $context->builder->call(
             $context->lookupFunction('__compiler_json_decode'),
-            $jsonPtr,
-            $fn->getParam(1)
+            $jsonPtr
         );
+        JitValueBox::copyIntoPointer($context, $fn->getParam(1), $decoded);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
