@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5880 |
-| Phase A inventory files (M2 ratio SSOT) | 5880 |
+| PHP files on vm.php path | 5884 |
+| Phase A inventory files (M2 ratio SSOT) | 5884 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17781 |
+| Source constructs flagged (warnings) | 17797 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 92 |
+| `ext/intl/Module.php` | 0 | 96 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -869,6 +869,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/collator_sort.php` | 0 | 3 |
 | `ext/intl/collator_sort_with_sort_keys.php` | 0 | 3 |
 | `ext/intl/datefmt_format_object.php` | 0 | 3 |
+| `ext/intl/datefmt_get_error_code.php` | 0 | 3 |
+| `ext/intl/datefmt_get_error_message.php` | 0 | 3 |
+| `ext/intl/datefmt_localtime.php` | 0 | 3 |
+| `ext/intl/datefmt_parse.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
 | `ext/intl/grapheme_levenshtein.php` | 0 | 2 |
 | `ext/intl/grapheme_str_contains.php` | 0 | 2 |
@@ -11575,23 +11579,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new resourcebundle_get (line 187)
 - new resourcebundle_locales (line 188)
 - new resourcebundle_count (line 189)
-- new datefmt_format_object (line 194)
-- new grapheme_strlen (line 222)
-- new grapheme_substr (line 223)
-- new grapheme_strpos (line 224)
-- new grapheme_str_contains (line 225)
-- new grapheme_strstr (line 226)
-- new grapheme_stristr (line 227)
-- new grapheme_stripos (line 228)
-- new grapheme_strrpos (line 229)
-- new grapheme_strripos (line 230)
-- new grapheme_extract (line 231)
-- new grapheme_levenshtein (line 232)
-- new grapheme_str_split (line 233)
-- new grapheme_strimwidth (line 234)
-- new intl_get_error_code (line 235)
-- new intl_get_error_message (line 236)
-- new intl_is_failure (line 237)
+- new datefmt_format_object (line 195)
+- new datefmt_parse (line 196)
+- new datefmt_localtime (line 197)
+- new datefmt_get_error_code (line 198)
+- new datefmt_get_error_message (line 199)
+- new grapheme_strlen (line 228)
+- new grapheme_substr (line 229)
+- new grapheme_strpos (line 230)
+- new grapheme_str_contains (line 231)
+- new grapheme_strstr (line 232)
+- new grapheme_stristr (line 233)
+- new grapheme_stripos (line 234)
+- new grapheme_strrpos (line 235)
+- new grapheme_strripos (line 236)
+- new grapheme_extract (line 237)
+- new grapheme_levenshtein (line 238)
+- new grapheme_str_split (line 239)
+- new grapheme_strimwidth (line 240)
+- new intl_get_error_code (line 241)
+- new intl_get_error_message (line 242)
+- new intl_is_failure (line 243)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12312,6 +12320,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - new Error (line 75)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_error_code.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 51)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_error_message.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 51)
+- 2 class method(s)
+
+### `ext/intl/datefmt_localtime.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- new Error (line 72)
+- 2 class method(s)
+
+### `ext/intl/datefmt_parse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Error (line 74)
 - 2 class method(s)
 
 ### `ext/intl/grapheme_extract.php`

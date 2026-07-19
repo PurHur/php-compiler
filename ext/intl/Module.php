@@ -191,7 +191,13 @@ class Module extends ModuleAbstract
             : [];
 
         $datefmt = IntlExtensionPolicy::advertisesIntlDateFormatter()
-            ? [new datefmt_format_object()]
+            ? [
+                new datefmt_format_object(),
+                new datefmt_parse(),
+                new datefmt_localtime(),
+                new datefmt_get_error_code(),
+                new datefmt_get_error_message(),
+            ]
             : [];
 
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
