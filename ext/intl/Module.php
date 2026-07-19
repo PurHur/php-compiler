@@ -123,6 +123,7 @@ class Module extends ModuleAbstract
                 new numfmt_create(),
                 new numfmt_format(),
                 new numfmt_parse(),
+                new numfmt_parse_currency(),
                 new numfmt_format_currency(),
             ]
             : [];
