@@ -846,7 +846,7 @@ class VM {
         if (null !== $domHtmlElIsset) {
             return $domHtmlElIsset;
         }
-        // Dom\* ParentNode::$children (#21033).
+        // Dom\* Node/CharacterData/ParentNode computed props (#21033, #21053, #21055).
         $domChildrenIsset = ext\dom\DomNodePropertySupport::propertyIsSet($object, $propName);
         if (null !== $domChildrenIsset) {
             return $domChildrenIsset;
@@ -1237,7 +1237,7 @@ class VM {
 
             return null;
         }
-        // Dom\* ParentNode::$children (#21033).
+        // Dom\* Node/CharacterData/ParentNode computed props (#21033, #21053, #21055).
         $domChildrenEmpty = ext\dom\DomNodePropertySupport::propertyIsEmpty($object, $propName);
         if (null !== $domChildrenEmpty) {
             $dst->bool($domChildrenEmpty);

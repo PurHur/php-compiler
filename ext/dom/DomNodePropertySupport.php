@@ -33,6 +33,18 @@ final class DomNodePropertySupport
                 'Cannot write read-only property '.$owner->class->name.'::$children'
             );
         }
+        // Living Dom\* Document / Element / DocumentFragment::$nodeValue is readonly null
+        // (php-src modern stub; #21054). Legacy DOMElement remains writable.
+        if (strtolower(VmDom::PROP_NODE_VALUE) === strtolower($name)
+            && str_starts_with(strtolower($owner->class->name), 'dom\\')
+            && (VmDom::isDocument($owner)
+                || VmDom::isElement($owner)
+                || VmDom::isDocumentFragment($owner))
+        ) {
+            throw new \Error(
+                'Cannot modify readonly property '.$owner->class->name.'::$nodeValue'
+            );
+        }
         if (!VmDom::isAttr($owner)) {
             return;
         }
@@ -87,38 +99,32 @@ final class DomNodePropertySupport
     }
 
     /**
-     * isset($node->children) — HTMLCollection always present (php-src private(set); #21033).
+     * isset($node->…) — computed Dom/DOMNode props, not null ClassProperty slots
+     * (php-src zend_std_has_property / node.c; #21033 children, #21053 Node, #21055 CharacterData).
      *
      * @return bool|null null when this support does not own the property
      */
     public static function propertyIsSet(ObjectEntry $object, string $name): ?bool
     {
-        if (!VmDom::isLivingParentNodeForChildren($object)
-            || strtolower(VmDom::PROP_CHILDREN) !== strtolower($name)
-        ) {
+        if (!self::isManagedProperty($object, $name)) {
             return null;
         }
-        $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
-        VmDom::ensureChildrenCollection($ctx, $object);
+        $var = self::getProperty($object, $name)->resolveIndirect();
 
-        return true;
+        return !$var->isUndefined() && Variable::TYPE_NULL !== $var->type;
     }
 
     /**
-     * empty($node->children) — object is truthy (#21033).
+     * empty($node->…) — Zend has_property then value truthiness (#21033, #21053, #21055).
      *
      * @return bool|null null when this support does not own the property
      */
     public static function propertyIsEmpty(ObjectEntry $object, string $name): ?bool
     {
-        if (!VmDom::isLivingParentNodeForChildren($object)
-            || strtolower(VmDom::PROP_CHILDREN) !== strtolower($name)
-        ) {
+        if (!self::isManagedProperty($object, $name)) {
             return null;
         }
-        $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
-        VmDom::ensureChildrenCollection($ctx, $object);
-        $var = VmDom::parentNodeChildrenVariable($object);
+        $var = self::getProperty($object, $name);
 
         return !\PHPCompiler\ext\standard\boolval::isTruthy($var);
     }
