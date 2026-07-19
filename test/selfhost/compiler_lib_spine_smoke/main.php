@@ -61,6 +61,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -265,6 +266,7 @@ require_once __DIR__.'/../../../ext/dom/DocumentSchemaValidate.php';
 require_once __DIR__.'/../../../ext/dom/DocumentSchemaValidateSource.php';
 require_once __DIR__.'/../../../ext/dom/DocumentValidate.php';
 require_once __DIR__.'/../../../ext/dom/DocumentXInclude.php';
+require_once __DIR__.'/../../../ext/dom/DomAdjacentPositionEnum.php';
 require_once __DIR__.'/../../../ext/dom/DomC14NJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomClassConstants.php';
 require_once __DIR__.'/../../../ext/dom/DomConstants.php';
@@ -5868,6 +5870,31 @@ require_once __DIR__.'/../../../ext/enchant/enchant_broker_init.php';
 require_once __DIR__.'/../../../ext/enchant/enchant_broker_request_dict.php';
 require_once __DIR__.'/../../../ext/enchant/enchant_dict_check.php';
 require_once __DIR__.'/../../../ext/enchant/enchant_dict_suggest.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_describe.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_get_error.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_list_dicts.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_request_pwl_dict.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_set_ordering.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_add.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_add_to_session.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_describe.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_get_error.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_is_added.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_quick_check.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove_from_session.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_store_replacement.php';
+require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
+require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
+require_once __DIR__.'/../../../ext/apcu/ApcuFunction.php';
+require_once __DIR__.'/../../../ext/apcu/Module.php';
+require_once __DIR__.'/../../../ext/apcu/VmApcu.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_cache_info.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_clear_cache.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_delete.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_exists.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_fetch.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_store.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -5900,29 +5927,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_describe.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_get_error.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_list_dicts.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_request_pwl_dict.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_set_ordering.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_add.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_add_to_session.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_describe.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_get_error.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_is_added.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_quick_check.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove_from_session.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_store_replacement.php';
-require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
-require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
-require_once __DIR__.'/../../../ext/apcu/ApcuFunction.php';
-require_once __DIR__.'/../../../ext/apcu/Module.php';
-require_once __DIR__.'/../../../ext/apcu/VmApcu.php';
-require_once __DIR__.'/../../../ext/apcu/apcu_cache_info.php';
-require_once __DIR__.'/../../../ext/apcu/apcu_clear_cache.php';
-require_once __DIR__.'/../../../ext/apcu/apcu_delete.php';
-require_once __DIR__.'/../../../ext/apcu/apcu_exists.php';
-require_once __DIR__.'/../../../ext/apcu/apcu_fetch.php';
-require_once __DIR__.'/../../../ext/apcu/apcu_store.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

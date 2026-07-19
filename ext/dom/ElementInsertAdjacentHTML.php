@@ -20,7 +20,13 @@ final class ElementInsertAdjacentHTML extends DomClassMethod
         if (\count($frame->calledArgs) < 3) {
             throw new \LogicException('DOMElement::insertAdjacentHTML() expects at least 2 arguments');
         }
-        $position = $this->stringArg($frame->calledArgs[1], 'DOMElement::insertAdjacentHTML()', 0, $frame, 'position');
+        $position = $this->adjacentPositionArg(
+            $frame->calledArgs[1],
+            'DOMElement::insertAdjacentHTML()',
+            0,
+            $frame,
+            'position'
+        );
         $html = $this->stringArg($frame->calledArgs[2], 'DOMElement::insertAdjacentHTML()', 1, $frame, 'html');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMElement::insertAdjacentHTML() requires VM context in this compiler build');
