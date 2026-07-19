@@ -90,6 +90,10 @@ final class JitFdiv
 
             return $double->constReal(0.0);
         }
+        if ($context->callerStrictTypes && 'number' === $expectedType) {
+            // Z_PARAM_NUMBER: reject string/bool under strict_types before numeric-string coerce (#4189).
+            JitInternalStrictArg::requireNumber($context, $arg, $function, $paramName, $argIndex);
+        }
         if ($context->callerStrictTypes && 'float' === $expectedType) {
             JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
         }
