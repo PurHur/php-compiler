@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * json_encode() JIT: embed via JsonEncodeJitHelper; thin AOT via isThinStandaloneAotMain (#9267, #13239, #20371).
+ * json_encode() JIT: always JitVmHelperLink + JsonEncodeJitHelper PHP (#9267, #13239, #20816).
  */
 final class JsonEncodeRuntimeShrinkTest extends TestCase
 {
@@ -15,11 +15,18 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncode.php');
         $this->assertStringContainsString('JsonEncodeJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('json_encode_value_bridge_entry', $source);
+        $this->assertStringContainsString('json_encode_array_bridge_entry', $source);
         $this->assertStringNotContainsString('StringJsonEncodeJit', $source);
         $this->assertStringNotContainsString('implementValue', $source);
         $this->assertStringNotContainsString('implementArray', $source);
-        $this->assertLessThan(250, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('StringJsonEncodeInventoryStubs', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertLessThan(160, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncodeJit.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncodeInventoryStubs.php');
     }
 
     public function testJsonEncodeJitHelperDelegatesToVmJson(): void
@@ -27,7 +34,10 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonEncodeJitHelper.php');
         $this->assertStringContainsString('VmJson::export', $source);
         $this->assertStringContainsString('VmJsonFormat::encodeExported', $source);
-        $this->assertStringContainsString('runStackFrames', $source);
+        $this->assertStringContainsString('encodeHashtable', $source);
+        $this->assertStringContainsString('VmActiveContextJitHelper::resolve', $source);
+        $this->assertStringNotContainsString('->runStackFrames(', $source);
+        $this->assertLessThan(70, \substr_count($source, "\n") + 1, 'JsonEncodeJitHelper must stay NestedJIT-slim (#20816)');
     }
 
     public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
@@ -35,11 +45,12 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncode.php');
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
         $this->assertStringContainsString('self::implement($context)', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringContainsString('StringJsonEncodeInventoryStubs', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
-        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('ensureDeferredStubsForInventoryEmit', $source);
     }
 
     public function testUserScriptAotFoldsInlineArrayLiterals(): void
@@ -49,5 +60,14 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitJsonEncodeCompileTime::tryEncode', $encode);
         $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
         $this->assertStringContainsString('jitJsonEncodeValueOperand', $jit);
+    }
+
+    public function testSpineBundleIncludesJsonEncodePhpJitPath(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JsonEncodeJitHelper.php', $spine);
+        $this->assertStringContainsString('StringJsonEncode.php', $spine);
+        $this->assertStringNotContainsString('StringJsonEncodeInventoryStubs.php', $spine);
+        $this->assertStringNotContainsString('StringJsonEncodeJit.php', $spine);
     }
 }

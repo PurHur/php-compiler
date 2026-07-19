@@ -1016,7 +1016,6 @@ class Context {
     private function ensureMinimalUserStandaloneBodies(): void
     {
         Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
         Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
         ExceptionBridge::ensureStandaloneBodies($this);
@@ -1062,7 +1061,6 @@ class Context {
     private function ensureBootstrapAotStandaloneBodies(): void
     {
         Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         $this->ensureMinimalUserStandaloneBodies();
         Builtin\EnvLocalRuntime::ensureBootstrapAotStubLinked($this);
         Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
@@ -1123,7 +1121,6 @@ class Context {
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
             // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
             Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
             Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
             \PHPCompiler\ext\standard\JitStreamFilterKernel::ensureDeferredStubsForInventoryEmit($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);

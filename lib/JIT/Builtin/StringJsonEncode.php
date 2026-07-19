@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\NestedContextMethodLlvm;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_json_encode_* via JsonEncodeJitHelper PHP (#9267, #13239, #20371).
+ * JIT/AOT link for __compiler_json_encode_* via JsonEncodeJitHelper PHP (#9267, #13239, #20816).
  *
- * Embed / non-thin: NestedJIT {@see JsonEncodeJitHelper} (#13239).
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20355 / #20336 shape): thin stubs without nested JIT (#13245).
+ * Embed + thin standalone AOT: {@see JsonEncodeJitHelper} via {@see JitVmHelperLink}
+ * (Serialize #20773 / VarExport #20589 shape — no thin null stubs).
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class StringJsonEncode
@@ -26,9 +26,16 @@ final class StringJsonEncode
 
     private const ENCODE_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\JsonEncodeJitHelper::encodeValue';
 
+    private const ENCODE_HT_HELPER = 'PHPCompiler\\ext\\standard\\JsonEncodeJitHelper::encodeHashtable';
+
+    private const VALUE_BRIDGE_ENTRY = 'json_encode_value_bridge_entry';
+
+    private const HT_BRIDGE_ENTRY = 'json_encode_array_bridge_entry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::ENCODE_VALUE_HELPER,
+        self::ENCODE_HT_HELPER,
     ];
 
     /** @var list<string> */
@@ -47,157 +54,84 @@ final class StringJsonEncode
         self::implement($context);
     }
 
-    /** Thin standalone AOT: linkable json_encode ABI without nested JsonEncodeJitHelper (#13245, #20371). */
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        if (!$context->isThinStandaloneAotMain()) {
-            return;
-        }
-        StringJsonEncodeInventoryStubs::implement($context);
-    }
-
     public static function implement(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        $probe = $context->module->getNamedFunction('__compiler_json_encode_value');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        // Thin + embed: publish sg_vm_context before NestedJIT of JsonEncodeJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'array');
+
+        $valueProbe = $context->module->getNamedFunction('__compiler_json_encode_value');
+        $htProbe = $context->module->getNamedFunction('__compiler_json_encode_array');
+        if (JitVmHelperLink::hasNamedBridgeEntry($valueProbe, self::VALUE_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry($htProbe, self::HT_BRIDGE_ENTRY)) {
             self::registerLinkedRuntime($context);
 
             return;
         }
-
-        if ($context->isThinStandaloneAotMain()) {
-            StringJsonEncodeInventoryStubs::implement($context);
-
-            return;
-        }
-
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        self::ensureJitHelperCompiled($context);
-        self::emitValueBridge($context);
-        self::emitArrayBridge($context);
-        self::registerLinkedRuntime($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function emitValueBridge(Context $context): void
-    {
-        $abiName = '__compiler_json_encode_value';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
+        if (null !== $valueProbe && $valueProbe->countBasicBlocks() > 0
+            && null !== $htProbe && $htProbe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
             return;
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-        $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($strPtr, false, $valuePtr, $i64);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('json_encode_value_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::ENCODE_VALUE_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1)
-        );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    /** Box __hashtable__* as __value__* — avoids Variable::array() in nested JIT (#13245). */
-    private static function emitArrayBridge(Context $context): void
-    {
-        $abiName = '__compiler_json_encode_array';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($strPtr, false, $htPtr, $i64);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('json_encode_array_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $valueSlot = JitValueBox::alloc($context);
-        $valuePtr = JitValueBox::pointer($context, $valueSlot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $valuePtr,
-            $fn->getParam(0)
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_json_encode_value',
+            self::VALUE_BRIDGE_ENTRY,
+            [$valuePtr, $i64],
+            $strPtr,
+            self::ENCODE_VALUE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20816'
         );
-        $result = $context->builder->call(
-            self::helperFunction($context, self::ENCODE_VALUE_HELPER),
-            $valuePtr,
-            $fn->getParam(1)
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_json_encode_array',
+            self::HT_BRIDGE_ENTRY,
+            [$htPtr, $i64],
+            $strPtr,
+            self::ENCODE_HT_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20816'
         );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
+        self::registerLinkedRuntime($context);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    public static function ensureJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20816'
+        );
+    }
+
+    public static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after JsonEncodeJitHelper compile (#9267)');
+            throw new \LogicException($logical.' missing after JsonEncodeJitHelper compile (#20816)');
         }
 
         return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        foreach (['resolveindirect'] as $method) {
-            NestedVmVariableMethodLlvm::ensureMethod($context, $method);
-        }
-        NestedContextMethodLlvm::ensureMethod($context, 'runstackframes');
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'JsonEncodeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('JsonEncodeJitHelper.php parseAndCompile failed (#9267)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9267)');
-            }
-        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -205,7 +139,7 @@ final class StringJsonEncode
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringJsonEncode bridge (#9267)');
+                throw new \LogicException($name.' missing after StringJsonEncode bridge (#20816)');
             }
             $context->registerFunction($name, $fn);
         }

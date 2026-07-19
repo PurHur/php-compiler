@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5854 |
-| Phase A inventory files (M2 ratio SSOT) | 5854 |
+| PHP files on vm.php path | 5853 |
+| Phase A inventory files (M2 ratio SSOT) | 5853 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17604 |
+| Source constructs flagged (warnings) | 17603 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2352,7 +2352,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
 | `ext/standard/JsonDecodeJitHelper.php` | 0 | 2 |
-| `ext/standard/JsonEncodeJitHelper.php` | 0 | 1 |
+| `ext/standard/JsonEncodeJitHelper.php` | 0 | 3 |
 | `ext/standard/JsonStringOperandArg.php` | 0 | 1 |
 | `ext/standard/KeySortJitHelper.php` | 0 | 3 |
 | `ext/standard/LcgJitHelper.php` | 0 | 1 |
@@ -4668,8 +4668,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringInterfaceExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonDecode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringJsonEncodeInventoryStubs.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLevenshtein.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringLink.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLocaltime.php` | 0 | 2 |
@@ -22663,6 +22662,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JsonEncodeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
+- new VM (line 33)
+- new Variable (line 54)
 - 2 class method(s)
 
 ### `ext/standard/JsonStringOperandArg.php`
@@ -38589,14 +38590,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringJsonEncode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 193)
-- 9 class method(s)
-- 1 closure(s)
-
-### `lib/JIT/Builtin/StringJsonEncodeInventoryStubs.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StringLevenshtein.php`
 
@@ -40476,19 +40470,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 958)
 - new Call\DateTimeFormat (line 961)
 - new Call\DateTimeFormat (line 962)
-- new Result (line 1300)
-- new Result (line 1321)
-- new Variable (line 1922)
-- new Variable (line 2059)
-- new Variable (line 2285)
-- new Variable (line 2343)
-- new VMVariable (line 2481)
-- new VMVariable (line 2497)
-- new VMVariable (line 2503)
-- new VMVariable (line 2509)
-- new VMVariable (line 2520)
-- new Variable (line 2550)
-- new Variable (line 2590)
+- new Result (line 1297)
+- new Result (line 1318)
+- new Variable (line 1919)
+- new Variable (line 2056)
+- new Variable (line 2282)
+- new Variable (line 2340)
+- new VMVariable (line 2478)
+- new VMVariable (line 2494)
+- new VMVariable (line 2500)
+- new VMVariable (line 2506)
+- new VMVariable (line 2517)
+- new Variable (line 2547)
+- new Variable (line 2587)
 - 102 class method(s)
 - 28 closure(s)
 
