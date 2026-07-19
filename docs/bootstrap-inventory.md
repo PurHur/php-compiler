@@ -26305,8 +26305,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new NativeRequestParseBodyException (line 56)
-- new NativeRequestParseBodyException (line 71)
-- new NativeRequestParseBodyException (line 99)
+- new NativeRequestParseBodyException (line 72)
+- new NativeRequestParseBodyException (line 100)
 - 12 class method(s)
 
 ### `ext/standard/RequestParseBodyJitHelper.php`
@@ -48400,7 +48400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmFloatCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/VM/VmFromCallable.php`
 

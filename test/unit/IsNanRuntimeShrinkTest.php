@@ -36,4 +36,15 @@ final class IsNanRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('IsNanJitHelper.php', $spine);
         $this->assertStringContainsString('MathIsNan.php', $spine);
     }
+
+    public function testFloatCompareDeclaresIsNanOnDemand(): void
+    {
+        $compare = (string) file_get_contents(__DIR__.'/../../lib/VM/VmFloatCompare.php');
+        $this->assertStringContainsString('function lookupOrDeclareIsNan', $compare);
+        $this->assertStringNotContainsString("lookupFunction('isnan')", $compare);
+
+        $clamp = (string) file_get_contents(__DIR__.'/../../ext/standard/JitClamp.php');
+        $this->assertStringContainsString('VmFloatCompare::lookupOrDeclareIsNan', $clamp);
+        $this->assertStringNotContainsString("lookupFunction('isnan')", $clamp);
+    }
 }

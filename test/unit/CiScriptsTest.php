@@ -2216,6 +2216,7 @@ final class CiScriptsTest extends TestCase
         $body = (string) file_get_contents($defaults);
         $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB="${PHP_COMPILER_CI_RAM_GB:-8}"', $body);
         $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT="${PHP_COMPILER_MEMORY_LIMIT:-1536M}"', $body);
+        $this->assertStringContainsString('PHP_COMPILER_LLVM_MEMORY_LIMIT="${PHP_COMPILER_LLVM_MEMORY_LIMIT:-6144M}"', $body);
         $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM="${PHP_COMPILER_DOCKER_MEM:-10g}"', $body);
     }
 
