@@ -280,6 +280,28 @@ final class SessionUserHandler
         return null;
     }
 
+    public static function hasUpdateTimestamp(): bool
+    {
+        return null !== self::$callbacks && isset(self::$callbacks[8]);
+    }
+
+    /**
+     * Optional update_timestamp (php-src PS_UPDATE_TIMESTAMP_FUNC(user); #21156).
+     */
+    public static function updateTimestamp(Context $ctx, string $id, string $data): bool
+    {
+        if (!self::isActiveModule() || null === self::$callbacks || !isset(self::$callbacks[8])) {
+            return self::write($ctx, $id, $data);
+        }
+        $idVar = new Variable();
+        $idVar->string($id);
+        $dataVar = new Variable();
+        $dataVar->string($data);
+        $result = self::invokeStored($ctx, self::$callbacks[8], $idVar, $dataVar);
+
+        return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+    }
+
     /**
      * Assert each of argc callables (php-src zend_is_callable loop; #21136).
      *
