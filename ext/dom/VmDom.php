@@ -1136,7 +1136,13 @@ final class VmDom
     ): Variable {
         // php-src document.c / xmlValidateName — Invalid Character Error (#20594).
         self::assertValidXmlName($name);
-        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ELEMENT);
+        // Dom\HTMLDocument::createElement — lowercase + HTML namespace (php-src document.c; #21030).
+        $namespaceUri = null;
+        if (self::isLivingHtmlDocument($ownerDocument)) {
+            $name = strtolower($name);
+            $namespaceUri = VmDomLiving::HTML_NS;
+        }
+        $class = self::resolveElementClassForNamespace($ctx, $ownerDocument, $namespaceUri);
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -1148,6 +1154,11 @@ final class VmDom
         $state->nodeName = $name;
         $state->localName = $name;
         $state->prefix = null;
+        $state->namespaceUri = $namespaceUri;
+        if (null !== $namespaceUri) {
+            // Default HTML nsDef (php-src ensure_html_ns / #21030).
+            $state->namespaceDeclarations[''] = $namespaceUri;
+        }
         if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
             $state->documentId = $ownerDocument->id;
         }
@@ -1177,7 +1188,8 @@ final class VmDom
         // php-src document.c — QName + xml/xmlns namespace URI rules (#20594).
         self::assertValidElementNSName($namespace, $qualifiedName);
         [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
-        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ELEMENT);
+        // php-src php_dom.c dom_get_element_ce — HTMLElement only in HTML ns (#21030).
+        $class = self::resolveElementClassForNamespace($ctx, $ownerDocument, $namespace);
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -10008,6 +10020,41 @@ final class VmDom
         }
 
         return $ctx->classes[$extendedLc] ?? $default;
+    }
+
+    /**
+     * Living HTML documents: HTMLElement iff namespace is the HTML ns (php-src dom_get_element_ce; #21030).
+     *
+     * HTMLDocument's nodeClassMap remaps classic DOMElement → Dom\HTMLElement for the HTML path;
+     * foreign namespaces must resolve to Dom\Element (or a Dom\Element registerNodeClass override).
+     */
+    private static function resolveElementClassForNamespace(
+        Context $ctx,
+        ?ObjectEntry $ownerDocument,
+        ?string $namespaceUri
+    ): ClassEntry {
+        if (self::isLivingHtmlDocument($ownerDocument) && VmDomLiving::HTML_NS !== $namespaceUri) {
+            $state = DomRegistry::state($ownerDocument);
+            $extendedLc = $state->nodeClassMap[VmDomLiving::CLASS_ELEMENT] ?? null;
+            if (null !== $extendedLc && isset($ctx->classes[$extendedLc])) {
+                return $ctx->classes[$extendedLc];
+            }
+            $living = $ctx->classes[VmDomLiving::CLASS_ELEMENT] ?? null;
+            if (null !== $living) {
+                return $living;
+            }
+        }
+
+        return self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ELEMENT);
+    }
+
+    private static function isLivingHtmlDocument(?ObjectEntry $ownerDocument): bool
+    {
+        if (null === $ownerDocument || !self::isDocument($ownerDocument)) {
+            return false;
+        }
+
+        return VmDomLiving::CLASS_HTML_DOCUMENT === strtolower($ownerDocument->class->name);
     }
 
     private static function resolveClassByName(Context $ctx, string $name): ?ClassEntry
