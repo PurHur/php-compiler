@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\LibcExtern;
@@ -35,21 +36,35 @@ final class JitEnvironMirrorKernel
         self::ensureEnvironGlobal($context);
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
+        $ht = JitNestedHelperCoerce::i64ToTypedPtr(
+            $context,
+            self::i64FromVar($context, $destPtr),
+            $htPtr
+        );
+        self::mirrorIntoHashtablePtr($context, $ht);
+    }
+
+    /** Emit libc environ walk into an already-loaded {@see __hashtable__*} (#20758). */
+    public static function mirrorIntoHashtablePtr(Context $context, Value $ht): void
+    {
+        LibcExtern::register($context);
+        self::ensureEnvironGlobal($context);
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         $i8pp = $i8p->pointerType(0);
         $i64 = $context->getTypeFromString('int64');
 
-        $ht = JitNestedHelperCoerce::i64ToTypedPtr(
-            $context,
-            self::i64FromVar($context, $destPtr),
-            $htPtr
-        );
         $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
         $fn = $context->functions[$context->activeFunction] ?? null;
         if (!$fn instanceof \PHPLLVM\Value\Function_) {
-            throw new \LogicException('JitEnvironMirrorKernel requires active function (#19157)');
+            $insert = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null === $insert) {
+                throw new \LogicException('JitEnvironMirrorKernel requires active function or insert block (#19157)');
+            }
+            $fn = $insert->getParent();
         }
 
         $doneBb = $fn->appendBasicBlock('environ_libc_done');

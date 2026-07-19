@@ -47,15 +47,20 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
         $this->assertNull(GetenvLookupJitHelper::fromEnviron('__PHPC_GETENV_MISSING_'.bin2hex(random_bytes(4)), 0));
     }
 
-    public function testStringGetenvAllUsesThinStubGate(): void
+    public function testStringGetenvAllAlwaysUsesHelperBridge(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenvAll.php');
-        $this->assertStringContainsString('GetenvJitHelper::fillAllEnvironmentHashtable', $source);
+        $this->assertStringContainsString('GetenvJitHelper::mergeLocalOverlayIntoNative', $source);
+        $this->assertStringContainsString('JitEnvironMirrorKernel::mirrorIntoHashtablePtr', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringContainsString('getenv_all_thin_stub', $source);
+        $this->assertStringContainsString('getenv_all_bridge_entry', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('getenv_all_thin_stub', $source);
+        $this->assertStringNotContainsString('implementThinStub', $source);
+        $this->assertStringNotContainsString('THIN_STUB_ENTRY', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('getenv_all_inv_stub', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 
     public function testSpineBundleIncludesGetenvKernel(): void
