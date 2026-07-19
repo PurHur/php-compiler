@@ -26,9 +26,12 @@ abstract class PdoClassMethod extends VmClassMethod
         return $var->toObject();
     }
 
+    /**
+     * Z_PARAM_STR — null TypeError on PROFILE=8.4 (php-src ext/pdo stubs; #21080).
+     */
     protected function stringArg(Variable $var, string $label, int $index, string $paramName): string
     {
-        return VmString::coerceStringBuiltinArg($var, $label, $index, $paramName);
+        return VmString::coerceZparamStrBuiltinArg($var, $label, $index, $paramName);
     }
 
     protected function intArg(Variable $var, string $label, int $index, string $paramName): int
