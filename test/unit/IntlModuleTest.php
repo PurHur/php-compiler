@@ -248,4 +248,28 @@ PHP;
             ob_get_clean()
         );
     }
+
+    public function test_locale_display_methods_via_vm(): void
+    {
+        if (!IntlExtensionPolicy::advertisesLocale()) {
+            self::markTestSkipped('Locale withheld until extension_loaded(\'intl\') (#19670)');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo Locale::getDisplayLanguage('en_US', 'en'), "\n";
+echo Locale::getDisplayRegion('en_US', 'en'), "\n";
+echo Locale::getDisplayScript('zh_Hans_CN', 'en'), "\n";
+echo Locale::getDisplayVariant('en_US_POSIX', 'en'), "\n";
+echo json_encode(Locale::getAllVariants('sl_IT_NEDIS_ROJAZ_ALBA')), "\n";
+echo locale_get_display_language('fr', 'en'), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_locale_display.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "English\nUnited States\nSimplified Han\nComputer\n[\"NEDIS\",\"ROJAZ\",\"ALBA\"]\nFrench\n",
+            ob_get_clean()
+        );
+    }
 }

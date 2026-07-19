@@ -117,6 +117,92 @@ final class VmLocale
     }
 
     /**
+     * Locale::getDisplayLanguage() — English language display (#20755).
+     *
+     * php-src: uloc_getDisplayLanguage(); unknown codes return the language subtag itself.
+     *
+     * @return string|false
+     */
+    public static function getDisplayLanguage(string $locale, ?string $displayLocale = null): string|false
+    {
+        unset($displayLocale);
+        $id = self::resolveLocaleOperand($locale);
+        $tags = self::parseBcp47Tags($id);
+        if ('' === $tags['language']) {
+            return false;
+        }
+
+        return self::englishLanguageName($tags['language']) ?? $tags['language'];
+    }
+
+    /**
+     * Locale::getDisplayRegion() — English region display (#20755).
+     *
+     * @return string|false
+     */
+    public static function getDisplayRegion(string $locale, ?string $displayLocale = null): string|false
+    {
+        unset($displayLocale);
+        $id = self::resolveLocaleOperand($locale);
+        $tags = self::parseBcp47Tags($id);
+        if ('' === $tags['region']) {
+            return '';
+        }
+
+        return self::englishRegionName($tags['region']) ?? $tags['region'];
+    }
+
+    /**
+     * Locale::getDisplayScript() — English script display (#20755).
+     *
+     * @return string|false
+     */
+    public static function getDisplayScript(string $locale, ?string $displayLocale = null): string|false
+    {
+        unset($displayLocale);
+        $id = self::resolveLocaleOperand($locale);
+        $tags = self::parseBcp47Tags($id);
+        if ('' === $tags['script']) {
+            return '';
+        }
+
+        return self::englishScriptName($tags['script']) ?? $tags['script'];
+    }
+
+    /**
+     * Locale::getDisplayVariant() — English variant display (#20755).
+     *
+     * Single known variants get ICU-shaped English labels; multi-variant tags return
+     * the underscore-joined raw codes (php-src / ICU).
+     *
+     * @return string|false
+     */
+    public static function getDisplayVariant(string $locale, ?string $displayLocale = null): string|false
+    {
+        unset($displayLocale);
+        $id = self::resolveLocaleOperand($locale);
+        $variants = self::variantSubtags($id);
+        if ([] === $variants) {
+            return '';
+        }
+        if (1 === \count($variants)) {
+            return self::englishVariantName($variants[0]) ?? $variants[0];
+        }
+
+        return implode('_', $variants);
+    }
+
+    /**
+     * Locale::getAllVariants() — variant subtag list (#20755).
+     *
+     * @return list<string>
+     */
+    public static function getAllVariants(string $locale): array
+    {
+        return self::variantSubtags(self::resolveLocaleOperand($locale));
+    }
+
+    /**
      * locale_lookup() / Locale::lookup() — RFC 4647 lookup (php-src locale_methods.c; #20036).
      *
      * @param list<string> $langtag
@@ -742,6 +828,61 @@ C;
         ];
 
         return $names[$region] ?? null;
+    }
+
+    private static function englishScriptName(string $script): ?string
+    {
+        static $names = [
+            'Hans' => 'Simplified Han',
+            'Hant' => 'Traditional Han',
+            'Latn' => 'Latin',
+            'Cyrl' => 'Cyrillic',
+            'Arab' => 'Arabic',
+            'Grek' => 'Greek',
+            'Hebr' => 'Hebrew',
+            'Deva' => 'Devanagari',
+            'Thai' => 'Thai',
+            'Jpan' => 'Japanese',
+            'Kore' => 'Korean',
+            'Hang' => 'Hangul',
+            'Hira' => 'Hiragana',
+            'Kana' => 'Katakana',
+        ];
+
+        return $names[$script] ?? null;
+    }
+
+    private static function englishVariantName(string $variant): ?string
+    {
+        static $names = [
+            'POSIX' => 'Computer',
+            'NEDIS' => 'Natisone dialect',
+            '1901' => 'Traditional German orthography',
+            '1996' => 'German orthography of 1996',
+            'ROJAZ' => 'Resian',
+            'ALBA' => 'Albanian',
+        ];
+
+        return $names[strtoupper($variant)] ?? null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function variantSubtags(string $locale): array
+    {
+        $raw = self::parseVariantFallback($locale);
+        if (null === $raw || '' === $raw) {
+            return [];
+        }
+        $out = [];
+        foreach (preg_split('/[_-]/', $raw) ?: [] as $v) {
+            if ('' !== $v) {
+                $out[] = strtoupper($v);
+            }
+        }
+
+        return $out;
     }
 
     private static function resolveLocaleOperand(string $locale): string

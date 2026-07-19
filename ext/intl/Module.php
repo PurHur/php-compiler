@@ -97,6 +97,11 @@ class Module extends ModuleAbstract
             $functions[] = new locale_parse();
             $functions[] = new locale_compose();
             $functions[] = new locale_get_keywords();
+            $functions[] = new locale_get_display_language();
+            $functions[] = new locale_get_display_region();
+            $functions[] = new locale_get_display_script();
+            $functions[] = new locale_get_display_variant();
+            $functions[] = new locale_get_all_variants();
         }
         $normalizer = IntlExtensionPolicy::advertisesNormalizer()
             ? [
