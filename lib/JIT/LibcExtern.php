@@ -72,6 +72,7 @@ final class LibcExtern
             'mkdir' => [$i32, false, [$i8p, $i32]],
             'remove' => [$i32, false, [$i8p]],
             'rename' => [$i32, false, [$i8p, $i8p]],
+            'chdir' => [$i32, false, [$i8p]],
             'getenv' => [$i8p, false, [$i8p]],
             'putenv' => [$i32, false, [$i8p]],
             'setenv' => [$i32, false, [$i8p, $i8p, $i32]],
