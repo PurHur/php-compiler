@@ -8481,9 +8481,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 9459)
 - new DOMException (line 9462)
 - new DOMException (line 9491)
-- new Error (line 10402)
-- new Error (line 10406)
-- 426 class method(s)
+- new Error (line 10459)
+- new Error (line 10463)
+- 427 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
