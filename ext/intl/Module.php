@@ -119,6 +119,9 @@ class Module extends ModuleAbstract
             ? [
                 new collator_create(),
                 new collator_compare(),
+                new collator_sort(),
+                new collator_asort(),
+                new collator_sort_with_sort_keys(),
                 new collator_get_attribute(),
                 new collator_set_attribute(),
                 new collator_get_strength(),
