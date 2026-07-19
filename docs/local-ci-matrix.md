@@ -16,7 +16,7 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | Variable | Default | Role |
 |----------|---------|------|
 | `PHP_COMPILER_MEMORY_LIMIT` | `1536M` | PHP heap for PHPUnit and `bin/vm.php` children |
-| `PHP_COMPILER_LLVM_MEMORY_LIMIT` | `4096M` | LLVM compile phases in `ci-local.sh` |
+| `PHP_COMPILER_LLVM_MEMORY_LIMIT` | `6144M` | LLVM compile phases in `ci-local.sh` / selfhost probe (#21104) |
 | `PHP_COMPILER_CI_RAM_GB` | `8` | `ulimit -v` for the CI shell |
 | `PHP_COMPILER_DOCKER_MEM` | `10g` | Docker cgroup RAM cap |
 | `PHP_COMPILER_VM_PEAK_RSS_MB` | `2048` | Kill VM subprocess if RSS exceeds this (when guard enabled) |
@@ -115,7 +115,7 @@ Both paths run `composer install`, `script/apply-patches.sh`, then the three boo
 |----------|------------------|
 | `PHP_COMPILER_LLVM_PATH` | `/opt/llvm9` in Docker; repo `.llvm/` after `install-llvm9.sh` on host fallback |
 | `PHP_COMPILER_MEMORY_LIMIT` | PHP heap during compile (default `1536M`) |
-| `PHP_COMPILER_LLVM_MEMORY_LIMIT` | LLVM compile phases (default `4096M`) |
+| `PHP_COMPILER_LLVM_MEMORY_LIMIT` | LLVM compile phases (default `6144M`, #21104) |
 | `PHP_COMPILER_SELFHOST_AOT` | Set by probe/link scripts for stub gating |
 | `BOOTSTRAP_WAVE_CHECK` | N/A in workflow (always runs wave-check); set `0` in `ci-local.sh` to skip locally |
 
