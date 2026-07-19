@@ -51,6 +51,9 @@ final class VmDomLiving
     /** php-src Dom\Implementation (php_dom.stub.php; #20898). */
     public const CLASS_IMPLEMENTATION = 'dom\\implementation';
 
+    /** php-src Dom\DocumentType (php_dom.stub.php; #20910). */
+    public const CLASS_DOCUMENT_TYPE = 'dom\\documenttype';
+
     public const PROP_BODY = 'body';
 
     public const PROP_HEAD = 'head';
@@ -568,6 +571,37 @@ final class VmDomLiving
         $var->object($document);
 
         return $var;
+    }
+
+    /**
+     * Dom\Implementation::createDocumentType() — php-src Dom_Implementation::createDocumentType (#20910).
+     */
+    public static function createDocumentType(
+        Context $ctx,
+        string $qualifiedName,
+        string $publicId,
+        string $systemId
+    ): Variable {
+        return VmDom::createDocumentType(
+            $ctx,
+            $qualifiedName,
+            $publicId,
+            $systemId,
+            null,
+            true
+        );
+    }
+
+    /**
+     * Dom\Implementation::createDocument() — new Dom\XMLDocument (php-src Dom_Implementation::createDocument; #20910).
+     */
+    public static function createDocument(
+        Context $ctx,
+        ?string $namespaceUri,
+        string $qualifiedName,
+        ?ObjectEntry $doctype
+    ): Variable {
+        return VmDom::createDocument($ctx, $namespaceUri, $qualifiedName, $doctype, true);
     }
 
     public static function findDirectChildElementByLocalName(ObjectEntry $parent, string $localName): ?ObjectEntry

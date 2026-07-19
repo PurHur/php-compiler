@@ -807,9 +807,18 @@ final class VmDom
         Context $ctx,
         string $qualifiedName,
         string $publicId,
-        string $systemId
+        string $systemId,
+        ?ObjectEntry $forDocument = null,
+        bool $living = false
     ): Variable {
-        $class = self::resolveNodeClass($ctx, null, self::CLASS_DOCUMENT_TYPE);
+        if ($living || (null !== $forDocument && VmDomLiving::isLivingDocument($forDocument))) {
+            $class = $ctx->classes[VmDomLiving::CLASS_DOCUMENT_TYPE] ?? null;
+            if (null === $class) {
+                throw new \LogicException('Dom\\DocumentType is not registered in this compiler build');
+            }
+        } else {
+            $class = self::resolveNodeClass($ctx, $forDocument, self::CLASS_DOCUMENT_TYPE);
+        }
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -837,49 +846,62 @@ final class VmDom
         Context $ctx,
         ?string $namespaceUri,
         string $qualifiedName,
-        ?ObjectEntry $doctype
+        ?ObjectEntry $doctype,
+        bool $living = false
     ): Variable {
+        $typeLabel = $living ? 'Dom\\DocumentType' : 'DOMDocumentType';
         if (null !== $doctype && !self::isDocumentType($doctype)) {
-            throw new \TypeError(
-                'DOMImplementation::createDocument(): Argument #3 ($doctype) must be of type DOMDocumentType or null'
-            );
+            throw new \TypeError(sprintf(
+                '%s::createDocument(): Argument #3 ($doctype) must be of type %s or null',
+                $living ? 'Dom\\Implementation' : 'DOMImplementation',
+                $typeLabel
+            ));
         }
 
-        $class = $ctx->classes[self::CLASS_DOCUMENT] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DOMDocument is not registered in this compiler build');
+        if ($living) {
+            $docVar = VmDomLiving::createXmlEmpty($ctx, '1.0', 'UTF-8');
+            $entry = $docVar->toObject();
+            $state = DomRegistry::state($entry);
+        } else {
+            $class = $ctx->classes[self::CLASS_DOCUMENT] ?? null;
+            if (null === $class) {
+                throw new \LogicException('DOMDocument is not registered in this compiler build');
+            }
+
+            $entry = new ObjectEntry($class);
+            $entry->constructed = true;
+            $entry->getProperty(self::PROP_FORMAT_OUTPUT)->bool(false);
+            self::initNodePropertySlots($entry);
+
+            $state = new DomNodeState();
+            $state->nodeType = DomConstants::XML_DOCUMENT_NODE;
+            $state->nodeName = '#document';
+            DomRegistry::attach($entry, $state);
+            self::ensureChildNodesList($ctx, $entry);
         }
 
-        $entry = new ObjectEntry($class);
-        $entry->constructed = true;
-        $entry->getProperty(self::PROP_FORMAT_OUTPUT)->bool(false);
-        self::initNodePropertySlots($entry);
-
-        $state = new DomNodeState();
-        $state->nodeType = DomConstants::XML_DOCUMENT_NODE;
-        $state->nodeName = '#document';
         $state->namespaceUri = $namespaceUri;
         $state->documentElementName = $qualifiedName;
+
+        $childIds = [];
         if (null !== $doctype) {
-            $dt = DomRegistry::state($doctype);
-            $state->doctypeName = $dt->nodeName;
-            $state->doctypePublicId = $dt->publicId;
-            $state->doctypeSystemId = $dt->systemId;
+            self::adoptDocumentTypeIntoDocument($doctype, $entry);
+            $childIds[] = $doctype->id;
         }
-        DomRegistry::attach($entry, $state);
-        self::ensureChildNodesList($ctx, $entry);
 
         if ('' !== $qualifiedName) {
             $rootVar = null !== $namespaceUri && '' !== $namespaceUri
                 ? self::createElementNS($ctx, $namespaceUri, $qualifiedName, $entry)
                 : self::createElement($ctx, $qualifiedName, $entry);
             $root = $rootVar->toObject();
-            $state->childIds = [$root->id];
+            $childIds[] = $root->id;
             $entry->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($root);
             self::linkChildToParent($root, $entry);
             self::propagateDocumentId($root, $entry->id);
-            self::syncSubtree($ctx, $entry);
         }
+
+        $state->childIds = $childIds;
+        self::syncSubtree($ctx, $entry);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -4005,17 +4027,61 @@ final class VmDom
         string $publicId,
         string $systemId
     ): ObjectEntry {
-        $doctypeVar = self::createDocumentType($ctx, $name, $publicId, $systemId);
+        $doctypeVar = self::createDocumentType(
+            $ctx,
+            $name,
+            $publicId,
+            $systemId,
+            $document,
+            VmDomLiving::isLivingDocument($document)
+        );
         $doctype = $doctypeVar->toObject();
+        self::adoptDocumentTypeIntoDocument($doctype, $document);
         $state = DomRegistry::state($document);
-        $state->doctypeName = $name;
-        $state->doctypePublicId = $publicId;
-        $state->doctypeSystemId = $systemId;
-        $state->doctypeId = $doctype->id;
-        self::linkChildToParent($doctype, $document);
-        self::propagateDocumentId($doctype, $document->id);
+        // Prepend doctype ahead of existing element children (php-src append order).
+        $without = [];
+        foreach ($state->childIds as $childId) {
+            if ($childId !== $doctype->id) {
+                $without[] = $childId;
+            }
+        }
+        $state->childIds = array_merge([$doctype->id], $without);
 
         return $doctype;
+    }
+
+    /**
+     * Attach an orphan (or re-parented) DocumentType to a document (php-src createDocument / parse; #20910).
+     */
+    private static function adoptDocumentTypeIntoDocument(ObjectEntry $doctype, ObjectEntry $document): void
+    {
+        $dt = DomRegistry::state($doctype);
+        $docState = DomRegistry::state($document);
+        $docState->doctypeName = $dt->nodeName;
+        $docState->doctypePublicId = $dt->publicId;
+        $docState->doctypeSystemId = $dt->systemId;
+        $docState->doctypeId = $doctype->id;
+
+        $oldParentId = $dt->parentId;
+        if (null !== $oldParentId && $oldParentId !== $document->id) {
+            $oldParent = DomRegistry::entry($oldParentId);
+            if (null !== $oldParent) {
+                $oldState = DomRegistry::state($oldParent);
+                $oldState->childIds = array_values(array_filter(
+                    $oldState->childIds,
+                    static fn (int $id): bool => $id !== $doctype->id
+                ));
+                if ($oldState->doctypeId === $doctype->id) {
+                    $oldState->doctypeId = null;
+                    $oldState->doctypeName = null;
+                    $oldState->doctypePublicId = null;
+                    $oldState->doctypeSystemId = null;
+                }
+            }
+        }
+
+        self::linkChildToParent($doctype, $document);
+        self::propagateDocumentId($doctype, $document->id);
     }
 
     public static function createProcessingInstruction(
@@ -9868,6 +9934,7 @@ final class VmDom
             VmDomLiving::CLASS_IMPLEMENTATION => 'Dom\\Implementation',
             self::CLASS_DOCUMENT => 'DOMDocument',
             self::CLASS_DOCUMENT_TYPE => 'DOMDocumentType',
+            VmDomLiving::CLASS_DOCUMENT_TYPE => 'Dom\\DocumentType',
             self::CLASS_PROCESSING_INSTRUCTION => 'DOMProcessingInstruction',
             self::CLASS_ELEMENT => 'DOMElement',
             self::CLASS_DOCUMENT_FRAGMENT => 'DOMDocumentFragment',
