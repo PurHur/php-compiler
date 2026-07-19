@@ -70,6 +70,7 @@ final class VmPDO
         $entry->constructor = new PDOConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        $entry->methodDeclaringClassLc['__construct'] = self::CLASS_LC;
 
         $methods = [
             'exec' => new PDOExec(),
@@ -157,21 +158,27 @@ final class VmPDO
 
     /**
      * PHP 8.4 driver-specific subclass (php-src ext/pdo_sqlite/pdo_sqlite.stub.php; #20529).
+     *
+     * Inherits PDO::__construct so `new Pdo\Sqlite($dsn)` runs the same DSN factory as
+     * `PDO::__construct` / `PDO::connect` (php-src pdo_dbh.c; #21096).
      */
     public static function registerSqliteSubclass(Context $ctx): void
     {
         if (!PdoExtensionPolicy::advertisesSqliteDriver()) {
             return;
         }
-        if (isset($ctx->classes[self::SQLITE_CLASS_LC])) {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
             return;
         }
-        if (!isset($ctx->classes[self::CLASS_LC])) {
+        if (isset($ctx->classes[self::SQLITE_CLASS_LC])) {
+            self::inheritPdoConstructor($ctx->classes[self::SQLITE_CLASS_LC], $ctx->classes[self::CLASS_LC]);
+
             return;
         }
         $sqlite = new ClassEntry(self::SQLITE_CLASS_NAME);
         $sqlite->isInternal = true;
         $sqlite->parentLc = self::CLASS_LC;
+        self::inheritPdoConstructor($sqlite, $ctx->classes[self::CLASS_LC]);
         $ctx->classes[self::SQLITE_CLASS_LC] = $sqlite;
     }
 
@@ -185,15 +192,18 @@ final class VmPDO
         if (!PdoExtensionPolicy::advertisesMysqlSubclass()) {
             return;
         }
-        if (isset($ctx->classes[self::MYSQL_CLASS_LC])) {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
             return;
         }
-        if (!isset($ctx->classes[self::CLASS_LC])) {
+        if (isset($ctx->classes[self::MYSQL_CLASS_LC])) {
+            self::inheritPdoConstructor($ctx->classes[self::MYSQL_CLASS_LC], $ctx->classes[self::CLASS_LC]);
+
             return;
         }
         $mysql = new ClassEntry(self::MYSQL_CLASS_NAME);
         $mysql->isInternal = true;
         $mysql->parentLc = self::CLASS_LC;
+        self::inheritPdoConstructor($mysql, $ctx->classes[self::CLASS_LC]);
         foreach (PdoMysqlConstants::CLASS_CONSTANTS as $name => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
@@ -217,15 +227,18 @@ final class VmPDO
         if (!PdoExtensionPolicy::advertisesPgsqlSubclass()) {
             return;
         }
-        if (isset($ctx->classes[self::PGSQL_CLASS_LC])) {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
             return;
         }
-        if (!isset($ctx->classes[self::CLASS_LC])) {
+        if (isset($ctx->classes[self::PGSQL_CLASS_LC])) {
+            self::inheritPdoConstructor($ctx->classes[self::PGSQL_CLASS_LC], $ctx->classes[self::CLASS_LC]);
+
             return;
         }
         $pgsql = new ClassEntry(self::PGSQL_CLASS_NAME);
         $pgsql->isInternal = true;
         $pgsql->parentLc = self::CLASS_LC;
+        self::inheritPdoConstructor($pgsql, $ctx->classes[self::CLASS_LC]);
         foreach (PdoPgsqlConstants::CLASS_CONSTANTS as $name => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
@@ -252,6 +265,45 @@ final class VmPDO
             $pgsql->methodNames[$lc] = $display;
         }
         $ctx->classes[self::PGSQL_CLASS_LC] = $pgsql;
+    }
+
+    /**
+     * Wire parent PDO::__construct + inherited instance methods onto a driver subclass (#21096).
+     *
+     * Builtin subclasses register before {@see VM::inheritFromParent} runs, so NEW would
+     * otherwise skip construction and AOT/JIT method tables would miss PDO::exec/query/….
+     * Preserve {@see ClassEntry::$methodDeclaringClassLc} so ReflectionMethod::getDeclaringClass()
+     * reports PDO (php-src zend_inheritance / reflection).
+     */
+    private static function inheritPdoConstructor(ClassEntry $child, ClassEntry $pdo): void
+    {
+        foreach ($pdo->methods as $name => $method) {
+            if (isset($child->methods[$name])) {
+                continue;
+            }
+            $vis = $pdo->methodVisibility[$name] ?? CfgFunc::FLAG_PUBLIC;
+            // Private methods are not inherited (Zend zend_inheritance).
+            if (($vis & CfgFunc::FLAG_PRIVATE) !== 0) {
+                continue;
+            }
+            $child->methods[$name] = $method;
+            $child->methodVisibility[$name] = $vis;
+            if (isset($pdo->methodDeclaringClassLc[$name])) {
+                $child->methodDeclaringClassLc[$name] = $pdo->methodDeclaringClassLc[$name];
+            } else {
+                $child->methodDeclaringClassLc[$name] = self::CLASS_LC;
+            }
+            if (isset($pdo->methodDeprecated[$name])) {
+                $child->methodDeprecated[$name] = $pdo->methodDeprecated[$name];
+            }
+            $child->methodNames[$name] = $pdo->methodNames[$name] ?? $name;
+        }
+        if (null === $child->constructor && null !== $pdo->constructor) {
+            $child->constructor = $pdo->constructor;
+        }
+        if (null === $child->destructor && null !== $pdo->destructor) {
+            $child->destructor = $pdo->destructor;
+        }
     }
 
     public static function isPdoFamily(ClassEntry $class): bool
