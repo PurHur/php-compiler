@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5872 |
-| Phase A inventory files (M2 ratio SSOT) | 5872 |
+| PHP files on vm.php path | 5873 |
+| Phase A inventory files (M2 ratio SSOT) | 5873 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17714 |
+| Source constructs flagged (warnings) | 17718 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 84 |
+| `ext/intl/Module.php` | 0 | 85 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -891,6 +891,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/locale_get_all_variants.php` | 0 | 4 |
 | `ext/intl/locale_get_default.php` | 0 | 2 |
 | `ext/intl/locale_get_display_language.php` | 0 | 3 |
+| `ext/intl/locale_get_display_name.php` | 0 | 3 |
 | `ext/intl/locale_get_display_region.php` | 0 | 3 |
 | `ext/intl/locale_get_display_script.php` | 0 | 3 |
 | `ext/intl/locale_get_display_variant.php` | 0 | 3 |
@@ -11497,75 +11498,76 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new locale_compose (line 98)
 - new locale_get_keywords (line 99)
 - new locale_get_display_language (line 100)
-- new locale_get_display_region (line 101)
-- new locale_get_display_script (line 102)
-- new locale_get_display_variant (line 103)
-- new locale_get_all_variants (line 104)
-- new normalizer_normalize (line 108)
-- new normalizer_is_normalized (line 109)
-- new normalizer_get_raw_decomposition (line 110)
-- new idn_to_ascii (line 114)
-- new idn_to_utf8 (line 114)
-- new collator_create (line 119)
-- new collator_compare (line 120)
-- new collator_get_attribute (line 121)
-- new collator_set_attribute (line 122)
-- new collator_get_strength (line 123)
-- new collator_set_strength (line 124)
-- new collator_get_sort_key (line 125)
-- new collator_get_locale (line 126)
-- new collator_get_error_code (line 127)
-- new collator_get_error_message (line 128)
-- new numfmt_create (line 134)
-- new numfmt_format (line 135)
-- new numfmt_parse (line 136)
-- new numfmt_parse_currency (line 137)
-- new numfmt_format_currency (line 138)
-- new numfmt_get_attribute (line 139)
-- new numfmt_set_attribute (line 140)
-- new numfmt_get_pattern (line 141)
-- new numfmt_set_pattern (line 142)
-- new numfmt_get_locale (line 143)
-- new numfmt_get_error_code (line 144)
-- new numfmt_get_error_message (line 145)
-- new msgfmt_create (line 151)
-- new msgfmt_format (line 152)
-- new msgfmt_format_message (line 153)
-- new msgfmt_parse (line 154)
-- new msgfmt_parse_message (line 155)
-- new msgfmt_get_locale (line 156)
-- new msgfmt_get_pattern (line 157)
-- new msgfmt_set_pattern (line 158)
-- new msgfmt_get_error_code (line 159)
-- new msgfmt_get_error_message (line 160)
-- new transliterator_create (line 166)
-- new transliterator_create_from_rules (line 167)
-- new transliterator_create_inverse (line 168)
-- new transliterator_list_ids (line 169)
-- new transliterator_transliterate (line 170)
-- new transliterator_get_error_code (line 171)
-- new transliterator_get_error_message (line 172)
-- new resourcebundle_create (line 178)
-- new resourcebundle_get (line 179)
-- new resourcebundle_locales (line 180)
-- new resourcebundle_count (line 181)
-- new datefmt_format_object (line 186)
-- new grapheme_strlen (line 214)
-- new grapheme_substr (line 215)
-- new grapheme_strpos (line 216)
-- new grapheme_str_contains (line 217)
-- new grapheme_strstr (line 218)
-- new grapheme_stristr (line 219)
-- new grapheme_stripos (line 220)
-- new grapheme_strrpos (line 221)
-- new grapheme_strripos (line 222)
-- new grapheme_extract (line 223)
-- new grapheme_levenshtein (line 224)
-- new grapheme_str_split (line 225)
-- new grapheme_strimwidth (line 226)
-- new intl_get_error_code (line 227)
-- new intl_get_error_message (line 228)
-- new intl_is_failure (line 229)
+- new locale_get_display_name (line 101)
+- new locale_get_display_region (line 102)
+- new locale_get_display_script (line 103)
+- new locale_get_display_variant (line 104)
+- new locale_get_all_variants (line 105)
+- new normalizer_normalize (line 109)
+- new normalizer_is_normalized (line 110)
+- new normalizer_get_raw_decomposition (line 111)
+- new idn_to_ascii (line 115)
+- new idn_to_utf8 (line 115)
+- new collator_create (line 120)
+- new collator_compare (line 121)
+- new collator_get_attribute (line 122)
+- new collator_set_attribute (line 123)
+- new collator_get_strength (line 124)
+- new collator_set_strength (line 125)
+- new collator_get_sort_key (line 126)
+- new collator_get_locale (line 127)
+- new collator_get_error_code (line 128)
+- new collator_get_error_message (line 129)
+- new numfmt_create (line 135)
+- new numfmt_format (line 136)
+- new numfmt_parse (line 137)
+- new numfmt_parse_currency (line 138)
+- new numfmt_format_currency (line 139)
+- new numfmt_get_attribute (line 140)
+- new numfmt_set_attribute (line 141)
+- new numfmt_get_pattern (line 142)
+- new numfmt_set_pattern (line 143)
+- new numfmt_get_locale (line 144)
+- new numfmt_get_error_code (line 145)
+- new numfmt_get_error_message (line 146)
+- new msgfmt_create (line 152)
+- new msgfmt_format (line 153)
+- new msgfmt_format_message (line 154)
+- new msgfmt_parse (line 155)
+- new msgfmt_parse_message (line 156)
+- new msgfmt_get_locale (line 157)
+- new msgfmt_get_pattern (line 158)
+- new msgfmt_set_pattern (line 159)
+- new msgfmt_get_error_code (line 160)
+- new msgfmt_get_error_message (line 161)
+- new transliterator_create (line 167)
+- new transliterator_create_from_rules (line 168)
+- new transliterator_create_inverse (line 169)
+- new transliterator_list_ids (line 170)
+- new transliterator_transliterate (line 171)
+- new transliterator_get_error_code (line 172)
+- new transliterator_get_error_message (line 173)
+- new resourcebundle_create (line 179)
+- new resourcebundle_get (line 180)
+- new resourcebundle_locales (line 181)
+- new resourcebundle_count (line 182)
+- new datefmt_format_object (line 187)
+- new grapheme_strlen (line 215)
+- new grapheme_substr (line 216)
+- new grapheme_strpos (line 217)
+- new grapheme_str_contains (line 218)
+- new grapheme_strstr (line 219)
+- new grapheme_stristr (line 220)
+- new grapheme_stripos (line 221)
+- new grapheme_strrpos (line 222)
+- new grapheme_strripos (line 223)
+- new grapheme_extract (line 224)
+- new grapheme_levenshtein (line 225)
+- new grapheme_str_split (line 226)
+- new grapheme_strimwidth (line 227)
+- new intl_get_error_code (line 228)
+- new intl_get_error_message (line 229)
+- new intl_is_failure (line 230)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12404,6 +12406,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/intl/locale_get_display_language.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/intl/locale_get_display_name.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
