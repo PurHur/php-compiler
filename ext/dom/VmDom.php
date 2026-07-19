@@ -7093,13 +7093,41 @@ final class VmDom
             return self::serializeHtmlElement($entry, $emptySelfClosing);
         }
         if (self::isTextNode($entry)) {
-            return DomRegistry::state($entry)->textContent ?? '';
+            // libxml htmlNodeDump: escape &<> in normal text; leave script/style raw (#21149).
+            $text = DomRegistry::state($entry)->textContent ?? '';
+
+            return self::htmlTextNeedsEntityEscape($entry) ? self::escapeText($text) : $text;
         }
         if (self::isCommentNode($entry)) {
             return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
+    }
+
+    /**
+     * Whether HTML text serialization must escape &lt;/&gt;/&amp; (php-src htmlNodeDump; #21149).
+     *
+     * libxml leaves script/style content unescaped; other elements (including xmp) escape.
+     */
+    private static function htmlTextNeedsEntityEscape(ObjectEntry $textNode): bool
+    {
+        $state = DomRegistry::state($textNode);
+        if (null === $state->parentId) {
+            return true;
+        }
+        $parent = DomRegistry::entry($state->parentId);
+        if (null === $parent || !self::isElement($parent)) {
+            return true;
+        }
+        $parentState = DomRegistry::state($parent);
+        $name = strtolower($parentState->localName ?? $parentState->nodeName);
+        $colon = strrpos($name, ':');
+        if (false !== $colon) {
+            $name = substr($name, $colon + 1);
+        }
+
+        return 'script' !== $name && 'style' !== $name;
     }
 
     private static function serializeHtmlElement(ObjectEntry $entry, bool $emptySelfClosing = true): string
