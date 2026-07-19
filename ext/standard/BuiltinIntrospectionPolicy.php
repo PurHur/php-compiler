@@ -200,6 +200,10 @@ final class BuiltinIntrospectionPolicy
             'ldap_first_entry',
             'ldap_next_entry',
             'ldap_free_result',
+            'ldap_exop',
+            'ldap_exop_sync',
+            'ldap_parse_exop',
+            'ldap_exop_refresh',
         ], true)) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
         }

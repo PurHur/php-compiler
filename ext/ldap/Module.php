@@ -29,7 +29,11 @@ class Module extends ModuleAbstract
         }
         foreach (LdapConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
-            $var->int($value);
+            if (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int($value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
         if (LdapExtensionPolicy::advertisesClasses()) {
@@ -45,6 +49,7 @@ class Module extends ModuleAbstract
 
         require_once __DIR__.'/ldap_link_builtins.php';
         require_once __DIR__.'/ldap_search_builtins.php';
+        require_once __DIR__.'/ldap_exop_builtins.php';
 
         return [
             new ldap_escape(),
@@ -64,6 +69,10 @@ class Module extends ModuleAbstract
             new ldap_first_entry(),
             new ldap_next_entry(),
             new ldap_free_result(),
+            new ldap_exop(),
+            new ldap_exop_sync(),
+            new ldap_parse_exop(),
+            new ldap_exop_refresh(),
         ];
     }
 }
