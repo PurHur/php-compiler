@@ -5,21 +5,46 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\session;
 
 use PHPCompiler\VM;
+use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmCallable;
+use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\ext\standard\VmSession;
 
 /**
- * Userspace session save handler dispatch (php-src ext/session/mod_user.c; #4873).
+ * Userspace session save handler dispatch (php-src ext/session/mod_user.c; #4873, #21136).
+ *
+ * Supports the object {@see SessionHandlerInterface} form and the legacy 6–9 callable form.
  */
 final class SessionUserHandler
 {
     private const USER_MODULE = 'user';
 
+    /** @var list<string> */
+    private const CALLBACK_PARAMS = [
+        'open',
+        'close',
+        'read',
+        'write',
+        'destroy',
+        'gc',
+        'create_sid',
+        'validate_sid',
+        'update_timestamp',
+    ];
+
     private static ?ObjectEntry $handler = null;
+
+    /**
+     * Procedural handlers — ClosureState kept by value so temp call-arg objects can die (#21136).
+     *
+     * @var list<array{kind: 'closure', closure: ClosureState}|array{kind: 'callable', callable: Variable}>|null
+     */
+    private static ?array $callbacks = null;
 
     private static bool $opened = false;
 
@@ -28,13 +53,14 @@ final class SessionUserHandler
     public static function reset(): void
     {
         self::$handler = null;
+        self::$callbacks = null;
         self::$opened = false;
         self::$shutdownRegistered = false;
     }
 
     public static function hasHandler(): bool
     {
-        return null !== self::$handler;
+        return null !== self::$handler || null !== self::$callbacks;
     }
 
     public static function isActiveModule(): bool
@@ -48,11 +74,31 @@ final class SessionUserHandler
     public static function install(ObjectEntry $handler, bool $registerShutdown): bool
     {
         self::$handler = $handler;
+        self::$callbacks = null;
         self::$opened = false;
         VmSession::setModuleName(self::USER_MODULE);
         if ($registerShutdown) {
             self::registerShutdown();
+        } else {
+            self::clearShutdown();
         }
+
+        return true;
+    }
+
+    /**
+     * Procedural 6–9 callable save handler (php-src session_set_save_handler argc≥6).
+     *
+     * @param list<array{kind: 'closure', closure: ClosureState}|array{kind: 'callable', callable: Variable}> $callbacks
+     */
+    public static function installCallables(array $callbacks): bool
+    {
+        self::$handler = null;
+        self::$callbacks = $callbacks;
+        self::$opened = false;
+        VmSession::setModuleName(self::USER_MODULE);
+        // php-src removes session_shutdown for the callable form (no auto register_shutdown).
+        self::clearShutdown();
 
         return true;
     }
@@ -68,17 +114,22 @@ final class SessionUserHandler
         return true;
     }
 
+    public static function clearShutdown(): void
+    {
+        ShutdownQueue::clearSessionWriteClose();
+        self::$shutdownRegistered = false;
+    }
+
     public static function open(Context $ctx): bool
     {
         if (!self::isActiveModule() || self::$opened) {
             return true;
         }
-        $vm = $ctx->runtime->vm;
         $pathVar = new Variable();
         $pathVar->string(VmSession::getSavePath());
         $nameVar = new Variable();
         $nameVar->string(VmSession::getName());
-        $result = $vm->invokeInstanceMethod(self::$handler, 'open', $pathVar, $nameVar)->resolveIndirect();
+        $result = self::dispatch($ctx, 0, 'open', $pathVar, $nameVar);
         if (Variable::TYPE_BOOLEAN !== $result->type || !$result->toBool()) {
             return false;
         }
@@ -95,10 +146,9 @@ final class SessionUserHandler
         if (!self::$opened && !self::open($ctx)) {
             return '';
         }
-        $vm = $ctx->runtime->vm;
         $idVar = new Variable();
         $idVar->string($id);
-        $result = $vm->invokeInstanceMethod(self::$handler, 'read', $idVar)->resolveIndirect();
+        $result = self::dispatch($ctx, 2, 'read', $idVar);
         if (Variable::TYPE_STRING === $result->type) {
             return $result->toString();
         }
@@ -117,12 +167,11 @@ final class SessionUserHandler
         if (!self::$opened && !self::open($ctx)) {
             return false;
         }
-        $vm = $ctx->runtime->vm;
         $idVar = new Variable();
         $idVar->string($id);
         $dataVar = new Variable();
         $dataVar->string($data);
-        $result = $vm->invokeInstanceMethod(self::$handler, 'write', $idVar, $dataVar)->resolveIndirect();
+        $result = self::dispatch($ctx, 3, 'write', $idVar, $dataVar);
 
         return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
     }
@@ -132,8 +181,7 @@ final class SessionUserHandler
         if (!self::isActiveModule() || !self::$opened) {
             return true;
         }
-        $vm = $ctx->runtime->vm;
-        $result = $vm->invokeInstanceMethod(self::$handler, 'close')->resolveIndirect();
+        $result = self::dispatch($ctx, 1, 'close');
         self::$opened = false;
         if (Variable::TYPE_BOOLEAN !== $result->type) {
             return false;
@@ -150,10 +198,9 @@ final class SessionUserHandler
         if (!self::$opened && !self::open($ctx)) {
             return false;
         }
-        $vm = $ctx->runtime->vm;
         $idVar = new Variable();
         $idVar->string($id);
-        $result = $vm->invokeInstanceMethod(self::$handler, 'destroy', $idVar)->resolveIndirect();
+        $result = self::dispatch($ctx, 4, 'destroy', $idVar);
 
         return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
     }
@@ -169,10 +216,9 @@ final class SessionUserHandler
         if (!self::$opened && !self::open($ctx)) {
             return false;
         }
-        $vm = $ctx->runtime->vm;
         $maxVar = new Variable();
-        $maxVar->int($maxLifetime);
-        $result = $vm->invokeInstanceMethod(self::$handler, 'gc', $maxVar)->resolveIndirect();
+        $maxVar->int($maxlifetime);
+        $result = self::dispatch($ctx, 5, 'gc', $maxVar);
         if (Variable::TYPE_INTEGER === $result->type) {
             return $result->toInt();
         }
@@ -188,6 +234,19 @@ final class SessionUserHandler
         if (!self::isActiveModule()) {
             return false;
         }
+        if (null !== self::$callbacks) {
+            if (!isset(self::$callbacks[7])) {
+                return true;
+            }
+            if (!self::$opened && !self::open($ctx)) {
+                return false;
+            }
+            $idVar = new Variable();
+            $idVar->string($id);
+            $result = self::invokeStored($ctx, self::$callbacks[7], $idVar);
+
+            return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+        }
         $vm = $ctx->runtime->vm;
         if (!$vm->hasInstanceMethod(self::$handler->class, 'validate_sid')) {
             return true;
@@ -200,6 +259,72 @@ final class SessionUserHandler
         $result = $vm->invokeInstanceMethod(self::$handler, 'validate_sid', $idVar)->resolveIndirect();
 
         return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+    }
+
+    /**
+     * Optional create_sid callback (php-src PS_CREATE_SID_FUNC(user) when set via 7-arg form).
+     *
+     * Object handlers keep the pre-#21136 path (php_session_create_id) — SessionHandler::create_sid
+     * requires an active session and must not run from generateId() before status flips active.
+     *
+     * @return string|null null → fall back to php_session_create_id
+     */
+    public static function createSid(Context $ctx): ?string
+    {
+        if (!self::isActiveModule() || null === self::$callbacks || !isset(self::$callbacks[6])) {
+            return null;
+        }
+        $result = self::invokeStored($ctx, self::$callbacks[6]);
+        if (Variable::TYPE_STRING === $result->type) {
+            return $result->toString();
+        }
+
+        return null;
+    }
+
+    /**
+     * Assert each of argc callables (php-src zend_is_callable loop; #21136).
+     *
+     * @param list<Variable> $args
+     * @return list<array{kind: 'closure', closure: ClosureState}|array{kind: 'callable', callable: Variable}>
+     */
+    public static function requireCallableArgs(Context $ctx, array $args): array
+    {
+        $out = [];
+        foreach ($args as $i => $arg) {
+            $out[] = self::requireCallableArg($ctx, $arg, $i + 1, self::CALLBACK_PARAMS[$i]);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{kind: 'closure', closure: ClosureState}|array{kind: 'callable', callable: Variable}
+     */
+    public static function requireCallableArg(
+        Context $ctx,
+        Variable $var,
+        int $argNum,
+        string $paramName
+    ): array {
+        $var = $var->resolveIndirect();
+        // Extract ClosureState now — temp call-arg ObjectEntries die when the builtin returns
+        // (same pattern as register_shutdown_function; #21136).
+        if (VmClosureCall::isClosure($var)) {
+            return ['kind' => 'closure', 'closure' => VmClosureCall::resolve($var)];
+        }
+        $nameOut = new Variable();
+        if (VmCallable::isCallable($ctx, $var, false, $nameOut)) {
+            $copy = new Variable();
+            $copy->copyFrom($var);
+
+            return ['kind' => 'callable', 'callable' => $copy];
+        }
+        $name = Variable::TYPE_STRING === $nameOut->type ? $nameOut->toString() : '';
+        throw new \TypeError(
+            'session_set_save_handler(): Argument #'.$argNum.' ($'.$paramName
+            .') must be a valid callback, function "'.$name.'" not found or invalid function name'
+        );
     }
 
     public static function requireHandlerObject(Variable $var, string $function): ObjectEntry
@@ -245,5 +370,28 @@ final class SessionUserHandler
                 );
             }
         }
+    }
+
+    private static function dispatch(Context $ctx, int $callbackIndex, string $method, Variable ...$args): Variable
+    {
+        if (null !== self::$callbacks) {
+            return self::invokeStored($ctx, self::$callbacks[$callbackIndex], ...$args);
+        }
+
+        return $ctx->runtime->vm->invokeInstanceMethod(self::$handler, $method, ...$args)->resolveIndirect();
+    }
+
+    /**
+     * @param array{kind: 'closure', closure: ClosureState}|array{kind: 'callable', callable: Variable} $entry
+     */
+    private static function invokeStored(Context $ctx, array $entry, Variable ...$args): Variable
+    {
+        if ('closure' === $entry['kind']) {
+            return VmClosureCall::invoke($ctx, $entry['closure'], ...$args)->resolveIndirect();
+        }
+        $cb = new Variable();
+        $cb->copyFrom($entry['callable']);
+
+        return VmCallable::invoke($ctx, $cb, ...$args)->resolveIndirect();
     }
 }

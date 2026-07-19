@@ -32,6 +32,12 @@ final class ShutdownQueue
         self::$sessionWriteCloseRegistered = true;
     }
 
+    /** php-src remove_user_shutdown_function("session_shutdown") — 6-callback save-handler form (#21136). */
+    public static function clearSessionWriteClose(): void
+    {
+        self::$sessionWriteCloseRegistered = false;
+    }
+
     public static function register(Variable $callable, Variable ...$args): void
     {
         self::$queue[] = ['kind' => 'callable', 'callable' => $callable, 'args' => $args];
