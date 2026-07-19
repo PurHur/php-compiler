@@ -40,7 +40,11 @@ final class ReflectionClassNewLazyGhost extends VmClassMethod
         if (null === $initObject->closureState) {
             throw new \LogicException('ReflectionClass::newLazyGhost() expects a callable');
         }
-        $lazy = LazyObjectSupport::createGhost($entry, $initObject->closureState);
+        $options = 0;
+        if (\count($frame->calledArgs) >= 3) {
+            $options = $frame->calledArgs[2]->resolveIndirect()->toInt();
+        }
+        $lazy = LazyObjectSupport::createGhost($entry, $initObject->closureState, $options);
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($lazy);

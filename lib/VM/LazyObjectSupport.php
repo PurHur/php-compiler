@@ -87,7 +87,7 @@ final class LazyObjectSupport
         return self::extractRequiredCallable($arg, $functionName, $argNum, $paramName);
     }
 
-    public static function createProxy(ClassEntry $class, ClosureState $initializer): ObjectEntry
+    public static function createProxy(ClassEntry $class, ClosureState $initializer, int $options = 0): ObjectEntry
     {
         $object = new ObjectEntry($class);
         $object->constructed = false;
@@ -96,11 +96,12 @@ final class LazyObjectSupport
         $object->lazyGhost = false;
         $object->lazyResetInitializer = $initializer;
         self::clearLazyRawInitializedProperties($object);
+        self::applyUserOptions($object, $options, false);
 
         return $object;
     }
 
-    public static function createGhost(ClassEntry $class, ?ClosureState $initializer): ObjectEntry
+    public static function createGhost(ClassEntry $class, ?ClosureState $initializer, int $options = 0): ObjectEntry
     {
         $object = new ObjectEntry($class);
         foreach ($object->getRawProperties() as $var) {
@@ -113,6 +114,7 @@ final class LazyObjectSupport
         $object->lazyGhost = true;
         $object->lazyResetInitializer = $initializer;
         self::clearLazyRawInitializedProperties($object);
+        self::applyUserOptions($object, $options, false);
 
         return $object;
     }
@@ -375,8 +377,40 @@ final class LazyObjectSupport
         return $object;
     }
 
-    /** ReflectionClass::SKIP_DESTRUCTOR (PHP 8.4). */
-    public const SKIP_DESTRUCTOR = 1;
+    /**
+     * ReflectionClass::SKIP_INITIALIZATION_ON_SERIALIZE — php-src ZEND_LAZY_OBJECT_SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
+     */
+    public const SKIP_INITIALIZATION_ON_SERIALIZE = 8;
+
+    /**
+     * ReflectionClass::SKIP_DESTRUCTOR — php-src ZEND_LAZY_OBJECT_SKIP_DESTRUCTOR (#21126).
+     */
+    public const SKIP_DESTRUCTOR = 16;
+
+    /** User-facing option bits accepted by lazy factories / reset (#21126). */
+    public const USER_OPTION_MASK = self::SKIP_INITIALIZATION_ON_SERIALIZE | self::SKIP_DESTRUCTOR;
+
+    /**
+     * Apply / validate ReflectionClass lazy $options (zend_object_make_lazy / reflection_class_make_lazy).
+     */
+    public static function applyUserOptions(ObjectEntry $object, int $options, bool $isReset = false): void
+    {
+        if (0 !== ($options & ~self::USER_OPTION_MASK)) {
+            throw new \ValueError('ReflectionClass lazy object $options contains unknown flags');
+        }
+        if (!$isReset && 0 !== ($options & self::SKIP_DESTRUCTOR)) {
+            throw new \ValueError(
+                'The "new" lazy object methods do not accept ReflectionClass::SKIP_DESTRUCTOR'
+            );
+        }
+        $object->lazyUserFlags = $options & self::USER_OPTION_MASK;
+    }
+
+    /** zend_lazy_object_initialize_on_serialize() (#21126, Zend/zend_lazy_objects.h). */
+    public static function shouldInitializeOnSerialize(ObjectEntry $object): bool
+    {
+        return 0 === ($object->lazyUserFlags & self::SKIP_INITIALIZATION_ON_SERIALIZE);
+    }
 
     /**
      * Zend zend_object_make_lazy ghost reset path (#5968).
@@ -390,6 +424,7 @@ final class LazyObjectSupport
         if ($object->lazyPending) {
             $object->lazyInitializer = $initializer;
             $object->lazyResetInitializer = $initializer;
+            self::applyUserOptions($object, $options, true);
 
             return;
         }
@@ -410,6 +445,7 @@ final class LazyObjectSupport
         $object->lazyGhost = true;
         $object->lazyResetInitializer = $initializer;
         self::clearLazyRawInitializedProperties($object);
+        self::applyUserOptions($object, $options, true);
     }
 
     /**
@@ -441,6 +477,7 @@ final class LazyObjectSupport
         $object->lazyGhost = false;
         $object->lazyResetInitializer = $factory;
         self::clearLazyRawInitializedProperties($object);
+        self::applyUserOptions($object, $options, true);
     }
 
     /**

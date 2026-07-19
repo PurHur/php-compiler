@@ -359,4 +359,44 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'create_lazy_ghost_object_return.php'));
         $this->assertSame("42\n", ob_get_clean());
     }
+
+    /** @covers issue #21126 */
+    public function testSerializeInitializesLazyGhostUnlessSkipFlag(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo defined('ReflectionClass::SKIP_INITIALIZATION_ON_SERIALIZE') ? 'Y' : 'N', "\n";
+echo defined('ReflectionClass::SKIP_DESTRUCTOR') ? 'Y' : 'N', "\n";
+echo ReflectionClass::SKIP_INITIALIZATION_ON_SERIALIZE, "\n";
+echo ReflectionClass::SKIP_DESTRUCTOR, "\n";
+class A {
+    public int $x;
+    public function __construct() {
+        $this->x = 7;
+        echo "ctor\n";
+    }
+}
+$r = new ReflectionClass(A::class);
+$init = function (A $obj) { $obj->__construct(); };
+$o = $r->newLazyGhost($init);
+echo 'uninit=', $r->isUninitializedLazyObject($o) ? 'Y' : 'N', "\n";
+$s = serialize($o);
+echo $s, "\n";
+echo 'uninit_after=', $r->isUninitializedLazyObject($o) ? 'Y' : 'N', "\n";
+$o2 = unserialize($s);
+echo 'x=', $o2->x, "\n";
+$skip = $r->newLazyGhost($init, ReflectionClass::SKIP_INITIALIZATION_ON_SERIALIZE);
+echo 'skip_uninit=', $r->isUninitializedLazyObject($skip) ? 'Y' : 'N', "\n";
+echo serialize($skip), "\n";
+echo 'skip_uninit_after=', $r->isUninitializedLazyObject($skip) ? 'Y' : 'N', "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'lazy_serialize_skip.php'));
+        $this->assertSame(
+            "Y\nY\n8\n16\nuninit=Y\nctor\nO:1:\"A\":1:{s:1:\"x\";i:7;}\nuninit_after=N\nx=7\n"
+            ."skip_uninit=Y\nO:1:\"A\":0:{}\nskip_uninit_after=Y\n",
+            ob_get_clean()
+        );
+    }
 }
