@@ -86,6 +86,36 @@ PHP;
         self::assertSame('__phpc_property_get_p', $registry['c']['p']['get'] ?? null);
     }
 
+    /** @covers issue #21098 — `&get` lowers to return-by-ref hook method */
+    public function testLowersByRefGetHookArrowAndBlock(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class C {
+    private array $a = [1];
+    public array $x {
+        &get => $this->a;
+    }
+}
+class D {
+    private array $a = [1];
+    public array $y {
+        &get {
+            return $this->a;
+        }
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('&get', $out);
+        self::assertStringContainsString('function &__phpc_property_get_x()', $out);
+        self::assertStringContainsString('function &__phpc_property_get_y()', $out);
+        self::assertTrue($registry['c']['x']['getByRef'] ?? false);
+        self::assertSame('a', $registry['c']['x']['getBacking'] ?? null);
+        self::assertTrue($registry['d']['y']['getByRef'] ?? false);
+    }
+
     public function testStripsAbstractGetHookOnInterface(): void
     {
         $src = <<<'PHP'

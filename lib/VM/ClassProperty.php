@@ -21,6 +21,8 @@ class ClassProperty {
     public ?string $getHookMethodLc = null;
     /** Get hook accepts call-site arguments via `$obj->prop(...)` (#18172, PHP 8.4). */
     public bool $getHookParameterized = false;
+    /** `&get` returns by reference — dim writes mutate through the ref (#21098, zend_property_hooks.c). */
+    public bool $getHookByRef = false;
     /** Lowercase unset-hook method name from property-hooks lowering (#6502), or null. */
     public ?string $unsetHookMethodLc = null;
     /** Virtual hooked property: hooks do not use backing storage (#4687, Zend zend_property_hooks.c). */
