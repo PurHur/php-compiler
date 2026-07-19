@@ -76,7 +76,7 @@ final class ini_set_ extends Internal
             return false;
         }
         $key = strtolower($option);
-        if (!in_array($key, ['session.save_path', 'session.gc_maxlifetime'], true)) {
+        if (!in_array($key, ['session.save_path', 'session.gc_maxlifetime', 'session.use_strict_mode'], true)) {
             return false;
         }
         if (null === $frame->vmContext) {

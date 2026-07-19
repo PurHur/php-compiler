@@ -132,6 +132,7 @@ final class VmIni
         'unserialize_callback_func',
         'session.gc_maxlifetime',
         'session.save_path',
+        'session.use_strict_mode',
         'include_path',
         'short_open_tag',
         'register_argc_argv',
@@ -198,6 +199,8 @@ final class VmIni
                 return self::setSessionGcMaxLifetime($newValue);
             case 'session.save_path':
                 return self::setSessionSavePath($newValue);
+            case 'session.use_strict_mode':
+                return self::setSessionUseStrictMode($newValue);
             case 'include_path':
                 return VmIncludePath::push($newValue);
             case 'default_charset':
@@ -279,6 +282,8 @@ final class VmIni
                 return (string) self::$sessionGcMaxLifetime;
             case 'session.save_path':
                 return self::$sessionSavePath;
+            case 'session.use_strict_mode':
+                return self::formatBoolIniGet(VmSession::isUseStrictMode());
             case 'include_path':
                 return VmIncludePath::get();
             case 'default_charset':
@@ -338,6 +343,7 @@ final class VmIni
             'unserialize_callback_func' => '',
             'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
             'session.save_path' => self::CFG_SESSION_SAVE_PATH,
+            'session.use_strict_mode' => '0',
             'max_execution_time' => self::CFG_MAX_EXECUTION_TIME,
             'default_charset' => self::CFG_DEFAULT_CHARSET,
             'cfg_file_path' => self::cfgFilePath(),
@@ -578,6 +584,15 @@ final class VmIni
         return $old;
     }
 
+    /** php-src session.use_strict_mode (#21155). */
+    private static function setSessionUseStrictMode(string $newValue): string
+    {
+        $old = self::formatBoolIniGet(VmSession::isUseStrictMode());
+        VmSession::setUseStrictMode(self::parseBoolIni($newValue));
+
+        return $old;
+    }
+
     private static function setUserAgent(string $newValue): string
     {
         $old = self::$userAgent;
@@ -703,6 +718,9 @@ final class VmIni
                 break;
             case 'session.save_path':
                 self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+                break;
+            case 'session.use_strict_mode':
+                VmSession::setUseStrictMode(false);
                 break;
             case 'user_agent':
                 self::$userAgent = '';

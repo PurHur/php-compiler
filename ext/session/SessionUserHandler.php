@@ -238,9 +238,7 @@ final class SessionUserHandler
             if (!isset(self::$callbacks[7])) {
                 return true;
             }
-            if (!self::$opened && !self::open($ctx)) {
-                return false;
-            }
+            // php-src PS_VALIDATE_SID_FUNC(user) calls validate_sid without requiring open first.
             $idVar = new Variable();
             $idVar->string($id);
             $result = self::invokeStored($ctx, self::$callbacks[7], $idVar);
