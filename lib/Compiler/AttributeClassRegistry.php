@@ -95,7 +95,7 @@ final class AttributeClassRegistry
                 }
             }
 
-            return AttributeSupport::TARGET_ALL;
+            return AttributeSupport::targetAll();
         }
 
         return null;

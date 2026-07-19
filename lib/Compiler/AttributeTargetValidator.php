@@ -16,16 +16,23 @@ use PHPCompiler\VM\AttributeSupport;
  */
 final class AttributeTargetValidator
 {
-    /** @var array<int, string> */
-    private const TARGET_LABELS = [
-        AttributeSupport::TARGET_CLASS => 'class',
-        AttributeSupport::TARGET_FUNCTION => 'function',
-        AttributeSupport::TARGET_METHOD => 'method',
-        AttributeSupport::TARGET_PROPERTY => 'property',
-        AttributeSupport::TARGET_CLASS_CONSTANT => 'class constant',
-        AttributeSupport::TARGET_PARAMETER => 'parameter',
-        AttributeSupport::TARGET_CONSTANT => 'constant',
-    ];
+    /** @return array<int, string> */
+    private static function targetLabels(): array
+    {
+        $labels = [
+            AttributeSupport::TARGET_CLASS => 'class',
+            AttributeSupport::TARGET_FUNCTION => 'function',
+            AttributeSupport::TARGET_METHOD => 'method',
+            AttributeSupport::TARGET_PROPERTY => 'property',
+            AttributeSupport::TARGET_CLASS_CONSTANT => 'class constant',
+            AttributeSupport::TARGET_PARAMETER => 'parameter',
+        ];
+        if (AttributeSupport::hasTargetConstant()) {
+            $labels[AttributeSupport::TARGET_CONSTANT] = 'constant';
+        }
+
+        return $labels;
+    }
 
     /**
      * @param list<AttributeEntry> $entries
@@ -141,7 +148,7 @@ final class AttributeTargetValidator
     private static function formatAllowedTargets(int $flags): string
     {
         $names = [];
-        foreach (self::TARGET_LABELS as $flag => $label) {
+        foreach (self::targetLabels() as $flag => $label) {
             if (0 !== ($flags & $flag)) {
                 $names[] = $label;
             }

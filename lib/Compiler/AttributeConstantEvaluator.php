@@ -116,18 +116,8 @@ final class AttributeConstantEvaluator
 
     private static function attributeBuiltinConstValue(string $lcConst): ?int
     {
-        return match ($lcConst) {
-            'target_class' => AttributeSupport::TARGET_CLASS,
-            'target_function' => AttributeSupport::TARGET_FUNCTION,
-            'target_method' => AttributeSupport::TARGET_METHOD,
-            'target_property' => AttributeSupport::TARGET_PROPERTY,
-            'target_class_constant' => AttributeSupport::TARGET_CLASS_CONSTANT,
-            'target_parameter' => AttributeSupport::TARGET_PARAMETER,
-            'target_constant' => AttributeSupport::TARGET_CONSTANT,
-            'target_all' => AttributeSupport::TARGET_ALL,
-            'is_repeatable' => AttributeSupport::IS_REPEATABLE,
-            default => null,
-        };
+        // Profile-aware; never host \Attribute (#20727).
+        return AttributeSupport::builtinConstValue($lcConst);
     }
 
     private static function evalIntBinary(BinaryOp $expr, string $op): int

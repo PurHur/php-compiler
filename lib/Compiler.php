@@ -9256,6 +9256,18 @@ class Compiler {
     protected function tryFoldExternalClassConstFetch(string $className, string $constName): ?Variable
     {
         $lcClass = strtolower(ltrim($className, '\\'));
+        // Attribute::* from compiler profile — never host \Attribute (#20727).
+        // Leave Attribute::class to the ::class / native paths (not a TARGET_* bit).
+        if ('attribute' === $lcClass && 'class' !== strtolower($constName)) {
+            $folded = AttributeSupport::builtinConstValue(strtolower($constName));
+            if (null === $folded) {
+                return null;
+            }
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $value->int($folded);
+
+            return $value;
+        }
         if ('phpcfg\\func' === $lcClass) {
             $flags = [
                 'FLAG_PUBLIC' => \PHPCfg\Func::FLAG_PUBLIC,
