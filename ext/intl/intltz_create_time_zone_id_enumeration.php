@@ -65,7 +65,12 @@ final class intltz_create_time_zone_id_enumeration extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->array(VmIntlTimeZone::createTimeZoneIDEnumeration($zoneType, $region, $rawOffset));
+        $frame->returnVar->object(VmIntlTimeZone::createTimeZoneIDEnumeration(
+            $frame->vmContext,
+            $zoneType,
+            $region,
+            $rawOffset
+        ));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

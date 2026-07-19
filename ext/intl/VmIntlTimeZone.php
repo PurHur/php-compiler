@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
-use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -14,7 +13,6 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\DateTimeZoneSupport;
-use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -179,7 +177,7 @@ final class VmIntlTimeZone
         return VmDateTimeNative::timezoneIdentifiersList(DateTimeZoneSupport::GROUP_ALL, null);
     }
 
-    public static function createEnumeration(?string $countryOrZoneId = null): HashTable
+    public static function createEnumeration(Context $ctx, ?string $countryOrZoneId = null): ObjectEntry
     {
         $ids = self::listAvailableIds();
         if (null !== $countryOrZoneId && '' !== $countryOrZoneId) {
@@ -204,11 +202,15 @@ final class VmIntlTimeZone
         }
         IntlError::clear();
 
-        return VmFs::stringListToArray($ids);
+        return VmIntlIterator::fromStringList($ctx, $ids);
     }
 
-    public static function createTimeZoneIDEnumeration(int $zoneType, ?string $region, ?int $rawOffset): HashTable
-    {
+    public static function createTimeZoneIDEnumeration(
+        Context $ctx,
+        int $zoneType,
+        ?string $region,
+        ?int $rawOffset
+    ): ObjectEntry {
         $ids = self::listAvailableIds();
         if (null !== $region && '' !== $region) {
             $cc = strtoupper($region);
@@ -238,7 +240,7 @@ final class VmIntlTimeZone
         }
         IntlError::clear();
 
-        return VmFs::stringListToArray($ids);
+        return VmIntlIterator::fromStringList($ctx, $ids);
     }
 
     private static function regionOfId(string $id): string
@@ -1356,7 +1358,7 @@ final class IntlTimeZoneCreateEnumeration extends VmClassMethod
             }
         }
         if (null === $frame->returnVar) { return; }
-        $frame->returnVar->array(VmIntlTimeZone::createEnumeration($countryOrZone));
+        $frame->returnVar->object(VmIntlTimeZone::createEnumeration($frame->vmContext, $countryOrZone));
     }
 }
 
@@ -1386,7 +1388,12 @@ final class IntlTimeZoneCreateTimeZoneIDEnumeration extends VmClassMethod
             }
         }
         if (null === $frame->returnVar) { return; }
-        $frame->returnVar->array(VmIntlTimeZone::createTimeZoneIDEnumeration($zoneType, $region, $rawOffset));
+        $frame->returnVar->object(VmIntlTimeZone::createTimeZoneIDEnumeration(
+            $frame->vmContext,
+            $zoneType,
+            $region,
+            $rawOffset
+        ));
     }
 }
 

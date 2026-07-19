@@ -7,6 +7,6 @@ foreach (['getUnknown', 'getUTC', 'createEnumeration', 'createTimeZoneIDEnumerat
 }
 echo 'unknown=' . IntlTimeZone::getUnknown()->getID() . "\n";
 echo 'utc=' . IntlTimeZone::getUTC()->getID() . "\n";
-$ids = IntlTimeZone::createEnumeration();
+$ids = iterator_to_array(IntlTimeZone::createEnumeration());
 echo 'count=' . count($ids) . "\n";
 echo 'est=' . IntlTimeZone::getIDForWindowsID('Eastern Standard Time') . "\n";

@@ -46,7 +46,12 @@ final class intlcal_get_keyword_values_for_locale extends Internal
         );
         $onlyCommonVar = $frame->calledArgs[2]->resolveIndirect();
         $onlyCommon = Variable::TYPE_NULL !== $onlyCommonVar->type && $onlyCommonVar->toBool();
-        $result = VmIntlCalendar::getKeywordValuesForLocale($keyword, $locale, $onlyCommon);
+        $result = VmIntlCalendar::getKeywordValuesForLocale(
+            $frame->vmContext,
+            $keyword,
+            $locale,
+            $onlyCommon
+        );
         if (null === $frame->returnVar) {
             return;
         }
@@ -55,7 +60,7 @@ final class intlcal_get_keyword_values_for_locale extends Internal
 
             return;
         }
-        $frame->returnVar->array($result);
+        $frame->returnVar->object($result);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
