@@ -49,6 +49,9 @@ class Module extends ModuleAbstract
             new dba_firstkey(),
             new dba_nextkey(),
             new dba_list(),
+            new dba_optimize(),
+            new dba_sync(),
+            new dba_key_split(),
         ];
     }
 }

@@ -45,7 +45,7 @@ final class dba_handlers extends DbaFunction
                 foreach ($handlers as $name) {
                     $val = new Variable(Variable::TYPE_STRING);
                     if ($fullInfo) {
-                        $val->string($name.' (PHP flatfile handler)');
+                        $val->string($name.' handler');
                     } else {
                         $val->string($name);
                     }

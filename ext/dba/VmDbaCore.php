@@ -20,10 +20,12 @@ final class VmDbaCore
 {
     public const HANDLER_FLATFILE = 'flatfile';
 
+    public const HANDLER_INIFILE = 'inifile';
+
     /** @return list<string> */
     public static function handlers(): array
     {
-        return [self::HANDLER_FLATFILE];
+        return [self::HANDLER_FLATFILE, self::HANDLER_INIFILE];
     }
 
     public static function open(
@@ -34,7 +36,7 @@ final class VmDbaCore
         ?Frame $frame = null
     ): Variable|false {
         $handler = null === $handler || '' === $handler ? self::HANDLER_FLATFILE : \strtolower($handler);
-        if (self::HANDLER_FLATFILE !== $handler) {
+        if (!\in_array($handler, self::handlers(), true)) {
             self::emitWarning($frame, 'dba_open(): Driver initialization failed for handler: '.$handler);
 
             return false;
@@ -95,7 +97,9 @@ final class VmDbaCore
         /** @var resource $fp */
         $fp = $state['fp'];
 
-        return VmDbaFlatfile::insert($fp, $key, $value);
+        return self::HANDLER_INIFILE === $state['handler']
+            ? VmDbaInifile::insert($fp, $key, $value)
+            : VmDbaFlatfile::insert($fp, $key, $value);
     }
 
     public static function replace(ObjectEntry $connection, string $key, string $value): bool
@@ -107,7 +111,9 @@ final class VmDbaCore
         /** @var resource $fp */
         $fp = $state['fp'];
 
-        return VmDbaFlatfile::replace($fp, $key, $value);
+        return self::HANDLER_INIFILE === $state['handler']
+            ? VmDbaInifile::replace($fp, $key, $value)
+            : VmDbaFlatfile::replace($fp, $key, $value);
     }
 
     public static function fetch(ObjectEntry $connection, string $key): string|false
@@ -115,7 +121,9 @@ final class VmDbaCore
         $state = VmDbaConnection::state($connection);
         /** @var resource $fp */
         $fp = $state['fp'];
-        $val = VmDbaFlatfile::fetch($fp, $key);
+        $val = self::HANDLER_INIFILE === $state['handler']
+            ? VmDbaInifile::fetch($fp, $key)
+            : VmDbaFlatfile::fetch($fp, $key);
 
         return null === $val ? false : $val;
     }
@@ -126,7 +134,9 @@ final class VmDbaCore
         /** @var resource $fp */
         $fp = $state['fp'];
 
-        return VmDbaFlatfile::exists($fp, $key);
+        return self::HANDLER_INIFILE === $state['handler']
+            ? VmDbaInifile::exists($fp, $key)
+            : VmDbaFlatfile::exists($fp, $key);
     }
 
     public static function delete(ObjectEntry $connection, string $key): bool
@@ -138,7 +148,9 @@ final class VmDbaCore
         /** @var resource $fp */
         $fp = $state['fp'];
 
-        return VmDbaFlatfile::delete($fp, $key);
+        return self::HANDLER_INIFILE === $state['handler']
+            ? VmDbaInifile::delete($fp, $key)
+            : VmDbaFlatfile::delete($fp, $key);
     }
 
     public static function firstKey(ObjectEntry $connection): string|false
@@ -146,7 +158,11 @@ final class VmDbaCore
         $state = VmDbaConnection::state($connection);
         /** @var resource $fp */
         $fp = $state['fp'];
-        [$key, $cursor] = VmDbaFlatfile::firstKey($fp);
+        if (self::HANDLER_INIFILE === $state['handler']) {
+            [$key, $cursor] = VmDbaInifile::firstKey($fp);
+        } else {
+            [$key, $cursor] = VmDbaFlatfile::firstKey($fp);
+        }
         VmDbaConnection::mutate($connection, static function (array &$row) use ($cursor): void {
             $row['cursor'] = $cursor;
         });
@@ -159,12 +175,54 @@ final class VmDbaCore
         $state = VmDbaConnection::state($connection);
         /** @var resource $fp */
         $fp = $state['fp'];
-        [$key, $cursor] = VmDbaFlatfile::nextKey($fp, (int) $state['cursor']);
+        if (self::HANDLER_INIFILE === $state['handler']) {
+            [$key, $cursor] = VmDbaInifile::nextKey($fp, (int) $state['cursor']);
+        } else {
+            [$key, $cursor] = VmDbaFlatfile::nextKey($fp, (int) $state['cursor']);
+        }
         VmDbaConnection::mutate($connection, static function (array &$row) use ($cursor): void {
             $row['cursor'] = $cursor;
         });
 
         return null === $key ? false : $key;
+    }
+
+    public static function optimize(ObjectEntry $connection): bool
+    {
+        VmDbaConnection::state($connection);
+
+        return true;
+    }
+
+    public static function sync(ObjectEntry $connection): bool
+    {
+        $state = VmDbaConnection::state($connection);
+        /** @var resource $fp */
+        $fp = $state['fp'];
+        \fflush($fp);
+
+        return true;
+    }
+
+    /**
+     * @return array{0: string, 1: string}|false
+     */
+    public static function keySplit(mixed $key): array|false
+    {
+        if (null === $key || false === $key) {
+            return false;
+        }
+        if (!\is_string($key)) {
+            throw new \TypeError(
+                'dba_key_split(): Argument #1 ($key) must be of type string|false|null, '
+                .\get_debug_type($key).' given'
+            );
+        }
+        if (\str_starts_with($key, '[') && false !== ($close = \strpos($key, ']'))) {
+            return [\substr($key, 1, $close - 1), \substr($key, $close + 1)];
+        }
+
+        return ['', $key];
     }
 
     public static function requireConnection(Variable $var, string $function): ObjectEntry
