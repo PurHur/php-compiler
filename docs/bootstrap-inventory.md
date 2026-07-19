@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5977 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18329 |
+| Source constructs flagged (warnings) | 18326 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4384,7 +4384,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/AssertionErrorRaise.php` | 0 | 2 |
 | `lib/JIT/Builtin/AttributeNewInstanceRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/AttributeRegistry.php` | 0 | 1 |
-| `lib/JIT/Builtin/AttributeRegistryLookupRuntime.php` | 0 | 4 |
+| `lib/JIT/Builtin/AttributeRegistryLookupRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/AttributeRegistryLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/BackedEnumFromRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
@@ -37609,10 +37609,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/AttributeRegistryLookupRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 391)
-- new JIT (line 422)
-- 19 class method(s)
-- 2 closure(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/AttributeRegistryLowering.php`
 
