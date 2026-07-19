@@ -11,18 +11,22 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\NativeDateInvalidTimeZoneException;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
 /**
- * IntlDateFormatter create/format — ICU pattern subset (#19549, #5201, #3336).
+ * IntlDateFormatter create/format/parse — ICU pattern subset (#19549, #5201, #3336, #20729).
  *
  * Style-only create (no explicit pattern) resolves CLDR-like date/time patterns for a
  * documented locale set, then formats via {@see icuPatternToPhpFormat()} — php-src
  * dateformat_create.c / dateformat_format.c / udat_open(UDAT_SHORT, …) semantics.
+ * Parse / localtime reverse the same mapped subset (php-src dateformat_parse.cpp).
  *
- * php-src: ext/intl/dateformat/dateformat_create.c, dateformat_format.c, dateformat.stub.php
+ * php-src: ext/intl/dateformat/dateformat_create.c, dateformat_format.c,
+ * dateformat_parse.cpp, dateformat.stub.php
  */
 final class VmIntlDateFormatter
 {
@@ -43,7 +47,18 @@ final class VmIntlDateFormatter
     /** Narrow no-break space (U+202F) — ICU en_US time patterns before `a`. */
     private const NNBSP = "\u{202F}";
 
-    /** @var array<int, array{locale: string, dateType: int, timeType: int, timezone: string, calendar: int, pattern: ?string}> */
+    /**
+     * @var array<int, array{
+     *   locale: string,
+     *   dateType: int,
+     *   timeType: int,
+     *   timezone: string,
+     *   calendar: int,
+     *   pattern: ?string,
+     *   errorCode: int,
+     *   errorMessage: string
+     * }>
+     */
     private static array $state = [];
 
     /** @return array<string, int> */
@@ -88,6 +103,8 @@ final class VmIntlDateFormatter
             'timezone' => $tz,
             'calendar' => $calendar,
             'pattern' => $pattern,
+            'errorCode' => IntlError::U_ZERO_ERROR,
+            'errorMessage' => 'U_ZERO_ERROR',
         ];
 
         return $object;
@@ -153,8 +170,256 @@ final class VmIntlDateFormatter
             return false;
         }
         IntlError::clear();
+        self::clearObjectError($formatter);
 
         return $pattern;
+    }
+
+    /**
+     * IntlDateFormatter::parse() / parseToCalendar() — php-src datefmt_parse (#20729).
+     *
+     * @param-out int|null $offset
+     *
+     * @return int|float|false
+     */
+    public static function parse(ObjectEntry $formatter, string $text, ?int &$offset, bool $updateCalendar = false)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_parse: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        $pattern = self::effectivePattern($state);
+        if (null === $pattern || '' === $pattern) {
+            self::fail(
+                $formatter,
+                'datefmt_parse: no date/time pattern available for locale/styles: U_ILLEGAL_ARGUMENT_ERROR',
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR
+            );
+
+            return false;
+        }
+        $start = $offset ?? 0;
+        if ($start < 0 || $start > \strlen($text)) {
+            return false;
+        }
+        $slice = \substr($text, $start);
+        $matched = self::matchPhpFormatPrefix(self::icuPatternToPhpFormat($pattern), $slice);
+        if (null === $matched) {
+            self::fail($formatter, 'Date parsing failed: U_PARSE_ERROR', IntlError::U_PARSE_ERROR);
+
+            return false;
+        }
+        $year = $matched['year'];
+        $month = $matched['month'];
+        $day = $matched['day'];
+        if (false === $year || false === $month || false === $day) {
+            self::fail($formatter, 'Date parsing failed: U_PARSE_ERROR', IntlError::U_PARSE_ERROR);
+
+            return false;
+        }
+        $hour = false === $matched['hour'] ? 0 : $matched['hour'];
+        $minute = false === $matched['minute'] ? 0 : $matched['minute'];
+        $second = false === $matched['second'] ? 0 : $matched['second'];
+        $tz = $state['timezone'];
+        try {
+            $timestamp = self::mktimeInTimezone(
+                (int) $year,
+                (int) $month,
+                (int) $day,
+                $hour,
+                $minute,
+                $second,
+                $tz
+            );
+        } catch (\Throwable) {
+            self::fail($formatter, 'Date parsing failed: U_PARSE_ERROR', IntlError::U_PARSE_ERROR);
+
+            return false;
+        }
+        $offset = $start + $matched['consumed'];
+        // updateCalendar mirrors php-src parseToCalendar (udat_parseCalendar); timestamp result is identical.
+        unset($updateCalendar);
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $timestamp;
+    }
+
+    /**
+     * IntlDateFormatter::localtime() — php-src datefmt_localtime (#20729).
+     *
+     * @param-out int|null $offset
+     *
+     * @return HashTable|false
+     */
+    public static function localtime(ObjectEntry $formatter, string $text, ?int &$offset)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_localtime: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        $pattern = self::effectivePattern($state);
+        if (null === $pattern || '' === $pattern) {
+            self::fail(
+                $formatter,
+                'datefmt_localtime: no date/time pattern available for locale/styles: U_ILLEGAL_ARGUMENT_ERROR',
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR
+            );
+
+            return false;
+        }
+        $start = $offset ?? 0;
+        if ($start < 0 || $start > \strlen($text)) {
+            return false;
+        }
+        $slice = \substr($text, $start);
+        $matched = self::matchPhpFormatPrefix(self::icuPatternToPhpFormat($pattern), $slice);
+        if (null === $matched) {
+            self::fail($formatter, 'Date parsing failed: U_PARSE_ERROR', IntlError::U_PARSE_ERROR);
+
+            return false;
+        }
+        $year = $matched['year'];
+        $month = $matched['month'];
+        $day = $matched['day'];
+        if (false === $year || false === $month || false === $day) {
+            self::fail($formatter, 'Date parsing failed: U_PARSE_ERROR', IntlError::U_PARSE_ERROR);
+
+            return false;
+        }
+        $hour = false === $matched['hour'] ? 0 : $matched['hour'];
+        $minute = false === $matched['minute'] ? 0 : $matched['minute'];
+        $second = false === $matched['second'] ? 0 : $matched['second'];
+        try {
+            $timestamp = self::mktimeInTimezone(
+                (int) $year,
+                (int) $month,
+                (int) $day,
+                $hour,
+                $minute,
+                $second,
+                $state['timezone']
+            );
+        } catch (\Throwable) {
+            self::fail($formatter, 'Date parsing failed: U_PARSE_ERROR', IntlError::U_PARSE_ERROR);
+
+            return false;
+        }
+        $offset = $start + $matched['consumed'];
+        $parts = VmDateTimeNative::format($timestamp, 0, $state['timezone'], 's,i,H,Y,j,w,z,n');
+        $bits = \explode(',', $parts);
+        $ht = new HashTable();
+        $fields = [
+            'tm_sec' => (int) $bits[0],
+            'tm_min' => (int) $bits[1],
+            'tm_hour' => (int) $bits[2],
+            'tm_year' => ((int) $bits[3]) - 1900,
+            'tm_mday' => (int) $bits[4],
+            'tm_wday' => (int) $bits[5],
+            'tm_yday' => (int) $bits[6],
+            'tm_mon' => ((int) $bits[7]) - 1,
+            'tm_isdst' => 0,
+        ];
+        foreach ($fields as $key => $value) {
+            $slot = new Variable();
+            $slot->int($value);
+            $ht->add($key, $slot);
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $ht;
+    }
+
+    /**
+     * IntlDateFormatter::getTimeZone() — php-src datefmt_get_timezone (#20729).
+     *
+     * @return ObjectEntry|false
+     */
+    public static function getTimeZone(ObjectEntry $formatter, Context $ctx)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_get_timezone: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        if (!isset($ctx->classes[VmIntlTimeZone::CLASS_LC])) {
+            self::fail($formatter, 'datefmt_get_timezone: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return VmIntlTimeZone::createFromId($ctx, $state['timezone']);
+    }
+
+    /**
+     * IntlDateFormatter::setTimeZone() — php-src datefmt_set_timezone (#20729).
+     */
+    public static function setTimeZone(ObjectEntry $formatter, Variable $timezoneArg, Context $ctx): bool
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_set_timezone: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        $var = $timezoneArg->resolveIndirect();
+        try {
+            if (Variable::TYPE_NULL === $var->type) {
+                $id = VmDate::defaultTimezoneGet();
+            } elseif (Variable::TYPE_OBJECT === $var->type) {
+                $obj = $var->toObject();
+                if (VmIntlTimeZone::isTimeZoneObject($obj)) {
+                    $id = VmIntlTimeZone::idOf($obj);
+                } elseif ('datetimezone' === strtolower($obj->class->name)) {
+                    $id = DateTimeSupport::timezoneName($obj);
+                } else {
+                    throw new \TypeError(\sprintf(
+                        'IntlDateFormatter::setTimeZone(): Argument #1 ($timezone) must be of type IntlTimeZone|DateTimeZone|string|null, %s given',
+                        $obj->class->name
+                    ));
+                }
+            } else {
+                $raw = VmString::coerceStringBuiltinArg($var, 'IntlDateFormatter::setTimeZone', 0, 'timezone');
+                $id = '' === $raw ? VmDate::defaultTimezoneGet() : VmDateTimeNative::validateTimezoneId($raw);
+            }
+        } catch (NativeDateInvalidTimeZoneException) {
+            $label = Variable::TYPE_STRING === $var->type ? $var->toString() : '';
+            self::fail(
+                $formatter,
+                "datefmt_set_timezone: No such time zone: '".$label."': U_ILLEGAL_ARGUMENT_ERROR",
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR
+            );
+
+            return false;
+        }
+        unset($ctx);
+        self::$state[$formatter->id]['timezone'] = $id;
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return true;
+    }
+
+    public static function getErrorCode(ObjectEntry $formatter): int
+    {
+        $state = self::$state[$formatter->id] ?? null;
+
+        return null === $state ? IntlError::U_ZERO_ERROR : $state['errorCode'];
+    }
+
+    public static function getErrorMessage(ObjectEntry $formatter): string
+    {
+        $state = self::$state[$formatter->id] ?? null;
+
+        return null === $state ? 'U_ZERO_ERROR' : $state['errorMessage'];
     }
 
     /**
@@ -549,5 +814,299 @@ final class VmIntlDateFormatter
         }
 
         return $out;
+    }
+
+    /**
+     * Match a PHP date()-style format as a prefix of $time (ICU allows trailing text).
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   consumed: int
+     * }|null
+     */
+    private static function matchPhpFormatPrefix(string $format, string $time): ?array
+    {
+        $pos = 0;
+        $timeLen = \strlen($time);
+        $components = [
+            'year' => false,
+            'month' => false,
+            'day' => false,
+            'hour' => false,
+            'minute' => false,
+            'second' => false,
+        ];
+        $formatLen = \strlen($format);
+        for ($i = 0; $i < $formatLen; ++$i) {
+            $fc = $format[$i];
+            if ('\\' === $fc) {
+                if ($i + 1 >= $formatLen) {
+                    return null;
+                }
+                $literal = $format[++$i];
+                if ($pos >= $timeLen || $time[$pos] !== $literal) {
+                    return null;
+                }
+                ++$pos;
+                continue;
+            }
+            switch ($fc) {
+                case 'Y':
+                    $digits = self::readDigits($time, $pos, 4, 4);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['year'] = (int) $digits;
+                    break;
+                case 'y':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $yy = (int) $digits;
+                    $components['year'] = $yy >= 69 ? 1900 + $yy : 2000 + $yy;
+                    break;
+                case 'm':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['month'] = (int) $digits;
+                    break;
+                case 'n':
+                    $digits = self::readDigits($time, $pos, 1, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['month'] = (int) $digits;
+                    break;
+                case 'd':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['day'] = (int) $digits;
+                    break;
+                case 'j':
+                    $digits = self::readDigits($time, $pos, 1, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['day'] = (int) $digits;
+                    break;
+                case 'H':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['hour'] = (int) $digits;
+                    break;
+                case 'G':
+                    $digits = self::readDigits($time, $pos, 1, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['hour'] = (int) $digits;
+                    break;
+                case 'h':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['hour'] = self::hour12To24((int) $digits, $components);
+                    break;
+                case 'g':
+                    $digits = self::readDigits($time, $pos, 1, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['hour'] = self::hour12To24((int) $digits, $components);
+                    break;
+                case 'i':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['minute'] = (int) $digits;
+                    break;
+                case 's':
+                    $digits = self::readDigits($time, $pos, 2, 2);
+                    if (null === $digits) {
+                        return null;
+                    }
+                    $components['second'] = (int) $digits;
+                    break;
+                case 'A':
+                case 'a':
+                    if ($pos + 2 > $timeLen) {
+                        return null;
+                    }
+                    $ampm = \strtoupper(\substr($time, $pos, 2));
+                    if ('AM' !== $ampm && 'PM' !== $ampm) {
+                        return null;
+                    }
+                    $pos += 2;
+                    if (false !== $components['hour']) {
+                        $h = (int) $components['hour'];
+                        if ('PM' === $ampm && $h < 12) {
+                            $components['hour'] = $h + 12;
+                        } elseif ('AM' === $ampm && 12 === $h) {
+                            $components['hour'] = 0;
+                        }
+                    }
+                    break;
+                case 'F':
+                    $name = self::readMonthName($time, $pos, true);
+                    if (null === $name) {
+                        return null;
+                    }
+                    $components['month'] = $name;
+                    break;
+                case 'M':
+                    $name = self::readMonthName($time, $pos, false);
+                    if (null === $name) {
+                        return null;
+                    }
+                    $components['month'] = $name;
+                    break;
+                case 'l':
+                case 'D':
+                    // Weekday names — consume token; date fields come from Y/m/d.
+                    if (null === self::readWeekdayName($time, $pos, 'l' === $fc)) {
+                        return null;
+                    }
+                    break;
+                case 'e':
+                case 'T':
+                    // Timezone display tokens are format-only in this subset; reject unexpected letters.
+                    if ($pos >= $timeLen || (!\ctype_alnum($time[$pos]) && '+' !== $time[$pos] && '-' !== $time[$pos])) {
+                        return null;
+                    }
+                    while ($pos < $timeLen && (
+                        \ctype_alnum($time[$pos])
+                        || '_' === $time[$pos]
+                        || '/' === $time[$pos]
+                        || '+' === $time[$pos]
+                        || '-' === $time[$pos]
+                    )) {
+                        ++$pos;
+                    }
+                    break;
+                default:
+                    if ($pos >= $timeLen || $time[$pos] !== $fc) {
+                        return null;
+                    }
+                    ++$pos;
+            }
+        }
+        $components['consumed'] = $pos;
+
+        return $components;
+    }
+
+    /**
+     * @param array{hour?: int|false} $components
+     */
+    private static function hour12To24(int $hour12, array $components): int
+    {
+        // AM/PM applied when 'A'/'a' is later seen; store raw 1–12 until then.
+        return $hour12;
+    }
+
+    private static function readDigits(string $time, int &$pos, int $min, int $max): ?string
+    {
+        $len = \strlen($time);
+        $start = $pos;
+        $n = 0;
+        while ($pos < $len && $n < $max && \ctype_digit($time[$pos])) {
+            ++$pos;
+            ++$n;
+        }
+        if ($n < $min) {
+            $pos = $start;
+
+            return null;
+        }
+
+        return \substr($time, $start, $n);
+    }
+
+    private static function readMonthName(string $time, int &$pos, bool $full): ?int
+    {
+        $fullNames = [
+            'january' => 1, 'february' => 2, 'march' => 3, 'april' => 4,
+            'may' => 5, 'june' => 6, 'july' => 7, 'august' => 8,
+            'september' => 9, 'october' => 10, 'november' => 11, 'december' => 12,
+        ];
+        $shortNames = [
+            'jan' => 1, 'feb' => 2, 'mar' => 3, 'apr' => 4,
+            'may' => 5, 'jun' => 6, 'jul' => 7, 'aug' => 8,
+            'sep' => 9, 'oct' => 10, 'nov' => 11, 'dec' => 12,
+        ];
+        $slice = \strtolower(\substr($time, $pos));
+        $table = $full ? $fullNames : $shortNames;
+        foreach ($table as $name => $month) {
+            if (\str_starts_with($slice, $name)) {
+                $pos += \strlen($name);
+
+                return $month;
+            }
+        }
+
+        return null;
+    }
+
+    private static function readWeekdayName(string $time, int &$pos, bool $full): ?string
+    {
+        $fullNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        $shortNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        $slice = \strtolower(\substr($time, $pos));
+        foreach ($full ? $fullNames : $shortNames as $name) {
+            if (\str_starts_with($slice, $name)) {
+                $pos += \strlen($name);
+
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    private static function mktimeInTimezone(
+        int $year,
+        int $month,
+        int $day,
+        int $hour,
+        int $minute,
+        int $second,
+        string $tzName
+    ): int {
+        $iso = \sprintf('%04d-%02d-%02d %02d:%02d:%02d', $year, $month, $day, $hour, $minute, $second);
+        $parsed = VmDateTimeNative::parseDateTime($iso, $tzName);
+
+        return (int) $parsed['timestamp'];
+    }
+
+    private static function fail(ObjectEntry $formatter, string $message, int $code): void
+    {
+        IntlError::set($code, $message);
+        if (isset(self::$state[$formatter->id])) {
+            self::$state[$formatter->id]['errorCode'] = $code;
+            self::$state[$formatter->id]['errorMessage'] = $message;
+        }
+    }
+
+    private static function clearObjectError(ObjectEntry $formatter): void
+    {
+        if (!isset(self::$state[$formatter->id])) {
+            return;
+        }
+        self::$state[$formatter->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+        self::$state[$formatter->id]['errorMessage'] = 'U_ZERO_ERROR';
     }
 }
