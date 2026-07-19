@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6021 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18561 |
+| Source constructs flagged (warnings) | 18573 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -875,7 +875,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmResourceBundle.php` | 0 | 33 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 29 |
 | `ext/intl/VmTransliterator.php` | 0 | 29 |
-| `ext/intl/VmUConverter.php` | 0 | 46 |
+| `ext/intl/VmUConverter.php` | 0 | 60 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
 | `ext/intl/collator_compare.php` | 0 | 3 |
 | `ext/intl/collator_create.php` | 0 | 3 |
@@ -2449,7 +2449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamIsLocal.php` | 0 | 1 |
 | `ext/standard/JitStreamIsatty.php` | 0 | 1 |
 | `ext/standard/JitStreamLibcHandleKernel.php` | 0 | 3 |
-| `ext/standard/JitStreamLifecycleKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamLifecycleKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamMetaKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamModeKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
@@ -12828,52 +12828,66 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmUConverter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 110)
-- new Variable (line 114)
-- new UConverterConstruct (line 121)
-- new UConverterConvert (line 125)
-- new UConverterGetErrorCode (line 126)
-- new UConverterGetErrorMessage (line 127)
-- new UConverterGetSourceEncoding (line 128)
-- new UConverterGetDestinationEncoding (line 129)
-- new UConverterSetSourceEncoding (line 130)
-- new UConverterSetDestinationEncoding (line 131)
-- new UConverterGetSourceType (line 132)
-- new UConverterGetDestinationType (line 133)
-- new UConverterGetSubstChars (line 134)
-- new UConverterSetSubstChars (line 135)
-- new UConverterReasonText (line 136)
-- new UConverterTranscode (line 137)
-- new UConverterGetAvailable (line 138)
-- new UConverterGetAliases (line 139)
-- new UConverterGetStandards (line 140)
-- new Error (line 195)
-- new Error (line 271)
-- new Error (line 301)
-- new Error (line 346)
-- new HashTable (line 531)
-- new Variable (line 533)
-- new Error (line 669)
-- new Error (line 673)
-- new ArgumentCountError (line 717)
-- new ArgumentCountError (line 738)
-- new ArgumentCountError (line 780)
-- new ArgumentCountError (line 805)
-- new ArgumentCountError (line 811)
-- new ArgumentCountError (line 868)
-- new ArgumentCountError (line 893)
-- new ArgumentCountError (line 924)
-- new ArgumentCountError (line 955)
-- new ArgumentCountError (line 987)
-- new ArgumentCountError (line 1019)
-- new ArgumentCountError (line 1050)
-- new ArgumentCountError (line 1082)
-- new ArgumentCountError (line 1112)
-- new ArgumentCountError (line 1136)
-- new ArgumentCountError (line 1172)
-- new ArgumentCountError (line 1202)
-- new ArgumentCountError (line 1238)
-- 47 class method(s)
+- new ClassEntry (line 112)
+- new Variable (line 116)
+- new UConverterConstruct (line 123)
+- new UConverterConvert (line 127)
+- new UConverterFromUCallback (line 128)
+- new UConverterToUCallback (line 129)
+- new UConverterGetErrorCode (line 130)
+- new UConverterGetErrorMessage (line 131)
+- new UConverterGetSourceEncoding (line 132)
+- new UConverterGetDestinationEncoding (line 133)
+- new UConverterSetSourceEncoding (line 134)
+- new UConverterSetDestinationEncoding (line 135)
+- new UConverterGetSourceType (line 136)
+- new UConverterGetDestinationType (line 137)
+- new UConverterGetSubstChars (line 138)
+- new UConverterSetSubstChars (line 139)
+- new UConverterReasonText (line 140)
+- new UConverterTranscode (line 141)
+- new UConverterGetAvailable (line 142)
+- new UConverterGetAliases (line 143)
+- new UConverterGetStandards (line 144)
+- new Error (line 221)
+- new Variable (line 457)
+- new HashTable (line 459)
+- new Variable (line 461)
+- new Variable (line 465)
+- new Variable (line 467)
+- new Variable (line 469)
+- new Variable (line 497)
+- new Variable (line 499)
+- new Variable (line 501)
+- new Variable (line 503)
+- new Error (line 712)
+- new Error (line 742)
+- new Error (line 787)
+- new HashTable (line 972)
+- new Variable (line 974)
+- new Error (line 1110)
+- new Error (line 1114)
+- new ArgumentCountError (line 1158)
+- new ArgumentCountError (line 1179)
+- new ArgumentCountError (line 1221)
+- new ArgumentCountError (line 1259)
+- new ArgumentCountError (line 1296)
+- new ArgumentCountError (line 1321)
+- new ArgumentCountError (line 1327)
+- new ArgumentCountError (line 1384)
+- new ArgumentCountError (line 1409)
+- new ArgumentCountError (line 1440)
+- new ArgumentCountError (line 1471)
+- new ArgumentCountError (line 1503)
+- new ArgumentCountError (line 1535)
+- new ArgumentCountError (line 1566)
+- new ArgumentCountError (line 1598)
+- new ArgumentCountError (line 1628)
+- new ArgumentCountError (line 1652)
+- new ArgumentCountError (line 1688)
+- new ArgumentCountError (line 1718)
+- new ArgumentCountError (line 1754)
+- 60 class method(s)
 
 ### `ext/intl/collator_asort.php`
 
@@ -24065,9 +24079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamLifecycleKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 298)
-- 17 class method(s)
-- 1 closure(s)
+- 9 class method(s)
 
 ### `ext/standard/JitStreamMetaKernel.php`
 
@@ -39845,7 +39857,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamLifecycleRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StreamMeta.php`
 
@@ -42264,19 +42276,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 958)
 - new Call\DateTimeFormat (line 961)
 - new Call\DateTimeFormat (line 962)
-- new Result (line 1296)
-- new Result (line 1317)
-- new Variable (line 1918)
-- new Variable (line 2055)
-- new Variable (line 2281)
-- new Variable (line 2339)
-- new VMVariable (line 2477)
-- new VMVariable (line 2493)
-- new VMVariable (line 2499)
-- new VMVariable (line 2505)
-- new VMVariable (line 2516)
-- new Variable (line 2546)
-- new Variable (line 2586)
+- new Result (line 1298)
+- new Result (line 1319)
+- new Variable (line 1920)
+- new Variable (line 2057)
+- new Variable (line 2283)
+- new Variable (line 2341)
+- new VMVariable (line 2479)
+- new VMVariable (line 2495)
+- new VMVariable (line 2501)
+- new VMVariable (line 2507)
+- new VMVariable (line 2518)
+- new Variable (line 2548)
+- new Variable (line 2588)
 - 102 class method(s)
 - 28 closure(s)
 

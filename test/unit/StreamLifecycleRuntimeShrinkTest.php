@@ -10,7 +10,7 @@ use PHPCompiler\ext\standard\VmPhpMemoryStream;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Stream lifecycle NestedJIT ABI bridges quarantined in ext/standard (#9442, #19758).
+ * Stream lifecycle NestedJIT ABI bridges — always StreamLifecycleJitHelper (#9442, #20966).
  */
 final class StreamLifecycleRuntimeShrinkTest extends TestCase
 {
@@ -32,25 +32,32 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamLifecycleRuntime.php');
         $this->assertStringContainsString('JitStreamLifecycleKernel', $orchestrator);
         $this->assertStringContainsString('JitStreamLifecycleKernel::ensureLinked', $orchestrator);
+        $this->assertStringNotContainsString('ensureDeferredStubsForInventoryEmit', $orchestrator);
+        $this->assertStringNotContainsString('implementDeferredStubs', $orchestrator);
+        $this->assertStringNotContainsString('shouldDeferInventoryEmitStubs', $orchestrator);
         $this->assertStringNotContainsString('NestedJitCompileScope', $orchestrator);
         $this->assertStringNotContainsString('__compiler_is_resource', $orchestrator);
-        $this->assertLessThan(55, \substr_count($orchestrator, "\n") + 1);
+        $this->assertLessThan(45, \substr_count($orchestrator, "\n") + 1);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelAlwaysNestedJitNoThinStubFork(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamLifecycleKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitStreamLifecycleKernel', $source);
         $this->assertStringContainsString('__compiler_is_resource', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('StreamLifecycleJitHelper', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('implementDeferredStubs', $source);
+        $this->assertStringNotContainsString('shouldDeferInventoryEmitStubs', $source);
+        $this->assertStringNotContainsString('implementStandalone', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
-        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(380, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertLessThan(280, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void

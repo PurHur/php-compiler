@@ -8,9 +8,10 @@ use PHPCompiler\ext\standard\JitStreamLifecycleKernel;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT embed link for stream lifecycle ABI (#9442, #19758).
+ * JIT/AOT embed link for stream lifecycle ABI (#9442, #20966).
  *
- * Thin orchestrator — NestedJIT bridges live in {@see JitStreamLifecycleKernel}.
+ * Thin orchestrator — NestedJIT bridges live in {@see JitStreamLifecycleKernel}
+ * (no deferred stub fork).
  */
 final class StreamLifecycleRuntime
 {
@@ -19,7 +20,7 @@ final class StreamLifecycleRuntime
         JitStreamLifecycleKernel::ensureLinked($context);
     }
 
-    /** Real fclose/feof bridges for user-script stream lowering (#9142). */
+    /** Real fclose/feof bridges for user-script stream lowering (#9142, #20966). */
     public static function ensureLinkedForUserScriptLowering(Context $context): void
     {
         JitStreamLifecycleKernel::ensureLinkedForUserScriptLowering($context);
@@ -28,20 +29,5 @@ final class StreamLifecycleRuntime
     public static function implement(Context $context): void
     {
         JitStreamLifecycleKernel::implement($context);
-    }
-
-    public static function shouldDeferInventoryEmitStubs(Context $context): bool
-    {
-        return JitStreamLifecycleKernel::shouldDeferInventoryEmitStubs($context);
-    }
-
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        JitStreamLifecycleKernel::ensureDeferredStubsForInventoryEmit($context);
-    }
-
-    public static function implementDeferredStubs(Context $context): void
-    {
-        JitStreamLifecycleKernel::implementDeferredStubs($context);
     }
 }
