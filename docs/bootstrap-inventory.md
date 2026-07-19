@@ -28946,8 +28946,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1776)
-- new Error (line 1787)
+- new Error (line 1778)
+- new Error (line 1789)
 - 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -33156,7 +33156,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_decrement.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/str_ends_with.php`
 
@@ -33173,7 +33173,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_increment.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/str_ireplace.php`
 
@@ -39608,14 +39608,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PendingHeadersJitBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 353)
-- 14 class method(s)
+- new JIT (line 455)
+- 15 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/PendingHeadersRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/PosixCtermidRuntime.php`
 
