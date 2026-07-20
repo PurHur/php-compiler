@@ -57,7 +57,7 @@ final class strip_tags extends Internal
             }
         }
 
-        $subject = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strip_tags', 0, 'string');
+        $subject = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strip_tags', 0, 'string');
         if (null === $allowed) {
             $allowPtr = $context->builder->load($context->constantStringFromString(''));
         } elseif (self::isAllowedTagsArrayArg($allowed)) {
@@ -77,14 +77,14 @@ final class strip_tags extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19284, ext/standard/string.c). */
+    /** Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21207, ext/standard/string.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'strip_tags', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'strip_tags',
             $argIndex,

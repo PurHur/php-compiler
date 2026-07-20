@@ -66,7 +66,7 @@ final class strtr extends Internal
         if (3 === \count($args)) {
             return JitStrtr::translate(
                 $context,
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strtr', 0, 'string'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strtr', 0, 'string'),
                 JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strtr', 1, 'from'),
                 JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'strtr', 2, 'to'),
                 $args[0],
@@ -101,14 +101,14 @@ final class strtr extends Internal
         return new \TypeError('strtr(): Argument #2 ($from) must be of type array, string given');
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19284, ext/standard/string.c). */
+    /** Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21207, ext/standard/string.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'strtr', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'strtr',
             $argIndex,
