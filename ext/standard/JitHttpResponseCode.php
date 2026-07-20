@@ -82,8 +82,8 @@ final class JitHttpResponseCode
         }
 
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            // Z_PARAM_LONG — null TypeError on PROFILE=8.4 (#20962, ext/standard/head.c).
-            if (VmMath::requiresForwardProfileStrictLongNull()) {
+            // Soft-null DEP+coerce on 8.4 (php-src head.c Z_PARAM_LONG; #21480, reverts #20962 TypeError).
+            if ($context->callerStrictTypes) {
                 TypeErrorRaise::registerDeclarations($context);
                 TypeErrorRaise::ensureLinked($context);
                 TypeErrorRaise::emitRaise(
@@ -91,6 +91,8 @@ final class JitHttpResponseCode
                     'http_response_code(): Argument #1 ($response_code) must be of type int, null given'
                 );
                 $context->builder->call($context->lookupFunction('abort'));
+            } else {
+                JitIntdiv::emitNullIntDeprecation($context, 'http_response_code', 0, 'response_code');
             }
             $context->builder->call(
                 $context->lookupFunction('__phpc_http_response_code_apply'),

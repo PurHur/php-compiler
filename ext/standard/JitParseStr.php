@@ -33,7 +33,8 @@ final class JitParseStr
             return;
         }
 
-        $encodedStr = JitStringBuiltinArg::lowerZparamStr($context, $encoded, 'parse_str', 0, 'string');
+        // Soft-null DEP+coerce on 8.4 (#21480, reverts #21380 TypeError).
+        $encodedStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $encoded, 'parse_str', 0, 'string');
         $parsedHt = HashTableHelper::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_parse_str'),
@@ -66,7 +67,8 @@ final class JitParseStr
             return;
         }
 
-        $encodedStr = JitStringBuiltinArg::lowerZparamStr($context, $encoded, 'parse_str', 0, 'string');
+        // Soft-null DEP+coerce on 8.4 (#21480, reverts #21380 TypeError).
+        $encodedStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $encoded, 'parse_str', 0, 'string');
         $parsedHt = HashTableHelper::alloc($context);
         self::emitRuntimeParse($context, $parsedHt, $encodedStr, $separator, $delimiter);
         $valPtr = JitValueBox::valuePtrFromVariable($context, $result);
@@ -118,7 +120,7 @@ final class JitParseStr
             $encodedStr,
             $helperFn->getParam(1)->typeOf()
         );
-        $delimiterArg = JitStringBuiltinArg::lowerZparamStr($context, $separator, 'parse_str', 2, 'separator');
+        $delimiterArg = JitStringBuiltinArg::lowerTrimFamilyString($context, $separator, 'parse_str', 2, 'separator');
         $delimiterArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
             $delimiterArg,

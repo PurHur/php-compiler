@@ -1,9 +1,12 @@
 --TEST--
-stdlib trigger_error()/user_error(null) TypeError on 8.4 (#21035, Zend/zend_builtin_functions.stub.php)
+stdlib trigger_error()/user_error(null) soft-null on 8.4 (#21480, reverts #21035)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+set_error_handler(static function (): bool {
+    return true;
+});
 foreach (['trigger_error', 'user_error'] as $f) {
     try {
         $r = $f(null);
@@ -15,5 +18,5 @@ foreach (['trigger_error', 'user_error'] as $f) {
     }
 }
 --EXPECT--
-trigger_error TypeError
-user_error TypeError
+trigger_error COERCED true
+user_error COERCED true

@@ -49,7 +49,8 @@ final class parse_str extends Internal
                 $argc
             ));
         }
-        $encodedStr = VmString::zparamStrBuiltinArgForFrame(
+        // Soft-null DEP+coerce on 8.4 (php-src string.c Z_PARAM_STR; #21480, reverts #21380 TypeError).
+        $encodedStr = VmString::trimFamilyStringArgForFrame(
             $frame,
             0,
             'parse_str',
@@ -72,7 +73,8 @@ final class parse_str extends Internal
 
         $delimiter = '&';
         if ($supportsSeparator && 3 === $argc) {
-            $delimiter = VmString::zparamStrBuiltinArgForFrame(
+            // Soft-null DEP+coerce on 8.4 (#21480).
+            $delimiter = VmString::trimFamilyStringArgForFrame(
                 $frame,
                 2,
                 'parse_str',
