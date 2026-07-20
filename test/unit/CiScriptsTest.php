@@ -815,6 +815,25 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--example 009', $common);
     }
 
+    public function testCiLocalHonorsDeploySmokeAllGate(): void
+    {
+        $local = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-local.sh');
+        $this->assertStringContainsString('ci_run_deploy_smoke_all', $local);
+
+        $common = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
+        $this->assertStringContainsString('DEPLOY_SMOKE_ALL_GATE', $common);
+        $this->assertStringContainsString('DEPLOY_SMOKE_ALL_GATE:-0', $common);
+        $this->assertStringContainsString('deploy-smoke-all.sh', $common);
+
+        $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');
+        $this->assertStringContainsString('DEPLOY_SMOKE_ALL_GATE="${DEPLOY_SMOKE_ALL_GATE:-0}"', $defaults);
+
+        $doc = (string) file_get_contents(dirname(__DIR__, 2).'/docs/local-ci-matrix.md');
+        $this->assertStringContainsString('DEPLOY_SMOKE_ALL_GATE', $doc);
+        $this->assertMatchesRegularExpression('/\| `DEPLOY_SMOKE_ALL_GATE` \| `0` \|/', $doc);
+        $this->assertStringContainsString('#2085', $doc);
+    }
+
     public function testCiDefaultsEnvDefinesSessionsWebDeploySmokeGateOff(): void
     {
         $defaults = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-defaults.env');

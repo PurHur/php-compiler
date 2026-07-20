@@ -1492,6 +1492,19 @@ ci_run_deploy_smoke() {
   fi
 }
 
+# Full deploy ladder via deploy-smoke-all.sh (issue #2077, opt-in #2085).
+ci_run_deploy_smoke_all() {
+  if [[ "${DEPLOY_SMOKE_ALL_GATE:-0}" != "1" ]]; then
+    return 0
+  fi
+  if ! ci_llvm_ready; then
+    echo "deploy-smoke-all: skipped (LLVM 9 not available)"
+    return 0
+  fi
+  echo "deploy-smoke-all: full PHPC_DEPLOY_ROOT ladder (DEPLOY_SMOKE_ALL_GATE=1, #2085; sub-gates 0 log skip)..."
+  "$_CI_SCRIPT_DIR/deploy-smoke-all.sh"
+}
+
 # @group aot-link PHPUnit (link-only; execute is ci_run_miniwebapp_aot_execute — #775).
 # 005 link: ExamplesCompileTest::test005SessionsWebAotLink when SESSIONS_WEB_AOT_LINK_GATE=1 (#1946).
 ci_run_aot_link_phpunit() {

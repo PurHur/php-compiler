@@ -476,6 +476,12 @@ final class Doctor
             ? 'ci-fast + ci-local check-miniwebapp-vm-oop.sh (#2189, #2059, #2293)'
             : 'opt-out — MINIWEBAPP_VM_OOP_GATE=0 skips VM serve OOP curls (#2293)';
         fwrite(STDOUT, '  003 VM OOP e2e  MINIWEBAPP_VM_OOP_GATE='.($vmOopOn ? '1' : '0')." (default {$vmOopDefault}) — {$vmOopDetail}\n");
+        $deployAllDefault = $defaultsWeb['DEPLOY_SMOKE_ALL_GATE'] ?? '0';
+        $deployAllOn = self::gateEnabled('DEPLOY_SMOKE_ALL_GATE', $deployAllDefault);
+        $deployAllDetail = $deployAllOn
+            ? 'ci-local runs script/deploy-smoke-all.sh (#2085)'
+            : 'opt-in — DEPLOY_SMOKE_ALL_GATE=1 ./script/ci-local.sh or make deploy-smoke-all (#2085, #2077)';
+        fwrite(STDOUT, '  Deploy ladder    DEPLOY_SMOKE_ALL_GATE='.($deployAllOn ? '1' : '0')." (default {$deployAllDefault}) — {$deployAllDetail}\n");
         fwrite(STDOUT, "  Full AOT tail    ./script/ci-local.sh --filter MiniWebAppAotExecuteTest   LLVM required\n");
         fwrite(STDOUT, "  Presenter bundle make north-star1-verify            --require-llvm / --skip-llvm-tail\n");
         fwrite(STDOUT, "  Script           ./script/north-star1-verify.sh    same as make target\n");
