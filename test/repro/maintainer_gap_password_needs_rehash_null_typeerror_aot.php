@@ -1,3 +1,4 @@
 <?php
-// #18655 AOT smoke — uncaught TypeError (exit 255), php-src Z_PARAM_STR
-password_needs_rehash(null, PASSWORD_DEFAULT);
+// #21314 AOT smoke — password_needs_rehash(null) soft-null (must not TypeError-abort)
+$r = password_needs_rehash(null, PASSWORD_DEFAULT);
+echo is_bool($r) ? "bool\n" : "bad\n";
