@@ -32,21 +32,11 @@ final class mb_strrchr extends Internal
                 $argc
             ));
         }
-        $haystack = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_strrchr',
-            0,
-            'haystack'
-        );
+        $haystack = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_strrchr', 0, 'haystack');
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[1],
-            'mb_strrchr',
-            1,
-            'needle'
-        );
+        $needle = VmString::trimFamilyStringArgForFrame($frame, 1, 'mb_strrchr', 1, 'needle');
         $part = $argc >= 3
             ? VmMbstring::coercePartArg($frame->calledArgs[2], 'mb_strrchr', 2)
             : false;
