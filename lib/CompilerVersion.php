@@ -646,6 +646,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ deprecates implicit nullable typed params (`int $x = null`) at compile time.
+     *
+     * php-src: Zend/zend_compile.c (zend_compile_params), RFC deprecate-implicitly-nullable-types.
+     */
+    public static function supportsImplicitNullableParameterDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ TENTATIVE_RETURN Core constant (Zend/zend_attributes.h, issue #18060).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2). Enable via stable 8.4.0+ or
