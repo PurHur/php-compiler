@@ -1,5 +1,5 @@
 --TEST--
-stdlib trim()/ltrim()/rtrim()/chop() null — coerce on 8.4 forward profile JIT (#19983, ext/standard/string.c)
+stdlib trim()/ltrim()/rtrim()/chop() null — TypeError on 8.4 forward profile JIT (#21350, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -16,8 +16,8 @@ foreach (['trim', 'ltrim', 'rtrim', 'chop'] as $fn) {
 echo var_export(trim(''), true), "\n";
 ?>
 --EXPECT--
-trim: uncaught
-ltrim: uncaught
-rtrim: uncaught
-chop: uncaught
+trim(): Argument #1 ($string) must be of type string, null given
+ltrim(): Argument #1 ($string) must be of type string, null given
+rtrim(): Argument #1 ($string) must be of type string, null given
+chop(): Argument #1 ($string) must be of type string, null given
 ''

@@ -18,7 +18,6 @@ use PHPCompiler\JIT\Builtin\StringTrimModeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -133,15 +132,12 @@ final class string_ltrim extends Internal
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen, 'ltrim');
     }
 
-    /** php_trim — null coerces with deprecation on forward profile (#19983, ext/standard/string.c). */
+    /** php_trim — Z_PARAM_STR null TypeError on 8.4 forward profile (#21350, ext/standard/string.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'ltrim', $paramName)->toString();
-        }
-
-        return VmString::coerceTrimFamilyStringArg(
-            $frame->calledArgs[$argIndex],
+        return VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            $argIndex,
             'ltrim',
             $argIndex,
             $paramName
@@ -154,17 +150,7 @@ final class string_ltrim extends Internal
         int $argIndex,
         string $paramName
     ): Value {
-        if ($context->callerStrictTypes) {
-            return JitStringBuiltinArg::lowerStrictOrCoercible(
-                $context,
-                $arg,
-                'ltrim',
-                $argIndex,
-                $paramName
-            );
-        }
-
-        return JitStringBuiltinArg::lowerTrimFamilyString(
+        return JitStringBuiltinArg::lowerZparamStr(
             $context,
             $arg,
             'ltrim',

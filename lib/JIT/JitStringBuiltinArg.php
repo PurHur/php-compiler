@@ -107,7 +107,7 @@ final class JitStringBuiltinArg
     /**
      * Soft-null string args — coerce+deprecate on forward profile (not Z_PARAM_STR TypeError).
      *
-     * trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
+     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
      * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data)/hash_hmac($data) (#21181, #21209),
      * HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/nl2br/quotemeta
      * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
