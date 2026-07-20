@@ -156,12 +156,14 @@ final class SensitiveParamSupport
         return $out;
     }
 
-    /** Format one trace argument for getTraceAsString()-style output. */
+    /**
+     * Format one trace argument for Throwable::getTraceAsString() (Zend zend_exceptions.c).
+     *
+     * SensitiveParameterValue markers format as Object(SensitiveParameterValue) — same as any
+     * object — not the debug_print_backtrace flat label {@see TRACE_ARG_LABEL} (#21524).
+     */
     public static function formatTraceArg(Variable $arg): string
     {
-        if (self::isMarker($arg)) {
-            return self::TRACE_ARG_LABEL;
-        }
         $arg = $arg->resolveIndirect();
         switch ($arg->type) {
             case Variable::TYPE_STRING:
