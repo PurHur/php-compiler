@@ -195,6 +195,68 @@ final class CurlConstants
     public const CURL_LOCK_DATA_PSL = 6;
     public const CURL_LOCK_DATA_SSL_SESSION = 4;
 
+    /** CURL_VERSION_* feature-bit constants (curl.h; php-src curl.stub.php; #21337). */
+    public const CURL_VERSION_IPV6 = 1;
+    public const CURL_VERSION_KERBEROS4 = 2;
+    public const CURL_VERSION_SSL = 4;
+    public const CURL_VERSION_LIBZ = 8;
+    public const CURL_VERSION_NTLM = 16;
+    public const CURL_VERSION_GSSNEGOTIATE = 32;
+    public const CURL_VERSION_ASYNCHDNS = 128;
+    public const CURL_VERSION_SPNEGO = 256;
+    public const CURL_VERSION_LARGEFILE = 512;
+    public const CURL_VERSION_IDN = 1024;
+    public const CURL_VERSION_SSPI = 2048;
+    public const CURL_VERSION_CONV = 4096;
+    public const CURL_VERSION_TLSAUTH_SRP = 16384;
+    public const CURL_VERSION_NTLM_WB = 32768;
+    public const CURL_VERSION_HTTP2 = 65536;
+    public const CURL_VERSION_GSSAPI = 131072;
+    public const CURL_VERSION_KERBEROS5 = 262144;
+    public const CURL_VERSION_UNIX_SOCKETS = 524288;
+    public const CURL_VERSION_PSL = 1048576;
+    public const CURL_VERSION_HTTPS_PROXY = 2097152;
+    public const CURL_VERSION_MULTI_SSL = 4194304;
+    public const CURL_VERSION_BROTLI = 8388608;
+    public const CURL_VERSION_ALTSVC = 16777216;
+    public const CURL_VERSION_HTTP3 = 33554432;
+    public const CURL_VERSION_ZSTD = 67108864;
+    public const CURL_VERSION_UNICODE = 134217728;
+    public const CURL_VERSION_HSTS = 268435456;
+    public const CURL_VERSION_GSASL = 536870912;
+
+    /** @var array<string, int> CURL_VERSION_* name → bit for feature_list + constant registration. */
+    public const VERSION_FEATURE_BITS = [
+        'CURL_VERSION_IPV6' => self::CURL_VERSION_IPV6,
+        'CURL_VERSION_KERBEROS4' => self::CURL_VERSION_KERBEROS4,
+        'CURL_VERSION_SSL' => self::CURL_VERSION_SSL,
+        'CURL_VERSION_LIBZ' => self::CURL_VERSION_LIBZ,
+        'CURL_VERSION_NTLM' => self::CURL_VERSION_NTLM,
+        'CURL_VERSION_GSSNEGOTIATE' => self::CURL_VERSION_GSSNEGOTIATE,
+        'CURL_VERSION_ASYNCHDNS' => self::CURL_VERSION_ASYNCHDNS,
+        'CURL_VERSION_SPNEGO' => self::CURL_VERSION_SPNEGO,
+        'CURL_VERSION_LARGEFILE' => self::CURL_VERSION_LARGEFILE,
+        'CURL_VERSION_IDN' => self::CURL_VERSION_IDN,
+        'CURL_VERSION_SSPI' => self::CURL_VERSION_SSPI,
+        'CURL_VERSION_CONV' => self::CURL_VERSION_CONV,
+        'CURL_VERSION_TLSAUTH_SRP' => self::CURL_VERSION_TLSAUTH_SRP,
+        'CURL_VERSION_NTLM_WB' => self::CURL_VERSION_NTLM_WB,
+        'CURL_VERSION_HTTP2' => self::CURL_VERSION_HTTP2,
+        'CURL_VERSION_GSSAPI' => self::CURL_VERSION_GSSAPI,
+        'CURL_VERSION_KERBEROS5' => self::CURL_VERSION_KERBEROS5,
+        'CURL_VERSION_UNIX_SOCKETS' => self::CURL_VERSION_UNIX_SOCKETS,
+        'CURL_VERSION_PSL' => self::CURL_VERSION_PSL,
+        'CURL_VERSION_HTTPS_PROXY' => self::CURL_VERSION_HTTPS_PROXY,
+        'CURL_VERSION_MULTI_SSL' => self::CURL_VERSION_MULTI_SSL,
+        'CURL_VERSION_BROTLI' => self::CURL_VERSION_BROTLI,
+        'CURL_VERSION_ALTSVC' => self::CURL_VERSION_ALTSVC,
+        'CURL_VERSION_HTTP3' => self::CURL_VERSION_HTTP3,
+        'CURL_VERSION_ZSTD' => self::CURL_VERSION_ZSTD,
+        'CURL_VERSION_UNICODE' => self::CURL_VERSION_UNICODE,
+        'CURL_VERSION_HSTS' => self::CURL_VERSION_HSTS,
+        'CURL_VERSION_GSASL' => self::CURL_VERSION_GSASL,
+    ];
+
     /** @var array<int, true> */
     private const EASY_OPTIONS = [
         self::CURLOPT_URL => true,
@@ -368,6 +430,9 @@ final class CurlConstants
             'CURL_LOCK_DATA_CONNECT' => self::CURL_LOCK_DATA_CONNECT,
             'CURL_LOCK_DATA_PSL' => self::CURL_LOCK_DATA_PSL,
         ];
+        foreach (self::VERSION_FEATURE_BITS as $name => $value) {
+            $constants[$name] = $value;
+        }
         if (CurlExtensionPolicy::advertisesExtension()) {
             foreach (self::httpClientConstants() as $name => $value) {
                 $constants[$name] = $value;
