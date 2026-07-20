@@ -1,5 +1,11 @@
 --TEST--
 Language: builtin Override attribute class exists and is internal (#5937)
+--SKIPIF--
+<?php
+if (PHP_VERSION_ID < 80300) {
+    echo "skip — host PHP < 8.3 (Override class unavailable)\n";
+}
+?>
 --FILE--
 <?php
 var_export(class_exists('Override', false));

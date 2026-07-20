@@ -484,10 +484,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ #[\Override] compile-time validation (Zend/zend_compile.c, #6303, #11559, #12201, #15801).
+     * PHP 8.3+ #[\Override] compile-time validation (Zend/zend_compile.c, #6303, #11559, #12201, #15801, #21388).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — Override is a normal attribute).
-     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Enabled by default when compiler MINOR_VERSION >= 3 (including 8.4.0-dev).
+     * Explicit PHP_COMPILER_PROFILE=8.2 disables validation to match Zend 8.2 behavior.
      * Distinct from advertisesOverrideAttributeClass() which may register the builtin class earlier (#12387).
      */
     public static function supportsOverrideAttribute(): bool
@@ -496,16 +496,16 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        }
+
+        if (self::MAJOR_VERSION > 8 || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 3)) {
             return true;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
     /**
@@ -535,6 +535,10 @@ final class CompilerVersion
      */
     public static function advertisesOverrideAttributeClass(): bool
     {
+        if (self::supportsOverrideAttribute()) {
+            return true;
+        }
+
         return self::advertisesForwardProfile84BuiltinAttributeClass();
     }
 
