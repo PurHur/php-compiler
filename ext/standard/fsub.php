@@ -30,17 +30,19 @@ final class fsub extends Internal
                 \sprintf('%s() expects exactly 2 arguments, %d given', self::FUNCTION, $argc)
             );
         }
-        $num1 = VmMath::parseDoubleBuiltinArg(
+        $num1 = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             self::FUNCTION,
             1,
-            'num1'
+            'num1',
+            $frame
         );
-        $num2 = VmMath::parseDoubleBuiltinArg(
+        $num2 = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             self::FUNCTION,
             2,
-            'num2'
+            'num2',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
@@ -61,7 +63,9 @@ final class fsub extends Internal
             $args[1],
             self::FUNCTION,
             'num1',
-            'num2'
+            'num2',
+            'float',
+            true
         );
 
         return $context->builder->fsub($left, $right);

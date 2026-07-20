@@ -32,7 +32,8 @@ final class sin extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'sin',
             1,
-            'num'
+            'num',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
