@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6131 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19065 |
+| Source constructs flagged (warnings) | 19067 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1443,11 +1443,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/pg_untrace.php` | 0 | 2 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
 | `ext/phar/Module.php` | 0 | 1 |
-| `ext/phar/PharBuiltin.php` | 0 | 17 |
+| `ext/phar/PharBuiltin.php` | 0 | 18 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 15 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 1 |
-| `ext/phar/VmPharArchive.php` | 0 | 20 |
+| `ext/phar/VmPharArchive.php` | 0 | 21 |
 | `ext/phar/VmPharData.php` | 0 | 29 |
 | `ext/phar/VmPharFileInfo.php` | 0 | 6 |
 | `ext/phar/VmPharTar.php` | 0 | 1 |
@@ -17378,22 +17378,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new PharConstruct (line 36)
-- new ArgumentCountError (line 79)
-- new ArgumentCountError (line 95)
-- new ArgumentCountError (line 113)
-- new ArgumentCountError (line 129)
-- new ArgumentCountError (line 149)
-- new ArgumentCountError (line 170)
-- new UnexpectedValueException (line 188)
-- new ArgumentCountError (line 204)
-- new ArgumentCountError (line 223)
-- new ArgumentCountError (line 254)
-- new ArgumentCountError (line 309)
-- new ArgumentCountError (line 335)
-- new ArgumentCountError (line 351)
-- new ArgumentCountError (line 371)
-- new ArgumentCountError (line 388)
-- 21 class method(s)
+- new ArgumentCountError (line 82)
+- new ArgumentCountError (line 98)
+- new ArgumentCountError (line 116)
+- new ArgumentCountError (line 132)
+- new ArgumentCountError (line 152)
+- new ArgumentCountError (line 173)
+- new UnexpectedValueException (line 191)
+- new ArgumentCountError (line 207)
+- new ArgumentCountError (line 226)
+- new ArgumentCountError (line 257)
+- new ArgumentCountError (line 341)
+- new ArgumentCountError (line 360)
+- new ArgumentCountError (line 386)
+- new ArgumentCountError (line 402)
+- new ArgumentCountError (line 422)
+- new ArgumentCountError (line 439)
+- 24 class method(s)
 
 ### `ext/phar/PharDataBuiltin.php`
 
@@ -17438,15 +17439,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RecursiveIteratorIterator (line 141)
 - new RecursiveDirectoryIterator (line 142)
 - new UnexpectedValueException (line 225)
-- new BadMethodCallException (line 282)
-- new BadMethodCallException (line 306)
-- new BadMethodCallException (line 309)
-- new Variable (line 311)
-- new Error (line 357)
-- new UnexpectedValueException (line 391)
-- new UnexpectedValueException (line 406)
-- new Error (line 437)
-- 29 class method(s)
+- new BadMethodCallException (line 298)
+- new BadMethodCallException (line 316)
+- new BadMethodCallException (line 340)
+- new BadMethodCallException (line 343)
+- new Variable (line 345)
+- new Error (line 391)
+- new UnexpectedValueException (line 425)
+- new UnexpectedValueException (line 440)
+- new Error (line 471)
+- 32 class method(s)
 
 ### `ext/phar/VmPharData.php`
 
@@ -29498,8 +29500,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1740)
-- new Error (line 1751)
+- new Error (line 1742)
+- new Error (line 1753)
 - 217 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -43776,7 +43778,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 457)
+- new Variable (line 458)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`

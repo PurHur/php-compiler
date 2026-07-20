@@ -51,6 +51,9 @@ final class PharBuiltin
             'getalias' => [PharGetAlias::class, 'getAlias'],
             'startbuffering' => [PharStartBuffering::class, 'startBuffering'],
             'stopbuffering' => [PharStopBuffering::class, 'stopBuffering'],
+            'isbuffering' => [PharIsBuffering::class, 'isBuffering'],
+            'count' => [PharCount::class, 'count'],
+            'delete' => [PharDelete::class, 'delete'],
             'compressfiles' => [PharCompressFiles::class, 'compressFiles'],
             'getpath' => [PharGetPath::class, 'getPath'],
             'offsetset' => [PharOffsetSet::class, 'offsetSet'],
@@ -296,6 +299,54 @@ final class PharStopBuffering extends VmClassMethod
     public function execute(Frame $frame): void
     {
         VmPharArchive::stopBuffering(VmPharArchive::requireReceiver($frame, 'Phar::stopBuffering'));
+    }
+}
+
+/** Phar::isBuffering() — php-src zim_Phar_isBuffering (#21228). */
+final class PharIsBuffering extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isBuffering'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPharArchive::isBuffering(
+                VmPharArchive::requireReceiver($frame, 'Phar::isBuffering')
+            ));
+        }
+    }
+}
+
+/** Phar::count() — php-src zim_Phar_count / Countable (#21228). */
+final class PharCount extends VmClassMethod
+{
+    public function __construct() { parent::__construct('count'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmPharArchive::count(
+                VmPharArchive::requireReceiver($frame, 'Phar::count')
+            ));
+        }
+    }
+}
+
+/** Phar::delete() — php-src zim_Phar_delete (#21228). */
+final class PharDelete extends VmClassMethod
+{
+    public function __construct() { parent::__construct('delete'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf('Phar::delete() expects exactly 1 argument, %d given', \max(0, $argc - 1)));
+        }
+        $ok = VmPharArchive::delete(
+            VmPharArchive::requireReceiver($frame, 'Phar::delete'),
+            VmPharArchive::coercePathArg($frame->calledArgs[1], 'Phar::delete', 0, 'localname')
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 }
 
