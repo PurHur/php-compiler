@@ -9461,6 +9461,65 @@ class Compiler {
     }
 
     /**
+     * Zend 8.4 compile-time deprecation for implicit nullable typed parameters (#21390).
+     */
+    protected function maybeEmitImplicitNullableParamDeprecation(
+        Op\Expr\Param $param,
+        ?int $defaultSlot,
+        Block $block
+    ): void {
+        if (!CompilerVersion::supportsImplicitNullableParameterDeprecation()) {
+            return;
+        }
+        if (!$this->paramIsImplicitNullable($param, $defaultSlot, $block)) {
+            return;
+        }
+        $vm = VM::running();
+        if (!$vm instanceof VM) {
+            return;
+        }
+
+        $paramName = $this->displayParamName($param);
+        $line = max(0, $param->getLine());
+        $file = $block->scriptPath();
+        if ('' === $file) {
+            $file = null;
+        }
+        $frame = $vm->builtinHandlerFrame();
+        if (null === $frame) {
+            $frames = $vm->context->runStackFrames();
+            $frame = [] !== $frames ? $frames[0] : null;
+        }
+        if (null === $frame) {
+            $frame = new Frame(null, $block, null);
+            $frame->vmContext = $vm->context;
+            if (null !== $file) {
+                $frame->scriptPath = $file;
+            }
+        }
+
+        $vm->context->errors->internalDeprecated(
+            sprintf(
+                'Implicitly marking parameter %s as nullable is deprecated, the explicit nullable type must be used instead',
+                $paramName
+            ),
+            $vm->context,
+            $frame,
+            $file,
+            $line
+        );
+    }
+
+    private function displayParamName(Op\Expr\Param $param): string
+    {
+        if ($param->name instanceof Operand\Literal && is_string($param->name->value) && '' !== $param->name->value) {
+            return '$'.$param->name->value;
+        }
+
+        return '$?';
+    }
+
+    /**
      * Zend zend_compile.c: property/param defaults must match declared type (#5347, #6558).
      */
     protected function assertParamDefaultMatchesDeclaredType(Op\Expr\Param $param, ?int $defaultSlot, Block $block): void
@@ -9657,6 +9716,7 @@ class Compiler {
         if ($this->paramIsImplicitNullable($param, $defaultConst, $block)) {
             $block->paramImplicitNullable[$slot] = true;
         }
+        $this->maybeEmitImplicitNullableParamDeprecation($param, $defaultConst, $block);
 
         return new OpCode(
             OpCode::TYPE_ARG_RECV,
