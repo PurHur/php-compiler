@@ -22,10 +22,12 @@ final class VmCurlCore
         return true;
     }
 
-    /** @return array<string, int|string> */
+    /** @return array<string, int|string|array<string, bool>> */
     public static function versionInfo(?int $age = null): array
     {
         unset($age);
+
+        $features = 125965879;
 
         return [
             'version_number' => 526080,
@@ -34,8 +36,25 @@ final class VmCurlCore
             'ssl_version' => 'OpenSSL/3.0.13',
             'libz_version' => '1.3',
             'host' => 'x86_64-pc-linux-gnu',
-            'features' => 125965879,
+            'features' => $features,
+            'feature_list' => self::featureList($features),
         ];
+    }
+
+    /**
+     * Derive feature_list bool map from bitmask (php-src ext/curl/interface.c PHP_FUNCTION(curl_version)).
+     *
+     * @return array<string, bool>
+     */
+    public static function featureList(int $features): array
+    {
+        $list = [];
+        foreach (CurlConstants::VERSION_FEATURE_BITS as $name => $bit) {
+            $shortName = \strtolower(\substr($name, \strlen('CURL_VERSION_')));
+            $list[$shortName] = ($features & $bit) !== 0;
+        }
+
+        return $list;
     }
 
     public static function versionArray(?int $age = null): HashTable
@@ -43,7 +62,21 @@ final class VmCurlCore
         $ht = new HashTable();
         foreach (self::versionInfo($age) as $key => $value) {
             $slot = new Variable();
-            if (\is_int($value)) {
+            if (\is_array($value)) {
+                $inner = new HashTable();
+                foreach ($value as $k => $v) {
+                    $s = new Variable();
+                    if (\is_bool($v)) {
+                        $s->bool($v);
+                    } elseif (\is_int($v)) {
+                        $s->int($v);
+                    } else {
+                        $s->string((string) $v);
+                    }
+                    $inner->add($k, $s);
+                }
+                $slot->array($inner);
+            } elseif (\is_int($value)) {
                 $slot->int($value);
             } else {
                 $slot->string($value);
