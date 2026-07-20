@@ -45,6 +45,7 @@ final class VmPDO
     {
         if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['exec'])) {
             self::registerDriverSubclasses($ctx);
+            self::registerSqliteExtensionMethods($ctx->classes[self::CLASS_LC]);
             self::registerPgsqlExtensionMethods($ctx->classes[self::CLASS_LC]);
 
             return;
@@ -88,8 +89,6 @@ final class VmPDO
             'intransaction' => new PDOInTransaction(),
             'errorcode' => new PDOErrorCode(),
             'errorinfo' => new PDOErrorInfo(),
-            'sqlitecreatefunction' => new PDOSqliteCreateFunction(),
-            'sqlitecreateaggregate' => new PDOSqliteCreateAggregate(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -104,14 +103,45 @@ final class VmPDO
         $entry->methodNames['intransaction'] = 'inTransaction';
         $entry->methodNames['errorcode'] = 'errorCode';
         $entry->methodNames['errorinfo'] = 'errorInfo';
-        $entry->methodNames['sqlitecreatefunction'] = 'sqliteCreateFunction';
-        $entry->methodNames['sqlitecreateaggregate'] = 'sqliteCreateAggregate';
         $entry->methodVisibility['getavailabledrivers'] = CfgFunc::FLAG_STATIC | $pub;
         $entry->methodVisibility['connect'] = CfgFunc::FLAG_STATIC | $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
         self::registerDriverSubclasses($ctx);
+        // Legacy PDO::sqlite* / pgsql* after subclasses so method_exists on Pdo\* matches Zend (#21552).
+        self::registerSqliteExtensionMethods($entry);
         self::registerPgsqlExtensionMethods($entry);
+    }
+
+    /**
+     * Legacy PDO::sqliteCreate* driver methods (php-src sqlite_driver.stub.php PDO_SQLite_Ext; #21552).
+     *
+     * Registered on PDO after driver subclasses so they stay parent-only (methodNotInherited),
+     * matching Zend's post-inheritance extension-method registration. Pdo\Sqlite gets its own copy.
+     */
+    public static function registerSqliteExtensionMethods(ClassEntry $entry): void
+    {
+        if (!PdoExtensionPolicy::advertisesSqliteDriver()) {
+            return;
+        }
+        if (isset($entry->methods['sqlitecreatefunction'])) {
+            $entry->methodNotInherited['sqlitecreatefunction'] = true;
+            $entry->methodNotInherited['sqlitecreateaggregate'] = true;
+
+            return;
+        }
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $methods = [
+            'sqlitecreatefunction' => [new PDOSqliteCreateFunction(), 'sqliteCreateFunction'],
+            'sqlitecreateaggregate' => [new PDOSqliteCreateAggregate(), 'sqliteCreateAggregate'],
+        ];
+        foreach ($methods as $lc => [$method, $display]) {
+            $entry->methods[$lc] = $method;
+            $entry->methodVisibility[$lc] = $pub;
+            $entry->methodNames[$lc] = $display;
+            $entry->methodDeclaringClassLc[$lc] = self::CLASS_LC;
+            $entry->methodNotInherited[$lc] = true;
+        }
     }
 
     /**
@@ -120,6 +150,7 @@ final class VmPDO
      * Registered on PDO when {@see PdoExtensionPolicy::advertisesPgsqlDriver()} so
      * method_exists(PDO::class, 'pgsqlGetPid') matches the issue repro. Live libpq
      * I/O remains #3741 — calls without a pgsql handle throw like the Pdo\Pgsql stubs.
+     * Marked methodNotInherited so Pdo\Mysql / Pdo\Sqlite do not advertise them (#21552).
      */
     public static function registerPgsqlExtensionMethods(ClassEntry $entry): void
     {
@@ -127,6 +158,20 @@ final class VmPDO
             return;
         }
         if (isset($entry->methods['pgsqlgetpid'])) {
+            foreach ([
+                'pgsqlcopyfromarray',
+                'pgsqlcopyfromfile',
+                'pgsqlcopytoarray',
+                'pgsqlcopytofile',
+                'pgsqllobcreate',
+                'pgsqllobopen',
+                'pgsqllobunlink',
+                'pgsqlgetnotify',
+                'pgsqlgetpid',
+            ] as $lc) {
+                $entry->methodNotInherited[$lc] = true;
+            }
+
             return;
         }
         $pub = CfgFunc::FLAG_PUBLIC;
@@ -145,6 +190,8 @@ final class VmPDO
             $entry->methods[$lc] = $method;
             $entry->methodVisibility[$lc] = $pub;
             $entry->methodNames[$lc] = $display;
+            $entry->methodDeclaringClassLc[$lc] = self::CLASS_LC;
+            $entry->methodNotInherited[$lc] = true;
         }
     }
 
@@ -161,6 +208,7 @@ final class VmPDO
      *
      * Inherits PDO::__construct so `new Pdo\Sqlite($dsn)` runs the same DSN factory as
      * `PDO::__construct` / `PDO::connect` (php-src pdo_dbh.c; #21096).
+     * Owns sqliteCreate* (legacy names) — not inherited from PDO_*_Ext (#21552).
      */
     public static function registerSqliteSubclass(Context $ctx): void
     {
@@ -172,6 +220,7 @@ final class VmPDO
         }
         if (isset($ctx->classes[self::SQLITE_CLASS_LC])) {
             self::inheritPdoConstructor($ctx->classes[self::SQLITE_CLASS_LC], $ctx->classes[self::CLASS_LC]);
+            self::installSqliteSubclassMethods($ctx->classes[self::SQLITE_CLASS_LC]);
 
             return;
         }
@@ -179,7 +228,37 @@ final class VmPDO
         $sqlite->isInternal = true;
         $sqlite->parentLc = self::CLASS_LC;
         self::inheritPdoConstructor($sqlite, $ctx->classes[self::CLASS_LC]);
+        self::installSqliteSubclassMethods($sqlite);
         $ctx->classes[self::SQLITE_CLASS_LC] = $sqlite;
+    }
+
+    /** Attach sqliteCreate* on Pdo\Sqlite (php-src keeps create* on subclass; we keep legacy names #19863/#21552). */
+    private static function installSqliteSubclassMethods(ClassEntry $sqlite): void
+    {
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $methods = [
+            'sqlitecreatefunction' => [new PDOSqliteCreateFunction(), 'sqliteCreateFunction'],
+            'sqlitecreateaggregate' => [new PDOSqliteCreateAggregate(), 'sqliteCreateAggregate'],
+        ];
+        foreach ($methods as $lc => [$method, $display]) {
+            $sqlite->methods[$lc] = $method;
+            $sqlite->methodVisibility[$lc] = $pub;
+            $sqlite->methodNames[$lc] = $display;
+            $sqlite->methodDeclaringClassLc[$lc] = self::SQLITE_CLASS_LC;
+            unset($sqlite->methodNotInherited[$lc]);
+        }
+        self::stripForeignDriverMethods($sqlite, [
+            'pgsqlcopyfromarray',
+            'pgsqlcopyfromfile',
+            'pgsqlcopytoarray',
+            'pgsqlcopytofile',
+            'pgsqllobcreate',
+            'pgsqllobopen',
+            'pgsqllobunlink',
+            'pgsqlgetnotify',
+            'pgsqlgetpid',
+            'getwarningcount',
+        ]);
     }
 
     /**
@@ -197,6 +276,7 @@ final class VmPDO
         }
         if (isset($ctx->classes[self::MYSQL_CLASS_LC])) {
             self::inheritPdoConstructor($ctx->classes[self::MYSQL_CLASS_LC], $ctx->classes[self::CLASS_LC]);
+            self::finalizeMysqlSubclassMethods($ctx->classes[self::MYSQL_CLASS_LC]);
 
             return;
         }
@@ -210,11 +290,30 @@ final class VmPDO
             $mysql->constants[$name] = $const;
             $mysql->constNames[$name] = PdoMysqlConstants::CLASS_CONSTANT_NAMES[$name];
         }
+        self::finalizeMysqlSubclassMethods($mysql);
+        $ctx->classes[self::MYSQL_CLASS_LC] = $mysql;
+    }
+
+    private static function finalizeMysqlSubclassMethods(ClassEntry $mysql): void
+    {
         $pub = CfgFunc::FLAG_PUBLIC;
         $mysql->methods['getwarningcount'] = new PDOMysqlGetWarningCount();
         $mysql->methodVisibility['getwarningcount'] = $pub;
         $mysql->methodNames['getwarningcount'] = 'getWarningCount';
-        $ctx->classes[self::MYSQL_CLASS_LC] = $mysql;
+        $mysql->methodDeclaringClassLc['getwarningcount'] = self::MYSQL_CLASS_LC;
+        self::stripForeignDriverMethods($mysql, [
+            'sqlitecreatefunction',
+            'sqlitecreateaggregate',
+            'pgsqlcopyfromarray',
+            'pgsqlcopyfromfile',
+            'pgsqlcopytoarray',
+            'pgsqlcopytofile',
+            'pgsqllobcreate',
+            'pgsqllobopen',
+            'pgsqllobunlink',
+            'pgsqlgetnotify',
+            'pgsqlgetpid',
+        ]);
     }
 
     /**
@@ -232,6 +331,7 @@ final class VmPDO
         }
         if (isset($ctx->classes[self::PGSQL_CLASS_LC])) {
             self::inheritPdoConstructor($ctx->classes[self::PGSQL_CLASS_LC], $ctx->classes[self::CLASS_LC]);
+            self::finalizePgsqlSubclassMethods($ctx->classes[self::PGSQL_CLASS_LC]);
 
             return;
         }
@@ -245,6 +345,12 @@ final class VmPDO
             $pgsql->constants[$name] = $const;
             $pgsql->constNames[$name] = PdoPgsqlConstants::CLASS_CONSTANT_NAMES[$name];
         }
+        self::finalizePgsqlSubclassMethods($pgsql);
+        $ctx->classes[self::PGSQL_CLASS_LC] = $pgsql;
+    }
+
+    private static function finalizePgsqlSubclassMethods(ClassEntry $pgsql): void
+    {
         $pub = CfgFunc::FLAG_PUBLIC;
         $methods = [
             'escapeidentifier' => [new PDOPgsqlEscapeIdentifier(), 'escapeIdentifier'],
@@ -263,8 +369,32 @@ final class VmPDO
             $pgsql->methods[$lc] = $method;
             $pgsql->methodVisibility[$lc] = $pub;
             $pgsql->methodNames[$lc] = $display;
+            $pgsql->methodDeclaringClassLc[$lc] = self::PGSQL_CLASS_LC;
         }
-        $ctx->classes[self::PGSQL_CLASS_LC] = $pgsql;
+        self::stripForeignDriverMethods($pgsql, [
+            'sqlitecreatefunction',
+            'sqlitecreateaggregate',
+            'getwarningcount',
+        ]);
+    }
+
+    /**
+     * Remove cross-driver methods that may have been copied before methodNotInherited existed (#21552).
+     *
+     * @param list<string> $methodLcs
+     */
+    private static function stripForeignDriverMethods(ClassEntry $child, array $methodLcs): void
+    {
+        foreach ($methodLcs as $lc) {
+            unset(
+                $child->methods[$lc],
+                $child->methodVisibility[$lc],
+                $child->methodNames[$lc],
+                $child->methodDeclaringClassLc[$lc],
+                $child->methodDeprecated[$lc],
+                $child->methodNotInherited[$lc]
+            );
+        }
     }
 
     /**
@@ -274,6 +404,7 @@ final class VmPDO
      * otherwise skip construction and AOT/JIT method tables would miss PDO::exec/query/….
      * Preserve {@see ClassEntry::$methodDeclaringClassLc} so ReflectionMethod::getDeclaringClass()
      * reports PDO (php-src zend_inheritance / reflection).
+     * Skip {@see ClassEntry::$methodNotInherited} PDO_*_Ext methods (#21552).
      */
     private static function inheritPdoConstructor(ClassEntry $child, ClassEntry $pdo): void
     {
@@ -284,6 +415,9 @@ final class VmPDO
             $vis = $pdo->methodVisibility[$name] ?? CfgFunc::FLAG_PUBLIC;
             // Private methods are not inherited (Zend zend_inheritance).
             if (($vis & CfgFunc::FLAG_PRIVATE) !== 0) {
+                continue;
+            }
+            if (isset($pdo->methodNotInherited[$name])) {
                 continue;
             }
             $child->methods[$name] = $method;

@@ -902,6 +902,14 @@ final class VmReflection
             }
             $class = $ctx->classes[$walk];
             if (isset($class->methods[$methodLc])) {
+                // Parent-only PDO_*_Ext methods are not statically callable on subclasses (#21552).
+                if ($walk !== $lcClass && isset($class->methodNotInherited[$methodLc])) {
+                    if (null === $class->parentLc) {
+                        break;
+                    }
+                    $walk = $class->parentLc;
+                    continue;
+                }
                 $vis = $class->methodVisibility[$methodLc] ?? CfgFunc::FLAG_PUBLIC;
                 if (($vis & CfgFunc::FLAG_STATIC) !== 0) {
                     return self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc);
@@ -2787,6 +2795,10 @@ final class VmReflection
                 }
                 // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
                 if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
+                    continue;
+                }
+                // PDO_*_Ext / similar parent-only methods are not visible on subclasses (#21552).
+                if ($class !== $entry && isset($class->methodNotInherited[$methodLc])) {
                     continue;
                 }
                 $byLc[$methodLc] = [
