@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6166 |
-| Phase A inventory files (M2 ratio SSOT) | 6166 |
+| PHP files on vm.php path | 6164 |
+| Phase A inventory files (M2 ratio SSOT) | 6164 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19294 |
+| Source constructs flagged (warnings) | 19292 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -125,7 +125,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ctype/CtypeFunction.php` | 0 | 1 |
 | `ext/ctype/CtypeJitHelper.php` | 0 | 1 |
 | `ext/ctype/JitCtype.php` | 0 | 1 |
-| `ext/ctype/Module.php` | 0 | 13 |
+| `ext/ctype/Module.php` | 0 | 12 |
 | `ext/ctype/VmCtype.php` | 0 | 1 |
 | `ext/curl/BuiltinClasses.php` | 0 | 1 |
 | `ext/curl/CurlConstants.php` | 0 | 1 |
@@ -446,7 +446,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
 | `ext/dom/TokenListValues.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 410 |
+| `ext/dom/VmDom.php` | 0 | 411 |
 | `ext/dom/VmDomCollectionDimension.php` | 0 | 1 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 44 |
@@ -1840,7 +1840,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/FilterIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/GlobIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 7 |
-| `ext/spl/InternalIteratorBuiltin.php` | 0 | 9 |
 | `ext/spl/IteratorIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 10 |
@@ -1873,7 +1872,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 11 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
-| `ext/spl/VmSplIterators.php` | 0 | 3 |
+| `ext/spl/VmSplIterators.php` | 0 | 10 |
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
 | `ext/spl/VmSplRegistry.php` | 0 | 4 |
 | `ext/spl/spl_classes.php` | 0 | 2 |
@@ -6736,24 +6735,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ctype/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new ctype_blank (line 19)
-- new ctype_alnum (line 20)
-- new ctype_alpha (line 21)
-- new ctype_cntrl (line 22)
-- new ctype_digit (line 23)
-- new ctype_graph (line 24)
-- new ctype_lower (line 25)
-- new ctype_print (line 26)
-- new ctype_punct (line 27)
-- new ctype_space (line 28)
-- new ctype_upper (line 29)
-- new ctype_xdigit (line 30)
+- new ctype_alnum (line 19)
+- new ctype_alpha (line 20)
+- new ctype_cntrl (line 21)
+- new ctype_digit (line 22)
+- new ctype_graph (line 23)
+- new ctype_lower (line 24)
+- new ctype_print (line 25)
+- new ctype_punct (line 26)
+- new ctype_space (line 27)
+- new ctype_upper (line 28)
+- new ctype_xdigit (line 29)
 - 1 class method(s)
 
 ### `ext/ctype/VmCtype.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 18 class method(s)
 
 ### `ext/curl/BuiltinClasses.php`
 
@@ -9153,47 +9151,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DomNodeState (line 7878)
 - new Variable (line 7885)
 - new DOMException (line 7968)
-- new HashTable (line 8244)
-- new Variable (line 8257)
-- new ObjectEntry (line 8299)
-- new DomNodeState (line 8303)
-- new Variable (line 8312)
-- new ObjectEntry (line 8362)
-- new DomNodeState (line 8365)
-- new Variable (line 8373)
-- new Variable (line 8577)
-- new DOMException (line 8714)
-- new DOMException (line 8721)
-- new DOMException (line 8728)
-- new DOMException (line 8732)
-- new DOMException (line 8735)
-- new DOMException (line 8744)
-- new DOMException (line 8756)
-- new Variable (line 8866)
-- new DOMException (line 9958)
-- new Variable (line 10017)
-- new Variable (line 10038)
-- new Variable (line 10066)
-- new Variable (line 10104)
-- new DOMException (line 10115)
-- new Variable (line 10117)
-- new DOMException (line 10291)
-- new DOMException (line 10318)
-- new DOMException (line 10354)
-- new DOMException (line 10450)
+- new HashTable (line 8245)
+- new Variable (line 8258)
+- new ObjectEntry (line 8275)
+- new ObjectEntry (line 8307)
+- new DomNodeState (line 8311)
+- new Variable (line 8320)
+- new ObjectEntry (line 8370)
+- new DomNodeState (line 8373)
+- new Variable (line 8381)
+- new Variable (line 8585)
+- new DOMException (line 8722)
+- new DOMException (line 8729)
+- new DOMException (line 8736)
+- new DOMException (line 8740)
+- new DOMException (line 8743)
+- new DOMException (line 8752)
+- new DOMException (line 8764)
+- new Variable (line 8874)
+- new DOMException (line 9966)
+- new Variable (line 10025)
+- new Variable (line 10046)
+- new Variable (line 10074)
+- new Variable (line 10112)
+- new DOMException (line 10123)
+- new Variable (line 10125)
+- new DOMException (line 10299)
+- new DOMException (line 10326)
+- new DOMException (line 10362)
 - new DOMException (line 10458)
-- new DOMException (line 10471)
-- new DOMException (line 10482)
-- new DOMException (line 10487)
-- new DOMException (line 10513)
-- new DOMException (line 10534)
-- new DOMException (line 10592)
-- new DOMException (line 10597)
+- new DOMException (line 10466)
+- new DOMException (line 10479)
+- new DOMException (line 10490)
+- new DOMException (line 10495)
+- new DOMException (line 10521)
+- new DOMException (line 10542)
 - new DOMException (line 10600)
-- new DOMException (line 10603)
-- new DOMException (line 10632)
-- new Error (line 11674)
-- new Error (line 11678)
+- new DOMException (line 10605)
+- new DOMException (line 10608)
+- new DOMException (line 10611)
+- new DOMException (line 10640)
+- new Error (line 11682)
+- new Error (line 11686)
 - 458 class method(s)
 - 3 closure(s)
 
@@ -20904,19 +20903,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 165)
 - 18 class method(s)
 
-### `ext/spl/InternalIteratorBuiltin.php`
-
-**Warnings** (review for bootstrap subset):
-- new ClassEntry (line 32)
-- new InternalIteratorConstruct (line 39)
-- new InternalIteratorCurrent (line 46)
-- new InternalIteratorKey (line 47)
-- new InternalIteratorNext (line 48)
-- new InternalIteratorValid (line 49)
-- new InternalIteratorRewind (line 50)
-- new ObjectEntry (line 68)
-- 14 class method(s)
-
 ### `ext/spl/IteratorIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21414,9 +21400,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/VmSplIterators.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 41)
-- new ClassEntry (line 55)
-- 4 class method(s)
+- new ClassEntry (line 47)
+- new InternalIteratorConstruct (line 54)
+- new InternalIteratorCurrent (line 61)
+- new InternalIteratorKey (line 62)
+- new InternalIteratorNext (line 63)
+- new InternalIteratorValid (line 64)
+- new InternalIteratorRewind (line 65)
+- new ClassEntry (line 80)
+- new ClassEntry (line 94)
+- 11 class method(s)
 
 ### `ext/spl/VmSplObserver.php`
 

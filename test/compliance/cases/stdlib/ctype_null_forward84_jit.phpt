@@ -6,7 +6,7 @@ PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 error_reporting(E_ALL);
-foreach (['ctype_alnum', 'ctype_digit', 'ctype_space', 'ctype_blank'] as $fn) {
+foreach (['ctype_alnum', 'ctype_digit', 'ctype_space'] as $fn) {
     $seen = [];
     set_error_handler(static function (int $no, string $str) use (&$seen): bool {
         $seen[] = [$no, $str];
@@ -34,5 +34,4 @@ echo 'ok_digit=', (int) ctype_digit('9'), "\n";
 ctype_alnum:result=false depr=1 err=
 ctype_digit:result=false depr=1 err=
 ctype_space:result=false depr=1 err=
-ctype_blank:result=false depr=1 err=
 ok_digit=1

@@ -20,7 +20,6 @@ final class CtypeModuleSkeletonTest extends TestCase
         $ctx = $runtime->vmContext;
 
         foreach ([
-            'ctype_blank',
             'ctype_alnum',
             'ctype_alpha',
             'ctype_cntrl',
@@ -69,20 +68,19 @@ PHP;
         self::assertSame('1100011', ob_get_clean());
     }
 
-    public function test_ctype_blank_vm_semantics(): void
+    public function test_ctype_blank_is_not_advertised(): void
     {
         $runtime = new Runtime();
+        self::assertFalse(VmReflection::functionExists($runtime->vmContext, 'ctype_blank'));
+
         $code = <<<'PHP'
 <?php
-echo (int) ctype_blank(" \t");
-echo (int) ctype_blank("\n");
-echo (int) ctype_blank(9);
-echo (int) ctype_blank(10);
+echo function_exists('ctype_blank') ? 'yes' : 'no';
 PHP;
-        $block = $runtime->parseAndCompile($code, 'ctype_blank.php');
+        $block = $runtime->parseAndCompile($code, 'ctype_blank_phantom.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('1010', ob_get_clean());
+        self::assertSame('no', ob_get_clean());
     }
 
     public function test_ctype_enum_case_operands_return_false(): void
