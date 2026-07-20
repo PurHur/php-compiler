@@ -114,6 +114,7 @@ final class JitStringBuiltinArg
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode (#21189), ord() (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
+     * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
      * introspection name args (function_exists/class_exists/defined/…) (#21281).

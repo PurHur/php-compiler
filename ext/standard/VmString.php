@@ -68,6 +68,7 @@ final class VmString
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode string
      * operands (#21189), ord() character (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
+     * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
@@ -648,7 +649,9 @@ final class VmString
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             if (self::requiresZparamStrStrictNullOnForwardProfile()) {
-                throw new \TypeError(self::stringBuiltinTypeError('strtok', 0, 'string', 'null'));
+                VmNullStringParamDeprecation::emit(null, 'strtok', 0, 'string');
+
+                return '';
             }
 
             return null;

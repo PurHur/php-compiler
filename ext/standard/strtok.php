@@ -60,16 +60,6 @@ final class strtok extends Internal
             );
         }
 
-        // Early TypeError return before StringStrtok::ensureLinked (AOT helper IR gap; #19242).
-        if (
-            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
-            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
-        ) {
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strtok', 0, 'string', 'string', 'string');
-
-            return JitStrtok::deadFalseResult($context);
-        }
-
         StringStrtok::ensureLinked($context);
         $tok = JitStringBuiltinArg::lower(
             $context,
@@ -80,9 +70,10 @@ final class strtok extends Internal
             '?string',
             '?string'
         );
+
         return JitStrtok::tokenize(
             $context,
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strtok', 0, 'string', 'string', 'string'),
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strtok', 0, 'string'),
             $tok
         );
     }
