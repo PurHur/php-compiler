@@ -1463,6 +1463,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phar_version_writable_modified')) {
                 continue;
             }
+            // Phar decompressFiles/setDefaultStub/copy: VM green (#21231); same Phar ctor MCJIT skip.
+            if (str_contains($name, 'phar_decompress_stub_copy')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }

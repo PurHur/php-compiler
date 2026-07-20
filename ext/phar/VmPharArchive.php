@@ -397,6 +397,59 @@ final class VmPharArchive
         self::markDirty($object);
     }
 
+    /** php-src zim_Phar_decompressFiles — tar subset marks archive dirty (#21231). */
+    public static function decompressFiles(ObjectEntry $object): bool
+    {
+        self::requireWritable('Phar::decompressFiles');
+        self::requireState($object);
+        self::markDirty($object);
+
+        return true;
+    }
+
+    /** php-src zim_Phar_setDefaultStub — createDefaultStub + setStub (#21231). */
+    public static function setDefaultStub(ObjectEntry $object, ?string $index = null, ?string $webIndex = null): bool
+    {
+        self::requireWritable('Phar::setDefaultStub');
+
+        return self::setStub($object, self::createDefaultStub($index, $webIndex));
+    }
+
+    /**
+     * php-src zim_Phar_copy — duplicate in-archive entry (#21231).
+     */
+    public static function copy(ObjectEntry $object, string $from, string $to): bool
+    {
+        self::requireWritable('Phar::copy');
+        $st = self::requireState($object);
+        $path = $st['path'];
+        $from = self::normalizeEntryName($from);
+        $to = self::normalizeEntryName($to);
+        if ('' === $from || '' === $to) {
+            throw new \UnexpectedValueException('Entry name cannot be empty');
+        }
+        $fromIsDir = isset($st['dirs'][$from]);
+        $fromIsFile = isset($st['files'][$from]);
+        if (!$fromIsDir && !$fromIsFile) {
+            throw new \UnexpectedValueException(
+                'file "'.$from.'" cannot be copied to file "'.$to.'", file does not exist in '.$path
+            );
+        }
+        if (isset($st['files'][$to]) || isset($st['dirs'][$to])) {
+            throw new \UnexpectedValueException(
+                'file "'.$from.'" cannot be copied to file "'.$to.'", file must not already exist in phar '.$path
+            );
+        }
+        if ($fromIsDir) {
+            self::$state[$object->id]['dirs'][$to] = true;
+        } else {
+            self::$state[$object->id]['files'][$to] = $st['files'][$from];
+        }
+        self::markDirty($object);
+
+        return true;
+    }
+
     public static function offsetSet(ObjectEntry $object, string $localname, string $contents): void
     {
         self::addFromString($object, $localname, $contents);
@@ -554,5 +607,10 @@ final class VmPharArchive
         }
 
         return self::$state[$object->id];
+    }
+
+    private static function normalizeEntryName(string $localname): string
+    {
+        return \rtrim(\ltrim(\str_replace('\\', '/', $localname), '/'), '/');
     }
 }
