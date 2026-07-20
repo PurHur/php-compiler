@@ -1,6 +1,6 @@
 --TEST--
 stdlib igbinary_serialize round-trip (#6573)
---INI--
+--ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
