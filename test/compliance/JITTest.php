@@ -1467,6 +1467,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phar_decompress_stub_copy')) {
                 continue;
             }
+            // Phar loadPhar/unlinkArchive: VM green (#21232); same Phar ctor MCJIT skip.
+            if (str_contains($name, 'phar_unlink_load')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }

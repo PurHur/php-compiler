@@ -29,6 +29,7 @@ final class BuiltinExceptionSupport
     public const CLASS_REDIS_EXCEPTION = 'redisexception';
     public const CLASS_PDO_EXCEPTION = 'pdoexception';
     public const CLASS_SQLITE3_EXCEPTION = 'sqlite3exception';
+    public const CLASS_PHAR_EXCEPTION = 'pharexception';
     public const CLASS_SOAP_FAULT = 'soapfault';
     public const CLASS_FFI_EXCEPTION = 'ffi\\exception';
     public const CLASS_FFI_PARSER_EXCEPTION = 'ffi\\parserexception';
@@ -259,6 +260,19 @@ final class BuiltinExceptionSupport
         $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
 
         return $var;
+    }
+
+    public static function materializePharException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_PHAR_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_PHAR_EXCEPTION, $message, $file, $line);
     }
 
     public static function materializeRedisException(
