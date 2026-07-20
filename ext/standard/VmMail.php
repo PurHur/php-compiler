@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 /**
  * mail() sendmail transport — php-src ext/standard/mail.c `php_mail()` (#3285, #21432).
  *
- * PHP-in-PHP: popen(sendmail_path) + RFC822 envelope on stdin; no new runtime C.
+ * PHP-in-PHP: popen(sendmail_path) + RFC822 envelope on stdin; no new runtime C (#21434).
  */
 final class VmMail
 {
@@ -275,8 +275,9 @@ final class VmMail
         }
 
         $cmd = $sendmailPath;
-        if (null !== $extraParams && '' !== $extraParams) {
-            $cmd .= ' '.VmEscapeshell::escapeshellcmd($extraParams);
+        $escapedExtra = self::resolveEscapedExtraParameters($extraParams);
+        if (null !== $escapedExtra && '' !== $escapedExtra) {
+            $cmd .= ' '.$escapedExtra;
         }
 
         $handle = VmFs::popen($cmd, 'w');
@@ -303,6 +304,22 @@ final class VmMail
         }
 
         return true;
+    }
+
+    /**
+     * php-src PHP_FUNCTION(mail) — mail.force_extra_parameters overrides arg 5 (#21434).
+     */
+    private static function resolveEscapedExtraParameters(?string $callerExtra): ?string
+    {
+        $forced = VmIniIntrospection::mirroredHostIniGet('mail.force_extra_parameters');
+        if (null !== $forced && '' !== $forced) {
+            return VmEscapeshell::escapeshellcmd($forced);
+        }
+        if (null === $callerExtra || '' === $callerExtra) {
+            return null;
+        }
+
+        return VmEscapeshell::escapeshellcmd($callerExtra);
     }
 
     /**

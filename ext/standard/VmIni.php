@@ -447,6 +447,11 @@ final class VmIni
 
             return true;
         }
+        if ('mail.force_extra_parameters' === $key) {
+            VmIniIntrospection::setMirroredHostIniOverride('mail.force_extra_parameters', $value);
+
+            return true;
+        }
         if ('mail.add_x_header' === $key) {
             self::$mailAddXHeader = self::parseBoolIni($value);
 

@@ -52,6 +52,7 @@ final class VmIniIntrospection
     public const MIRRORED_HOST_INI_KEYS = [
         'extension_dir',
         'sendmail_path',
+        'mail.force_extra_parameters',
     ];
 
     /**
