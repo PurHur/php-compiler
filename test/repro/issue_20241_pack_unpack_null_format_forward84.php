@@ -1,9 +1,7 @@
-<?php
-
 /**
- * #20241 — pack()/unpack() null format/data under PHP_COMPILER_PROFILE=8.4.
+ * #20241 / #21246 — pack()/unpack() null under PHP_COMPILER_PROFILE=8.4.
  *
- * Expect TypeError (Z_PARAM_STR); default profile still deprecate+coerce.
+ * $format remains Z_PARAM_STR TypeError; unpack $string / pack values soft-null (#21246, #21209).
  */
 error_reporting(E_ALL);
 foreach ([

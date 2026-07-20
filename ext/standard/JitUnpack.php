@@ -14,7 +14,8 @@ use PHPLLVM\Value;
 /**
  * LLVM JIT/AOT helper for unpack() via __compiler_unpack (issue #3188, #5442).
  *
- * Z_PARAM_STR $format / $data: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241).
+ * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241).
+ * $string soft-null on 8.4 (#21246, pack.c) — DEP+coerce, not TypeError.
  */
 final class JitUnpack
 {
@@ -34,9 +35,8 @@ final class JitUnpack
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20241, pack.c).
+        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20241, pack.c).
         $nullFormat = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
-        $nullData = JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false);
         $fmt = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'unpack', 0, 'format')
             : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'unpack', 0, 'format');
@@ -50,16 +50,11 @@ final class JitUnpack
             // lower* already emitted TypeError+abort; do not lower __compiler_unpack after terminator.
             return $context->constantFromBool(false);
         }
+        // $string soft-null on 8.4 (#21246); strict_types still TypeError.
         $data = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'unpack', 1, 'string')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'unpack', 1, 'string');
-        if (
-            $nullData
-            && (
-                $context->callerStrictTypes
-                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            )
-        ) {
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'unpack', 1, 'string');
+        if ($context->callerStrictTypes && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))) {
             return $context->constantFromBool(false);
         }
         $offset = $context->getTypeFromString('int64')->constInt(0, false);
