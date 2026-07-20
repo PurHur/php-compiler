@@ -1,19 +1,26 @@
 --TEST--
-Language: #[\SensitiveParameter] omits args from Throwable::getTrace() (VM, #15036)
+Language: #[\SensitiveParameter] redacts Throwable::getTrace() args via SensitiveParameterValue (#21339, VM)
 --FILE--
 <?php
-function f(#[\SensitiveParameter] string $secret): void {
+function f(#[\SensitiveParameter] string $secret, string $ok): void {
     throw new Exception('trace');
 }
 try {
-    f('hunter2');
+    f('hunter2', 'visible');
 } catch (Exception $e) {
-    echo array_key_exists('args', $e->getTrace()[0]) ? 'has_args' : 'no_args', "\n";
+    $args = $e->getTrace()[0]['args'] ?? [];
+    echo 'argc=', count($args), "\n";
+    echo isset($args[0]) && is_object($args[0]) ? get_class($args[0]) : 'missing', "\n";
+    echo isset($args[1]) ? var_export($args[1], true) : 'missing', "\n";
     $traceString = $e->getTraceAsString();
+    echo str_contains($traceString, 'hunter2') ? 'leaked' : 'no_leak', "\n";
     echo str_contains($traceString, '[Sensitive Parameter]') ? 'redacted_label' : 'no_redacted_label', "\n";
-    echo str_contains($traceString, 'f()') ? 'bare_call' : 'no_bare_call', "\n";
+    echo str_contains($traceString, 'visible') ? 'plain_visible' : 'no_plain', "\n";
 }
 --EXPECT--
-no_args
-no_redacted_label
-bare_call
+argc=2
+SensitiveParameterValue
+'visible'
+no_leak
+redacted_label
+plain_visible
