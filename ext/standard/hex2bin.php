@@ -40,7 +40,7 @@ final class hex2bin extends Internal
                 \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
             );
         }
-        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'hex2bin', 0, 'string');
+        $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'hex2bin', 0, 'string');
         $strict = false;
         if (2 === $argc) {
             $strictVar = $frame->calledArgs[1]->resolveIndirect();
@@ -137,13 +137,13 @@ final class hex2bin extends Internal
         return $outPtr;
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19283, ext/standard/string.c). */
+    /** Soft-null on 8.4 forward profile (#21209, ext/standard/string.c hex2bin). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'hex2bin', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'hex2bin', 0, 'string');
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'hex2bin', 0, 'string');
     }
 }

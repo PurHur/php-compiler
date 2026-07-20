@@ -31,11 +31,10 @@ final class JitSscanf
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
-        // Do not fold null→'' at compile time — Z_PARAM_STR TypeError on 8.4 (#19894).
+        // $string soft-null on 8.4; $format stays Z_PARAM_STR (#21209, ext/standard/sscanf.c).
         $strLit = $args[0]->compileTimeString ?? null;
         if (($args[0]->isNullConstant ?? false) && null === $strLit) {
-            if (JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-                || $context->callerStrictTypes) {
+            if ($context->callerStrictTypes) {
                 $strLit = null;
             } else {
                 $strLit = '';
@@ -54,15 +53,15 @@ final class JitSscanf
             return self::parseCompileTime($context, $strLit, $fmtLit, \array_slice($args, 2));
         }
 
-        // Lower Z_PARAM_STR before ensureLinked — null must TypeError without compiling helpers (#19894).
-        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'sscanf', 0, 'string');
+        $str = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'sscanf', 0, 'string')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'sscanf', 0, 'string');
         $fmt = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'sscanf', 1, 'format');
         $nullRejected = (
             $context->callerStrictTypes
             || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
         ) && (
-            JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)
-            || JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
+            JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
         );
         if ($nullRejected) {
             return $context->getTypeFromString('__value__*')->constNull();

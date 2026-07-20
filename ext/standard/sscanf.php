@@ -29,8 +29,8 @@ final class sscanf extends Internal
                 $argc
             ));
         }
-        // php-src Z_PARAM_STR — null TypeError on 8.4 forward profile (#19894).
-        $input = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'sscanf', 0, 'string');
+        // $string soft-null on 8.4; $format stays Z_PARAM_STR (#21209, ext/standard/sscanf.c).
+        $input = VmString::trimFamilyStringArgForFrame($frame, 0, 'sscanf', 0, 'string');
         $format = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'sscanf', 1, 'format');
         $outVars = [];
         for ($i = 2; $i < $argc; ++$i) {

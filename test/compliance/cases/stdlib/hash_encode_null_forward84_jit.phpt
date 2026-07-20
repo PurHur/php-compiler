@@ -1,5 +1,5 @@
 --TEST--
-stdlib bin2hex()/hash()/base64_encode null DEP+coerce; hash_hmac TypeError on 8.4 JIT (#21188/#21181)
+stdlib bin2hex()/hash()/base64_encode/hash_hmac null DEP+coerce on 8.4 JIT (#21188/#21181/#21209)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -34,6 +34,6 @@ echo var_export(hash('md5', ''), true), "\n";
 bin2hex: ''
 base64_encode: ''
 hash: 'd41d8cd98f00b204e9800998ecf8427e'
-hash_hmac(): Argument #2 ($data) must be of type string, null given
+hash_hmac: 'cd32bedd46aa63cffa3023f050fc78e3'
 depr=1
 'd41d8cd98f00b204e9800998ecf8427e'

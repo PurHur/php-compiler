@@ -23,5 +23,5 @@ echo bin2hex(pack('a*', 'ok')), "\n";
 pack_fmt TypeError
 unpack_data TypeError
 unpack_fmt TypeError
-pack_val TypeError
+pack_val COERCED
 6f6b
