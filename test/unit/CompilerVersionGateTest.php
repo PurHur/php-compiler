@@ -595,9 +595,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testAdvertisesOverrideAttributeClassFalseOnReferenceProfile(): void
+    public function testAdvertisesOverrideAttributeClassTrueOnDefaultProfile(): void
     {
-        $this->assertFalse(CompilerVersion::advertisesOverrideAttributeClass());
+        $this->assertTrue(CompilerVersion::advertisesOverrideAttributeClass());
     }
 
     public function testAdvertisesOverrideAttributeClassTrueWhenProfile84(): void
@@ -1388,9 +1388,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());
     }
 
-    public function testSupportsOverrideAttributeFalseOnReferenceProfile(): void
+    public function testSupportsOverrideAttributeTrueOnDefaultProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsOverrideAttribute());
+        $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
     }
 
     public function testSupportsOverrideAttributeFalseWhenProfile82(): void
