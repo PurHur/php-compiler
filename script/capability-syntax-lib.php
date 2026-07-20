@@ -334,11 +334,12 @@ function syntaxRowDefinitions(): array
         [
             'id' => 'class_const_object',
             'construct' => 'Class constants with `new` object expressions',
-            'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_NEW'],
-            'issue' => 15608,
+            // Empty opcodes: status from compile probe (Zend rejects — probe fails → no/no/no).
+            'opcodes' => [],
+            'issue' => 21493,
             'notes' => [
-                'PHP 8.3+ class constant `new` initializers (#12940, #15693, Zend/zend_compile.c)',
-                'Enabled on stable 8.4.0+ or PHP_COMPILER_PROFILE=8.3/8.4; property defaults still rejected',
+                'Zend rejects `new` in class constants and property defaults on all profiles (#21493, Zend/zend_compile.c)',
+                'new-in-initializers RFC: param defaults / static vars / attributes only — compile fatal matches php-src',
             ],
             'probe' => 'class C { public const X = new stdClass(); } var_export(C::X);',
         ],

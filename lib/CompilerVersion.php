@@ -602,27 +602,15 @@ final class CompilerVersion
     /**
      * Whether class constants may use `new Class(...)` initializers.
      *
-     * PHP 8.3+ forward profile: `public const X = new DateTime(...)` materializes once per class
-     * (#12940, #16878, Zend/zend_compile.c zend_const_expr_to_zval allow_dynamic). Withheld on the
-     * 8.4.0-dev reference profile (matches Zend 8.2 rejection). Instance property defaults allow `new`
-     * only on PHP 8.4+ forward profile via {@see supportsPropertyDefaultObjectExpressions()}.
+     * Always false: Zend/php-src rejects `new` in class constant expressions on every shipping
+     * version (including 8.4) — "New expressions are not supported in this context"
+     * ({@see Zend/zend_compile.c} zend_compile_const_expr). The "new in initializers" RFC covers
+     * parameter defaults, static variables, and attribute args only — not class constants (#21493).
+     * Prior forward-profile enables (#12940, #15693) were incorrect vs php-src-strict.
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */
@@ -1088,31 +1076,36 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ instance property default `new Class(...)` initializers (#18040, Zend/zend_compile.c).
+     * Whether instance property defaults may use `new Class(...)`.
      *
-     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
+     * Always false: Zend rejects `new` in property default expressions (all profiles) —
+     * same message as class constants (#21493, Zend/zend_compile.c zend_compile_property).
+     * Prior 8.4 forward-profile enable (#18040) was incorrect vs php-src-strict.
      */
     public static function supportsPropertyDefaultObjectExpressions(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
-     * PHP 8.4+ static property default `new Class` / `new Class(...)` initializers (#18816, Zend/zend_compile.c).
+     * Whether static property defaults may use `new Class` / `new Class(...)`.
+     *
+     * Always false: Zend rejects `new` in static property defaults (#21493, Zend/zend_compile.c).
      */
     public static function supportsStaticPropertyDefaultObjectExpressions(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
-     * PHP 8.4+ bare `new Class` (without trailing `()`) in class constants and static property initializers (#18816).
+     * Whether bare `new Class` (without `()`) is allowed in class constants / static property defaults.
      *
-     * php-src: Zend/zend_compile.c — zend_compile_const_expr / NewWithoutParens.
+     * Always false: those contexts reject all `new` on Zend (#21493). Parameter defaults and
+     * static variables still allow `new` via separate compile paths.
      */
     public static function supportsNewWithoutParensInConstAndStaticInitializers(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

@@ -1,16 +1,7 @@
 --TEST--
-Language: static property bare `new UserClass` on PHP 8.4 forward profile (#19046, Zend/zend_compile.c)
+Language: static property bare `new UserClass` rejected under PROFILE=8.4 (#21493, re-#19046, Zend/zend_compile.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
---SKIPIF--
-<?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../../vendor/autoload.php';
-}
-if (!PHPCompiler\CompilerVersion::supportsStaticPropertyDefaultObjectExpressions()) {
-    die('skip static property default new requires PHP_COMPILER_PROFILE=8.4');
-}
-?>
 --FILE--
 <?php
 class Node {
@@ -22,7 +13,7 @@ class ListHead {
 }
 
 echo ListHead::$nil->label, "\n";
-echo ListHead::$nil === ListHead::$nil ? "1\n" : "0\n";
---EXPECT--
-nil
-1
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: New expressions are not supported in this context

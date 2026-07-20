@@ -9,7 +9,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** Property default `new` — reference profile rejects; 8.4 forward profile allows instance (#18040). */
+/** Property default `new` — Zend rejects on all profiles (#21493, re-#18040). */
 final class PropertyDefaultNewTest extends TestCase
 {
     public function testInstanceTypedPropertyDefaultNewCompileErrors(): void
@@ -102,12 +102,13 @@ PHP, 'property_default_new_promoted.php');
         $this->assertNotNull($block);
     }
 
-    public function testSupportsPropertyDefaultObjectExpressionsTrueOnForwardProfile(): void
+    public function testSupportsPropertyDefaultObjectExpressionsFalseOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsPropertyDefaultObjectExpressions());
+            // Zend 8.4 rejects property-default `new` (#21493).
+            $this->assertFalse(CompilerVersion::supportsPropertyDefaultObjectExpressions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
