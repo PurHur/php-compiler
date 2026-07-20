@@ -104,6 +104,60 @@ final class VmTidy
         }
     }
 
+    /**
+     * tidy_repair_string() / tidy::repairString() — host bridge (#21498).
+     *
+     * @return string|false
+     */
+    public static function repairString(string $html, ?Frame $frame)
+    {
+        if (!self::hostAvailable() || !\function_exists('tidy_repair_string')) {
+            self::emitWarning($frame, 'tidy_repair_string(): host ext/tidy is not available');
+
+            return false;
+        }
+
+        try {
+            $out = \tidy_repair_string($html);
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_repair_string(): '.$e->getMessage());
+
+            return false;
+        }
+        if (false === $out) {
+            return false;
+        }
+
+        return (string) $out;
+    }
+
+    /**
+     * tidy_repair_file() / tidy::repairFile() — host bridge (#21498).
+     *
+     * @return string|false
+     */
+    public static function repairFile(string $filename, ?Frame $frame)
+    {
+        if (!self::hostAvailable() || !\function_exists('tidy_repair_file')) {
+            self::emitWarning($frame, 'tidy_repair_file(): host ext/tidy is not available');
+
+            return false;
+        }
+
+        try {
+            $out = \tidy_repair_file($filename);
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_repair_file(): '.$e->getMessage());
+
+            return false;
+        }
+        if (false === $out) {
+            return false;
+        }
+
+        return (string) $out;
+    }
+
     public static function htmlStringArg(Variable $arg, string $func, int $argNum): string
     {
         return VmString::coerceStringBuiltinArg($arg, $func, $argNum, 'string');
