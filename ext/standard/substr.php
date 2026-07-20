@@ -47,7 +47,8 @@ final class substr extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'substr', 0, 'string');
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21189; reverts #18980 TypeError).
+        $string = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'substr', 0, 'string');
         $offset = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -104,7 +105,7 @@ final class substr extends Internal
         if (null === $strLit
             && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
         ) {
-            if ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
+            if ($context->callerStrictTypes) {
                 $strLit = null;
             } else {
                 $strLit = '';
@@ -127,19 +128,25 @@ final class substr extends Internal
                     $folded = VmString::substr($strLit, $offsetLit, null, $warnOnClip);
                 }
                 if (null !== $folded) {
+                    if ('' === $strLit && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
+                        JitStringBuiltinArg::emitNullStringParamDeprecation(
+                            $context,
+                            'substr',
+                            0,
+                            'string'
+                        );
+                    }
+
                     return $context->builder->load($context->constantStringFromString($folded));
                 }
             }
         }
 
-        if (
-            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
-            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
-        ) {
-            return JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr', 0, 'string');
+        if ($context->callerStrictTypes) {
+            $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr', 0, 'string');
+        } else {
+            $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr', 0, 'string');
         }
-
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr', 0, 'string');
         BasicBlockHelper::ensureOpenInsertBlock($context, 'substr_str_cont');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];

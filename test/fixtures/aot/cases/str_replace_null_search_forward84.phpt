@@ -1,10 +1,9 @@
 --TEST--
-AOT: str_replace null $search TypeError on 8.4 forward profile (#20173)
+AOT: str_replace null $search soft-null on 8.4 (#21189)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-str_replace(null, 'b', 'hay');
+echo str_replace(null, 'b', 'hay'), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+hay

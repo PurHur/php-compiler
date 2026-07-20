@@ -1,5 +1,7 @@
 <?php
-// Guard #20176 — null needle TypeError under PHP_COMPILER_PROFILE=8.4
+// Guard #20176/#21189 — null needle soft-null for strstr/strpos; siblings still TypeError
+error_reporting(E_ALL);
+set_error_handler(static function (): bool { return true; });
 foreach ([
     'strstr' => static fn () => strstr('abc', null),
     'stristr' => static fn () => stristr('Abc', null),
@@ -9,8 +11,8 @@ foreach ([
     'strripos' => static fn () => strripos('abc', null),
 ] as $label => $factory) {
     try {
-        $factory();
-        echo "$label: uncaught\n";
+        $r = $factory();
+        echo "$label: OK ", var_export($r, true), "\n";
     } catch (TypeError $e) {
         echo $label.': '.$e->getMessage()."\n";
     }

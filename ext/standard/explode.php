@@ -46,7 +46,8 @@ final class explode extends Internal
             ));
         }
         $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'explode', 0, 'separator');
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'explode', 1, 'string');
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21189).
+        $string = VmString::trimFamilyStringArgForFrame($frame, 1, 'explode', 1, 'string');
         $limit = \PHP_INT_MAX;
         if (3 === $argc) {
             $limit = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'explode', 3, 'limit');
@@ -110,7 +111,7 @@ final class explode extends Internal
         $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
         $haystack = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'explode', 1, 'string')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'explode', 1, 'string');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'explode', 1, 'string');
         $i64 = $context->getTypeFromString('int64');
         if (3 === $argc) {
             $limitLit = self::compileTimeLimit($context, $args[2]);

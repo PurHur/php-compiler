@@ -17,50 +17,6 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
-/** @internal */
-final class VmNullStringParamDeprecation
-{
-    public static function message(
-        string $function,
-        int $argIndex,
-        string $paramName,
-        string $expectedType = 'string'
-    ): string {
-        return sprintf(
-            '%s(): Passing null to parameter #%d ($%s) of type %s is deprecated',
-            $function,
-            $argIndex + 1,
-            $paramName,
-            $expectedType
-        );
-    }
-
-    public static function emit(
-        ?Frame $frame,
-        string $function,
-        int $argIndex,
-        string $paramName,
-        string $expectedType = 'string'
-    ): void {
-        $vm = VM::running();
-        if (null === $vm) {
-            return;
-        }
-        if (null === $frame) {
-            $frame = $vm->builtinHandlerFrame();
-            if (null === $frame) {
-                $frames = $vm->context->runStackFrames();
-                $frame = [] !== $frames ? $frames[0] : null;
-            }
-        }
-        $vm->context->errors->internalDeprecated(
-            self::message($function, $argIndex, $paramName, $expectedType),
-            $vm->context,
-            $frame
-        );
-    }
-}
-
 final class VmString
 {
     /**
@@ -101,7 +57,8 @@ final class VmString
      * HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/nl2br/quotemeta
      * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
-     * and preg_match $subject (#21198).
+     * preg_match $subject (#21198), and substr/strpos/strstr/explode string
+     * operands (#21189).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,
