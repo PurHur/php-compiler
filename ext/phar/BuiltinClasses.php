@@ -77,6 +77,9 @@ final class BuiltinClasses
             'none' => VmPhar::COMPRESSED_NONE,
             'gz' => VmPhar::COMPRESSED_GZ,
             'bz2' => VmPhar::COMPRESSED_BZ2,
+            'phar' => VmPhar::FORMAT_PHAR,
+            'tar' => VmPhar::FORMAT_TAR,
+            'zip' => VmPhar::FORMAT_ZIP,
         ] as $lc => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);

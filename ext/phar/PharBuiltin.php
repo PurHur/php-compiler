@@ -64,6 +64,12 @@ final class PharBuiltin
             'getmodified' => [PharGetModified::class, 'getModified'],
             'compressfiles' => [PharCompressFiles::class, 'compressFiles'],
             'decompressfiles' => [PharDecompressFiles::class, 'decompressFiles'],
+            'compress' => [PharCompress::class, 'compress'],
+            'decompress' => [PharDecompress::class, 'decompress'],
+            'converttodata' => [PharConvertToData::class, 'convertToData'],
+            'converttoexecutable' => [PharConvertToExecutable::class, 'convertToExecutable'],
+            'iscompressed' => [PharIsCompressed::class, 'isCompressed'],
+            'isfileformat' => [PharIsFileFormat::class, 'isFileFormat'],
             'setdefaultstub' => [PharSetDefaultStub::class, 'setDefaultStub'],
             'copy' => [PharCopy::class, 'copy'],
             'getpath' => [PharGetPath::class, 'getPath'],
@@ -491,6 +497,118 @@ final class PharDecompressFiles extends VmClassMethod
             $frame->returnVar->bool(VmPharArchive::decompressFiles(
                 VmPharArchive::requireReceiver($frame, 'Phar::decompressFiles')
             ));
+        }
+    }
+}
+
+/** Phar::compress() — whole-archive gzip (#21328). */
+final class PharCompress extends VmClassMethod
+{
+    public function __construct() { parent::__construct('compress'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf('Phar::compress() expects at least 1 argument, %d given', \max(0, $argc - 1)));
+        }
+        $object = VmPharArchive::requireReceiver($frame, 'Phar::compress');
+        $compression = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $ext = $argc >= 3 ? VmPharArchive::coercePathArg($frame->calledArgs[2], 'Phar::compress', 1, 'extension') : null;
+        $out = VmPharArchive::compress($object, $frame->vmContext, $compression, $ext);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->object($out);
+        }
+    }
+}
+
+/** Phar::decompress() — strip whole-archive compression (#21328). */
+final class PharDecompress extends VmClassMethod
+{
+    public function __construct() { parent::__construct('decompress'); }
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharArchive::requireReceiver($frame, 'Phar::decompress');
+        $ext = \count($frame->calledArgs) >= 2
+            ? VmPharArchive::coercePathArg($frame->calledArgs[1], 'Phar::decompress', 0, 'extension') : null;
+        $out = VmPharArchive::decompress($object, $frame->vmContext, $ext);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->object($out);
+        }
+    }
+}
+
+/** Phar::convertToData() — emit PharData tar (#21328). */
+final class PharConvertToData extends VmClassMethod
+{
+    public function __construct() { parent::__construct('convertToData'); }
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharArchive::requireReceiver($frame, 'Phar::convertToData');
+        $argc = \count($frame->calledArgs);
+        $format = $argc >= 2 ? $frame->calledArgs[1]->resolveIndirect()->toInt() : null;
+        $compression = $argc >= 3 ? $frame->calledArgs[2]->resolveIndirect()->toInt() : null;
+        $ext = $argc >= 4 ? VmPharArchive::coercePathArg($frame->calledArgs[3], 'Phar::convertToData', 2, 'extension') : null;
+        $out = VmPharArchive::convertToData($object, $frame->vmContext, $format, $compression, $ext);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->object($out);
+        }
+    }
+}
+
+/** Phar::convertToExecutable() — already-executable / re-emit Phar (#21328). */
+final class PharConvertToExecutable extends VmClassMethod
+{
+    public function __construct() { parent::__construct('convertToExecutable'); }
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharArchive::requireReceiver($frame, 'Phar::convertToExecutable');
+        $argc = \count($frame->calledArgs);
+        $format = $argc >= 2 ? $frame->calledArgs[1]->resolveIndirect()->toInt() : null;
+        $compression = $argc >= 3 ? $frame->calledArgs[2]->resolveIndirect()->toInt() : null;
+        $ext = $argc >= 4 ? VmPharArchive::coercePathArg($frame->calledArgs[3], 'Phar::convertToExecutable', 2, 'extension') : null;
+        $out = VmPharArchive::convertToExecutable($object, $frame->vmContext, $format, $compression, $ext);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->object($out);
+        }
+    }
+}
+
+/** Phar::isCompressed() — whole-archive method or false (#21328). */
+final class PharIsCompressed extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isCompressed'); }
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPharArchive::isCompressed(
+            VmPharArchive::requireReceiver($frame, 'Phar::isCompressed')
+        );
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->int($result);
+        }
+    }
+}
+
+/** Phar::isFileFormat() — tar-backed format check (#21328). */
+final class PharIsFileFormat extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isFileFormat'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf('Phar::isFileFormat() expects exactly 1 argument, %d given', \max(0, $argc - 1)));
+        }
+        $ok = VmPharArchive::isFileFormat(
+            VmPharArchive::requireReceiver($frame, 'Phar::isFileFormat'),
+            $frame->calledArgs[1]->resolveIndirect()->toInt()
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
         }
     }
 }

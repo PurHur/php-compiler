@@ -13,6 +13,7 @@ use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStatPath;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\VmZlib;
 
 /**
  * Phar executable archive state — php-src ext/phar/phar_object.c (#20628).
@@ -29,7 +30,20 @@ final class VmPharArchive
     /** Reserved ustar member for archive metadata (#21229). */
     private const META_ENTRY = '.phar/metadata';
 
-    /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string, hasMetadata: bool, metadata: mixed}> */
+    /**
+     * @var array<int, array{
+     *   path: string,
+     *   files: array<string, string>,
+     *   dirs: array<string, true>,
+     *   dirty: bool,
+     *   buffering: bool,
+     *   stub: string,
+     *   alias: string,
+     *   hasMetadata: bool,
+     *   metadata: mixed,
+     *   wholeCompression: int
+     * }>
+     */
     private static array $state = [];
 
     /** @var array<string, string> alias → archive path (Phar::loadPhar; #21232). */
@@ -45,7 +59,8 @@ final class VmPharArchive
         string $alias = '',
         bool $buffering = false,
         bool $hasMetadata = false,
-        mixed $metadata = null
+        mixed $metadata = null,
+        int $wholeCompression = VmPhar::COMPRESSED_NONE
     ): void {
         if ('' === $stub) {
             $stub = self::createDefaultStub();
@@ -60,6 +75,7 @@ final class VmPharArchive
             'alias' => $alias,
             'hasMetadata' => $hasMetadata,
             'metadata' => $metadata,
+            'wholeCompression' => $wholeCompression,
         ];
     }
 
@@ -71,6 +87,15 @@ final class VmPharArchive
             if (false === $binary) {
                 throw new \UnexpectedValueException('phar error: unable to open phar "'.$path.'"');
             }
+            $wholeCompression = VmPhar::COMPRESSED_NONE;
+            if (\strlen($binary) >= 2 && "\x1f" === $binary[0] && "\x8b" === $binary[1]) {
+                $decoded = VmZlib::gzdecode($binary);
+                if (false === $decoded) {
+                    throw new \UnexpectedValueException('phar error: unable to open phar "'.$path.'"');
+                }
+                $binary = $decoded;
+                $wholeCompression = VmPhar::COMPRESSED_GZ;
+            }
             [$stub, $payload] = self::splitStub($binary);
             $entries = VmPharTar::readArchiveEntries($payload);
             $hasMetadata = false;
@@ -81,7 +106,19 @@ final class VmPharArchive
                 $metadata = '' === $raw ? null : \unserialize($raw);
                 unset($entries['files'][self::META_ENTRY]);
             }
-            self::bind($object, $path, $entries['files'], false, $entries['dirs'], $stub, '', false, $hasMetadata, $metadata);
+            self::bind(
+                $object,
+                $path,
+                $entries['files'],
+                false,
+                $entries['dirs'],
+                $stub,
+                '',
+                false,
+                $hasMetadata,
+                $metadata,
+                $wholeCompression
+            );
 
             return;
         }
@@ -411,6 +448,200 @@ final class VmPharArchive
         return true;
     }
 
+    /**
+     * php-src zim_Phar_compress — whole-archive gzip wrapper (#21328).
+     * This build supports GZ only (same subset as PharData::compress).
+     */
+    public static function compress(ObjectEntry $object, Context $ctx, int $compression, ?string $extension = null): ObjectEntry
+    {
+        self::requireWritable('Phar::compress');
+        $st = self::requireState($object);
+        self::ensureFlushed($object);
+        if (VmPhar::COMPRESSED_GZ !== $compression) {
+            throw new \BadMethodCallException('Only gzip compression is supported for Phar in this build');
+        }
+        if (!VmPhar::canCompress(VmPhar::COMPRESSED_GZ)) {
+            throw new \BadMethodCallException('zlib extension is required for gzip compression');
+        }
+        $ext = null !== $extension && '' !== $extension ? \ltrim($extension, '.') : 'gz';
+        $path = $st['path'];
+        $outPath = \str_ends_with(\strtolower($path), '.'.$ext) ? $path : $path.'.'.$ext;
+        $binary = self::buildBinary($object);
+        $encoded = VmZlib::gzencode($binary);
+        if (false === $encoded || false === VmFs::filePutContents($outPath, $encoded)) {
+            throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
+        }
+        $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        $out->constructed = true;
+        self::bind(
+            $out,
+            $outPath,
+            $st['files'],
+            false,
+            $st['dirs'],
+            $st['stub'],
+            $st['alias'],
+            false,
+            $st['hasMetadata'],
+            $st['metadata'],
+            VmPhar::COMPRESSED_GZ
+        );
+
+        return $out;
+    }
+
+    /**
+     * php-src zim_Phar_decompress — strip whole-archive compression (#21328).
+     */
+    public static function decompress(ObjectEntry $object, Context $ctx, ?string $extension = null): ObjectEntry
+    {
+        self::requireWritable('Phar::decompress');
+        $st = self::requireState($object);
+        self::ensureFlushed($object);
+        $path = $st['path'];
+        $outPath = $path;
+        foreach (['.phar.gz', '.phar.bz2', '.gz', '.bz2'] as $suffix) {
+            if (\str_ends_with(\strtolower($path), $suffix)) {
+                $outPath = \substr($path, 0, -\strlen($suffix));
+                if (\str_starts_with($suffix, '.phar.')) {
+                    $outPath .= '.phar';
+                }
+                break;
+            }
+        }
+        if (null !== $extension && '' !== $extension) {
+            $outPath = \preg_replace('/\.[^.]+$/', '', $outPath).'.'.\ltrim($extension, '.');
+        }
+        $binary = self::buildBinary($object);
+        if (false === VmFs::filePutContents($outPath, $binary)) {
+            throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
+        }
+        $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        $out->constructed = true;
+        self::bind(
+            $out,
+            $outPath,
+            $st['files'],
+            false,
+            $st['dirs'],
+            $st['stub'],
+            $st['alias'],
+            false,
+            $st['hasMetadata'],
+            $st['metadata'],
+            VmPhar::COMPRESSED_NONE
+        );
+
+        return $out;
+    }
+
+    /**
+     * php-src zim_Phar_convertToData — emit PharData tar archive (#21328).
+     */
+    public static function convertToData(ObjectEntry $object, Context $ctx, ?int $format = null, ?int $compression = null, ?string $extension = null): ObjectEntry
+    {
+        self::requireWritable('Phar::convertToData');
+        $st = self::requireState($object);
+        self::ensureFlushed($object);
+        if (null !== $format && VmPhar::FORMAT_TAR !== $format && 0 !== $format) {
+            throw new \BadMethodCallException('Only tar format is supported for Phar::convertToData() in this build');
+        }
+        if (null !== $compression && VmPhar::COMPRESSED_NONE !== $compression && 0 !== $compression) {
+            throw new \BadMethodCallException('Only uncompressed tar is supported for Phar::convertToData() in this build');
+        }
+        $path = $st['path'];
+        $base = \preg_replace('/\.phar(\.(gz|bz2))?$/i', '', $path) ?? $path;
+        $ext = null !== $extension && '' !== $extension ? \ltrim($extension, '.') : 'tar';
+        $outPath = $base.'.'.$ext;
+        $binary = VmPharTar::writeArchive($st['files'], $st['dirs']);
+        if (false === VmFs::filePutContents($outPath, $binary)) {
+            throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
+        }
+        if (!isset($ctx->classes[VmPharData::CLASS_LC])) {
+            PharDataBuiltin::register($ctx);
+        }
+        $out = new ObjectEntry($ctx->classes[VmPharData::CLASS_LC]);
+        $out->constructed = true;
+        VmPharData::bind($out, $outPath, $st['files'], false, $st['dirs']);
+
+        return $out;
+    }
+
+    /**
+     * php-src zim_Phar_convertToExecutable — already executable tar-backed Phar (#21328).
+     */
+    public static function convertToExecutable(ObjectEntry $object, Context $ctx, ?int $format = null, ?int $compression = null, ?string $extension = null): ObjectEntry
+    {
+        self::requireWritable('Phar::convertToExecutable');
+        $st = self::requireState($object);
+        self::ensureFlushed($object);
+        if (null !== $format && VmPhar::FORMAT_TAR !== $format && VmPhar::FORMAT_PHAR !== $format && 0 !== $format) {
+            throw new \BadMethodCallException('Only tar/phar format is supported for Phar::convertToExecutable() in this build');
+        }
+        if (null !== $compression && VmPhar::COMPRESSED_NONE !== $compression && VmPhar::COMPRESSED_GZ !== $compression && 0 !== $compression) {
+            throw new \BadMethodCallException('Only NONE/GZ compression is supported for Phar::convertToExecutable() in this build');
+        }
+        $wantGz = null !== $compression && VmPhar::COMPRESSED_GZ === $compression;
+        if ($wantGz) {
+            return self::compress($object, $ctx, VmPhar::COMPRESSED_GZ, $extension);
+        }
+        $path = $st['path'];
+        $outPath = $path;
+        if (null !== $extension && '' !== $extension) {
+            $base = \preg_replace('/(\.phar)?(\.(gz|bz2))?$/i', '', $path) ?? $path;
+            $outPath = $base.'.'.\ltrim($extension, '.');
+        }
+        $binary = self::buildBinary($object);
+        if ($outPath !== $path || VmPhar::COMPRESSED_NONE !== $st['wholeCompression']) {
+            if (false === VmFs::filePutContents($outPath, $binary)) {
+                throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
+            }
+        }
+        $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        $out->constructed = true;
+        self::bind(
+            $out,
+            $outPath,
+            $st['files'],
+            false,
+            $st['dirs'],
+            $st['stub'],
+            $st['alias'],
+            false,
+            $st['hasMetadata'],
+            $st['metadata'],
+            VmPhar::COMPRESSED_NONE
+        );
+
+        return $out;
+    }
+
+    /**
+     * php-src zim_Phar_isCompressed — whole-archive compression method or false (#21328).
+     *
+     * @return int|false
+     */
+    public static function isCompressed(ObjectEntry $object): int|false
+    {
+        $st = self::requireState($object);
+        $c = $st['wholeCompression'];
+        if (VmPhar::COMPRESSED_NONE === $c) {
+            return false;
+        }
+
+        return $c;
+    }
+
+    /**
+     * php-src zim_Phar_isFileFormat — this build is always tar-backed (#21328).
+     */
+    public static function isFileFormat(ObjectEntry $object, int $format): bool
+    {
+        self::requireState($object);
+
+        return VmPhar::FORMAT_TAR === $format;
+    }
+
     /** php-src zim_Phar_setDefaultStub — createDefaultStub + setStub (#21231). */
     public static function setDefaultStub(ObjectEntry $object, ?string $index = null, ?string $webIndex = null): bool
     {
@@ -599,18 +830,18 @@ final class VmPharArchive
         }
     }
 
-    private static function flush(ObjectEntry $object): void
+    private static function ensureFlushed(ObjectEntry $object): void
     {
         $st = self::requireState($object);
-        if (!$st['dirty']) {
-            return;
+        if ($st['dirty']) {
+            self::flush($object);
         }
-        if (!VmPhar::canWrite()) {
-            throw new \UnexpectedValueException(
-                'Cannot write to archive - write operations disabled by the php.ini setting phar.readonly'
-            );
-        }
-        $path = $st['path'];
+    }
+
+    /** Build on-disk stub+tar bytes (uncompressed). */
+    private static function buildBinary(ObjectEntry $object): string
+    {
+        $st = self::requireState($object);
         $stub = $st['stub'];
         if (!\str_contains($stub, self::HALT)) {
             if (!\str_ends_with(\rtrim($stub), '?>')) {
@@ -623,7 +854,30 @@ final class VmPharArchive
         if ($st['hasMetadata']) {
             $files[self::META_ENTRY] = \serialize($st['metadata']);
         }
-        $binary = $stub.VmPharTar::writeArchive($files, $st['dirs']);
+
+        return $stub.VmPharTar::writeArchive($files, $st['dirs']);
+    }
+
+    private static function flush(ObjectEntry $object): void
+    {
+        $st = self::requireState($object);
+        if (!$st['dirty']) {
+            return;
+        }
+        if (!VmPhar::canWrite()) {
+            throw new \UnexpectedValueException(
+                'Cannot write to archive - write operations disabled by the php.ini setting phar.readonly'
+            );
+        }
+        $path = $st['path'];
+        $binary = self::buildBinary($object);
+        if (VmPhar::COMPRESSED_GZ === $st['wholeCompression']) {
+            $encoded = VmZlib::gzencode($binary);
+            if (false === $encoded) {
+                throw new \UnexpectedValueException('phar error: unable to write phar "'.$path.'"');
+            }
+            $binary = $encoded;
+        }
         if (false === VmFs::filePutContents($path, $binary)) {
             throw new \UnexpectedValueException('phar error: unable to write phar "'.$path.'"');
         }
@@ -652,7 +906,7 @@ final class VmPharArchive
         return [\substr($binary, 0, $stubEnd), \substr($binary, $stubEnd)];
     }
 
-    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string, hasMetadata: bool, metadata: mixed} */
+    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string, hasMetadata: bool, metadata: mixed, wholeCompression: int} */
     private static function requireState(ObjectEntry $object): array
     {
         if (!isset(self::$state[$object->id])) {
@@ -684,6 +938,15 @@ final class VmPharArchive
             throw new \PharException(
                 'Unknown phar archive "'.$path.'": unable to open phar for reading "'.$path.'"'
             );
+        }
+        if (\strlen($binary) >= 2 && "\x1f" === $binary[0] && "\x8b" === $binary[1]) {
+            $decoded = VmZlib::gzdecode($binary);
+            if (false === $decoded) {
+                throw new \PharException(
+                    'Unknown phar archive "'.$path.'": unable to open phar for reading "'.$path.'"'
+                );
+            }
+            $binary = $decoded;
         }
         if (!\str_contains($binary, '__HALT_COMPILER()')) {
             throw new \PharException(
