@@ -699,13 +699,40 @@ final class VmOdbcNative
      */
     public static function setAutocommit(\FFI\CData $hdbc, bool $enable): bool
     {
+        $value = $enable ? self::SQL_AUTOCOMMIT_ON : self::SQL_AUTOCOMMIT_OFF;
+
+        return self::setConnectOption($hdbc, self::SQL_AUTOCOMMIT, $value);
+    }
+
+    /**
+     * SQLSetConnectOption (php-src odbc_setoption which=1; #21267).
+     */
+    public static function setConnectOption(\FFI\CData $hdbc, int $option, int $value): bool
+    {
         try {
             $ffi = self::ffi();
             if (null === $ffi) {
                 return false;
             }
-            $value = $enable ? self::SQL_AUTOCOMMIT_ON : self::SQL_AUTOCOMMIT_OFF;
-            $rc = (int) $ffi->SQLSetConnectOption($hdbc, self::SQL_AUTOCOMMIT, $value);
+            $rc = (int) $ffi->SQLSetConnectOption($hdbc, $option, $value);
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * SQLSetStmtOption (php-src odbc_setoption which=2; #21267).
+     */
+    public static function setStmtOption(\FFI\CData $hstmt, int $option, int $value): bool
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $rc = (int) $ffi->SQLSetStmtOption($hstmt, $option, $value);
 
             return self::ok($rc);
         } catch (\Throwable $e) {
@@ -856,6 +883,7 @@ SQLRETURN SQLForeignKeys(SQLHSTMT hstmt, SQLCHAR *szPkCatalogName, SQLSMALLINT c
 SQLRETURN SQLStatistics(SQLHSTMT hstmt, SQLCHAR *szCatalogName, SQLSMALLINT cbCatalogName, SQLCHAR *szSchemaName, SQLSMALLINT cbSchemaName, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLUSMALLINT fUnique, SQLUSMALLINT fAccuracy);
 SQLRETURN SQLGetTypeInfo(SQLHSTMT hstmt, SQLSMALLINT fSqlType);
 SQLRETURN SQLSetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLULEN vParam);
+SQLRETURN SQLSetStmtOption(SQLHSTMT hstmt, SQLUSMALLINT fOption, SQLULEN vParam);
 SQLRETURN SQLGetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLPOINTER pvParam);
 SQLRETURN SQLTransact(SQLHENV henv, SQLHDBC hdbc, SQLUSMALLINT fType);
 SQLRETURN SQLMoreResults(SQLHSTMT hstmt);
