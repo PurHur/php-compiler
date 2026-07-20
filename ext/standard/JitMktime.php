@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\StringMktime;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -45,31 +44,6 @@ final class JitMktime
 
     private static function jitIntArg(Context $context, JITVariable $arg, int $position): Value
     {
-        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
-            // Z_PARAM_LONG $hour — null TypeError on PROFILE=8.4 (#20227).
-            if ($context->callerStrictTypes || VmMath::requiresForwardProfileStrictLongNull()) {
-                self::emitIntTypeErrorAndAbort($context, $position, 'null');
-
-                return $context->getTypeFromString('int64')->constInt(0, false);
-            }
-
-            return $context->getTypeFromString('int64')->constInt(0, false);
-        }
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readLong'),
-                $arg->value
-            );
-        }
-
-        throw new \LogicException('mktime() argument #'.$position.' must be an integer in this compiler build');
-    }
-
-    private static function emitIntTypeErrorAndAbort(Context $context, int $position, string $given): void
-    {
         $name = match ($position) {
             1 => 'hour',
             2 => 'minute',
@@ -79,18 +53,18 @@ final class JitMktime
             6 => 'year',
             default => 'arg',
         };
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise(
-            $context,
-            \sprintf(
-                'mktime(): Argument #%d ($%s) must be of type int, %s given',
-                $position,
-                $name,
-                $given
-            )
-        );
-        $context->builder->call($context->lookupFunction('abort'));
+        // Z_PARAM_LONG $hour — soft-null DEP+coerce on 8.4 (#21491, reverts #20227 TypeError).
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return JitChr::lowerZParamLongArg($context, $arg, 'mktime', $position, $name);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return JitChr::lowerZParamLongArg($context, $arg, 'mktime', $position, $name);
+        }
+
+        throw new \LogicException('mktime() argument #'.$position.' must be an integer in this compiler build');
     }
 
     private static function jitOptionalIntArg(

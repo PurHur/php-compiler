@@ -71,12 +71,11 @@ final class gmmktime extends Internal
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            // Z_PARAM_LONG $hour — null TypeError on PROFILE=8.4 (#20227, ext/date/php_date.stub.php).
-            if (InternalStrictArg::isCallerStrict($frame)
-                || VmMath::requiresForwardProfileStrictLongNull()
-            ) {
+            // Z_PARAM_LONG $hour — soft-null DEP+coerce on 8.4 (ext/date/php_date.c; #21491, reverts #20227).
+            if (InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(self::intTypeError($position, $var->type));
             }
+            VmNullNumberParamDeprecation::emit($frame, 'gmmktime', $position, self::argName($position), 'int');
 
             return 0;
         }
