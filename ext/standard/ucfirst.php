@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,7 +31,7 @@ final class ucfirst extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('ucfirst() requires exactly one argument');
         }
-        $subject = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'ucfirst', 0, 'string');
+        $subject = self::vmStringArg($frame);
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::asciiUcfirst($subject))
@@ -52,13 +53,27 @@ final class ucfirst extends Internal
         return $copy;
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20080, ext/standard/string.c). */
+    private static function vmStringArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'ucfirst', 'string')->toString();
+        }
+
+        return VmString::coerceTrimFamilyStringArg(
+            $frame->calledArgs[0],
+            'ucfirst',
+            0,
+            'string'
+        );
+    }
+
+    /** Soft-null DEP+coerce on forward profile (#21428, reverts #20080; ext/standard/string.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'ucfirst', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'ucfirst', 0, 'string');
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'ucfirst', 0, 'string');
     }
 }

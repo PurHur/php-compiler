@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\StringUcwords;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -25,10 +26,10 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'ucwords', 0, 'string');
+        $string = self::vmStringArg($frame, 0, 'string');
         $separators = VmString::TRIM_DEFAULT;
         if (2 === $argc) {
-            $separators = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'ucwords', 1, 'separators');
+            $separators = self::vmStringArg($frame, 1, 'separators');
         }
         if (null === $frame->returnVar) {
             return;
@@ -61,7 +62,21 @@ final class ucwords extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20080, ext/standard/string.c). */
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'ucwords', $paramName)->toString();
+        }
+
+        return VmString::coerceTrimFamilyStringArg(
+            $frame->calledArgs[$argIndex],
+            'ucwords',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    /** Soft-null DEP+coerce on forward profile (#21428, reverts #20080; ext/standard/string.c). */
     private static function jitStringArg(
         Context $context,
         JITVariable $arg,
@@ -78,7 +93,7 @@ final class ucwords extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'ucwords',

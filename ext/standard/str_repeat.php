@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\StringStrRepeat;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -31,7 +32,7 @@ final class str_repeat extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('str_repeat() requires exactly two arguments');
         }
-        $input = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'str_repeat', 0, 'string');
+        $input = self::vmStringArg($frame);
         $times = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_repeat', 2, 'times');
         $result = VmString::repeat($input, $times);
         if (null === $frame->returnVar) {
@@ -55,13 +56,27 @@ final class str_repeat extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20080, ext/standard/string.c). */
+    private static function vmStringArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'str_repeat', 'string')->toString();
+        }
+
+        return VmString::coerceTrimFamilyStringArg(
+            $frame->calledArgs[0],
+            'str_repeat',
+            0,
+            'string'
+        );
+    }
+
+    /** Soft-null DEP+coerce on forward profile (#21428, reverts #20080; ext/standard/string.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'str_repeat', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'str_repeat', 0, 'string');
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'str_repeat', 0, 'string');
     }
 }
