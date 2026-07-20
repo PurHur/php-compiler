@@ -1,0 +1,15 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -3562,10 +3562,12 @@
+         'IntlDateFormatter::setPattern' => ['bool', 'pattern' => 'string'],
+         'IntlDateFormatter::setTimeZone' => ['boolean', 'timezone' => ''],
+         'IntlDateFormatter::setTimeZoneId' => ['bool', 'zone' => 'string', 'fmt=' => 'intldateformatter'],
++        'IntlTimeZone::getIanaID' => ['string|false', 'zoneId' => 'string'],
+         'intl_error_name' => ['string', 'error_code' => 'int'],
+         'intl_get_error_code' => ['int'],
+         'intl_get_error_message' => ['string'],
+         'intl_is_failure' => ['bool', 'error_code' => 'int'],
++        'intltz_get_iana_id' => ['string|false', 'zoneId' => 'string'],
+         'intval' => ['int', 'var' => '', 'base=' => 'int'],
+         'ip2long' => ['int', 'ip_address' => 'string'],
+         'iptcembed' => ['array', 'iptcdata' => 'string', 'jpeg_file_name' => 'string', 'spool=' => 'int'],
