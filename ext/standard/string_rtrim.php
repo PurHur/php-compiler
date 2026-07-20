@@ -39,6 +39,14 @@ final class string_rtrim extends Internal
             throw new \LogicException($fn.'() requires one to three arguments');
         }
         $string = self::vmStringArg($frame, $fn, 0, 'string');
+        if ('' === $string) {
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $frame->returnVar->string('');
+
+            return;
+        }
         [$mask, $mode] = VmString::resolveTrimMaskAndMode(
             \array_slice($frame->calledArgs, 1),
             $fn,
@@ -60,6 +68,23 @@ final class string_rtrim extends Internal
         $argc = \count($args);
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException($fn.'() requires one to three arguments');
+        }
+        if (
+            !$context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
+        ) {
+            $emptyPtr = JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[0],
+                $fn,
+                0,
+                'string'
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $emptyPtr
+            );
         }
         $literal = $args[0]->compileTimeString ?? null;
         $optional = \array_slice($args, 1);
@@ -105,6 +130,10 @@ final class string_rtrim extends Internal
             }
         }
         $str = self::jitStringArg($context, $fn, $args[0], 0, 'string');
+        $early = string_trim::jitReturnIfCoercedEmptyTrimInput($context, $args[0], $str);
+        if (null !== $early) {
+            return $early;
+        }
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(

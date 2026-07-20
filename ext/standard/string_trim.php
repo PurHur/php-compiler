@@ -43,6 +43,14 @@ final class string_trim extends Internal
             throw new \LogicException('trim() requires one to three arguments');
         }
         $string = self::vmStringArg($frame, 0, 'string');
+        if ('' === $string) {
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $frame->returnVar->string('');
+
+            return;
+        }
         [$mask, $mode] = VmString::resolveTrimMaskAndMode(
             \array_slice($frame->calledArgs, 1),
             'trim',
@@ -62,6 +70,23 @@ final class string_trim extends Internal
         $argc = \count($args);
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('trim() requires one to three arguments');
+        }
+        if (
+            !$context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
+        ) {
+            $emptyPtr = JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[0],
+                'trim',
+                0,
+                'string'
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $emptyPtr
+            );
         }
         $literal = $args[0]->compileTimeString ?? null;
         $optional = \array_slice($args, 1);
@@ -105,6 +130,10 @@ final class string_trim extends Internal
             }
         }
         $str = self::jitStringArg($context, $args[0], 0, 'string');
+        $early = self::jitReturnIfCoercedEmptyTrimInput($context, $args[0], $str);
+        if (null !== $early) {
+            return $early;
+        }
         $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         if (null !== $maskStr) {
             $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskStr);
@@ -256,6 +285,29 @@ final class string_trim extends Internal
         );
 
         return $context->builder->icmp(Builder::INT_NE, $inMask, $i32->constInt(0, false));
+    }
+
+    /** trim/ltrim/rtrim/chop: coerced null/"" needs no php_trim loop (AOT-safe, #21404). */
+    public static function jitReturnIfCoercedEmptyTrimInput(
+        Context $context,
+        JITVariable $arg,
+        Value $strVal
+    ): ?Value {
+        if ($context->callerStrictTypes) {
+            return null;
+        }
+        if (
+            JITVariable::TYPE_NULL === $arg->type
+            || $arg->isNullConstant
+            || '' === ($arg->compileTimeString ?? null)
+        ) {
+            return $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $strVal
+            );
+        }
+
+        return null;
     }
 
     /** php_trim — Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21404). */

@@ -37,7 +37,8 @@ final class VmString
      * wordwrap/str_pad, substr_compare, str_increment/str_decrement,
      * and other typed string builtins use this guard (php-src ext/standard/string.c).
      * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords are Z_PARAM_STR TypeError on 8.4 (#20080).
-     * strlen/strtolower/strtoupper/strrev, and md5/sha1/crc32/bin2hex/hash($data)/hash_hmac($data) coerce null with
+     * strlen/strtolower/strtoupper/strrev, trim/ltrim/rtrim/chop (#21404, reverts #21350),
+     * and md5/sha1/crc32/bin2hex/hash($data)/hash_hmac($data) coerce null with
      * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181 #21209).
      * base64_encode/base64_decode, urlencode/urldecode/rawurlencode/rawurldecode, parse_url soft-null (#21188).
      * mb_strlen/mb_substr/mb_strpos and iconv/iconv_strlen(+substr/strpos/strrpos input) soft-null (#21197).
@@ -68,7 +69,8 @@ final class VmString
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
      * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords moved to Z_PARAM_STR TypeError (#20080).
-     * Used by strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data) (#21181),
+     * Used by strlen/strtolower/strtoupper/strrev (#20007), trim/ltrim/rtrim/chop (#21404),
+     * md5/sha1/crc32/bin2hex/hash($data) (#21181),
      * stripslashes/addcslashes/stripcslashes/quotemeta (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
      * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),

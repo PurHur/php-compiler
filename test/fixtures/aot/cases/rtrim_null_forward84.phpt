@@ -1,10 +1,9 @@
 --TEST--
-AOT: rtrim(null) — TypeError on 8.4 forward profile (#21350, ext/standard/string.c)
+AOT: rtrim null — coerce on 8.4 forward profile (#21404)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-rtrim(null);
+echo rtrim(null) === '' ? 'ok' : 'bad', "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+ok
