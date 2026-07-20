@@ -103,7 +103,7 @@ final class htmlentities extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'htmlentities', 0, 'string');
+        $str = self::jitStringArg($context, $args[0], 0, 'string');
         $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($argc >= 2) {
             $flagsLlvm = $flagsKnown
@@ -114,15 +114,41 @@ final class htmlentities extends Internal
         return JitHtmlentities::escape($context, $str, $flagsLlvm);
     }
 
-    /** Soft-null — coerce+deprecate on forward profile (#21180, ext/standard/html.c). */
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#21351, ext/standard/html.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'htmlentities', $paramName)->toString();
         }
 
-        return VmString::coerceTrimFamilyStringArg(
-            $frame->calledArgs[$argIndex],
+        return VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            'htmlentities',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'htmlentities',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
             'htmlentities',
             $argIndex,
             $paramName

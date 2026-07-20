@@ -45,6 +45,7 @@ final class VmString
      * $subject (and str_replace family $subject) soft-null likewise (#21198, #21318).
      * json_decode/json_validate $json, unserialize $data, parse_str $string soft-null (#21223).
      * introspection name args (function_exists/class_exists/defined/…) soft-null (#21281).
+     * htmlspecialchars/htmlentities/nl2br/addslashes are Z_PARAM_STR TypeError on 8.4 (#21351), not soft-null.
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare is Z_PARAM_STR TypeError on 8.4 (#20164), not soft-null.
      */
@@ -58,8 +59,7 @@ final class VmString
      *
      * Used by str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
      * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data) (#21181),
-     * HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/addcslashes/stripcslashes/nl2br/quotemeta
-     * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
+     * stripslashes/addcslashes/stripcslashes/quotemeta (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
      * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * mb_strtolower/mb_convert_encoding/mb_substr_count string inputs (#21282),

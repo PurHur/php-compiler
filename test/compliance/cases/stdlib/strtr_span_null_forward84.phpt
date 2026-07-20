@@ -23,4 +23,4 @@ strtr: strtr(): Argument #1 ($string) must be of type string, null given
 strcspn: strcspn(): Argument #1 ($string) must be of type string, null given
 strspn: strspn(): Argument #1 ($string) must be of type string, null given
 strip_tags: strip_tags(): Argument #1 ($string) must be of type string, null given
-nl2br: uncaught ''
+nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
