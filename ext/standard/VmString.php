@@ -74,6 +74,7 @@ final class VmString
      * date/gmdate $format and strtotime $datetime soft-null (#21208, reverts #19651).
      * password_verify/password_needs_rehash string operands soft-null (#21314; hash_equals stays TypeError).
      * str_rot13/crypt/uniqid/gzcompress soft-null (#21280).
+     * zlib one-shot $data (gzdeflate/gzinflate/gzdecode/gzuncompress/gzcompress/gzencode) soft-null (#21311, reverts #19332).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,
