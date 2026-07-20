@@ -56,7 +56,7 @@ final class VmString
      *
      * Used by trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
      * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data) (#21181),
-     * HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/nl2br/quotemeta
+     * HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/addcslashes/stripcslashes/nl2br/quotemeta
      * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
      * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),

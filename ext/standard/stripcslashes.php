@@ -19,7 +19,7 @@ use PHPLLVM\Value;
 /**
  * stripcslashes() — unescape C-style byte sequences (php-src ext/standard/string.c; issue #3356).
  *
- * Z_PARAM_STR: null TypeError on PHP_COMPILER_PROFILE=8.4 (#19432).
+ * Soft-null on forward profile like addslashes/stripslashes (#21220 / #21180).
  */
 final class stripcslashes extends Internal
 {
@@ -40,6 +40,16 @@ final class stripcslashes extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('stripcslashes() requires exactly one argument in this compiler build');
         }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'stripcslashes', 0, 'string');
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'stripcslashes', 0, 'string');
+        }
+
         $subjectLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
         if (null !== $subjectLit) {
             return $context->builder->load(
@@ -61,7 +71,7 @@ final class stripcslashes extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'stripcslashes', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'stripcslashes',
             $argIndex,
@@ -85,7 +95,7 @@ final class stripcslashes extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'stripcslashes',

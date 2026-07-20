@@ -24,11 +24,11 @@ foreach ($cases as $name => $fn) {
 echo var_export(stripslashes(''), true), "\n";
 ?>
 --EXPECT--
-addcslashes(): Argument #1 ($string) must be of type string, null given
+addcslashes: uncaught ''
 stripslashes: uncaught ''
 hebrev(): Argument #1 ($string) must be of type string, null given
 str_split(): Argument #1 ($string) must be of type string, null given
 convert_uudecode(): Argument #1 ($string) must be of type string, null given
 str_getcsv(): Argument #1 ($string) must be of type string, null given
-ord(): Argument #1 ($character) must be of type string, null given
+ord: uncaught 0
 ''
