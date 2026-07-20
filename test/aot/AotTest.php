@@ -265,10 +265,8 @@ class AotTest extends BaseTest
                 && str_contains($name, 'stream_support_read_write_constants')) {
                 continue;
             }
-            if (!CompilerVersion::supportsConvertCyrString()
-                && str_contains($name, 'convert_cyr_string')) {
-                continue;
-            }
+            // convert_cyr_string / money_format removed in php-src 8.0 (#21481): functional AOT uses
+            // PROFILE=7.4 via --ENV--; phantom_* cases always include.
             if (!CompilerVersion::supportsStrxfrm()
                 && str_contains($name, 'strxfrm')) {
                 continue;
