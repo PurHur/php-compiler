@@ -48,13 +48,14 @@ final class addslashes extends Internal
         );
     }
 
+    /** Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21406). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'addslashes', $paramName)->toString();
         }
 
-        return VmString::zparamStrBuiltinArgForFrame(
+        return VmString::trimFamilyStringArgForFrame(
             $frame,
             $argIndex,
             'addslashes',
@@ -79,7 +80,7 @@ final class addslashes extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'addslashes',
