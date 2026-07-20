@@ -35,7 +35,7 @@ final class parse_ini_string extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $ini = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'parse_ini_string', 0, 'ini_string');
+        $ini = VmString::trimFamilyStringArgForFrame($frame, 0, 'parse_ini_string', 0, 'ini_string');
         $processSections = false;
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
         if (isset($frame->calledArgs[1])) {
@@ -57,13 +57,13 @@ final class parse_ini_string extends Internal
             throw new \LogicException('parse_ini_string() expects between 1 and 3 arguments in this compiler build');
         }
         if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            if (VmString::requiresZparamStrStrictNullOnForwardProfile()) {
+            if ($context->callerStrictTypes) {
                 JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'parse_ini_string', 0, 'ini_string');
                 $slot = JitValueBox::alloc($context);
 
                 return JitValueBox::pointer($context, $slot);
             }
-
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'parse_ini_string', 0, 'ini_string');
             $literal = '';
         } else {
             $literal = JitStringArg::compileTimeLiteral($args[0]);

@@ -120,6 +120,7 @@ final class JitStringBuiltinArg
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
      * json_decode/json_validate $json, unserialize $data (#21223).
+     * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
      * parse_str $string is Z_PARAM_STR TypeError on 8.4 (#21380).
      * introspection name args (function_exists/class_exists/defined/…) (#21281).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).

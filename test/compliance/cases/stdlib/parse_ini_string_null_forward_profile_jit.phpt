@@ -1,7 +1,8 @@
 --TEST--
-stdlib PHP 8.4 profile — parse_ini_string(null) E_DEPRECATED + [] (#21431, reverts #18658, ext/standard/basic_functions.c)
+stdlib PHP 8.4 profile — parse_ini_string(null) JIT E_DEPRECATED + [] (#21431)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
+--JIT--
 --FILE--
 <?php
 error_reporting(E_ALL);
