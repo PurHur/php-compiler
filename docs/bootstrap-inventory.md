@@ -11592,8 +11592,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/JitHashContext.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 306)
-- new JITVariable (line 333)
+- new JITVariable (line 309)
+- new JITVariable (line 336)
 - 18 class method(s)
 
 ### `ext/hash/JitHashCryptoKernel.php`
@@ -11635,12 +11635,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/VmHashContext.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashContextDebugInfo (line 35)
-- new ObjectEntry (line 60)
-- new Variable (line 67)
-- new ObjectEntry (line 146)
-- new Variable (line 153)
-- 10 class method(s)
+- new HashContextDebugInfo (line 34)
+- new ObjectEntry (line 59)
+- new Variable (line 66)
+- new ObjectEntry (line 145)
+- new Variable (line 152)
+- 9 class method(s)
 
 ### `ext/hash/VmMhash.php`
 
