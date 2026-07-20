@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -44,10 +45,18 @@ final class StringVersionCompare
             return;
         }
 
+        // Restore caller insert block after bridge emit (#21556 / peer #19998) —
+        // clearInsertionPosition left the user-script builder detached
+        // ("Current basic block has no parent function").
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementCompareBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementCompareBridge(Context $context): void
