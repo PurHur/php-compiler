@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6161 |
-| Phase A inventory files (M2 ratio SSOT) | 6161 |
+| PHP files on vm.php path | 6162 |
+| Phase A inventory files (M2 ratio SSOT) | 6162 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19255 |
+| Source constructs flagged (warnings) | 19259 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1174,7 +1174,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbstringLanguageRegistry.php` | 0 | 1 |
 | `ext/mbstring/MbstringMailProfile.php` | 0 | 1 |
 | `ext/mbstring/MbstringState.php` | 0 | 3 |
-| `ext/mbstring/Module.php` | 0 | 67 |
+| `ext/mbstring/Module.php` | 0 | 68 |
 | `ext/mbstring/Utf8CaseMap.php` | 0 | 1 |
 | `ext/mbstring/VmMbConvertVariables.php` | 0 | 3 |
 | `ext/mbstring/VmMbParseStr.php` | 0 | 2 |
@@ -1244,6 +1244,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_substr_count.php` | 0 | 2 |
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
 | `ext/mbstring/mb_ucfirst.php` | 0 | 3 |
+| `ext/mbstring/mb_ucwords.php` | 0 | 3 |
 | `ext/msgpack/Module.php` | 0 | 3 |
 | `ext/msgpack/MsgpackExtensionPolicy.php` | 0 | 1 |
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
@@ -15184,40 +15185,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new mb_rtrim (line 63)
 - new mb_ucfirst (line 66)
 - new mb_lcfirst (line 67)
-- new mb_scrub (line 69)
-- new mb_encode_numericentity (line 70)
-- new mb_decode_numericentity (line 71)
-- new mb_encode_mimeheader (line 72)
-- new mb_decode_mimeheader (line 73)
-- new mb_send_mail (line 74)
-- new mb_http_output (line 75)
-- new mb_get_info (line 76)
-- new mb_output_handler (line 77)
-- new mb_internal_encoding (line 78)
-- new mb_language (line 79)
-- new mb_http_input (line 80)
-- new mb_parse_str (line 81)
-- new mb_detect_order (line 82)
-- new mb_substitute_character (line 83)
-- new mb_preferred_mime_name (line 84)
-- new mb_encoding_aliases (line 85)
-- new mb_convert_kana (line 86)
-- new mb_split (line 87)
-- new mb_ereg (line 88)
-- new mb_eregi (line 89)
-- new mb_ereg_replace (line 90)
-- new mb_eregi_replace (line 91)
-- new mb_ereg_replace_callback (line 92)
-- new mb_ereg_match (line 93)
-- new mb_ereg_search (line 94)
-- new mb_ereg_search_pos (line 95)
-- new mb_ereg_search_regs (line 96)
-- new mb_ereg_search_init (line 97)
-- new mb_ereg_search_getregs (line 98)
-- new mb_ereg_search_getpos (line 99)
-- new mb_ereg_search_setpos (line 100)
-- new mb_regex_encoding (line 101)
-- new mb_regex_set_options (line 102)
+- new mb_ucwords (line 70)
+- new mb_scrub (line 72)
+- new mb_encode_numericentity (line 73)
+- new mb_decode_numericentity (line 74)
+- new mb_encode_mimeheader (line 75)
+- new mb_decode_mimeheader (line 76)
+- new mb_send_mail (line 77)
+- new mb_http_output (line 78)
+- new mb_get_info (line 79)
+- new mb_output_handler (line 80)
+- new mb_internal_encoding (line 81)
+- new mb_language (line 82)
+- new mb_http_input (line 83)
+- new mb_parse_str (line 84)
+- new mb_detect_order (line 85)
+- new mb_substitute_character (line 86)
+- new mb_preferred_mime_name (line 87)
+- new mb_encoding_aliases (line 88)
+- new mb_convert_kana (line 89)
+- new mb_split (line 90)
+- new mb_ereg (line 91)
+- new mb_eregi (line 92)
+- new mb_ereg_replace (line 93)
+- new mb_eregi_replace (line 94)
+- new mb_ereg_replace_callback (line 95)
+- new mb_ereg_match (line 96)
+- new mb_ereg_search (line 97)
+- new mb_ereg_search_pos (line 98)
+- new mb_ereg_search_regs (line 99)
+- new mb_ereg_search_init (line 100)
+- new mb_ereg_search_getregs (line 101)
+- new mb_ereg_search_getpos (line 102)
+- new mb_ereg_search_setpos (line 103)
+- new mb_regex_encoding (line 104)
+- new mb_regex_set_options (line 105)
 - 2 class method(s)
 
 ### `ext/mbstring/Utf8CaseMap.php`
@@ -15245,19 +15247,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 296)
 - new HashTable (line 554)
 - new Variable (line 557)
-- new ArgumentCountError (line 1617)
-- new ArgumentCountError (line 1625)
-- new Error (line 2922)
-- new Error (line 2926)
-- new Variable (line 3042)
-- new HashTable (line 3101)
-- new Variable (line 3103)
-- new HashTable (line 3120)
-- new Variable (line 3122)
-- new ArgumentCountError (line 3137)
-- new MailBuiltin (line 3351)
-- new Variable (line 3356)
-- 156 class method(s)
+- new ArgumentCountError (line 1629)
+- new ArgumentCountError (line 1637)
+- new Error (line 2934)
+- new Error (line 2938)
+- new Variable (line 3054)
+- new HashTable (line 3113)
+- new Variable (line 3115)
+- new HashTable (line 3132)
+- new Variable (line 3134)
+- new ArgumentCountError (line 3149)
+- new MailBuiltin (line 3363)
+- new Variable (line 3368)
+- 157 class method(s)
 - 1 closure(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
@@ -15692,6 +15694,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/mbstring/mb_ucfirst.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_ucwords.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
@@ -38715,7 +38724,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 211 class method(s)
+- 213 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

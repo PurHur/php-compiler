@@ -78,6 +78,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['mb_ucfirst', 'mb_lcfirst'], true)) {
             return CompilerVersion::advertisesMbUcfirstLcfirst();
         }
+        if ('mb_ucwords' === $lc) {
+            return CompilerVersion::advertisesMbUcwords();
+        }
         if (\in_array($lc, ['str_increment', 'str_decrement'], true)) {
             return CompilerVersion::advertisesStrIncrement();
         }

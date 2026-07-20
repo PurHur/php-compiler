@@ -1253,6 +1253,7 @@
         "ext/mbstring/mb_substr_count.php",
         "ext/mbstring/mb_trim.php",
         "ext/mbstring/mb_ucfirst.php",
+        "ext/mbstring/mb_ucwords.php",
         "ext/msgpack/Module.php",
         "ext/msgpack/MsgpackExtensionPolicy.php",
         "ext/msgpack/VmMsgpack.php",
@@ -3049,6 +3050,7 @@
         "ext/standard/VmMetaphone.php",
         "ext/standard/VmMime.php",
         "ext/standard/VmMinMax.php",
+        "ext/standard/VmMoneyFormat.php",
         "ext/standard/VmMt19937.php",
         "ext/standard/VmNetInterfaces.php",
         "ext/standard/VmNetInterfacesNative.php",
@@ -3687,6 +3689,7 @@
         "ext/standard/mkdir_.php",
         "ext/standard/mktime.php",
         "ext/standard/modf.php",
+        "ext/standard/money_format.php",
         "ext/standard/move_uploaded_file.php",
         "ext/standard/mt_getrandmax.php",
         "ext/standard/mt_rand.php",
@@ -6393,9 +6396,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6159,
+        "inventory_files": 6162,
         "excluded": 0,
-        "eligible": 6159,
+        "eligible": 6162,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

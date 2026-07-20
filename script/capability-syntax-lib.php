@@ -1373,6 +1373,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/mbstring/mb_trim.php',
         ],
         [
+            'names' => ['mb_ucwords'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbUcwords'],
+            'since' => '8.4.0',
+            'module' => 'mbstring',
+            'relPath' => 'ext/mbstring/mb_ucwords.php',
+        ],
+        [
             'names' => ['generator_to_array'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsGeneratorToArray'],
             'since' => '8.4.0',
