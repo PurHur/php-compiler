@@ -58,6 +58,16 @@ final class BuiltinClasses
         $entry->methodVisibility['diagnose'] = $pub;
         $entry->methodNames['diagnose'] = 'diagnose';
 
+        $parseString = new TidyParseStringMethod();
+        $entry->methods['parsestring'] = $parseString;
+        $entry->methodVisibility['parsestring'] = $pub;
+        $entry->methodNames['parsestring'] = 'parseString';
+
+        $parseFile = new TidyParseFileMethod();
+        $entry->methods['parsefile'] = $parseFile;
+        $entry->methodVisibility['parsefile'] = $pub;
+        $entry->methodNames['parsefile'] = 'parseFile';
+
         $repairString = new TidyRepairString();
         $entry->methods['repairstring'] = $repairString;
         $entry->methodVisibility['repairstring'] = $pubStatic;
@@ -129,6 +139,70 @@ final class TidyDiagnose extends VmClassMethod
             throw new \LogicException('tidy::diagnose() called without $this');
         }
         $ok = VmTidy::diagnose($self->toObject(), $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
+            $ret->bool($ok);
+        });
+    }
+}
+
+/** tidy::parseString() — instance host bridge (#21501). */
+final class TidyParseStringMethod extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('parseString');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'tidy::parseString() expects at least 1 argument, '.max(0, \count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (\count($frame->calledArgs) > 4) {
+            throw new \ArgumentCountError(
+                'tidy::parseString() expects at most 3 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::parseString() called without $this');
+        }
+        $html = VmTidy::htmlStringArg($frame->calledArgs[1], 'tidy::parseString', 0);
+        $ok = VmTidy::parseStringInto($self->toObject(), $html, $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
+            $ret->bool($ok);
+        });
+    }
+}
+
+/** tidy::parseFile() — instance host bridge (#21501). */
+final class TidyParseFileMethod extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('parseFile');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'tidy::parseFile() expects at least 1 argument, '.max(0, \count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (\count($frame->calledArgs) > 5) {
+            throw new \ArgumentCountError(
+                'tidy::parseFile() expects at most 4 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::parseFile() called without $this');
+        }
+        $filename = VmTidy::htmlStringArg($frame->calledArgs[1], 'tidy::parseFile', 0);
+        $ok = VmTidy::parseFileInto($self->toObject(), $filename, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
         });

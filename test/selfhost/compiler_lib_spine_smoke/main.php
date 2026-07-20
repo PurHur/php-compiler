@@ -6244,6 +6244,7 @@ require_once __DIR__.'/../../../ext/tidy/Module.php';
 require_once __DIR__.'/../../../ext/tidy/TidyExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/tidy/VmTidy.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_parse_string.php';
+require_once __DIR__.'/../../../ext/tidy/tidy_parse_file.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
