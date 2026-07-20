@@ -34,9 +34,10 @@ final class hash_hmac extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // Z_PARAM_STR $algo — null TypeError on 8.4 forward profile (#20304, ext/hash/hash.c).
-        $algo = self::vmZparamStrArg($frame, 0, 'algo');
+        // Z_PARAM_STR $algo — non-strict null is E_DEPRECATED + '' then ValueError (#21490, reverts #20304).
+        $algo = self::vmAlgoArg($frame);
         $data = self::vmDataArg($frame);
+        // Z_PARAM_STR $key — null TypeError on 8.4 forward profile (#20175 / #21557).
         $key = self::vmZparamStrArg($frame, 2, 'key');
         $raw = false;
         if (4 === $argc) {
@@ -66,10 +67,39 @@ final class hash_hmac extends Internal
         }
         return JitHash::hashHmac(
             $context,
-            self::jitZparamStrArg($context, $args[0], 0, 'algo'),
+            self::jitAlgoArg($context, $args[0]),
             self::jitDataArg($context, $args[1]),
             self::jitZparamStrArg($context, $args[2], 2, 'key'),
             $raw
+        );
+    }
+
+    /**
+     * Z_PARAM_STR $algo — soft-null then ValueError on empty/unknown (#21490, ext/hash/hash.c).
+     */
+    private static function vmAlgoArg(Frame $frame): string
+    {
+        return VmString::trimFamilyStringArgForFrame($frame, 0, 'hash_hmac', 0, 'algo');
+    }
+
+    private static function jitAlgoArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'hash_hmac',
+                0,
+                'algo'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $arg,
+            'hash_hmac',
+            0,
+            'algo'
         );
     }
 
@@ -114,7 +144,7 @@ final class hash_hmac extends Internal
     }
 
     /**
-     * Z_PARAM_STR $algo / $key — null TypeError on 8.4 forward profile (#20175, #20304, ext/hash/hash.c).
+     * Z_PARAM_STR $key — null TypeError on 8.4 forward profile (#20175, #21557, ext/hash/hash.c).
      */
     private static function vmZparamStrArg(Frame $frame, int $argIndex, string $paramName): string
     {

@@ -38,8 +38,8 @@ final class hash_ extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR $algo — null TypeError on 8.4 forward profile (#20304, ext/hash/hash.c).
-        $algo = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'hash', 0, 'algo');
+        // Z_PARAM_STR $algo — non-strict null is E_DEPRECATED + '' then ValueError (#21490, reverts #20304).
+        $algo = VmString::trimFamilyStringArgForFrame($frame, 0, 'hash', 0, 'algo');
         $data = self::vmDataArg($frame);
         $raw = false;
         if (isset($frame->calledArgs[2])) {
@@ -82,7 +82,7 @@ final class hash_ extends Internal
         );
     }
 
-    /** Z_PARAM_STR $algo — null TypeError on 8.4 forward profile (#20304, ext/hash/hash.c). */
+    /** Z_PARAM_STR $algo — soft-null then ValueError on empty/unknown (#21490, ext/hash/hash.c). */
     private static function jitAlgoArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
@@ -95,7 +95,7 @@ final class hash_ extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'hash',
