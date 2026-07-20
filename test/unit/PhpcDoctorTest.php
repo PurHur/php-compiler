@@ -182,6 +182,8 @@ final class PhpcDoctorTest extends TestCase
         $this->assertStringContainsString('examples-sessions-smoke', $result['stdout']);
         $this->assertStringContainsString('examples-aot-smoke.sh', $result['stdout']);
         $this->assertStringContainsString('deploy-smoke-all', $result['stdout']);
+        $this->assertStringContainsString('DEPLOY_SMOKE_ALL_GATE', $result['stdout']);
+        $this->assertStringContainsString('#2085', $result['stdout']);
         $this->assertStringContainsString('#2077', $result['stdout']);
         $this->assertStringContainsString('test005SessionsWebAotLink', $result['stdout']);
         $this->assertStringContainsString('#1891', $result['stdout']);
