@@ -1697,7 +1697,7 @@ final class VmDomXPath
 
             return false === $colon ? $name : substr($name, $colon + 1);
         }
-        // namespace-uri([node-set]) — XPath 1.0 (#20818).
+        // namespace-uri([node-set]) — XPath 1.0 (#20818, #21238).
         if (preg_match('~^namespace-uri\(~i', $expression)) {
             $args = self::wrappedFunctionArgs($expression, 'namespace-uri');
             if (null === $args || \count($args) > 1) {
@@ -1708,7 +1708,8 @@ final class VmDomXPath
                 return '';
             }
 
-            return DomRegistry::state($node)->namespaceURI ?? '';
+            // DomNodeState stores namespaceUri; match predicate path (#21125).
+            return VmDom::readNamespaceUri($node) ?? '';
         }
         // concat(string, string, ...) — XPath 1.0 (#20818).
         if (preg_match('~^concat\(~i', $expression)) {

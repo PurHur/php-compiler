@@ -400,7 +400,7 @@ final class DomParseSimpleXmlJitHelper
     /**
      * Document-order elements with in-scope prefix→URI maps (xml always present; #20097/#20206).
      *
-     * @return list<array{local: string, inScope: array<string, string>}>
+     * @return list<array{local: string, prefix: string, qname: string, inScope: array<string, string>}>
      */
     public static function walkElementsInScopeNamespaces(string $xml): array
     {
@@ -439,6 +439,7 @@ final class DomParseSimpleXmlJitHelper
             $attrs = $tag[2] ?? '';
             $selfClosing = '/' === ($tag[3] ?? '');
             $colon = strpos($qname, ':');
+            $prefix = false === $colon ? '' : substr($qname, 0, $colon);
             $local = false === $colon ? $qname : substr($qname, $colon + 1);
 
             $decls = [];
@@ -451,22 +452,24 @@ final class DomParseSimpleXmlJitHelper
                 $decls[''] = $def[1];
             }
 
-            foreach ($decls as $prefix => $uri) {
-                unset($inScope[$prefix]);
-                $inScope[$prefix] = $uri;
+            foreach ($decls as $declPrefix => $uri) {
+                unset($inScope[$declPrefix]);
+                $inScope[$declPrefix] = $uri;
             }
 
             $out[] = [
                 'local' => $local,
+                'prefix' => $prefix,
+                'qname' => $qname,
                 'inScope' => $inScope,
             ];
 
             if ($selfClosing) {
                 $inScope = ['xml' => $xmlNs];
                 foreach ($stack as $frame) {
-                    foreach ($frame as $prefix => $uri) {
-                        unset($inScope[$prefix]);
-                        $inScope[$prefix] = $uri;
+                    foreach ($frame as $framePrefix => $uri) {
+                        unset($inScope[$framePrefix]);
+                        $inScope[$framePrefix] = $uri;
                     }
                 }
             } else {

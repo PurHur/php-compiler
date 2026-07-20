@@ -31,8 +31,8 @@ final class JitDomXPathEvaluate
 
         $exprLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         $expr = null !== $exprLit ? trim($exprLit) : null;
-        // string()/name() before bool — `=` inside [@attr=…] is not a comparison (#21148).
-        if (null !== $expr && preg_match('~^(string|name)\(~i', $expr)) {
+        // string()/name()/local-name()/namespace-uri() before bool — `=` inside [@attr=…] is not a comparison (#21148, #21238).
+        if (null !== $expr && preg_match('~^(string|name|local-name|namespace-uri)\(~i', $expr)) {
             DomXPathEvaluateRuntime::ensureStringLinked($context);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_string_cont');
 
@@ -64,7 +64,7 @@ final class JitDomXPathEvaluate
             );
         }
 
-        throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean/not/compare, count/sum/number/arithmetic, or string/name() literal');
+        throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean/not/compare, count/sum/number/arithmetic, or string/name()/local-name()/namespace-uri() literal');
     }
 
     private static function isBoolEvaluateExpr(string $expr): bool
