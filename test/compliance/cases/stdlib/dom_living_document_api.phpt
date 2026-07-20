@@ -53,11 +53,11 @@ echo 'xml_adopt=', $adopted->nodeName, "\n";
 ?>
 --EXPECT--
 createElement=1 getElementsByTagName=1 getElementsByClassName=1 importNode=1 adoptNode=1 saveXml=1 saveXmlFile=1 saveHtmlFile=1 append=1 prepend=1 replaceChildren=1 
-el=span:Dom\HTMLElement
+el=SPAN:Dom\HTMLElement
 tags=1
 class=1
 saveXml=ok
-import=div
+import=DIV
 saveXmlFile=ok
 saveHtmlFile=ok
 xml_createElement=1 xml_getElementsByTagName=1 xml_saveXml=1 xml_importNode=1 xml_adoptNode=1 

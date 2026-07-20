@@ -41,7 +41,7 @@ className=a
 id=x
 className2=b c attr=b c
 inner2=<b>x</b><i>y</i>
-child=b
+child=B
 outer_replaced=<p id="z" class="q">z</p>
 old_gone=yes
-orphan_tag=span
+orphan_tag=SPAN

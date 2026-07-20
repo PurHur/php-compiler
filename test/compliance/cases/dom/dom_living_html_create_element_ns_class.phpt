@@ -32,7 +32,7 @@ $xd = Dom\XMLDocument::createFromString('<root/>');
 echo 'xml_htmlns=', get_class($xd->createElementNS($htmlNs, 'div')), "\n";
 ?>
 --EXPECT--
-createElement=Dom\HTMLElement name=div ns=http://www.w3.org/1999/xhtml
+createElement=Dom\HTMLElement name=DIV ns=http://www.w3.org/1999/xhtml
 htmlns=Dom\HTMLElement
 svg=Dom\Element html=no
 custom=Dom\Element html=no

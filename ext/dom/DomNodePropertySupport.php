@@ -180,7 +180,8 @@ final class DomNodePropertySupport
             return $var;
         }
         if (strtolower(VmDom::PROP_NODE_NAME) === $lc || strtolower(VmDom::PROP_TAG_NAME) === $lc) {
-            $var->string(DomRegistry::state($object)->nodeName);
+            // HTML Dom\Element tagName/nodeName are uppercase (php-src element.c; #21558).
+            $var->string(VmDom::readNodeName($object));
 
             return $var;
         }

@@ -37,8 +37,8 @@ has
 Dom\HTMLCollection
 isa
 len=2
-item0=div
-named=div
-dim=div
+item0=DIV
+named=DIV
+dim=DIV
 live=3
 legacy=DOMNodeList
