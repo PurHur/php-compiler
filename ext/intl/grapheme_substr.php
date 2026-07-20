@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\intl;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -36,8 +37,13 @@ final class grapheme_substr extends Internal
                 'grapheme_substr() expects at least 2 arguments, '.$argc.' given'
             );
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20694, grapheme_string.c).
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'grapheme_substr', 0, 'string');
+        // Z_PARAM_STR — Zend 8.4 DEP+coerce on null, not TypeError (#21320, grapheme_string.c).
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, 0, 'grapheme_substr', 'string');
+            $string = $frame->calledArgs[0]->resolveIndirect()->toString();
+        } else {
+            $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'grapheme_substr', 0, 'string', 'string', false);
+        }
         if (null === $frame->returnVar) {
             return;
         }
