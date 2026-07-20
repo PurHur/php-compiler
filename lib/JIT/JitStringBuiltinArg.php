@@ -117,6 +117,7 @@ final class JitStringBuiltinArg
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
      * unpack($string) soft-null (#21246).
+     * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
      */
     public static function lowerTrimFamilyString(
         Context $context,
