@@ -37,6 +37,25 @@ final class VmDomXPath
         return 'concat('.implode(',', $parts).')';
     }
 
+    /**
+     * XPath 1.0 string-value of a node (libxml / php-src ext/dom/xpath.c).
+     *
+     * Living Dom\Element::$nodeValue is always null (#21034); element/document/
+     * fragment string-value is descendant text (`textContent`). Attr/text/comment/
+     * PI/namespace keep `nodeValue` (#21271, re-#20757/#20818).
+     */
+    private static function xpathStringValue(?ObjectEntry $node): string
+    {
+        if (null === $node || !DomRegistry::has($node)) {
+            return '';
+        }
+        if (VmDom::isElement($node) || VmDom::isDocument($node) || VmDom::isDocumentFragment($node)) {
+            return VmDom::readTextContent($node);
+        }
+
+        return VmDom::readNodeValue($node) ?? '';
+    }
+
     public static function create(Context $ctx, ObjectEntry $document): ObjectEntry
     {
         VmDom::ensureDocument($document);
@@ -1603,7 +1622,7 @@ final class VmDomXPath
                 }
                 $value = '';
                 if (VmDom::isElement($node) || VmDom::isTextNode($node) || VmDom::isAttr($node)) {
-                    $value = VmDom::readNodeValue($node) ?? '';
+                    $value = self::xpathStringValue($node);
                 }
                 if (!is_numeric($value)) {
                     return NAN;
@@ -1894,10 +1913,10 @@ final class VmDomXPath
         if (null !== $leftNodes && null !== $rightNodes) {
             foreach ($leftNodes as $leftId) {
                 $leftNode = DomRegistry::entry($leftId);
-                $leftStr = null !== $leftNode ? (VmDom::readNodeValue($leftNode) ?? '') : '';
+                $leftStr = self::xpathStringValue($leftNode);
                 foreach ($rightNodes as $rightId) {
                     $rightNode = DomRegistry::entry($rightId);
-                    $rightStr = null !== $rightNode ? (VmDom::readNodeValue($rightNode) ?? '') : '';
+                    $rightStr = self::xpathStringValue($rightNode);
                     if (self::compareScalarsAsXPath($leftStr, $op, $rightStr)) {
                         return true;
                     }
@@ -1909,7 +1928,7 @@ final class VmDomXPath
         if (null !== $leftNodes) {
             foreach ($leftNodes as $leftId) {
                 $leftNode = DomRegistry::entry($leftId);
-                $leftStr = null !== $leftNode ? (VmDom::readNodeValue($leftNode) ?? '') : '';
+                $leftStr = self::xpathStringValue($leftNode);
                 if (self::compareScalarsAsXPath($leftStr, $op, $right)) {
                     return true;
                 }
@@ -1919,7 +1938,7 @@ final class VmDomXPath
         }
         foreach ($rightNodes ?? [] as $rightId) {
             $rightNode = DomRegistry::entry($rightId);
-            $rightStr = null !== $rightNode ? (VmDom::readNodeValue($rightNode) ?? '') : '';
+            $rightStr = self::xpathStringValue($rightNode);
             if (self::compareScalarsAsXPath($left, $op, $rightStr)) {
                 return true;
             }
@@ -1980,7 +1999,7 @@ final class VmDomXPath
                 return NAN;
             }
             $node = DomRegistry::entry($value[0]);
-            $str = null !== $node ? (VmDom::readNodeValue($node) ?? '') : '';
+            $str = self::xpathStringValue($node);
 
             return is_numeric($str) ? (float) $str : NAN;
         }
@@ -2028,7 +2047,7 @@ final class VmDomXPath
             }
             $node = DomRegistry::entry($value[0]);
 
-            return null !== $node ? (VmDom::readNodeValue($node) ?? '') : '';
+            return self::xpathStringValue($node);
         }
 
         return '';
@@ -2076,10 +2095,10 @@ final class VmDomXPath
             }
             $root = $rootVar->toObject();
 
-            return null !== $root ? (VmDom::readNodeValue($root) ?? '') : '';
+            return self::xpathStringValue($root);
         }
         if (VmDom::isElement($node) || VmDom::isTextNode($node) || VmDom::isAttr($node)) {
-            return VmDom::readNodeValue($node) ?? '';
+            return self::xpathStringValue($node);
         }
 
         return '';
@@ -2434,8 +2453,9 @@ final class VmDomXPath
             return '';
         }
         // Attr string-value is the attribute value (XPath 1.0 / php-src xpath.c; #19352).
+        // Element string-value is descendant text — not Dom\Element::$nodeValue (#21271).
         if (VmDom::isElement($node) || VmDom::isTextNode($node) || VmDom::isAttr($node)) {
-            return VmDom::readNodeValue($node) ?? '';
+            return self::xpathStringValue($node);
         }
 
         return '';
@@ -2797,7 +2817,7 @@ final class VmDomXPath
                 return $var;
             }
             $node = DomRegistry::entry($nodeIds[0]);
-            $var->string(null !== $node ? (VmDom::readNodeValue($node) ?? '') : '');
+            $var->string(self::xpathStringValue($node));
 
             return $var;
         }
