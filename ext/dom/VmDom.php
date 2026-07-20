@@ -6275,7 +6275,8 @@ final class VmDom
             $lines[] = self::serializeDoctype(
                 $state->doctypeName,
                 $state->doctypePublicId ?? '',
-                $state->doctypeSystemId ?? ''
+                $state->doctypeSystemId ?? '',
+                self::documentDoctypeInternalSubset($state)
             );
             $emittedDoctype = true;
         }
@@ -7397,7 +7398,8 @@ final class VmDom
             return self::serializeDoctype(
                 $dt->nodeName,
                 $dt->publicId ?? '',
-                $dt->systemId ?? ''
+                $dt->systemId ?? '',
+                $dt->internalSubset
             );
         }
         if (self::isElement($entry)) {
@@ -10279,18 +10281,48 @@ final class VmDom
         return $cloned;
     }
 
-    private static function serializeDoctype(string $name, string $publicId, string $systemId): string
+    private static function documentDoctypeInternalSubset(DomNodeState $docState): ?string
     {
-        if ('' !== $publicId || '' !== $systemId) {
-            return sprintf(
-                '<!DOCTYPE %s PUBLIC "%s" "%s">',
-                self::escapeName($name),
+        if (null === $docState->doctypeId) {
+            return null;
+        }
+        $doctype = DomRegistry::entry($docState->doctypeId);
+        if (null === $doctype) {
+            return null;
+        }
+
+        return DomRegistry::state($doctype)->internalSubset;
+    }
+
+    private static function serializeDoctype(
+        string $name,
+        string $publicId,
+        string $systemId,
+        ?string $internalSubset = null
+    ): string {
+        $escapedName = self::escapeName($name);
+        if ('' !== $publicId) {
+            $out = sprintf(
+                '<!DOCTYPE %s PUBLIC "%s" "%s"',
+                $escapedName,
                 self::escapeAttr($publicId),
                 self::escapeAttr($systemId)
             );
+        } elseif ('' !== $systemId) {
+            $out = sprintf(
+                '<!DOCTYPE %s SYSTEM "%s"',
+                $escapedName,
+                self::escapeAttr($systemId)
+            );
+        } else {
+            $out = '<!DOCTYPE '.$escapedName;
         }
 
-        return '<!DOCTYPE '.self::escapeName($name).'>';
+        if (null !== $internalSubset && '' !== $internalSubset) {
+            $out .= " [\n".$internalSubset.']';
+        }
+
+        return $out.'>';
     }
 
     private static function escapeAttr(string $value): string
@@ -11125,7 +11157,8 @@ final class VmDom
             $lines[] = self::serializeDoctype(
                 $state->doctypeName,
                 $state->doctypePublicId ?? '',
-                $state->doctypeSystemId ?? ''
+                $state->doctypeSystemId ?? '',
+                self::documentDoctypeInternalSubset($state)
             );
         }
         $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
