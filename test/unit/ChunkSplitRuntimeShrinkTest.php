@@ -8,13 +8,17 @@ use PHPCompiler\ext\standard\ChunkSplitJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** chunk_split() JIT routes through ChunkSplitJitHelper PHP not inline LLVM (#14626). */
+/** chunk_split() JIT routes through ChunkSplitJitHelper PHP not inline LLVM (#14626, #21399). */
 final class ChunkSplitRuntimeShrinkTest extends TestCase
 {
     public function testStringChunkSplitUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringChunkSplit.php');
         $this->assertStringContainsString('ChunkSplitJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
 
         $jitChunk = (string) file_get_contents(__DIR__.'/../../ext/standard/JitChunkSplit.php');
         $this->assertStringNotContainsString('chunksplit_head', $jitChunk);
