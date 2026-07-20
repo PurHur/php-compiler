@@ -1,5 +1,5 @@
 --TEST--
-stdlib hash()/hash_hmac() null $algo TypeError on 8.4 forward (#20304); hash_file soft-null (#21572)
+stdlib hash()/hash_hmac()/hash_file() null $algo soft-null on 8.4 (#21490/#21572)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -21,7 +21,7 @@ foreach (['hash', 'hash_hmac'] as $fn) {
         }
         echo $fn, ' uncaught ', var_export($r, true), "\n";
     } catch (TypeError $e) {
-        echo $e->getMessage(), "\n";
+        echo $fn, ' TE:', $e->getMessage(), "\n";
     } catch (ValueError $e) {
         echo $fn, ' VE:', $e->getMessage(), "\n";
     }
@@ -41,11 +41,11 @@ try {
     echo $e->getMessage(), "\n";
 }
 restore_error_handler();
-echo 'depr=', (int) ($seen >= 1), "\n";
+echo 'depr=', (int) ($seen >= 3), "\n";
 ?>
 --EXPECT--
-hash(): Argument #1 ($algo) must be of type string, null given
-hash_hmac(): Argument #1 ($algo) must be of type string, null given
+hash VE:hash(): Argument #1 ($algo) must be a valid hashing algorithm
+hash_hmac VE:hash_hmac(): Argument #1 ($algo) must be a valid cryptographic hashing algorithm
 hash_file(): Argument #1 ($algo) must be a valid hashing algorithm
 hash(): Argument #1 ($algo) must be a valid hashing algorithm
 depr=1
