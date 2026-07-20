@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\libxml;
 
 use PHPCompiler\ext\standard\VmCallable;
+use PHPCompiler\ext\standard\VmClosureCall;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -29,6 +32,9 @@ final class VmLibxml
     private static bool $entityLoaderDisabled = false;
 
     private static ?Variable $externalEntityLoader = null;
+
+    /** Pinned separately — VM GC may clear ObjectEntry::$closureState when only a PHP static holds the Variable (#21599). */
+    private static ?\PHPCompiler\VM\ClosureState $externalEntityLoaderState = null;
 
     /** @var list<array{level: int, code: int, column: int, message: string, file: string, line: int}> */
     private static array $errors = [];
@@ -92,12 +98,13 @@ final class VmLibxml
         return self::$entityLoaderDisabled;
     }
 
-    /** php-src ext/libxml/libxml.c — libxml_set_external_entity_loader() (#6379, #14953). */
+    /** php-src ext/libxml/libxml.c — libxml_set_external_entity_loader() (#6379, #14953, #21599). */
     public static function setExternalEntityLoader(Context $ctx, Variable $resolver): void
     {
         $resolved = $resolver->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
             self::$externalEntityLoader = null;
+            self::$externalEntityLoaderState = null;
 
             return;
         }
@@ -109,17 +116,191 @@ final class VmLibxml
         $stored = new Variable();
         $stored->copyFrom($resolved);
         self::$externalEntityLoader = $stored;
+        // Pin ClosureState: temp/inline closures can lose ObjectEntry::$closureState after the
+        // creating frame is GC'd while only this PHP static still references the Variable.
+        self::$externalEntityLoaderState = VmClosureCall::isClosure($stored)
+            ? VmClosureCall::resolve($stored)
+            : null;
     }
 
     public static function getExternalEntityLoader(): ?Variable
     {
+        self::rebindExternalEntityLoaderClosureState();
+
         return self::$externalEntityLoader;
+    }
+
+    /** Re-attach pinned ClosureState after VM GC nulls ObjectEntry::$closureState (#21599). */
+    private static function rebindExternalEntityLoaderClosureState(): void
+    {
+        if (null === self::$externalEntityLoader || null === self::$externalEntityLoaderState) {
+            return;
+        }
+        $resolved = self::$externalEntityLoader->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return;
+        }
+        $object = $resolved->toObject();
+        if (null === $object->closureState) {
+            $object->closureState = self::$externalEntityLoaderState;
+        }
+    }
+
+    /**
+     * Resolve an external general entity for DOM/SimpleXML NOENT substitution.
+     *
+     * php-src ext/libxml/libxml.c — php_libxml_external_entity_loader / default input buffer (#21599).
+     *
+     * @return string|null entity body, or null when load failed (error already recorded)
+     */
+    public static function resolveExternalEntityContent(
+        Context $ctx,
+        ?string $publicId,
+        string $systemId,
+        ?Frame $frame = null
+    ): ?string {
+        $loader = self::$externalEntityLoader;
+        if (null !== $loader) {
+            $publicVar = new Variable();
+            if (null === $publicId) {
+                $publicVar->null();
+            } else {
+                $publicVar->string($publicId);
+            }
+            $systemVar = new Variable();
+            $systemVar->string($systemId);
+            $contextVar = self::externalEntityLoaderContextVariable();
+            self::rebindExternalEntityLoaderClosureState();
+            if (null !== self::$externalEntityLoaderState) {
+                $result = VmClosureCall::invoke(
+                    $ctx,
+                    self::$externalEntityLoaderState,
+                    $publicVar,
+                    $systemVar,
+                    $contextVar
+                );
+            } else {
+                $result = VmCallable::invoke($ctx, $loader, $publicVar, $systemVar, $contextVar);
+            }
+            $content = self::materializeExternalEntityLoaderResult($ctx, $result);
+            if (null === $content) {
+                // Custom loader returned null/false — php-src reports entity id "NULL" (code 1).
+                self::handleError(
+                    $ctx,
+                    [
+                        'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+                        'code' => 1,
+                        'column' => 0,
+                        'message' => 'Failed to load external entity "NULL"',
+                        'file' => '',
+                        'line' => 0,
+                    ],
+                    $frame,
+                    null,
+                    'Failed to load external entity "NULL"'
+                );
+
+                return null;
+            }
+
+            return $content;
+        }
+
+        if (self::$entityLoaderDisabled) {
+            self::reportDefaultExternalEntityLoadFailure($ctx, $systemId, $frame);
+
+            return null;
+        }
+
+        $data = VmFs::readPathContentsViaOpen($systemId, $ctx);
+        if (false === $data) {
+            self::reportDefaultExternalEntityLoadFailure($ctx, $systemId, $frame);
+
+            return null;
+        }
+
+        return $data;
+    }
+
+    /** php-src entity_loader $context — directory/intSubName/extSubURI/extSubSystem (#21599). */
+    private static function externalEntityLoaderContextVariable(): Variable
+    {
+        $ht = new HashTable();
+        foreach (['directory', 'intSubName', 'extSubURI', 'extSubSystem'] as $key) {
+            $nullVar = new Variable();
+            $nullVar->null();
+            $ht->add($key, $nullVar);
+        }
+        $var = new Variable();
+        $var->array($ht);
+
+        return $var;
+    }
+
+    /**
+     * Loader return: resource stream → contents; string → path/URI to open; null/false → fail.
+     */
+    private static function materializeExternalEntityLoaderResult(Context $ctx, Variable $result): ?string
+    {
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_NULL === $result->type
+            || (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool())
+        ) {
+            return null;
+        }
+        if (ResourceSupport::isOpenStreamResource($result)) {
+            $handle = ResourceSupport::resolveHandle($result);
+            if (null === $handle) {
+                return null;
+            }
+            $data = VmFs::streamGetContents($handle);
+            if (false === $data) {
+                return null;
+            }
+
+            return $data;
+        }
+        if (Variable::TYPE_STRING === $result->type) {
+            $path = $result->toString();
+            if ('' === $path) {
+                return null;
+            }
+            $data = VmFs::readPathContentsViaOpen($path, $ctx);
+
+            return false === $data ? null : $data;
+        }
+
+        return null;
+    }
+
+    /** Default / disable_entity_loader failure — libxml I/O warning code 1549. */
+    private static function reportDefaultExternalEntityLoadFailure(
+        Context $ctx,
+        string $systemId,
+        ?Frame $frame
+    ): void {
+        $message = sprintf('failed to load external entity "%s"', $systemId);
+        self::handleError(
+            $ctx,
+            [
+                'level' => LibxmlConstants::LIBXML_ERR_WARNING,
+                'code' => 1549,
+                'column' => 0,
+                'message' => $message,
+                'file' => '',
+                'line' => 0,
+            ],
+            $frame,
+            null,
+            'I/O warning : '.$message
+        );
     }
 
     public static function resetEntityLoaderStateForTest(): void
     {
         self::$entityLoaderDisabled = false;
         self::$externalEntityLoader = null;
+        self::$externalEntityLoaderState = null;
     }
 
     public static function getErrors(Context $ctx): HashTable
