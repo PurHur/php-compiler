@@ -38,6 +38,11 @@ final class SleepJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/TimeSleepRuntime.php');
         $this->assertStringContainsString('SleepJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('PHP_COMPILER_EMIT_HELPER_LINK', $source);
         $this->assertStringNotContainsString('TimeSleepRuntimeLibcBridge', $source);
         $this->assertStringNotContainsString('nanosleepLoop', $source);
         $this->assertStringNotContainsString('ensureLibcTime', $source);
