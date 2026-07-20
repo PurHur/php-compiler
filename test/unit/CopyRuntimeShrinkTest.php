@@ -28,6 +28,13 @@ final class CopyRuntimeShrinkTest extends TestCase
         $this->assertLessThan(200, \substr_count($source, "\n") + 1);
     }
 
+    public function testCopyJitHelperUsesTriggerErrorJitHelperForDirectoryWarning(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/CopyJitHelper.php');
+        $this->assertStringContainsString('TriggerErrorJitHelper::warning', $source);
+        $this->assertStringNotContainsString('trigger_error', $source);
+    }
+
     public function testCopyJitHelperMatchesVmFs(): void
     {
         $from = sys_get_temp_dir().'/phpc_copy_from_'.getmypid();
