@@ -392,6 +392,10 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'mb_ucwords_phantom')) {
                 continue;
             }
+            if (CompilerVersion::supportsMbUcwords()
+                && str_contains($name, 'mb_ucwords_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (('stdlib/stream_supports' === $name)
                     || str_contains($name, 'stream_support_constants')

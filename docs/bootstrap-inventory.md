@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6162 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19260 |
+| Source constructs flagged (warnings) | 19258 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4889,7 +4889,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringCaseCompare.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringChdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringChmod.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringChunkSplit.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringChunkSplit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClassExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClassImplements.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClassParents.php` | 0 | 1 |
@@ -41309,9 +41309,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringChunkSplit.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 129)
-- 7 class method(s)
-- 1 closure(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringClassExists.php`
 
@@ -45168,45 +45166,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\EnumFromHandler (line 14410)
 - new CompileError (line 15136)
 - new VM\ClassProperty (line 15301)
-- new Variable (line 15611)
-- new Variable (line 15806)
-- new Variable (line 15808)
-- new ClassEntry (line 15851)
-- new Func\PHP (line 15858)
-- new VM\ClassProperty (line 15986)
-- new Func\PHP (line 16133)
-- new Variable (line 16209)
-- new Variable (line 16216)
-- new Variable (line 16222)
-- new Variable (line 16259)
-- new Variable (line 16288)
-- new Variable (line 16473)
-- new Variable (line 16519)
-- new VM\ClassProperty (line 16584)
-- new Error (line 16630)
-- new Error (line 16665)
+- new Variable (line 15614)
+- new Variable (line 15809)
+- new Variable (line 15811)
+- new ClassEntry (line 15854)
+- new Func\PHP (line 15861)
+- new VM\ClassProperty (line 15989)
+- new Func\PHP (line 16136)
+- new Variable (line 16212)
+- new Variable (line 16219)
+- new Variable (line 16225)
+- new Variable (line 16262)
+- new Variable (line 16291)
+- new Variable (line 16476)
+- new Variable (line 16522)
+- new VM\ClassProperty (line 16587)
+- new Error (line 16633)
 - new Error (line 16668)
 - new Error (line 16671)
 - new Error (line 16674)
-- new ObjectEntry (line 16676)
-- new Error (line 16689)
+- new Error (line 16677)
+- new ObjectEntry (line 16679)
 - new Error (line 16692)
 - new Error (line 16695)
-- new Error (line 16714)
-- new ObjectEntry (line 16718)
-- new Variable (line 16720)
-- new Variable (line 16734)
-- new Variable (line 16761)
-- new Variable (line 16774)
-- new Error (line 16904)
-- new Error (line 16909)
-- new VM\ObjectEntry (line 16913)
-- new Variable (line 17057)
-- new Variable (line 17075)
-- new NoDiscardMetadata (line 17244)
-- new Variable (line 17413)
-- new Variable (line 17415)
-- new Variable (line 17515)
+- new Error (line 16698)
+- new Error (line 16717)
+- new ObjectEntry (line 16721)
+- new Variable (line 16723)
+- new Variable (line 16737)
+- new Variable (line 16764)
+- new Variable (line 16777)
+- new Error (line 16907)
+- new Error (line 16912)
+- new VM\ObjectEntry (line 16916)
+- new Variable (line 17060)
+- new Variable (line 17078)
+- new NoDiscardMetadata (line 17247)
+- new Variable (line 17416)
+- new Variable (line 17418)
+- new Variable (line 17518)
 - 493 class method(s)
 - 25 closure(s)
 

@@ -15355,6 +15355,9 @@ restart:
                     if (isset($iface->constVisibility[$name])) {
                         $entry->constVisibility[$name] = $iface->constVisibility[$name];
                     }
+                    if (isset($iface->constFinal[$name])) {
+                        $entry->constFinal[$name] = true;
+                    }
                 }
             }
         }

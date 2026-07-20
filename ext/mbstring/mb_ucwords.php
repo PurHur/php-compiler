@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_ucwords() — multibyte upper-case the first character of each word (php-src ext/mbstring/mbstring.c; PHP 8.4, #20799).
+ * mb_ucwords() — multibyte title-case words (php-src ext/mbstring/mbstring.c; PHP 8.4, #20799).
  */
 final class mb_ucwords extends Internal
 {

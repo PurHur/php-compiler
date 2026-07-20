@@ -477,6 +477,10 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'mb_ucwords_phantom')) {
                 continue;
             }
+            if (CompilerVersion::supportsMbUcwords()
+                && str_contains($name, 'mb_ucwords_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsConvertCyrString()
                 && str_contains($name, 'convert_cyr_string')) {
                 continue;
