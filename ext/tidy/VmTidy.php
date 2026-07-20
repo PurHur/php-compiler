@@ -173,6 +173,114 @@ final class VmTidy
         return $var;
     }
 
+    /**
+     * tidy::__construct(?string $filename, array|string|null $config, ?string $encoding, bool $useIncludePath)
+     * — host bridge (#21603). php-src ext/tidy/tidy.c PHP_METHOD(tidy, __construct).
+     *
+     * @param array<string, mixed>|string|null $config
+     */
+    public static function constructInto(
+        ObjectEntry $object,
+        ?string $filename,
+        array|string|null $config,
+        ?string $encoding,
+        bool $useIncludePath,
+        ?Frame $frame
+    ): void {
+        $object->constructed = true;
+
+        if (self::hostAvailable()) {
+            try {
+                $host = new \tidy($filename, $config, $encoding, $useIncludePath);
+            } catch (\Throwable $e) {
+                throw $e;
+            }
+            self::$hostObjects[$object->id] = $host;
+            self::syncHostProperties($object, $host);
+
+            return;
+        }
+
+        if (null === $filename || '' === $filename) {
+            return;
+        }
+
+        $contents = self::loadFileToMemory($filename, $useIncludePath);
+        if (null === $contents) {
+            throw new \Error(\sprintf(
+                'Cannot load "%s" into memory%s',
+                $filename,
+                $useIncludePath ? ' (using include path)' : ''
+            ));
+        }
+        // File readable but no host tidy to parse — soft-path empty document.
+        self::emitWarning($frame, 'tidy::__construct(): host ext/tidy is not available');
+    }
+
+    /**
+     * @return string|null file contents, or null when unreadable
+     */
+    private static function loadFileToMemory(string $filename, bool $useIncludePath): ?string
+    {
+        $data = @\file_get_contents($filename, $useIncludePath);
+        if (false === $data) {
+            return null;
+        }
+
+        return $data;
+    }
+
+    /**
+     * Coerce tidy config argument (array|string|null) for host bridge (#21603).
+     *
+     * @return array<string, mixed>|string|null
+     */
+    public static function configArg(Variable $arg, string $func, int $argNum): array|string|null
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg->type) {
+            return null;
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            return $arg->toString();
+        }
+        if (Variable::TYPE_ARRAY === $arg->type) {
+            $out = [];
+            foreach ($arg->toArray()->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
+                $key = match ($keyVar->type) {
+                    Variable::TYPE_STRING => $keyVar->toString(),
+                    Variable::TYPE_INTEGER => (string) $keyVar->toInt(),
+                    default => (string) $keyVar->toString(),
+                };
+                $out[$key] = self::configScalar($valueVar);
+            }
+
+            return $out;
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($config) must be of type array|string|null, %s given',
+            $func,
+            $argNum + 1,
+            self::typeLabel($arg)
+        ));
+    }
+
+    /** @return mixed */
+    private static function configScalar(Variable $value)
+    {
+        $value = $value->resolveIndirect();
+
+        return match ($value->type) {
+            Variable::TYPE_NULL => null,
+            Variable::TYPE_BOOLEAN => $value->toBool(),
+            Variable::TYPE_INTEGER => $value->toInt(),
+            Variable::TYPE_FLOAT => $value->toFloat(),
+            Variable::TYPE_STRING => $value->toString(),
+            default => $value->toString(),
+        };
+    }
+
     public static function hostFrom(ObjectEntry $object): ?object
     {
         return self::$hostObjects[$object->id] ?? null;

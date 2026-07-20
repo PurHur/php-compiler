@@ -54,6 +54,12 @@ final class BuiltinClasses
             VmTidy::CLASS_LC
         );
 
+        $ctor = new TidyConstruct();
+        $entry->constructor = $ctor;
+        $entry->methods['__construct'] = $ctor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methodNames['__construct'] = '__construct';
+
         $clean = new TidyCleanRepair();
         $entry->methods['cleanrepair'] = $clean;
         $entry->methodVisibility['cleanrepair'] = $pub;
@@ -211,6 +217,58 @@ final class BuiltinClasses
         }
 
         return 0;
+    }
+}
+
+/** tidy::__construct() — host bridge (#21603). */
+final class TidyConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'tidy::__construct() expects at most 4 arguments, %d given',
+                \max(0, $argc - 1)
+            ));
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::__construct() called without $this');
+        }
+
+        $filename = null;
+        if (isset($frame->calledArgs[1])) {
+            $fnVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $fnVar->type) {
+                $filename = VmTidy::htmlStringArg($frame->calledArgs[1], 'tidy::__construct', 0);
+            }
+        }
+
+        $config = null;
+        if (isset($frame->calledArgs[2])) {
+            $config = VmTidy::configArg($frame->calledArgs[2], 'tidy::__construct', 1);
+        }
+
+        $encoding = null;
+        if (isset($frame->calledArgs[3])) {
+            $encVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $encVar->type) {
+                $encoding = VmTidy::htmlStringArg($frame->calledArgs[3], 'tidy::__construct', 2);
+            }
+        }
+
+        $useIncludePath = false;
+        if (isset($frame->calledArgs[4])) {
+            $useIncludePath = (bool) $frame->calledArgs[4]->resolveIndirect()->toBool();
+        }
+
+        VmTidy::constructInto($self->toObject(), $filename, $config, $encoding, $useIncludePath, $frame);
     }
 }
 
