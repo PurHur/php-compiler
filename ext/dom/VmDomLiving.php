@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\ext\libxml\LibxmlConstants;
+use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -254,12 +255,16 @@ final class VmDomLiving
         string $source,
         int $options = 0,
         ?string $overrideEncoding = null,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        string $inputName = 'Entity',
+        string $methodLabel = 'Dom\\HTMLDocument::createFromString'
     ): Variable {
         self::assertValidHtmlParseOptions($options);
         if (null !== $overrideEncoding && '' === $overrideEncoding) {
             throw new \ValueError('Dom\\HTMLDocument::createFromString(): Argument #3 ($overrideEncoding) must not be empty');
         }
+
+        self::reportHtmlInitialModeTreeErrors($ctx, $source, $options, $frame, $methodLabel, $inputName);
 
         $document = self::allocateHtmlDocument($ctx);
         if (null !== $overrideEncoding) {
@@ -315,7 +320,15 @@ final class VmDomLiving
             );
         }
 
-        $docVar = self::createFromString($ctx, $contents, $options, $overrideEncoding, $frame);
+        $docVar = self::createFromString(
+            $ctx,
+            $contents,
+            $options,
+            $overrideEncoding,
+            $frame,
+            $path,
+            'Dom\\HTMLDocument::createFromFile'
+        );
         // php-src sets document URL from the loaded path (#20898).
         DomRegistry::state($docVar->toObject())->documentUri = $path;
 
@@ -1009,6 +1022,176 @@ final class VmDomLiving
         if (0 !== ($options & ~$allowed)) {
             throw new \ValueError('Dom\\HTMLDocument::createFromString(): Argument #2 ($options) contains an invalid option');
         }
+    }
+
+    /**
+     * Lexbor UNTOININMO tree-error surface for Dom\HTMLDocument factories
+     * (php-src ext/dom/html_document.c dom_lexbor_libxml2_bridge_tree_error_reporter; #21523).
+     *
+     * HTML5 initial insertion mode rejects start/end tags (and non-whitespace characters
+     * when later markup forces reprocessing) before a DOCTYPE. LIBXML_NOERROR silences;
+     * LIBXML_HTML_NOIMPLIED suppresses line-1 UNTOININMO like php-src.
+     */
+    private static function reportHtmlInitialModeTreeErrors(
+        Context $ctx,
+        string $source,
+        int $options,
+        ?Frame $frame,
+        string $methodLabel,
+        string $inputName
+    ): void {
+        if (0 !== ($options & LibxmlConstants::LIBXML_NOERROR)) {
+            return;
+        }
+
+        $token = self::findInitialModeUnexpectedToken($source);
+        if (null === $token) {
+            return;
+        }
+        // php-src: line==1 && html_no_implied && UNTOININMO → skip (mimic libxml no-doctype silence).
+        if (1 === $token['line'] && 0 !== ($options & LibxmlConstants::LIBXML_HTML_NOIMPLIED)) {
+            return;
+        }
+
+        $columnPart = $token['len'] <= 1
+            ? (string) $token['column']
+            : $token['column'].'-'.($token['column'] + $token['len'] - 1);
+        $body = sprintf(
+            'tree error unexpected-token-in-initial-mode in %s, line: %d, column: %s',
+            $inputName,
+            $token['line'],
+            $columnPart
+        );
+        $record = [
+            'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+            'code' => 1,
+            'column' => $token['column'],
+            'message' => $body,
+            'file' => $inputName,
+            'line' => $token['line'],
+        ];
+        VmLibxml::handleError($ctx, $record, $frame, null, $methodLabel.'(): '.$body);
+    }
+
+    /**
+     * Locate the first HTML5 initial-mode unexpected token (start/end tag name, or leading
+     * character when later markup is present). Returns 1-based line/column and token length.
+     *
+     * @return array{line: int, column: int, len: int}|null
+     */
+    private static function findInitialModeUnexpectedToken(string $source): ?array
+    {
+        $len = \strlen($source);
+        $i = 0;
+        if ($len >= 3 && "\xEF\xBB\xBF" === substr($source, 0, 3)) {
+            $i = 3;
+        }
+        $line = 1;
+        $column = 1;
+
+        while ($i < $len) {
+            $ch = $source[$i];
+            if (' ' === $ch || "\t" === $ch || "\r" === $ch || "\f" === $ch) {
+                ++$i;
+                ++$column;
+                continue;
+            }
+            if ("\n" === $ch) {
+                ++$i;
+                ++$line;
+                $column = 1;
+                continue;
+            }
+
+            // Comments are allowed in initial mode (php-src / HTML5).
+            if ($i + 3 < $len && '<!--' === substr($source, $i, 4)) {
+                $end = strpos($source, '-->', $i + 4);
+                if (false === $end) {
+                    return null;
+                }
+                for ($j = $i; $j < $end + 3; ++$j) {
+                    if ("\n" === $source[$j]) {
+                        ++$line;
+                        $column = 1;
+                    } else {
+                        ++$column;
+                    }
+                }
+                $i = $end + 3;
+                continue;
+            }
+
+            // DOCTYPE is the only start that stays in initial mode without error.
+            if ($i + 1 < $len && '<' === $ch
+                && 1 === preg_match('/^<!DOCTYPE\b/i', substr($source, $i))
+            ) {
+                return null;
+            }
+
+            // End tag: </name — name starts at column after "</".
+            if ($i + 1 < $len && '<' === $ch && '/' === $source[$i + 1]) {
+                $nameStart = $i + 2;
+                $nameCol = $column + 2;
+                $nameLen = 0;
+                while ($nameStart + $nameLen < $len
+                    && 1 === preg_match('/[A-Za-z0-9:-]/', $source[$nameStart + $nameLen])
+                ) {
+                    ++$nameLen;
+                }
+                if ($nameLen > 0) {
+                    return ['line' => $line, 'column' => $nameCol, 'len' => $nameLen];
+                }
+
+                return ['line' => $line, 'column' => $column, 'len' => 1];
+            }
+
+            // Start tag: <Name
+            if ('<' === $ch && $i + 1 < $len && 1 === preg_match('/[A-Za-z]/', $source[$i + 1])) {
+                $nameStart = $i + 1;
+                $nameCol = $column + 1;
+                $nameLen = 0;
+                while ($nameStart + $nameLen < $len
+                    && 1 === preg_match('/[A-Za-z0-9:-]/', $source[$nameStart + $nameLen])
+                ) {
+                    ++$nameLen;
+                }
+
+                return ['line' => $line, 'column' => $nameCol, 'len' => max(1, $nameLen)];
+            }
+
+            // Character token: Zend reports UNTOININMO only when later markup forces reprocess
+            // (plain text-only documents stay silent).
+            if (self::htmlSourceHasMarkupAfter($source, $i)) {
+                return ['line' => $line, 'column' => $column, 'len' => 1];
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /** True when a start/end tag or DOCTYPE appears at or after $from. */
+    private static function htmlSourceHasMarkupAfter(string $source, int $from): bool
+    {
+        $len = \strlen($source);
+        for ($i = $from; $i < $len; ++$i) {
+            if ('<' !== $source[$i]) {
+                continue;
+            }
+            if ($i + 1 >= $len) {
+                return false;
+            }
+            $next = $source[$i + 1];
+            if ('/' === $next || 1 === preg_match('/[A-Za-z]/', $next)) {
+                return true;
+            }
+            if (1 === preg_match('/^<!DOCTYPE\b/i', substr($source, $i))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** php-src ext/dom/xml_document.c check_options_validity(). */
