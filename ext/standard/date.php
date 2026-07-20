@@ -38,9 +38,9 @@ final class date extends Internal
         return JitDate::formatDate($context, false, ...$args);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19651, ext/date/php_date.c). */
+    /** Soft-null on 8.4 — Zend deprecate+coerce (ext/date/php_date.c; #21208, reverts #19651 TypeError). */
     private static function vmFormatArg(Frame $frame): string
     {
-        return VmString::zparamStrBuiltinArgForFrame($frame, 0, 'date', 0, 'format');
+        return VmString::trimFamilyStringArgForFrame($frame, 0, 'date', 0, 'format');
     }
 }

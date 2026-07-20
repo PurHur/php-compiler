@@ -35,8 +35,8 @@ final class strtotime extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19651, ext/date/php_date.c)
-        $time = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'strtotime', 0, 'datetime');
+        // Soft-null on 8.4 — Zend deprecate+coerce (ext/date/php_date.c; #21208, reverts #19651 TypeError)
+        $time = VmString::trimFamilyStringArgForFrame($frame, 0, 'strtotime', 0, 'datetime');
         $now = null;
         if (2 === $argc) {
             $baseVar = $frame->calledArgs[1]->resolveIndirect();
