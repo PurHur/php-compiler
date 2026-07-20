@@ -28,6 +28,21 @@ final class VmPhar
 
     public const FORMAT_ZIP = 3;
 
+    /** php-src PHAR_SIG_* (ext/phar/phar_internal.h). */
+    public const SIG_MD5 = 0x0001;
+
+    public const SIG_SHA1 = 0x0002;
+
+    public const SIG_SHA256 = 0x0003;
+
+    public const SIG_SHA512 = 0x0004;
+
+    public const SIG_OPENSSL = 0x0010;
+
+    public const SIG_OPENSSL_SHA256 = 0x0011;
+
+    public const SIG_OPENSSL_SHA512 = 0x0012;
+
     /** Startup {@code -d phar.readonly=} override (bin/vm.php −d → VmIni::applyStartupIniOverride). */
     private static ?bool $startupReadonly = null;
 
@@ -84,6 +99,59 @@ final class VmPhar
     /**
      * Phar::canCompress($method = 0) — PHAR_G(has_zlib)/has_bz2 (phar_object.c).
      */
+    /**
+     * @return list<int>
+     */
+    public static function knownSignatureAlgorithms(): array
+    {
+        return [
+            self::SIG_MD5,
+            self::SIG_SHA1,
+            self::SIG_SHA256,
+            self::SIG_SHA512,
+            self::SIG_OPENSSL,
+            self::SIG_OPENSSL_SHA256,
+            self::SIG_OPENSSL_SHA512,
+        ];
+    }
+
+    public static function assertSignatureAlgorithm(int $algo): void
+    {
+        if (!\in_array($algo, self::knownSignatureAlgorithms(), true)) {
+            throw new \UnexpectedValueException('Unknown signature algorithm specified');
+        }
+        if (\in_array($algo, [self::SIG_OPENSSL, self::SIG_OPENSSL_SHA256, self::SIG_OPENSSL_SHA512], true)
+            && !\extension_loaded('openssl')) {
+            throw new \UnexpectedValueException('Cannot set signature algorithm, OpenSSL extension is not available');
+        }
+    }
+
+    /** @return string hex digest (uppercase) for hash-based signatures */
+    public static function computeHashSignature(string $binary, int $algo): string
+    {
+        return match ($algo) {
+            self::SIG_MD5 => \strtoupper(\md5($binary)),
+            self::SIG_SHA1 => \strtoupper(\sha1($binary)),
+            self::SIG_SHA256 => \strtoupper(\hash('sha256', $binary)),
+            self::SIG_SHA512 => \strtoupper(\hash('sha512', $binary)),
+            default => throw new \UnexpectedValueException('Unknown signature algorithm specified'),
+        };
+    }
+
+    public static function signatureHashTypeName(int $algo): string
+    {
+        return match ($algo) {
+            self::SIG_MD5 => 'MD5',
+            self::SIG_SHA1 => 'SHA-1',
+            self::SIG_SHA256 => 'SHA-256',
+            self::SIG_SHA512 => 'SHA-512',
+            self::SIG_OPENSSL => 'OpenSSL',
+            self::SIG_OPENSSL_SHA256 => 'OpenSSL_SHA256',
+            self::SIG_OPENSSL_SHA512 => 'OpenSSL_SHA512',
+            default => 'Unknown ('.$algo.')',
+        };
+    }
+
     public static function canCompress(int $method = 0): bool
     {
         $hasZlib = \extension_loaded('zlib');

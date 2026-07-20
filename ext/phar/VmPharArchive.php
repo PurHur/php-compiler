@@ -42,6 +42,9 @@ final class VmPharArchive
      *   hasMetadata: bool,
      *   metadata: mixed,
      *   wholeCompression: int
+     *   sigFlags: int
+     *   signature: string
+     *   sigPrivateKey: ?string
      * }>
      */
     private static array $state = [];
@@ -60,7 +63,10 @@ final class VmPharArchive
         bool $buffering = false,
         bool $hasMetadata = false,
         mixed $metadata = null,
-        int $wholeCompression = VmPhar::COMPRESSED_NONE
+        int $wholeCompression = VmPhar::COMPRESSED_NONE,
+        int $sigFlags = 0,
+        string $signature = '',
+        ?string $sigPrivateKey = null
     ): void {
         if ('' === $stub) {
             $stub = self::createDefaultStub();
@@ -76,6 +82,9 @@ final class VmPharArchive
             'hasMetadata' => $hasMetadata,
             'metadata' => $metadata,
             'wholeCompression' => $wholeCompression,
+            'sigFlags' => $sigFlags,
+            'signature' => $signature,
+            'sigPrivateKey' => $sigPrivateKey,
         ];
     }
 
@@ -699,6 +708,36 @@ final class VmPharArchive
         return true;
     }
 
+    /** php-src zim_Phar_setSignatureAlgorithm (#21329). */
+    public static function setSignatureAlgorithm(ObjectEntry $object, int $algo, ?string $privateKey = null): void
+    {
+        if (!VmPhar::canWrite()) {
+            throw new \UnexpectedValueException('Cannot set signature algorithm, phar is read-only');
+        }
+        VmPhar::assertSignatureAlgorithm($algo);
+        self::requireState($object);
+        self::$state[$object->id]['sigFlags'] = $algo;
+        self::$state[$object->id]['sigPrivateKey'] = $privateKey;
+        self::$state[$object->id]['dirty'] = true;
+        self::flush($object);
+    }
+
+    /**
+     * @return array{hash: string, hash_type: string}|false
+     */
+    public static function getSignature(ObjectEntry $object): array|false
+    {
+        $st = self::requireState($object);
+        if (0 === $st['sigFlags'] || '' === $st['signature']) {
+            return false;
+        }
+
+        return [
+            'hash' => $st['signature'],
+            'hash_type' => VmPhar::signatureHashTypeName($st['sigFlags']),
+        ];
+    }
+
     public static function registerAlias(string $alias, string $filename): void
     {
         self::$aliases[$alias] = self::normalizeArchivePath($filename);
@@ -924,7 +963,38 @@ final class VmPharArchive
         if (false === VmFs::filePutContents($path, $binary)) {
             throw new \UnexpectedValueException('phar error: unable to write phar "'.$path.'"');
         }
+        self::refreshSignature($object, $binary);
         self::$state[$object->id]['dirty'] = false;
+    }
+
+    private static function refreshSignature(ObjectEntry $object, string $binary): void
+    {
+        $sigFlags = self::$state[$object->id]['sigFlags'];
+        if (0 === $sigFlags) {
+            self::$state[$object->id]['signature'] = '';
+
+            return;
+        }
+        if (\in_array($sigFlags, [VmPhar::SIG_OPENSSL, VmPhar::SIG_OPENSSL_SHA256, VmPhar::SIG_OPENSSL_SHA512], true)) {
+            $key = self::$state[$object->id]['sigPrivateKey'];
+            if (null === $key || '' === $key) {
+                throw new \PharException('no private key specified');
+            }
+            $digestAlgo = match ($sigFlags) {
+                VmPhar::SIG_OPENSSL_SHA256 => OPENSSL_ALGO_SHA256,
+                VmPhar::SIG_OPENSSL_SHA512 => OPENSSL_ALGO_SHA512,
+                default => OPENSSL_ALGO_SHA1,
+            };
+            $signature = '';
+            $signed = \openssl_sign($binary, $signature, $key, $digestAlgo);
+            if (!$signed) {
+                throw new \PharException('openssl signing failed');
+            }
+            self::$state[$object->id]['signature'] = $signature;
+
+            return;
+        }
+        self::$state[$object->id]['signature'] = VmPhar::computeHashSignature($binary, $sigFlags);
     }
 
     /** @return array{0: string, 1: string} stub + payload */
@@ -949,7 +1019,7 @@ final class VmPharArchive
         return [\substr($binary, 0, $stubEnd), \substr($binary, $stubEnd)];
     }
 
-    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string, hasMetadata: bool, metadata: mixed, wholeCompression: int} */
+    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string, hasMetadata: bool, metadata: mixed, wholeCompression: int, sigFlags: int, signature: string, sigPrivateKey: ?string} */
     private static function requireState(ObjectEntry $object): array
     {
         if (!isset(self::$state[$object->id])) {

@@ -19,16 +19,19 @@ final class VmPharData
 {
     public const CLASS_LC = 'phardata';
 
-    /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool}> */
+    /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, sigFlags: int, signature: string, sigPrivateKey: ?string}> */
     private static array $state = [];
 
-    public static function bind(ObjectEntry $object, string $path, array $files, bool $dirty, array $dirs = []): void
+    public static function bind(ObjectEntry $object, string $path, array $files, bool $dirty, array $dirs = [], int $sigFlags = 0, string $signature = '', ?string $sigPrivateKey = null): void
     {
         self::$state[$object->id] = [
             'path' => $path,
             'files' => $files,
             'dirs' => $dirs,
             'dirty' => $dirty,
+            'sigFlags' => $sigFlags,
+            'signature' => $signature,
+            'sigPrivateKey' => $sigPrivateKey,
         ];
     }
 
@@ -295,6 +298,33 @@ final class VmPharData
         return self::requireState($object)['path'];
     }
 
+    /** php-src zim_Phar_setSignatureAlgorithm on PharData (#21329). */
+    public static function setSignatureAlgorithm(ObjectEntry $object, int $algo, ?string $privateKey = null): void
+    {
+        VmPhar::assertSignatureAlgorithm($algo);
+        self::requireState($object);
+        self::$state[$object->id]['sigFlags'] = $algo;
+        self::$state[$object->id]['sigPrivateKey'] = $privateKey;
+        self::$state[$object->id]['dirty'] = true;
+        self::flush($object);
+    }
+
+    /**
+     * @return array{hash: string, hash_type: string}|false
+     */
+    public static function getSignature(ObjectEntry $object): array|false
+    {
+        $st = self::requireState($object);
+        if (0 === $st['sigFlags'] || '' === $st['signature']) {
+            return false;
+        }
+
+        return [
+            'hash' => $st['signature'],
+            'hash_type' => VmPhar::signatureHashTypeName($st['sigFlags']),
+        ];
+    }
+
     public static function mapToHashTable(array $map): HashTable
     {
         $ht = new HashTable();
@@ -348,10 +378,41 @@ final class VmPharData
         if (false === VmFs::filePutContents($path, $binary)) {
             throw new \UnexpectedValueException('phar error: unable to write phar "'.$path.'"');
         }
+        self::refreshSignature($object, $binary);
         self::$state[$object->id]['dirty'] = false;
     }
 
-    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool} */
+    private static function refreshSignature(ObjectEntry $object, string $binary): void
+    {
+        $sigFlags = self::$state[$object->id]['sigFlags'];
+        if (0 === $sigFlags) {
+            self::$state[$object->id]['signature'] = '';
+
+            return;
+        }
+        if (\in_array($sigFlags, [VmPhar::SIG_OPENSSL, VmPhar::SIG_OPENSSL_SHA256, VmPhar::SIG_OPENSSL_SHA512], true)) {
+            $key = self::$state[$object->id]['sigPrivateKey'];
+            if (null === $key || '' === $key) {
+                throw new \PharException('no private key specified');
+            }
+            $digestAlgo = match ($sigFlags) {
+                VmPhar::SIG_OPENSSL_SHA256 => OPENSSL_ALGO_SHA256,
+                VmPhar::SIG_OPENSSL_SHA512 => OPENSSL_ALGO_SHA512,
+                default => OPENSSL_ALGO_SHA1,
+            };
+            $signature = '';
+            $signed = \openssl_sign($binary, $signature, $key, $digestAlgo);
+            if (!$signed) {
+                throw new \PharException('openssl signing failed');
+            }
+            self::$state[$object->id]['signature'] = $signature;
+
+            return;
+        }
+        self::$state[$object->id]['signature'] = VmPhar::computeHashSignature($binary, $sigFlags);
+    }
+
+    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, sigFlags: int, signature: string, sigPrivateKey: ?string} */
     private static function requireState(ObjectEntry $object): array
     {
         if (!isset(self::$state[$object->id])) {
