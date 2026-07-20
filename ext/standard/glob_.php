@@ -25,7 +25,7 @@ final class glob_ extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireArgCountRange($frame, 'glob', 1, 2);
-        $pattern = VmString::stringBuiltinArgForFrame($frame, 0, 'glob', 0, 'pattern');
+        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'glob', 1, 'pattern');
         $flags = 0;
         if (isset($frame->calledArgs[1])) {
             $flags = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'glob', 2, 'flags');
@@ -57,7 +57,7 @@ final class glob_ extends Internal
             );
         }
 
-        $pattern = JitStringBuiltinArg::lower($context, $args[0], 'glob', 0, 'pattern');
+        $pattern = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'glob', 1, 'pattern');
         StringFsGlob::ensureLinked($context);
 
         return JitFsGlob::glob($context, $pattern, $flags);
