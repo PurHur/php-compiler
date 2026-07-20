@@ -99,6 +99,7 @@ final class VmString
      * hebrev($string) soft-null (#21421, ext/standard/string.c).
      * dechex/decbin/decoct $num, hexdec/bindec/octdec/base_convert string operands soft-null (#21244).
      * zlib one-shot $data (gzdeflate/gzinflate/gzdecode/gzuncompress/gzcompress/gzencode) soft-null (#21311, reverts #19332).
+     * openssl_encrypt/openssl_decrypt $data soft-null (#21445, reverts #20263; ext/openssl/openssl.c).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

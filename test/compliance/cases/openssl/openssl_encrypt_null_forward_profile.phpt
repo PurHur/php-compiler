@@ -1,5 +1,5 @@
 --TEST--
-openssl openssl_encrypt(null) TypeError on 8.4 forward profile (#20263, re-#19038, ext/openssl/openssl.c)
+openssl openssl_encrypt(null) soft-null on 8.4 forward profile (#21445, reverts #20263, ext/openssl/openssl.c)
 --SKIPIF--
 <?php
 if (!extension_loaded('ffi')) {
@@ -14,15 +14,11 @@ PHP_COMPILER_PROFILE=8.4
 <?php
 $iv = str_repeat("\0", 16);
 $key = str_repeat('k', 16);
-try {
-    $r = openssl_encrypt(null, 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
-    echo 'COERCE len='.strlen((string) $r)."\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
-$r2 = openssl_encrypt('', 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
-echo 'empty len='.strlen($r2)."\n";
+$empty = openssl_encrypt('', 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
+$null = openssl_encrypt(null, 'AES-128-CBC', $key, OPENSSL_RAW_DATA, $iv);
+echo 'same='.(($empty === $null) ? '1' : '0')."\n";
+echo 'len='.strlen((string) $empty)."\n";
 ?>
 --EXPECT--
-openssl_encrypt(): Argument #1 ($data) must be of type string, null given
-empty len=16
+same=1
+len=16

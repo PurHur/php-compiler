@@ -1,5 +1,5 @@
 <?php
-/** Repro for #20263 — openssl_encrypt(null) TypeError under PROFILE=8.4. */
+/** Repro for #21445 (was #20263) — openssl_encrypt(null) soft-null under PROFILE=8.4. */
 $iv = str_repeat("\0", 16);
 $key = str_repeat('k', 16);
 try {

@@ -36,9 +36,9 @@ final class openssl_decrypt extends Internal
             return;
         }
 
-        // Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#20263, re-#19038, ext/openssl/openssl.c);
-        // 8.2 still coerces+deprecates like openssl_digest (#20207).
-        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'openssl_decrypt', 0, 'data');
+        // Z_PARAM_STR $data — soft-null DEP+coerce on forward profile (#21445, reverts #20263;
+        // php-src ext/openssl/openssl.c — Zend 8.4 still deprecates null → '').
+        $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'openssl_decrypt', 0, 'data');
         $cipherAlgo = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'openssl_decrypt', 1, 'cipher_algo');
         $passphrase = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'openssl_decrypt', 2, 'passphrase');
         $options = 0;
