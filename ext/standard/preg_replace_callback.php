@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -43,7 +42,9 @@ final class preg_replace_callback extends Internal
         $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_replace_callback', 0, 'pattern');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_replace_callback', $pattern);
         $callbackVar = $frame->calledArgs[1]->resolveIndirect();
-        $subjectVar = VmPreg::requireStringOrArraySubject(
+        // $subject soft-null: E_DEPRECATED + '' on 8.4 (php-src php_pcre.c / #21318, re-#21198).
+        $subjectVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
             $frame->calledArgs[2],
             'preg_replace_callback',
             2,
@@ -143,7 +144,7 @@ final class preg_replace_callback extends Internal
         }
 
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace_callback', 2, 'subject');
-        if (JITVariable::TYPE_STRING !== $args[2]->type) {
+        if (!JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
             throw new \LogicException(
                 'preg_replace_callback() array subject is not supported for JIT/AOT in this compiler build'
             );
@@ -153,12 +154,25 @@ final class preg_replace_callback extends Internal
         $pattern = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_replace_callback', 0, 'pattern')
             : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_replace_callback', 0, 'pattern');
+        // $subject soft-null DEP+coerce on 8.4 (#21318; php-src php_pcre.c).
+        $subject = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'preg_replace_callback', 2, 'subject')
+            : JitStringBuiltinArg::lower(
+                $context,
+                $args[2],
+                'preg_replace_callback',
+                2,
+                'subject',
+                'array|string',
+                null,
+                false
+            );
 
         return JitPregReplaceCallback::invoke(
             $context,
             $pattern,
             $args[1],
-            JitStringArg::lower($context, $args[2], 'preg_replace_callback() subject')
+            $subject
         );
     }
 

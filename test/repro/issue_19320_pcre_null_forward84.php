@@ -1,7 +1,7 @@
 <?php
 /**
- * Issue #19320 / #21198 — preg_quote/match_all/split null TypeError on 8.4;
- * preg_match subject is soft DEP+coerce (#21198).
+ * Issue #19320 / #21198 / #21318 — preg_quote null TypeError on 8.4;
+ * preg_match/match_all/split $subject soft DEP+coerce (#21198, #21318).
  */
 set_error_handler(static function (int $no, string $msg): bool {
     if (E_DEPRECATED === $no) {

@@ -56,7 +56,9 @@ final class preg_replace_callback_array extends Internal
             ));
         }
 
-        $subjectVar = VmPreg::requireStringOrArraySubject(
+        // $subject soft-null: E_DEPRECATED + '' on 8.4 (php-src php_pcre.c / #21318, re-#21198).
+        $subjectVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
             $frame->calledArgs[1],
             'preg_replace_callback_array',
             1,
@@ -113,7 +115,7 @@ final class preg_replace_callback_array extends Internal
         }
 
         JitPregSubject::requireStringOrArray($context, $args[1], 'preg_replace_callback_array', 1, 'subject');
-        if (JITVariable::TYPE_STRING !== $args[1]->type) {
+        if (!JitPregSubject::isStringOrCoercibleNullSubject($args[1])) {
             throw new \LogicException(
                 'preg_replace_callback_array() array subject is not supported for JIT/AOT in this compiler build'
             );
