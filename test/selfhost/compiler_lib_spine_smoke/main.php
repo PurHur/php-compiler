@@ -4019,6 +4019,7 @@ require_once __DIR__.'/../../../ext/xml/VmXmlSaxDispatcher.php';
 require_once __DIR__.'/../../../ext/xml/VmXmlStructBuilder.php';
 require_once __DIR__.'/../../../ext/xml/XmlConstants.php';
 require_once __DIR__.'/../../../ext/xml/XmlFunction.php';
+require_once __DIR__.'/../../../ext/xml/XmlHandlerDeprecation.php';
 require_once __DIR__.'/../../../ext/xml/XmlParserHandlers.php';
 require_once __DIR__.'/../../../ext/xml/XmlParserSupport.php';
 require_once __DIR__.'/../../../ext/xml/XmlSetHandlerFunction.php';

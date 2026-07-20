@@ -21,6 +21,8 @@ final class xml_set_object extends XmlFunction
         if (2 !== $argc) {
             throw new \ArgumentCountError('xml_set_object() expects exactly 2 arguments, '.$argc.' given');
         }
+        // #[\Deprecated(since: '8.4', …)] — E_DEPRECATED on PROFILE≥8.4 (xml.stub.php; #21522).
+        XmlHandlerDeprecation::emitXmlSetObject($frame);
         if (null === $frame->returnVar) {
             return;
         }
