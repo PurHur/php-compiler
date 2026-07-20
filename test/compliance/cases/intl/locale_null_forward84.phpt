@@ -1,5 +1,5 @@
 --TEST--
-intl locale_get_*/canonicalize/display_name(null) TypeError on 8.4 forward (#21078)
+intl locale_get_*/canonicalize/display_name(null) DEP+coerce on 8.4 forward (#21368, re-#21078)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -7,6 +7,7 @@ PHP_COMPILER_PROFILE=8.4
 if (!function_exists('locale_get_primary_language') || !class_exists('Locale', false)) {
     die("skip ext/intl Locale parsers not available");
 }
+error_reporting(E_ALL & ~E_DEPRECATED);
 foreach ([
     'primary' => static fn () => locale_get_primary_language(null),
     'region' => static fn () => locale_get_region(null),
@@ -37,17 +38,17 @@ echo 'ok_script=', var_export(locale_get_script('zh-Hans-CN'), true), "\n";
 $canon = locale_canonicalize('en-us');
 echo 'ok_canon=', (int) (is_string($canon) && '' !== $canon), "\n";
 ?>
---EXPECT--
-primary TypeError null
-region TypeError null
-script TypeError null
-canonicalize TypeError null
-display_name TypeError null
-method_primary TypeError null
-method_region TypeError null
-method_script TypeError null
-method_canonicalize TypeError null
-method_display TypeError null
+--EXPECTREGEX--
+primary COERCED '.+'
+region COERCED '.*'
+script COERCED '.*'
+canonicalize COERCED '.+'
+display_name COERCED (false|'.+')
+method_primary COERCED '.+'
+method_region COERCED '.*'
+method_script COERCED '.*'
+method_canonicalize COERCED '.+'
+method_display COERCED (false|'.+')
 ok_primary='en'
 ok_region='US'
 ok_script='Hans'

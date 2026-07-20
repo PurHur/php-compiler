@@ -30,8 +30,8 @@ final class LocaleGetDisplayName extends VmClassMethod
                 'Locale::getDisplayName() expects at most 2 arguments, '.$argc.' given'
             );
         }
-        // Z_PARAM_STR $locale — null TypeError on PROFILE=8.4 (#21078, locale.stub.php).
-        $locale = VmString::coerceZparamStrBuiltinArg(
+        // Z_PARAM_STR $locale — Zend 8.4 deprecates null + coerces (#21368, locale.stub.php).
+        $locale = VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'Locale::getDisplayName',
             0,
