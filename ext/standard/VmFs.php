@@ -632,6 +632,7 @@ final class VmFs
         ?int $length = null,
         ?\PHPCompiler\VM\Context $ctx = null
     ) {
+        $path = self::rewritePharInterceptPath($path);
         $httpOptions = [];
         if ($streamContext instanceof \PHPCompiler\VM\Variable) {
             $httpOptions = VmStreamContext::httpWrapperOptions($streamContext);
@@ -684,6 +685,17 @@ final class VmFs
         }
         if (VmDataUri::isDataUri($path)) {
             $data = VmDataUri::decode($path);
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
+        }
+        if (self::isPharUri($path)) {
+            $data = self::readPharUriContents($path);
             if (false === $data) {
                 return false;
             }
@@ -898,6 +910,14 @@ final class VmFs
     }
 
     public static function fopen(string $path, string $mode, ?\PHPCompiler\VM\Context $ctx = null) {
+        $path = self::rewritePharInterceptPath($path);
+        if (self::isPharUri($path)) {
+            if (null === $ctx) {
+                return false;
+            }
+
+            return self::finalizeStreamOpen(self::openPharUri($path, $mode), $mode);
+        }
         if (VmStreamWrapperRegistry::isCustomProtocol($path)) {
             if (null === $ctx) {
                 return false;
@@ -2855,5 +2875,43 @@ final class VmFs
         }
 
         return VmFsDiskNative::diskTotalSpace($path);
+    }
+
+    private static function rewritePharInterceptPath(string $path): string
+    {
+        if (!\class_exists(\PHPCompiler\ext\phar\VmPharStream::class, false)) {
+            return $path;
+        }
+
+        return \PHPCompiler\ext\phar\VmPharStream::rewriteInterceptedPath($path);
+    }
+
+    private static function isPharUri(string $path): bool
+    {
+        return \str_starts_with($path, 'phar://');
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function readPharUriContents(string $uri)
+    {
+        if (!\class_exists(\PHPCompiler\ext\phar\VmPharStream::class)) {
+            return false;
+        }
+
+        return \PHPCompiler\ext\phar\VmPharStream::readContents($uri);
+    }
+
+    /**
+     * @return int|false
+     */
+    private static function openPharUri(string $uri, string $mode)
+    {
+        if (!\class_exists(\PHPCompiler\ext\phar\VmPharStream::class)) {
+            return false;
+        }
+
+        return \PHPCompiler\ext\phar\VmPharStream::open($uri, $mode);
     }
 }

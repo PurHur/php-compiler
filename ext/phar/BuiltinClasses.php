@@ -29,7 +29,8 @@ final class BuiltinClasses
         if (isset($ctx->classes[VmPhar::CLASS_LC])
             && isset($ctx->classes[VmPhar::CLASS_LC]->methods['canwrite'])
             && isset($ctx->classes[VmPhar::CLASS_LC]->methods['addfromstring'])
-            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['loadphar'])) {
+            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['loadphar'])
+            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['mapphar'])) {
             return;
         }
 
@@ -64,6 +65,14 @@ final class BuiltinClasses
         $entry->methods['unlinkarchive'] = new PharUnlinkArchive();
         $entry->methodVisibility['unlinkarchive'] = $pubStatic;
         $entry->methodNames['unlinkarchive'] = 'unlinkArchive';
+
+        $entry->methods['mapphar'] = new PharMapPhar();
+        $entry->methodVisibility['mapphar'] = $pubStatic;
+        $entry->methodNames['mapphar'] = 'mapPhar';
+
+        $entry->methods['interceptfilefuncs'] = new PharInterceptFileFuncs();
+        $entry->methodVisibility['interceptfilefuncs'] = $pubStatic;
+        $entry->methodNames['interceptfilefuncs'] = 'interceptFileFuncs';
 
         if (!isset($ctx->classes['pharexception'])) {
             $pharEx = new ClassEntry('PharException');
@@ -229,6 +238,65 @@ final class PharUnlinkArchive extends VmClassMethod
             BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
                 $ret->bool($result);
             });
+        });
+    }
+}
+
+/** Phar::mapPhar() — php-src zim_Phar_mapPhar (#21338). */
+final class PharMapPhar extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('mapPhar');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        BuiltinExecute::run($frame, static function (Frame $frame): void {
+            $argc = \count($frame->calledArgs);
+            if ($argc > 2) {
+                throw new \ArgumentCountError(
+                    'Phar::mapPhar() expects at most 2 arguments, '.$argc.' given'
+                );
+            }
+            $alias = null;
+            if ($argc >= 1) {
+                $arg0 = $frame->calledArgs[0]->resolveIndirect();
+                if (!$arg0->isNull()) {
+                    $alias = $arg0->toString();
+                }
+            }
+            $dataoffset = 0;
+            if ($argc >= 2) {
+                $dataoffset = $frame->calledArgs[1]->resolveIndirect()->toInt();
+            }
+            $scriptPath = PharRunning::resolveScriptPath($frame);
+            $result = VmPharStream::mapPhar($alias, $dataoffset, $scriptPath);
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+                $ret->bool($result);
+            });
+        });
+    }
+}
+
+/** Phar::interceptFileFuncs() — php-src zim_Phar_interceptFileFuncs (#21338). */
+final class PharInterceptFileFuncs extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('interceptFileFuncs');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        BuiltinExecute::run($frame, static function (Frame $frame): void {
+            $argc = \count($frame->calledArgs);
+            if ($argc > 0) {
+                throw new \ArgumentCountError(
+                    'Phar::interceptFileFuncs() expects exactly 0 arguments, '.$argc.' given'
+                );
+            }
+            VmPharStream::enableInterceptFileFuncs();
         });
     }
 }
