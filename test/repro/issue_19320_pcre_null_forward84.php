@@ -1,9 +1,17 @@
 <?php
 /**
- * Issue #19320 — preg_quote/match/match_all/split null string args TypeError on PROFILE=8.4.
- *
- * Run: PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/issue_19320_pcre_null_forward84.php
+ * Issue #19320 / #21198 — preg_quote/match_all/split null TypeError on 8.4;
+ * preg_match subject is soft DEP+coerce (#21198).
  */
+set_error_handler(static function (int $no, string $msg): bool {
+    if (E_DEPRECATED === $no) {
+        echo "DEP ";
+
+        return true;
+    }
+
+    return false;
+});
 foreach ([
     'preg_quote' => static fn () => preg_quote(null),
     'preg_match' => static fn () => preg_match('/./', null),

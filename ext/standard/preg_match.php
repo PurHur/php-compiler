@@ -20,9 +20,10 @@ final class preg_match extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('preg_match() requires 2 to 5 arguments in this compiler build');
         }
-        // Z_PARAM_STR $pattern/$subject — null TypeError on 8.4 forward profile (#20226, #19320).
+        // Z_PARAM_STR $pattern — null TypeError on 8.4 (#20226).
+        // $subject soft-null: E_DEPRECATED + '' on 8.4 (php-src php_pcre.c / #21198).
         $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_match', 0, 'pattern');
-        $subject = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'preg_match', 1, 'subject');
+        $subject = VmString::trimFamilyStringArgForFrame($frame, 1, 'preg_match', 1, 'subject');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_match', $pattern);
 
         $flags = 0;

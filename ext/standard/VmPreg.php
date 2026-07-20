@@ -90,11 +90,10 @@ final class VmPreg
     }
 
     /**
-     * Z_PARAM_STR_OR_ARR on preg/str/substr_replace $subject (#11938, #19755).
+     * Z_PARAM_STR_OR_ARR on preg/str/substr_replace $subject (#11938, #19755, #21198).
      *
-     * Null coerces to "" outside strict_types on profiles &lt; 8.4 (with E_DEPRECATED);
-     * TypeError on 8.4 forward profile (#19282, #19241, php-src ext/standard/string.c /
-     * ext/pcre/php_pcre.c).
+     * Null coerces to "" outside strict_types with E_DEPRECATED on all profiles including 8.4
+     * (php-src ext/standard/string.c / ext/pcre/php_pcre.c — not TypeError; reverts #19241).
      *
      * @throws \TypeError
      */
@@ -107,15 +106,12 @@ final class VmPreg
     ): Variable {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (
-                InternalStrictArg::isCallerStrict($frame)
-                || VmString::requiresZparamStrStrictNullOnForwardProfile()
-            ) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(
                     self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
                 );
             }
-            // php-src Z_PARAM_STR_OR_ARR: E_DEPRECATED then coerce to "" (#19755).
+            // php-src Z_PARAM_STR_OR_ARR: E_DEPRECATED then coerce to "" (#19755, #21198).
             VmNullStringParamDeprecation::emit($frame, $function, $argIndex, $paramName, 'array|string');
             $empty = new Variable();
             $empty->string('');

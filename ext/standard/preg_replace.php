@@ -41,15 +41,13 @@ final class preg_replace extends Internal
         }
         $patternRaw = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_NULL === $patternRaw->type) {
-            // Z_PARAM_STR_OR_ARRAY — null TypeError on strict_types or 8.4 forward profile (#20226).
-            if (
-                InternalStrictArg::isCallerStrict($frame)
-                || VmString::requiresZparamStrStrictNullOnForwardProfile()
-            ) {
+            // Zend 8.4: soft-null $pattern — DEP then empty-regex warning + null (#21198).
+            if (InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(
                     'preg_replace(): Argument #1 ($pattern) must be of type array|string, null given'
                 );
             }
+            VmNullStringParamDeprecation::emit($frame, 'preg_replace', 0, 'pattern', 'array|string');
             VmPregFailure::warnEmptyRegularExpression($frame, 'preg_replace');
             $frame->returnVar->null();
 
@@ -193,7 +191,7 @@ final class preg_replace extends Internal
             'replacement',
             'array|string'
         );
-        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_replace', 'subject', 3)) {
+        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_replace', 'subject', 3, false)) {
             return $context->getTypeFromString('__string__*')->constNull();
         }
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
@@ -202,7 +200,7 @@ final class preg_replace extends Internal
                 $context,
                 $pattern,
                 $replacement,
-                JitStringBuiltinArg::lower($context, $args[2], 'preg_replace', 2, 'subject', 'array|string'),
+                JitStringBuiltinArg::lower($context, $args[2], 'preg_replace', 2, 'subject', 'array|string', null, false),
                 $limit
             );
         }

@@ -118,14 +118,14 @@ final class str_replace extends Internal
             throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
         }
 
-        // Z_PARAM_STR_OR_ARR null TypeError on PROFILE=8.4 (#20173 search/replace; #18914 subject).
+        // Z_PARAM_STR_OR_ARR: search/replace TypeError on 8.4; $subject soft-null (#21198 / Zend).
         if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[0], 'str_replace', 'search', 1)) {
             return $context->getTypeFromString('__string__*')->constNull();
         }
         if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[1], 'str_replace', 'replace', 2)) {
             return $context->getTypeFromString('__string__*')->constNull();
         }
-        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'str_replace', 'subject', 3)) {
+        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'str_replace', 'subject', 3, false)) {
             return $context->getTypeFromString('__string__*')->constNull();
         }
         JitPregSubject::requireStringOrArray($context, $args[2], 'str_replace', 2, 'subject');
@@ -144,7 +144,7 @@ final class str_replace extends Internal
                     $context,
                     JitStringBuiltinArg::lower($context, $args[0], 'str_replace', 0, 'search', 'array|string'),
                     JitStringBuiltinArg::lower($context, $args[1], 'str_replace', 1, 'replace', 'array|string'),
-                    JitStringBuiltinArg::lower($context, $args[2], 'str_replace', 2, 'subject', 'array|string'),
+                    JitStringBuiltinArg::lower($context, $args[2], 'str_replace', 2, 'subject', 'array|string', null, false),
                     false,
                     $countSlot
                 );
