@@ -1,5 +1,5 @@
 <?php
-// Repro #19297 / #21197 — mbstring null under PROFILE=8.4
+// Repro #19297 / #21197 / #21282 — mbstring null under PROFILE=8.4
 error_reporting(E_ALL);
 set_error_handler(static function (int $no): bool {
     return E_DEPRECATED === $no;

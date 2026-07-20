@@ -69,13 +69,14 @@ final class mb_convert_encoding extends Internal
 
             return;
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19297, mbstring.c).
-        $source = VmString::coerceZparamStrBuiltinArg(
+        // array|string $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21282).
+        $source = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'mb_convert_encoding',
             0,
             'string',
-            'array|string'
+            'array|string',
+            false
         );
         $result = VmMbstring::convertEncoding($source, $to, $from);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
