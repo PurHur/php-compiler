@@ -22,4 +22,4 @@ foreach ([
 --EXPECT--
 parse_ini_file(): Argument #1 ($filename) cannot be empty
 checkdnsrr(): Argument #1 ($hostname) cannot be empty
-TypeError: setcookie(): Argument #1 ($name) must be of type string, null given
+setcookie(): Argument #1 ($name) cannot be empty

@@ -1,19 +1,27 @@
 <?php
 /**
- * #21003 — setcookie(null)/setrawcookie(null) TypeError under PHP_COMPILER_PROFILE=8.4 (re-#18659).
- * php-src: ext/standard/head.c — PHP_FUNCTION(setcookie)/setrawcookie / Z_PARAM_STR $name
+ * #21233 — setcookie(null)/setrawcookie(null) DEP + ValueError under PHP_COMPILER_PROFILE=8.4
+ * (reverts over-strict #21003 TypeError; php-src ext/standard/head.c).
  */
-foreach (['setcookie', 'setrawcookie'] as $f) {
+error_reporting(E_ALL);
+set_error_handler(static function (int $no, string $msg): bool {
+    if (E_DEPRECATED === $no) {
+        echo "DEP\n";
+        return true;
+    }
+
+    return false;
+});
+foreach (['setcookie', 'setrawcookie'] as $fn) {
     try {
-        var_export($f(null));
-        echo " COERCED\n";
-    } catch (Throwable $e) {
-        echo $f, ' ', get_class($e), ': ', $e->getMessage(), "\n";
+        $fn(null);
+        echo "$fn: uncaught\n";
+        exit(1);
+    } catch (ValueError $e) {
+        echo "$fn ValueError OK\n";
+    } catch (TypeError $e) {
+        echo "$fn unexpected TypeError: ", $e->getMessage(), "\n";
+        exit(1);
     }
 }
-try {
-    setcookie('');
-    echo "empty: uncaught\n";
-} catch (ValueError $e) {
-    echo 'empty: ', $e->getMessage(), "\n";
-}
+echo "OK\n";

@@ -39,23 +39,7 @@ final class JitSetcookieOptions
             throw new \LogicException($function.'() options form requires exactly three arguments');
         }
 
-        // Null name: TypeError under PROFILE=8.4 before empty ValueError (#21003).
-        $nullName = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
-        if ($nullName && (
-            $context->callerStrictTypes
-            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-        )) {
-            JitStringBuiltinArg::lowerRequiredString(
-                $context,
-                $args[0],
-                $function,
-                0,
-                'name'
-            );
-
-            return $context->constantFromBool(false);
-        }
-        $namePtr = JitStringBuiltinArg::lowerZparamStr($context, $args[0], $function, 0, 'name');
+        $namePtr = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $function, 0, 'name');
         JitStringBuiltinArg::rejectEmpty(
             $context,
             $args[0],
