@@ -20,7 +20,7 @@ if (is_array($before) && $before !== []) {
 }
 http_clear_last_response_headers();
 $after = http_get_last_response_headers();
-echo 'after_empty=', $after === [] ? 'yes' : 'no', "\n";
+echo 'after_empty=', null === $after ? 'yes' : 'no', "\n";
 
 if (!is_array($before) || count($before) < 1) {
     fwrite(STDERR, "fail: expected HTTP response headers after fetch\n");
@@ -30,8 +30,8 @@ if (!isset($before[0]) || !str_starts_with((string) $before[0], 'HTTP/')) {
     fwrite(STDERR, "fail: first header line must be HTTP status\n");
     exit(1);
 }
-if ($after !== []) {
-    fwrite(STDERR, "fail: buffer not cleared\n");
+if (null !== $after) {
+    fwrite(STDERR, "fail: buffer not cleared to null\n");
     exit(1);
 }
 

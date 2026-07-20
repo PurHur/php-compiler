@@ -6,5 +6,4 @@ http_clear_last_response_headers();
 var_export(http_get_last_response_headers());
 echo "\n";
 --EXPECT--
-array (
-)
+NULL
