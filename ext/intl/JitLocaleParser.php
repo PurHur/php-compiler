@@ -12,7 +12,11 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM JIT helper for locale_get_* BCP-47 parsers + canonicalize (#17072, #20760). */
+/**
+ * LLVM JIT helper for locale_get_* BCP-47 parsers + canonicalize (#17072, #20760).
+ *
+ * Z_PARAM_STR $locale — null TypeError on PROFILE=8.4 (#21078, locale.stub.php).
+ */
 final class JitLocaleParser
 {
     public static function primaryLanguage(Context $context, JITVariable $locale): Value
@@ -26,7 +30,7 @@ final class JitLocaleParser
 
         return LocaleParser::invokePrimaryLanguage(
             $context,
-            JitStringBuiltinArg::lower($context, $locale, 'locale_get_primary_language', 0, 'locale')
+            JitStringBuiltinArg::lowerZparamStr($context, $locale, 'locale_get_primary_language', 0, 'locale')
         );
     }
 
@@ -41,7 +45,7 @@ final class JitLocaleParser
 
         return LocaleParser::invokeRegion(
             $context,
-            JitStringBuiltinArg::lower($context, $locale, 'locale_get_region', 0, 'locale')
+            JitStringBuiltinArg::lowerZparamStr($context, $locale, 'locale_get_region', 0, 'locale')
         );
     }
 
@@ -56,7 +60,7 @@ final class JitLocaleParser
 
         return LocaleParser::invokeScript(
             $context,
-            JitStringBuiltinArg::lower($context, $locale, 'locale_get_script', 0, 'locale')
+            JitStringBuiltinArg::lowerZparamStr($context, $locale, 'locale_get_script', 0, 'locale')
         );
     }
 
@@ -82,7 +86,7 @@ final class JitLocaleParser
 
         return LocaleParser::invokeCanonicalize(
             $context,
-            JitStringBuiltinArg::lower($context, $locale, $function, 0, 'locale')
+            JitStringBuiltinArg::lowerZparamStr($context, $locale, $function, 0, 'locale')
         );
     }
 }

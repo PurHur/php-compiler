@@ -30,7 +30,8 @@ final class LocaleGetDisplayName extends VmClassMethod
                 'Locale::getDisplayName() expects at most 2 arguments, '.$argc.' given'
             );
         }
-        $locale = VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR $locale — null TypeError on PROFILE=8.4 (#21078, locale.stub.php).
+        $locale = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'Locale::getDisplayName',
             0,
