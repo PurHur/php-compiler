@@ -56,6 +56,9 @@ final class fputcsv extends Internal
         }
         if (isset($frame->calledArgs[4])) {
             $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape', 4);
+        } else {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
+            VmCsvArg::emitOmittedEscapeDeprecation($frame, 'fputcsv');
         }
         if (isset($frame->calledArgs[5])) {
             $eol = VmReflection::stringArg($frame->calledArgs[5], 'fputcsv() eol', 5);
@@ -117,6 +120,9 @@ final class fputcsv extends Internal
         }
         if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             $escape = JitStringArg::lower($context, $args[4], 'fputcsv() escape');
+        } else {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
+            VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'fputcsv');
         }
         if (isset($args[5]) && !NamedOptionalCallArgs::isOmittedOptional($args[5])) {
             $eol = JitStringArg::lower($context, $args[5], 'fputcsv() eol');

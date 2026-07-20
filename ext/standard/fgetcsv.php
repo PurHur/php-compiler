@@ -42,9 +42,6 @@ final class fgetcsv extends Internal
         if (isset($frame->calledArgs[1])) {
             $length = self::parseLengthArg($frame->calledArgs[1]->resolveIndirect());
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
@@ -56,6 +53,12 @@ final class fgetcsv extends Internal
         }
         if (isset($frame->calledArgs[4])) {
             $escape = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'fgetcsv', 4, 'escape');
+        } else {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
+            VmCsvArg::emitOmittedEscapeDeprecation($frame, 'fgetcsv');
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         VmCsvArg::validateFgetcsvOptions($separator, $enclosure, $escape);
         $row = VmFs::fgetcsv($handle, $length, $separator, $enclosure, $escape);
@@ -101,6 +104,9 @@ final class fgetcsv extends Internal
         }
         if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             $escape = JitStringBuiltinArg::lower($context, $args[4], 'fgetcsv', 4, 'escape');
+        } else {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
+            VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'fgetcsv');
         }
         JitCsvArg::validateFgetcsvCall($context, ...$args);
 
