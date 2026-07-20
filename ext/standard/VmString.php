@@ -73,6 +73,7 @@ final class VmString
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
      * date/gmdate $format and strtotime $datetime soft-null (#21208, reverts #19651).
      * password_verify/password_needs_rehash string operands soft-null (#21314; hash_equals stays TypeError).
+     * str_rot13/crypt/uniqid/gzcompress soft-null (#21280).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

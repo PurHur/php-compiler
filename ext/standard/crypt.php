@@ -10,10 +10,13 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** crypt() — POSIX DES/BCRYPT via libcrypt (issue #3771; php-src: ext/standard/crypt.c). */
+/**
+ * crypt() — POSIX DES/BCRYPT via libcrypt (issue #3771; php-src: ext/standard/crypt.c).
+ *
+ * Soft-null $string/$salt on forward profile — Zend 8.4 deprecate+coerce (#21280).
+ */
 final class crypt extends Internal
 {
     public function __construct()
@@ -28,17 +31,8 @@ final class crypt extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $arg0 = $frame->calledArgs[0]->resolveIndirect();
-        $arg1 = $frame->calledArgs[1]->resolveIndirect();
-        // php-src stub: crypt(string $string, string $salt) — TypeError names must match Zend.
-        if (Variable::TYPE_NULL === $arg0->type) {
-            throw new \TypeError('crypt(): Argument #1 ($string) must be of type string, null given');
-        }
-        if (Variable::TYPE_NULL === $arg1->type) {
-            throw new \TypeError('crypt(): Argument #2 ($salt) must be of type string, null given');
-        }
-        $password = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'crypt', 0, 'string');
-        $salt = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'crypt', 1, 'salt');
+        $password = VmString::trimFamilyStringArgForFrame($frame, 0, 'crypt', 0, 'string');
+        $salt = VmString::trimFamilyStringArgForFrame($frame, 1, 'crypt', 1, 'salt');
         $frame->returnVar->string(
             VmPassword::crypt($password, $salt)
         );
@@ -54,8 +48,33 @@ final class crypt extends Internal
 
         return JitPassword::crypt(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'crypt', 0, 'string'),
-            JitStringBuiltinArg::lowerTypedString($context, $args[1], 'crypt', 1, 'salt')
+            self::jitStringArg($context, $args[0], 0, 'string'),
+            self::jitStringArg($context, $args[1], 1, 'salt')
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'crypt',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $arg,
+            'crypt',
+            $argIndex,
+            $paramName
         );
     }
 }

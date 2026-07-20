@@ -26,11 +26,11 @@ foreach ([
 }
 ?>
 --EXPECT--
-nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
+nl2br: ''
 str_shuffle: ''
-str_rot13: str_rot13(): Argument #1 ($string) must be of type string, null given
+str_rot13: ''
 crc32: 0
 convert_uuencode: '`
 '
 hebrev: hebrev(): Argument #1 ($string) must be of type string, null given
-quoted_printable_encode: quoted_printable_encode(): Argument #1 ($string) must be of type string, null given
+quoted_printable_encode: ''

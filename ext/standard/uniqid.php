@@ -17,7 +17,7 @@ use PHPLLVM\Value;
 /**
  * uniqid() — time-based unique string (VmString; JIT/AOT via StringUniqid + UniqidJitHelper, #2219 #5233).
  *
- * Z_PARAM_STR $prefix: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20138, re-#18788).
+ * Soft-null $prefix on forward profile — Zend 8.4 deprecate+coerce (#21280; reverts #20138 TypeError).
  */
 final class uniqid extends Internal
 {
@@ -38,9 +38,10 @@ final class uniqid extends Internal
         $prefix = '';
         $moreEntropy = false;
         if ($argc >= 1) {
-            // Z_PARAM_STR — null TypeError on PROFILE=8.4 (php-src uniqid.c; #20138).
-            $prefix = VmString::coerceZparamStrBuiltinArg(
-                $frame->calledArgs[0],
+            // Soft-null — Zend 8.4 deprecate+coerce (php-src uniqid.c; #21280).
+            $prefix = VmString::trimFamilyStringArgForFrame(
+                $frame,
+                0,
                 'uniqid',
                 0,
                 'prefix'
@@ -64,7 +65,23 @@ final class uniqid extends Internal
         }
         $prefix = $context->builder->load($context->constantStringFromString(''));
         if (isset($args[0])) {
-            $prefix = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'uniqid', 0, 'prefix');
+            if ($context->callerStrictTypes) {
+                $prefix = JitStringBuiltinArg::lowerStrictOrCoercible(
+                    $context,
+                    $args[0],
+                    'uniqid',
+                    0,
+                    'prefix'
+                );
+            } else {
+                $prefix = JitStringBuiltinArg::lowerTrimFamilyString(
+                    $context,
+                    $args[0],
+                    'uniqid',
+                    0,
+                    'prefix'
+                );
+            }
         }
         $moreEntropy = $context->constantFromBool(false);
         if (isset($args[1])) {

@@ -1,31 +1,21 @@
 <?php
+// Repro #21280 — crypt(null, …) / crypt(…, null) soft-null under PROFILE=8.4 (Zend DEP+coerce)
 
-// Issue #18657 — crypt(null salt) must throw TypeError, not return '*0'
+error_reporting(E_ALL & ~E_DEPRECATED);
 
-$caught = false;
 try {
     $result = crypt('password', null);
-    echo "FAIL: no TypeError, got: " . var_export($result, true) . "\n";
+    echo is_string($result) ? "OK: salt-null coerced\n" : "FAIL\n";
 } catch (\TypeError $e) {
-    $caught = true;
-    echo "OK: TypeError — " . $e->getMessage() . "\n";
-}
-
-if (!$caught) {
+    echo "FAIL: TypeError — " . $e->getMessage() . "\n";
     exit(1);
 }
 
-// Also test null password
-$caught2 = false;
 try {
     $result2 = crypt(null, '$2y$10$abcdefghijklmnopqrstuv');
-    echo "FAIL: no TypeError for null password, got: " . var_export($result2, true) . "\n";
+    echo is_string($result2) ? "OK: string-null coerced\n" : "FAIL\n";
 } catch (\TypeError $e) {
-    $caught2 = true;
-    echo "OK: TypeError (password) — " . $e->getMessage() . "\n";
-}
-
-if (!$caught2) {
+    echo "FAIL: TypeError (password) — " . $e->getMessage() . "\n";
     exit(1);
 }
 
