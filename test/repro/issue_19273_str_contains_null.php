@@ -1,9 +1,9 @@
 <?php
-// Repro #19273 — str_contains/starts_with/ends_with null haystack under PHP_COMPILER_PROFILE=8.4
+// Repro #19273 / superseded by #21187 — soft-null (DEP+false) under PROFILE=8.4, not TypeError
 foreach (['str_contains', 'str_starts_with', 'str_ends_with'] as $f) {
     try {
-        $f(null, 'x');
-        echo "$f:OK\n";
+        $r = $f(null, 'x');
+        echo "$f:OK=", var_export($r, true), "\n";
     } catch (Throwable $e) {
         echo "$f: ".get_class($e)."\n";
     }
