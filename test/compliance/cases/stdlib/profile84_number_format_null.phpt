@@ -1,5 +1,5 @@
 --TEST--
-stdlib number_format(null) — TypeError on PHP 8.4 forward profile (#21379, ext/standard/number_format.c)
+PROFILE=8.4: number_format(null) TypeError (#21379, ext/standard/number_format.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
