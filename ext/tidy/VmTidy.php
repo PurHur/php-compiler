@@ -65,6 +65,87 @@ final class VmTidy
         return self::wrapHost($ctx, $host);
     }
 
+    /**
+     * tidy_parse_file() — host bridge (#21501).
+     *
+     * @return Variable|false
+     */
+    public static function parseFile(Context $ctx, string $filename, ?Frame $frame)
+    {
+        if (!self::hostAvailable() || !\function_exists('tidy_parse_file')) {
+            self::emitWarning($frame, 'tidy_parse_file(): host ext/tidy is not available');
+
+            return false;
+        }
+
+        try {
+            $host = \tidy_parse_file($filename);
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_parse_file(): '.$e->getMessage());
+
+            return false;
+        }
+        if (false === $host || !\is_object($host)) {
+            return false;
+        }
+
+        return self::wrapHost($ctx, $host);
+    }
+
+    /**
+     * tidy::parseString() — reload host document into existing object (#21501).
+     */
+    public static function parseStringInto(ObjectEntry $object, string $html, ?Frame $frame): bool
+    {
+        if (!self::hostAvailable()) {
+            self::emitWarning($frame, 'tidy::parseString(): host ext/tidy is not available');
+
+            return false;
+        }
+
+        try {
+            $host = \tidy_parse_string($html);
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy::parseString(): '.$e->getMessage());
+
+            return false;
+        }
+        if (false === $host || !\is_object($host)) {
+            return false;
+        }
+        self::$hostObjects[$object->id] = $host;
+        self::syncHostProperties($object, $host);
+
+        return true;
+    }
+
+    /**
+     * tidy::parseFile() — reload host document into existing object (#21501).
+     */
+    public static function parseFileInto(ObjectEntry $object, string $filename, ?Frame $frame): bool
+    {
+        if (!self::hostAvailable() || !\function_exists('tidy_parse_file')) {
+            self::emitWarning($frame, 'tidy::parseFile(): host ext/tidy is not available');
+
+            return false;
+        }
+
+        try {
+            $host = \tidy_parse_file($filename);
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy::parseFile(): '.$e->getMessage());
+
+            return false;
+        }
+        if (false === $host || !\is_object($host)) {
+            return false;
+        }
+        self::$hostObjects[$object->id] = $host;
+        self::syncHostProperties($object, $host);
+
+        return true;
+    }
+
     public static function wrapHost(Context $ctx, object $host): Variable
     {
         $entry = new ObjectEntry(self::requireClass($ctx));

@@ -24,6 +24,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/BuiltinClasses.php';
         require_once __DIR__.'/VmTidy.php';
         require_once __DIR__.'/tidy_parse_string.php';
+        require_once __DIR__.'/tidy_parse_file.php';
         require_once __DIR__.'/tidy_repair_string.php';
         require_once __DIR__.'/tidy_repair_file.php';
         require_once __DIR__.'/tidy_clean_repair.php';
@@ -50,6 +51,7 @@ class Module extends ModuleAbstract
 
         return [
             new tidy_parse_string(),
+            new tidy_parse_file(),
             new tidy_repair_string(),
             new tidy_repair_file(),
             new tidy_clean_repair(),
