@@ -10,8 +10,8 @@ use PHPCompiler\VM\ObjectEntry;
 /**
  * DOMXPath::evaluate() scalar helpers for compiled JIT/AOT modules (#18526).
  *
- * SSOT: {@see VmDomXPath::evaluate()}. String results prefer user-script folding (#19352);
- * this ABI remains for number()/boolean() and non-foldable string() shapes.
+ * SSOT: {@see VmDomXPath::evaluate()}. String ABI calls evaluate()->toString() (#21238);
+ * user-script folding remains preferred for foldable literals (#19352).
  */
 final class DomXPathEvaluateJitHelper
 {
@@ -36,11 +36,9 @@ final class DomXPathEvaluateJitHelper
         ObjectEntry $xpath,
         string $expression
     ): string {
-        // Prefer compile-time user-script folding. Runtime NestedJit cannot read
-        // TYPE_STRING Variables returned from evaluate() (#19352); return empty
-        // only when folding is unavailable — callers should keep expressions foldable.
-        unset($ctx, $xpath, $expression);
-
-        return '';
+        // Native string return for the AOT/JIT string ABI (#21238). User-script
+        // folding remains preferred for foldable literals; this path covers
+        // namespace-uri()/local-name()/string() when folding is unavailable.
+        return VmDomXPath::evaluate($ctx, $xpath, $expression)->toString($ctx);
     }
 }
