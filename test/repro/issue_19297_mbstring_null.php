@@ -1,5 +1,9 @@
 <?php
-// Repro #19297 — mbstring null string operands under PHP_COMPILER_PROFILE=8.4
+// Repro #19297 / #21197 — mbstring null under PROFILE=8.4
+error_reporting(E_ALL);
+set_error_handler(static function (int $no): bool {
+    return E_DEPRECATED === $no;
+});
 $cases = [
     'mb_strlen' => static fn () => mb_strlen(null),
     'mb_substr' => static fn () => mb_substr(null, 0),
@@ -10,8 +14,8 @@ $cases = [
 ];
 foreach ($cases as $name => $fn) {
     try {
-        $fn();
-        echo "$name: uncaught\n";
+        $r = $fn();
+        echo "$name: OK ".var_export($r, true)."\n";
     } catch (TypeError $e) {
         echo $name.': '.$e->getMessage()."\n";
     }

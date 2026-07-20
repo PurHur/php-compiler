@@ -1,5 +1,14 @@
 <?php
-// Guard #19297 — mbstring null $string TypeError under PHP_COMPILER_PROFILE=8.4
+// Guard #19297 / #21197 — mbstring null under PROFILE=8.4
+// #21197: mb_strlen/mb_substr/mb_strpos soft-null; others still TypeError until follow-ups.
+error_reporting(E_ALL);
+set_error_handler(static function (int $no, string $str): bool {
+    if (E_DEPRECATED === $no) {
+        return true;
+    }
+
+    return false;
+});
 $cases = [
     'mb_strlen' => static fn () => mb_strlen(null),
     'mb_substr' => static fn () => mb_substr(null, 0),
@@ -10,8 +19,8 @@ $cases = [
 ];
 foreach ($cases as $name => $fn) {
     try {
-        $fn();
-        echo "$name: uncaught\n";
+        $r = $fn();
+        echo $name.': OK '.var_export($r, true)."\n";
     } catch (TypeError $e) {
         echo $name.': '.$e->getMessage()."\n";
     }

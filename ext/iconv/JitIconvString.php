@@ -28,11 +28,11 @@ final class JitIconvString
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('iconv_strlen() requires one or two arguments');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20208).
-        if (self::rejectNullZparam($context, $args[0], 'iconv_strlen', 0, 'string')) {
+        // Soft-null $string on 8.4 (#21197); strict_types still TypeErrors.
+        if (self::abortOnStrictNull($context, $args[0], 'iconv_strlen', 0, 'string')) {
             return self::unreachableIntOrFalse($context);
         }
-        $inputLit = self::stringLitOrEmpty($args[0]);
+        $inputLit = self::softNullStringLit($context, $args[0], 'iconv_strlen', 0, 'string');
         $encodingLit = self::encodingLiteral($args, 1);
         if (null !== $inputLit && null !== $encodingLit) {
             $result = VmIconv::iconvStrlen($inputLit, $encodingLit);
@@ -52,12 +52,12 @@ final class JitIconvString
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('iconv_strpos() requires two to four arguments');
         }
-        if (self::rejectNullZparam($context, $args[0], 'iconv_strpos', 0, 'haystack')
-            || self::rejectNullZparam($context, $args[1], 'iconv_strpos', 1, 'needle')) {
+        if (self::abortOnStrictNull($context, $args[0], 'iconv_strpos', 0, 'haystack')
+            || self::abortOnStrictNull($context, $args[1], 'iconv_strpos', 1, 'needle')) {
             return self::unreachableIntOrFalse($context);
         }
-        $hayLit = self::stringLitOrEmpty($args[0]);
-        $needleLit = self::stringLitOrEmpty($args[1]);
+        $hayLit = self::softNullStringLit($context, $args[0], 'iconv_strpos', 0, 'haystack');
+        $needleLit = self::softNullStringLit($context, $args[1], 'iconv_strpos', 1, 'needle');
         $offsetLit = $argc >= 3 ? self::tryCompileTimeInt($context, $args[2]) : 0;
         $encodingLit = $argc >= 4 ? self::encodingLiteral($args, 3) : 'UTF-8';
         if (null !== $hayLit && null !== $needleLit && null !== $offsetLit && null !== $encodingLit) {
@@ -78,10 +78,10 @@ final class JitIconvString
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('iconv_substr() requires two to four arguments');
         }
-        if (self::rejectNullZparam($context, $args[0], 'iconv_substr', 0, 'string')) {
+        if (self::abortOnStrictNull($context, $args[0], 'iconv_substr', 0, 'string')) {
             return self::unreachableStringOrFalse($context);
         }
-        $inputLit = self::stringLitOrEmpty($args[0]);
+        $inputLit = self::softNullStringLit($context, $args[0], 'iconv_substr', 0, 'string');
         $offsetLit = self::tryCompileTimeInt($context, $args[1]);
         $lengthLit = $argc >= 3 ? self::tryCompileTimeOptionalInt($context, $args[2]) : null;
         $encodingLit = $argc >= 4 ? self::encodingLiteral($args, 3) : 'UTF-8';
@@ -102,12 +102,12 @@ final class JitIconvString
         if (\count($args) < 2 || \count($args) > 3) {
             throw new \LogicException('iconv_strrpos() requires two or three arguments');
         }
-        if (self::rejectNullZparam($context, $args[0], 'iconv_strrpos', 0, 'haystack')
-            || self::rejectNullZparam($context, $args[1], 'iconv_strrpos', 1, 'needle')) {
+        if (self::abortOnStrictNull($context, $args[0], 'iconv_strrpos', 0, 'haystack')
+            || self::abortOnStrictNull($context, $args[1], 'iconv_strrpos', 1, 'needle')) {
             return self::unreachableIntOrFalse($context);
         }
-        $hayLit = self::stringLitOrEmpty($args[0]);
-        $needleLit = self::stringLitOrEmpty($args[1]);
+        $hayLit = self::softNullStringLit($context, $args[0], 'iconv_strrpos', 0, 'haystack');
+        $needleLit = self::softNullStringLit($context, $args[1], 'iconv_strrpos', 1, 'needle');
         $encodingLit = self::encodingLiteral($args, 2);
         if (null !== $hayLit && null !== $needleLit && null !== $encodingLit) {
             $result = VmIconv::iconvStrrpos($hayLit, $needleLit, $encodingLit);
@@ -122,11 +122,11 @@ final class JitIconvString
     }
 
     /**
-     * Emit Z_PARAM_STR TypeError for null under PROFILE≥8.4 / strict_types (#20208).
+     * Emit TypeError for null under caller strict_types only (#21197 soft-null otherwise).
      *
      * @return bool true when the call is aborted (unreachable)
      */
-    private static function rejectNullZparam(
+    private static function abortOnStrictNull(
         Context $context,
         JITVariable $arg,
         string $function,
@@ -134,24 +134,25 @@ final class JitIconvString
         string $param
     ): bool {
         $isNull = JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant;
-        if (!$isNull) {
+        if (!$isNull || !$context->callerStrictTypes) {
             return false;
         }
-        $reject = $context->callerStrictTypes
-            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
-        if (!$reject) {
-            return false;
-        }
-        // Side-effect: emit TypeError + abort (return value unused).
         JitStringBuiltinArg::lowerZparamStr($context, $arg, $function, $argIndex, $param);
 
         return true;
     }
 
-    /** Soft-null → '' outside 8.4 zparam guard; otherwise compile-time string literal. */
-    private static function stringLitOrEmpty(JITVariable $arg): ?string
-    {
+    /** Soft-null → '' with E_DEPRECATED; otherwise compile-time string literal (#21197). */
+    private static function softNullStringLit(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $param
+    ): ?string {
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, $function, $argIndex, $param);
+
             return '';
         }
 
