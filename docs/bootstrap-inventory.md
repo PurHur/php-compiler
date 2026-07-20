@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6137 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19096 |
+| Source constructs flagged (warnings) | 19095 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4882,7 +4882,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringClassUses.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClassUsesRecursive.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettime.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringClockGettimeRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringClockGettimeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringConvertUu.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCountChars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCslashes.php` | 0 | 2 |
@@ -29556,8 +29556,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1746)
-- new Error (line 1757)
+- new Error (line 1745)
+- new Error (line 1756)
 - 217 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -37569,9 +37569,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1396)
 - new Variable (line 1403)
 - new Frame (line 1414)
-- new Variable (line 1478)
-- new Variable (line 1504)
-- new Variable (line 1544)
+- new Variable (line 1482)
+- new Variable (line 1508)
+- new Variable (line 1548)
 - 123 class method(s)
 
 ### `lib/BuiltinByRefParams.php`
@@ -41106,7 +41106,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringClockGettimeRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 92)
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/StringConvertUu.php`
@@ -43832,7 +43831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 461)
+- new Variable (line 459)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
@@ -48770,20 +48769,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new self (line 1983)
 - new self (line 2210)
 - new self (line 2321)
-- new self (line 2412)
-- new Error (line 2419)
-- new DivisionByZeroError (line 2524)
-- new DivisionByZeroError (line 2531)
-- new self (line 2552)
-- new Error (line 2581)
-- new self (line 2602)
-- new self (line 2614)
-- new Error (line 2641)
-- new self (line 2662)
-- new self (line 2670)
-- new Error (line 2849)
-- new Error (line 2855)
-- new Error (line 2864)
+- new self (line 2414)
+- new Error (line 2421)
+- new DivisionByZeroError (line 2526)
+- new DivisionByZeroError (line 2533)
+- new self (line 2554)
+- new Error (line 2583)
+- new self (line 2604)
+- new self (line 2616)
+- new Error (line 2643)
+- new self (line 2664)
+- new self (line 2672)
+- new Error (line 2851)
+- new Error (line 2857)
+- new Error (line 2866)
 - 123 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`

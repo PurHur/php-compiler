@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_clock_gettime_assoc via ClockGettimeJitHelper (#11624).
+ * JIT/AOT link for __compiler_clock_gettime_assoc via ClockGettimeJitHelper (#11624, #21270).
+ *
+ * Nested helper compile: {@see JitVmHelperLink::ensureCompiled} (HelperRuntimeCache + user-script
+ * env clear — no hand-rolled NestedJit putenv). Peer: ProcessIdentity #21259 / gethostname #21166.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmHrtimeNative}, {@see \PHPCompiler\ext\standard\VmClockGettime}.
+ * php-src: ext/standard/hrtime.c — clock_gettime
  */
 final class StringClockGettimeRuntime
 {
     private const HELPER_PATH = '/ext/standard/ClockGettimeJitHelper.php';
 
     private const ASSOC_HELPER = 'PHPCompiler\\ext\\standard\\ClockGettimeJitHelper::assoc';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::ASSOC_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -62,46 +72,17 @@ final class StringClockGettimeRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ClockGettimeJitHelper compile (#11624)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#21270');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = \strtolower(self::ASSOC_HELPER);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ClockGettimeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ClockGettimeJitHelper.php parseAndCompile failed (#11624)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException($lc.' was not compiled for JIT (#11624)');
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21270'
+        );
     }
 }
