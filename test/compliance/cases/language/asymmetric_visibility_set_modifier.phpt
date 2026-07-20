@@ -18,4 +18,4 @@ try {
 }
 --EXPECT--
 a@b.c
-Error: Cannot modify public private(set) property User::$email from global scope
+Error: Cannot modify private(set) property User::$email from global scope

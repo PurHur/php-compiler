@@ -14,4 +14,4 @@ try {
 }
 --EXPECT--
 hi
-Error: Cannot modify public private(set) property B::$label from global scope
+Error: Cannot modify private(set) property B::$label from global scope

@@ -18,5 +18,5 @@ try {
 echo $c->x, "\n";
 --EXPECT--
 g
-Error: Cannot modify public protected(set) property C::$x from global scope
+Error: Cannot modify protected(set) property C::$x from global scope
 g

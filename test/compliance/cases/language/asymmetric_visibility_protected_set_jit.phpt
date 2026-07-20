@@ -16,4 +16,4 @@ try {
 }
 --EXPECT--
 ok
-Cannot modify public protected(set) property A::$x from global scope
+Cannot modify protected(set) property A::$x from global scope

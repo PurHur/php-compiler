@@ -16,4 +16,4 @@ try {
 }
 --EXPECT--
 x
-Cannot modify public private(set) property Demo::$name from global scope
+Cannot modify private(set) property Demo::$name from global scope

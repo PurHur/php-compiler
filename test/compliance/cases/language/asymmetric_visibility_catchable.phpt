@@ -13,5 +13,5 @@ try {
 }
 echo $p->name, "\n";
 --EXPECT--
-Error: Cannot modify public private(set) property PrivateSet::$name from global scope
+Error: Cannot modify private(set) property PrivateSet::$name from global scope
 x

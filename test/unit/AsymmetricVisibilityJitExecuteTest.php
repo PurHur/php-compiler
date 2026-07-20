@@ -42,7 +42,7 @@ final class AsymmetricVisibilityJitExecuteTest extends TestCase
     {
         $this->assertMcjitOutput(
             $this->fixtureCode('asymmetric_visibility_jit.phpt'),
-            "x\nCannot modify public (private(set)) property Demo::\$name from global scope\n"
+            "x\nCannot modify private(set) property Demo::\$name from global scope\n"
         );
     }
 

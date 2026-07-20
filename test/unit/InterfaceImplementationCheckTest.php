@@ -188,7 +188,7 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame(
-            "b\nCannot modify public (private(set)) property C::\$slug from global scope\n",
+            "b\nCannot modify private(set) property C::\$slug from global scope\n",
             ob_get_clean()
         );
     }

@@ -352,10 +352,11 @@ PHP;
         );
     }
 
-    public function testWriteModifierLabelIncludesExplicitRead(): void
+    /** @covers issue #21526 — Zend write errors omit get-visibility (zend_errors.c). */
+    public function testWriteModifierLabelMatchesZendSetOnly(): void
     {
         self::assertSame(
-            'public private(set)',
+            'private(set)',
             AsymmetricVisibilityRewriter::writeModifierLabel(
                 \PHPCfg\Func::FLAG_PUBLIC,
                 \PHPCfg\Func::FLAG_PRIVATE,
@@ -368,6 +369,14 @@ PHP;
                 \PHPCfg\Func::FLAG_PUBLIC,
                 \PHPCfg\Func::FLAG_PRIVATE,
                 false
+            )
+        );
+        self::assertSame(
+            'protected(set)',
+            AsymmetricVisibilityRewriter::writeModifierLabel(
+                \PHPCfg\Func::FLAG_PUBLIC,
+                \PHPCfg\Func::FLAG_PROTECTED,
+                true
             )
         );
     }

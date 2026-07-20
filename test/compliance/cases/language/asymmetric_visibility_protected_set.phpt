@@ -20,5 +20,5 @@ $a->setX('from-method');
 echo $a->x, "\n";
 --EXPECT--
 ok
-Error: Cannot modify public protected(set) property A::$x from global scope
+Error: Cannot modify protected(set) property A::$x from global scope
 from-method

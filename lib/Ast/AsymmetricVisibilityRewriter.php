@@ -829,20 +829,15 @@ final class AsymmetricVisibilityRewriter
         return 'public'.self::SET_MODIFIER_NEEDLE;
     }
 
-    /** php-src: zend_object_handlers.c — asymmetric write errors include explicit read modifier (#15995). */
+    /**
+     * php-src: Zend/zend_errors.c zend_asymmetric_visibility_property_modification_error —
+     * write errors use only the set visibility (`private(set)` / `protected(set)`); get-visibility is omitted (#21526).
+     *
+     * $readVisibilityFlags / $explicitReadModifier retained for call-site compatibility.
+     */
     public static function writeModifierLabel(int $readVisibilityFlags, int $setVisibilityFlags, bool $explicitReadModifier): string
     {
-        $setLabel = self::setModifierLabel($setVisibilityFlags);
-        if (!$explicitReadModifier) {
-            return $setLabel;
-        }
-        $readLabel = match (true) {
-            ($readVisibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 => 'private',
-            ($readVisibilityFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0 => 'protected',
-            default => 'public',
-        };
-
-        return $readLabel.' '.$setLabel;
+        return self::setModifierLabel($setVisibilityFlags);
     }
 
     /** @param array<string, mixed> $attributes */
