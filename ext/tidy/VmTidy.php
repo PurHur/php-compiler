@@ -511,6 +511,37 @@ final class VmTidy
     }
 
     /**
+     * tidy_*_count() family — host bridge (#21541).
+     *
+     * @param 'error'|'warning'|'access'|'config' $kind
+     */
+    public static function countKind(ObjectEntry $object, string $kind, ?Frame $frame): int
+    {
+        $host = self::hostFrom($object);
+        $func = 'tidy_'.$kind.'_count';
+        if (null === $host) {
+            self::emitWarning($frame, $func.'(): tidy object has no host backend');
+
+            return 0;
+        }
+        try {
+            if (\function_exists($func)) {
+                $n = $func($host);
+            } else {
+                self::emitWarning($frame, $func.'(): host tidy lacks '.$func);
+
+                return 0;
+            }
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, $func.'(): '.$e->getMessage());
+
+            return 0;
+        }
+
+        return (int) $n;
+    }
+
+    /**
      * tidy_repair_string() / tidy::repairString() — host bridge (#21498).
      *
      * @return string|false
