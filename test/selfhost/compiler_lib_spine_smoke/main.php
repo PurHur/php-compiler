@@ -3527,6 +3527,7 @@ require_once __DIR__.'/../../../ext/standard/log10.php';
 require_once __DIR__.'/../../../ext/standard/log1p.php';
 require_once __DIR__.'/../../../ext/standard/long2ip.php';
 require_once __DIR__.'/../../../ext/standard/lstat_.php';
+require_once __DIR__.'/../../../ext/standard/VmMail.php';
 require_once __DIR__.'/../../../ext/standard/mail.php';
 require_once __DIR__.'/../../../ext/standard/md5.php';
 require_once __DIR__.'/../../../ext/standard/md5_file.php';

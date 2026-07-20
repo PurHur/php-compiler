@@ -25,6 +25,17 @@ final class HttpResponseCodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('addGlobal($i32,', $source);
     }
 
+    /** HttpResponseRuntime: JitVmHelperLink::ensureCompiled — no hand-rolled NestedJit compile (#21441). */
+    public function testHttpResponseRuntimeUsesJitVmHelperLink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/HttpResponseRuntime.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+    }
+
     /** Issue #11206: standalone C main wrapper must not re-enter implement() and clear the insert block. */
     public function testEmitResetForStandaloneMainDoesNotRelink(): void
     {
