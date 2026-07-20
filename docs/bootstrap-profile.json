@@ -116,7 +116,6 @@
         "ext/ctype/VmCtype.php",
         "ext/ctype/ctype_alnum.php",
         "ext/ctype/ctype_alpha.php",
-        "ext/ctype/ctype_blank.php",
         "ext/ctype/ctype_cntrl.php",
         "ext/ctype/ctype_digit.php",
         "ext/ctype/ctype_graph.php",
@@ -835,8 +834,10 @@
         "ext/iconv/iconv_strpos.php",
         "ext/iconv/iconv_strrpos.php",
         "ext/iconv/iconv_substr.php",
+        "ext/igbinary/IgbinaryExtensionPolicy.php",
         "ext/igbinary/IgbinaryFunction.php",
         "ext/igbinary/Module.php",
+        "ext/igbinary/VmIgbinary.php",
         "ext/igbinary/igbinary_pack.php",
         "ext/igbinary/igbinary_serialize.php",
         "ext/igbinary/igbinary_unpack.php",
@@ -6397,9 +6398,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6163,
+        "inventory_files": 6164,
         "excluded": 0,
-        "eligible": 6163,
+        "eligible": 6164,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

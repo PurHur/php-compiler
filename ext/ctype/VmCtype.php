@@ -29,7 +29,6 @@ final class VmCtype
     public const KIND_SPACE = 8;
     public const KIND_UPPER = 9;
     public const KIND_XDIGIT = 10;
-    public const KIND_BLANK = 11;
 
     public static function evaluate(
         Variable $var,
@@ -133,7 +132,6 @@ final class VmCtype
             self::KIND_SPACE => self::isSpace($byte),
             self::KIND_UPPER => self::isUpper($byte),
             self::KIND_XDIGIT => self::isXdigit($byte),
-            self::KIND_BLANK => self::isBlank($byte),
             default => throw new \LogicException('Unknown ctype kind: '.$kind),
         };
     }
@@ -144,7 +142,6 @@ final class VmCtype
     public static function specForFunction(string $function): array
     {
         return match ($function) {
-            'ctype_blank' => ['kind' => self::KIND_BLANK, 'allow_digits' => false, 'allow_minus' => false],
             'ctype_alnum' => ['kind' => self::KIND_ALNUM, 'allow_digits' => true, 'allow_minus' => false],
             'ctype_alpha' => ['kind' => self::KIND_ALPHA, 'allow_digits' => false, 'allow_minus' => false],
             'ctype_cntrl' => ['kind' => self::KIND_CNTRL, 'allow_digits' => false, 'allow_minus' => false],
@@ -200,11 +197,6 @@ final class VmCtype
     private static function isSpace(int $byte): bool
     {
         return \in_array($byte, [9, 10, 11, 12, 13, 32], true);
-    }
-
-    private static function isBlank(int $byte): bool
-    {
-        return 9 === $byte || 32 === $byte;
     }
 
     private static function isPrint(int $byte): bool

@@ -12,7 +12,6 @@ $tests = [
     'ctype_upper' => static fn () => ctype_upper(E::A),
     'ctype_xdigit' => static fn () => ctype_xdigit(E::B),
     'ctype_space' => static fn () => ctype_space(E::A),
-    'ctype_blank' => static fn () => ctype_blank(E::A),
     'ctype_cntrl' => static fn () => ctype_cntrl(E::A),
     'ctype_graph' => static fn () => ctype_graph(E::A),
     'ctype_print' => static fn () => ctype_print(E::A),
@@ -31,7 +30,6 @@ ctype_lower:0
 ctype_upper:0
 ctype_xdigit:0
 ctype_space:0
-ctype_blank:0
 ctype_cntrl:0
 ctype_graph:0
 ctype_print:0

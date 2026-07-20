@@ -16,7 +16,6 @@ class Module extends ModuleAbstract
     public function getFunctions(): array
     {
         return [
-            new ctype_blank(),
             new ctype_alnum(),
             new ctype_alpha(),
             new ctype_cntrl(),
