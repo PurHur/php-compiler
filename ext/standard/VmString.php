@@ -79,7 +79,7 @@ final class VmString
      * function_exists/class_exists/interface_exists/trait_exists/enum_exists/
      * extension_loaded/defined/constant/method_exists/property_exists/define name args (#21281),
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode string
-     * operands (#21189), ord() character (#21222),
+     * operands (#21189), substr_count/substr_replace haystack (#21196), ord() character (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),

@@ -82,23 +82,6 @@ final class substr_replace extends Internal
             throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
         }
 
-        // Early TypeError for null $string on 8.4 forward profile (#19282, string.c Z_PARAM_ARRAY_OR_STR).
-        if (
-            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
-            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
-        ) {
-            JitStringBuiltinArg::lowerZparamStr(
-                $context,
-                $args[0],
-                'substr_replace',
-                0,
-                'string',
-                'array|string'
-            );
-
-            return $context->getTypeFromString('__string__*')->constNull();
-        }
-
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $lengthVal = $i64->constInt(0, false);
@@ -151,7 +134,7 @@ final class substr_replace extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'substr_replace',
