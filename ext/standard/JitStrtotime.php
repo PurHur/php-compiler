@@ -23,10 +23,10 @@ final class JitStrtotime
 
         StringStrtotime::ensureLinked($context);
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19651, ext/date/php_date.c)
+        // Soft-null on 8.4 — Zend deprecate+coerce (#21208, reverts #19651 TypeError)
         $time = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtotime', 0, 'datetime')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strtotime', 0, 'datetime');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strtotime', 0, 'datetime');
         $hasBase = $context->constantFromBool(2 === $argc && !self::isNullJitArg($args[1]));
         $base = (2 === $argc && !self::isNullJitArg($args[1]))
             ? self::jitOptionalIntArg($context, $args[1], 2)

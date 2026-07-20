@@ -258,8 +258,8 @@ final class JitDate
         if ($argc > 2) {
             throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19651, ext/date/php_date.c)
-        $format = JitStringBuiltinArg::lowerZparamStr($context, $args[0], $function, 0, 'format');
+        // Soft-null on 8.4 — Zend deprecate+coerce (#21208, reverts #19651 TypeError)
+        $format = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $function, 0, 'format');
         $i64 = $context->getTypeFromString('int64');
         $timestamp = $argc >= 2
             ? JitDateTimestampArg::lowerNullable(

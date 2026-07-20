@@ -118,6 +118,7 @@ final class JitStringBuiltinArg
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
+     * date/gmdate $format and strtotime $datetime soft-null (#21208, reverts #19651).
      */
     public static function lowerTrimFamilyString(
         Context $context,
