@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 /**
  * collator_get_sort_key() — procedural Collator::getSortKey
  * (php-src collator_sort.c / collator.stub.php; #20801).
+ *
+ * Z_PARAM_STR null TypeError on 8.4 forward (#21077, collator.stub.php).
  */
 final class collator_get_sort_key extends Internal
 {
