@@ -12482,6 +12482,10 @@ class Compiler {
         if (!\is_array($callArgs) || !$this->callArgIsDeadInlineTemporary($arg)) {
             return null;
         }
+        // importNode($doc->documentElement->firstChild, true) — hoisted true is not a PropertyFetch arg (#18860, re-open).
+        if (null !== $this->tryFoldHoistedBoolNullLiteralCallArg($arg, $block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
         $nonLiteralArgCount = 0;
         foreach ($callArgs as $callArg) {
             if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
@@ -12567,7 +12571,18 @@ class Compiler {
                 $deadTempArgIndices[] = (int) $i;
             }
         }
-        $deadOrdinal = array_search($argIndex, $deadTempArgIndices, true);
+        $propertyDeadTempArgIndices = [];
+        foreach ($deadTempArgIndices as $deadIdx) {
+            $deadArg = $callArgs[$deadIdx] ?? null;
+            if (
+                $deadArg instanceof Operand
+                && null !== $this->tryFoldHoistedBoolNullLiteralCallArg($deadArg, $block, $cfgCallOp, $deadIdx)
+            ) {
+                continue;
+            }
+            $propertyDeadTempArgIndices[] = $deadIdx;
+        }
+        $deadOrdinal = array_search($argIndex, $propertyDeadTempArgIndices, true);
         if (!\is_int($deadOrdinal)) {
             return null;
         }
@@ -12575,7 +12590,7 @@ class Compiler {
         // leaves map to the trailing propertyArgCount slots (#19719):
         // insertBefore($d->createElement('x'), $r->lastChild).
         $fetchCount = \count($fetches);
-        $firstFetchDeadOrdinal = \count($deadTempArgIndices) - $fetchCount;
+        $firstFetchDeadOrdinal = \count($propertyDeadTempArgIndices) - $fetchCount;
         if ($deadOrdinal < $firstFetchDeadOrdinal) {
             return null;
         }
