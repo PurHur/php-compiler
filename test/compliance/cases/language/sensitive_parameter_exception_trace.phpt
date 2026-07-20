@@ -1,5 +1,5 @@
 --TEST--
-Language: #[\SensitiveParameter] redacts Throwable::getTrace() args via SensitiveParameterValue (#21339, VM)
+Language: #[\SensitiveParameter] redacts Throwable::getTrace() args via SensitiveParameterValue (#21339/#21524, VM)
 --FILE--
 <?php
 function f(#[\SensitiveParameter] string $secret, string $ok): void {
@@ -14,7 +14,8 @@ try {
     echo isset($args[1]) ? var_export($args[1], true) : 'missing', "\n";
     $traceString = $e->getTraceAsString();
     echo str_contains($traceString, 'hunter2') ? 'leaked' : 'no_leak', "\n";
-    echo str_contains($traceString, '[Sensitive Parameter]') ? 'redacted_label' : 'no_redacted_label', "\n";
+    echo str_contains($traceString, 'Object(SensitiveParameterValue)') ? 'object_form' : 'no_object_form', "\n";
+    echo str_contains($traceString, '[Sensitive Parameter]') ? 'flat_label' : 'no_flat_label', "\n";
     echo str_contains($traceString, 'visible') ? 'plain_visible' : 'no_plain', "\n";
 }
 --EXPECT--
@@ -22,5 +23,6 @@ argc=2
 SensitiveParameterValue
 'visible'
 no_leak
-redacted_label
+object_form
+no_flat_label
 plain_visible
