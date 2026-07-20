@@ -8,13 +8,19 @@ use PHPCompiler\ext\standard\StrRepeatJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** str_repeat() JIT routes through StrRepeatJitHelper PHP not inline LLVM (#14602). */
+/** str_repeat() JIT routes through StrRepeatJitHelper + JitVmHelperLink (#14602, #21601). */
 final class StrRepeatRuntimeShrinkTest extends TestCase
 {
     public function testStringStrRepeatUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrRepeat.php');
         $this->assertStringContainsString('StrRepeatJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('BasicBlockHelper', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStrRepeat.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/str_repeat.php');
