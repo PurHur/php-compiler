@@ -18,14 +18,11 @@ final class JitFunctionExists
     public static function invoke(Context $context, JITVariable $nameArg): Value
     {
         $i1 = $context->getTypeFromString('int1');
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20360, zend_builtin_functions.c).
-        // Compile-time null must not continue into StringFunctionExists after catchable abort.
+        // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281); empty name is never registered.
+        $nameStr = self::jitNameArg($context, $nameArg);
         if (JITVariable::TYPE_NULL === $nameArg->type || ($nameArg->isNullConstant ?? false)) {
-            self::jitNameArg($context, $nameArg);
-
             return $i1->constInt(0, false);
         }
-        $nameStr = self::jitNameArg($context, $nameArg);
         $literal = JitStringArg::compileTimeLiteral($nameArg);
         if (null !== $literal) {
             $literal = VmReflection::normalizeGlobalIntrospectionName($literal);
@@ -57,7 +54,7 @@ final class JitFunctionExists
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'function_exists',

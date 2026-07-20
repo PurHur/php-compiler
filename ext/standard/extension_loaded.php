@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * extension_loaded() — registered extension probe (ext/standard/info.c parity, #3204).
  *
- * Z_PARAM_STR $extension — null TypeError on PHP_COMPILER_PROFILE=8.4 (#20254).
+ * Z_PARAM_STR $extension — soft-null DEP+coerce on PHP_COMPILER_PROFILE=8.4 (#21281).
  */
 final class extension_loaded extends Internal
 {
@@ -30,8 +30,8 @@ final class extension_loaded extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/info.c).
-        $name = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'extension_loaded', 0, 'extension');
+        // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21281, ext/standard/info.c).
+        $name = VmString::trimFamilyStringArgForFrame($frame, 0, 'extension_loaded', 0, 'extension');
         $frame->returnVar->bool(VmInfo::extension_loaded($name));
     }
 

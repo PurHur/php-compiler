@@ -27,8 +27,8 @@ final class enum_exists_ extends Internal
             throw new \LogicException('enum_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19223, zend_builtin_functions.c).
-        $name = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'enum_exists', 0, 'enum');
+        // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, zend_builtin_functions.c).
+        $name = VmString::trimFamilyStringArgForFrame($frame, 0, 'enum_exists', 0, 'enum');
         $autoload = VmReflection::autoloadFlagFromFrame($frame);
         $exists = VmReflection::enumExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
@@ -44,6 +44,12 @@ final class enum_exists_ extends Internal
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             return ReflectionBuiltinHelper::enumExistsLiteral($context, $literal);
+        }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            self::jitNameArg($context, $args[0]);
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
         }
 
         return JitEnumExists::invoke(
@@ -64,7 +70,7 @@ final class enum_exists_ extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'enum_exists',

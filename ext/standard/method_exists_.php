@@ -34,8 +34,8 @@ final class method_exists_ extends Internal
             ));
         }
         $ctx = VmReflection::requireContext($frame);
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20360, zend_builtin_functions.c).
-        $method = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'method_exists', 1, 'method');
+        // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, zend_builtin_functions.c).
+        $method = VmString::trimFamilyStringArgForFrame($frame, 1, 'method_exists', 1, 'method');
         $exists = VmReflection::methodExists($ctx, $frame->calledArgs[0], $method);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
@@ -51,8 +51,7 @@ final class method_exists_ extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR method — null TypeError on 8.4 forward profile (#20360).
-        // Compile-time null must not enter JitMethodExists (runaway LLVM on TYPE_NULL method slot).
+        // Z_PARAM_STR method — soft-null DEP+coerce on 8.4 (#21281); empty method never exists.
         if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
             self::jitMethodNameArg($context, $args[1]);
             $i1 = $context->getTypeFromString('int1');
@@ -97,7 +96,7 @@ final class method_exists_ extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'method_exists',
