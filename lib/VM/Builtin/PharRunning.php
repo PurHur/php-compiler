@@ -32,7 +32,7 @@ final class PharRunning extends VmClassMethod
         });
     }
 
-    private static function resolveScriptPath(Frame $frame): string
+    public static function resolveScriptPath(Frame $frame): string
     {
         if (null !== $frame->vmContext) {
             $server = $frame->vmContext->getSuperglobal('_SERVER');
