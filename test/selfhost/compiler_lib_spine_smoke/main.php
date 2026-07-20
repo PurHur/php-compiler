@@ -2899,6 +2899,7 @@ require_once __DIR__.'/../../../ext/standard/VmNetInterfacesNative.php';
 require_once __DIR__.'/../../../ext/standard/VmNetInterfacesPure.php';
 require_once __DIR__.'/../../../ext/standard/VmNetworkServices.php';
 require_once __DIR__.'/../../../ext/standard/VmNullNumberParamDeprecation.php';
+require_once __DIR__.'/../../../ext/standard/VmNullStringParamDeprecation.php';
 require_once __DIR__.'/../../../ext/standard/VmNumberFormat.php';
 require_once __DIR__.'/../../../ext/standard/VmOb.php';
 require_once __DIR__.'/../../../ext/standard/VmObGzhandler.php';
