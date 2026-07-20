@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
 use PHPCompiler\JIT\Builtin\StringPhpinfoRuntime;
@@ -22,6 +23,12 @@ final class JitInfo
 {
     public static function phpversion(Context $context, ?JITVariable $extension): Value
     {
+        if ($context->isUserScriptAot()) {
+            $folded = self::tryFoldPhpversionUserScript($context, $extension);
+            if (null !== $folded) {
+                return $folded;
+            }
+        }
         StringInfo::ensureLinked($context);
         $strPtr = $context->getTypeFromString('__string__*');
         $extArg = $strPtr->constNull();
@@ -92,6 +99,9 @@ final class JitInfo
 
     public static function php_uname(Context $context, ?Value $mode): Value
     {
+        if ($context->isUserScriptAot() && null === $mode) {
+            return self::emitUserScriptStringLiteral($context, InfoJitHelper::php_uname(null));
+        }
         StringInfo::ensureLinked($context);
         $strPtr = $context->getTypeFromString('__string__*');
         if (null === $mode) {
@@ -389,6 +399,65 @@ final class JitInfo
             Builder::INT_EQ,
             $cmp,
             $context->getTypeFromString('int32')->constInt(0, false)
+        );
+    }
+
+    /**
+     * User-script AOT: fold phpversion() when extension is omitted or a compile-time literal (#21359).
+     * Avoids broken nested InfoJitHelper::phpversionArgv bridge at runtime (re-#13803).
+     */
+    private static function tryFoldPhpversionUserScript(Context $context, ?JITVariable $extension): ?Value
+    {
+        if (null === $extension) {
+            return self::emitUserScriptStringLiteral($context, CompilerVersion::reportedPhpVersion());
+        }
+        if (JITVariable::TYPE_NULL === $extension->type || ($extension->isNullConstant ?? false)) {
+            return self::emitUserScriptFalse($context);
+        }
+        $lit = $extension->compileTimeString ?? JitStringArg::compileTimeLiteral($extension);
+        if (null === $lit) {
+            return null;
+        }
+        $version = InfoJitHelper::phpversionArgv('' === $lit ? null : $lit);
+        if (null === $version) {
+            return self::emitUserScriptFalse($context);
+        }
+
+        return self::emitUserScriptStringLiteral($context, $version);
+    }
+
+    /** @internal user-script AOT string results without __compiler_php_uname (#21359) */
+    public static function emitUserScriptStringLiteral(Context $context, string $text): Value
+    {
+        StringInfo::ensureLinked($context);
+        $owned = self::initOwnedStringLiteral($context, $text);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $separated = $context->builder->call($context->lookupFunction('__string__separate'), $owned);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $separated);
+
+        return $ptr;
+    }
+
+    private static function emitUserScriptFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+        return $ptr;
+    }
+
+    private static function initOwnedStringLiteral(Context $context, string $text): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $cstr = $context->builder->pointerCast($context->constantFromString($text), $charPtr);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $i64->constInt(\strlen($text), false),
+            $cstr
         );
     }
 }
