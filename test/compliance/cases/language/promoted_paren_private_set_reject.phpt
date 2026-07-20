@@ -12,4 +12,4 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-Error: Cannot modify public private(set) property D::$x from global scope
+Error: Cannot modify private(set) property D::$x from global scope

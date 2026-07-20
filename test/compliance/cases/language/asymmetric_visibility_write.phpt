@@ -38,9 +38,9 @@ echo $q->tag, "\n";
 $q->mutate();
 echo $q->tag, "\n";
 --EXPECT--
-Error: Cannot modify public private(set) property PrivateSet::$name from global scope
+Error: Cannot modify private(set) property PrivateSet::$name from global scope
 x
 y
-Error: Cannot modify public protected(set) property ProtectedSet::$tag from global scope
+Error: Cannot modify protected(set) property ProtectedSet::$tag from global scope
 a
 b

@@ -19,4 +19,4 @@ try {
 }
 --EXPECT--
 b
-Cannot modify public private(set) property C::$slug from global scope
+Cannot modify private(set) property C::$slug from global scope

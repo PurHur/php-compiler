@@ -16,4 +16,4 @@ try {
 }
 --EXPECT--
 hi
-Error: Cannot modify public private(set) property C::$x from global scope
+Error: Cannot modify private(set) property C::$x from global scope

@@ -17,4 +17,4 @@ try {
 }
 --EXPECT--
 alice
-Error: Cannot modify public private(set) property C::$name from global scope
+Error: Cannot modify private(set) property C::$name from global scope
