@@ -539,6 +539,12 @@ final class DomLivingBuiltinClasses
             }
             if (isset($from->methodNames[$lc])) {
                 $to->methodNames[$lc] = $from->methodNames[$lc];
+            } elseif (!isset($to->methodNames[$lc])) {
+                $declared = $method->getName();
+                if (str_contains($declared, '::')) {
+                    $declared = substr($declared, strrpos($declared, '::') + 2);
+                }
+                $to->methodNames[$lc] = $declared;
             }
         }
     }
@@ -561,6 +567,12 @@ final class DomLivingBuiltinClasses
             }
             if (isset($from->methodNames[$lc])) {
                 $to->methodNames[$lc] = $from->methodNames[$lc];
+            } elseif (!isset($to->methodNames[$lc])) {
+                $declared = $from->methods[$lc]->getName();
+                if (str_contains($declared, '::')) {
+                    $declared = substr($declared, strrpos($declared, '::') + 2);
+                }
+                $to->methodNames[$lc] = $declared;
             }
         }
     }

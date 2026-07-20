@@ -26,25 +26,24 @@ final class ReflectionClassGetMethod extends VmClassMethod
         $receiver = ReflectionSupport::requireReflectionClass($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
         $className = ReflectionSupport::classNameFromReflection($receiver);
-        $entry = VmReflection::resolveClassEntry($ctx, $className);
-        if (null === $entry) {
+        if (null === VmReflection::resolveClassEntry($ctx, $className)) {
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
         $method = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getMethod() name', 1);
-        $methodLc = strtolower($method);
-        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
-            ReflectionSupport::throwReflectionException(
-                ReflectionSupport::methodNotFoundMessage($className, $method)
-            );
-        }
+        [$declEntry, $canonical] = ReflectionSupport::reflectionMethodFromClassAndMethod(
+            $ctx,
+            $className,
+            $method
+        );
         $rmClass = $ctx->classes[ReflectionSupport::REFLECTION_METHOD] ?? null;
         if (null === $rmClass) {
             throw new \LogicException('ReflectionMethod is not registered in this compiler build');
         }
         $rm = new ObjectEntry($rmClass);
         $rm->constructed = true;
-        $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS)->string($entry->name);
-        $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC)->string($method);
+        // php-src: composing class name on the ReflectionMethod (requested class).
+        $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS)->string($declEntry->name);
+        $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC)->string($canonical);
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($rm);
