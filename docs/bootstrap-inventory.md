@@ -28440,7 +28440,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 84 class method(s)
+- 85 class method(s)
 
 ### `ext/standard/VmMemory.php`
 

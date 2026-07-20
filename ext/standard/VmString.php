@@ -58,7 +58,7 @@ final class VmString
      * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * preg_match $subject (#21198), and substr/strpos/strstr/explode string
-     * operands (#21189).
+     * operands (#21189), ord() character (#21222).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

@@ -537,7 +537,7 @@ final class JitIntdiv
     }
 
     /** Z_PARAM_LONG null coerce E_DEPRECATED (#19756). */
-    private static function emitNullIntDeprecation(
+    public static function emitNullIntDeprecation(
         Context $context,
         string $function,
         int $argIndex,

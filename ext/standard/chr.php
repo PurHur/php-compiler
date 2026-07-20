@@ -27,7 +27,7 @@ final class chr extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'chr', 1);
-        $n = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'chr', 1, 'codepoint');
+        $n = VmMath::parseChrCodepointForFrame($frame, 0, 'chr', 1, 'codepoint');
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,7 +46,7 @@ final class chr extends Internal
         if ($context->callerStrictTypes) {
             JitInternalStrictArg::requireInt($context, $args[0], 'chr', 'codepoint', 1);
         }
-        $v = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'chr', 1, 'codepoint');
+        $v = JitChr::lowerCodepoint($context, $args[0]);
         $const256 = $v->typeOf()->constInt(256, false);
         $rem = $context->builder->signedRem($v, $const256);
         $zero = $v->typeOf()->constInt(0, false);

@@ -6,7 +6,6 @@ PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach ([
-    'chr' => static fn () => chr(null),
     'wordwrap' => static fn () => wordwrap(null),
     'dechex' => static fn () => dechex(null),
     'decbin' => static fn () => decbin(null),
@@ -21,7 +20,6 @@ foreach ([
     }
 }
 --EXPECT--
-chr: chr(): Argument #1 ($codepoint) must be of type int, null given
 wordwrap: wordwrap(): Argument #1 ($string) must be of type string, null given
 dechex: dechex(): Argument #1 ($num) must be of type int, null given
 decbin: decbin(): Argument #1 ($num) must be of type int, null given
