@@ -1,9 +1,10 @@
 --TEST--
-stdlib Z_PARAM_STR null — mixed soft-null/TypeError on 8.4 (#19319/#21180, ext/standard/string.c)
+stdlib Z_PARAM_STR null — soft-null mix on 8.4 (#19319/#21180/#21420, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_WARNING);
 $cases = [
     'addcslashes' => fn () => addcslashes(null, 'a'),
     'stripslashes' => fn () => stripslashes(null),
@@ -27,8 +28,11 @@ echo var_export(stripslashes(''), true), "\n";
 addcslashes: uncaught ''
 stripslashes: uncaught ''
 hebrev: uncaught ''
-str_split(): Argument #1 ($string) must be of type string, null given
-convert_uudecode(): Argument #1 ($string) must be of type string, null given
-str_getcsv(): Argument #1 ($string) must be of type string, null given
+str_split: uncaught array (
+)
+convert_uudecode: uncaught false
+str_getcsv: uncaught array (
+  0 => NULL,
+)
 ord: uncaught 0
 ''

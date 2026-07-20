@@ -48,7 +48,8 @@ final class VmString
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
      * parse_str $string is Z_PARAM_STR TypeError on 8.4 (#21380, re-#20113).
      * introspection name args (function_exists/class_exists/defined/…) soft-null (#21281).
-     * htmlspecialchars/htmlentities/nl2br/addslashes are Z_PARAM_STR TypeError on 8.4 (#21351), not soft-null.
+     * htmlspecialchars/htmlentities/nl2br/addslashes soft-null on 8.4 (#21405/#21406; reverts #21351 TypeError).
+     * convert_uudecode soft-null on 8.4 (#21420; empty decode → warning+false like Zend).
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare is Z_PARAM_STR TypeError on 8.4 (#20164), not soft-null.
      * glob()/fnmatch() pattern soft-null on 8.4 (#21366, ext/standard/file.c, fnmatch.c).
@@ -89,7 +90,7 @@ final class VmString
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
      * json_decode/json_validate $json, unserialize $data (#21223).
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
-     * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
+     * hex2bin/convert_uuencode/convert_uudecode/sscanf($string), pack($values) soft-null (#21209/#21420).
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
      * setcookie/setrawcookie $name soft-null (#21233, re-#21003).
