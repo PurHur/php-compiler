@@ -3038,6 +3038,7 @@
         "ext/standard/VmNetInterfacesPure.php",
         "ext/standard/VmNetworkServices.php",
         "ext/standard/VmNullNumberParamDeprecation.php",
+        "ext/standard/VmNullStringParamDeprecation.php",
         "ext/standard/VmNumberFormat.php",
         "ext/standard/VmOb.php",
         "ext/standard/VmObGzhandler.php",
@@ -6364,9 +6365,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6130,
+        "inventory_files": 6131,
         "excluded": 0,
-        "eligible": 6130,
+        "eligible": 6131,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
