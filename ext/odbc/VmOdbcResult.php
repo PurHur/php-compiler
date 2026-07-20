@@ -27,6 +27,7 @@ final class VmOdbcResult
      *   colnames: list<string>,
      *   coltypes: list<string>,
      *   collens: list<int>,
+     *   colscales: list<int>,
      *   cursor: int,
      *   closed: bool,
      *   connection: ObjectEntry,
@@ -61,6 +62,7 @@ final class VmOdbcResult
      * @param list<string>      $colnames
      * @param list<string>      $coltypes
      * @param list<int>         $collens
+     * @param list<int>         $colscales
      * @param list<mixed>       $binds
      */
     public static function wrap(
@@ -73,7 +75,8 @@ final class VmOdbcResult
         array $collens = [],
         int $numparams = 0,
         bool $executed = true,
-        array $binds = []
+        array $binds = [],
+        array $colscales = []
     ): Variable {
         self::registerClass($ctx);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
@@ -84,13 +87,18 @@ final class VmOdbcResult
                 $colnames[] = (string) ($i + 1);
                 $coltypes[] = '';
                 $collens[] = 0;
+                $colscales[] = 0;
             }
+        }
+        while (\count($colscales) < \count($colnames)) {
+            $colscales[] = 0;
         }
         self::$state[$object->id] = [
             'rows' => $rows,
             'colnames' => $colnames,
             'coltypes' => $coltypes,
             'collens' => $collens,
+            'colscales' => $colscales,
             'cursor' => -1,
             'closed' => false,
             'connection' => $connection,
@@ -244,11 +252,11 @@ final class VmOdbcResult
         return $types[$field1Based - 1];
     }
 
-    public static function fieldLen(ObjectEntry $object, int $field1Based): int|false
+    public static function fieldLen(ObjectEntry $object, int $field1Based, string $fn = 'odbc_field_len'): int|false
     {
         self::requireLive($object);
         if ($field1Based < 1) {
-            throw new \ValueError('odbc_field_len(): Argument #2 ($field) must be greater than 0');
+            throw new \ValueError($fn.'(): Argument #2 ($field) must be greater than 0');
         }
         $lens = self::$state[$object->id]['collens'];
         if (0 === \count($lens)) {
@@ -259,6 +267,38 @@ final class VmOdbcResult
         }
 
         return $lens[$field1Based - 1];
+    }
+
+    /**
+     * Column scale (php-src odbc_field_scale / SQL_COLUMN_SCALE; #21306).
+     */
+    public static function fieldScale(ObjectEntry $object, int $field1Based): int|false
+    {
+        self::requireLive($object);
+        if ($field1Based < 1) {
+            throw new \ValueError('odbc_field_scale(): Argument #2 ($field) must be greater than 0');
+        }
+        $cols = self::$state[$object->id]['colnames'];
+        if (0 === \count($cols)) {
+            return false;
+        }
+        if ($field1Based > \count($cols)) {
+            return false;
+        }
+        $hstmt = self::$state[$object->id]['hstmt'];
+        if (null !== $hstmt) {
+            // SQL_COLUMN_SCALE = 5 (sql.h / php-src odbc_column_lengths type=1)
+            $live = VmOdbcNative::colAttributeNumeric($hstmt, $field1Based, 5);
+            if (null !== $live) {
+                return $live;
+            }
+        }
+        $scales = self::$state[$object->id]['colscales'];
+        if ($field1Based > \count($scales)) {
+            return 0;
+        }
+
+        return $scales[$field1Based - 1];
     }
 
     public static function fieldNum(ObjectEntry $object, string $name): int|false
@@ -334,6 +374,7 @@ final class VmOdbcResult
      * @param list<string>      $colnames
      * @param list<string>      $coltypes
      * @param list<int>         $collens
+     * @param list<int>         $colscales
      * @param list<mixed>       $binds
      */
     public static function applyBuffered(
@@ -342,13 +383,18 @@ final class VmOdbcResult
         array $colnames,
         array $coltypes,
         array $collens,
-        array $binds = []
+        array $binds = [],
+        array $colscales = []
     ): void {
         self::requireLive($object);
+        while (\count($colscales) < \count($colnames)) {
+            $colscales[] = 0;
+        }
         self::$state[$object->id]['rows'] = $rows;
         self::$state[$object->id]['colnames'] = $colnames;
         self::$state[$object->id]['coltypes'] = $coltypes;
         self::$state[$object->id]['collens'] = $collens;
+        self::$state[$object->id]['colscales'] = $colscales;
         self::$state[$object->id]['cursor'] = -1;
         self::$state[$object->id]['executed'] = true;
         self::$state[$object->id]['binds'] = $binds;
