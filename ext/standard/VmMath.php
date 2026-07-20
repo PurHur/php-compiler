@@ -425,6 +425,30 @@ final class VmMath
     }
 
     /**
+     * chr() codepoint with caller strict_types parity (php-src string.c php_chr; #5085, #21222).
+     */
+    public static function parseChrCodepointForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): int {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireInt($frame, $argIndex, $function, $paramName);
+
+            return $frame->calledArgs[$argIndex]->resolveIndirect()->toInt();
+        }
+        $var = $frame->calledArgs[$argIndex];
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
+            self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
+        }
+
+        return self::parseChrCodepoint($var, $function, $userArgIndex, $paramName, $frame);
+    }
+
+    /**
      * Nullable int builtin args with strict_types TypeError on float/string (#11286, zend_verify_arg_type).
      */
     public static function parseNullableIntBuiltinArgForFrame(
@@ -462,7 +486,8 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): int {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseIntBuiltinArg($var, $function, $argIndex, $paramName);
@@ -480,8 +505,14 @@ final class VmMath
         if (Variable::TYPE_FLOAT === $var->type) {
             return self::floatToZendLong($var->toFloat());
         }
+        if (Variable::TYPE_NULL === $var->type) {
+            // Z_PARAM_LONG: E_DEPRECATED then coerce to 0 on forward profile (#19756, #21222).
+            VmNullNumberParamDeprecation::emit($frame, $function, $argIndex, $paramName, 'int');
 
-        return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+            return 0;
+        }
+
+        return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName, $frame);
     }
 
     private static function parseNullableLongBuiltinArgCore(

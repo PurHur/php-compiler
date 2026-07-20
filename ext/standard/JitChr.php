@@ -21,8 +21,10 @@ final class JitChr
     public static function lowerCodepoint(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_NULL === $arg->type) {
-            if (VmMath::requiresForwardProfileStrictLongNull()) {
+            if ($context->callerStrictTypes) {
                 self::emitIntTypeErrorAndAbort($context, 'null');
+            } else {
+                JitIntdiv::emitNullIntDeprecation($context, 'chr', 1, 'codepoint');
             }
 
             return $context->getTypeFromString('int64')->constInt(0, false);
@@ -92,8 +94,10 @@ final class JitChr
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
 
         $context->builder->positionAtEnd($nullBlock);
-        if (VmMath::requiresForwardProfileStrictLongNull()) {
+        if ($context->callerStrictTypes) {
             self::emitIntTypeErrorAndAbort($context, 'null');
+        } else {
+            JitIntdiv::emitNullIntDeprecation($context, 'chr', 1, 'codepoint');
         }
         $context->builder->branch($mergeBlock);
 

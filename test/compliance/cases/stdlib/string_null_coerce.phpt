@@ -23,7 +23,9 @@ foreach ([
 ?>
 --EXPECT--
 dirname: ''
-explode: explode(): Argument #2 ($string) must be of type string, null given
-ord: ord(): Argument #1 ($character) must be of type string, null given
-chr: chr(): Argument #1 ($codepoint) must be of type int, null given
+explode: array (
+  0 => '',
+)
+ord: 0
+chr: '' . "\0" . ''
 parse_url: parse_url(): Argument #1 ($url) must be of type string, null given

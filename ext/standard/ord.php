@@ -27,7 +27,8 @@ final class ord extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'ord', 1);
-        $s = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'ord', 0, 'character');
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21222; php-src string.c ord).
+        $s = VmString::trimFamilyStringArgForFrame($frame, 0, 'ord', 1, 'character');
         if (null === $frame->returnVar) {
             return;
         }
@@ -72,7 +73,7 @@ final class ord extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'ord',

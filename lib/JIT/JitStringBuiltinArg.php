@@ -113,7 +113,7 @@ final class JitStringBuiltinArg
      * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
      * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
-     * preg_match $subject (#21198), and substr/strpos/strstr/explode (#21189).
+     * preg_match $subject (#21198), and substr/strpos/strstr/explode (#21189), ord() (#21222).
      */
     public static function lowerTrimFamilyString(
         Context $context,
