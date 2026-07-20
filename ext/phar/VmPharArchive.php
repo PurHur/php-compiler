@@ -9,6 +9,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStatPath;
 use PHPCompiler\ext\standard\VmString;
@@ -30,6 +31,9 @@ final class VmPharArchive
 
     /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string, hasMetadata: bool, metadata: mixed}> */
     private static array $state = [];
+
+    /** @var array<string, string> alias → archive path (Phar::loadPhar; #21232). */
+    private static array $aliases = [];
 
     public static function bind(
         ObjectEntry $object,
@@ -450,6 +454,55 @@ final class VmPharArchive
         return true;
     }
 
+    /**
+     * php-src phar_load — validate archive and register alias (#21232).
+     */
+    public static function loadPhar(string $filename, string $alias = ''): bool
+    {
+        $filename = self::normalizeArchivePath($filename);
+        self::assertReadablePharFile($filename);
+        if ('' !== $alias) {
+            self::$aliases[$alias] = $filename;
+        }
+
+        return true;
+    }
+
+    /**
+     * php-src phar_unlink_archive — drop in-memory state and unlink on disk (#21232).
+     */
+    public static function unlinkArchive(string $archive): bool
+    {
+        $archive = self::normalizeArchivePath($archive);
+        foreach (self::$state as $oid => $st) {
+            if ($st['path'] !== $archive) {
+                continue;
+            }
+            $live = ObjectRegistry::find($oid);
+            if (null !== $live && $live->refCount > 0) {
+                throw new \PharException(
+                    'phar archive "'.$archive.'" has open file handles or objects.  fclose() all file handles, and unset() all objects prior to calling unlinkArchive()'
+                );
+            }
+            unset(self::$state[$oid]);
+        }
+        foreach (self::$aliases as $alias => $path) {
+            if ($path === $archive) {
+                unset(self::$aliases[$alias]);
+            }
+        }
+        if (!VmStatPath::isFile($archive)) {
+            throw new \PharException(
+                'Unknown phar archive "'.$archive.'": unable to open phar for reading "'.$archive.'"'
+            );
+        }
+        if (!VmFs::unlink($archive)) {
+            throw new \UnexpectedValueException('phar error: unable to delete phar "'.$archive.'"');
+        }
+
+        return true;
+    }
+
     public static function offsetSet(ObjectEntry $object, string $localname, string $contents): void
     {
         self::addFromString($object, $localname, $contents);
@@ -612,5 +665,32 @@ final class VmPharArchive
     private static function normalizeEntryName(string $localname): string
     {
         return \rtrim(\ltrim(\str_replace('\\', '/', $localname), '/'), '/');
+    }
+
+    private static function normalizeArchivePath(string $path): string
+    {
+        return \str_replace('\\', '/', $path);
+    }
+
+    private static function assertReadablePharFile(string $path): void
+    {
+        if (!VmStatPath::isFile($path)) {
+            throw new \PharException(
+                'Unknown phar archive "'.$path.'": unable to open phar for reading "'.$path.'"'
+            );
+        }
+        $binary = VmFs::fileGetContents($path);
+        if (false === $binary) {
+            throw new \PharException(
+                'Unknown phar archive "'.$path.'": unable to open phar for reading "'.$path.'"'
+            );
+        }
+        if (!\str_contains($binary, '__HALT_COMPILER()')) {
+            throw new \PharException(
+                'internal corruption of phar "'.$path.'" (__HALT_COMPILER(); not found)'
+            );
+        }
+        [, $payload] = self::splitStub($binary);
+        VmPharTar::readArchiveEntries($payload);
     }
 }

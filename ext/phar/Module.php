@@ -19,6 +19,7 @@ class Module extends ModuleAbstract
 
             return;
         }
+        require_once __DIR__.'/bootstrap_pharexception.php';
         BuiltinClasses::register($runtime->vmContext);
         parent::init($runtime);
     }

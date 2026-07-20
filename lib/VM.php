@@ -9375,6 +9375,8 @@ restart:
             return $this->dispatchVmPDOException($e, $callerFrame);
         } catch (\SQLite3Exception $e) {
             return $this->dispatchVmSQLite3Exception($e, $callerFrame);
+        } catch (\PharException $e) {
+            return $this->dispatchVmPharException($e, $callerFrame);
         } catch (\SoapFault $e) {
             return $this->dispatchVmSoapFault($e, $callerFrame);
         } catch (\RuntimeException $e) {
@@ -9596,6 +9598,20 @@ restart:
             $file,
             $line,
             (int) $error->getCode()
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native PharException from ext/phar builtins (#21232). */
+    private function dispatchVmPharException(\PharException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializePharException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
