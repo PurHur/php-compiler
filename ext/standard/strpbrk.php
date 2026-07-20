@@ -21,7 +21,7 @@ final class strpbrk extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('strpbrk() requires exactly two arguments in this compiler build');
         }
-        $haystackStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'strpbrk', 0, 'string');
+        $haystackStr = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'strpbrk', 0, 'string');
         $maskStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strpbrk', 1, 'characters');
         if (null === $frame->returnVar) {
             return;
@@ -44,7 +44,7 @@ final class strpbrk extends Internal
 
         return JitStrpbrk::find(
             $context,
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strpbrk', 0, 'string'),
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strpbrk', 0, 'string'),
             JitStringBuiltinArg::lower($context, $args[1], 'strpbrk', 1, 'characters')
         );
     }

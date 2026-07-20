@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -24,13 +25,11 @@ final class stripos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('stripos() requires two or three arguments');
         }
-        $haystack = $frame->calledArgs[0]->resolveIndirect();
-        $needle = $frame->calledArgs[1]->resolveIndirect();
+        $haystackStr = self::vmStringArg($frame, 0, 'haystack');
+        $needleStr = self::vmStringArg($frame, 1, 'needle');
         if (null === $frame->returnVar) {
             return;
         }
-        $haystackStr = VmString::coerceZparamStrBuiltinArg($haystack, 'stripos', 0, 'haystack');
-        $needleStr = VmString::coerceZparamStrBuiltinArg($needle, 'stripos', 1, 'needle');
         $offset = 0;
         if (3 === $argc) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'stripos', 3, 'offset');
@@ -65,8 +64,12 @@ final class stripos extends Internal
         }
 
         StringStrpos::ensureLinked($context);
-        $hay = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'stripos', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'stripos', 1, 'needle');
+        $hay = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'stripos', 0, 'haystack')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'stripos', 0, 'haystack');
+        $needle = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'stripos', 1, 'needle')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'stripos', 1, 'needle');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'stripos', 3, 'offset')
             : null;
@@ -90,5 +93,19 @@ final class stripos extends Internal
         }
 
         return null;
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'stripos', $paramName)->toString();
+        }
+
+        return VmString::coerceTrimFamilyStringArg(
+            $frame->calledArgs[$argIndex],
+            'stripos',
+            $argIndex,
+            $paramName
+        );
     }
 }
