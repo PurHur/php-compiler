@@ -109,9 +109,10 @@ final class VmSimpleXml
     public static function loadString(Context $ctx, string $data, ?Frame $frame = null): ?ObjectEntry
     {
         $trimmed = trim($data);
+        // php-src: empty/whitespace-only after Z_PARAM_STR coerce → false with no warning
+        // (Zend 8.2+/8.4; null→'' soft path for #21502). Whitespace that is not empty still
+        // goes through libxml and may emit parser errors.
         if ('' === $trimmed) {
-            self::warn($ctx, 'simplexml_load_string(): supplied argument cannot be empty', $frame);
-
             return null;
         }
 
