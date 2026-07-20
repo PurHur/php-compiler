@@ -39,6 +39,8 @@ final class BuiltinParamNames
             'resourcebundle::create' => ['locale', 'bundlename', 'fallback'],
             'resourcebundle::get' => ['index'],
             'resourcebundle::count' => [],
+            // php-src timezone.stub.php — ICU≥74 (#21553)
+            'intltimezone::getianaid' => ['zoneId'],
             default => null,
         };
     }
@@ -52,6 +54,8 @@ final class BuiltinParamNames
 
         $lc = strtolower($name);
         switch ($lc) {
+            case 'intltz_get_iana_id':
+                return ['zoneId'];
             case 'strlen':
             case 'ucfirst':
             case 'lcfirst':
@@ -564,6 +568,11 @@ final class BuiltinParamNames
 
     public static function paramCountForInternalMethod(string $class, string $method): ?int
     {
+        $names = self::forClassMethod(strtolower($class).'::'.strtolower($method));
+        if (null !== $names) {
+            return \count($names);
+        }
+
         return BuiltinInternalArgInfo::paramCountForClassMethod($class, $method);
     }
 
@@ -579,6 +588,11 @@ final class BuiltinParamNames
 
     public static function requiredParamCountForInternalMethod(string $class, string $method): ?int
     {
+        $names = self::forClassMethod(strtolower($class).'::'.strtolower($method));
+        if (null !== $names) {
+            return self::requiredParamCountFromNames($names);
+        }
+
         return BuiltinInternalArgInfo::requiredParamCountForClassMethod($class, $method);
     }
 
