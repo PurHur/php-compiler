@@ -37,6 +37,12 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString("memLimit = '8192M'", $jit);
         $this->assertStringContainsString('full-spine sidecar host-compile OOMs below 8GB (#8559)', $jit);
         $this->assertStringContainsString('StringFsDir::ensureLinked', $aot);
+        $this->assertStringContainsString('ensureSidecarCopyAbisForLink', $aot);
+        $this->assertStringContainsString('ensureSidecarCopyAbisForLink($this->context)', $jit);
         $this->assertStringContainsString('__compiler_resolve_sidecar_source_path', $aot);
+        $fnPos = strpos($aot, 'function emitStandaloneWriteCachedAot');
+        $this->assertNotFalse($fnPos);
+        $fnChunk = substr($aot, $fnPos, 1200);
+        $this->assertStringNotContainsString('StringFsDir::ensureLinked', $fnChunk, '#21417: link ABIs before stub builder swap, not inside sidecar emit');
     }
 }

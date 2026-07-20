@@ -6213,6 +6213,9 @@ class JIT {
             return $this->context->functions[$lcname];
         }
         $keepObjectStandalone = $this->ensureRuntimeStandaloneKeepObjectLoweringForLink();
+        if (\PHPCompiler\JIT\M3EmitTuTrivialEchoAot::isRegistered($this->context)) {
+            \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::ensureSidecarCopyAbisForLink($this->context);
+        }
         $objectPtr = $this->context->getTypeFromString('__object__*');
         $strPtr = $this->context->getTypeFromString('__string__*');
         $voidTy = $this->context->getTypeFromString('void');
