@@ -31,5 +31,5 @@ str_rot13: ''
 crc32: 0
 convert_uuencode: '`
 '
-hebrev: hebrev(): Argument #1 ($string) must be of type string, null given
+hebrev: ''
 quoted_printable_encode: ''
