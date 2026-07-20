@@ -2339,8 +2339,10 @@ restart:
 
             return;
         }
-        // BcMath\Number do_operation (+ - * / % **) — php-src ext/bcmath/bcmath.c (#20648).
-        $bcCtx = null !== $frame ? $frame->vmContext : (null !== $vm ? $vm->context : null);
+        // BcMath\Number do_operation (+ - * / % **) — php-src ext/bcmath/bcmath.c (#20648, #21266).
+        // Prefer frame context, but fall back to $vm->context: CFG try/catch/merge frames from
+        // Block::getFrame often leave vmContext null even though the VM still has a live Context.
+        $bcCtx = $frame?->vmContext ?? $vm?->context;
         if (null !== $bcCtx
             && \PHPCompiler\ext\bcmath\VmBcMathNumber::tryDoOperation($this, $opCode, $left, $right, $bcCtx)) {
             return;
@@ -2704,7 +2706,7 @@ restart:
 
                     return;
                 }
-                $bcCtx = null !== $frame ? $frame->vmContext : (null !== $vm ? $vm->context : null);
+                $bcCtx = $frame?->vmContext ?? $vm?->context;
                 if (null !== $bcCtx
                     && \PHPCompiler\ext\bcmath\VmBcMathNumber::tryUnaryMinus($this, $resolved, $bcCtx)) {
                     return;

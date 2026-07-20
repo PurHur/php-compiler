@@ -33,6 +33,18 @@ try {
 } catch (TypeError $e) {
     echo "null TypeError\n";
 }
+// Operators inside try/catch and after an unrelated catch (#21266).
+try {
+    echo 'try+', (string) ($a + $b), "\n";
+} catch (Throwable $e) {
+    echo 'tryEX=', $e->getMessage(), "\n";
+}
+try {
+    throw new Exception('unrelated');
+} catch (Throwable $e) {
+    echo 'caught=', $e->getMessage(), "\n";
+}
+echo 'after+', (string) ($a + $b), "\n";
 --EXPECT--
 4.0/1
 -1.0/1
@@ -46,3 +58,6 @@ try {
 110
 4.0
 null TypeError
+try+4.0
+caught=unrelated
+after+4.0
