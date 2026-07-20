@@ -24564,7 +24564,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitPrintf.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
+- new ArgumentCountError (line 29)
 - 1 class method(s)
 
 ### `ext/standard/JitProcClose.php`
@@ -29880,8 +29880,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1800)
-- new Error (line 1811)
+- new Error (line 1801)
+- new Error (line 1812)
 - 218 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -30928,7 +30928,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/convert_cyr_string.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 31)
 - 2 class method(s)
 
 ### `ext/standard/convert_uudecode.php`
@@ -32877,8 +32877,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/money_format.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- new Error (line 38)
+- new ArgumentCountError (line 36)
+- new Error (line 41)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -39010,7 +39010,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 215 class method(s)
+- 218 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -42872,8 +42872,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ValueEchoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 213)
-- 16 class method(s)
+- new Variable (line 227)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/ValueSortRuntime.php`
 
@@ -44345,7 +44345,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 485)
+- new Variable (line 486)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`

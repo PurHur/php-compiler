@@ -13,6 +13,9 @@ use PHPLLVM\Value;
 
 /**
  * convert_cyr_string() — Cyrillic charset conversion (php-src cyr_convert.c, #4649).
+ *
+ * Removed in php-src 8.0; registered only when {@see \PHPCompiler\CompilerVersion::supportsConvertCyrString()}
+ * (pre-8.0 legacy profiles). #21481.
  */
 final class convert_cyr_string extends Internal
 {

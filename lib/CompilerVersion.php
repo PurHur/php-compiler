@@ -2321,14 +2321,37 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ convert_cyr_string() (ext/standard/cyr_convert.c, #11907, #17319).
+     * convert_cyr_string() — removed in php-src 8.0 (ext/standard/cyr_convert.c, #21481, re-#11907/#17319).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * PHP_COMPILER_PROFILE=8.4 or stable 8.4.0+ runtime.
+     * Only register on pre-8.0 language profiles (legacy). Zend 8.2 / 8.4 have no symbol.
+     * php-src: UPGRADING — convert_cyr_string gone since 8.0.
      */
     public static function supportsConvertCyrString(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.0.0', '<');
+    }
+
+    /** convert_cyr_string() visible to function_exists() — pre-8.0 profiles only (#21481). */
+    public static function advertisesConvertCyrString(): bool
+    {
+        return self::supportsConvertCyrString();
+    }
+
+    /**
+     * money_format() — removed in php-src 8.0 (ext/standard/formatted_print.c, #21481, re-#3693).
+     *
+     * Only register on pre-8.0 language profiles (legacy). Zend 8.2 / 8.4 have no symbol.
+     * php-src: UPGRADING — money_format gone since 8.0.
+     */
+    public static function supportsMoneyFormat(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.0.0', '<');
+    }
+
+    /** money_format() visible to function_exists() — pre-8.0 profiles only (#21481). */
+    public static function advertisesMoneyFormat(): bool
+    {
+        return self::supportsMoneyFormat();
     }
 
     /**

@@ -15,6 +15,9 @@ use PHPLLVM\Value;
 /**
  * money_format() — locale monetary formatting via strfmon(3) (#3693).
  *
+ * Removed in php-src 8.0; registered only when {@see \PHPCompiler\CompilerVersion::supportsMoneyFormat()}
+ * (pre-8.0 legacy profiles). #21481.
+ *
  * php-src: ext/standard/formatted_print.c — PHP_FUNCTION(money_format)
  */
 final class money_format extends Internal

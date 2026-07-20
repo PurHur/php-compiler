@@ -1,5 +1,7 @@
 --TEST--
-ext/standard money_format() strfmon parity (#3693, ext/standard/formatted_print.c)
+ext/standard money_format() strfmon parity — pre-8.0 legacy (#3693, #21481)
+--ENV--
+PHP_COMPILER_PROFILE=7.4
 --SKIPIF--
 <?php
 if (!extension_loaded('FFI') && !function_exists('money_format')) {

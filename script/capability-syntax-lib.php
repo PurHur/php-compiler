@@ -1271,9 +1271,16 @@ function withheldBuiltinGateDefinitions(): array
         [
             'names' => ['convert_cyr_string'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsConvertCyrString'],
-            'since' => '8.3.0',
+            'since' => '7.4.0',
             'module' => 'standard',
             'relPath' => 'ext/standard/convert_cyr_string.php',
+        ],
+        [
+            'names' => ['money_format'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMoneyFormat'],
+            'since' => '7.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/money_format.php',
         ],
         [
             'names' => ['class_uses_recursive'],

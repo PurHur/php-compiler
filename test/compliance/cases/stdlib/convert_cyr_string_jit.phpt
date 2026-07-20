@@ -1,5 +1,7 @@
 --TEST--
-stdlib convert_cyr_string() JIT/AOT (#4649)
+stdlib convert_cyr_string() JIT/AOT — pre-8.0 legacy (#4649, #21481)
+--ENV--
+PHP_COMPILER_PROFILE=7.4
 --FILE--
 <?php
 echo function_exists('convert_cyr_string') ? "yes\n" : "no\n";

@@ -631,6 +631,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     public function testConvertCyrStringNotAdvertisedOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsConvertCyrString());
+        $this->assertFalse(CompilerVersion::advertisesConvertCyrString());
+    }
+
+    public function testMoneyFormatNotAdvertisedOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsMoneyFormat());
+        $this->assertFalse(CompilerVersion::advertisesMoneyFormat());
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['money_format']));
     }
 
     public function testStrxfrmNotAdvertisedOnReferenceProfile(): void
@@ -657,12 +666,54 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsStrxfrm());
-            $this->assertTrue(CompilerVersion::supportsConvertCyrString());
+            $this->assertFalse(CompilerVersion::supportsConvertCyrString());
+            $this->assertFalse(CompilerVersion::supportsMoneyFormat());
             $this->assertTrue(CompilerVersion::supportsGetmygrgid());
             $runtime = new Runtime();
-            foreach (['strxfrm', 'convert_cyr_string', 'getmygrgid'] as $fn) {
+            foreach (['strxfrm', 'getmygrgid'] as $fn) {
                 $this->assertTrue(isset($runtime->vmContext->functions[$fn]), $fn);
             }
+            $this->assertFalse(isset($runtime->vmContext->functions['convert_cyr_string']));
+            $this->assertFalse(isset($runtime->vmContext->functions['money_format']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** convert_cyr_string()/money_format() removed in php-src 8.0 — must not register on 8.4 (#21481). */
+    public function testRemovedStdlibBuiltinsWithheldOnPhp84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsConvertCyrString());
+            $this->assertFalse(CompilerVersion::supportsMoneyFormat());
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['convert_cyr_string']));
+            $this->assertFalse(isset($runtime->vmContext->functions['money_format']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testRemovedStdlibBuiltinsRegisteredOnPhp74LegacyProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=7.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsConvertCyrString());
+            $this->assertTrue(CompilerVersion::supportsMoneyFormat());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['convert_cyr_string']));
+            $this->assertTrue(isset($runtime->vmContext->functions['money_format']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
