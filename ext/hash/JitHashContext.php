@@ -50,7 +50,10 @@ final class JitHashContext
             throw new \LogicException('hash_init() requires exactly one argument in this compiler build');
         }
         HashContextEmbedBridge::ensureLinked($context);
-        $algoStr = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_init', 0, 'algo');
+        // Z_PARAM_STR $algo — non-strict null is E_DEPRECATED + '' then ValueError (#21572).
+        $algoStr = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_init', 0, 'algo')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'hash_init', 0, 'algo');
         $handle = self::callHelper($context, self::INIT_HELPER, $algoStr);
 
         $objectType = $context->type->object;
