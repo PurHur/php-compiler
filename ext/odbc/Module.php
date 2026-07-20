@@ -74,6 +74,8 @@ class Module extends ModuleAbstract
             new odbc_field_name(),
             new odbc_field_type(),
             new odbc_field_len(),
+            new odbc_field_len('odbc_field_precision'),
+            new odbc_field_scale(),
             new odbc_field_num(),
             new odbc_tables(),
             new odbc_columns(),

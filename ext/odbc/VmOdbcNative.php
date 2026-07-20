@@ -386,6 +386,7 @@ final class VmOdbcNative
                 'name' => self::ffiString($name, (int) $nameLen->cdata),
                 'type' => (string) (int) $dataType->cdata,
                 'len' => (int) $colSize->cdata,
+                'scale' => (int) $decimal->cdata,
             ];
         } catch (\Throwable $e) {
             return null;
@@ -956,7 +957,7 @@ final class VmOdbcNative
     /**
      * Buffer all current result rows + column metadata.
      *
-     * @return array{rows: list<list<mixed>>, colnames: list<string>, coltypes: list<string>, collens: list<int>}|null
+     * @return array{rows: list<list<mixed>>, colnames: list<string>, coltypes: list<string>, collens: list<int>, colscales: list<int>}|null
      */
     public static function bufferResult(\FFI\CData $hstmt): ?array
     {
@@ -964,16 +965,19 @@ final class VmOdbcNative
         $colnames = [];
         $coltypes = [];
         $collens = [];
+        $colscales = [];
         for ($i = 1; $i <= $ncols; ++$i) {
             $meta = self::describeCol($hstmt, $i);
             if (null === $meta) {
                 $colnames[] = 'col'.$i;
                 $coltypes[] = '';
                 $collens[] = 0;
+                $colscales[] = 0;
             } else {
                 $colnames[] = $meta['name'];
                 $coltypes[] = $meta['type'];
                 $collens[] = $meta['len'];
+                $colscales[] = $meta['scale'];
             }
         }
         $rows = [];
@@ -997,7 +1001,39 @@ final class VmOdbcNative
             'colnames' => $colnames,
             'coltypes' => $coltypes,
             'collens' => $collens,
+            'colscales' => $colscales,
         ];
+    }
+
+    /**
+     * SQLColAttribute numeric attribute (php-src odbc_column_lengths; #21306).
+     * SQL_COLUMN_PRECISION=4, SQL_COLUMN_SCALE=5 (ODBC 2).
+     */
+    public static function colAttributeNumeric(\FFI\CData $hstmt, int $col1Based, int $field): ?int
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return null;
+            }
+            $num = $ffi->new('SQLLEN');
+            $rc = (int) $ffi->SQLColAttribute(
+                $hstmt,
+                $col1Based,
+                $field,
+                null,
+                0,
+                null,
+                \FFI::addr($num)
+            );
+            if (!self::ok($rc)) {
+                return null;
+            }
+
+            return (int) $num->cdata;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**

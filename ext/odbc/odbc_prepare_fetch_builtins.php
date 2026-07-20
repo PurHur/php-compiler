@@ -481,9 +481,9 @@ final class odbc_field_type extends Internal
 
 final class odbc_field_len extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'odbc_field_len')
     {
-        parent::__construct('odbc_field_len');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -491,7 +491,8 @@ final class odbc_field_len extends Internal
         $argc = \count($frame->calledArgs);
         if (2 !== $argc) {
             throw new \ArgumentCountError(\sprintf(
-                'odbc_field_len() expects exactly 2 arguments, %d given',
+                '%s() expects exactly 2 arguments, %d given',
+                $this->name,
                 $argc
             ));
         }
@@ -500,10 +501,13 @@ final class odbc_field_len extends Internal
         }
         $res = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $res->type || !VmOdbcResult::isLive($res->toObject())) {
-            throw new \TypeError('odbc_field_len(): supplied resource is not a valid ODBC result resource');
+            throw new \TypeError(\sprintf(
+                '%s(): supplied resource is not a valid ODBC result resource',
+                $this->name
+            ));
         }
         $field = $frame->calledArgs[1]->resolveIndirect()->toInt();
-        $len = VmOdbcResult::fieldLen($res->toObject(), $field);
+        $len = VmOdbcResult::fieldLen($res->toObject(), $field, $this->name);
         if (false === $len) {
             $frame->returnVar->bool(false);
 
@@ -514,7 +518,46 @@ final class odbc_field_len extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('odbc_field_len() is not implemented for JIT (#21258)');
+        throw new \LogicException($this->name.'() is not implemented for JIT (#21258)');
+    }
+}
+
+final class odbc_field_scale extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('odbc_field_scale');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'odbc_field_scale() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $res = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $res->type || !VmOdbcResult::isLive($res->toObject())) {
+            throw new \TypeError('odbc_field_scale(): supplied resource is not a valid ODBC result resource');
+        }
+        $field = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $scale = VmOdbcResult::fieldScale($res->toObject(), $field);
+        if (false === $scale) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($scale);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('odbc_field_scale() is not implemented for JIT (#21306)');
     }
 }
 

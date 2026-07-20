@@ -102,7 +102,11 @@ final class VmOdbcCore
             $hstmt,
             $buffered['colnames'],
             $buffered['coltypes'],
-            $buffered['collens']
+            $buffered['collens'],
+            0,
+            true,
+            [],
+            $buffered['colscales'] ?? []
         );
     }
 
@@ -137,16 +141,19 @@ final class VmOdbcCore
         $colnames = [];
         $coltypes = [];
         $collens = [];
+        $colscales = [];
         for ($i = 1; $i <= $ncols; ++$i) {
             $meta = VmOdbcNative::describeCol($hstmt, $i);
             if (null === $meta) {
                 $colnames[] = 'col'.$i;
                 $coltypes[] = '';
                 $collens[] = 0;
+                $colscales[] = 0;
             } else {
                 $colnames[] = $meta['name'];
                 $coltypes[] = $meta['type'];
                 $collens[] = $meta['len'];
+                $colscales[] = $meta['scale'];
             }
         }
         VmOdbcConnection::setLastError('', '');
@@ -160,7 +167,9 @@ final class VmOdbcCore
             $coltypes,
             $collens,
             $numparams,
-            false
+            false,
+            [],
+            $colscales
         );
     }
 
@@ -219,7 +228,8 @@ final class VmOdbcCore
             $buffered['colnames'],
             $buffered['coltypes'],
             $buffered['collens'],
-            $binds
+            $binds,
+            $buffered['colscales'] ?? []
         );
         VmOdbcConnection::setLastError('', '');
 
@@ -702,7 +712,9 @@ final class VmOdbcCore
                 $buffered['rows'],
                 $buffered['colnames'],
                 $buffered['coltypes'],
-                $buffered['collens']
+                $buffered['collens'],
+                [],
+                $buffered['colscales'] ?? []
             );
             VmOdbcConnection::setLastError('', '');
 
@@ -880,7 +892,11 @@ final class VmOdbcCore
             $hstmt,
             $buffered['colnames'],
             $buffered['coltypes'],
-            $buffered['collens']
+            $buffered['collens'],
+            0,
+            true,
+            [],
+            $buffered['colscales'] ?? []
         );
     }
 
