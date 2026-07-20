@@ -387,6 +387,87 @@ final class VmOdbcCore
     }
 
     /**
+     * @return Variable|false
+     */
+    public static function specialColumns(
+        ObjectEntry $connection,
+        int $type,
+        ?string $catalog,
+        string $schema,
+        string $table,
+        int $scope,
+        int $nullable,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_specialcolumns',
+            'SQLSpecialColumns',
+            static function ($hstmt) use ($type, $catalog, $schema, $table, $scope, $nullable): bool {
+                return VmOdbcNative::specialColumns(
+                    $hstmt,
+                    $type,
+                    $catalog,
+                    $schema,
+                    $table,
+                    $scope,
+                    $nullable
+                );
+            }
+        );
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function procedures(
+        ObjectEntry $connection,
+        ?string $catalog,
+        ?string $schema,
+        ?string $procedure,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_procedures',
+            'SQLProcedures',
+            static function ($hstmt) use ($catalog, $schema, $procedure): bool {
+                return VmOdbcNative::procedures($hstmt, $catalog, $schema, $procedure);
+            }
+        );
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function procedureColumns(
+        ObjectEntry $connection,
+        ?string $catalog,
+        ?string $schema,
+        ?string $procedure,
+        ?string $column,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_procedurecolumns',
+            'SQLProcedureColumns',
+            static function ($hstmt) use ($catalog, $schema, $procedure, $column): bool {
+                return VmOdbcNative::procedureColumns($hstmt, $catalog, $schema, $procedure, $column);
+            }
+        );
+    }
+
+    /**
      * odbc_autocommit — get status (int) or set mode (bool) (php-src; #21277).
      *
      * @return int|bool

@@ -14,7 +14,8 @@ use PHPCompiler\VM;
  * Connect/close/exec/fetch/error + PHP 8.2 connection-string helpers +
  * prepare/execute/fetch_array/tables/columns/field_* + autocommit/commit/rollback +
  * next_result/data_source/binmode/longreadlen/setoption +
- * primarykeys/foreignkeys/statistics/gettypeinfo catalog APIs.
+ * primarykeys/foreignkeys/statistics/gettypeinfo +
+ * specialcolumns/procedures/procedurecolumns catalog APIs.
  * Thin unixODBC FFI when libodbc is present (document unixodbc / libsqliteodbc in Docker).
  */
 class Module extends ModuleAbstract
@@ -79,6 +80,9 @@ class Module extends ModuleAbstract
             new odbc_foreignkeys(),
             new odbc_statistics(),
             new odbc_gettypeinfo(),
+            new odbc_specialcolumns(),
+            new odbc_procedures(),
+            new odbc_procedurecolumns(),
             new odbc_free_result(),
             new odbc_autocommit(),
             new odbc_commit(),
