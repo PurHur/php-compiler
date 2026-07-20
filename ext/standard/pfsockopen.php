@@ -38,7 +38,7 @@ final class pfsockopen extends Internal
             return;
         }
 
-        $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pfsockopen', 0, 'hostname');
+        $hostname = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'pfsockopen', 0, 'hostname');
 
         $port = -1;
         if ($argc >= 2) {

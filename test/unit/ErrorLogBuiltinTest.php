@@ -94,8 +94,8 @@ final class ErrorLogBuiltinTest extends TestCase
         $builtin->execute($frame);
     }
 
-    /** @see https://github.com/PurHur/php-compiler/issues/20253 */
-    public function test_null_message_type_error_on_forward84(): void
+    /** @see https://github.com/PurHur/php-compiler/issues/21446 */
+    public function test_null_message_coerces_on_forward84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
@@ -108,11 +108,8 @@ final class ErrorLogBuiltinTest extends TestCase
             $message = new VMVariable();
             $message->null();
             $frame->calledArgs[] = $message;
-            $this->expectException(\TypeError::class);
-            $this->expectExceptionMessage(
-                'error_log(): Argument #1 ($message) must be of type string, null given'
-            );
             $builtin->execute($frame);
+            self::assertTrue($frame->returnVar->resolveIndirect()->toBool());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

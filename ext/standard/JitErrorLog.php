@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for error_log() (#3380 JIT/AOT; Z_PARAM_STR null #20253). */
+/** LLVM lowering for error_log() (#3380 JIT/AOT; soft-null message #21446). */
 final class JitErrorLog
 {
     private const FILE_APPEND = 8;
@@ -28,11 +28,10 @@ final class JitErrorLog
             return self::lowerFileAppend($context, $message, $destination);
         }
 
-        $msgStr = JitStringBuiltinArg::lowerZparamStr($context, $message, 'error_log', 0, 'message');
+        $msgStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $message, 'error_log', 0, 'message');
         $nullOperand = JITVariable::TYPE_NULL === $message->type
             || ($message->isNullConstant ?? false);
-        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
-            // TypeError already emitted; skip runtime call after abort (#20253).
+        if ($nullOperand && $context->callerStrictTypes) {
             $slot = JitValueBox::alloc($context);
 
             return JitValueBox::pointer($context, $slot);
@@ -80,10 +79,10 @@ final class JitErrorLog
         }
 
         $pathStr = JitFilestatArg::lowerFilename($context, $destination, 'error_log');
-        $msgStr = JitStringBuiltinArg::lowerZparamStr($context, $message, 'error_log', 0, 'message');
+        $msgStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $message, 'error_log', 0, 'message');
         $nullOperand = JITVariable::TYPE_NULL === $message->type
             || ($message->isNullConstant ?? false);
-        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
+        if ($nullOperand && $context->callerStrictTypes) {
             $slot = JitValueBox::alloc($context);
 
             return JitValueBox::pointer($context, $slot);

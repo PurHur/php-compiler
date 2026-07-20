@@ -17,7 +17,7 @@ use PHPLLVM\Value;
 /**
  * dns_get_record() — DNS record lookup (ext/standard/dns.c parity, #6392).
  *
- * Z_PARAM_STR $hostname — null TypeError on 8.4 forward profile (#18786, ext/standard/dns.c).
+ * $hostname soft-null DEP+coerce on 8.4 forward profile (#21446, reverts #18786).
  *
  * VM: VmDns::dnsGetRecord(). JIT/AOT: JitDnsGetRecord compile-time materializer.
  *
@@ -40,7 +40,7 @@ final class dns_get_record extends Internal
             return;
         }
 
-        $hostname = VmString::coerceZparamStrBuiltinArg(
+        $hostname = VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'dns_get_record',
             0,
@@ -78,14 +78,14 @@ final class dns_get_record extends Internal
         }
 
         $hostnameArg = $args[0];
-        JitStringBuiltinArg::lowerZparamStr($context, $hostnameArg, 'dns_get_record', 0, 'hostname');
+        JitStringBuiltinArg::lowerTrimFamilyString($context, $hostnameArg, 'dns_get_record', 0, 'hostname');
 
         $literal = JitStringArg::compileTimeLiteral($hostnameArg);
         if (null === $literal) {
             $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
                 || ($hostnameArg->isNullConstant ?? false);
             if ($nullOperand) {
-                if (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes) {
+                if ($context->callerStrictTypes) {
                     $slot = JitValueBox::alloc($context);
 
                     return JitValueBox::pointer($context, $slot);
