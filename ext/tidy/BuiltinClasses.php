@@ -14,11 +14,17 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * Register tidy class (php-src ext/tidy/tidy.stub.php; #21464, #21498, #21499, #21540).
+ * Register tidy + tidyNode classes (php-src ext/tidy/tidy.stub.php; #21464, #21498, #21499, #21540, #21543).
  */
 final class BuiltinClasses
 {
     public static function register(Context $ctx): void
+    {
+        self::registerTidy($ctx);
+        self::registerTidyNode($ctx);
+    }
+
+    private static function registerTidy(Context $ctx): void
     {
         if (isset($ctx->classes[VmTidy::CLASS_LC])) {
             return;
@@ -113,7 +119,79 @@ final class BuiltinClasses
         $entry->methodVisibility['isxml'] = $pub;
         $entry->methodNames['isxml'] = 'isXml';
 
+        $root = new TidyRoot();
+        $entry->methods['root'] = $root;
+        $entry->methodVisibility['root'] = $pub;
+        $entry->methodNames['root'] = 'root';
+
+        $html = new TidyHtml();
+        $entry->methods['html'] = $html;
+        $entry->methodVisibility['html'] = $pub;
+        $entry->methodNames['html'] = 'html';
+
+        $head = new TidyHead();
+        $entry->methods['head'] = $head;
+        $entry->methodVisibility['head'] = $pub;
+        $entry->methodNames['head'] = 'head';
+
+        $body = new TidyBody();
+        $entry->methods['body'] = $body;
+        $entry->methodVisibility['body'] = $pub;
+        $entry->methodNames['body'] = 'body';
+
         $ctx->classes[VmTidy::CLASS_LC] = $entry;
+    }
+
+    /** final class tidyNode — readonly properties + node helpers (#21543). */
+    private static function registerTidyNode(Context $ctx): void
+    {
+        if (isset($ctx->classes[VmTidy::NODE_CLASS_LC])) {
+            return;
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $priv = CfgFunc::FLAG_PRIVATE;
+        $entry = new ClassEntry('tidyNode');
+        $entry->isInternal = true;
+        $entry->isFinal = true;
+
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $intProto = new Variable(Variable::TYPE_INTEGER);
+        $boolProto = new Variable(Variable::TYPE_BOOLEAN);
+        $nullProto = new Variable(Variable::TYPE_NULL);
+        $arrProto = new Variable(Variable::TYPE_ARRAY);
+
+        $entry->properties[] = new ClassProperty('value', null, $strProto, true, $pub, VmTidy::NODE_CLASS_LC);
+        $entry->properties[] = new ClassProperty('name', null, $strProto, true, $pub, VmTidy::NODE_CLASS_LC);
+        $entry->properties[] = new ClassProperty('type', null, $intProto, true, $pub, VmTidy::NODE_CLASS_LC);
+        $entry->properties[] = new ClassProperty('line', null, $intProto, true, $pub, VmTidy::NODE_CLASS_LC);
+        $entry->properties[] = new ClassProperty('column', null, $intProto, true, $pub, VmTidy::NODE_CLASS_LC);
+        $entry->properties[] = new ClassProperty('proprietary', null, $boolProto, true, $pub, VmTidy::NODE_CLASS_LC);
+        $entry->properties[] = new ClassProperty('id', $nullProto, $intProto, true, $pub, VmTidy::NODE_CLASS_LC);
+        $entry->properties[] = new ClassProperty('attribute', $nullProto, $arrProto, true, $pub, VmTidy::NODE_CLASS_LC);
+        $entry->properties[] = new ClassProperty('child', $nullProto, $arrProto, true, $pub, VmTidy::NODE_CLASS_LC);
+
+        $ctor = new TidyNodeConstruct();
+        $entry->constructor = $ctor;
+        $entry->methods['__construct'] = $ctor;
+        $entry->methodVisibility['__construct'] = $priv;
+
+        foreach ([
+            'hasChildren' => new TidyNodeHasChildren(),
+            'hasSiblings' => new TidyNodeHasSiblings(),
+            'isComment' => new TidyNodeIsComment(),
+            'isText' => new TidyNodeIsText(),
+            'getParent' => new TidyNodeGetParent(),
+            'getPreviousSibling' => new TidyNodeGetPreviousSibling(),
+            'getNextSibling' => new TidyNodeGetNextSibling(),
+        ] as $name => $method) {
+            $lc = strtolower($name);
+            $entry->methods[$lc] = $method;
+            $entry->methodVisibility[$lc] = $pub;
+            $entry->methodNames[$lc] = $name;
+        }
+
+        $ctx->classes[VmTidy::NODE_CLASS_LC] = $entry;
     }
 
     /** Static call may omit receiver; instance-style leaves tidy $this in args[0]. */
@@ -512,5 +590,263 @@ final class TidyIsXml extends VmClassMethod
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
         });
+    }
+}
+
+/** Shared 0-arg tidy document-node getter (#21543). */
+abstract class TidyDocumentNodeMethod extends VmClassMethod
+{
+    abstract protected function nodeKind(): string;
+
+    public function execute(Frame $frame): void
+    {
+        $kind = $this->nodeKind();
+        $method = $kind;
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidy::'.$method.'() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidy::'.$method.'() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::'.$method.'() called without $this');
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('tidy::'.$method.'() requires a VM context');
+        }
+        $node = VmTidy::getDocumentNode($ctx, $self->toObject(), $kind, $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($node): void {
+            VmTidy::assignNullableNode($ret, $node);
+        });
+    }
+}
+
+/** tidy::root() — host bridge (#21543). */
+final class TidyRoot extends TidyDocumentNodeMethod
+{
+    public function __construct()
+    {
+        parent::__construct('root');
+    }
+
+    protected function nodeKind(): string
+    {
+        return 'root';
+    }
+}
+
+/** tidy::html() — host bridge (#21543). */
+final class TidyHtml extends TidyDocumentNodeMethod
+{
+    public function __construct()
+    {
+        parent::__construct('html');
+    }
+
+    protected function nodeKind(): string
+    {
+        return 'html';
+    }
+}
+
+/** tidy::head() — host bridge (#21543). */
+final class TidyHead extends TidyDocumentNodeMethod
+{
+    public function __construct()
+    {
+        parent::__construct('head');
+    }
+
+    protected function nodeKind(): string
+    {
+        return 'head';
+    }
+}
+
+/** tidy::body() — host bridge (#21543). */
+final class TidyBody extends TidyDocumentNodeMethod
+{
+    public function __construct()
+    {
+        parent::__construct('body');
+    }
+
+    protected function nodeKind(): string
+    {
+        return 'body';
+    }
+}
+
+/** tidyNode private constructor — cannot construct from userland (#21543). */
+final class TidyNodeConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        throw new \Error('Call to private tidyNode::__construct() from invalid context');
+    }
+}
+
+/** Shared 0-arg tidyNode bool method (#21543). */
+abstract class TidyNodeBoolMethod extends VmClassMethod
+{
+    abstract protected function hostMethod(): string;
+
+    public function execute(Frame $frame): void
+    {
+        $method = $this->hostMethod();
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidyNode::'.$method.'() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidyNode::'.$method.'() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidyNode::'.$method.'() called without $this');
+        }
+        $ok = VmTidy::nodeBoolMethod($self->toObject(), $method, $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
+            $ret->bool($ok);
+        });
+    }
+}
+
+/** tidyNode::hasChildren() (#21543). */
+final class TidyNodeHasChildren extends TidyNodeBoolMethod
+{
+    public function __construct()
+    {
+        parent::__construct('hasChildren');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'hasChildren';
+    }
+}
+
+/** tidyNode::hasSiblings() (#21543). */
+final class TidyNodeHasSiblings extends TidyNodeBoolMethod
+{
+    public function __construct()
+    {
+        parent::__construct('hasSiblings');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'hasSiblings';
+    }
+}
+
+/** tidyNode::isComment() (#21543). */
+final class TidyNodeIsComment extends TidyNodeBoolMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isComment');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'isComment';
+    }
+}
+
+/** tidyNode::isText() (#21543). */
+final class TidyNodeIsText extends TidyNodeBoolMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isText');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'isText';
+    }
+}
+
+/** Shared 0-arg tidyNode related-node getter (#21543). */
+abstract class TidyNodeRelatedMethod extends VmClassMethod
+{
+    abstract protected function hostMethod(): string;
+
+    public function execute(Frame $frame): void
+    {
+        $method = $this->hostMethod();
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidyNode::'.$method.'() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidyNode::'.$method.'() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidyNode::'.$method.'() called without $this');
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('tidyNode::'.$method.'() requires a VM context');
+        }
+        $node = VmTidy::nodeRelated($ctx, $self->toObject(), $method, $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($node): void {
+            VmTidy::assignNullableNode($ret, $node);
+        });
+    }
+}
+
+/** tidyNode::getParent() (#21543). */
+final class TidyNodeGetParent extends TidyNodeRelatedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getParent');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'getParent';
+    }
+}
+
+/** tidyNode::getPreviousSibling() (#21543). */
+final class TidyNodeGetPreviousSibling extends TidyNodeRelatedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPreviousSibling');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'getPreviousSibling';
+    }
+}
+
+/** tidyNode::getNextSibling() (#21543). */
+final class TidyNodeGetNextSibling extends TidyNodeRelatedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getNextSibling');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'getNextSibling';
     }
 }

@@ -24,8 +24,13 @@ final class VmTidy
 {
     public const CLASS_LC = 'tidy';
 
+    public const NODE_CLASS_LC = 'tidynode';
+
     /** @var array<int, object> ObjectEntry id => host \tidy instance */
     private static array $hostObjects = [];
+
+    /** @var array<int, object> ObjectEntry id => host \tidyNode instance */
+    private static array $hostNodes = [];
 
     public static function hostAvailable(): bool
     {
@@ -39,6 +44,15 @@ final class VmTidy
         }
 
         return $ctx->classes[self::CLASS_LC];
+    }
+
+    public static function requireNodeClass(Context $ctx): ClassEntry
+    {
+        if (!isset($ctx->classes[self::NODE_CLASS_LC])) {
+            throw new \LogicException('tidyNode builtin class is not registered');
+        }
+
+        return $ctx->classes[self::NODE_CLASS_LC];
     }
 
     /**
@@ -162,6 +176,32 @@ final class VmTidy
     public static function hostFrom(ObjectEntry $object): ?object
     {
         return self::$hostObjects[$object->id] ?? null;
+    }
+
+    public static function hostNodeFrom(ObjectEntry $object): ?object
+    {
+        return self::$hostNodes[$object->id] ?? null;
+    }
+
+    /**
+     * Wrap host \tidyNode as VM tidyNode (#21543).
+     *
+     * @return Variable|null null when $host is not an object
+     */
+    public static function wrapHostNode(Context $ctx, mixed $host): ?Variable
+    {
+        if (null === $host || false === $host || !\is_object($host)) {
+            return null;
+        }
+
+        $entry = new ObjectEntry(self::requireNodeClass($ctx));
+        $entry->constructed = true;
+        self::$hostNodes[$entry->id] = $host;
+        self::syncNodeProperties($ctx, $entry, $host);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
     }
 
     public static function requireTidyObject(Variable $arg, string $func, int $argNum): ObjectEntry
@@ -701,6 +741,272 @@ final class VmTidy
     public static function htmlStringArg(Variable $arg, string $func, int $argNum): string
     {
         return VmString::coerceStringBuiltinArg($arg, $func, $argNum, 'string');
+    }
+
+    /**
+     * tidy_get_root/html/head/body + tidy::{root,html,head,body} — host bridge (#21543).
+     *
+     * @param 'root'|'html'|'head'|'body' $kind
+     *
+     * @return Variable|null wrapped tidyNode, or null when missing/unavailable
+     */
+    public static function getDocumentNode(Context $ctx, ObjectEntry $object, string $kind, ?Frame $frame): ?Variable
+    {
+        $host = self::hostFrom($object);
+        $procedural = 'tidy_get_'.$kind;
+        $method = $kind;
+        if (null === $host) {
+            self::emitWarning($frame, $procedural.'(): tidy object has no host backend');
+
+            return null;
+        }
+        try {
+            if (\function_exists($procedural)) {
+                $node = $procedural($host);
+            } elseif (\is_callable([$host, $method])) {
+                $node = $host->{$method}();
+            } else {
+                self::emitWarning($frame, $procedural.'(): host tidy lacks '.$method.'()');
+
+                return null;
+            }
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, $procedural.'(): '.$e->getMessage());
+
+            return null;
+        }
+
+        return self::wrapHostNode($ctx, $node);
+    }
+
+    public static function requireTidyNodeObject(Variable $arg, string $func, int $argNum): ObjectEntry
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($node) must be of type tidyNode, %s given',
+                $func,
+                $argNum + 1,
+                self::typeLabel($arg)
+            ));
+        }
+        $object = $arg->toObject();
+        if (self::NODE_CLASS_LC !== strtolower($object->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($node) must be of type tidyNode, %s given',
+                $func,
+                $argNum + 1,
+                $object->class->name
+            ));
+        }
+
+        return $object;
+    }
+
+    /**
+     * tidyNode predicate / sibling helpers — host bridge (#21543).
+     *
+     * @param 'hasChildren'|'hasSiblings'|'isComment'|'isHtml'|'isText'|'isJste'|'isAsp'|'isPhp' $method
+     */
+    public static function nodeBoolMethod(ObjectEntry $object, string $method, ?Frame $frame): bool
+    {
+        $host = self::hostNodeFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidyNode::'.$method.'(): tidyNode has no host backend');
+
+            return false;
+        }
+        if (!\is_callable([$host, $method])) {
+            self::emitWarning($frame, 'tidyNode::'.$method.'(): host tidyNode lacks '.$method.'()');
+
+            return false;
+        }
+        try {
+            return (bool) $host->{$method}();
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidyNode::'.$method.'(): '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * tidyNode::getParent / getPreviousSibling / getNextSibling (#21543).
+     *
+     * @param 'getParent'|'getPreviousSibling'|'getNextSibling' $method
+     */
+    public static function nodeRelated(Context $ctx, ObjectEntry $object, string $method, ?Frame $frame): ?Variable
+    {
+        $host = self::hostNodeFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidyNode::'.$method.'(): tidyNode has no host backend');
+
+            return null;
+        }
+        if (!\is_callable([$host, $method])) {
+            self::emitWarning($frame, 'tidyNode::'.$method.'(): host tidyNode lacks '.$method.'()');
+
+            return null;
+        }
+        try {
+            $related = $host->{$method}();
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidyNode::'.$method.'(): '.$e->getMessage());
+
+            return null;
+        }
+
+        return self::wrapHostNode($ctx, $related);
+    }
+
+    /** Mirror host tidyNode readonly properties onto the VM object (#21543). */
+    public static function syncNodeProperties(Context $ctx, ObjectEntry $object, object $host): void
+    {
+        self::syncNodeScalarString($object, 'value', $host);
+        self::syncNodeScalarString($object, 'name', $host);
+        self::syncNodeScalarInt($object, 'type', $host);
+        self::syncNodeScalarInt($object, 'line', $host);
+        self::syncNodeScalarInt($object, 'column', $host);
+        self::syncNodeScalarBool($object, 'proprietary', $host);
+        self::syncNodeNullableInt($object, 'id', $host);
+        self::syncNodeAttributeProperty($object, $host);
+        self::syncNodeChildProperty($ctx, $object, $host);
+    }
+
+    private static function syncNodeScalarString(ObjectEntry $object, string $prop, object $host): void
+    {
+        if (!$object->hasProperty($prop)) {
+            return;
+        }
+        $slot = $object->getProperty($prop);
+        try {
+            $raw = $host->{$prop} ?? null;
+        } catch (\Throwable $e) {
+            $slot->string('');
+
+            return;
+        }
+        $slot->string(null === $raw ? '' : (string) $raw);
+    }
+
+    private static function syncNodeScalarInt(ObjectEntry $object, string $prop, object $host): void
+    {
+        if (!$object->hasProperty($prop)) {
+            return;
+        }
+        $slot = $object->getProperty($prop);
+        try {
+            $raw = $host->{$prop} ?? 0;
+        } catch (\Throwable $e) {
+            $slot->int(0);
+
+            return;
+        }
+        $slot->int((int) $raw);
+    }
+
+    private static function syncNodeScalarBool(ObjectEntry $object, string $prop, object $host): void
+    {
+        if (!$object->hasProperty($prop)) {
+            return;
+        }
+        $slot = $object->getProperty($prop);
+        try {
+            $raw = $host->{$prop} ?? false;
+        } catch (\Throwable $e) {
+            $slot->bool(false);
+
+            return;
+        }
+        $slot->bool((bool) $raw);
+    }
+
+    private static function syncNodeNullableInt(ObjectEntry $object, string $prop, object $host): void
+    {
+        if (!$object->hasProperty($prop)) {
+            return;
+        }
+        $slot = $object->getProperty($prop);
+        try {
+            $raw = $host->{$prop} ?? null;
+        } catch (\Throwable $e) {
+            $slot->null();
+
+            return;
+        }
+        if (null === $raw) {
+            $slot->null();
+
+            return;
+        }
+        $slot->int((int) $raw);
+    }
+
+    private static function syncNodeAttributeProperty(ObjectEntry $object, object $host): void
+    {
+        if (!$object->hasProperty('attribute')) {
+            return;
+        }
+        $slot = $object->getProperty('attribute');
+        try {
+            $raw = $host->attribute ?? null;
+        } catch (\Throwable $e) {
+            $slot->null();
+
+            return;
+        }
+        if (null === $raw || !\is_array($raw)) {
+            $slot->null();
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($raw as $key => $item) {
+            $cell = new Variable();
+            $cell->string((string) $item);
+            $ht->add(\is_int($key) ? (string) $key : (string) $key, $cell);
+        }
+        $slot->array($ht);
+    }
+
+    private static function syncNodeChildProperty(Context $ctx, ObjectEntry $object, object $host): void
+    {
+        if (!$object->hasProperty('child')) {
+            return;
+        }
+        $slot = $object->getProperty('child');
+        try {
+            $raw = $host->child ?? null;
+        } catch (\Throwable $e) {
+            $slot->null();
+
+            return;
+        }
+        if (null === $raw || !\is_array($raw)) {
+            $slot->null();
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($raw as $key => $item) {
+            $wrapped = self::wrapHostNode($ctx, $item);
+            if (null === $wrapped) {
+                continue;
+            }
+            $ht->add(\is_int($key) ? (string) $key : (string) $key, $wrapped);
+        }
+        $slot->array($ht);
+    }
+
+    /** Assign nullable tidyNode return (#21543). */
+    public static function assignNullableNode(Variable $ret, ?Variable $node): void
+    {
+        if (null === $node) {
+            $ret->null();
+
+            return;
+        }
+        $ret->copyFrom($node);
     }
 
     private static function emitWarning(?Frame $frame, string $message): void

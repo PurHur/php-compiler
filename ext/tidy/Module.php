@@ -42,6 +42,10 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/tidy_get_html_ver.php';
         require_once __DIR__.'/tidy_is_xhtml.php';
         require_once __DIR__.'/tidy_is_xml.php';
+        require_once __DIR__.'/tidy_get_root.php';
+        require_once __DIR__.'/tidy_get_html.php';
+        require_once __DIR__.'/tidy_get_head.php';
+        require_once __DIR__.'/tidy_get_body.php';
         parent::init($runtime);
         if (!TidyExtensionPolicy::advertisesExtension()) {
             return;
@@ -80,6 +84,10 @@ class Module extends ModuleAbstract
             new tidy_get_html_ver(),
             new tidy_is_xhtml(),
             new tidy_is_xml(),
+            new tidy_get_root(),
+            new tidy_get_html(),
+            new tidy_get_head(),
+            new tidy_get_body(),
         ];
     }
 }
