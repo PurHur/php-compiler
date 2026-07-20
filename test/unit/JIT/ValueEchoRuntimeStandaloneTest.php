@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9225: AOT standalone echo type bridges must not nested-compile ValueEchoJitHelper LLVM.
+ * Issue #21513: AOT standalone echo type bridges route through ValueEchoJitHelper via JitVmHelperLink.
  *
  * @group aot-lint
  */
@@ -33,6 +33,19 @@ final class ValueEchoRuntimeStandaloneTest extends TestCase
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
+            $this->assertTrue(
+                JitVmHelperLink::hasNamedBridgeEntry($fn, 'value_echo_type_bridge_entry'),
+                $name.' must use helper bridge entry (#21513)'
+            );
         }
+    }
+
+    public function testSourceHasNoStandaloneIcmpFork(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/ValueEchoRuntime.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('implementStandaloneTypeBridge', $source);
+        $this->assertStringNotContainsString('value_echo_type_standalone_entry', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
     }
 }
