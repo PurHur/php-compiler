@@ -25,7 +25,7 @@ final class JitErrorHandler
         JITVariable $callback,
         ?JITVariable $maskArg
     ): Value {
-        ErrorHandlerJitRuntime::ensureLinked($context, true);
+        ErrorHandlerJitRuntime::ensureLinked($context);
 
         $name = $callback->compileTimeString ?? null;
         if (null === $name) {
@@ -70,7 +70,7 @@ final class JitErrorHandler
 
     public static function restore(Context $context): Value
     {
-        ErrorHandlerJitRuntime::ensureLinked($context, true);
+        ErrorHandlerJitRuntime::ensureLinked($context);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -84,7 +84,7 @@ final class JitErrorHandler
 
     public static function get(Context $context): Value
     {
-        ErrorHandlerJitRuntime::ensureLinked($context, true);
+        ErrorHandlerJitRuntime::ensureLinked($context);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

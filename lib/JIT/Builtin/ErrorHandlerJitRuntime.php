@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\BasicBlock;
@@ -19,6 +18,7 @@ use llvm\LLVMValueRef_ptr;
  *
  * Stack state uses LLVM module globals ({@see DefineRuntime} pattern) because nested-JIT
  * static property stores in {@see ErrorHandlerJitHelper} omit string slots on standalone AOT.
+ * Thin no-op ABI stubs deleted (#21346). VM SSOT remains {@see ErrorHandlerJitHelper}.
  * php-src: ext/standard/basic_functions.c — set_error_handler, restore_error_handler
  */
 final class ErrorHandlerJitRuntime
@@ -47,17 +47,17 @@ final class ErrorHandlerJitRuntime
         '__phpc_error_handler_get_apply',
     ];
 
-    public static function ensureLinked(Context $context, bool $requireFullStack = false): void
-    {
-        self::implement($context, $requireFullStack);
-    }
-
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context, false);
+        self::implement($context);
     }
 
-    public static function implement(Context $context, bool $requireFullStack = false): void
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function implement(Context $context): void
     {
         if (self::fullStackReady($context)) {
             self::registerLinkedRuntime($context);
@@ -68,98 +68,12 @@ final class ErrorHandlerJitRuntime
         $restoreBlock = self::captureInsertBlock($context);
         self::ensureValueWriters($context);
         self::ensureStackGlobals($context);
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            if (!self::standaloneLinkStubsReady($context)) {
-                self::implementStandaloneThinAbi($context);
-            }
-            if (!$requireFullStack) {
-                self::registerLinkedRuntime($context);
-                self::restoreInsertBlock($context, $restoreBlock);
-
-                return;
-            }
-        }
-
         self::implementDispatchBridge($context);
         self::implementSetApplyBridge($context);
         self::implementRestoreApplyBridge($context);
         self::implementGetApplyBridge($context);
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restoreBlock);
-    }
-
-    private static function implementStandaloneThinAbi(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $valPtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $savedBuilder = $context->builder;
-
-        $dispatch = self::standaloneAbiFunction(
-            $context,
-            '__phpc_error_handler_dispatch',
-            $context->context->functionType($i32, false, $i32, $i8p, $sizeT, $i32)
-        );
-        if (0 === $dispatch->countBasicBlocks()) {
-            $entry = $dispatch->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($i32->constInt(0, false));
-            $context->builder->clearInsertionPosition();
-        }
-        $context->registerFunction('__phpc_error_handler_dispatch', $dispatch);
-
-        $setApply = self::standaloneAbiFunction(
-            $context,
-            '__phpc_error_handler_set_apply',
-            $context->context->functionType($voidTy, false, $valPtr, $i8p, $sizeT, $i8p, $i32)
-        );
-        $context->registerFunction('__phpc_error_handler_set_apply', $setApply);
-
-        $restoreApply = self::standaloneAbiFunction(
-            $context,
-            '__phpc_error_handler_restore_apply',
-            $context->context->functionType($voidTy, false, $valPtr)
-        );
-        if (0 === $restoreApply->countBasicBlocks()) {
-            $entry = $restoreApply->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeBool'),
-                $restoreApply->getParam(0),
-                $i32->constInt(1, false)
-            );
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-        }
-        $context->registerFunction('__phpc_error_handler_restore_apply', $restoreApply);
-
-        $getApply = self::standaloneAbiFunction(
-            $context,
-            '__phpc_error_handler_get_apply',
-            $context->context->functionType($voidTy, false, $valPtr)
-        );
-        $context->registerFunction('__phpc_error_handler_get_apply', $getApply);
-
-        $context->builder = $savedBuilder;
-    }
-
-    private static function standaloneAbiFunction(Context $context, string $abiName, $ft): LlvmFunction
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null === $probe) {
-            $context->module->addFunction($abiName, $ft);
-            $probe = $context->module->getNamedFunction($abiName);
-        }
-        if (null === $probe) {
-            throw new \LogicException($abiName.' missing after standalone ABI declare (#9472)');
-        }
-
-        return $probe;
     }
 
     private static function implementDispatchBridge(Context $context): void
@@ -737,24 +651,6 @@ final class ErrorHandlerJitRuntime
             $context->module->getNamedFunction('__phpc_error_handler_get_apply'),
             'eh_get_entry'
         );
-    }
-
-    /** Thin dispatch/restore bodies for helper-runtime link; set/get declared only (#17671). */
-    private static function standaloneLinkStubsReady(Context $context): bool
-    {
-        foreach (['__phpc_error_handler_dispatch', '__phpc_error_handler_restore_apply'] as $abiName) {
-            $probe = $context->module->getNamedFunction($abiName);
-            if (null === $probe || 0 === $probe->countBasicBlocks()) {
-                return false;
-            }
-        }
-        foreach (['__phpc_error_handler_set_apply', '__phpc_error_handler_get_apply'] as $abiName) {
-            if (null === $context->module->getNamedFunction($abiName)) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private static function bridgeEntryForEmit(LlvmFunction $fn, string $entryBlockName): BasicBlock
