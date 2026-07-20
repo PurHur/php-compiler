@@ -1,3 +1,4 @@
 <?php
-/** AOT uncaught TypeError (#20361) — try/catch not required for EXPECT_EXIT 255. */
-ini_get(null);
+/** AOT soft-null ini_get (#21312) — must not TypeError; avoid var_export(false) AOT crash. */
+error_reporting(E_ALL & ~E_DEPRECATED);
+echo ini_get(null) === false ? "false\n" : "bad\n";

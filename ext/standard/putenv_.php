@@ -15,7 +15,7 @@ use PHPLLVM\Value;
  * putenv() — set/unset process environment (VM; JIT/AOT via GetenvJitHelper + libc mirror).
  *
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(putenv) / Z_PARAM_STR
- * Null → TypeError on 8.4 forward profile (#21004, re-#17041) before syntax ValueError.
+ * Soft-null on PROFILE=8.4 — Zend DEP+coerce then ValueError on empty (#21312, reverts #21004 TypeError).
  */
 final class putenv_ extends Internal
 {
@@ -29,8 +29,8 @@ final class putenv_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('putenv() requires exactly one argument');
         }
-        // Z_PARAM_STR — TypeError on PROFILE=8.4 before empty-assignment ValueError (#21004).
-        $assignment = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'putenv', 0, 'assignment');
+        // Soft-null — Zend Z_PARAM_STR DEP+coerce; empty → ValueError (#21312).
+        $assignment = VmString::trimFamilyStringArgForFrame($frame, 0, 'putenv', 0, 'assignment');
         $ok = VmEnv::putenv($assignment);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
@@ -56,15 +56,10 @@ final class putenv_ extends Internal
                 }
             }
         }
-        // Null operand: TypeError under PROFILE=8.4 / strict_types without materialize+putenv
-        // (AOT IR clears insert block on abort; peer ini_get #20361 / bindec #20658 / #21004).
+        // Null under caller strict_types: TypeError without materialize+putenv
+        // (AOT IR clears insert block on abort; peer ini_get #20361 / bindec #20658).
         $nullArg = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
-        if ($nullArg && (
-            $context->callerStrictTypes
-            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-        )) {
-            // lowerRequiredString: branch to err block before TypeErrorRaise NestedJIT
-            // so uncaught AOT keeps a parent function (#20361 pattern).
+        if ($nullArg && $context->callerStrictTypes) {
             JitStringBuiltinArg::lowerRequiredString(
                 $context,
                 $args[0],
@@ -82,7 +77,7 @@ final class putenv_ extends Internal
         return JitEnv::putenv($context, $assignment);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#21004). */
+    /** Soft-null Z_PARAM_STR on 8.4 — Zend DEP+coerce (#21312); strict_types still TypeError. */
     private static function jitAssignmentArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
@@ -95,7 +90,7 @@ final class putenv_ extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'putenv',

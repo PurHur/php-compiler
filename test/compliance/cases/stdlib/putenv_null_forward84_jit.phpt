@@ -1,16 +1,24 @@
 --TEST--
-stdlib putenv(null) — TypeError JIT forward 8.4 profile (#21004, re-#17041, ext/standard/basic_functions.c)
+stdlib putenv(null) — soft-null DEP then ValueError JIT on 8.4 (#21312, reverts #21004)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL);
+$deps = 0;
+set_error_handler(static function (int $no, string $msg) use (&$deps): bool {
+    if (E_DEPRECATED === $no) {
+        ++$deps;
+    }
+    return true;
+});
 try {
     putenv(null);
     echo "uncaught\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 } catch (ValueError $e) {
-    echo 'ValueError: ', $e->getMessage(), "\n";
+    echo ($deps > 0 ? 'DEP ' : ''), 'ValueError: ', $e->getMessage(), "\n";
 }
 
 try {
@@ -21,5 +29,5 @@ try {
 }
 ?>
 --EXPECT--
-putenv(): Argument #1 ($assignment) must be of type string, null given
+DEP ValueError: putenv(): Argument #1 ($assignment) must have a valid syntax
 empty: putenv(): Argument #1 ($assignment) must have a valid syntax

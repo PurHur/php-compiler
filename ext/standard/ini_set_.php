@@ -55,7 +55,7 @@ final class ini_set_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException($fn.'() requires exactly two arguments');
         }
-        // Compile-time null/non-string TypeError: emit abort without linking IniRuntime (#20361).
+        // Compile-time non-string TypeError (int/… on 8.4; null soft-coerces #21312; #20361).
         if (IniOptionArg::jitOptionRejectsWithoutIniCall($context, $args[0])) {
             IniOptionArg::jitOption($context, $args[0], $fn);
 
