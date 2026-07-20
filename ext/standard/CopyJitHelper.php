@@ -16,9 +16,8 @@ final class CopyJitHelper
     public static function copyArgv(string $from, string $to): int
     {
         if (\is_dir($from)) {
-            @\trigger_error(
-                'The first argument to copy() function cannot be a directory',
-                \E_WARNING
+            TriggerErrorJitHelper::warning(
+                'The first argument to copy() function cannot be a directory'
             );
 
             return 0;
