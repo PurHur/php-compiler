@@ -14,7 +14,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * Register tidy class (php-src ext/tidy/tidy.stub.php; #21464, #21498, #21499).
+ * Register tidy class (php-src ext/tidy/tidy.stub.php; #21464, #21498, #21499, #21540).
  */
 final class BuiltinClasses
 {
@@ -77,6 +77,21 @@ final class BuiltinClasses
         $entry->methods['repairfile'] = $repairFile;
         $entry->methodVisibility['repairfile'] = $pubStatic;
         $entry->methodNames['repairfile'] = 'repairFile';
+
+        $getOpt = new TidyGetOpt();
+        $entry->methods['getopt'] = $getOpt;
+        $entry->methodVisibility['getopt'] = $pub;
+        $entry->methodNames['getopt'] = 'getOpt';
+
+        $getConfig = new TidyGetConfig();
+        $entry->methods['getconfig'] = $getConfig;
+        $entry->methodVisibility['getconfig'] = $pub;
+        $entry->methodNames['getconfig'] = 'getConfig';
+
+        $getStatus = new TidyGetStatus();
+        $entry->methods['getstatus'] = $getStatus;
+        $entry->methodVisibility['getstatus'] = $pub;
+        $entry->methodNames['getstatus'] = 'getStatus';
 
         $ctx->classes[VmTidy::CLASS_LC] = $entry;
     }
@@ -269,6 +284,101 @@ final class TidyRepairFile extends VmClassMethod
                 return;
             }
             $ret->string($repaired);
+        });
+    }
+}
+
+/** tidy::getOpt() — host bridge (#21540). */
+final class TidyGetOpt extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getOpt');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'tidy::getOpt() expects exactly 1 argument, '.max(0, \count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (\count($frame->calledArgs) > 2) {
+            throw new \ArgumentCountError(
+                'tidy::getOpt() expects exactly 1 argument, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::getOpt() called without $this');
+        }
+        $option = VmTidy::htmlStringArg($frame->calledArgs[1], 'tidy::getOpt', 0);
+        $val = VmTidy::getOpt($self->toObject(), $option, $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($val): void {
+            if (null === $val) {
+                $ret->bool(false);
+
+                return;
+            }
+            VmTidy::assignOptValue($ret, $val);
+        });
+    }
+}
+
+/** tidy::getConfig() — host bridge (#21540). */
+final class TidyGetConfig extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getConfig');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidy::getConfig() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidy::getConfig() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::getConfig() called without $this');
+        }
+        $cfg = VmTidy::getConfig($self->toObject(), $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($cfg): void {
+            VmTidy::assignConfigArray($ret, null === $cfg ? [] : $cfg);
+        });
+    }
+}
+
+/** tidy::getStatus() — host bridge (#21540). */
+final class TidyGetStatus extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getStatus');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidy::getStatus() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidy::getStatus() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::getStatus() called without $this');
+        }
+        $status = VmTidy::getStatus($self->toObject(), $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($status): void {
+            $ret->int($status);
         });
     }
 }

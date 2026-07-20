@@ -9,6 +9,7 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmString;
@@ -372,6 +373,141 @@ final class VmTidy
             return;
         }
         self::syncErrorBufferProperty($object, null === $buf ? null : (string) $buf);
+    }
+
+    /**
+     * tidy_getopt() / tidy::getOpt() — host bridge (#21540).
+     *
+     * @return string|int|bool|null null when host missing / option lookup fails (caller maps to warning path)
+     */
+    public static function getOpt(ObjectEntry $object, string $option, ?Frame $frame)
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_getopt(): tidy object has no host backend');
+
+            return null;
+        }
+        try {
+            if (\function_exists('tidy_getopt')) {
+                $val = \tidy_getopt($host, $option);
+            } elseif (\is_callable([$host, 'getOpt'])) {
+                $val = $host->getOpt($option);
+            } else {
+                self::emitWarning($frame, 'tidy_getopt(): host tidy lacks getOpt()');
+
+                return null;
+            }
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_getopt(): '.$e->getMessage());
+
+            return null;
+        }
+
+        return $val;
+    }
+
+    /**
+     * tidy_get_config() / tidy::getConfig() — host bridge (#21540).
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function getConfig(ObjectEntry $object, ?Frame $frame): ?array
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_get_config(): tidy object has no host backend');
+
+            return null;
+        }
+        try {
+            if (\function_exists('tidy_get_config')) {
+                $cfg = \tidy_get_config($host);
+            } elseif (\is_callable([$host, 'getConfig'])) {
+                $cfg = $host->getConfig();
+            } else {
+                self::emitWarning($frame, 'tidy_get_config(): host tidy lacks getConfig()');
+
+                return null;
+            }
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_get_config(): '.$e->getMessage());
+
+            return null;
+        }
+        if (!\is_array($cfg)) {
+            return [];
+        }
+
+        return $cfg;
+    }
+
+    /**
+     * tidy_get_status() / tidy::getStatus() — host bridge (#21540).
+     */
+    public static function getStatus(ObjectEntry $object, ?Frame $frame): int
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_get_status(): tidy object has no host backend');
+
+            return 0;
+        }
+        try {
+            if (\function_exists('tidy_get_status')) {
+                $status = \tidy_get_status($host);
+            } elseif (\is_callable([$host, 'getStatus'])) {
+                $status = $host->getStatus();
+            } else {
+                self::emitWarning($frame, 'tidy_get_status(): host tidy lacks getStatus()');
+
+                return 0;
+            }
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_get_status(): '.$e->getMessage());
+
+            return 0;
+        }
+
+        return (int) $status;
+    }
+
+    /** Assign string|int|bool return for tidy_getopt (#21540). */
+    public static function assignOptValue(Variable $ret, string|int|bool $value): void
+    {
+        if (\is_bool($value)) {
+            $ret->bool($value);
+
+            return;
+        }
+        if (\is_int($value)) {
+            $ret->int($value);
+
+            return;
+        }
+        $ret->string($value);
+    }
+
+    /** Assign associative config array for tidy_get_config (#21540). */
+    public static function assignConfigArray(Variable $ret, array $cfg): void
+    {
+        $ht = new HashTable();
+        foreach ($cfg as $key => $item) {
+            $slot = new Variable();
+            if (\is_bool($item)) {
+                $slot->bool($item);
+            } elseif (\is_int($item)) {
+                $slot->int($item);
+            } elseif (\is_float($item)) {
+                $slot->float($item);
+            } elseif (null === $item) {
+                $slot->null();
+            } else {
+                $slot->string((string) $item);
+            }
+            $ht->add(\is_int($key) ? (string) $key : (string) $key, $slot);
+        }
+        $ret->array($ht);
     }
 
     /**
