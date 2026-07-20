@@ -36,8 +36,8 @@ final class hash_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // Z_PARAM_STR $algo — null TypeError on 8.4 forward profile (#20304, ext/hash/hash.c).
-        $algo = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'hash_file', 0, 'algo');
+        // Z_PARAM_STR $algo — non-strict null is E_DEPRECATED + '' then ValueError (#21572, reverts #20304).
+        $algo = VmString::trimFamilyStringArgForFrame($frame, 0, 'hash_file', 0, 'algo');
         $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 1, 'hash_file', 'filename');
         $raw = false;
         if (3 === $argc) {
@@ -68,7 +68,7 @@ final class hash_file extends Internal
         }
         $algo = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_file', 0, 'algo')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'hash_file', 0, 'algo');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'hash_file', 0, 'algo');
         $path = JitStreamPath::lowerNonEmptyPath($context, $args[1], 'hash_file', 1, 'filename');
 
         return JitHashFile::hash($context, $algo, $path, $raw);

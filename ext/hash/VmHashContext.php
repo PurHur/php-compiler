@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\hash;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\ext\standard\VmStreamArg;
-use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
@@ -227,19 +226,5 @@ final class VmHashContext
         }
 
         return $object;
-    }
-
-    /**
-     * Z_PARAM_STR for HashContext string operands (algo / data) — null TypeError on 8.4 (#20195).
-     *
-     * php-src: ext/hash/hash.c — PHP_FUNCTION(hash_init) / PHP_FUNCTION(hash_update)
-     */
-    public static function coerceContextString(
-        Variable $var,
-        string $function,
-        int $argNum,
-        string $paramName
-    ): string {
-        return VmString::coerceZparamStrBuiltinArg($var, $function, $argNum, $paramName);
     }
 }
