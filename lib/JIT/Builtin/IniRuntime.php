@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for ini_get/ini_set/ini_restore via IniJitHelper PHP (#9249).
+ * JIT/AOT link for ini_get/ini_set/ini_restore via IniJitHelper PHP (#9249, #21200).
  *
- * Replaces ~1k-line LLVM ini tables. Semantics match {@see \PHPCompiler\ext\standard\VmIni}.
+ * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\IniJitHelper}
+ * via {@see JitVmHelperLink} (IncludePath #20877 / RandomBytes #21186 shape — no thin
+ * false/nop stub fork). Semantics match {@see \PHPCompiler\ext\standard\VmIni}.
  * php-src: ext/standard/ini.c, main/php_ini.c
  */
 final class IniRuntime
@@ -37,6 +42,14 @@ final class IniRuntime
 
     private const SERIALIZE_PRECISION_INT_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::getSerializePrecisionInt';
 
+    private const GET_BRIDGE_ENTRY = 'ini_get_bridge_entry';
+
+    private const CFG_GET_BRIDGE_ENTRY = 'ini_cfg_get_bridge_entry';
+
+    private const SET_BRIDGE_ENTRY = 'ini_set_bridge_entry';
+
+    private const RESTORE_BRIDGE_ENTRY = 'ini_restore_bridge_entry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::INI_GET_HELPER,
@@ -51,55 +64,25 @@ final class IniRuntime
         self::implement($context);
     }
 
-    /**
-     * Thin AOT link fillers for Type::register empty `__compiler_ini_*` shells (#20361).
-     *
-     * Full NestedJIT of IniJitHelper pulls `__compiler_sprintf` and other helpers that are
-     * not yet in the thin helper-runtime TU. Stubs write false / no-op so TypeError paths
-     * (null option under PROFILE=8.4) and HelloWorld-shaped links resolve; real NestedJIT
-     * still runs via {@see implement} outside thin standalone AOT.
-     *
-     * Does not NestedJIT SilenceRuntime / sprintf — only fills the four ini ABI symbols.
-     */
-    public static function ensureThinAotLinkStubs(Context $context): void
+    public static function ensureStandaloneBodies(Context $context): void
     {
-        $restoreBlock = self::captureInsertBlock($context);
-        self::ensureGlobals($context);
-        self::ensureValueWriters($context);
-        self::implementIfMissing($context, '__compiler_ini_get', self::implementIniGetFalseStub(...));
-        self::implementIfMissing($context, '__compiler_ini_cfg_get', self::implementIniGetFalseStub(...));
-        self::implementIfMissing($context, '__compiler_ini_set', self::implementIniSetFalseStub(...));
-        self::implementIfMissing($context, '__compiler_ini_restore', self::implementIniRestoreNopStub(...));
-        foreach (
-            [
-                '__compiler_ini_get',
-                '__compiler_ini_cfg_get',
-                '__compiler_ini_set',
-                '__compiler_ini_restore',
-            ] as $name
-        ) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after IniRuntime thin AOT stub (#20361)');
-            }
-            $context->registerFunction($name, $fn);
-        }
-        self::restoreInsertBlock($context, $restoreBlock);
-        $context->builder->clearInsertionPosition();
+        self::implement($context);
     }
 
     public static function implement(Context $context): void
     {
-        if ($context->isThinStandaloneAotMain()) {
-            self::ensureThinAotLinkStubs($context);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
+        // Thin + embed: publish sg_vm_context before NestedJIT of IniJitHelper (#21200 / #17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
         $probe = $context->module->getNamedFunction('__compiler_ini_get');
-        $cfgProbe = $context->module->getNamedFunction('__compiler_ini_cfg_get');
-        if (null !== $probe && $probe->countBasicBlocks() > 0
-            && null !== $cfgProbe && $cfgProbe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::GET_BRIDGE_ENTRY)) {
             SilenceRuntime::ensureLinked($context);
             self::registerLinkedRuntime($context);
 
@@ -109,7 +92,12 @@ final class IniRuntime
         $restoreBlock = self::captureInsertBlock($context);
         SilenceRuntime::ensureLinked($context);
         self::ensureGlobals($context);
-        self::ensureJitHelperCompiled($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21200'
+        );
         self::ensureValueWriters($context);
         self::implementIfMissing($context, '__compiler_ini_get', self::implementIniGetBridge(...));
         self::implementIfMissing($context, '__compiler_ini_cfg_get', self::implementIniCfgGetBridge(...));
@@ -125,14 +113,14 @@ final class IniRuntime
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
         $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
-
-            return;
-        }
-
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        $entry = match ($name) {
+            '__compiler_ini_get' => self::GET_BRIDGE_ENTRY,
+            '__compiler_ini_cfg_get' => self::CFG_GET_BRIDGE_ENTRY,
+            '__compiler_ini_set' => self::SET_BRIDGE_ENTRY,
+            '__compiler_ini_restore' => self::RESTORE_BRIDGE_ENTRY,
+            default => '',
+        };
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entry)) {
             $context->registerFunction($name, $probe);
 
             return;
@@ -171,42 +159,9 @@ final class IniRuntime
         };
     }
 
-    private static function implementIniGetFalseStub(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('ini_get_thin_stub');
-        $context->builder->positionAtEnd($entry);
-        $i32 = $context->getTypeFromString('int32');
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $fn->getParam(1),
-            $i32->constInt(0, false)
-        );
-        $context->builder->returnVoid();
-    }
-
-    private static function implementIniSetFalseStub(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('ini_set_thin_stub');
-        $context->builder->positionAtEnd($entry);
-        $i32 = $context->getTypeFromString('int32');
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $fn->getParam(2),
-            $i32->constInt(0, false)
-        );
-        $context->builder->returnVoid();
-    }
-
-    private static function implementIniRestoreNopStub(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('ini_restore_thin_stub');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnVoid();
-    }
-
     private static function implementIniGetBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('ini_get_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::GET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $result = JitNestedHelperCoerce::callHelper(
             $context,
@@ -219,7 +174,7 @@ final class IniRuntime
 
     private static function implementIniCfgGetBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('ini_cfg_get_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::CFG_GET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $result = JitNestedHelperCoerce::callHelper(
             $context,
@@ -232,7 +187,7 @@ final class IniRuntime
 
     private static function implementIniSetBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('ini_set_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::SET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $result = JitNestedHelperCoerce::callHelper(
             $context,
@@ -246,7 +201,7 @@ final class IniRuntime
 
     private static function implementIniRestoreBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('ini_restore_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::RESTORE_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $context->builder->call(
             self::helperFunction($context, self::INI_RESTORE_HELPER),
@@ -298,45 +253,7 @@ final class IniRuntime
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after IniJitHelper compile (#9249)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'IniJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('IniJitHelper.php parseAndCompile failed (#9249)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9249)');
-            }
-        }
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#21200');
     }
 
     private static function ensureGlobals(Context $context): void

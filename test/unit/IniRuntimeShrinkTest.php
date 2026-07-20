@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\IniJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ini_get/ini_set JIT routes through IniJitHelper PHP, not LLVM ini tables (#9249). */
+/** ini_get/ini_set JIT: always IniJitHelper NestedJIT — no thin false/nop stubs (#9249, #21200). */
 final class IniRuntimeShrinkTest extends TestCase
 {
     public function testIniJitHelperDelegatesToVmIniSemantics(): void
@@ -29,15 +29,27 @@ final class IniRuntimeShrinkTest extends TestCase
         $this->assertSame('.user.ini', IniJitHelper::iniGet('user_ini.filename'));
     }
 
-    public function testIniRuntimeUsesJitHelperNotLlvmKeyWalk(): void
+    public function testIniRuntimeAlwaysUsesJitHelperBridge(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/IniRuntime.php');
-        $this->assertStringContainsString('IniJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('ini_get_bridge_entry', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('ensureThinAotLinkStubs', $source);
+        $this->assertStringNotContainsString('implementIniGetFalseStub', $source);
+        $this->assertStringNotContainsString('implementIniSetFalseStub', $source);
+        $this->assertStringNotContainsString('implementIniRestoreNopStub', $source);
+        $this->assertStringNotContainsString('ini_get_thin_stub', $source);
+        $this->assertStringNotContainsString('ini_set_thin_stub', $source);
+        $this->assertStringNotContainsString('ini_restore_thin_stub', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('branchIfKey', $source);
         $this->assertStringNotContainsString("lookupFunction('strcasecmp')", $source);
         $this->assertStringNotContainsString('emitParseBoolIni', $source);
         $lineCount = \substr_count($source, "\n") + 1;
-        $this->assertLessThanOrEqual(360, $lineCount);
+        $this->assertLessThanOrEqual(400, $lineCount);
         $this->assertGreaterThan(600, 1034 - $lineCount);
     }
 
@@ -66,5 +78,12 @@ final class IniRuntimeShrinkTest extends TestCase
         $this->assertSame('ISO-8859-1', IniJitHelper::iniGet('default_charset'));
         IniJitHelper::iniRestore('default_charset');
         $this->assertSame('UTF-8', IniJitHelper::iniGet('default_charset'));
+    }
+
+    public function testSpineBundleIncludesIniPhpJitPath(): void
+    {
+        $spine = (string) \file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('IniJitHelper.php', $spine);
+        $this->assertStringContainsString('IniRuntime.php', $spine);
     }
 }
