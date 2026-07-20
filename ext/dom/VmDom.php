@@ -3727,8 +3727,8 @@ final class VmDom
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $dtdDefaultAttrs = self::parseDoctypeDefaultAttributes($trimmed);
-        $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
         $substituteEntities = 0 !== ($options & LibxmlConstants::LIBXML_NOENT);
+        $generalEntities = self::parseDoctypeGeneralEntities($ctx, $trimmed, $substituteEntities, $frame);
         $parts = self::splitXmlDocumentParts($trimmed);
         if (null === $parts) {
             // Prefer libxml-shaped diagnostics (e.g. unclosed start tag) over a generic
@@ -4732,20 +4732,75 @@ final class VmDom
     /**
      * @return array<string, string> general entity name => replacement text
      */
-    private static function parseDoctypeGeneralEntities(string $xml): array
-    {
+    private static function parseDoctypeGeneralEntities(
+        Context $ctx,
+        string $xml,
+        bool $substituteEntities = false,
+        ?\PHPCompiler\Frame $frame = null
+    ): array {
         $entities = [];
         $subset = self::extractDoctypeInternalSubset($xml);
         if (null === $subset) {
             return $entities;
         }
-        if (preg_match_all('/<!ENTITY\s+([A-Za-z_][\w:.-]*)\s+"([^"]*)"\s*>/', $subset, $matches, PREG_SET_ORDER)) {
+        // Internal parsed entities first (declaration order: first wins).
+        if (preg_match_all('/<!ENTITY\s+(?!%)([A-Za-z_][\w:.-]*)\s+"([^"]*)"\s*>/', $subset, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
-                $entities[$match[1]] = $match[2];
+                if (!isset($entities[$match[1]])) {
+                    $entities[$match[1]] = $match[2];
+                }
+            }
+        }
+        // External SYSTEM entities (skip NDATA unparsed — those end with NDATA name>).
+        if (preg_match_all(
+            '/<!ENTITY\s+(?!%)([A-Za-z_][\w:.-]*)\s+SYSTEM\s+"([^"]*)"\s*>/',
+            $subset,
+            $matches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($matches as $match) {
+                if (isset($entities[$match[1]])) {
+                    continue;
+                }
+                $entities[$match[1]] = $substituteEntities
+                    ? self::resolveExternalGeneralEntityReplacement($ctx, null, $match[2], $frame)
+                    : '';
+            }
+        }
+        // External PUBLIC entities (skip PUBLIC+NDATA unparsed).
+        if (preg_match_all(
+            '/<!ENTITY\s+(?!%)([A-Za-z_][\w:.-]*)\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"\s*>/',
+            $subset,
+            $matches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($matches as $match) {
+                if (isset($entities[$match[1]])) {
+                    continue;
+                }
+                $entities[$match[1]] = $substituteEntities
+                    ? self::resolveExternalGeneralEntityReplacement($ctx, $match[2], $match[3], $frame)
+                    : '';
             }
         }
 
         return $entities;
+    }
+
+    /**
+     * LIBXML_NOENT external entity body — empty string on load failure (Zend leaves no text child).
+     *
+     * php-src ext/libxml/libxml.c + ext/dom/document.c (#21599).
+     */
+    private static function resolveExternalGeneralEntityReplacement(
+        Context $ctx,
+        ?string $publicId,
+        string $systemId,
+        ?\PHPCompiler\Frame $frame
+    ): string {
+        $content = VmLibxml::resolveExternalEntityContent($ctx, $publicId, $systemId, $frame);
+
+        return null === $content ? '' : $content;
     }
 
     private static function extractDoctypeInternalSubset(string $xml): ?string
