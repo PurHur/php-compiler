@@ -835,7 +835,9 @@ require_once __DIR__.'/../../../ext/iconv/iconv_strlen.php';
 require_once __DIR__.'/../../../ext/iconv/iconv_strpos.php';
 require_once __DIR__.'/../../../ext/iconv/iconv_strrpos.php';
 require_once __DIR__.'/../../../ext/iconv/iconv_substr.php';
+require_once __DIR__.'/../../../ext/igbinary/IgbinaryExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/igbinary/IgbinaryFunction.php';
+require_once __DIR__.'/../../../ext/igbinary/VmIgbinary.php';
 require_once __DIR__.'/../../../ext/igbinary/Module.php';
 require_once __DIR__.'/../../../ext/igbinary/igbinary_pack.php';
 require_once __DIR__.'/../../../ext/igbinary/igbinary_serialize.php';
@@ -3528,7 +3530,6 @@ require_once __DIR__.'/../../../ext/standard/log10.php';
 require_once __DIR__.'/../../../ext/standard/log1p.php';
 require_once __DIR__.'/../../../ext/standard/long2ip.php';
 require_once __DIR__.'/../../../ext/standard/lstat_.php';
-require_once __DIR__.'/../../../ext/standard/VmMail.php';
 require_once __DIR__.'/../../../ext/standard/mail.php';
 require_once __DIR__.'/../../../ext/standard/md5.php';
 require_once __DIR__.'/../../../ext/standard/md5_file.php';
@@ -6269,8 +6270,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/pcntl/pcntl_errno.php';
-require_once __DIR__.'/../../../ext/pcntl/pcntl_sigwaitinfo.php';
-require_once __DIR__.'/../../../ext/pcntl/pcntl_wifcontinued.php';
-require_once __DIR__.'/../../../ext/phar/VmPharStream.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
