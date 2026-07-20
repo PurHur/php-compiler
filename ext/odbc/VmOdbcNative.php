@@ -802,6 +802,71 @@ final class VmOdbcNative
     }
 
     /**
+     * SQLTablePrivileges (php-src odbc_tableprivileges; #21295).
+     */
+    public static function tablePrivileges(
+        \FFI\CData $hstmt,
+        ?string $catalog,
+        string $schema,
+        string $table
+    ): bool {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $catBuf = null === $catalog ? null : self::cString($ffi, $catalog);
+            $rc = (int) $ffi->SQLTablePrivileges(
+                $hstmt,
+                $catBuf,
+                null === $catalog ? 0 : self::SQL_NTS,
+                self::cString($ffi, $schema),
+                self::SQL_NTS,
+                self::cString($ffi, $table),
+                self::SQL_NTS
+            );
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * SQLColumnPrivileges (php-src odbc_columnprivileges; #21295).
+     */
+    public static function columnPrivileges(
+        \FFI\CData $hstmt,
+        ?string $catalog,
+        string $schema,
+        string $table,
+        string $column
+    ): bool {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $catBuf = null === $catalog ? null : self::cString($ffi, $catalog);
+            $rc = (int) $ffi->SQLColumnPrivileges(
+                $hstmt,
+                $catBuf,
+                null === $catalog ? 0 : self::SQL_NTS,
+                self::cString($ffi, $schema),
+                self::SQL_NTS,
+                self::cString($ffi, $table),
+                self::SQL_NTS,
+                self::cString($ffi, $column),
+                self::SQL_NTS
+            );
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Set SQL_AUTOCOMMIT (php-src SQLSetConnectOption; #21277).
      */
     public static function setAutocommit(\FFI\CData $hdbc, bool $enable): bool
@@ -992,6 +1057,8 @@ SQLRETURN SQLGetTypeInfo(SQLHSTMT hstmt, SQLSMALLINT fSqlType);
 SQLRETURN SQLSpecialColumns(SQLHSTMT hstmt, SQLSMALLINT fColType, SQLCHAR *szTableQualifier, SQLSMALLINT cbTableQualifier, SQLCHAR *szTableOwner, SQLSMALLINT cbTableOwner, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLSMALLINT fScope, SQLSMALLINT fNullable);
 SQLRETURN SQLProcedures(SQLHSTMT hstmt, SQLCHAR *szProcQualifier, SQLSMALLINT cbProcQualifier, SQLCHAR *szProcOwner, SQLSMALLINT cbProcOwner, SQLCHAR *szProcName, SQLSMALLINT cbProcName);
 SQLRETURN SQLProcedureColumns(SQLHSTMT hstmt, SQLCHAR *szProcQualifier, SQLSMALLINT cbProcQualifier, SQLCHAR *szProcOwner, SQLSMALLINT cbProcOwner, SQLCHAR *szProcName, SQLSMALLINT cbProcName, SQLCHAR *szColumnName, SQLSMALLINT cbColumnName);
+SQLRETURN SQLTablePrivileges(SQLHSTMT hstmt, SQLCHAR *szTableQualifier, SQLSMALLINT cbTableQualifier, SQLCHAR *szTableOwner, SQLSMALLINT cbTableOwner, SQLCHAR *szTableName, SQLSMALLINT cbTableName);
+SQLRETURN SQLColumnPrivileges(SQLHSTMT hstmt, SQLCHAR *szTableQualifier, SQLSMALLINT cbTableQualifier, SQLCHAR *szTableOwner, SQLSMALLINT cbTableOwner, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLCHAR *szColumnName, SQLSMALLINT cbColumnName);
 SQLRETURN SQLSetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLULEN vParam);
 SQLRETURN SQLSetStmtOption(SQLHSTMT hstmt, SQLUSMALLINT fOption, SQLULEN vParam);
 SQLRETURN SQLGetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLPOINTER pvParam);
