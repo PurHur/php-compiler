@@ -165,6 +165,28 @@ final class PcntlHostBridge
         return \pcntl_wifstopped($status);
     }
 
+    public static function wifcontinued(int $status): bool
+    {
+        if (\function_exists('pcntl_wifcontinued')) {
+            return \pcntl_wifcontinued($status);
+        }
+
+        return (0xffff === ($status & 0xffff));
+    }
+
+    /**
+     * @param list<int> $signals
+     * @param array<string, int>|null $info
+     */
+    public static function sigwaitinfo(array $signals, ?array &$info = null): int|false
+    {
+        if (!\function_exists('pcntl_sigwaitinfo')) {
+            return false;
+        }
+
+        return \pcntl_sigwaitinfo($signals, $info);
+    }
+
     public static function wtermsig(int $status): int
     {
         return (int) \pcntl_wtermsig($status);

@@ -259,6 +259,12 @@ final class PcntlLibcThinAbi
         return 0x7f === ($status & 0xff);
     }
 
+    /** Linux WIFCONTINUED — ((status & 0xffff) == 0xffff) */
+    public static function wifcontinued(int $status): bool
+    {
+        return 0xffff === ($status & 0xffff);
+    }
+
     /** Linux WTERMSIG */
     public static function wtermsig(int $status): int
     {

@@ -51,6 +51,9 @@ class Module extends ModuleAbstract
             new pcntl_setns(),
             new pcntl_strerror(),
             new pcntl_get_last_error(),
+            new pcntl_errno(),
+            new pcntl_wifcontinued(),
+            new pcntl_sigwaitinfo(),
         ];
     }
 }
