@@ -39,11 +39,24 @@ final class BuiltinClasses
             $pub,
             VmTidy::CLASS_LC
         );
+        $entry->properties[] = new ClassProperty(
+            'errorBuffer',
+            new Variable(Variable::TYPE_NULL),
+            $strProto,
+            false,
+            $pub,
+            VmTidy::CLASS_LC
+        );
 
         $clean = new TidyCleanRepair();
         $entry->methods['cleanrepair'] = $clean;
         $entry->methodVisibility['cleanrepair'] = $pub;
         $entry->methodNames['cleanrepair'] = 'cleanRepair';
+
+        $diagnose = new TidyDiagnose();
+        $entry->methods['diagnose'] = $diagnose;
+        $entry->methodVisibility['diagnose'] = $pub;
+        $entry->methodNames['diagnose'] = 'diagnose';
 
         $repairString = new TidyRepairString();
         $entry->methods['repairstring'] = $repairString;
@@ -92,6 +105,30 @@ final class TidyCleanRepair extends VmClassMethod
             throw new \LogicException('tidy::cleanRepair() called without $this');
         }
         $ok = VmTidy::cleanRepair($self->toObject(), $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
+            $ret->bool($ok);
+        });
+    }
+}
+
+/** tidy::diagnose() — host bridge (#21500). */
+final class TidyDiagnose extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('diagnose');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidy::diagnose() called without $this');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::diagnose() called without $this');
+        }
+        $ok = VmTidy::diagnose($self->toObject(), $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
         });

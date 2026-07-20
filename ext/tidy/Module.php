@@ -28,6 +28,8 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/tidy_repair_file.php';
         require_once __DIR__.'/tidy_clean_repair.php';
         require_once __DIR__.'/tidy_get_output.php';
+        require_once __DIR__.'/tidy_diagnose.php';
+        require_once __DIR__.'/tidy_get_error_buffer.php';
         parent::init($runtime);
         if (!TidyExtensionPolicy::advertisesExtension()) {
             return;
@@ -52,6 +54,8 @@ class Module extends ModuleAbstract
             new tidy_repair_file(),
             new tidy_clean_repair(),
             new tidy_get_output(),
+            new tidy_diagnose(),
+            new tidy_get_error_buffer(),
         ];
     }
 }

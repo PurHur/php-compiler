@@ -6280,4 +6280,6 @@ require_once __DIR__.'/../../../ext/tidy/tidy_repair_file.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_repair_string.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_get_output.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_clean_repair.php';
+require_once __DIR__.'/../../../ext/tidy/tidy_get_error_buffer.php';
+require_once __DIR__.'/../../../ext/tidy/tidy_diagnose.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
