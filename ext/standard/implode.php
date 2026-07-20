@@ -29,6 +29,8 @@ use PHPLLVM\Value;
 
 /**
  * implode() with glue and array of scalar values (subset of PHP; JIT/AOT via JitImplode).
+ *
+ * $separator soft-null DEP+coerce on PROFILE=8.4 (#21210, reverts #19894; php-src string.c).
  */
 final class implode extends Internal
 {
@@ -70,13 +72,8 @@ final class implode extends Internal
             } elseif (Variable::TYPE_NULL === $second->type) {
                 self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
                 self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
-                VmString::coerceZparamStrBuiltinArg(
-                    $frame->calledArgs[0],
-                    $this->getName(),
-                    0,
-                    'separator',
-                    'array|string'
-                );
+                // Soft-null separator then Arg #1 ($array) string given (#19566 / #21210).
+                self::coerceSeparatorSoftNull($frame->calledArgs[0], $this->getName());
                 throw new \TypeError(sprintf(
                     '%s(): Argument #1 ($array) must be of type array, string given',
                     $this->getName()
@@ -84,13 +81,7 @@ final class implode extends Internal
             } else {
                 self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
                 self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
-                $glue = VmString::coerceZparamStrBuiltinArg(
-                    $frame->calledArgs[0],
-                    $this->getName(),
-                    0,
-                    'separator',
-                    'array|string'
-                );
+                $glue = self::coerceSeparatorSoftNull($frame->calledArgs[0], $this->getName());
                 $ht = VmArray::requireArrayParam(
                     $frame->calledArgs[1],
                     $this->getName(),
@@ -144,15 +135,7 @@ final class implode extends Internal
                     return $this->jitTwoArgNullPiecesBoxedFirst($context, $args[0], $this->getName());
                 }
                 self::rejectNullSeparatorJit($context, $args[0], $this->getName());
-                JitStringBuiltinArg::lowerZparamStr(
-                    $context,
-                    $args[0],
-                    $this->getName(),
-                    0,
-                    'separator',
-                    'array|string',
-                    'string'
-                );
+                self::lowerSeparatorSoftNull($context, $args[0], $this->getName());
                 self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $this->getName());
 
                 return $context->getTypeFromString('__string__*')->constNull();
@@ -169,15 +152,7 @@ final class implode extends Internal
                 return $this->jitTwoArgBoxedFirstDispatch($context, $args[0], $args[1], $this->getName());
             }
             self::rejectNullSeparatorJit($context, $args[0], $this->getName());
-            $glue = JitStringBuiltinArg::lowerZparamStr(
-                $context,
-                $args[0],
-                $this->getName(),
-                0,
-                'separator',
-                'array|string',
-                'string'
-            );
+            $glue = self::lowerSeparatorSoftNull($context, $args[0], $this->getName());
             self::jitRejectNullPiecesModernForm($context, $args[1], $this->getName());
             $haystack = $this->loadHaystack($context, $args[1], true);
         }
@@ -263,13 +238,12 @@ final class implode extends Internal
     }
 
     /**
-     * php-src Z_PARAM_ARRAY_HT_OR_STR — null TypeError under strict_types or 8.4 forward profile
-     * (#11013, #19894, ext/standard/string.c).
+     * php-src Z_PARAM_ARRAY_HT_OR_STR — null TypeError only under declare(strict_types=1)
+     * (#11013, #18632). PROFILE=8.4 soft-null DEP+coerce (#21210, reverts #19894).
      */
     private static function rejectNullSeparator(Frame $frame, Variable $var, string $function): void
     {
-        if (!InternalStrictArg::isCallerStrict($frame)
-            && !VmString::requiresZparamStrStrictNullOnForwardProfile()) {
+        if (!InternalStrictArg::isCallerStrict($frame)) {
             return;
         }
         if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
@@ -278,6 +252,39 @@ final class implode extends Internal
                 $function
             ));
         }
+    }
+
+    /**
+     * Soft-null separator — Zend 8.4 deprecate+coerce (#21210; php-src string.c implode).
+     */
+    private static function coerceSeparatorSoftNull(Variable $var, string $function): string
+    {
+        return VmString::coerceStringBuiltinArg(
+            $var,
+            $function,
+            0,
+            'separator',
+            'array|string',
+            false
+        );
+    }
+
+    /**
+     * JIT soft-null separator — same as {@see coerceSeparatorSoftNull} (#21210).
+     */
+    private static function lowerSeparatorSoftNull(Context $context, JITVariable $arg, string $function): Value
+    {
+        return JitStringBuiltinArg::lower(
+            $context,
+            $arg,
+            $function,
+            0,
+            'separator',
+            'array|string',
+            'string',
+            false,
+            false
+        );
     }
 
     /**
@@ -341,15 +348,7 @@ final class implode extends Internal
         );
         $context->builder->positionAtEnd($stringBlock);
         self::rejectNullSeparatorJit($context, $firstArg, $function);
-        JitStringBuiltinArg::lowerZparamStr(
-            $context,
-            $firstArg,
-            $function,
-            0,
-            'separator',
-            'array|string',
-            'string'
-        );
+        self::lowerSeparatorSoftNull($context, $firstArg, $function);
         self::emitPiecesNullStringFirstTypeErrorAndAbort($context, $function);
         $context->builder->positionAtEnd($arrayBlock);
         $i64 = $context->getTypeFromString('int64');
@@ -503,16 +502,8 @@ final class implode extends Internal
         self::jitRejectArrayFirstTwoArgForm($context, $secondArg, $function);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($modernBlock);
-        // lowerZparamStr handles boxed null TypeError on 8.4 (shared guard #19894).
-        $glue = JitStringBuiltinArg::lowerZparamStr(
-            $context,
-            $firstArg,
-            $function,
-            0,
-            'separator',
-            'array|string',
-            'string'
-        );
+        // Soft-null boxed separator on PROFILE=8.4 (#21210, reverts #19894).
+        $glue = self::lowerSeparatorSoftNull($context, $firstArg, $function);
         self::jitRejectNullPiecesModernForm($context, $secondArg, $function);
         $haystack = $this->loadHaystack($context, $secondArg, true);
 
@@ -521,8 +512,7 @@ final class implode extends Internal
 
     private static function rejectNullSeparatorJit(Context $context, JITVariable $arg, string $function): void
     {
-        if (!$context->callerStrictTypes
-            && !JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
+        if (!$context->callerStrictTypes) {
             return;
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
