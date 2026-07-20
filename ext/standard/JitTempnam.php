@@ -23,7 +23,7 @@ final class JitTempnam
     public static function lowerDirectory(Context $context, JITVariable $arg): Value
     {
         if (self::isNullJitArg($arg)) {
-            if ($context->callerStrictTypes) {
+            if ($context->callerStrictTypes || VmString::requiresTypedPathStringOnForwardProfile()) {
                 JitInternalStrictArg::requireString($context, $arg, 'tempnam', 'directory', 1);
 
                 return JitStringArg::lower($context, $arg, 'tempnam() directory');
