@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\PregJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** preg_* JIT embed routes through PregJitHelper PHP not StringPregMatchStandaloneLlvm (#9542, #13736). */
+/** preg_* JIT: always PregJitHelper NestedJIT — no dishonest Kernel stubs (#9542, #21212). */
 final class PregMatchRuntimeShrinkTest extends TestCase
 {
     public function testStringPregMatchJitIsThinDispatcher(): void
@@ -20,21 +20,24 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertLessThan(80, \substr_count($source, "\n") + 1);
     }
 
-    public function testPregMatchRuntimeUsesJitHelperForReplaceCallback(): void
+    public function testPregMatchRuntimeAlwaysUsesJitHelperBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PregMatchRuntime.php');
         $this->assertStringContainsString('PregJitHelper', $source);
         $this->assertStringContainsString('replaceCallbackArgv', $source);
         $this->assertStringContainsString('PregCallbackInvokeJitHelper', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('StringFormat::ensureLinked', $source);
         $this->assertStringNotContainsString('pcre2_compile', $source);
         $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm', $source);
         $this->assertStringNotContainsString('PregMatchUserScriptLlvm', $source);
-        $this->assertStringContainsString('JitPregMatchKernel', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('JitPregMatchKernel', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PregMatchUserScriptLlvm.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitPregMatchKernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitPregMatchKernel.php');
     }
 
     public function testPregJitHelperDelegatesToVmPregNative(): void
@@ -53,5 +56,14 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertSame(0, PregJitHelper::matchArgv('/z/', 'abc'));
         $this->assertSame(-1, PregJitHelper::matchArgv('[', 'abc'));
         $this->assertSame(1, PregJitHelper::lastError());
+    }
+
+    public function testSpineBundleIncludesPregPhpJitPath(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('PregJitHelper.php', $spine);
+        $this->assertStringContainsString('PregMatchRuntime.php', $spine);
+        $this->assertStringNotContainsString('JitPregMatchKernel.php', $spine);
+        $this->assertStringNotContainsString('PregMatchUserScriptLlvm.php', $spine);
     }
 }

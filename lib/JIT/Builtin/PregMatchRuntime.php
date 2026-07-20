@@ -12,7 +12,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
-use PHPCompiler\ext\standard\JitPregMatchKernel;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
 use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
 use PHPLLVM\Value;
@@ -20,11 +21,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 use llvm\LLVMValueRef_ptr;
 
 /**
- * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542).
+ * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542, #21212).
  *
- * Embed / non-thin: PregMatchRuntime + PregJitHelper PHP (#9542, #12982, #13736).
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20178 / #20169 shape): {@see JitPregMatchKernel}
- * stubs (NestedJIT of PregJitHelper segfaults under user-script AOT — #19399, #16075).
+ * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\PregJitHelper}
+ * (IniRuntime #21200 / IncludePath #20877 shape — no dishonest Kernel stub fork).
  * preg_replace_callback uses PHP match loop + thin LLVM callback invoke (#13736).
  * php-src: ext/pcre/php_pcre.c
  */
@@ -95,12 +95,15 @@ final class PregMatchRuntime
 
     public static function implement(Context $context): void
     {
-        if ($context->isThinStandaloneAotMain()) {
-            JitPregMatchKernel::implement($context);
-            self::registerLinkedRuntime($context);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of PregJitHelper (#21212 / #17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
 
         $probe = $context->module->getNamedFunction('__compiler_preg_match');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -117,6 +120,8 @@ final class PregMatchRuntime
 
         self::ensureRuntimeHelpers($context);
         self::ensureInvokeCallbackHelperLinked($context);
+        // VmPregPattern NestedJIT calls sprintf for pattern warnings (#21212 thin AOT link).
+        StringFormat::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementLastErrorBridge($context);
         self::implementLastErrorMsgBridge($context);

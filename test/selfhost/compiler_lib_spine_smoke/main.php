@@ -2305,7 +2305,6 @@ require_once __DIR__.'/../../../ext/standard/JitPregMatch.php';
 require_once __DIR__.'/../../../ext/standard/JitPregMatchAll.php';
 require_once __DIR__.'/../../../ext/standard/JitPregMatchAllEx.php';
 require_once __DIR__.'/../../../ext/standard/JitPregMatchEx.php';
-require_once __DIR__.'/../../../ext/standard/JitPregMatchKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplace.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplaceCallback.php';
 require_once __DIR__.'/../../../ext/standard/JitPregReplaceCallbackArray.php';
