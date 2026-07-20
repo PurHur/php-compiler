@@ -556,6 +556,49 @@ final class VmTidy
     }
 
     /**
+     * tidy_get_opt_doc() / tidy::getOptDoc() — host bridge (#21604).
+     *
+     * php-src: ValueError on unknown option; false when docs unavailable; string otherwise.
+     *
+     * @return string|false|null null when soft-path (no host / no getOptDoc)
+     */
+    public static function getOptDoc(ObjectEntry $object, string $option, ?Frame $frame, bool $isMethod): string|false|null
+    {
+        $host = self::hostFrom($object);
+        $label = $isMethod ? 'tidy::getOptDoc' : 'tidy_get_opt_doc';
+        if (null === $host) {
+            self::emitWarning($frame, $label.'(): tidy object has no host backend');
+
+            return null;
+        }
+        try {
+            if (\function_exists('tidy_get_opt_doc')) {
+                $doc = \tidy_get_opt_doc($host, $option);
+            } elseif (\is_callable([$host, 'getOptDoc'])) {
+                $doc = $host->getOptDoc($option);
+            } else {
+                self::emitWarning($frame, $label.'(): host tidy lacks getOptDoc()');
+
+                return null;
+            }
+        } catch (\ValueError $e) {
+            throw $e;
+        } catch (\Error $e) {
+            // Host may throw Error/ValueError-shaped invalid option.
+            throw $e;
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, $label.'(): '.$e->getMessage());
+
+            return null;
+        }
+        if (false === $doc) {
+            return false;
+        }
+
+        return (string) $doc;
+    }
+
+    /**
      * tidy_get_config() / tidy::getConfig() — host bridge (#21540).
      *
      * @return array<string, mixed>|null

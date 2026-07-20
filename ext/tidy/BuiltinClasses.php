@@ -95,6 +95,11 @@ final class BuiltinClasses
         $entry->methodVisibility['getopt'] = $pub;
         $entry->methodNames['getopt'] = 'getOpt';
 
+        $getOptDoc = new TidyGetOptDoc();
+        $entry->methods['getoptdoc'] = $getOptDoc;
+        $entry->methodVisibility['getoptdoc'] = $pub;
+        $entry->methodNames['getoptdoc'] = 'getOptDoc';
+
         $getConfig = new TidyGetConfig();
         $entry->methods['getconfig'] = $getConfig;
         $entry->methodVisibility['getconfig'] = $pub;
@@ -481,6 +486,43 @@ final class TidyGetOpt extends VmClassMethod
                 return;
             }
             VmTidy::assignOptValue($ret, $val);
+        });
+    }
+}
+
+/** tidy::getOptDoc() — host bridge (#21604). */
+final class TidyGetOptDoc extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getOptDoc');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'tidy::getOptDoc() expects exactly 1 argument, '.max(0, \count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (\count($frame->calledArgs) > 2) {
+            throw new \ArgumentCountError(
+                'tidy::getOptDoc() expects exactly 1 argument, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::getOptDoc() called without $this');
+        }
+        $option = VmTidy::htmlStringArg($frame->calledArgs[1], 'tidy::getOptDoc', 0);
+        $doc = VmTidy::getOptDoc($self->toObject(), $option, $frame, true);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($doc): void {
+            if (null === $doc || false === $doc) {
+                $ret->bool(false);
+
+                return;
+            }
+            $ret->string($doc);
         });
     }
 }

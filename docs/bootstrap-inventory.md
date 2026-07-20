@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6228 |
-| Phase A inventory files (M2 ratio SSOT) | 6228 |
+| PHP files on vm.php path | 6214 |
+| Phase A inventory files (M2 ratio SSOT) | 6214 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19629 |
+| Source constructs flagged (warnings) | 19604 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1626,21 +1626,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_string.php` | 0 | 2 |
-| `ext/snmp/BuiltinClasses.php` | 0 | 1 |
-| `ext/snmp/Module.php` | 0 | 4 |
-| `ext/snmp/SNMPClose.php` | 0 | 2 |
-| `ext/snmp/SNMPConstruct.php` | 0 | 3 |
-| `ext/snmp/SNMPGetErrno.php` | 0 | 2 |
-| `ext/snmp/SNMPGetError.php` | 0 | 2 |
-| `ext/snmp/SNMPGetMethod.php` | 0 | 3 |
-| `ext/snmp/SNMPWalkMethod.php` | 0 | 3 |
-| `ext/snmp/SnmpClassMethod.php` | 0 | 1 |
-| `ext/snmp/SnmpConstants.php` | 0 | 1 |
-| `ext/snmp/SnmpExtensionPolicy.php` | 0 | 1 |
-| `ext/snmp/SnmpFunction.php` | 0 | 1 |
-| `ext/snmp/VmSnmp.php` | 0 | 10 |
-| `ext/snmp/snmpget.php` | 0 | 1 |
-| `ext/snmp/snmpwalk.php` | 0 | 1 |
 | `ext/soap/BuiltinClasses.php` | 0 | 9 |
 | `ext/soap/Module.php` | 0 | 3 |
 | `ext/soap/SoapClassMethod.php` | 0 | 1 |
@@ -4088,10 +4073,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvshm/shmop_read.php` | 0 | 2 |
 | `ext/sysvshm/shmop_size.php` | 0 | 2 |
 | `ext/sysvshm/shmop_write.php` | 0 | 2 |
-| `ext/tidy/BuiltinClasses.php` | 0 | 72 |
-| `ext/tidy/Module.php` | 0 | 24 |
+| `ext/tidy/BuiltinClasses.php` | 0 | 77 |
+| `ext/tidy/Module.php` | 0 | 26 |
+| `ext/tidy/TidyConstants.php` | 0 | 1 |
 | `ext/tidy/TidyExtensionPolicy.php` | 0 | 1 |
-| `ext/tidy/VmTidy.php` | 0 | 10 |
+| `ext/tidy/VmTidy.php` | 0 | 12 |
 | `ext/tidy/tidy_access_count.php` | 0 | 2 |
 | `ext/tidy/tidy_clean_repair.php` | 0 | 2 |
 | `ext/tidy/tidy_config_count.php` | 0 | 2 |
@@ -4103,6 +4089,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/tidy/tidy_get_head.php` | 0 | 2 |
 | `ext/tidy/tidy_get_html.php` | 0 | 2 |
 | `ext/tidy/tidy_get_html_ver.php` | 0 | 2 |
+| `ext/tidy/tidy_get_opt_doc.php` | 0 | 2 |
 | `ext/tidy/tidy_get_output.php` | 0 | 2 |
 | `ext/tidy/tidy_get_release.php` | 0 | 2 |
 | `ext/tidy/tidy_get_root.php` | 0 | 2 |
@@ -5519,7 +5506,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 108 |
+| `lib/Runtime.php` | 0 | 107 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -19250,102 +19237,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - 2 class method(s)
-
-### `ext/snmp/BuiltinClasses.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/snmp/Module.php`
-
-**Warnings** (review for bootstrap subset):
-- new VM\Variable (line 39)
-- new snmpget (line 53)
-- new snmpwalk (line 54)
-- 4 class method(s)
-
-### `ext/snmp/SNMPClose.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- 1 class method(s)
-
-### `ext/snmp/SNMPConstruct.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- new ArgumentCountError (line 26)
-- 1 class method(s)
-
-### `ext/snmp/SNMPGetErrno.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- 1 class method(s)
-
-### `ext/snmp/SNMPGetError.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- 1 class method(s)
-
-### `ext/snmp/SNMPGetMethod.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- new ArgumentCountError (line 24)
-- 1 class method(s)
-
-### `ext/snmp/SNMPWalkMethod.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- new ArgumentCountError (line 24)
-- 1 class method(s)
-
-### `ext/snmp/SnmpClassMethod.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/snmp/SnmpConstants.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/snmp/SnmpExtensionPolicy.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/snmp/SnmpFunction.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/snmp/VmSnmp.php`
-
-**Warnings** (review for bootstrap subset):
-- new ClassEntry (line 37)
-- new Variable (line 40)
-- new SNMPConstruct (line 47)
-- new SNMPGetMethod (line 52)
-- new SNMPWalkMethod (line 53)
-- new SNMPClose (line 54)
-- new SNMPGetError (line 55)
-- new SNMPGetErrno (line 56)
-- new SnmpState (line 79)
-- 14 class method(s)
-
-### `ext/snmp/snmpget.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/snmp/snmpwalk.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
 
 ### `ext/soap/BuiltinClasses.php`
 
@@ -35548,100 +35439,112 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 40)
 - new ClassProperty (line 48)
 - new Variable (line 50)
-- new TidyCleanRepair (line 57)
-- new TidyDiagnose (line 62)
-- new TidyParseStringMethod (line 67)
-- new TidyParseFileMethod (line 72)
-- new TidyRepairString (line 77)
-- new TidyRepairFile (line 82)
-- new TidyGetOpt (line 87)
-- new TidyGetConfig (line 92)
-- new TidyGetStatus (line 97)
-- new TidyGetRelease (line 102)
-- new TidyGetHtmlVer (line 107)
-- new TidyIsXhtml (line 112)
-- new TidyIsXml (line 117)
-- new TidyRoot (line 122)
-- new TidyHtml (line 127)
-- new TidyHead (line 132)
-- new TidyBody (line 137)
-- new ClassEntry (line 154)
-- new Variable (line 158)
-- new Variable (line 159)
-- new Variable (line 160)
-- new Variable (line 161)
-- new Variable (line 162)
-- new ClassProperty (line 164)
-- new ClassProperty (line 165)
-- new ClassProperty (line 166)
-- new ClassProperty (line 167)
-- new ClassProperty (line 168)
-- new ClassProperty (line 169)
-- new ClassProperty (line 170)
-- new ClassProperty (line 171)
-- new ClassProperty (line 172)
-- new TidyNodeConstruct (line 174)
-- new TidyNodeHasChildren (line 180)
-- new TidyNodeHasSiblings (line 181)
-- new TidyNodeIsComment (line 182)
-- new TidyNodeIsHtml (line 183)
-- new TidyNodeIsText (line 184)
-- new TidyNodeIsJste (line 185)
-- new TidyNodeIsAsp (line 186)
-- new TidyNodeIsPhp (line 187)
-- new TidyNodeGetParent (line 188)
-- new TidyNodeGetPreviousSibling (line 189)
-- new TidyNodeGetNextSibling (line 190)
-- new ArgumentCountError (line 276)
-- new ArgumentCountError (line 281)
-- new ArgumentCountError (line 308)
-- new ArgumentCountError (line 313)
-- new ArgumentCountError (line 341)
+- new TidyConstruct (line 57)
+- new TidyCleanRepair (line 63)
+- new TidyDiagnose (line 68)
+- new TidyParseStringMethod (line 73)
+- new TidyParseFileMethod (line 78)
+- new TidyRepairString (line 83)
+- new TidyRepairFile (line 88)
+- new TidyGetOpt (line 93)
+- new TidyGetOptDoc (line 98)
+- new TidyGetConfig (line 103)
+- new TidyGetStatus (line 108)
+- new TidyGetRelease (line 113)
+- new TidyGetHtmlVer (line 118)
+- new TidyIsXhtml (line 123)
+- new TidyIsXml (line 128)
+- new TidyRoot (line 133)
+- new TidyHtml (line 138)
+- new TidyHead (line 143)
+- new TidyBody (line 148)
+- new ClassEntry (line 165)
+- new Variable (line 169)
+- new Variable (line 170)
+- new Variable (line 171)
+- new Variable (line 172)
+- new Variable (line 173)
+- new ClassProperty (line 175)
+- new ClassProperty (line 176)
+- new ClassProperty (line 177)
+- new ClassProperty (line 178)
+- new ClassProperty (line 179)
+- new ClassProperty (line 180)
+- new ClassProperty (line 181)
+- new ClassProperty (line 182)
+- new ClassProperty (line 183)
+- new TidyNodeConstruct (line 185)
+- new TidyNodeHasChildren (line 191)
+- new TidyNodeHasSiblings (line 192)
+- new TidyNodeIsComment (line 193)
+- new TidyNodeIsHtml (line 194)
+- new TidyNodeIsText (line 195)
+- new TidyNodeIsJste (line 196)
+- new TidyNodeIsAsp (line 197)
+- new TidyNodeIsPhp (line 198)
+- new TidyNodeGetParent (line 199)
+- new TidyNodeGetPreviousSibling (line 200)
+- new TidyNodeGetNextSibling (line 201)
+- new ArgumentCountError (line 240)
+- new ArgumentCountError (line 339)
 - new ArgumentCountError (line 344)
-- new ArgumentCountError (line 373)
+- new ArgumentCountError (line 371)
 - new ArgumentCountError (line 376)
 - new ArgumentCountError (line 404)
-- new ArgumentCountError (line 409)
-- new ArgumentCountError (line 444)
-- new ArgumentCountError (line 473)
-- new ArgumentCountError (line 502)
-- new ArgumentCountError (line 527)
-- new ArgumentCountError (line 556)
-- new ArgumentCountError (line 585)
-- new ArgumentCountError (line 613)
-- new Error (line 698)
-- new ArgumentCountError (line 714)
-- new ArgumentCountError (line 853)
-- 39 class method(s)
-- 16 closure(s)
+- new ArgumentCountError (line 407)
+- new ArgumentCountError (line 436)
+- new ArgumentCountError (line 439)
+- new ArgumentCountError (line 467)
+- new ArgumentCountError (line 472)
+- new ArgumentCountError (line 504)
+- new ArgumentCountError (line 509)
+- new ArgumentCountError (line 544)
+- new ArgumentCountError (line 573)
+- new ArgumentCountError (line 602)
+- new ArgumentCountError (line 627)
+- new ArgumentCountError (line 656)
+- new ArgumentCountError (line 685)
+- new ArgumentCountError (line 713)
+- new Error (line 798)
+- new ArgumentCountError (line 814)
+- new ArgumentCountError (line 953)
+- 41 class method(s)
+- 17 closure(s)
 
 ### `ext/tidy/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new tidy_parse_string (line 68)
-- new tidy_parse_file (line 69)
-- new tidy_repair_string (line 70)
-- new tidy_repair_file (line 71)
-- new tidy_clean_repair (line 72)
-- new tidy_get_output (line 73)
-- new tidy_diagnose (line 74)
-- new tidy_get_error_buffer (line 75)
-- new tidy_getopt (line 76)
-- new tidy_get_config (line 77)
-- new tidy_get_status (line 78)
-- new tidy_error_count (line 79)
-- new tidy_warning_count (line 80)
-- new tidy_access_count (line 81)
-- new tidy_config_count (line 82)
-- new tidy_get_release (line 83)
-- new tidy_get_html_ver (line 84)
-- new tidy_is_xhtml (line 85)
-- new tidy_is_xml (line 86)
-- new tidy_get_root (line 87)
-- new tidy_get_html (line 88)
-- new tidy_get_head (line 89)
-- new tidy_get_body (line 90)
+- new Variable (line 56)
+- new tidy_parse_string (line 75)
+- new tidy_parse_file (line 76)
+- new tidy_repair_string (line 77)
+- new tidy_repair_file (line 78)
+- new tidy_clean_repair (line 79)
+- new tidy_get_output (line 80)
+- new tidy_diagnose (line 81)
+- new tidy_get_error_buffer (line 82)
+- new tidy_getopt (line 83)
+- new tidy_get_opt_doc (line 84)
+- new tidy_get_config (line 85)
+- new tidy_get_status (line 86)
+- new tidy_error_count (line 87)
+- new tidy_warning_count (line 88)
+- new tidy_access_count (line 89)
+- new tidy_config_count (line 90)
+- new tidy_get_release (line 91)
+- new tidy_get_html_ver (line 92)
+- new tidy_is_xhtml (line 93)
+- new tidy_is_xml (line 94)
+- new tidy_get_root (line 95)
+- new tidy_get_html (line 96)
+- new tidy_get_head (line 97)
+- new tidy_get_body (line 98)
 - 4 class method(s)
+
+### `ext/tidy/TidyConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/tidy/TidyExtensionPolicy.php`
 
@@ -35653,14 +35556,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 166)
 - new Variable (line 170)
-- new ObjectEntry (line 197)
-- new Variable (line 201)
-- new HashTable (line 534)
-- new Variable (line 536)
-- new HashTable (line 963)
-- new Variable (line 965)
-- new HashTable (line 990)
-- 46 class method(s)
+- new tidy (line 194)
+- new Error (line 210)
+- new ObjectEntry (line 305)
+- new Variable (line 309)
+- new HashTable (line 685)
+- new Variable (line 687)
+- new HashTable (line 1114)
+- new Variable (line 1116)
+- new HashTable (line 1141)
+- 51 class method(s)
 
 ### `ext/tidy/tidy_access_count.php`
 
@@ -35726,6 +35631,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 33)
+- 2 class method(s)
+
+### `ext/tidy/tidy_get_opt_doc.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 40)
 - 2 class method(s)
 
 ### `ext/tidy/tidy_get_output.php`
@@ -39401,7 +39312,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 222 class method(s)
+- 221 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -45530,40 +45441,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\yaml\Module (line 268)
 - new ext\redis\Module (line 269)
 - new ext\mongodb\Module (line 270)
-- new ext\snmp\Module (line 271)
-- new ext\zstd\Module (line 272)
-- new ext\lzf\Module (line 273)
-- new ext\bz2\Module (line 274)
-- new ext\brotli\Module (line 275)
-- new ext\sodium\Module (line 276)
-- new ext\sqlite3\Module (line 277)
-- new ext\pgsql\Module (line 278)
-- new ext\odbc\Module (line 279)
-- new ext\dba\Module (line 280)
-- new ext\mailparse\Module (line 281)
-- new ext\enchant\Module (line 282)
-- new ext\tidy\Module (line 283)
-- new ext\pdo\Module (line 284)
-- new ext\phar\Module (line 285)
-- new ext\uri\Module (line 286)
-- new ext\uuid\Module (line 287)
-- new ext\uploadprogress\Module (line 288)
-- new ext\apcu\Module (line 289)
-- new ext\sysvshm\Module (line 290)
-- new ext\sysvsem\Module (line 291)
-- new ext\sysvmsg\Module (line 292)
-- new ext\reflection\Module (line 293)
-- new ext\standard\Module (line 294)
-- new JIT (line 370)
-- new JITContext (line 384)
-- new SealedClassPreprocessor (line 450)
-- new StaticClassPreprocessor (line 453)
-- new SourcePreprocessor\PropertyHooks (line 456)
-- new State (line 597)
-- new ReflectionProperty (line 624)
-- new ReflectionProperty (line 627)
-- new LintCompiler (line 1038)
-- new Variable (line 1168)
+- new ext\zstd\Module (line 271)
+- new ext\lzf\Module (line 272)
+- new ext\bz2\Module (line 273)
+- new ext\brotli\Module (line 274)
+- new ext\sodium\Module (line 275)
+- new ext\sqlite3\Module (line 276)
+- new ext\pgsql\Module (line 277)
+- new ext\odbc\Module (line 278)
+- new ext\dba\Module (line 279)
+- new ext\mailparse\Module (line 280)
+- new ext\enchant\Module (line 281)
+- new ext\tidy\Module (line 282)
+- new ext\pdo\Module (line 283)
+- new ext\phar\Module (line 284)
+- new ext\uri\Module (line 285)
+- new ext\uuid\Module (line 286)
+- new ext\uploadprogress\Module (line 287)
+- new ext\apcu\Module (line 288)
+- new ext\sysvshm\Module (line 289)
+- new ext\sysvsem\Module (line 290)
+- new ext\sysvmsg\Module (line 291)
+- new ext\reflection\Module (line 292)
+- new ext\standard\Module (line 293)
+- new JIT (line 369)
+- new JITContext (line 383)
+- new SealedClassPreprocessor (line 449)
+- new StaticClassPreprocessor (line 452)
+- new SourcePreprocessor\PropertyHooks (line 455)
+- new State (line 596)
+- new ReflectionProperty (line 623)
+- new ReflectionProperty (line 626)
+- new LintCompiler (line 1037)
+- new Variable (line 1167)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
