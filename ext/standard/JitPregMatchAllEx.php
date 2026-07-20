@@ -29,13 +29,13 @@ final class JitPregMatchAllEx
 
         StringPregMatch::ensureLinked($context);
 
-        // Z_PARAM_STR $pattern — null TypeError on 8.4 (#20226).
+        // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226 TypeError).
         // $subject soft-null DEP+coerce on 8.4 (#21318; php-src php_pcre.c).
         if ($context->callerStrictTypes) {
             $pattern = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_match_all', 0, 'pattern');
             $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'preg_match_all', 1, 'subject');
         } else {
-            $pattern = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_match_all', 0, 'pattern');
+            $pattern = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'preg_match_all', 0, 'pattern');
             $subject = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'preg_match_all', 1, 'subject');
         }
 
