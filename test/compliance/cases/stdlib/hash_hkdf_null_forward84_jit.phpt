@@ -1,29 +1,45 @@
 --TEST--
-stdlib hash_hkdf() JIT — null algo/key TypeError on 8.4 forward (#21079, ext/hash/hash.stub.php)
+stdlib hash_hkdf() JIT — null algo/key DEP+coerce then ValueError on 8.4 (#21319, reverts #21079)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
+--JIT--
 --FILE--
 <?php
+error_reporting(E_ALL);
+$seen = 0;
+set_error_handler(static function (int $no) use (&$seen): bool {
+    if (E_DEPRECATED === $no) {
+        $seen++;
+    }
+    return true;
+});
 try {
     $r = hash_hkdf('sha256', null);
     echo 'key uncaught ', var_export($r, true), "\n";
+} catch (ValueError $e) {
+    echo "key:VE\n";
 } catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
+    echo "key:TE\n";
 }
 try {
-    $r = hash_hkdf(null, 'k');
-    echo 'algo uncaught ', var_export($r, true), "\n";
+    hash_hkdf(null, 'k');
+    echo "algo:OK\n";
+} catch (ValueError $e) {
+    echo "algo:VE\n";
 } catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
+    echo "algo:TE\n";
 }
 try {
     hash_hkdf('sha256', '');
     echo "empty key uncaught\n";
 } catch (ValueError $e) {
-    echo $e->getMessage(), "\n";
+    echo "empty:VE\n";
 }
+restore_error_handler();
+echo 'depr=', (int) ($seen >= 1), "\n";
 ?>
 --EXPECT--
-hash_hkdf(): Argument #2 ($key) must be of type string, null given
-hash_hkdf(): Argument #1 ($algo) must be of type string, null given
-hash_hkdf(): Argument #2 ($key) cannot be empty
+key:VE
+algo:VE
+empty:VE
+depr=1

@@ -73,6 +73,7 @@ final class VmString
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
      * date/gmdate $format and strtotime $datetime soft-null (#21208, reverts #19651).
      * password_verify/password_needs_rehash string operands soft-null (#21314; hash_equals stays TypeError).
+     * hash_pbkdf2($algo/$password/$salt) and hash_hkdf($algo/$key/$info/$salt) soft-null (#21319, reverts #20659/#21079).
      * str_rot13/crypt/uniqid/gzcompress soft-null (#21280).
      * zlib one-shot $data (gzdeflate/gzinflate/gzdecode/gzuncompress/gzcompress/gzencode) soft-null (#21311, reverts #19332).
      */
