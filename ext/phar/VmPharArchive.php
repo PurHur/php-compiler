@@ -52,6 +52,9 @@ final class VmPharArchive
     /** @var array<string, string> alias → archive path (Phar::loadPhar; #21232). */
     private static array $aliases = [];
 
+    /** @var array<string, true> full archive paths (php-src PHAR_G phar_fname_map; #21327). */
+    private static array $filenameMap = [];
+
     public static function bind(
         ObjectEntry $object,
         string $path,
@@ -128,6 +131,7 @@ final class VmPharArchive
                 $metadata,
                 $wholeCompression
             );
+            self::registerFilenameMap($path);
 
             return;
         }
@@ -136,6 +140,7 @@ final class VmPharArchive
             throw new \UnexpectedValueException('phar error: unable to create phar "'.$path.'"');
         }
         self::bind($object, $path, [], true, []);
+        self::registerFilenameMap($path);
         // New archive is dirty; flush immediately only when writable.
         if (VmPhar::canWrite()) {
             self::flush($object);
@@ -701,11 +706,27 @@ final class VmPharArchive
     {
         $filename = self::normalizeArchivePath($filename);
         self::assertReadablePharFile($filename);
+        self::registerFilenameMap($filename);
         if ('' !== $alias) {
             self::registerAlias($alias, $filename);
         }
 
         return true;
+    }
+
+    public static function registerFilenameMap(string $path): void
+    {
+        self::$filenameMap[self::normalizeArchivePath($path)] = true;
+    }
+
+    public static function isRegisteredArchivePath(string $path): bool
+    {
+        return isset(self::$filenameMap[self::normalizeArchivePath($path)]);
+    }
+
+    public static function normalizeArchivePathPublic(string $path): string
+    {
+        return self::normalizeArchivePath($path);
     }
 
     /** php-src zim_Phar_setSignatureAlgorithm (#21329). */
