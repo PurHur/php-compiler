@@ -40,8 +40,7 @@ final class mail extends Internal
         $message = VmString::coercePathBuiltinArg($frame->calledArgs[2], 'mail', 2, 'message');
         $headers = null;
         if ($argc >= 4) {
-            $headers = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'mail', 3, 'additional_headers');
-            VmString::rejectNullByteBuiltinStringArg($headers, 'mail', 3, 'additional_headers');
+            $headers = VmMail::coerceAdditionalHeaders($frame->calledArgs[3]);
         }
         $extraParams = null;
         if (5 === $argc) {
