@@ -70,6 +70,7 @@ final class VmTidy
         $entry = new ObjectEntry(self::requireClass($ctx));
         $entry->constructed = true;
         self::$hostObjects[$entry->id] = $host;
+        self::syncValueProperty($entry, $host);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
 
@@ -79,6 +80,44 @@ final class VmTidy
     public static function hostFrom(ObjectEntry $object): ?object
     {
         return self::$hostObjects[$object->id] ?? null;
+    }
+
+    public static function requireTidyObject(Variable $arg, string $func, int $argNum): ObjectEntry
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($tidy) must be of type tidy, %s given',
+                $func,
+                $argNum + 1,
+                self::typeLabel($arg)
+            ));
+        }
+        $object = $arg->toObject();
+        if (self::CLASS_LC !== strtolower($object->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($tidy) must be of type tidy, %s given',
+                $func,
+                $argNum + 1,
+                $object->class->name
+            ));
+        }
+
+        return $object;
+    }
+
+    public static function typeLabel(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $var->toObject()->class->name,
+            default => 'mixed',
+        };
     }
 
     public static function cleanRepair(ObjectEntry $object, ?Frame $frame): bool
@@ -96,12 +135,70 @@ final class VmTidy
         }
 
         try {
-            return (bool) $host->cleanRepair();
+            $ok = (bool) $host->cleanRepair();
         } catch (\Throwable $e) {
             self::emitWarning($frame, 'tidy::cleanRepair(): '.$e->getMessage());
 
             return false;
         }
+        self::syncValueProperty($object, $host);
+
+        return $ok;
+    }
+
+    /**
+     * tidy_get_output() / $tidy->value — host document string (#21499).
+     */
+    public static function getOutput(ObjectEntry $object, ?Frame $frame): string
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_get_output(): tidy object has no host backend');
+
+            return '';
+        }
+        try {
+            if (\function_exists('tidy_get_output')) {
+                $out = \tidy_get_output($host);
+            } else {
+                $out = $host->value ?? '';
+            }
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_get_output(): '.$e->getMessage());
+
+            return '';
+        }
+        $str = false === $out || null === $out ? '' : (string) $out;
+        self::syncValueProperty($object, $host, $str);
+
+        return $str;
+    }
+
+    /** Keep public $value in sync with host tidy (#21499). */
+    public static function syncValueProperty(ObjectEntry $object, object $host, ?string $forced = null): void
+    {
+        if (!$object->hasProperty('value')) {
+            return;
+        }
+        $slot = $object->getProperty('value');
+        if (null !== $forced) {
+            $slot->string($forced);
+
+            return;
+        }
+        try {
+            $raw = $host->value ?? null;
+        } catch (\Throwable $e) {
+            $slot->null();
+
+            return;
+        }
+        if (null === $raw) {
+            $slot->null();
+
+            return;
+        }
+        $slot->string((string) $raw);
     }
 
     /**

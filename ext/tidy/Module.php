@@ -26,6 +26,8 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/tidy_parse_string.php';
         require_once __DIR__.'/tidy_repair_string.php';
         require_once __DIR__.'/tidy_repair_file.php';
+        require_once __DIR__.'/tidy_clean_repair.php';
+        require_once __DIR__.'/tidy_get_output.php';
         parent::init($runtime);
         if (!TidyExtensionPolicy::advertisesExtension()) {
             return;
@@ -48,6 +50,8 @@ class Module extends ModuleAbstract
             new tidy_parse_string(),
             new tidy_repair_string(),
             new tidy_repair_file(),
+            new tidy_clean_repair(),
+            new tidy_get_output(),
         ];
     }
 }

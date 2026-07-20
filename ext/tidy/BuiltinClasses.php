@@ -9,11 +9,12 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * Register tidy class (php-src ext/tidy/tidy.stub.php; #21464, #21498).
+ * Register tidy class (php-src ext/tidy/tidy.stub.php; #21464, #21498, #21499).
  */
 final class BuiltinClasses
 {
@@ -27,6 +28,18 @@ final class BuiltinClasses
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry = new ClassEntry('tidy');
         $entry->isInternal = true;
+
+        $nullDefault = new Variable(Variable::TYPE_NULL);
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $entry->properties[] = new ClassProperty(
+            'value',
+            $nullDefault,
+            $strProto,
+            false,
+            $pub,
+            VmTidy::CLASS_LC
+        );
+
         $clean = new TidyCleanRepair();
         $entry->methods['cleanrepair'] = $clean;
         $entry->methodVisibility['cleanrepair'] = $pub;
