@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6137 |
-| Phase A inventory files (M2 ratio SSOT) | 6137 |
+| PHP files on vm.php path | 6138 |
+| Phase A inventory files (M2 ratio SSOT) | 6138 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19095 |
+| Source constructs flagged (warnings) | 19128 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -903,7 +903,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmLocale.php` | 0 | 2 |
 | `ext/intl/VmMessageFormatter.php` | 0 | 36 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
-| `ext/intl/VmNumberFormatter.php` | 0 | 56 |
+| `ext/intl/VmNumberFormatter.php` | 0 | 55 |
 | `ext/intl/VmResourceBundle.php` | 0 | 33 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 29 |
 | `ext/intl/VmTransliterator.php` | 0 | 29 |
@@ -1248,12 +1248,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
 | `ext/odbc/BuiltinClasses.php` | 0 | 1 |
-| `ext/odbc/Module.php` | 0 | 15 |
+| `ext/odbc/Module.php` | 0 | 28 |
 | `ext/odbc/OdbcConstants.php` | 0 | 1 |
 | `ext/odbc/OdbcExtensionPolicy.php` | 0 | 1 |
 | `ext/odbc/VmOdbcConnection.php` | 0 | 4 |
 | `ext/odbc/VmOdbcConnstr.php` | 0 | 1 |
-| `ext/odbc/VmOdbcCore.php` | 0 | 1 |
+| `ext/odbc/VmOdbcCore.php` | 0 | 8 |
 | `ext/odbc/VmOdbcNative.php` | 0 | 1 |
 | `ext/odbc/VmOdbcResult.php` | 0 | 4 |
 | `ext/odbc/odbc_close.php` | 0 | 2 |
@@ -1268,6 +1268,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/odbc/odbc_fetch_row.php` | 0 | 2 |
 | `ext/odbc/odbc_num_rows.php` | 0 | 2 |
 | `ext/odbc/odbc_pconnect.php` | 0 | 2 |
+| `ext/odbc/odbc_prepare_fetch_builtins.php` | 0 | 14 |
 | `ext/odbc/odbc_result.php` | 0 | 2 |
 | `ext/opcache/Module.php` | 0 | 4 |
 | `ext/opcache/OpcacheFunction.php` | 0 | 1 |
@@ -9280,59 +9281,59 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomXPath.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 48)
-- new DomNodeState (line 51)
-- new Variable (line 182)
-- new Variable (line 215)
-- new Variable (line 221)
-- new Variable (line 227)
-- new Variable (line 236)
-- new DOMException (line 258)
-- new DOMException (line 264)
-- new DOMException (line 412)
-- new DOMException (line 463)
-- new DOMException (line 936)
-- new DOMException (line 1332)
-- new DOMException (line 1464)
-- new DOMException (line 1473)
+- new ObjectEntry (line 67)
+- new DomNodeState (line 70)
+- new Variable (line 201)
+- new Variable (line 234)
+- new Variable (line 240)
+- new Variable (line 246)
+- new Variable (line 255)
+- new DOMException (line 277)
+- new DOMException (line 283)
+- new DOMException (line 431)
+- new DOMException (line 482)
+- new DOMException (line 955)
+- new DOMException (line 1351)
 - new DOMException (line 1483)
-- new DOMException (line 1527)
-- new DOMException (line 1553)
-- new DOMException (line 1567)
-- new DOMException (line 1576)
-- new DOMException (line 1585)
-- new DOMException (line 1642)
-- new DOMException (line 1659)
-- new DOMException (line 1689)
-- new DOMException (line 1704)
-- new DOMException (line 1718)
-- new DOMException (line 1731)
-- new DOMException (line 1745)
-- new DOMException (line 1760)
-- new DOMException (line 1775)
-- new DOMException (line 1789)
-- new DOMException (line 1798)
-- new DOMException (line 1802)
-- new DOMException (line 1826)
-- new Variable (line 2485)
-- new DOMException (line 2491)
-- new Error (line 2504)
-- new Variable (line 2508)
-- new Variable (line 2518)
-- new Variable (line 2646)
-- new DOMException (line 2653)
-- new Error (line 2707)
-- new Variable (line 2742)
-- new Variable (line 2748)
-- new Variable (line 2760)
-- new Variable (line 2772)
-- new Variable (line 2793)
-- new HashTable (line 2804)
-- new Variable (line 2810)
-- new Variable (line 2814)
-- new Variable (line 2831)
-- new Variable (line 2840)
-- 87 class method(s)
+- new DOMException (line 1492)
+- new DOMException (line 1502)
+- new DOMException (line 1546)
+- new DOMException (line 1572)
+- new DOMException (line 1586)
+- new DOMException (line 1595)
+- new DOMException (line 1604)
+- new DOMException (line 1661)
+- new DOMException (line 1678)
+- new DOMException (line 1708)
+- new DOMException (line 1723)
+- new DOMException (line 1737)
+- new DOMException (line 1750)
+- new DOMException (line 1764)
+- new DOMException (line 1779)
+- new DOMException (line 1794)
+- new DOMException (line 1808)
+- new DOMException (line 1817)
+- new DOMException (line 1821)
+- new DOMException (line 1845)
+- new Variable (line 2505)
+- new DOMException (line 2511)
+- new Error (line 2524)
+- new Variable (line 2528)
+- new Variable (line 2538)
+- new Variable (line 2666)
+- new DOMException (line 2673)
+- new Error (line 2727)
+- new Variable (line 2762)
+- new Variable (line 2768)
+- new Variable (line 2780)
+- new Variable (line 2792)
+- new Variable (line 2813)
+- new HashTable (line 2824)
+- new Variable (line 2830)
+- new Variable (line 2834)
+- new Variable (line 2851)
+- new Variable (line 2860)
+- 88 class method(s)
 - 4 closure(s)
 
 ### `ext/dom/XPathConstruct.php`
@@ -11152,23 +11153,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gmp/VmGmp.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 275)
-- new DivisionByZeroError (line 303)
-- new DivisionByZeroError (line 381)
-- new DivisionByZeroError (line 727)
-- new DivisionByZeroError (line 1455)
-- 87 class method(s)
+- new DivisionByZeroError (line 276)
+- new DivisionByZeroError (line 304)
+- new DivisionByZeroError (line 414)
+- new DivisionByZeroError (line 760)
+- new DivisionByZeroError (line 1488)
+- 89 class method(s)
 
 ### `ext/gmp/VmGmpObject.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 24)
-- new ClassEntry (line 27)
-- new ClassProperty (line 29)
-- new GmpToString (line 31)
-- new ObjectEntry (line 43)
-- new Variable (line 45)
-- 3 class method(s)
+- new Variable (line 29)
+- new ClassEntry (line 32)
+- new ClassProperty (line 34)
+- new GmpToString (line 36)
+- new ObjectEntry (line 48)
+- new Variable (line 50)
+- 13 class method(s)
 
 ### `ext/gmp/gmp_abs.php`
 
@@ -13097,62 +13098,61 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmNumberFormatter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 226)
-- new Variable (line 230)
-- new NumberFormatterConstruct (line 237)
-- new NumberFormatterCreate (line 241)
-- new NumberFormatterFormat (line 242)
-- new NumberFormatterFormatCurrency (line 243)
-- new NumberFormatterParse (line 244)
-- new NumberFormatterParseCurrency (line 245)
-- new NumberFormatterGetAttribute (line 246)
-- new NumberFormatterSetAttribute (line 247)
-- new NumberFormatterGetSymbol (line 248)
-- new NumberFormatterSetSymbol (line 249)
-- new NumberFormatterGetTextAttribute (line 250)
-- new NumberFormatterSetTextAttribute (line 251)
-- new NumberFormatterGetPattern (line 252)
-- new NumberFormatterSetPattern (line 253)
-- new NumberFormatterGetLocale (line 254)
-- new NumberFormatterGetErrorCode (line 255)
-- new NumberFormatterGetErrorMessage (line 256)
-- new Error (line 274)
-- new ObjectEntry (line 276)
-- new Error (line 883)
-- new ArgumentCountError (line 1185)
-- new Error (line 1193)
-- new ArgumentCountError (line 1217)
-- new ArgumentCountError (line 1247)
-- new Error (line 1255)
-- new ArgumentCountError (line 1287)
-- new Error (line 1295)
-- new ArgumentCountError (line 1324)
-- new Error (line 1332)
-- new ArgumentCountError (line 1387)
-- new Error (line 1395)
-- new ArgumentCountError (line 1448)
-- new Error (line 1456)
-- new ArgumentCountError (line 1488)
-- new Error (line 1496)
-- new ArgumentCountError (line 1520)
-- new Error (line 1528)
-- new ArgumentCountError (line 1556)
-- new Error (line 1564)
-- new ArgumentCountError (line 1588)
-- new Error (line 1596)
-- new ArgumentCountError (line 1624)
-- new Error (line 1632)
-- new ArgumentCountError (line 1656)
-- new Error (line 1664)
-- new ArgumentCountError (line 1691)
-- new Error (line 1699)
-- new ArgumentCountError (line 1722)
-- new Error (line 1730)
-- new ArgumentCountError (line 1757)
-- new Error (line 1765)
-- new ArgumentCountError (line 1786)
-- new Error (line 1794)
-- 56 class method(s)
+- new ClassEntry (line 235)
+- new Variable (line 239)
+- new NumberFormatterConstruct (line 246)
+- new NumberFormatterCreate (line 250)
+- new NumberFormatterFormat (line 251)
+- new NumberFormatterFormatCurrency (line 252)
+- new NumberFormatterParse (line 253)
+- new NumberFormatterParseCurrency (line 254)
+- new NumberFormatterGetAttribute (line 255)
+- new NumberFormatterSetAttribute (line 256)
+- new NumberFormatterGetSymbol (line 257)
+- new NumberFormatterSetSymbol (line 258)
+- new NumberFormatterGetTextAttribute (line 259)
+- new NumberFormatterSetTextAttribute (line 260)
+- new NumberFormatterGetPattern (line 261)
+- new NumberFormatterSetPattern (line 262)
+- new NumberFormatterGetLocale (line 263)
+- new NumberFormatterGetErrorCode (line 264)
+- new NumberFormatterGetErrorMessage (line 265)
+- new Error (line 283)
+- new ObjectEntry (line 285)
+- new ArgumentCountError (line 1471)
+- new Error (line 1479)
+- new ArgumentCountError (line 1503)
+- new ArgumentCountError (line 1533)
+- new Error (line 1541)
+- new ArgumentCountError (line 1573)
+- new Error (line 1581)
+- new ArgumentCountError (line 1610)
+- new Error (line 1618)
+- new ArgumentCountError (line 1673)
+- new Error (line 1681)
+- new ArgumentCountError (line 1734)
+- new Error (line 1742)
+- new ArgumentCountError (line 1774)
+- new Error (line 1782)
+- new ArgumentCountError (line 1806)
+- new Error (line 1814)
+- new ArgumentCountError (line 1842)
+- new Error (line 1850)
+- new ArgumentCountError (line 1874)
+- new Error (line 1882)
+- new ArgumentCountError (line 1910)
+- new Error (line 1918)
+- new ArgumentCountError (line 1942)
+- new Error (line 1950)
+- new ArgumentCountError (line 1977)
+- new Error (line 1985)
+- new ArgumentCountError (line 2008)
+- new Error (line 2016)
+- new ArgumentCountError (line 2043)
+- new Error (line 2051)
+- new ArgumentCountError (line 2072)
+- new Error (line 2080)
+- 63 class method(s)
 
 ### `ext/intl/VmResourceBundle.php`
 
@@ -15713,19 +15713,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 32)
-- new odbc_connect (line 48)
-- new odbc_pconnect (line 49)
-- new odbc_close (line 50)
-- new odbc_close_all (line 51)
-- new odbc_connection_string_is_quoted (line 52)
-- new odbc_connection_string_should_quote (line 53)
-- new odbc_connection_string_quote (line 54)
-- new odbc_exec (line 55)
-- new odbc_fetch_row (line 56)
-- new odbc_result (line 57)
-- new odbc_num_rows (line 58)
-- new odbc_error (line 59)
-- new odbc_errormsg (line 60)
+- new odbc_connect (line 50)
+- new odbc_pconnect (line 51)
+- new odbc_close (line 52)
+- new odbc_close_all (line 53)
+- new odbc_connection_string_is_quoted (line 54)
+- new odbc_connection_string_should_quote (line 55)
+- new odbc_connection_string_quote (line 56)
+- new odbc_exec (line 57)
+- new odbc_prepare (line 58)
+- new odbc_execute (line 59)
+- new odbc_fetch_row (line 60)
+- new odbc_fetch_array (line 61)
+- new odbc_fetch_object (line 62)
+- new odbc_fetch_into (line 63)
+- new odbc_result (line 64)
+- new odbc_num_rows (line 65)
+- new odbc_num_fields (line 66)
+- new odbc_field_name (line 67)
+- new odbc_field_type (line 68)
+- new odbc_field_len (line 69)
+- new odbc_field_num (line 70)
+- new odbc_tables (line 71)
+- new odbc_columns (line 72)
+- new odbc_free_result (line 73)
+- new odbc_error (line 74)
+- new odbc_errormsg (line 75)
 - 3 class method(s)
 
 ### `ext/odbc/OdbcConstants.php`
@@ -15754,20 +15767,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/odbc/VmOdbcCore.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- new HashTable (line 301)
+- new Variable (line 303)
+- new Variable (line 307)
+- new ObjectEntry (line 333)
+- new HashTable (line 356)
+- new Variable (line 358)
+- 15 class method(s)
+- 2 closure(s)
 
 ### `ext/odbc/VmOdbcNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 21 class method(s)
 
 ### `ext/odbc/VmOdbcResult.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 29)
-- new ObjectEntry (line 40)
-- new Variable (line 48)
-- 8 class method(s)
+- new ClassEntry (line 46)
+- new ObjectEntry (line 71)
+- new Variable (line 94)
+- 19 class method(s)
 
 ### `ext/odbc/odbc_close.php`
 
@@ -15840,6 +15860,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
 - 3 class method(s)
+
+### `ext/odbc/odbc_prepare_fetch_builtins.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 74)
+- new ArgumentCountError (line 125)
+- new ArgumentCountError (line 168)
+- new ArgumentCountError (line 215)
+- new ArgumentCountError (line 265)
+- new ArgumentCountError (line 324)
+- new ArgumentCountError (line 383)
+- new ArgumentCountError (line 415)
+- new ArgumentCountError (line 454)
+- new ArgumentCountError (line 493)
+- new ArgumentCountError (line 532)
+- new ArgumentCountError (line 571)
+- 28 class method(s)
 
 ### `ext/odbc/odbc_result.php`
 
@@ -48763,26 +48801,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new EnumCaseEntry (line 1305)
 - new self (line 1788)
 - new self (line 1806)
-- new self (line 1965)
-- new self (line 1973)
-- new self (line 1981)
-- new self (line 1983)
-- new self (line 2210)
-- new self (line 2321)
-- new self (line 2414)
-- new Error (line 2421)
-- new DivisionByZeroError (line 2526)
-- new DivisionByZeroError (line 2533)
-- new self (line 2554)
-- new Error (line 2583)
-- new self (line 2604)
-- new self (line 2616)
-- new Error (line 2643)
-- new self (line 2664)
-- new self (line 2672)
-- new Error (line 2851)
-- new Error (line 2857)
-- new Error (line 2866)
+- new self (line 1971)
+- new self (line 1979)
+- new self (line 1987)
+- new self (line 1989)
+- new self (line 2225)
+- new self (line 2342)
+- new self (line 2436)
+- new Error (line 2443)
+- new DivisionByZeroError (line 2548)
+- new DivisionByZeroError (line 2555)
+- new self (line 2576)
+- new Error (line 2605)
+- new self (line 2626)
+- new self (line 2638)
+- new Error (line 2665)
+- new self (line 2686)
+- new self (line 2694)
+- new Error (line 2879)
+- new Error (line 2885)
+- new Error (line 2894)
 - 123 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`
