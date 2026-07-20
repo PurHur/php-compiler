@@ -1,10 +1,9 @@
 --TEST--
-AOT: substr_count null — TypeError on 8.4 forward profile (#19282)
+AOT: substr_count(null) — soft-null on 8.4 forward profile (#21196)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-substr_count(null, 'a');
+echo substr_count(null, 'a'), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+0
