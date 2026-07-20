@@ -37,8 +37,8 @@ final class mb_strcut extends Internal
                 max(\array_keys($frame->calledArgs)) + 1
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20225, mbstring.c).
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_strcut', 0, 'string');
+        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21430, reverts #20225 TypeError).
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_strcut', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
