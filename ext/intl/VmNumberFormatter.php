@@ -286,10 +286,12 @@ final class VmNumberFormatter
     {
         $object->constructed = true;
         $resolvedLocale = '' !== $locale ? $locale : VmLocale::getDefault();
+        // php-src/ICU: create without an explicit pattern still exposes a non-empty
+        // default via unum_toPattern (#21113) — e.g. DECIMAL → #,##0.###.
         self::$state[$object->id] = [
             'locale' => $resolvedLocale,
             'style' => $style,
-            'pattern' => $pattern,
+            'pattern' => null !== $pattern ? $pattern : self::defaultPatternForStyle($style),
             'attributes' => [
                 self::GROUPING_USED => 1,
                 self::FRACTION_DIGITS => self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style ? 2 : -1,
@@ -301,6 +303,26 @@ final class VmNumberFormatter
             'errorMessage' => 'U_ZERO_ERROR',
         ];
         IntlError::clear();
+    }
+
+    /**
+     * ICU default DecimalFormat patterns for common UNumberFormatStyle values
+     * (php-src numfmt_get_pattern / unum_toPattern; #21113).
+     *
+     * Rule-based styles (SPELLOUT/ORDINAL/…) expose large ICU rulesets — left empty
+     * until #21110; DECIMAL/PERCENT/CURRENCY/SCIENTIFIC match Zend/ICU CLDR defaults.
+     */
+    public static function defaultPatternForStyle(int $style): string
+    {
+        return match ($style) {
+            self::PERCENT => '#,##0%',
+            self::CURRENCY => '¤#,##0.00',
+            self::CURRENCY_ACCOUNTING => '¤#,##0.00;(¤#,##0.00)',
+            self::SCIENTIFIC => '#E0',
+            self::PATTERN_DECIMAL, self::IGNORE => '#',
+            self::SPELLOUT, self::ORDINAL, self::DURATION, self::PATTERN_RULEBASED => '',
+            default => '#,##0.###',
+        };
     }
 
     /**
@@ -740,8 +762,12 @@ final class VmNumberFormatter
         }
         self::clearObjectError($formatter);
         IntlError::clear();
+        $pattern = $state['pattern'] ?? null;
+        if (null === $pattern) {
+            return self::defaultPatternForStyle((int) ($state['style'] ?? self::DECIMAL));
+        }
 
-        return $state['pattern'] ?? '';
+        return $pattern;
     }
 
     public static function setPattern(ObjectEntry $formatter, string $pattern): bool
