@@ -81,6 +81,7 @@ final class VmString
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * mb_strtolower/mb_convert_encoding/mb_substr_count string inputs (#21282),
      * mb_strcut/mb_strimwidth/mb_encode_mimeheader string inputs (#21430),
+     * mb_scrub/mb_detect_encoding string inputs (#21516, reverts #21061/#20225 TypeError),
      * function_exists/class_exists/interface_exists/trait_exists/enum_exists/
      * extension_loaded/defined/constant/method_exists/property_exists/define name args (#21281),
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode string

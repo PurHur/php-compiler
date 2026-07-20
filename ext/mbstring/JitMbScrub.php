@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -22,9 +23,17 @@ final class JitMbScrub
         if (!isset($args[0])) {
             return null;
         }
-        $string = JitStringArg::compileTimeLiteral($args[0]);
-        if (null === $string) {
-            return null;
+        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516, reverts #21061 TypeError).
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                return JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'mb_scrub', 0, 'string');
+            }
+            $string = '';
+        } else {
+            $string = JitStringArg::compileTimeLiteral($args[0]);
+            if (null === $string) {
+                return null;
+            }
         }
         $encoding = self::compileTimeEncoding($args, 1);
         if (null === $encoding) {

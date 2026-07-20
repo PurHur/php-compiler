@@ -1,5 +1,5 @@
 --TEST--
-mb_strwidth/mb_convert_case/mb_scrub null on 8.4 profile JIT (#21061, #21313, ext/mbstring/mbstring.c)
+mb_strwidth/mb_convert_case/mb_scrub null on 8.4 profile JIT (#21061, #21313, #21516, ext/mbstring/mbstring.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -12,7 +12,7 @@ foreach ([
 ] as $name => $fn) {
     try {
         $r = $fn();
-        if ('mb_convert_case' === $name) {
+        if ('mb_convert_case' === $name || 'mb_scrub' === $name) {
             echo "$name: OK ".var_export($r, true)."\n";
             continue;
         }
@@ -28,7 +28,7 @@ echo mb_scrub("a\x80b"), "\n";
 --EXPECT--
 mb_strwidth: mb_strwidth(): Argument #1 ($string) must be of type string, null given
 mb_convert_case: OK ''
-mb_scrub: mb_scrub(): Argument #1 ($string) must be of type string, null given
+mb_scrub: OK ''
 2
 AB
 a?b
