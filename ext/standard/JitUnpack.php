@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * LLVM JIT/AOT helper for unpack() via __compiler_unpack (issue #3188, #5442).
  *
- * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241).
+ * Soft-null $format on PROFILE=8.4 — Zend DEP+[] (#21478, reverts #20241 TypeError).
  * $string soft-null on 8.4 (#21246, pack.c) — DEP+coerce, not TypeError.
  */
 final class JitUnpack
@@ -35,18 +35,12 @@ final class JitUnpack
                 $argc
             ));
         }
-        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20241, pack.c).
+        // Soft-null $format on 8.4 — Zend deprecate+coerce (#21478, reverts #20241 TypeError).
         $nullFormat = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
         $fmt = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'unpack', 0, 'format')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'unpack', 0, 'format');
-        if (
-            $nullFormat
-            && (
-                $context->callerStrictTypes
-                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            )
-        ) {
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'unpack', 0, 'format');
+        if ($nullFormat && $context->callerStrictTypes) {
             // lower* already emitted TypeError+abort; do not lower __compiler_unpack after terminator.
             return $context->constantFromBool(false);
         }

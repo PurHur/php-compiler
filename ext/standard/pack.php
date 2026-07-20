@@ -13,15 +13,15 @@ use PHPLLVM\Value;
 /**
  * pack() — binary string from format and values (VM via PackEngine; JIT/AOT via __compiler_pack, #5231).
  *
- * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241, pack.c).
+ * Soft-null $format on PROFILE=8.4 — Zend DEP+'' (#21478, reverts #20241 TypeError).
  */
 final class pack extends Internal
 {
     public function execute(Frame $frame): void
     {
         $this->requireAtLeastArgCount($frame, 'pack', 1);
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20241, ext/standard/pack.c).
-        $fmt = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'pack', 0, 'format');
+        // Soft-null $format on 8.4 — Zend deprecate+coerce (#21478, reverts #20241 TypeError).
+        $fmt = VmString::trimFamilyStringArgForFrame($frame, 0, 'pack', 0, 'format');
         $argc = \count($frame->calledArgs);
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {

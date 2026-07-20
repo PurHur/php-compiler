@@ -1,5 +1,5 @@
 --TEST--
-stdlib unpack() null $string soft-null on 8.4 (#21246, pack.c)
+stdlib unpack() null $string soft-null on 8.4 (#21246, pack.c); format soft-null (#21478)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -31,12 +31,13 @@ try {
 } catch (TypeError $e) {
     $lines[] = $e->getMessage();
 }
+$fmtLabel = 'fmt COERCED';
 try {
     unpack(null, 'x');
-    $lines[] = 'fmt COERCED';
 } catch (TypeError $e) {
-    $lines[] = 'fmt TypeError';
+    $fmtLabel = 'fmt TypeError';
 }
+$lines[] = $fmtLabel;
 restore_error_handler();
 echo implode("\n", $lines), "\n";
 echo 'dep=', (int) ($dep >= 1), ' warn=', (int) ($warn >= 1), "\n";
@@ -44,5 +45,5 @@ echo 'dep=', (int) ($dep >= 1), ' warn=', (int) ($warn >= 1), "\n";
 --EXPECT--
 C_null: false
 a_null: {"1":""}
-fmt TypeError
+fmt COERCED
 dep=1 warn=1

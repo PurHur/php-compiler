@@ -93,6 +93,7 @@ final class VmString
      * json_decode/json_validate $json, unserialize $data (#21223).
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
      * hex2bin/convert_uuencode/convert_uudecode/sscanf($string), pack($values) soft-null (#21209/#21420).
+     * pack()/unpack() $format soft-null (#21478, reverts #20241 TypeError).
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
      * setcookie/setrawcookie $name soft-null (#21233, re-#21003).

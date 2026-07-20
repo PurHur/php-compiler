@@ -1,10 +1,9 @@
 <?php
 
 /**
- * #21246 — unpack($string=null) under PHP_COMPILER_PROFILE=8.4.
+ * #21246 / #21478 — unpack() null under PHP_COMPILER_PROFILE=8.4.
  *
- * Zend: E_DEPRECATED + Warning (insufficient input for 'C') → false (no TypeError).
- * $format null remains Z_PARAM_STR TypeError (#20241).
+ * Zend: $string soft-null DEP+Warning → false; $format soft-null DEP+[] (#21478, reverts #20241).
  */
 error_reporting(E_ALL);
 $dep = 0;
@@ -33,6 +32,9 @@ try {
 }
 restore_error_handler();
 echo 'dep=', $dep, ' warn=', $warn, "\n";
+set_error_handler(static function (int $no, string $msg): bool {
+    return true;
+});
 try {
     unpack(null, 'x');
     echo "fmt COERCED\n";
