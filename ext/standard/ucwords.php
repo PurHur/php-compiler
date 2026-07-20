@@ -25,10 +25,10 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
-        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'ucwords', 0, 'string');
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'ucwords', 0, 'string');
         $separators = VmString::TRIM_DEFAULT;
         if (2 === $argc) {
-            $separators = VmString::trimFamilyStringArgForFrame($frame, 1, 'ucwords', 1, 'separators');
+            $separators = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'ucwords', 1, 'separators');
         }
         if (null === $frame->returnVar) {
             return;
@@ -61,7 +61,7 @@ final class ucwords extends Internal
         );
     }
 
-    /** Soft-null — coerce+deprecate on forward profile (#19998, ext/standard/string.c). */
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20080, ext/standard/string.c). */
     private static function jitStringArg(
         Context $context,
         JITVariable $arg,
@@ -78,7 +78,7 @@ final class ucwords extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerTrimFamilyString(
+        return JitStringBuiltinArg::lowerZparamStr(
             $context,
             $arg,
             'ucwords',
