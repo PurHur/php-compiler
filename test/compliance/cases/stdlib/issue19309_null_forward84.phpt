@@ -37,6 +37,7 @@ count_chars(): Argument #1 ($string) must be of type string, null given
 str_word_count(): Argument #1 ($string) must be of type string, null given
 crc32: uncaught 0
 base_convert(): Argument #1 ($num) must be of type string, null given
-convert_uuencode(): Argument #1 ($string) must be of type string, null given
+convert_uuencode: uncaught '`
+'
 quotemeta: uncaught ''
 ''

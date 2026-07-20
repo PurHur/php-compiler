@@ -46,7 +46,9 @@ final class JitPack
         }
         $numArgs = $argc - 1;
         for ($i = 1; $i < $argc; ++$i) {
-            self::rejectNullValueArg($context, $args[$i], $i + 1);
+            if ($context->callerStrictTypes) {
+                self::rejectNullValueArg($context, $args[$i], $i + 1);
+            }
         }
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(
@@ -150,16 +152,13 @@ final class JitPack
         }
     }
 
-    /** php-src ext/standard/pack.c — null value operands TypeError on 8.4 forward profile (#18992, #19388). */
+    /** php-src ext/standard/pack.c — null value operands quiet-coerce; strict_types TypeError (#21209). */
     private static function rejectNullValueArg(Context $context, JITVariable $arg, int $argNumber): void
     {
         if (JITVariable::TYPE_NULL !== $arg->type) {
             return;
         }
-        if (
-            !$context->callerStrictTypes
-            && !JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-        ) {
+        if (!$context->callerStrictTypes) {
             return;
         }
         TypeErrorRaise::registerDeclarations($context);

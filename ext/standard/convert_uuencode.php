@@ -50,7 +50,7 @@ final class convert_uuencode extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'convert_uuencode', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'convert_uuencode',
             $argIndex,
@@ -74,7 +74,7 @@ final class convert_uuencode extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'convert_uuencode',

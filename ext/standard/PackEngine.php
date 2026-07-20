@@ -577,7 +577,6 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
-            self::rejectNullForwardProfileValue($resolved, $valueArgIndex);
             EnumCaseSupport::packRejectStringOperand($resolved);
             if (Variable::TYPE_STRING === $resolved->type) {
                 return $resolved->toString();
@@ -607,8 +606,6 @@ final class PackEngine
             return $value ? '1' : '';
         }
         if (null === $value) {
-            self::rejectNativeNullForwardProfileValue($valueArgIndex);
-
             return '';
         }
 
