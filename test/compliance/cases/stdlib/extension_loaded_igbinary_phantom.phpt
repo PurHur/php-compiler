@@ -1,5 +1,5 @@
 --TEST--
-stdlib extension_loaded('igbinary') false until serialize implemented (#11993, ext/igbinary/igbinary.c)
+stdlib extension_loaded('igbinary') false on reference profile (#11993, #21463)
 --FILE--
 <?php
 declare(strict_types=1);

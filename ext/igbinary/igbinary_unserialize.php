@@ -38,7 +38,7 @@ final class igbinary_unserialize extends Internal
 
             return;
         }
-        $frame->returnVar->copyFrom(VmJson::import($decoded));
+        $frame->returnVar->copyFrom(VmJson::importDecoded($decoded, false, $frame->vmContext));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

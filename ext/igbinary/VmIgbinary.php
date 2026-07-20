@@ -7,12 +7,14 @@ namespace PHPCompiler\ext\igbinary;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * igbinary encode/decode (php-src ext/igbinary/igbinary.c; #6573).
+ * igbinary encode/decode (php-src ext/igbinary/igbinary.c; #6573, #21463).
  *
- * PHP-in-PHP subset: null, bool, int, float, string, array (list + map). No objects/resources.
+ * PHP-in-PHP subset: null, bool, int, float, string, array, stdClass (+ public props).
+ * No resources; custom class __serialize/__sleep deferred.
  */
 final class VmIgbinary
 {
@@ -38,8 +40,17 @@ final class VmIgbinary
     public const TYPE_ARRAY8 = 0x14;
     public const TYPE_ARRAY16 = 0x15;
     public const TYPE_ARRAY32 = 0x16;
+    public const TYPE_OBJECT8 = 0x17;
+    public const TYPE_OBJECT16 = 0x18;
+    public const TYPE_OBJECT32 = 0x19;
+    public const TYPE_OBJECT_ID8 = 0x1a;
+    public const TYPE_OBJECT_ID16 = 0x1b;
+    public const TYPE_OBJECT_ID32 = 0x1c;
     public const TYPE_LONG64P = 0x20;
     public const TYPE_LONG64N = 0x21;
+    public const TYPE_OBJREF8 = 0x22;
+    public const TYPE_OBJREF16 = 0x23;
+    public const TYPE_OBJREF32 = 0x24;
 
     private const INVALID_DATA = 'igbinary_unserialize(): Error at offset 0 of %d bytes';
 
@@ -94,6 +105,9 @@ final class IgbinarySerializeState
     /** @var array<int, int> HashTable object id => reference index */
     private array $arrayRefs = [];
 
+    /** @var array<int, int> ObjectEntry id => reference index */
+    private array $objectRefs = [];
+
     private int $nextRefIndex = 0;
 
     public function writeHeader(): void
@@ -124,6 +138,9 @@ final class IgbinarySerializeState
                 break;
             case Variable::TYPE_ARRAY:
                 $this->writeArray($value->toArray(), true);
+                break;
+            case Variable::TYPE_OBJECT:
+                $this->writeObject($value->toObject());
                 break;
             default:
                 throw new \Exception('Cannot igbinary-serialize type '.$value->type);
@@ -178,6 +195,75 @@ final class IgbinarySerializeState
             $this->append32($len);
         }
         $this->buffer .= $s;
+    }
+
+    /**
+     * Serialize object as class name + property array (php-src igbinary_serialize_object; #21463).
+     *
+     * MVP: stdClass / plain public props only (no __serialize / __sleep / Serializable).
+     */
+    private function writeObject(ObjectEntry $object): void
+    {
+        $id = $object->id;
+        if (isset($this->objectRefs[$id])) {
+            $this->writeObjRef($this->objectRefs[$id]);
+
+            return;
+        }
+        $this->objectRefs[$id] = $this->nextRefIndex++;
+
+        $className = $object->class->name;
+        $this->writeObjectName($className);
+
+        $pairs = [];
+        foreach ($object->propertiesWithNames() as $name => $propVar) {
+            $pairs[] = [(string) $name, $propVar->resolveIndirect()];
+        }
+        $n = \count($pairs);
+        if ($n <= 0xff) {
+            $this->append8(VmIgbinary::TYPE_ARRAY8);
+            $this->append8($n);
+        } elseif ($n <= 0xffff) {
+            $this->append8(VmIgbinary::TYPE_ARRAY16);
+            $this->append16($n);
+        } else {
+            $this->append8(VmIgbinary::TYPE_ARRAY32);
+            $this->append32($n);
+        }
+        foreach ($pairs as [$key, $valVar]) {
+            $this->writeString($key);
+            $this->writeValue($valVar);
+        }
+    }
+
+    private function writeObjectName(string $className): void
+    {
+        $len = \strlen($className);
+        if ($len <= 0xff) {
+            $this->append8(VmIgbinary::TYPE_OBJECT8);
+            $this->append8($len);
+        } elseif ($len <= 0xffff) {
+            $this->append8(VmIgbinary::TYPE_OBJECT16);
+            $this->append16($len);
+        } else {
+            $this->append8(VmIgbinary::TYPE_OBJECT32);
+            $this->append32($len);
+        }
+        $this->buffer .= $className;
+    }
+
+    private function writeObjRef(int $index): void
+    {
+        if ($index <= 0xff) {
+            $this->append8(VmIgbinary::TYPE_OBJREF8);
+            $this->append8($index);
+        } elseif ($index <= 0xffff) {
+            $this->append8(VmIgbinary::TYPE_OBJREF16);
+            $this->append16($index);
+        } else {
+            $this->append8(VmIgbinary::TYPE_OBJREF32);
+            $this->append32($index);
+        }
     }
 
     private function writeArray(HashTable $ht, bool $trackRef): void
@@ -314,11 +400,51 @@ final class IgbinaryUnserializeState
             VmIgbinary::TYPE_ARRAY8 => $this->readArray($this->read8(), true),
             VmIgbinary::TYPE_ARRAY16 => $this->readArray($this->read16(), true),
             VmIgbinary::TYPE_ARRAY32 => $this->readArray($this->read32(), true),
+            VmIgbinary::TYPE_OBJECT8 => $this->readObject($this->readString($this->read8())),
+            VmIgbinary::TYPE_OBJECT16 => $this->readObject($this->readString($this->read16())),
+            VmIgbinary::TYPE_OBJECT32 => $this->readObject($this->readString($this->read32())),
+            VmIgbinary::TYPE_OBJECT_ID8,
+            VmIgbinary::TYPE_OBJECT_ID16,
+            VmIgbinary::TYPE_OBJECT_ID32 => throw new IgbinaryUnpackException(),
             VmIgbinary::TYPE_REF8 => $this->refs[$this->read8()] ?? throw new IgbinaryUnpackException(),
             VmIgbinary::TYPE_REF16 => $this->refs[$this->read16()] ?? throw new IgbinaryUnpackException(),
             VmIgbinary::TYPE_REF32 => $this->refs[$this->read32()] ?? throw new IgbinaryUnpackException(),
+            VmIgbinary::TYPE_OBJREF8 => $this->refs[$this->read8()] ?? throw new IgbinaryUnpackException(),
+            VmIgbinary::TYPE_OBJREF16 => $this->refs[$this->read16()] ?? throw new IgbinaryUnpackException(),
+            VmIgbinary::TYPE_OBJREF32 => $this->refs[$this->read32()] ?? throw new IgbinaryUnpackException(),
             default => throw new IgbinaryUnpackException(),
         };
+    }
+
+    /**
+     * Decode object8/16/32 + property array into a host stdClass (imported to VM via VmJson).
+     *
+     * MVP (#21463): only `stdClass` class names; other classes fail unpack.
+     */
+    private function readObject(string $className): \stdClass
+    {
+        if ('stdClass' !== $className) {
+            throw new IgbinaryUnpackException();
+        }
+        $obj = new \stdClass();
+        $this->refs[] = $obj;
+        $type = $this->read8();
+        $count = match ($type) {
+            VmIgbinary::TYPE_ARRAY8 => $this->read8(),
+            VmIgbinary::TYPE_ARRAY16 => $this->read16(),
+            VmIgbinary::TYPE_ARRAY32 => $this->read32(),
+            default => throw new IgbinaryUnpackException(),
+        };
+        for ($i = 0; $i < $count; ++$i) {
+            $key = $this->readValue();
+            $val = $this->readValue();
+            if (!\is_string($key) && !\is_int($key)) {
+                throw new IgbinaryUnpackException();
+            }
+            $obj->{(string) $key} = $val;
+        }
+
+        return $obj;
     }
 
     private function readArray(int $count, bool $registerRef): array
