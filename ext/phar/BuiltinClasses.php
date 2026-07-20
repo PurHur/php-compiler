@@ -89,6 +89,13 @@ final class BuiltinClasses
             'phar' => VmPhar::FORMAT_PHAR,
             'tar' => VmPhar::FORMAT_TAR,
             'zip' => VmPhar::FORMAT_ZIP,
+            'md5' => VmPhar::SIG_MD5,
+            'sha1' => VmPhar::SIG_SHA1,
+            'sha256' => VmPhar::SIG_SHA256,
+            'sha512' => VmPhar::SIG_SHA512,
+            'openssl' => VmPhar::SIG_OPENSSL,
+            'openssl_sha256' => VmPhar::SIG_OPENSSL_SHA256,
+            'openssl_sha512' => VmPhar::SIG_OPENSSL_SHA512,
         ] as $lc => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);

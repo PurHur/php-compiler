@@ -56,6 +56,8 @@ final class PharDataBuiltin
             'offsetget' => [PharDataOffsetGet::class, 'offsetGet'],
             'offsetexists' => [PharDataOffsetExists::class, 'offsetExists'],
             'offsetunset' => [PharDataOffsetUnset::class, 'offsetUnset'],
+            'setsignaturealgorithm' => [PharDataSetSignatureAlgorithm::class, 'setSignatureAlgorithm'],
+            'getsignature' => [PharDataGetSignature::class, 'getSignature'],
         ];
         foreach ($map as $lc => [$class, $name]) {
             $entry->methods[$lc] = new $class();
@@ -306,4 +308,44 @@ final class PharDataOffsetUnset extends VmClassMethod
 {
     public function __construct() { parent::__construct('offsetUnset'); }
     public function execute(Frame $frame): void {}
+}
+
+final class PharDataSetSignatureAlgorithm extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setSignatureAlgorithm'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf('PharData::setSignatureAlgorithm() expects at least 1 argument, %d given', \max(0, $argc - 1)));
+        }
+        $object = VmPharData::requireReceiver($frame, 'PharData::setSignatureAlgorithm');
+        $algo = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $privateKey = null;
+        if ($argc >= 3) {
+            $arg = $frame->calledArgs[2]->resolveIndirect();
+            if (!$arg->isNull()) {
+                $privateKey = $arg->toString();
+            }
+        }
+        VmPharData::setSignatureAlgorithm($object, $algo, $privateKey);
+    }
+}
+
+final class PharDataGetSignature extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getSignature'); }
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sig = VmPharData::getSignature(VmPharData::requireReceiver($frame, 'PharData::getSignature'));
+        if (false === $sig) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->array(VmPharData::mapToHashTable($sig));
+    }
 }

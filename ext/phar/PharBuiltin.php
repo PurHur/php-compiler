@@ -71,6 +71,8 @@ final class PharBuiltin
             'iscompressed' => [PharIsCompressed::class, 'isCompressed'],
             'isfileformat' => [PharIsFileFormat::class, 'isFileFormat'],
             'setdefaultstub' => [PharSetDefaultStub::class, 'setDefaultStub'],
+            'setsignaturealgorithm' => [PharSetSignatureAlgorithm::class, 'setSignatureAlgorithm'],
+            'getsignature' => [PharGetSignature::class, 'getSignature'],
             'copy' => [PharCopy::class, 'copy'],
             'getpath' => [PharGetPath::class, 'getPath'],
             'offsetset' => [PharOffsetSet::class, 'offsetSet'],
@@ -632,6 +634,48 @@ final class PharSetDefaultStub extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
+    }
+}
+
+/** Phar::setSignatureAlgorithm() — php-src zim_Phar_setSignatureAlgorithm (#21329). */
+final class PharSetSignatureAlgorithm extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setSignatureAlgorithm'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf('Phar::setSignatureAlgorithm() expects at least 1 argument, %d given', \max(0, $argc - 1)));
+        }
+        $object = VmPharArchive::requireReceiver($frame, 'Phar::setSignatureAlgorithm');
+        $algo = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $privateKey = null;
+        if ($argc >= 3) {
+            $arg = $frame->calledArgs[2]->resolveIndirect();
+            if (!$arg->isNull()) {
+                $privateKey = $arg->toString();
+            }
+        }
+        VmPharArchive::setSignatureAlgorithm($object, $algo, $privateKey);
+    }
+}
+
+/** Phar::getSignature() — php-src zim_Phar_getSignature (#21329). */
+final class PharGetSignature extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getSignature'); }
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $sig = VmPharArchive::getSignature(VmPharArchive::requireReceiver($frame, 'Phar::getSignature'));
+        if (false === $sig) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->array(VmPharArchive::mapToHashTable($sig));
     }
 }
 
