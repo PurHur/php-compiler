@@ -43,7 +43,8 @@ final class VmString
      * mb_strlen/mb_substr/mb_strpos and iconv/iconv_strlen(+substr/strpos/strrpos input) soft-null (#21197).
      * preg_match/preg_replace/preg_split/preg_match_all/preg_replace_callback*
      * $subject (and str_replace family $subject) soft-null likewise (#21198, #21318).
-     * json_decode/json_validate $json, unserialize $data, parse_str $string soft-null (#21223).
+     * json_decode/json_validate $json, unserialize $data soft-null (#21223).
+     * parse_str $string is Z_PARAM_STR TypeError on 8.4 (#21380, re-#20113).
      * introspection name args (function_exists/class_exists/defined/…) soft-null (#21281).
      * htmlspecialchars/htmlentities/nl2br/addslashes are Z_PARAM_STR TypeError on 8.4 (#21351), not soft-null.
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
@@ -79,7 +80,7 @@ final class VmString
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
-     * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
+     * json_decode/json_validate $json, unserialize $data (#21223).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).

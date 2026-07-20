@@ -1,22 +1,16 @@
 --TEST--
-AOT: parse_str(null) — E_DEPRECATED + empty result on 8.4 forward profile (#21223)
+AOT: parse_str(null) — TypeError on 8.4 forward profile (#21380, re-#20113)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 error_reporting(E_ALL);
-$seen = 0;
-set_error_handler(static function (int $no) use (&$seen): bool {
-    if (E_DEPRECATED === $no) {
-        $seen++;
-    }
-    return true;
-});
-parse_str(null, $o);
-echo var_export($o, true), "\n";
-echo 'depr=', (int) ($seen >= 1), "\n";
+try {
+    parse_str(null, $o);
+    echo "COERCE\n";
+} catch (TypeError $e) {
+    echo "TypeError\n";
+}
 ?>
 --EXPECT--
-array (
-)
-depr=1
+TypeError

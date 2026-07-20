@@ -117,7 +117,8 @@ final class JitStringBuiltinArg
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
-     * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
+     * json_decode/json_validate $json, unserialize $data (#21223).
+     * parse_str $string is Z_PARAM_STR TypeError on 8.4 (#21380).
      * introspection name args (function_exists/class_exists/defined/…) (#21281).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
      * unpack($string) soft-null (#21246).

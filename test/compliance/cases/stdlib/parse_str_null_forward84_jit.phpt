@@ -1,5 +1,5 @@
 --TEST--
-stdlib parse_str(null) — E_DEPRECATED + empty result on 8.4 forward profile JIT (#21223)
+stdlib parse_str(null) — TypeError on 8.4 forward profile JIT (#21380, re-#20113)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -25,8 +25,7 @@ parse_str('', $empty);
 echo var_export($empty, true), "\n";
 ?>
 --EXPECT--
-array (
-)
-depr=1
+TypeError
+depr=0
 array (
 )

@@ -1,5 +1,6 @@
 <?php
-// Repro #21223 — json_decode/unserialize/parse_str(null) soft-null under PROFILE=8.4 (Zend DEP+coerce).
+// Repro #21223 — json_decode/unserialize(null) soft-null under PROFILE=8.4 (Zend DEP+coerce).
+// parse_str(null) is Z_PARAM_STR TypeError (#21380), not soft-null.
 error_reporting(E_ALL);
 $seen = [];
 set_error_handler(static function (int $no, string $str) use (&$seen): bool {
@@ -18,10 +19,11 @@ foreach ([
     },
 ] as $n => $fn) {
     try {
-        echo $n, '=', var_export($fn(), true), "\n";
+        $v = $fn();
+        echo $n, '=', var_export($v, true), "\n";
     } catch (Throwable $e) {
         echo $n, '=', get_class($e), "\n";
     }
 }
 restore_error_handler();
-echo 'depr=', (int) (count($seen) >= 3), "\n";
+echo 'depr=', (int) (count($seen) >= 2), "\n";
