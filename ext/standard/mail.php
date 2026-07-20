@@ -8,14 +8,13 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * mail() — send mail via sendmail transport (php-src ext/standard/mail.c, #12482).
+ * mail() — send mail via sendmail transport (php-src ext/standard/mail.c, #3285 / #12482).
  *
- * VM returns false when transport is unavailable; matches Zend CLI without sendmail.
+ * VM: {@see VmMail::send()} popen(sendmail_path). JIT/AOT: arg guards + false (transport follow-up).
  */
 final class mail extends Internal
 {
@@ -36,16 +35,20 @@ final class mail extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'mail', 0, 'to');
-        VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'mail', 1, 'subject');
-        VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'mail', 2, 'message');
+        $to = VmString::coercePathBuiltinArg($frame->calledArgs[0], 'mail', 0, 'to');
+        $subject = VmString::coercePathBuiltinArg($frame->calledArgs[1], 'mail', 1, 'subject');
+        $message = VmString::coercePathBuiltinArg($frame->calledArgs[2], 'mail', 2, 'message');
+        $headers = null;
         if ($argc >= 4) {
-            VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'mail', 3, 'additional_headers');
+            $headers = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'mail', 3, 'additional_headers');
+            VmString::rejectNullByteBuiltinStringArg($headers, 'mail', 3, 'additional_headers');
         }
+        $extraParams = null;
         if (5 === $argc) {
-            VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'mail', 4, 'additional_params');
+            $extraParams = VmString::coercePathBuiltinArg($frame->calledArgs[4], 'mail', 4, 'additional_params');
         }
-        $frame->returnVar->bool(false);
+        $ok = VmMail::send($frame, $to, $subject, $message, $headers, $extraParams);
+        $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6162 |
-| Phase A inventory files (M2 ratio SSOT) | 6162 |
+| PHP files on vm.php path | 6163 |
+| Phase A inventory files (M2 ratio SSOT) | 6163 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19258 |
+| Source constructs flagged (warnings) | 19259 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2995,6 +2995,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmLocale.php` | 0 | 7 |
 | `ext/standard/VmLocaleCollate.php` | 0 | 1 |
 | `ext/standard/VmLocalePure.php` | 0 | 1 |
+| `ext/standard/VmMail.php` | 0 | 1 |
 | `ext/standard/VmMath.php` | 0 | 1 |
 | `ext/standard/VmMemory.php` | 0 | 1 |
 | `ext/standard/VmMetaTags.php` | 0 | 3 |
@@ -28582,18 +28583,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 824)
-- new HashTable (line 831)
-- new Variable (line 842)
-- new Variable (line 946)
-- new Variable (line 954)
-- new Variable (line 962)
+- new HashTable (line 830)
+- new HashTable (line 837)
+- new Variable (line 848)
+- new Variable (line 952)
+- new Variable (line 960)
+- new Variable (line 968)
 - 58 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
 **Warnings** (review for bootstrap subset):
-- 20 class method(s)
+- 21 class method(s)
 
 ### `ext/standard/VmIniQuantity.php`
 
@@ -28721,6 +28722,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
+
+### `ext/standard/VmMail.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/VmMath.php`
 
@@ -32702,7 +32708,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/mail.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/standard/md5.php`
