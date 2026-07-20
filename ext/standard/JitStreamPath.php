@@ -20,7 +20,7 @@ final class JitStreamPath
         int $argIndex = 0,
         string $paramName = 'filename'
     ): Value {
-        // Null → TypeError on PROFILE=8.4 before empty-path ValueError (#21062, #21076; #20474).
+        // Z_PARAM_PATH soft-null DEP+coerce on 8.4, then empty-path ValueError (#20362, #21235).
         $path = JitStringBuiltinArg::lowerPath(
             $context,
             $arg,

@@ -45,7 +45,7 @@ final class VmStreamPath
     /**
      * Coerce a path operand and reject empty string (php-src Z_PARAM_PATH / non-empty stream path).
      *
-     * Null → TypeError on PROFILE=8.4 before empty-path ValueError (#21062, #21076; siblings #20474).
+     * Null soft-coerces with E_DEPRECATED on PROFILE=8.4, then empty-path ValueError (#20362, #21235).
      * Real empty string "" still ValueError (php-src streams / zend_stream).
      *
      * @throws \ValueError when the coerced path is empty

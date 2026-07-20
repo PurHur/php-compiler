@@ -1,5 +1,5 @@
 --TEST--
-AOT: readfile(null) — TypeError on 8.4 forward profile (#21076, ext/standard/file.c)
+AOT: readfile(null) — empty-path ValueError on 8.4 forward profile (#21235, ext/standard/file.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
