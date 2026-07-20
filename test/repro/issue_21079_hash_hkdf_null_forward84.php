@@ -1,7 +1,7 @@
 <?php
 /**
- * Issue #21079 — hash_hkdf() null $key/$algo TypeError on PROFILE=8.4
- * (before empty-key ValueError; php-src ext/hash/hash.stub.php).
+ * Issue #21079 / #21319 — hash_hkdf() null $key/$algo soft-null on PROFILE=8.4
+ * then empty-key ValueError (php-src ext/hash/hash.stub.php).
  */
 try {
     hash_hkdf('sha256', null);

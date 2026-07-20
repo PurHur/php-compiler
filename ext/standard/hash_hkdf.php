@@ -16,7 +16,8 @@ use PHPLLVM\Value;
 /**
  * hash_hkdf() — RFC 5869 HKDF (VM + JIT/AOT via __compiler_hash_hkdf, issue #5025).
  *
- * php-src: ext/hash/hash_hkdf.c / hash.stub.php — Z_PARAM_STR algo/key/info/salt (#19341, #21079).
+ * php-src: ext/hash/hash_hkdf.c / hash.stub.php — Z_PARAM_STR algo/key/info/salt.
+ * Non-strict null is E_DEPRECATED + '' on 8.4 (re-#21079 / #21319); empty key → ValueError (#19341).
  */
 final class hash_hkdf extends Internal
 {
@@ -26,7 +27,7 @@ final class hash_hkdf extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('hash_hkdf() requires two to five arguments in this compiler build');
         }
-        // Z_PARAM_STR $algo / $key — null TypeError on 8.4 forward (#21079); else coerce then empty-key ValueError (#19341).
+        // Soft-null then empty-key ValueError (#21319 / #19341).
         $algo = self::vmZparamStrArg($frame, 0, 'algo');
         $key = self::vmZparamStrArg($frame, 1, 'key');
         VmString::rejectEmptyBuiltinStringArg($key, 'hash_hkdf', 1, 'key');
@@ -98,7 +99,7 @@ final class hash_hkdf extends Internal
     }
 
     /**
-     * Z_PARAM_STR $algo / $key / $info / $salt — null TypeError on 8.4 forward (#21079, ext/hash/hash.stub.php).
+     * Z_PARAM_STR $algo / $key / $info / $salt — non-strict null is E_DEPRECATED + '' on 8.4 (#21319).
      */
     private static function vmZparamStrArg(Frame $frame, int $argIndex, string $paramName): string
     {
@@ -108,7 +109,7 @@ final class hash_hkdf extends Internal
             return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'hash_hkdf',
             $argIndex,
@@ -132,7 +133,7 @@ final class hash_hkdf extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'hash_hkdf',

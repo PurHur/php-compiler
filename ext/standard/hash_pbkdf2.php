@@ -18,7 +18,8 @@ use PHPLLVM\Value;
 /**
  * hash_pbkdf2() — sha256, sha1, md5 (VM + JIT/AOT via __compiler_hash_pbkdf2, issue #3773).
  *
- * php-src: ext/hash/hash.c / hash.stub.php — Z_PARAM_STR algo/password/salt (#20659).
+ * php-src: ext/hash/hash.c / hash.stub.php — Z_PARAM_STR algo/password/salt.
+ * Non-strict null is E_DEPRECATED + '' on 8.4 (re-#20659 / #21319); strict_types still TypeErrors.
  */
 final class hash_pbkdf2 extends Internal
 {
@@ -28,7 +29,7 @@ final class hash_pbkdf2 extends Internal
         if ($argc < 4 || $argc > 6) {
             throw new \LogicException('hash_pbkdf2() requires four to six arguments in this compiler build');
         }
-        // Z_PARAM_STR $algo / $password / $salt — null TypeError on 8.4 forward (#20659).
+        // Z_PARAM_STR $algo / $password / $salt — soft-null DEP+coerce on 8.4 (#21319).
         $algo = self::vmZparamStrArg($frame, 0, 'algo');
         $password = self::vmZparamStrArg($frame, 1, 'password');
         $salt = self::vmZparamStrArg($frame, 2, 'salt');
@@ -96,7 +97,7 @@ final class hash_pbkdf2 extends Internal
     }
 
     /**
-     * Z_PARAM_STR $algo / $password / $salt — null TypeError on 8.4 forward (#20659, ext/hash/hash.c).
+     * Z_PARAM_STR $algo / $password / $salt — non-strict null is E_DEPRECATED + '' on 8.4 (#21319).
      */
     private static function vmZparamStrArg(Frame $frame, int $argIndex, string $paramName): string
     {
@@ -106,7 +107,7 @@ final class hash_pbkdf2 extends Internal
             return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'hash_pbkdf2',
             $argIndex,
@@ -130,7 +131,7 @@ final class hash_pbkdf2 extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'hash_pbkdf2',
