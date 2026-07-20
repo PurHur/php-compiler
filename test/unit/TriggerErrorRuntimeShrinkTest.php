@@ -7,18 +7,20 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * TriggerError NestedJIT ABI bridges quarantined in ext/standard (#9293, #19864).
+ * TriggerError NestedJIT ABI bridges quarantined in ext/standard (#9293, #19864, #21300).
  */
 final class TriggerErrorRuntimeShrinkTest extends TestCase
 {
-    public function testStringTriggerErrorJitUsesTriggerErrorJitHelperNotLlvmBodies(): void
+    public function testNoStandaloneThinAbiFork(): void
     {
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitTriggerErrorKernel.php');
-        $this->assertStringContainsString('TriggerErrorJitHelper', $kernel);
-        $this->assertStringNotContainsString('emitStderrPrintCliError', $kernel);
-        $this->assertStringNotContainsString('selectErrorPrefix', $kernel);
-        $this->assertStringNotContainsString('recordAndMaybePrint', $kernel);
-        $this->assertFileExists(__DIR__.'/../../ext/standard/TriggerErrorJitHelper.php');
+        $this->assertStringNotContainsString('implementStandaloneThinAbi', $kernel);
+        $this->assertStringNotContainsString('standaloneAbiFunction', $kernel);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $kernel);
+        $this->assertStringContainsString('__phpc_last_error_record', $kernel);
+        $this->assertStringContainsString('implementTriggerErrorBridge', $kernel);
+        $this->assertStringContainsString('ensureStderrLibcDecls', $kernel);
+        $this->assertStringContainsString('fprintf', $kernel);
     }
 
     public function testBuiltinStringTriggerErrorJitIsThinOrchestrator(): void
@@ -42,11 +44,9 @@ final class TriggerErrorRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitTriggerErrorKernel', $source);
         $this->assertStringContainsString('__compiler_trigger_error', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
-        $this->assertStringContainsString('TriggerErrorJitHelper', $source);
-        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(500, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('fprintf', $source);
+        $this->assertLessThan(600, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void
@@ -54,6 +54,7 @@ final class TriggerErrorRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('JitTriggerErrorKernel.php', $spine);
         $this->assertStringContainsString('StringTriggerErrorJit.php', $spine);
+        $this->assertStringNotContainsString('TriggerErrorStderrJitHelper.php', $spine);
         $kernelPos = strpos($spine, 'JitTriggerErrorKernel.php');
         $orchPos = strpos($spine, 'lib/JIT/Builtin/StringTriggerErrorJit.php');
         $this->assertNotFalse($kernelPos);

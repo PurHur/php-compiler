@@ -9,9 +9,10 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for __compiler_trigger_error via TriggerErrorJitHelper PHP (#9293, #19864).
+ * JIT/AOT link for __compiler_trigger_error via TriggerErrorJitHelper PHP (#9293, #19864, #21300).
  *
- * Thin orchestrator — NestedJIT bridges live in {@see JitTriggerErrorKernel}.
+ * Thin orchestrator — NestedJIT bridges live in {@see JitTriggerErrorKernel}
+ * (embed + standalone; no thin no-op ABI fork).
  * php-src: Zend/zend_execute_API.c, main/php_errors.c
  */
 final class StringTriggerErrorJit
