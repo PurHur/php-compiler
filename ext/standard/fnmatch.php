@@ -30,8 +30,8 @@ final class fnmatch extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pattern = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'fnmatch', 0, 'pattern');
-        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fnmatch', 1, 'filename');
+        $pattern = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'fnmatch', 1, 'pattern');
+        $filename = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[1], 'fnmatch', 2, 'filename');
         $flags = 0;
         if (3 === $argc) {
             $flagsVar = $frame->calledArgs[2]->resolveIndirect();
@@ -60,8 +60,8 @@ final class fnmatch extends Internal
 
         return JitFnmatch::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'fnmatch', 0, 'pattern'),
-            JitStringBuiltinArg::lower($context, $args[1], 'fnmatch', 1, 'filename'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'fnmatch', 1, 'pattern'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'fnmatch', 2, 'filename'),
             $flags
         );
     }
