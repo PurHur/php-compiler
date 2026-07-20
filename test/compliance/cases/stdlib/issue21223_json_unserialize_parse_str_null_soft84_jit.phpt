@@ -1,5 +1,5 @@
 --TEST--
-json/stdlib soft-null batch — json_decode/unserialize/parse_str on 8.4 JIT (#21223)
+json/stdlib soft-null batch — json_decode/unserialize on 8.4 JIT; parse_str TypeError (#21223, #21380)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -23,17 +23,17 @@ foreach ([
     },
 ] as $n => $fn) {
     try {
-        echo $n, '=', var_export($fn(), true), "\n";
+        $v = $fn();
+        echo $n, '=', var_export($v, true), "\n";
     } catch (Throwable $e) {
         echo $n, '=', get_class($e), "\n";
     }
 }
 restore_error_handler();
-echo 'depr=', (int) (count($seen) >= 3), "\n";
+echo 'depr=', (int) (count($seen) >= 2), "\n";
 ?>
 --EXPECT--
 json_decode=NULL
 unserialize=false
-parse_str=array (
-)
+parse_str=TypeError
 depr=1

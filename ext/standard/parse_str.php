@@ -49,8 +49,7 @@ final class parse_str extends Internal
                 $argc
             ));
         }
-        // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #20113 TypeError).
-        $encodedStr = VmString::trimFamilyStringArgForFrame(
+        $encodedStr = VmString::zparamStrBuiltinArgForFrame(
             $frame,
             0,
             'parse_str',
