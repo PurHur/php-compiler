@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\tokenizer;
 
 use PHPCompiler\JIT\Builtin\TokenGetAll;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -24,23 +25,27 @@ final class JitTokenGetAll
 
         $sourceLit = $args[0]->compileTimeString ?? null;
         $flagsLit = self::compileTimeFlags($context, $args, $argc);
-        if (null !== $sourceLit && null !== $flagsLit) {
+        // Non-empty compile-time source — materialize. Empty "" uses runtime empty HT
+        // (nested TokenGetAllJitHelper returns garbage for "" on AOT; #21503).
+        if (null !== $sourceLit && '' !== $sourceLit && null !== $flagsLit) {
             return self::materializeCompileTime($context, $sourceLit, $flagsLit);
         }
+        if ('' === $sourceLit && null !== $flagsLit) {
+            return self::materializeEmptyTokens($context);
+        }
 
-        // php-src Z_PARAM_STR — null TypeError on 8.4 forward profile (#19894).
-        $source = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'token_get_all', 0, 'source');
+        // Soft-null compile-time null → DEP + empty tokens (#21503, reverts #19894 TypeError).
         if (
             (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
-            && (
-                $context->callerStrictTypes
-                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            )
+            && !$context->callerStrictTypes
         ) {
-            $slot = JitValueBox::alloc($context);
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'token_get_all', 0, 'source');
 
-            return JitValueBox::pointer($context, $slot);
+            return self::materializeEmptyTokens($context);
         }
+
+        // php-src Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21503, reverts #19894 TypeError).
+        $source = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'token_get_all', 0, 'source');
         $flags = self::lowerFlagsRuntime($context, $args, $argc);
         $ht = $context->builder->call(
             TokenGetAll::helperFunction($context),
@@ -56,8 +61,23 @@ final class JitTokenGetAll
         return $ptr;
     }
 
+    /** Empty token list without TokenGetAllJitHelper — AOT-safe (#21503). */
+    public static function materializeEmptyTokens(Context $context): Value
+    {
+        $ht = HashTableHelper::alloc($context);
+        $context->refcount->addref($ht);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $ptr, $ht);
+
+        return $ptr;
+    }
+
     public static function materializeCompileTime(Context $context, string $source, int $flags): Value
     {
+        if ('' === $source) {
+            return self::materializeEmptyTokens($context);
+        }
         $ht = VmTokenizer::hostTokensToHashTable(VmTokenizer::tokenize($source, $flags));
         $cacheKey = 'token_get_all:'.md5($source).':'.$flags;
         $global = $context->constantArrayFromVmHashTable($cacheKey, $ht);
