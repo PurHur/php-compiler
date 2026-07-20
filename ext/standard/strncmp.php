@@ -47,8 +47,8 @@ final class strncmp extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         StringStrncmp::ensureLinked($context);
-        $left = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strncmp', 0, 'string1');
-        $right = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strncmp', 1, 'string2');
+        $left = self::jitStringArg($context, $args[0], 0, 'string1');
+        $right = self::jitStringArg($context, $args[1], 1, 'string2');
         $length = JitLongArg::lower($context, $args[2], 'strncmp() length');
 
         return StringStrncmp::invoke($context, $left, $right, $length);
@@ -60,8 +60,34 @@ final class strncmp extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strncmp', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21317, peers strcmp #21190).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
+            'strncmp',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'strncmp',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $arg,
             'strncmp',
             $argIndex,
             $paramName

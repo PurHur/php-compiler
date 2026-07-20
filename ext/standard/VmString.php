@@ -68,6 +68,7 @@ final class VmString
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode string
      * operands (#21189), ord() character (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
+     * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
      * unpack($string) soft-null (#21246).
