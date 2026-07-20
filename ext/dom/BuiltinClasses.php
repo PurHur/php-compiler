@@ -15,6 +15,32 @@ final class BuiltinClasses
         VmDom::registerClasses($ctx);
         DomLivingBuiltinClasses::register($ctx);
         self::registerDomExceptionConstants($ctx);
+        self::syncDeclaredMethodNames($ctx);
+    }
+
+    /**
+     * Fill ClassEntry::$methodNames from Internal handler getName() when missing (#21283).
+     *
+     * Registration keys are lowercase; Reflection and error messages need Zend camelCase.
+     */
+    private static function syncDeclaredMethodNames(Context $ctx): void
+    {
+        foreach ($ctx->classes as $entry) {
+            $name = $entry->name;
+            if (!str_starts_with($name, 'DOM') && !str_starts_with($name, 'Dom\\')) {
+                continue;
+            }
+            foreach ($entry->methods as $lc => $handler) {
+                if (isset($entry->methodNames[$lc])) {
+                    continue;
+                }
+                $declared = $handler->getName();
+                if (str_contains($declared, '::')) {
+                    $declared = substr($declared, strrpos($declared, '::') + 2);
+                }
+                $entry->methodNames[$lc] = $declared;
+            }
+        }
     }
 
     private static function registerDomExceptionConstants(Context $ctx): void

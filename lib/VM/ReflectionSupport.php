@@ -2577,12 +2577,31 @@ final class ReflectionSupport
             self::throwReflectionException(self::classNotFoundMessage($className));
         }
         $methodLc = strtolower($methodName);
-        if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
-            self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
+        // php-src walks inheritance for ReflectionClass::getMethod() / ReflectionMethod::__construct.
+        $declaring = null;
+        foreach (VmReflection::classHierarchyChain($entry, $ctx) as $class) {
+            if (!isset($class->methods[$methodLc]) && !isset($class->abstractMethods[$methodLc])) {
+                continue;
+            }
+            $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            // php-src: parent-private methods are not visible on the child (#7191).
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
+                continue;
+            }
+            $declaring = $class;
+            break;
+        }
+        if (null === $declaring) {
+            if ($entry->isEnum && VmReflection::methodExistsOnClass($entry, $methodName)) {
+                $declaring = $entry;
+            } else {
+                self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
+            }
         }
         // php-src ext/reflection/php_reflection.c — store the requested class (composing
         // class for trait imports/aliases), matching ReflectionClass::getMethod().
-        return [$entry, $methodName];
+        // Canonicalize method casing like Zend (DOM appendchild → appendChild; #21283).
+        return [$entry, VmReflection::canonicalMethodDisplayName($declaring, $methodLc)];
     }
 
     /**

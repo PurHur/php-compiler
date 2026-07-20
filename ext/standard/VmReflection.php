@@ -2739,6 +2739,30 @@ final class VmReflection
     }
 
     /**
+     * Declared Reflection method name casing (php-src ext/reflection; #21283).
+     *
+     * Prefer explicit {@see ClassEntry::$methodNames}, then Internal handler
+     * {@see Func::getName()} (DOM/builtin registration keys are lowercase), else the lc key.
+     */
+    public static function canonicalMethodDisplayName(ClassEntry $class, string $methodLc): string
+    {
+        if (isset($class->methodNames[$methodLc])) {
+            return $class->methodNames[$methodLc];
+        }
+        $handler = $class->methods[$methodLc] ?? null;
+        if ($handler instanceof Func) {
+            $name = $handler->getName();
+            if (str_contains($name, '::')) {
+                $name = substr($name, strrpos($name, '::') + 2);
+            }
+
+            return $name;
+        }
+
+        return $methodLc;
+    }
+
+    /**
      * Methods visible on $entry (child overrides parent), php-src ReflectionClass::getMethods.
      *
      * @return list<array{methodLc: string, display: string, declaring: ClassEntry}>
@@ -2767,7 +2791,7 @@ final class VmReflection
                 }
                 $byLc[$methodLc] = [
                     'methodLc' => $methodLc,
-                    'display' => $class->methodNames[$methodLc] ?? $methodLc,
+                    'display' => self::canonicalMethodDisplayName($class, $methodLc),
                     'declaring' => $class,
                 ];
             }
