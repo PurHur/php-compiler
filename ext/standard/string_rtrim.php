@@ -132,14 +132,14 @@ final class string_rtrim extends Internal
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $end, $fn);
     }
 
-    /** php_trim — Z_PARAM_STR null TypeError on 8.4 forward profile (#21350, ext/standard/string.c). */
+    /** php_trim — Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21404). */
     private static function vmStringArg(
         Frame $frame,
         string $function,
         int $argIndex,
         string $paramName
     ): string {
-        return VmString::zparamStrBuiltinArgForFrame(
+        return VmString::trimFamilyStringArgForFrame(
             $frame,
             $argIndex,
             $function,
@@ -155,7 +155,17 @@ final class string_rtrim extends Internal
         int $argIndex,
         string $paramName
     ): Value {
-        return JitStringBuiltinArg::lowerZparamStr(
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                $function,
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             $function,

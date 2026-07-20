@@ -258,10 +258,10 @@ final class string_trim extends Internal
         return $context->builder->icmp(Builder::INT_NE, $inMask, $i32->constInt(0, false));
     }
 
-    /** php_trim — Z_PARAM_STR null TypeError on 8.4 forward profile (#21350, ext/standard/string.c). */
+    /** php_trim — Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21404). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        return VmString::zparamStrBuiltinArgForFrame(
+        return VmString::trimFamilyStringArgForFrame(
             $frame,
             $argIndex,
             'trim',
@@ -276,7 +276,17 @@ final class string_trim extends Internal
         int $argIndex,
         string $paramName
     ): Value {
-        return JitStringBuiltinArg::lowerZparamStr(
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'trim',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'trim',
