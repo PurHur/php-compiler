@@ -1450,6 +1450,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phar_instance_api')) {
                 continue;
             }
+            // Phar delete/count/isBuffering: VM green (#21228); MCJIT PHPT same Phar ctor harness
+            // failure as #20628 ("Current basic block has no parent function").
+            if (str_contains($name, 'phar_delete_count_buffer')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }

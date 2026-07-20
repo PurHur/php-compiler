@@ -269,6 +269,40 @@ final class VmPharArchive
         }
     }
 
+    /** php-src zim_Phar_isBuffering (#21228). */
+    public static function isBuffering(ObjectEntry $object): bool
+    {
+        return self::requireState($object)['buffering'];
+    }
+
+    /**
+     * php-src zim_Phar_count — file + directory entries (#21228).
+     */
+    public static function count(ObjectEntry $object): int
+    {
+        $st = self::requireState($object);
+
+        return \count($st['files']) + \count($st['dirs']);
+    }
+
+    /**
+     * php-src zim_Phar_delete — remove entry; BadMethodCallException if missing (#21228).
+     */
+    public static function delete(ObjectEntry $object, string $localname): bool
+    {
+        self::requireWritable('Phar::delete');
+        self::requireState($object);
+        $localname = \rtrim(\ltrim(\str_replace('\\', '/', $localname), '/'), '/');
+        if (!isset(self::$state[$object->id]['files'][$localname])
+            && !isset(self::$state[$object->id]['dirs'][$localname])) {
+            throw new \BadMethodCallException('Entry '.$localname.' does not exist and cannot be deleted');
+        }
+        unset(self::$state[$object->id]['files'][$localname], self::$state[$object->id]['dirs'][$localname]);
+        self::markDirty($object);
+
+        return true;
+    }
+
     public static function compressFiles(ObjectEntry $object, int $compression): void
     {
         self::requireWritable('Phar::compressFiles');
