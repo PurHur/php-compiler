@@ -20,13 +20,17 @@ final class VmFsTempnam
 
     /**
      * php-src ext/standard/file.c — null $directory selects system temp dir (#14672);
-     * caller strict_types rejects null (#18244, zend_verify_arg_type).
+     * caller strict_types rejects null (#18244, zend_verify_arg_type);
+     * forward profile 8.4+ rejects null $directory like stub `string $directory` (#20960).
      */
     public static function resolveDirectoryArg(Variable $var, Frame $frame): string
     {
         $resolved = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
-            if (InternalStrictArg::isCallerStrict($frame)) {
+            if (
+                InternalStrictArg::isCallerStrict($frame)
+                || VmString::requiresTypedPathStringOnForwardProfile()
+            ) {
                 throw new \TypeError(
                     'tempnam(): Argument #1 ($directory) must be of type string, null given'
                 );
