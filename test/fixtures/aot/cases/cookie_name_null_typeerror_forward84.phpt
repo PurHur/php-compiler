@@ -1,10 +1,16 @@
 --TEST--
-AOT setcookie(null) — TypeError forward 8.4 profile (#21003)
+AOT setcookie(null) — empty name ValueError on 8.4 forward profile (#21233, re-#21003)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-setcookie(null);
+error_reporting(E_ALL & ~E_DEPRECATED);
+try {
+    setcookie(null);
+    echo "uncaught\n";
+} catch (ValueError $e) {
+    echo "ValueError\n";
+}
+?>
 --EXPECT--
---EXPECT_EXIT--
-255
+ValueError

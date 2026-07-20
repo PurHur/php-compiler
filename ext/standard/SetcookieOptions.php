@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -36,7 +37,7 @@ final class SetcookieOptions
      *     partitioned: bool,
      * }
      */
-    public static function parseArgs(string $function, array $args): array
+    public static function parseArgs(string $function, array $args, ?Frame $frame = null): array
     {
         $argc = \count($args);
         if ($argc < 1) {
@@ -53,8 +54,8 @@ final class SetcookieOptions
 
                 return self::parseOptionsArray(
                     $function,
-                    // Z_PARAM_STR — TypeError on PROFILE=8.4 before empty-name ValueError (#21003, re-#18659).
-                    VmString::coerceZparamStrBuiltinArg($args[0], $function, 0, 'name'),
+                    // Z_PARAM_STR — null → E_DEPRECATED + '' on 8.4, then empty-name ValueError (#21233, re-#21003).
+                    self::coerceNameArg($function, $args[0], $frame),
                     $argc >= 2
                         ? VmString::coerceStringBuiltinArg($args[1], $function, 1, 'value')
                         : '',
@@ -66,7 +67,16 @@ final class SetcookieOptions
             throw new \ArgumentCountError($function.'() accepts at most seven arguments');
         }
 
-        return self::parsePositional($function, $args);
+        return self::parsePositional($function, $args, $frame);
+    }
+
+    private static function coerceNameArg(string $function, Variable $var, ?Frame $frame): string
+    {
+        if (null !== $frame) {
+            return VmString::trimFamilyStringArgForFrame($frame, 0, $function, 0, 'name');
+        }
+
+        return VmString::coerceTrimFamilyStringArg($var, $function, 0, 'name');
     }
 
     /**
@@ -84,11 +94,10 @@ final class SetcookieOptions
      *     partitioned: bool,
      * }
      */
-    private static function parsePositional(string $function, array $args): array
+    private static function parsePositional(string $function, array $args, ?Frame $frame = null): array
     {
         $argc = \count($args);
-        // Z_PARAM_STR — TypeError on PROFILE=8.4 before empty-name ValueError (#21003, re-#18659).
-        $name = VmString::coerceZparamStrBuiltinArg($args[0], $function, 0, 'name');
+        $name = self::coerceNameArg($function, $args[0], $frame);
         $value = '';
         if ($argc >= 2) {
             $value = VmString::coerceStringBuiltinArg($args[1], $function, 1, 'value');
