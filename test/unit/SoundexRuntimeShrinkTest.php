@@ -15,6 +15,10 @@ final class SoundexRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSoundex.php');
         $this->assertStringContainsString('SoundexJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitSoundex.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/soundex.php');

@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_soundex via SoundexJitHelper PHP (#13448).
+ * JIT/AOT link for __compiler_soundex via SoundexJitHelper PHP (#13448, #21362).
  *
- * Replaces ~177 LOC LLVM in JitSoundex.php. SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringMetaphone #21342 / TimeSleep #21289.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(soundex)
  */
 final class StringSoundex
 {
+    private const ABI = '__compiler_soundex';
+
     private const HELPER_PATH = '/ext/standard/SoundexJitHelper.php';
 
     private const SOUNDEX_HELPER = 'PHPCompiler\\ext\\standard\\SoundexJitHelper::soundexArgv';
@@ -27,10 +29,7 @@ final class StringSoundex
         self::SOUNDEX_HELPER,
     ];
 
-    /** @var list<string> */
-    private const ABI_FUNCTIONS = [
-        '__compiler_soundex',
-    ];
+    private const BRIDGE_ENTRY = 'soundex_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -39,107 +38,33 @@ final class StringSoundex
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::ensureLinked($context);
     }
 
-    public static function implement(Context $context): void
+    private static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_soundex');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        // Restore caller insert block after bridge emit (#19998 / #21190) — clearInsertionPosition
-        // left the user-script builder detached ("Current basic block has no parent function").
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        self::ensureJitHelperCompiled($context);
-        self::implementBridge($context);
-        self::registerLinkedRuntime($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function implementBridge(Context $context): void
-    {
-        $abiName = '__compiler_soundex';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('soundex_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::SOUNDEX_HELPER),
-            $fn->getParam(0)
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr],
+            $strPtr,
+            self::SOUNDEX_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21362'
         );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SoundexJitHelper compile (#13448)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SoundexJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('SoundexJitHelper.php parseAndCompile failed (#13448)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#13448)');
-            }
-        }
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach (self::ABI_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after StringSoundex bridge (#13448)');
-            }
-            $context->registerFunction($name, $fn);
-        }
     }
 }
