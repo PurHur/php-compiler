@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\JitEnvironMirrorKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -14,11 +13,12 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_getenv_all (#5075, #20156, #20758).
+ * JIT/AOT link for __compiler_getenv_all (#5075, #20156, #20758, #21579).
  *
- * Embed + thin standalone AOT: libc environ via {@see JitEnvironMirrorKernel} (no NestedJIT),
+ * Embed + thin standalone AOT: process environ via {@see EnvironMirrorRuntime}
+ * (`__superglobals__mirror_process_environ` — shared with $_SERVER refresh #18984),
  * then putenv overlay via {@see GetenvJitHelper::mergeLocalOverlayIntoNative}.
- * No thin void stub (Rename #20603 / getenv named #20644 shape).
+ * No inline environ-kernel walk in this bridge (Rename #19215 shape).
  * php-src: ext/standard/basic_functions.c — zif_getenv argc==0
  */
 final class StringGetenvAll
@@ -65,6 +65,8 @@ final class StringGetenvAll
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureHashtableHelpers($context);
         self::ensureOverlayHelperCompiled($context);
+        // Ensure environ-mirror ABI before emitting getenv_all body (#21579).
+        EnvironMirrorRuntime::ensureLinked($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
         if (null !== $savedInsert) {
@@ -124,9 +126,8 @@ final class StringGetenvAll
         $context->functions[$abiName] = $fn;
         $context->activeFunction = $abiName;
         try {
-            // Inline libc environ walk — NestedJIT EnvironMirrorNativeJitHelper is empty under
-            // thin AOT with HELPER_RUNTIME_O=0 (#20758 / #19157).
-            JitEnvironMirrorKernel::mirrorIntoHashtablePtr($context, $ht);
+            // Shared environ-mirror ABI (thin = libc kernel, embed = NestedJIT) (#21579).
+            EnvironMirrorRuntime::emitFillCall($context, $ht);
             $i64 = $context->getTypeFromString('int64');
             $htI64 = JitNestedHelperCoerce::ptrToI64($context, $ht);
             $htSlot = $context->builder->alloca($i64, 1);
