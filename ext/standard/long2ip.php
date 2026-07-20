@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -29,7 +28,7 @@ final class long2ip extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $properAddress = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'long2ip', 1, 'proper_address');
+        $properAddress = VmMath::parseChrCodepointForFrame($frame, 0, 'long2ip', 1, 'proper_address');
         $result = VmInet::long2ip($properAddress);
         if (false === $result) {
             $frame->returnVar->bool(false);
@@ -47,7 +46,7 @@ final class long2ip extends Internal
 
         return JitInet::long2ip(
             $context,
-            JitLongArg::lower($context, $args[0], 'long2ip() argument #1')
+            JitChr::lowerZParamLongArg($context, $args[0], 'long2ip', 1, 'proper_address')
         );
     }
 }

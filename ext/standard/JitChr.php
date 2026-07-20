@@ -20,22 +20,39 @@ final class JitChr
 {
     public static function lowerCodepoint(Context $context, JITVariable $arg): Value
     {
+        return self::lowerZParamLongArg($context, $arg, 'chr', 1, 'codepoint');
+    }
+
+    /** Z_PARAM_LONG with null deprecation on forward profile (chr/long2ip; #21222, #21236). */
+    public static function lowerZParamLongArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
             if ($context->callerStrictTypes) {
-                self::emitIntTypeErrorAndAbort($context, 'null');
+                self::emitIntTypeErrorAndAbort($context, $function, $userArgIndex, $paramName, 'null');
             } else {
-                JitIntdiv::emitNullIntDeprecation($context, 'chr', 1, 'codepoint');
+                JitIntdiv::emitNullIntDeprecation($context, $function, $userArgIndex, $paramName);
             }
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
-            self::emitIntTypeErrorAndAbort($context, 'array');
+            self::emitIntTypeErrorAndAbort($context, $function, $userArgIndex, $paramName, 'array');
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            self::emitIntTypeErrorAndAbort($context, self::compileTimeObjectGivenLabel($context, $arg));
+            self::emitIntTypeErrorAndAbort(
+                $context,
+                $function,
+                $userArgIndex,
+                $paramName,
+                self::compileTimeObjectGivenLabel($context, $arg)
+            );
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -46,24 +63,34 @@ final class JitChr
             );
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            return self::lowerStringOperand($context, $arg);
+            return self::lowerStringOperand($context, $arg, $function, $userArgIndex, $paramName);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedOperand($context, $arg);
+            return self::lowerBoxedOperand($context, $arg, $function, $userArgIndex, $paramName);
         }
 
-        return JitLongArg::lower($context, $arg, 'chr() codepoint');
+        return JitLongArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $userArgIndex));
     }
 
-    private static function lowerStringOperand(Context $context, JITVariable $arg): Value
-    {
-        $strPtr = JitStringArg::lower($context, $arg, 'chr() argument #1');
+    private static function lowerStringOperand(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): Value {
+        $strPtr = JitStringArg::lower($context, $arg, sprintf('%s() argument #%d', $function, $userArgIndex));
 
-        return self::lowerStringOperandFromPtr($context, $strPtr);
+        return self::lowerStringOperandFromPtr($context, $strPtr, $function, $userArgIndex, $paramName);
     }
 
-    private static function lowerBoxedOperand(Context $context, JITVariable $arg): Value
-    {
+    private static function lowerBoxedOperand(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -95,9 +122,9 @@ final class JitChr
 
         $context->builder->positionAtEnd($nullBlock);
         if ($context->callerStrictTypes) {
-            self::emitIntTypeErrorAndAbort($context, 'null');
+            self::emitIntTypeErrorAndAbort($context, $function, $userArgIndex, $paramName, 'null');
         } else {
-            JitIntdiv::emitNullIntDeprecation($context, 'chr', 1, 'codepoint');
+            JitIntdiv::emitNullIntDeprecation($context, $function, $userArgIndex, $paramName);
         }
         $context->builder->branch($mergeBlock);
 
@@ -106,7 +133,7 @@ final class JitChr
         $context->builder->branchIf($isArray, $arrayBlock, $objectBlock);
 
         $context->builder->positionAtEnd($arrayBlock);
-        self::emitIntTypeErrorAndAbort($context, 'array');
+        self::emitIntTypeErrorAndAbort($context, $function, $userArgIndex, $paramName, 'array');
 
         $context->builder->positionAtEnd($objectBlock);
         $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTy);
@@ -115,7 +142,7 @@ final class JitChr
         $context->builder->branchIf($isObject, $errBlock, $afterObject);
 
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, 'object');
+        self::emitIntTypeErrorAndAbort($context, $function, $userArgIndex, $paramName, 'object');
 
         $context->builder->positionAtEnd($afterObject);
         $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
@@ -124,7 +151,13 @@ final class JitChr
         $context->builder->branchIf($isEnumCase, $enumErrBlock, $afterEnum);
 
         $context->builder->positionAtEnd($enumErrBlock);
-        self::emitIntTypeErrorAndAbort($context, self::compileTimeEnumCaseGivenLabel($context, $arg));
+        self::emitIntTypeErrorAndAbort(
+            $context,
+            $function,
+            $userArgIndex,
+            $paramName,
+            self::compileTimeEnumCaseGivenLabel($context, $arg)
+        );
 
         $context->builder->positionAtEnd($afterEnum);
         $isDouble = $context->builder->icmp(Builder::INT_EQ, $typeByte, $doubleTy);
@@ -143,7 +176,7 @@ final class JitChr
 
         $context->builder->positionAtEnd($stringCoerce);
         $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
-        $strLong = self::lowerStringOperandFromPtr($context, $strVal);
+        $strLong = self::lowerStringOperandFromPtr($context, $strVal, $function, $userArgIndex, $paramName);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
@@ -162,14 +195,19 @@ final class JitChr
         return $phi;
     }
 
-    private static function lowerStringOperandFromPtr(Context $context, Value $strPtr): Value
-    {
+    private static function lowerStringOperandFromPtr(
+        Context $context,
+        Value $strPtr,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): Value {
         $isNumeric = self::stringPtrIsNumeric($context, $strPtr);
         $okBlock = BasicBlockHelper::append($context, 'chr_str_ok');
         $errBlock = BasicBlockHelper::append($context, 'chr_str_err');
         $context->builder->branchIf($isNumeric, $okBlock, $errBlock);
         $context->builder->positionAtEnd($errBlock);
-        self::emitIntTypeErrorAndAbort($context, 'string');
+        self::emitIntTypeErrorAndAbort($context, $function, $userArgIndex, $paramName, 'string');
         $context->builder->positionAtEnd($okBlock);
 
         return self::stringPtrToLong($context, $strPtr);
@@ -247,19 +285,27 @@ final class JitChr
         return self::compileTimeObjectGivenLabel($context, $arg);
     }
 
-    private static function intTypeError(string $given): string
+    private static function intTypeError(string $function, int $userArgIndex, string $paramName, string $given): string
     {
         return sprintf(
-            'chr(): Argument #1 ($codepoint) must be of type int, %s given',
+            '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $function,
+            $userArgIndex,
+            $paramName,
             $given
         );
     }
 
-    private static function emitIntTypeErrorAndAbort(Context $context, string $given): void
-    {
+    private static function emitIntTypeErrorAndAbort(
+        Context $context,
+        string $function,
+        int $userArgIndex,
+        string $paramName,
+        string $given
+    ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, self::intTypeError($given));
+        TypeErrorRaise::emitRaise($context, self::intTypeError($function, $userArgIndex, $paramName, $given));
         $context->builder->call($context->lookupFunction('abort'));
     }
 }
