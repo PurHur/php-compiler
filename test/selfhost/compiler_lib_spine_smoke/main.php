@@ -70,6 +70,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -5549,8 +5550,19 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionCompositeTypeGetTypes.p
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetAttributes.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetDeclaringClass.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetDeprecatedMessage.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetDeprecatedVersion.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetModifiers.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetValue.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantHasType.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantIsDeprecated.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantIsEnumCase.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantIsFinal.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantIsPrivate.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantIsProtected.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantIsPublic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionDeprecatedReturn.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumBackedCaseConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumBackedCaseGetBackingValue.php';
@@ -6022,6 +6034,7 @@ require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove_from_session.php
 require_once __DIR__.'/../../../ext/enchant/enchant_dict_store_replacement.php';
 require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
 require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
+require_once __DIR__.'/../../../ext/phar/bootstrap_pharexception.php';
 require_once __DIR__.'/../../../ext/apcu/ApcuFunction.php';
 require_once __DIR__.'/../../../ext/apcu/Module.php';
 require_once __DIR__.'/../../../ext/apcu/VmApcu.php';
@@ -6241,5 +6254,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/standard/VmNullStringParamDeprecation.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

@@ -6,40 +6,41 @@ namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
-use PHPCompiler\VM\AttributeRegistry;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionConstant::getAttributes() — VM read path (#4136, #21255). */
-final class ReflectionConstantGetAttributes extends VmClassMethod
+/** ReflectionConstant::hasType() — globals always false (#21255). */
+final class ReflectionConstantHasType extends VmClassMethod
 {
     public function __construct()
     {
-        parent::__construct('getAttributes');
+        parent::__construct('hasType');
     }
 
     public function execute(Frame $frame): void
     {
         $receiver = ReflectionSupport::requireReflectionConstant($frame, $frame->calledArgs[0]);
-        $ctx = VmReflection::requireContext($frame);
-        [$filter, $flags] = ReflectionSupport::getAttributesFilterArgs($frame, 'ReflectionConstant::getAttributes()');
         if (ReflectionSupport::isGlobalReflectionConstant($receiver)) {
-            // php-src ReflectionConstant has no getAttributes(); compiler surface returns [].
             if (null !== $frame->returnVar) {
-                $frame->returnVar->copyFrom(ReflectionSupport::attributesArray($frame, []));
+                $frame->returnVar->bool(false);
             }
 
             return;
         }
+        $ctx = VmReflection::requireContext($frame);
         $className = ReflectionSupport::classNameFromReflection($receiver);
-        $constant = ReflectionSupport::constantNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
             throw new \LogicException('ReflectionConstant refers to unknown class in this compiler build');
         }
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom(
-                AttributeRegistry::constantAttributes($frame, $entry, strtolower($constant), $filter, $flags)
+        $constant = ReflectionSupport::constantNameFromReflection($receiver);
+        $key = VmReflection::findClassConstantKey($entry, $constant, $ctx);
+        if (null === $key) {
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::constantNotFoundMessage($className, $constant)
             );
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(isset($entry->constDeclaredTypes[$key]));
         }
     }
 }

@@ -55,6 +55,30 @@ final class ReflectionDeprecatedReturn
         self::returnNullableString($frame, $meta?->since);
     }
 
+    /** ReflectionConstant (global) deprecation metadata (#21255). */
+    public static function globalConstantMetadata(Frame $frame, Variable $receiver): ?DeprecatedMetadata
+    {
+        $ctx = VmReflection::requireContext($frame);
+        $obj = ReflectionSupport::requireReflectionConstant($frame, $receiver);
+        $constant = ReflectionSupport::constantNameFromReflection($obj);
+
+        return $ctx->globalConstDeprecated[strtolower($constant)] ?? null;
+    }
+
+    public static function globalConstantMessage(Frame $frame, Variable $receiver): void
+    {
+        $meta = self::globalConstantMetadata($frame, $receiver);
+
+        self::returnNullableString($frame, $meta?->message);
+    }
+
+    public static function globalConstantVersion(Frame $frame, Variable $receiver): void
+    {
+        $meta = self::globalConstantMetadata($frame, $receiver);
+
+        self::returnNullableString($frame, $meta?->since);
+    }
+
     private static function classEntry(Frame $frame, Variable $receiver): \PHPCompiler\VM\ClassEntry
     {
         $receiver = ReflectionSupport::requireReflectionClass($frame, $receiver);
