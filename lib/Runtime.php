@@ -268,6 +268,7 @@ class Runtime {
         $this->load(new ext\yaml\Module);
         $this->load(new ext\redis\Module);
         $this->load(new ext\mongodb\Module);
+        $this->load(new ext\snmp\Module);
         $this->load(new ext\zstd\Module);
         $this->load(new ext\lzf\Module);
         $this->load(new ext\bz2\Module);

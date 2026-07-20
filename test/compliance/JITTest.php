@@ -794,6 +794,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'redis_phantom')) {
                 continue;
             }
+            // snmpget/snmpwalk not JIT-lowered yet (#6070); phantom registration checks are fine.
+            if (str_contains($name, 'snmp')
+                && !str_contains($name, 'snmp_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsSnmp()
+                && str_contains($name, 'snmp_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))
