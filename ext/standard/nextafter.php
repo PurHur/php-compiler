@@ -34,13 +34,15 @@ final class nextafter extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             self::FUNCTION,
             1,
-            'num'
+            'num',
+            $frame
         );
-        $next = VmMath::parseDoubleBuiltinArg(
+        $next = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             self::FUNCTION,
             2,
-            'next'
+            'next',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
@@ -53,14 +55,8 @@ final class nextafter extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException(self::FUNCTION.'() requires exactly two arguments');
         }
-        [$num, $next] = JitFdiv::lowerOperands(
-            $context,
-            $args[0],
-            $args[1],
-            self::FUNCTION,
-            'num',
-            'next'
-        );
+        $num = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', self::FUNCTION, 'float');
+        $next = JitFdiv::lowerSingleOperand($context, $args[1], 2, 'next', self::FUNCTION, 'float', true);
 
         return MathNextafter::invoke($context, $num, $next);
     }

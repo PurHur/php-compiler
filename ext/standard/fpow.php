@@ -47,17 +47,19 @@ final class fpow extends Internal
                     : self::FUNCTION.'() requires exactly two arguments'
             );
         }
-        $num = VmMath::parseDoubleBuiltinArg(
+        $num = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             self::FUNCTION,
             1,
-            'num'
+            'num',
+            $frame
         );
-        $exponent = VmMath::parseDoubleBuiltinArg(
+        $exponent = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             self::FUNCTION,
             2,
-            'exponent'
+            'exponent',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
@@ -89,7 +91,7 @@ final class fpow extends Internal
                     : self::FUNCTION.'() requires exactly two arguments'
             );
         }
-        [$base, $exp] = JitFdiv::lowerOperands($context, $args[0], $args[1], self::FUNCTION, 'num', 'exponent');
+        [$base, $exp] = JitFdiv::lowerOperands($context, $args[0], $args[1], self::FUNCTION, 'num', 'exponent', 'float', true);
         $power = MathFpow::invoke($context, $base, $exp);
         if ($argc < 3) {
             return $power;

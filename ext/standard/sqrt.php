@@ -32,7 +32,8 @@ final class sqrt extends Internal
             $frame->calledArgs[0]->resolveIndirect(),
             'sqrt',
             1,
-            'num'
+            'num',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
