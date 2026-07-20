@@ -1,13 +1,12 @@
 --TEST--
-AOT: implode(null) TypeError on 8.4 forward profile (#19894)
+AOT: implode(null) soft-null on 8.4 forward profile (#21210)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-// Literal null before an array literal boxes as TYPE_VALUE without isNullConstant
-// on AOT; variable form exercises the same Z_PARAM_STR 8.4 TypeError path.
+// Variable null — literal null before array literal can take a different
+// boxed path; variable form matches Zend soft-null separator (#21210).
 $sep = null;
-implode($sep, ['a', 'b']);
+echo implode($sep, ['a', 'b']), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+ab

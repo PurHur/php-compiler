@@ -96,7 +96,7 @@ final class VmString
      * setcookie/setrawcookie $name soft-null (#21233, re-#21003).
      * date/gmdate $format and strtotime $datetime soft-null (#21208, reverts #19651).
      * timezone_open/DateTimeZone/date_default_timezone_set timezone id soft-null (#21369, ext/date/php_date.stub.php).
-     * password_verify/password_needs_rehash string operands soft-null (#21314; hash_equals stays TypeError).
+     * password_verify/password_needs_rehash/password_hash string operands soft-null (#21314/#21210; hash_equals stays TypeError).
      * hash_pbkdf2($algo/$password/$salt) and hash_hkdf($algo/$key/$info/$salt) soft-null (#21319, reverts #20659/#21079).
      * str_rot13/crypt/uniqid/gzcompress soft-null (#21280).
      * hebrev($string) soft-null (#21421, ext/standard/string.c).
@@ -105,6 +105,7 @@ final class VmString
      * openssl_encrypt/openssl_decrypt $data soft-null (#21445, reverts #20263; ext/openssl/openssl.c).
      * error_log($message), fsockopen/pfsockopen/stream_socket_client hostname/remote,
      * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
+     * implode/join $separator soft-null (#21210, reverts #19894).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

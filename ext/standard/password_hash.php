@@ -26,8 +26,8 @@ final class password_hash extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('password_hash() requires two or three arguments in this compiler build');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20174, ext/standard/password.c)
-        $password = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'password_hash', 0, 'password');
+        // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21210, reverts #20174; password.c).
+        $password = VmString::trimFamilyStringArgForFrame($frame, 0, 'password_hash', 0, 'password');
         $algo = VmPassword::resolveAlgo($frame->calledArgs[1], 'password_hash', 1, 'algo');
         $options = [];
         if (3 === $argc) {
@@ -66,8 +66,8 @@ final class password_hash extends Internal
 
         return JitPassword::hash(
             $context,
-            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20174, ext/standard/password.c)
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'password_hash', 0, 'password'),
+            // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21210, reverts #20174; password.c).
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'password_hash', 0, 'password'),
             JitPasswordAlgo::lower($context, $args[1], 'password_hash', 1, 'algo'),
             $options
         );
