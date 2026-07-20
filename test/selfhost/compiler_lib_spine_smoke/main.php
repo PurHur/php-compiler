@@ -71,6 +71,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -6238,6 +6239,11 @@ require_once __DIR__.'/../../../ext/dba/dba_optimize.php';
 require_once __DIR__.'/../../../ext/dba/dba_popen.php';
 require_once __DIR__.'/../../../ext/dba/dba_replace.php';
 require_once __DIR__.'/../../../ext/dba/dba_sync.php';
+require_once __DIR__.'/../../../ext/tidy/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/tidy/Module.php';
+require_once __DIR__.'/../../../ext/tidy/TidyExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/tidy/VmTidy.php';
+require_once __DIR__.'/../../../ext/tidy/tidy_parse_string.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
