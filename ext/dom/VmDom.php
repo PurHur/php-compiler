@@ -12,7 +12,7 @@ use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
-use PHPCompiler\ext\spl\ArrayIteratorBuiltin;
+use PHPCompiler\ext\spl\InternalIteratorBuiltin;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
@@ -7778,8 +7778,8 @@ final class VmDom
     }
 
     /**
-     * DOMNodeList::getIterator() — php-src InternalIterator over live items (#21298).
-     * Snapshot into ArrayIterator (same pattern as TokenList / ResourceBundle).
+     * DOMNodeList::getIterator() — php-src InternalIterator over live items (#21298, #21466).
+     * Snapshot into InternalIterator (class identity matches Zend; foreach keys/values unchanged).
      */
     public static function nodeListGetIterator(Context $ctx, ObjectEntry $nodeList): ObjectEntry
     {
@@ -7800,7 +7800,7 @@ final class VmDom
             $ht->append($v);
         }
 
-        return self::arrayIteratorFromTable($ctx, $ht);
+        return self::internalIteratorFromTable($ctx, $ht);
     }
 
     /**
@@ -8234,8 +8234,7 @@ final class VmDom
     }
 
     /**
-     * DOMNamedNodeMap::getIterator() — php-src InternalIterator; keys are Attr local names (#21298).
-     * Snapshot into ArrayIterator (same pattern as TokenList / ResourceBundle).
+     * DOMNamedNodeMap::getIterator() — php-src InternalIterator; keys are Attr local names (#21298, #21466).
      */
     public static function namedNodeMapGetIterator(Context $ctx, ObjectEntry $namedNodeMap): ObjectEntry
     {
@@ -8260,23 +8259,16 @@ final class VmDom
             $ht->add($key, $v);
         }
 
-        return self::arrayIteratorFromTable($ctx, $ht);
+        return self::internalIteratorFromTable($ctx, $ht);
     }
 
     /**
-     * Shared ArrayIterator factory for DOM collection getIterator() snapshots (#21298, #20884).
+     * Shared InternalIterator factory for DOM NodeList / NamedNodeMap getIterator() (#21466).
+     * TokenList still uses ArrayIterator via VmDomTokenList (separate surface).
      */
-    private static function arrayIteratorFromTable(Context $ctx, HashTable $ht): ObjectEntry
+    private static function internalIteratorFromTable(Context $ctx, HashTable $ht): ObjectEntry
     {
-        $class = $ctx->classes[ArrayIteratorBuiltin::CLASS_LC] ?? null;
-        if (null === $class) {
-            throw new \LogicException('ArrayIterator is not registered in this compiler build');
-        }
-        $entry = new ObjectEntry($class);
-        $entry->constructed = true;
-        ArrayIteratorBuiltin::init($entry, $ht);
-
-        return $entry;
+        return InternalIteratorBuiltin::fromTable($ctx, $ht);
     }
 
     /**
