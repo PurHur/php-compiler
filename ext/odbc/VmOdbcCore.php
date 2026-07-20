@@ -682,6 +682,71 @@ final class VmOdbcCore
     }
 
     /**
+     * odbc_cursor — SQLGetInfo(SQL_MAX_CURSOR_NAME_LEN) + SQLGetCursorName
+     * with S1015 → SQLSetCursorName fallback (php-src php_odbc.c; #21307).
+     */
+    public static function cursor(
+        ObjectEntry $result,
+        Context $ctx,
+        ?Frame $frame = null
+    ): string|false {
+        VmOdbcResult::requireLive($result);
+        $hstmt = VmOdbcResult::hstmt($result);
+        if (null === $hstmt) {
+            return false;
+        }
+        $conn = VmOdbcResult::connection($result);
+        if (!VmOdbcConnection::isLive($conn)) {
+            return false;
+        }
+        $native = VmOdbcConnection::native($conn);
+        $hdbc = $native['hdbc'];
+        $henv = $native['henv'];
+        if (null === $hdbc) {
+            return false;
+        }
+        $maxLen = VmOdbcNative::getInfoUSmallInt($hdbc, VmOdbcNative::SQL_MAX_CURSOR_NAME_LEN);
+        if (null === $maxLen) {
+            return false;
+        }
+        if ($maxLen <= 0) {
+            return false;
+        }
+        $got = VmOdbcNative::getCursorName($hstmt, $maxLen);
+        if (null === $got) {
+            return false;
+        }
+        if ($got['ok']) {
+            VmOdbcConnection::setLastError('', '');
+
+            return $got['name'];
+        }
+        $err = VmOdbcNative::sqlError($henv, $hdbc, $hstmt);
+        if (null !== $err && 0 === \strncmp($err['state'], 'S1015', 5)) {
+            $cursorname = 'php_curs_'.$result->id;
+            if (\strlen($cursorname) > $maxLen) {
+                $cursorname = \substr($cursorname, 0, $maxLen);
+            }
+            if (!VmOdbcNative::setCursorName($hstmt, $cursorname)) {
+                return self::execFail($ctx, $frame, 'SQLSetCursorName', 'odbc_cursor');
+            }
+            VmOdbcConnection::setLastError('', '');
+
+            return $cursorname;
+        }
+        $msg = null !== $err ? $err['message'] : 'Failed to fetch error message';
+        $state = null !== $err ? $err['state'] : 'HY000';
+        VmOdbcConnection::setLastError($state, $msg);
+        self::warn(
+            $ctx,
+            \sprintf('odbc_cursor(): SQL error: %s, SQL state %s', $msg, $state),
+            $frame
+        );
+
+        return false;
+    }
+
+    /**
      * odbc_next_result — SQLMoreResults + re-buffer (php-src php_odbc.c).
      */
     public static function nextResult(
