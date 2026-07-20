@@ -1,39 +1,42 @@
 --TEST--
-stdlib filestat path builtins — null TypeError on 8.4 forward profile (#18817, #20474, ext/standard/filestat.c)
+stdlib filestat path builtins — null soft-coerces on 8.4 forward profile (#20362 supersedes #20474, ext/standard/filestat.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED);
 foreach (['touch', 'unlink', 'rename', 'mkdir', 'filesize', 'filemtime', 'filetype', 'is_executable'] as $fn) {
     try {
         if ('rename' === $fn) {
-            rename(null, 'b');
+            $r = @rename(null, 'b');
         } elseif ('mkdir' === $fn) {
-            @mkdir(null);
+            $r = @mkdir(null);
         } elseif ('touch' === $fn) {
-            touch(null);
+            $r = @touch(null);
         } elseif ('filesize' === $fn) {
-            filesize(null);
+            $r = @filesize(null);
         } elseif ('filemtime' === $fn) {
-            filemtime(null);
+            $r = @filemtime(null);
         } elseif ('filetype' === $fn) {
-            filetype(null);
+            $r = @filetype(null);
         } elseif ('is_executable' === $fn) {
-            is_executable(null);
+            $r = @is_executable(null);
         } else {
-            @unlink(null);
+            $r = @unlink(null);
         }
-        echo "$fn: uncaught\n";
+        echo $fn, ':', var_export($r, true), "\n";
     } catch (TypeError $e) {
-        echo $fn.': '.$e->getMessage()."\n";
+        echo $fn, ': TypeError: ', $e->getMessage(), "\n";
+    } catch (ValueError $e) {
+        echo $fn, ': ValueError: ', $e->getMessage(), "\n";
     }
 }
 --EXPECT--
-touch: touch(): Argument #1 ($filename) must be of type string, null given
-unlink: unlink(): Argument #1 ($filename) must be of type string, null given
-rename: rename(): Argument #1 ($from) must be of type string, null given
-mkdir: mkdir(): Argument #1 ($directory) must be of type string, null given
-filesize: filesize(): Argument #1 ($filename) must be of type string, null given
-filemtime: filemtime(): Argument #1 ($filename) must be of type string, null given
-filetype: filetype(): Argument #1 ($filename) must be of type string, null given
-is_executable: is_executable(): Argument #1 ($filename) must be of type string, null given
+touch:false
+unlink:false
+rename:false
+mkdir:false
+filesize:false
+filemtime:false
+filetype:false
+is_executable:false

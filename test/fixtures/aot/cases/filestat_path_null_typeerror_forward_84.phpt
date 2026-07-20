@@ -1,10 +1,10 @@
 --TEST--
-AOT: Z_PARAM_PATH builtins — null TypeError on 8.4 forward profile (#18817, ext/standard/filestat.c)
+AOT: Z_PARAM_PATH builtins — null soft-coerces on 8.4 forward profile (#20362, ext/standard/filestat.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-touch(null);
+error_reporting(E_ALL & ~E_DEPRECATED);
+echo var_export(@touch(null), true), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+false

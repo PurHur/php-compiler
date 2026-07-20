@@ -57,7 +57,7 @@ final class VmStreamPath
         int $argIndex = 0,
         string $paramName = 'filename'
     ): string {
-        // Default softNullPath=false — TypeError on 8.4 forward profile (#21062 / #21076).
+        // Z_PARAM_PATH soft-null DEP+coerce on 8.4 (#20362 / #19146).
         $path = VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName);
         if ('' === $path) {
             throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);

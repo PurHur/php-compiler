@@ -25,12 +25,12 @@ final class JitFilestatArg
         string $function,
         int $argIndex = 0,
         string $paramName = 'filename',
-        bool $softNullPath = false
+        bool $softNullPath = true
     ): Value {
         return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName, 'string', null, $softNullPath);
     }
 
-    /** basename/dirname/pathinfo — soft-null on forward profile (#19997; TypeError in #20099). */
+    /** basename/dirname/pathinfo — soft-null on forward profile (#19997 / #20362). */
     public static function lowerPathComponentFilename(
         Context $context,
         JITVariable $arg,
