@@ -11,8 +11,9 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\spl\SplArrayStorage;
+use PHPCompiler\ext\standard\VmJson;
 
-/** Phar instance methods — php-src ext/phar/phar_object.c (#20628). */
+/** Phar instance methods — php-src ext/phar/phar_object.c (#20628, #21228, #21229). */
 final class PharBuiltin
 {
     public static function registerInstanceMethods(Context $ctx): void
@@ -21,22 +22,22 @@ final class PharBuiltin
             BuiltinClasses::registerPhar($ctx);
         }
         $entry = $ctx->classes[VmPhar::CLASS_LC];
-        if (isset($entry->methods['addfromstring'])) {
-            return;
-        }
-
-        foreach (['arrayaccess' => 'ArrayAccess', 'countable' => 'Countable'] as $lc => $name) {
-            if (isset($ctx->classes[$lc]) && !\in_array($name, $entry->interfaces, true)) {
-                $entry->interfaces[] = $name;
-            }
-        }
 
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
-        $entry->constructor = new PharConstruct();
-        $entry->methods['__construct'] = $entry->constructor;
-        $entry->methodVisibility['__construct'] = $pub;
-        $entry->methodNames['__construct'] = '__construct';
+
+        if (!isset($entry->methods['addfromstring'])) {
+            foreach (['arrayaccess' => 'ArrayAccess', 'countable' => 'Countable'] as $lc => $name) {
+                if (isset($ctx->classes[$lc]) && !\in_array($name, $entry->interfaces, true)) {
+                    $entry->interfaces[] = $name;
+                }
+            }
+
+            $entry->constructor = new PharConstruct();
+            $entry->methods['__construct'] = $entry->constructor;
+            $entry->methodVisibility['__construct'] = $pub;
+            $entry->methodNames['__construct'] = '__construct';
+        }
 
         $methods = [
             'addfromstring' => [PharAddFromString::class, 'addFromString'],
@@ -54,6 +55,10 @@ final class PharBuiltin
             'isbuffering' => [PharIsBuffering::class, 'isBuffering'],
             'count' => [PharCount::class, 'count'],
             'delete' => [PharDelete::class, 'delete'],
+            'hasmetadata' => [PharHasMetadata::class, 'hasMetadata'],
+            'getmetadata' => [PharGetMetadata::class, 'getMetadata'],
+            'setmetadata' => [PharSetMetadata::class, 'setMetadata'],
+            'delmetadata' => [PharDelMetadata::class, 'delMetadata'],
             'compressfiles' => [PharCompressFiles::class, 'compressFiles'],
             'getpath' => [PharGetPath::class, 'getPath'],
             'offsetset' => [PharOffsetSet::class, 'offsetSet'],
@@ -62,13 +67,19 @@ final class PharBuiltin
             'offsetunset' => [PharOffsetUnset::class, 'offsetUnset'],
             'createdefaultstub' => [PharCreateDefaultStub::class, 'createDefaultStub'],
         ];
+        $added = false;
         foreach ($methods as $lc => [$class, $name]) {
+            if (isset($entry->methods[$lc])) {
+                continue;
+            }
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = 'createdefaultstub' === $lc ? $pubStatic : $pub;
             $entry->methodNames[$lc] = $name;
+            $added = true;
         }
-
-        $ctx->classes[VmPhar::CLASS_LC] = $entry;
+        if ($added || !isset($entry->methods['addfromstring'])) {
+            $ctx->classes[VmPhar::CLASS_LC] = $entry;
+        }
     }
 }
 
@@ -344,6 +355,63 @@ final class PharDelete extends VmClassMethod
             VmPharArchive::requireReceiver($frame, 'Phar::delete'),
             VmPharArchive::coercePathArg($frame->calledArgs[1], 'Phar::delete', 0, 'localname')
         );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/** Phar::hasMetadata() — php-src zim_Phar_hasMetadata (#21229). */
+final class PharHasMetadata extends VmClassMethod
+{
+    public function __construct() { parent::__construct('hasMetadata'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPharArchive::hasMetadata(
+                VmPharArchive::requireReceiver($frame, 'Phar::hasMetadata')
+            ));
+        }
+    }
+}
+
+/** Phar::getMetadata() — php-src zim_Phar_getMetadata (#21229). */
+final class PharGetMetadata extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getMetadata'); }
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $value = VmPharArchive::getMetadata(VmPharArchive::requireReceiver($frame, 'Phar::getMetadata'));
+        $imported = VmJson::import($value);
+        $frame->returnVar->copyFrom($imported);
+    }
+}
+
+/** Phar::setMetadata() — php-src zim_Phar_setMetadata (#21229). */
+final class PharSetMetadata extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setMetadata'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf('Phar::setMetadata() expects exactly 1 argument, %d given', \max(0, $argc - 1)));
+        }
+        $meta = VmJson::export($frame->calledArgs[1]->resolveIndirect(), $frame->vmContext, null, $frame);
+        VmPharArchive::setMetadata(VmPharArchive::requireReceiver($frame, 'Phar::setMetadata'), $meta);
+    }
+}
+
+/** Phar::delMetadata() — php-src zim_Phar_delMetadata (#21229). */
+final class PharDelMetadata extends VmClassMethod
+{
+    public function __construct() { parent::__construct('delMetadata'); }
+    public function execute(Frame $frame): void
+    {
+        $ok = VmPharArchive::delMetadata(VmPharArchive::requireReceiver($frame, 'Phar::delMetadata'));
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
