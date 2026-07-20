@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6212 |
-| Phase A inventory files (M2 ratio SSOT) | 6212 |
+| PHP files on vm.php path | 6228 |
+| Phase A inventory files (M2 ratio SSOT) | 6228 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19588 |
+| Source constructs flagged (warnings) | 19620 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1132,7 +1132,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
 | `ext/libxml/LibxmlFunction.php` | 0 | 1 |
 | `ext/libxml/Module.php` | 0 | 10 |
-| `ext/libxml/VmLibxml.php` | 0 | 20 |
+| `ext/libxml/VmLibxml.php` | 0 | 15 |
 | `ext/libxml/libxml_clear_errors.php` | 0 | 1 |
 | `ext/libxml/libxml_disable_entity_loader.php` | 0 | 2 |
 | `ext/libxml/libxml_get_errors.php` | 0 | 1 |
@@ -1626,6 +1626,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_string.php` | 0 | 2 |
+| `ext/snmp/BuiltinClasses.php` | 0 | 1 |
+| `ext/snmp/Module.php` | 0 | 4 |
+| `ext/snmp/SNMPClose.php` | 0 | 2 |
+| `ext/snmp/SNMPConstruct.php` | 0 | 3 |
+| `ext/snmp/SNMPGetErrno.php` | 0 | 2 |
+| `ext/snmp/SNMPGetError.php` | 0 | 2 |
+| `ext/snmp/SNMPGetMethod.php` | 0 | 3 |
+| `ext/snmp/SNMPWalkMethod.php` | 0 | 3 |
+| `ext/snmp/SnmpClassMethod.php` | 0 | 1 |
+| `ext/snmp/SnmpConstants.php` | 0 | 1 |
+| `ext/snmp/SnmpExtensionPolicy.php` | 0 | 1 |
+| `ext/snmp/SnmpFunction.php` | 0 | 1 |
+| `ext/snmp/VmSnmp.php` | 0 | 10 |
+| `ext/snmp/snmpget.php` | 0 | 1 |
+| `ext/snmp/snmpwalk.php` | 0 | 1 |
 | `ext/soap/BuiltinClasses.php` | 0 | 9 |
 | `ext/soap/Module.php` | 0 | 3 |
 | `ext/soap/SoapClassMethod.php` | 0 | 1 |
@@ -5504,7 +5519,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 107 |
+| `lib/Runtime.php` | 0 | 108 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -9156,90 +9171,90 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 3681)
 - new ObjectEntry (line 4541)
 - new DomNodeState (line 4543)
-- new ObjectEntry (line 5048)
-- new DomNodeState (line 5050)
-- new ObjectEntry (line 5078)
-- new DomNodeState (line 5080)
-- new ObjectEntry (line 5313)
-- new DomNodeState (line 5318)
-- new DOMException (line 5717)
-- new DOMException (line 5733)
-- new Variable (line 5751)
-- new DOMException (line 5765)
-- new DOMException (line 5768)
-- new DOMException (line 5778)
-- new Error (line 5808)
-- new DOMException (line 5814)
-- new DOMException (line 5828)
-- new DOMException (line 6033)
-- new DOMException (line 6230)
-- new DOMException (line 6234)
-- new DOMException (line 6323)
-- new DOMException (line 6327)
-- new DOMException (line 6385)
-- new DOMException (line 6402)
-- new DOMException (line 6434)
-- new DOMException (line 6476)
-- new DOMException (line 6503)
-- new DOMException (line 7400)
-- new Variable (line 7455)
-- new DOMException (line 7742)
-- new DOMException (line 7881)
-- new DOMException (line 7926)
-- new HashTable (line 8011)
-- new Variable (line 8015)
-- new ObjectEntry (line 8037)
-- new DomNodeState (line 8041)
-- new Variable (line 8048)
-- new ObjectEntry (line 8066)
-- new DomNodeState (line 8070)
-- new Variable (line 8077)
-- new ObjectEntry (line 8095)
-- new DomNodeState (line 8099)
-- new Variable (line 8106)
-- new DOMException (line 8189)
-- new HashTable (line 8465)
+- new ObjectEntry (line 4993)
+- new DomNodeState (line 4995)
+- new ObjectEntry (line 5023)
+- new DomNodeState (line 5025)
+- new ObjectEntry (line 5258)
+- new DomNodeState (line 5263)
+- new DOMException (line 5662)
+- new DOMException (line 5678)
+- new Variable (line 5696)
+- new DOMException (line 5710)
+- new DOMException (line 5713)
+- new DOMException (line 5723)
+- new Error (line 5753)
+- new DOMException (line 5759)
+- new DOMException (line 5773)
+- new DOMException (line 5978)
+- new DOMException (line 6175)
+- new DOMException (line 6179)
+- new DOMException (line 6268)
+- new DOMException (line 6272)
+- new DOMException (line 6330)
+- new DOMException (line 6347)
+- new DOMException (line 6379)
+- new DOMException (line 6421)
+- new DOMException (line 6448)
+- new DOMException (line 7345)
+- new Variable (line 7400)
+- new DOMException (line 7687)
+- new DOMException (line 7826)
+- new DOMException (line 7871)
+- new HashTable (line 7956)
+- new Variable (line 7960)
+- new ObjectEntry (line 7982)
+- new DomNodeState (line 7986)
+- new Variable (line 7993)
+- new ObjectEntry (line 8011)
+- new DomNodeState (line 8015)
+- new Variable (line 8022)
+- new ObjectEntry (line 8040)
+- new DomNodeState (line 8044)
+- new Variable (line 8051)
+- new DOMException (line 8134)
+- new HashTable (line 8410)
+- new Variable (line 8423)
+- new ObjectEntry (line 8465)
+- new DomNodeState (line 8469)
 - new Variable (line 8478)
-- new ObjectEntry (line 8520)
-- new DomNodeState (line 8524)
-- new Variable (line 8533)
-- new ObjectEntry (line 8583)
-- new DomNodeState (line 8586)
-- new Variable (line 8594)
-- new Variable (line 8799)
-- new DOMException (line 8936)
-- new DOMException (line 8943)
-- new DOMException (line 8950)
-- new DOMException (line 8954)
-- new DOMException (line 8957)
-- new DOMException (line 8966)
-- new DOMException (line 8978)
-- new Variable (line 9088)
-- new DOMException (line 10183)
-- new Variable (line 10242)
-- new Variable (line 10265)
-- new Variable (line 10294)
-- new Variable (line 10332)
-- new DOMException (line 10343)
-- new Variable (line 10345)
-- new DOMException (line 10519)
-- new DOMException (line 10546)
-- new DOMException (line 10582)
-- new DOMException (line 10678)
+- new ObjectEntry (line 8528)
+- new DomNodeState (line 8531)
+- new Variable (line 8539)
+- new Variable (line 8744)
+- new DOMException (line 8881)
+- new DOMException (line 8888)
+- new DOMException (line 8895)
+- new DOMException (line 8899)
+- new DOMException (line 8902)
+- new DOMException (line 8911)
+- new DOMException (line 8923)
+- new Variable (line 9033)
+- new DOMException (line 10128)
+- new Variable (line 10187)
+- new Variable (line 10210)
+- new Variable (line 10239)
+- new Variable (line 10277)
+- new DOMException (line 10288)
+- new Variable (line 10290)
+- new DOMException (line 10464)
+- new DOMException (line 10491)
+- new DOMException (line 10527)
+- new DOMException (line 10623)
+- new DOMException (line 10631)
+- new DOMException (line 10644)
+- new DOMException (line 10655)
+- new DOMException (line 10660)
 - new DOMException (line 10686)
-- new DOMException (line 10699)
-- new DOMException (line 10710)
-- new DOMException (line 10715)
-- new DOMException (line 10741)
-- new DOMException (line 10762)
-- new DOMException (line 10820)
-- new DOMException (line 10825)
-- new DOMException (line 10828)
-- new DOMException (line 10831)
-- new DOMException (line 10860)
-- new Error (line 11902)
-- new Error (line 11906)
-- 465 class method(s)
+- new DOMException (line 10707)
+- new DOMException (line 10765)
+- new DOMException (line 10770)
+- new DOMException (line 10773)
+- new DOMException (line 10776)
+- new DOMException (line 10805)
+- new Error (line 11847)
+- new Error (line 11851)
+- 464 class method(s)
 - 3 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -14996,26 +15011,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/libxml/VmLibxml.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 48)
-- new Variable (line 49)
-- new ClassEntry (line 50)
-- new ClassProperty (line 52)
-- new ClassProperty (line 53)
-- new ClassProperty (line 54)
-- new ClassProperty (line 55)
-- new ClassProperty (line 56)
-- new ClassProperty (line 57)
-- new Variable (line 116)
-- new Variable (line 164)
-- new Variable (line 170)
-- new HashTable (line 228)
-- new Variable (line 230)
-- new Variable (line 234)
-- new HashTable (line 308)
-- new Variable (line 321)
-- new ObjectEntry (line 384)
-- new Variable (line 393)
-- 21 class method(s)
+- new Variable (line 42)
+- new Variable (line 43)
+- new ClassEntry (line 44)
+- new ClassProperty (line 46)
+- new ClassProperty (line 47)
+- new ClassProperty (line 48)
+- new ClassProperty (line 49)
+- new ClassProperty (line 50)
+- new ClassProperty (line 51)
+- new Variable (line 109)
+- new HashTable (line 127)
+- new Variable (line 140)
+- new ObjectEntry (line 203)
+- new Variable (line 212)
+- 16 class method(s)
 
 ### `ext/libxml/libxml_clear_errors.php`
 
@@ -19235,6 +19245,102 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - 2 class method(s)
+
+### `ext/snmp/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 39)
+- new snmpget (line 53)
+- new snmpwalk (line 54)
+- 4 class method(s)
+
+### `ext/snmp/SNMPClose.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/snmp/SNMPConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 26)
+- 1 class method(s)
+
+### `ext/snmp/SNMPGetErrno.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/snmp/SNMPGetError.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/snmp/SNMPGetMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+
+### `ext/snmp/SNMPWalkMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+
+### `ext/snmp/SnmpClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/snmp/SnmpConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/SnmpExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/SnmpFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/VmSnmp.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 37)
+- new Variable (line 40)
+- new SNMPConstruct (line 47)
+- new SNMPGetMethod (line 52)
+- new SNMPWalkMethod (line 53)
+- new SNMPClose (line 54)
+- new SNMPGetError (line 55)
+- new SNMPGetErrno (line 56)
+- new SnmpState (line 79)
+- 14 class method(s)
+
+### `ext/snmp/snmpget.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmpwalk.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/soap/BuiltinClasses.php`
 
@@ -39286,7 +39392,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 221 class method(s)
+- 222 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -45415,39 +45521,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\yaml\Module (line 268)
 - new ext\redis\Module (line 269)
 - new ext\mongodb\Module (line 270)
-- new ext\zstd\Module (line 271)
-- new ext\lzf\Module (line 272)
-- new ext\bz2\Module (line 273)
-- new ext\brotli\Module (line 274)
-- new ext\sodium\Module (line 275)
-- new ext\sqlite3\Module (line 276)
-- new ext\pgsql\Module (line 277)
-- new ext\odbc\Module (line 278)
-- new ext\dba\Module (line 279)
-- new ext\mailparse\Module (line 280)
-- new ext\enchant\Module (line 281)
-- new ext\tidy\Module (line 282)
-- new ext\pdo\Module (line 283)
-- new ext\phar\Module (line 284)
-- new ext\uri\Module (line 285)
-- new ext\uuid\Module (line 286)
-- new ext\uploadprogress\Module (line 287)
-- new ext\apcu\Module (line 288)
-- new ext\sysvshm\Module (line 289)
-- new ext\sysvsem\Module (line 290)
-- new ext\sysvmsg\Module (line 291)
-- new ext\reflection\Module (line 292)
-- new ext\standard\Module (line 293)
-- new JIT (line 369)
-- new JITContext (line 383)
-- new SealedClassPreprocessor (line 449)
-- new StaticClassPreprocessor (line 452)
-- new SourcePreprocessor\PropertyHooks (line 455)
-- new State (line 596)
-- new ReflectionProperty (line 623)
-- new ReflectionProperty (line 626)
-- new LintCompiler (line 1037)
-- new Variable (line 1167)
+- new ext\snmp\Module (line 271)
+- new ext\zstd\Module (line 272)
+- new ext\lzf\Module (line 273)
+- new ext\bz2\Module (line 274)
+- new ext\brotli\Module (line 275)
+- new ext\sodium\Module (line 276)
+- new ext\sqlite3\Module (line 277)
+- new ext\pgsql\Module (line 278)
+- new ext\odbc\Module (line 279)
+- new ext\dba\Module (line 280)
+- new ext\mailparse\Module (line 281)
+- new ext\enchant\Module (line 282)
+- new ext\tidy\Module (line 283)
+- new ext\pdo\Module (line 284)
+- new ext\phar\Module (line 285)
+- new ext\uri\Module (line 286)
+- new ext\uuid\Module (line 287)
+- new ext\uploadprogress\Module (line 288)
+- new ext\apcu\Module (line 289)
+- new ext\sysvshm\Module (line 290)
+- new ext\sysvsem\Module (line 291)
+- new ext\sysvmsg\Module (line 292)
+- new ext\reflection\Module (line 293)
+- new ext\standard\Module (line 294)
+- new JIT (line 370)
+- new JITContext (line 384)
+- new SealedClassPreprocessor (line 450)
+- new StaticClassPreprocessor (line 453)
+- new SourcePreprocessor\PropertyHooks (line 456)
+- new State (line 597)
+- new ReflectionProperty (line 624)
+- new ReflectionProperty (line 627)
+- new LintCompiler (line 1038)
+- new Variable (line 1168)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
