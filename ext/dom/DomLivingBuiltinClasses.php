@@ -226,8 +226,8 @@ final class DomLivingBuiltinClasses
         $namedNodeMap = new ClassEntry('Dom\\NamedNodeMap');
         $namedNodeMap->isInternal = true;
         $namedNodeMap->interfaces[] = 'countable';
-        if (isset($ctx->classes['iterator'])) {
-            $namedNodeMap->interfaces[] = 'iterator';
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $namedNodeMap->interfaces[] = 'iteratoraggregate';
         }
         if (isset($ctx->classes['traversable'])) {
             $namedNodeMap->interfaces[] = 'traversable';
@@ -240,14 +240,11 @@ final class DomLivingBuiltinClasses
         $dtdNamedNodeMap = new ClassEntry('Dom\\DtdNamedNodeMap');
         $dtdNamedNodeMap->isInternal = true;
         $dtdNamedNodeMap->interfaces[] = 'countable';
-        if (isset($ctx->classes['iterator'])) {
-            $dtdNamedNodeMap->interfaces[] = 'iterator';
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $dtdNamedNodeMap->interfaces[] = 'iteratoraggregate';
         }
         if (isset($ctx->classes['traversable'])) {
             $dtdNamedNodeMap->interfaces[] = 'traversable';
-        }
-        if (isset($ctx->classes['iteratoraggregate'])) {
-            $dtdNamedNodeMap->interfaces[] = 'iteratoraggregate';
         }
         $dtdNamedNodeMap->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
         self::copyMethods($ctx->classes[VmDom::CLASS_NAMED_NODE_MAP] ?? null, $dtdNamedNodeMap);
@@ -356,8 +353,8 @@ final class DomLivingBuiltinClasses
         $htmlCollection = new ClassEntry('Dom\\HTMLCollection');
         $htmlCollection->isInternal = true;
         $htmlCollection->interfaces[] = 'countable';
-        if (isset($ctx->classes['iterator'])) {
-            $htmlCollection->interfaces[] = 'iterator';
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $htmlCollection->interfaces[] = 'iteratoraggregate';
         }
         if (isset($ctx->classes['traversable'])) {
             $htmlCollection->interfaces[] = 'traversable';
@@ -373,8 +370,8 @@ final class DomLivingBuiltinClasses
         $nodeList = new ClassEntry('Dom\\NodeList');
         $nodeList->isInternal = true;
         $nodeList->interfaces[] = 'countable';
-        if (isset($ctx->classes['iterator'])) {
-            $nodeList->interfaces[] = 'iterator';
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $nodeList->interfaces[] = 'iteratoraggregate';
         }
         if (isset($ctx->classes['traversable'])) {
             $nodeList->interfaces[] = 'traversable';

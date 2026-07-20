@@ -12,6 +12,7 @@ use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
+use PHPCompiler\ext\spl\ArrayIteratorBuiltin;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
@@ -425,11 +426,12 @@ final class VmDom
         $nsNode->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
         $ctx->classes[self::CLASS_NAMESPACE_NODE] = $nsNode;
 
+        // IteratorAggregate + Countable (php-src php_dom.stub.php; #21298) — not Iterator.
         $nodeList = new ClassEntry('DOMNodeList');
         $nodeList->isInternal = true;
         $nodeList->interfaces[] = 'countable';
-        if (isset($ctx->classes['iterator'])) {
-            $nodeList->interfaces[] = 'iterator';
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $nodeList->interfaces[] = 'iteratoraggregate';
         }
         if (isset($ctx->classes['traversable'])) {
             $nodeList->interfaces[] = 'traversable';
@@ -439,23 +441,16 @@ final class VmDom
         $nodeList->methodVisibility['item'] = $pub;
         $nodeList->methods['count'] = new NodeListCount();
         $nodeList->methodVisibility['count'] = $pub;
-        $nodeList->methods['rewind'] = new NodeListRewind();
-        $nodeList->methodVisibility['rewind'] = $pub;
-        $nodeList->methods['valid'] = new NodeListValid();
-        $nodeList->methodVisibility['valid'] = $pub;
-        $nodeList->methods['current'] = new NodeListCurrent();
-        $nodeList->methodVisibility['current'] = $pub;
-        $nodeList->methods['key'] = new NodeListKey();
-        $nodeList->methodVisibility['key'] = $pub;
-        $nodeList->methods['next'] = new NodeListNext();
-        $nodeList->methodVisibility['next'] = $pub;
+        $nodeList->methods['getiterator'] = new NodeListGetIterator();
+        $nodeList->methodVisibility['getiterator'] = $pub;
+        $nodeList->methodNames['getiterator'] = 'getIterator';
         $ctx->classes[self::CLASS_NODE_LIST] = $nodeList;
 
         $namedNodeMap = new ClassEntry('DOMNamedNodeMap');
         $namedNodeMap->isInternal = true;
         $namedNodeMap->interfaces[] = 'countable';
-        if (isset($ctx->classes['iterator'])) {
-            $namedNodeMap->interfaces[] = 'iterator';
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $namedNodeMap->interfaces[] = 'iteratoraggregate';
         }
         if (isset($ctx->classes['traversable'])) {
             $namedNodeMap->interfaces[] = 'traversable';
@@ -471,16 +466,9 @@ final class VmDom
         $namedNodeMap->methodNames['getnameditemns'] = 'getNamedItemNS';
         $namedNodeMap->methods['count'] = new NamedNodeMapCount();
         $namedNodeMap->methodVisibility['count'] = $pub;
-        $namedNodeMap->methods['rewind'] = new NamedNodeMapRewind();
-        $namedNodeMap->methodVisibility['rewind'] = $pub;
-        $namedNodeMap->methods['valid'] = new NamedNodeMapValid();
-        $namedNodeMap->methodVisibility['valid'] = $pub;
-        $namedNodeMap->methods['current'] = new NamedNodeMapCurrent();
-        $namedNodeMap->methodVisibility['current'] = $pub;
-        $namedNodeMap->methods['key'] = new NamedNodeMapKey();
-        $namedNodeMap->methodVisibility['key'] = $pub;
-        $namedNodeMap->methods['next'] = new NamedNodeMapNext();
-        $namedNodeMap->methodVisibility['next'] = $pub;
+        $namedNodeMap->methods['getiterator'] = new NamedNodeMapGetIterator();
+        $namedNodeMap->methodVisibility['getiterator'] = $pub;
+        $namedNodeMap->methodNames['getiterator'] = 'getIterator';
         $ctx->classes[self::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
 
         if (CompilerVersion::supportsDomTokenList()) {
@@ -7677,6 +7665,32 @@ final class VmDom
     }
 
     /**
+     * DOMNodeList::getIterator() — php-src InternalIterator over live items (#21298).
+     * Snapshot into ArrayIterator (same pattern as TokenList / ResourceBundle).
+     */
+    public static function nodeListGetIterator(Context $ctx, ObjectEntry $nodeList): ObjectEntry
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::getIterator() called on non-nodelist in this compiler build');
+        }
+        self::refreshNodeListIfLive($nodeList);
+        $ht = new HashTable();
+        $len = \count(DomRegistry::state($nodeList)->listNodeIds);
+        for ($i = 0; $i < $len; ++$i) {
+            $node = self::nodeListItem($nodeList, $i);
+            $v = new Variable();
+            if (null === $node) {
+                $v->null();
+            } else {
+                $v->object($node);
+            }
+            $ht->append($v);
+        }
+
+        return self::arrayIteratorFromTable($ctx, $ht);
+    }
+
+    /**
      * @param list<int> $nodeIds
      */
     public static function createNodeList(Context $ctx, array $nodeIds): Variable
@@ -8104,6 +8118,52 @@ final class VmDom
             throw new \LogicException('DOMNamedNodeMap::next() called on non-namednodemap in this compiler build');
         }
         ++DomRegistry::state($namedNodeMap)->listIterIndex;
+    }
+
+    /**
+     * DOMNamedNodeMap::getIterator() — php-src InternalIterator; keys are Attr local names (#21298).
+     * Snapshot into ArrayIterator (same pattern as TokenList / ResourceBundle).
+     */
+    public static function namedNodeMapGetIterator(Context $ctx, ObjectEntry $namedNodeMap): ObjectEntry
+    {
+        if (!self::isNamedNodeMap($namedNodeMap)) {
+            throw new \LogicException('DOMNamedNodeMap::getIterator() called on non-namednodemap in this compiler build');
+        }
+        $ht = new HashTable();
+        $len = \count(DomRegistry::state($namedNodeMap)->listNodeIds);
+        for ($i = 0; $i < $len; ++$i) {
+            $node = self::namedNodeMapItem($namedNodeMap, $i);
+            if (null === $node) {
+                continue;
+            }
+            // php-src NamedNodeMap iteration keys Attr.name (local), not nodeName (QName).
+            if (self::isAttr($node)) {
+                $key = self::readLocalName($node);
+            } else {
+                $key = DomRegistry::state($node)->nodeName;
+            }
+            $v = new Variable();
+            $v->object($node);
+            $ht->add($key, $v);
+        }
+
+        return self::arrayIteratorFromTable($ctx, $ht);
+    }
+
+    /**
+     * Shared ArrayIterator factory for DOM collection getIterator() snapshots (#21298, #20884).
+     */
+    private static function arrayIteratorFromTable(Context $ctx, HashTable $ht): ObjectEntry
+    {
+        $class = $ctx->classes[ArrayIteratorBuiltin::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ArrayIterator is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        ArrayIteratorBuiltin::init($entry, $ht);
+
+        return $entry;
     }
 
     /**

@@ -544,6 +544,33 @@ final class VmDomJitDispatch
     }
 
     /**
+     * IteratorAggregate::getIterator() — NodeList / NamedNodeMap / TokenList (#21298, #20884).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function dispatchGetIterator(VmContext $ctx, ObjectEntry $receiver, array $extra): Variable
+    {
+        $result = new Variable();
+        if (VmDom::isNodeList($receiver)) {
+            $result->object(VmDom::nodeListGetIterator($ctx, $receiver));
+
+            return $result;
+        }
+        if (VmDom::isNamedNodeMap($receiver)) {
+            $result->object(VmDom::namedNodeMapGetIterator($ctx, $receiver));
+
+            return $result;
+        }
+        if (VmDom::isTokenList($receiver)) {
+            $result->object(VmDomTokenList::getIterator($ctx, $receiver));
+
+            return $result;
+        }
+
+        throw new \Error('Call to undefined method '.$receiver->class->name.'::getIterator()');
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function nodeListItem(VmContext $ctx, ObjectEntry $nodeList, array $extra): Variable
