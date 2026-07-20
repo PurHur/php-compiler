@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -25,8 +25,8 @@ final class strripos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strripos() requires two or three arguments');
         }
-        $haystackStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'strripos', 0, 'haystack');
-        $needleStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[1], 'strripos', 1, 'needle');
+        $haystackStr = self::vmStringArg($frame, 0, 'haystack');
+        $needleStr = self::vmStringArg($frame, 1, 'needle');
         if (null === $frame->returnVar) {
             return;
         }
@@ -63,8 +63,12 @@ final class strripos extends Internal
             );
         }
         StringStrrpos::ensureLinked($context);
-        $hay = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strripos', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strripos', 1, 'needle');
+        $hay = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strripos', 0, 'haystack')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strripos', 0, 'haystack');
+        $needle = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'strripos', 1, 'needle')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'strripos', 1, 'needle');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'strripos', 3, 'offset')
             : null;
@@ -88,5 +92,19 @@ final class strripos extends Internal
         }
 
         return null;
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strripos', $paramName)->toString();
+        }
+
+        return VmString::coerceTrimFamilyStringArg(
+            $frame->calledArgs[$argIndex],
+            'strripos',
+            $argIndex,
+            $paramName
+        );
     }
 }

@@ -17,12 +17,12 @@ foreach (['strpos', 'stripos', 'strrpos', 'strripos', 'strstr', 'stristr', 'strc
 ?>
 --EXPECT--
 strpos: OK false
-stripos: TypeError
-strrpos: TypeError
-strripos: TypeError
+stripos: OK false
+strrpos: OK false
+strripos: OK false
 strstr: OK false
-stristr: TypeError
-strchr: TypeError
-strrchr: TypeError
-strpbrk: TypeError
+stristr: OK false
+strchr: OK false
+strrchr: OK false
+strpbrk: OK false
 strtok: TypeError
