@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * LLVM JIT/AOT helper for pack() via __compiler_pack (issue #5231).
  *
- * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241).
+ * Soft-null $format on PROFILE=8.4 — Zend DEP+'' (#21478, reverts #20241 TypeError).
  */
 final class JitPack
 {
@@ -29,18 +29,12 @@ final class JitPack
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20241, pack.c).
+        // Soft-null $format on 8.4 — Zend deprecate+coerce (#21478, reverts #20241 TypeError).
         $nullFormat = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
         $fmt = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'pack', 0, 'format')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'pack', 0, 'format');
-        if (
-            $nullFormat
-            && (
-                $context->callerStrictTypes
-                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            )
-        ) {
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'pack', 0, 'format');
+        if ($nullFormat && $context->callerStrictTypes) {
             // lower* already emitted TypeError+abort; do not lower __compiler_pack after terminator.
             return $context->constantFromString('');
         }

@@ -1,9 +1,11 @@
 /**
- * #20241 / #21246 — pack()/unpack() null under PHP_COMPILER_PROFILE=8.4.
- *
- * $format remains Z_PARAM_STR TypeError; unpack $string / pack values soft-null (#21246, #21209).
+ * #21478 — pack()/unpack() null $format soft-null under PHP_COMPILER_PROFILE=8.4
+ * (reverts #20241 TypeError; unpack $string / pack values still soft #21246/#21209).
  */
 error_reporting(E_ALL);
+set_error_handler(static function (int $n, string $m): bool {
+    return true;
+});
 foreach ([
     'pack_fmt' => static fn () => pack(null),
     'unpack_data' => static fn () => unpack('a*', null),
