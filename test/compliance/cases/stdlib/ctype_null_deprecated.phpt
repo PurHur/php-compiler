@@ -18,7 +18,6 @@ $fns = [
     'ctype_space',
     'ctype_upper',
     'ctype_xdigit',
-    'ctype_blank',
 ];
 
 foreach ($fns as $fn) {
@@ -54,4 +53,3 @@ ctype_punct:result=false depr=1 msg=1
 ctype_space:result=false depr=1 msg=1
 ctype_upper:result=false depr=1 msg=1
 ctype_xdigit:result=false depr=1 msg=1
-ctype_blank:result=false depr=1 msg=1
