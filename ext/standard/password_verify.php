@@ -24,9 +24,9 @@ final class password_verify extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('password_verify() requires exactly two arguments');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20174, ext/standard/password.c)
-        $password = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'password_verify', 0, 'password');
-        $hash = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'password_verify', 1, 'hash');
+        // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21314, ext/standard/password.c).
+        $password = VmString::trimFamilyStringArgForFrame($frame, 0, 'password_verify', 0, 'password');
+        $hash = VmString::trimFamilyStringArgForFrame($frame, 1, 'password_verify', 1, 'hash');
         if (null === $frame->returnVar) {
             return;
         }
@@ -43,9 +43,9 @@ final class password_verify extends Internal
 
         return JitPassword::verify(
             $context,
-            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20174, ext/standard/password.c)
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'password_verify', 0, 'password'),
-            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'password_verify', 1, 'hash')
+            // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21314, ext/standard/password.c).
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'password_verify', 0, 'password'),
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'password_verify', 1, 'hash')
         );
     }
 }

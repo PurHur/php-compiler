@@ -35,8 +35,8 @@ final class password_needs_rehash extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#18655, ext/standard/password.c)
-        $hash = VmString::zparamStrBuiltinArgForFrame(
+        // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21314, ext/standard/password.c).
+        $hash = VmString::trimFamilyStringArgForFrame(
             $frame,
             0,
             'password_needs_rehash',
@@ -86,8 +86,8 @@ final class password_needs_rehash extends Internal
 
         return JitPasswordNeedsRehash::invoke(
             $context,
-            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#18655, ext/standard/password.c)
-            JitStringBuiltinArg::lowerZparamStr(
+            // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21314, ext/standard/password.c).
+            JitStringBuiltinArg::lowerTrimFamilyString(
                 $context,
                 $args[0],
                 'password_needs_rehash',
