@@ -587,6 +587,19 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
+    /**
+     * PHP 8.5+ ReflectionConstant::getFileName()/getExtension()/getExtensionName()
+     * (ext/reflection/php_reflection.stub.php, #21551).
+     */
+    public static function advertisesReflectionConstantFileExtensionApis(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
     /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class advertisement (#11902). */
     public static function advertisesDelayedTargetValidationAttributeClass(): bool
     {

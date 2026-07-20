@@ -6395,7 +6395,8 @@ restart:
                         throw new \LogicException('Global constant value must be a compile-time constant');
                     }
                     $constValue = VM\EnumCaseSupport::materializeConstantValue($this->context, $constValue);
-                    if (!$this->context->defineConstant($name, $constValue)) {
+                    $constFilename = '' !== $frame->scriptPath ? $frame->scriptPath : 'Command line code';
+                    if (!$this->context->defineConstant($name, $constValue, false, $constFilename)) {
                         $line = (int) ($op->globalConstStartLine ?? 0);
                         $this->context->errors->triggerError(
                             "Constant {$name} already defined",

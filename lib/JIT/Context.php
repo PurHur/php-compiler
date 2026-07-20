@@ -942,6 +942,10 @@ class Context {
         $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
+        $this->functionProxies['reflectionconstant::getname'] = new Call\ReflectionConstantGetName();
+        $this->functionProxies['reflectionconstant::getnamespacename'] = new Call\ReflectionConstantGetNamespaceName();
+        $this->functionProxies['reflectionconstant::getshortname'] = new Call\ReflectionConstantGetShortName();
+        $this->functionProxies['reflectionconstant::__tostring'] = new Call\ReflectionConstantToString();
         $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {

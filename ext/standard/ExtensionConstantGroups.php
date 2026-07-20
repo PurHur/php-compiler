@@ -139,6 +139,29 @@ final class ExtensionConstantGroups
             || isset(self::CATEGORIZED_CORE_RUNTIME_NAMES[$name]);
     }
 
+    /**
+     * Extension bucket for a non-user constant (ReflectionConstant::getExtension*, #21551).
+     * Returns null when the name is not a known extension/Core constant.
+     */
+    public static function extensionNameForConstant(string $name): ?string
+    {
+        if (isset(self::CATEGORIZED_CORE_RUNTIME_NAMES[$name])) {
+            return 'Core';
+        }
+        foreach (StdlibModuleConstants::CORE_BUCKET_NAMES as $coreName) {
+            if ($coreName === $name) {
+                return 'Core';
+            }
+        }
+        foreach (self::groups() as $extension => $constants) {
+            if (isset($constants[$name])) {
+                return $extension;
+            }
+        }
+
+        return null;
+    }
+
     /** @return list<string> */
     public static function coreBucketNames(): array
     {

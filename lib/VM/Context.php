@@ -41,6 +41,13 @@ class Context {
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> */
     public array $globalConstDeprecated = [];
 
+    /**
+     * Declaring filename for user constants (ReflectionConstant::getFileName, PHP 8.5+, #21551).
+     *
+     * @var array<string, string>
+     */
+    public array $globalConstantFilenames = [];
+
     /** @var array<string, Variable> */
     private array $superglobalVars = [];
 
@@ -533,8 +540,9 @@ class Context {
      * Register a user constant (const / define). Returns false if already defined.
      *
      * PHP 8+ ignores case-insensitive constants; $caseInsensitive is accepted for call-site BC only.
+     * Optional $filename feeds ReflectionConstant::getFileName() (php-src zend_constant.filename, #21551).
      */
-    public function defineConstant(string $name, Variable $value, bool $caseInsensitive = false): bool
+    public function defineConstant(string $name, Variable $value, bool $caseInsensitive = false, ?string $filename = null): bool
     {
         if (isset($this->constants[$name])) {
             return false;
@@ -545,6 +553,12 @@ class Context {
             }
         }
         $this->constants[$name] = EnumCaseSupport::materializeConstantValue($this, $value);
+        $file = (null !== $filename && '' !== $filename) ? $filename : 'Command line code';
+        // php-src CLI uses "Command line code" for -r / stdin; compliance harness uses "-" (#21551).
+        if ('-' === $file) {
+            $file = 'Command line code';
+        }
+        $this->globalConstantFilenames[$name] = $file;
 
         return true;
     }

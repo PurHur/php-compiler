@@ -48,7 +48,8 @@ final class define_ extends Internal
                 $frame
             );
         }
-        $ok = $frame->vmContext->defineConstant($name, $value);
+        $filename = '' !== $frame->scriptPath ? $frame->scriptPath : 'Command line code';
+        $ok = $frame->vmContext->defineConstant($name, $value, false, $filename);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

@@ -172,6 +172,12 @@ use PHPCompiler\VM\Builtin\ReflectionConstantGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetModifiers;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetName;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetNamespaceName;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetShortName;
+use PHPCompiler\VM\Builtin\ReflectionConstantToString;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetFileName;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetExtension;
+use PHPCompiler\VM\Builtin\ReflectionConstantGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
 use PHPCompiler\VM\Builtin\ReflectionConstantHasType;
@@ -1063,6 +1069,20 @@ final class BuiltinClasses
             $rconst->methodVisibility['__construct'] = $pub;
             $rconst->methods['getname'] = new ReflectionConstantGetName();
             $rconst->methodVisibility['getname'] = $pub;
+            $rconst->methods['getnamespacename'] = new ReflectionConstantGetNamespaceName();
+            $rconst->methodVisibility['getnamespacename'] = $pub;
+            $rconst->methods['getshortname'] = new ReflectionConstantGetShortName();
+            $rconst->methodVisibility['getshortname'] = $pub;
+            $rconst->methods['__tostring'] = new ReflectionConstantToString();
+            $rconst->methodVisibility['__tostring'] = $pub;
+            if (CompilerVersion::advertisesReflectionConstantFileExtensionApis()) {
+                $rconst->methods['getfilename'] = new ReflectionConstantGetFileName();
+                $rconst->methodVisibility['getfilename'] = $pub;
+                $rconst->methods['getextension'] = new ReflectionConstantGetExtension();
+                $rconst->methodVisibility['getextension'] = $pub;
+                $rconst->methods['getextensionname'] = new ReflectionConstantGetExtensionName();
+                $rconst->methodVisibility['getextensionname'] = $pub;
+            }
             $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
             $rconst->methodVisibility['getvalue'] = $pub;
             $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
