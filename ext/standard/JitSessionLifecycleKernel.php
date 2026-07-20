@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\SessionCreateIdRuntime;
 use PHPCompiler\JIT\Builtin\SessionStart;
 use PHPCompiler\JIT\Builtin\SessionStorageGlobals;
@@ -17,11 +16,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT LLVM for session lifecycle (#5332, #5750, #6968, #9446, #19896).
+ * JIT/AOT LLVM for session lifecycle (#5332, #5750, #6968, #9446, #19896, #21564).
  *
  * Quarantined from lib/JIT/Builtin/SessionLifecycleRuntime —
  * {@see \PHPCompiler\JIT\Builtin\SessionLifecycleRuntime} stays the thin orchestrator.
  *
+ * Embed + standalone: honest `__phpc_session_*_apply` bodies (cookie/disk) — no
+ * legacy C-symbol forwarder / embed-only simplified stubs (#21564).
  * Replaces lib/AOT/runtime/phpc_session_lifecycle.c. php-src: ext/session/session.c
  * `__phpc_session_generate_new_id` routes through SessionCreateIdJitHelper PHP (#9500).
  */
@@ -35,10 +36,6 @@ final class JitSessionLifecycleKernel
         SessionStorageGlobals::implementEnsureDefaults($context);
         SessionStorageRuntime::ensureLinked($context);
         self::implementGenerateNewId($context);
-
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            return;
-        }
 
         self::implementStandaloneRuntime($context);
         self::implementStandaloneWriteClose($context);
@@ -88,7 +85,7 @@ final class JitSessionLifecycleKernel
 
     private static function implementStandaloneRuntime(Context $context): void
     {
-        $fn = $context->lookupFunction(SessionStart::RUNTIME_C_SYMBOL);
+        $fn = $context->lookupFunction('__phpc_session_start_apply');
         if ($fn->countBasicBlocks() > 0) {
             return;
         }

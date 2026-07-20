@@ -4,42 +4,30 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\SessionLifecycleRuntime;
-use PHPCompiler\JIT\Builtin\SessionStart;
-use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5332: AOT standalone must define session lifecycle without phpc_session_lifecycle.c.
+ * Issue #5332 / #21564: session lifecycle without phpc_session_lifecycle.c or
+ * SessionStart C-symbol forwarder. NestedJIT ensureLinked is covered elsewhere
+ * when HashTable helper compile is healthy; this file stays source-level.
  *
  * @group aot-lint
  */
 final class SessionLifecycleRuntimeStandaloneTest extends TestCase
 {
-    public function testEnsureLinkedDefinesLifecycleForStandalone(): void
+    public function testKernelImplementsStartApplyDirectlyNoForwarder(): void
     {
-        $runtime = new Runtime(Runtime::MODE_AOT);
-        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        SessionLifecycleRuntime::ensureLinked($ctx);
+        $kernel = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionLifecycleKernel.php');
+        $this->assertStringContainsString("lookupFunction('__phpc_session_start_apply')", $kernel);
+        $this->assertStringNotContainsString('phpc_session_start_runtime', $kernel);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $kernel);
+        $this->assertStringContainsString('implementStandaloneRuntime', $kernel);
+        $this->assertStringContainsString('implementStandaloneWriteClose', $kernel);
 
-        foreach (
-            [
-                SessionStart::RUNTIME_C_SYMBOL,
-                '__phpc_session_write_close_apply',
-                '__phpc_session_regenerate_id_apply',
-                '__phpc_session_destroy_apply',
-                '__phpc_session_abort_apply',
-                '__phpc_session_reset_apply',
-                '__phpc_session_create_id_apply',
-                '__phpc_session_gc_apply',
-                '__phpc_session_generate_new_id',
-                'phpc_session_random_id_string',
-            ] as $name
-        ) {
-            $fn = $ctx->lookupFunction($name);
-            $this->assertNotNull($fn, $name);
-            $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
-        }
+        $start = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/SessionStart.php');
+        $this->assertStringNotContainsString('implementStandaloneForwarder', $start);
+        $this->assertStringNotContainsString('registerRuntimeDeclaration', $start);
+        $this->assertStringNotContainsString('RUNTIME_C_SYMBOL', $start);
     }
 
     public function testPhpcSessionLifecycleCRemoved(): void
