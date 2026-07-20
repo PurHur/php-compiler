@@ -14,8 +14,8 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
  */
 final class ExceptionTrace
 {
-    /** Zend exception traces omit call arguments (zend_exception_get_trace); unlike debug_backtrace(). */
-    private const TRACE_OPTIONS = VmDebugBacktrace::IGNORE_ARGS;
+    /** Include args with #[\SensitiveParameter] redaction (Zend zend_exceptions.c; #21339 / re-#15036). */
+    private const TRACE_OPTIONS = 0;
 
     /**
      * Snapshot caller frame for manual `new Throwable()` (not thrown) — Zend object_init_ex (#9905).
