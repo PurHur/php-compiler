@@ -23,7 +23,8 @@ final class LocaleGetScript extends VmClassMethod
                 'Locale::getScript() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
-        $locale = VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR $locale — null TypeError on PROFILE=8.4 (#21078, locale.stub.php).
+        $locale = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'Locale::getScript',
             0,

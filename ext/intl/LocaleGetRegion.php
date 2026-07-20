@@ -23,7 +23,8 @@ final class LocaleGetRegion extends VmClassMethod
                 'Locale::getRegion() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
-        $locale = VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR $locale — null TypeError on PROFILE=8.4 (#21078, locale.stub.php).
+        $locale = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'Locale::getRegion',
             0,
