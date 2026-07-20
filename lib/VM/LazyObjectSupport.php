@@ -87,8 +87,47 @@ final class LazyObjectSupport
         return self::extractRequiredCallable($arg, $functionName, $argNum, $paramName);
     }
 
+    /**
+     * Declared instance properties that Zend marks IS_PROP_LAZY at make_lazy time.
+     *
+     * Excludes the MCJIT empty-class pad {@see \PHPCompiler\JitMcjitEmbed::CLASS_PAD_PROPERTY}
+     * so zero-real-prop classes stay non-lazy (#21570).
+     *
+     * @see Zend/zend_lazy_objects.c zend_object_make_lazy — lazy_properties_count
+     */
+    public static function countLazyInstanceProperties(ClassEntry $class): int
+    {
+        $pad = \PHPCompiler\JitMcjitEmbed::CLASS_PAD_PROPERTY;
+        $n = 0;
+        foreach ($class->properties as $property) {
+            if ($property->name !== $pad) {
+                ++$n;
+            }
+        }
+
+        return $n;
+    }
+
+    /**
+     * Classes with zero declared instance properties never become lazy (#21570).
+     *
+     * @see Zend/zend_lazy_objects.c — "If the object has no properties to begin with, this happens immediately."
+     */
+    public static function classCanBeLazy(ClassEntry $class): bool
+    {
+        return self::countLazyInstanceProperties($class) > 0;
+    }
+
     public static function createProxy(ClassEntry $class, ClosureState $initializer, int $options = 0): ObjectEntry
     {
+        if (!self::classCanBeLazy($class)) {
+            // zend_object_make_lazy early-return: ordinary object, initializer discarded (#21570).
+            $object = new ObjectEntry($class);
+            $object->constructed = true;
+            self::applyUserOptions($object, $options, false);
+
+            return $object;
+        }
         $object = new ObjectEntry($class);
         $object->constructed = false;
         $object->lazyInitializer = $initializer;
@@ -103,6 +142,14 @@ final class LazyObjectSupport
 
     public static function createGhost(ClassEntry $class, ?ClosureState $initializer, int $options = 0): ObjectEntry
     {
+        if (!self::classCanBeLazy($class)) {
+            // zend_object_make_lazy early-return: ordinary object, initializer discarded (#21570).
+            $object = new ObjectEntry($class);
+            $object->constructed = true;
+            self::applyUserOptions($object, $options, false);
+
+            return $object;
+        }
         $object = new ObjectEntry($class);
         foreach ($object->getRawProperties() as $var) {
             $var->reset();
@@ -438,6 +485,21 @@ final class LazyObjectSupport
             $var->type = Variable::TYPE_UNDEFINED;
         }
 
+        // Zero declared instance props: make_lazy returns a non-lazy object (#21570).
+        if (!self::classCanBeLazy($object->class)) {
+            $object->constructed = true;
+            $object->destructorInvoked = false;
+            $object->lazyInitializer = null;
+            $object->lazyPending = false;
+            $object->lazyGhost = false;
+            $object->lazyResetInitializer = null;
+            $object->lazyInitException = null;
+            self::clearLazyRawInitializedProperties($object);
+            self::applyUserOptions($object, $options, true);
+
+            return;
+        }
+
         $object->constructed = false;
         $object->destructorInvoked = false;
         $object->lazyInitializer = $initializer;
@@ -468,6 +530,21 @@ final class LazyObjectSupport
         foreach ($object->getRawProperties() as $var) {
             $var->reset();
             $var->type = Variable::TYPE_UNDEFINED;
+        }
+
+        // Zero declared instance props: make_lazy returns a non-lazy object (#21570).
+        if (!self::classCanBeLazy($object->class)) {
+            $object->constructed = true;
+            $object->destructorInvoked = false;
+            $object->lazyInitializer = null;
+            $object->lazyPending = false;
+            $object->lazyGhost = false;
+            $object->lazyResetInitializer = null;
+            $object->lazyInitException = null;
+            self::clearLazyRawInitializedProperties($object);
+            self::applyUserOptions($object, $options, true);
+
+            return;
         }
 
         $object->constructed = false;

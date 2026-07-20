@@ -34,7 +34,7 @@ final class ReflectionClassNewLazyGhost implements Call
         $classIdVal = ReflectionClassNewLazyProxy::loadClassIdFromLazyFactoryArg($context, $args[0]);
         $obj = $context->type->object->allocateForRuntimeClassId($classIdVal);
         $context->type->object->resetInstancePropertySlots($obj, $classIdVal);
-        LazyObjectHelper::registerLazyObject($context, $obj, $initIndex, true);
+        LazyObjectHelper::registerLazyObjectForRuntimeClass($context, $obj, $initIndex, true, $classIdVal);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(

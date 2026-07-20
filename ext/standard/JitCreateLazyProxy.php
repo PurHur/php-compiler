@@ -44,7 +44,7 @@ final class JitCreateLazyProxy
         [$cstr, $len] = ReflectionSetup::stringVarAsCstr($context, $args[0]);
         $classIdVal = $context->type->object->classIdFromRuntimeName($cstr, $len);
         $obj = $context->type->object->allocateForRuntimeClassId($classIdVal);
-        LazyObjectHelper::registerLazyObject($context, $obj, $initIndex, false);
+        LazyObjectHelper::registerLazyObjectForRuntimeClass($context, $obj, $initIndex, false, $classIdVal);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(

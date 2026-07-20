@@ -32,6 +32,27 @@ final class LazyObjectHelper
         LazyObjectHelperLlvm::registerLazyObject($context, $obj, $initIndex, $ghost);
     }
 
+    /**
+     * Mark lazy only when the runtime class has declared instance properties (#21570).
+     *
+     * @see Zend/zend_lazy_objects.c zend_object_make_lazy — zero-prop early return
+     */
+    public static function registerLazyObjectForRuntimeClass(
+        Context $context,
+        Value $obj,
+        int $initIndex,
+        bool $ghost,
+        Value $classIdVal
+    ): void {
+        LazyObjectHelperLlvm::registerLazyObjectForRuntimeClass(
+            $context,
+            $obj,
+            $initIndex,
+            $ghost,
+            $classIdVal
+        );
+    }
+
     public static function emitEnsureInitialized(Context $context, Value $obj): void
     {
         LazyObjectHelperLlvm::emitEnsureInitialized($context, $obj);
