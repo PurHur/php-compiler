@@ -57,7 +57,8 @@ final class hebrev extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'hebrev', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21421, ext/standard/string.c).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'hebrev',
             $argIndex,

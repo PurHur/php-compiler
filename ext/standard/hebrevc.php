@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,12 +32,7 @@ final class hebrevc extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('hebrevc() accepts one or two arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'hebrevc',
-            0,
-            'string'
-        );
+        $string = self::vmStringArg($frame, 0, 'string');
         $maxCharsPerLine = 0;
         if ($argc >= 2) {
             $maxVar = $frame->calledArgs[1]->resolveIndirect();
@@ -53,5 +50,19 @@ final class hebrevc extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         return JitHebrevc::invoke($context, ...$args);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'hebrevc', $paramName)->toString();
+        }
+
+        return VmString::coerceTrimFamilyStringArg(
+            $frame->calledArgs[$argIndex],
+            'hebrevc',
+            $argIndex,
+            $paramName
+        );
     }
 }
