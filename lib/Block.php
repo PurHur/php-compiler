@@ -1418,6 +1418,10 @@ class Block {
             if (null !== $frame->returnVar) {
                 $return->returnVar = $frame->returnVar;
             }
+            // CFG try/catch/merge and other block edges must keep VM context (#21266).
+            if (null !== $frame->vmContext) {
+                $return->vmContext = $frame->vmContext;
+            }
             // CFG branch targets (e.g. function-static init) must keep closure invoke context (#4872).
             if (null !== $frame->closureCall) {
                 $return->closureCall = $frame->closureCall;
