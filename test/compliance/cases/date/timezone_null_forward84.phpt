@@ -1,5 +1,5 @@
 --TEST--
-date timezone_open / DateTimeZone / date_default_timezone_set(null) — DEP+coerce on 8.4 (#21369, re-#20959, ext/date/php_date.stub.php)
+date timezone_open / DateTimeZone / date_default_timezone_set(null) — DEP+coerce on 8.4 (#21369, ext/date/php_date.stub.php)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
