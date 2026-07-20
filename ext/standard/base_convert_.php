@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathBaseConvert;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -43,7 +44,7 @@ final class base_convert_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $numStr = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'base_convert', 0, 'num');
+        $numStr = VmString::trimFamilyStringArgForFrame($frame, 0, 'base_convert', 0, 'num');
         if (Variable::TYPE_INTEGER !== $fromVar->type || Variable::TYPE_INTEGER !== $toVar->type) {
             throw new \LogicException('base_convert() base arguments must be integers in this compiler build');
         }
@@ -65,7 +66,16 @@ final class base_convert_ extends Internal
         }
         $num = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base_convert', 0, 'num')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'base_convert', 0, 'num');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'base_convert', 0, 'num');
+        if (
+            !$context->callerStrictTypes
+            && ($args[0]->isNullConstant ?? false)
+        ) {
+            return JitValueBox::coerceToValuePtrForStore(
+                $context,
+                $context->builder->load($context->constantStringFromString('0'))
+            );
+        }
         MathBaseConvert::ensureLinked($context);
         $ptr = $this->stringDataPtr($context, $num);
         $fromBase = $this->jitLong($context, $args[1], 'base_convert() argument #2');

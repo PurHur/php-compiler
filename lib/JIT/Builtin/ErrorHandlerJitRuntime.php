@@ -19,6 +19,7 @@ use llvm\LLVMValueRef_ptr;
  * Stack state uses LLVM module globals ({@see DefineRuntime} pattern) because nested-JIT
  * static property stores in {@see ErrorHandlerJitHelper} omit string slots on standalone AOT.
  * Thin no-op ABI stubs deleted (#21346). VM SSOT remains {@see ErrorHandlerJitHelper}.
+ * Depth/top/saved mirrors exception-handler stack shape.
  * php-src: ext/standard/basic_functions.c — set_error_handler, restore_error_handler
  */
 final class ErrorHandlerJitRuntime

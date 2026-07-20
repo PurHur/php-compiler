@@ -359,6 +359,18 @@ final class VmPcntl
         throw new \Error('pcntl_wifstopped() is not available in this compiler build');
     }
 
+    public static function wifcontinued(int $status): bool
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::wifcontinued($status);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::wifcontinued($status);
+        }
+
+        throw new \Error('pcntl_wifcontinued() is not available in this compiler build');
+    }
+
     public static function wtermsig(int $status): int
     {
         if (PcntlHostBridge::forkAvailable()) {
@@ -698,6 +710,27 @@ final class VmPcntl
         }
 
         throw new \Error('pcntl_sigtimedwait() is not available in this compiler build');
+    }
+
+    /**
+     * @param array<string, int>|null $infoOut
+     */
+    public static function sigwaitinfo(array $signals, ?Variable $infoOut): int|false
+    {
+        foreach ($signals as $signo) {
+            VmPcntlArg::validateSignal($signo, 'pcntl_sigwaitinfo');
+        }
+        $info = [];
+        if (PcntlHostBridge::available()) {
+            $rc = PcntlHostBridge::sigwaitinfo($signals, $info);
+            if (false !== $rc && null !== $infoOut) {
+                self::writeSiginfo($info, $infoOut);
+            }
+
+            return $rc;
+        }
+
+        throw new \Error('pcntl_sigwaitinfo() is not available in this compiler build');
     }
 
     public static function waitid(int $idtype, int $id, ?Variable $infoOut, int $options): bool

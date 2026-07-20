@@ -20,6 +20,8 @@ final class ErrorHandlerRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('implementStandaloneThinAbi', $source);
         $this->assertStringNotContainsString('standaloneAbiFunction', $source);
         $this->assertStringNotContainsString('standaloneLinkStubsReady', $source);
+        $this->assertStringContainsString('phpc_eh_stack_depth', $source);
+        $this->assertStringContainsString('ensureStackGlobals', $source);
         $this->assertStringContainsString('implementDispatchBridge', $source);
         $this->assertStringContainsString('implementSetApplyBridge', $source);
         $this->assertStringContainsString('implementGetApplyBridge', $source);

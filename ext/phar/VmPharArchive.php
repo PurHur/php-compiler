@@ -693,10 +693,53 @@ final class VmPharArchive
         $filename = self::normalizeArchivePath($filename);
         self::assertReadablePharFile($filename);
         if ('' !== $alias) {
-            self::$aliases[$alias] = $filename;
+            self::registerAlias($alias, $filename);
         }
 
         return true;
+    }
+
+    public static function registerAlias(string $alias, string $filename): void
+    {
+        self::$aliases[$alias] = self::normalizeArchivePath($filename);
+    }
+
+    public static function resolveAliasPath(string $alias): ?string
+    {
+        return self::$aliases[$alias] ?? null;
+    }
+
+    /**
+     * @return array{files: array<string, string>, dirs: array<string, true>}|null
+     */
+    public static function liveEntriesForPath(string $path): ?array
+    {
+        $path = self::normalizeArchivePath($path);
+        foreach (self::$state as $st) {
+            if ($st['path'] !== $path) {
+                continue;
+            }
+
+            return ['files' => $st['files'], 'dirs' => $st['dirs']];
+        }
+
+        return null;
+    }
+
+    public static function assertReadablePharFilePublic(string $path): void
+    {
+        self::assertReadablePharFile($path);
+    }
+
+    public static function normalizeEntryNamePublic(string $localname): string
+    {
+        return self::normalizeEntryName($localname);
+    }
+
+    /** @return array{0: string, 1: string} */
+    public static function splitStubPublic(string $binary): array
+    {
+        return self::splitStub($binary);
     }
 
     /**

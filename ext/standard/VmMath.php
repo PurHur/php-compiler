@@ -609,10 +609,7 @@ final class VmMath
             case Variable::TYPE_BOOLEAN:
                 return $var->toBool() ? 1.0 : 0.0;
             case Variable::TYPE_NULL:
-                if (self::requiresForwardProfileStrictDoubleNull()) {
-                    throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'null'));
-                }
-                // Z_PARAM_DOUBLE: E_DEPRECATED then coerce to 0.0 (#19756).
+                // Z_PARAM_DOUBLE: E_DEPRECATED then coerce to 0.0 (sqrt/sin/log; #19756, #20432).
                 VmNullNumberParamDeprecation::emit($frame, $function, $argIndex, $paramName, 'float');
 
                 return 0.0;
@@ -633,6 +630,26 @@ final class VmMath
                     )
                 );
         }
+    }
+
+    /**
+     * Z_PARAM_DOUBLE null → TypeError on PHP 8.4 forward profile (fadd/fsub/fmul/fpow only; #19182, #20432).
+     *
+     * @throws \TypeError when operand is null on PROFILE=8.4+
+     */
+    public static function parseForwardProfileStrictDoubleBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        ?Frame $frame = null
+    ): float {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type && self::requiresForwardProfileStrictDoubleNull()) {
+            throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+        }
+
+        return self::parseDoubleBuiltinArg($var, $function, $argIndex, $paramName, $frame);
     }
 
     /**
