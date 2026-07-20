@@ -27,9 +27,9 @@ final class preg_split extends Internal
                 'preg_split() expects 2 to 4 arguments in this compiler build'
             );
         }
-        // Z_PARAM_STR $pattern — null TypeError on 8.4 (#20226).
+        // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226 TypeError).
         // $subject soft-null: E_DEPRECATED + '' on 8.4 (php-src php_pcre.c / #21318, re-#21198).
-        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_split', 0, 'pattern');
+        $pattern = VmString::trimFamilyStringArgForFrame($frame, 0, 'preg_split', 0, 'pattern');
         $subject = VmString::trimFamilyStringArgForFrame($frame, 1, 'preg_split', 1, 'subject');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_split', $pattern);
         $limit = -1;
@@ -102,13 +102,13 @@ final class preg_split extends Internal
             $flags = JitIntdiv::lowerIntBuiltinArg($context, $args[3], 'preg_split', 4, 'flags');
         }
 
-        // Z_PARAM_STR $pattern — null TypeError on 8.4 (#20226).
+        // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226 TypeError).
         // $subject soft-null DEP+coerce on 8.4 (#21318; php-src php_pcre.c).
         if ($context->callerStrictTypes) {
             $pattern = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_split', 0, 'pattern');
             $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'preg_split', 1, 'subject');
         } else {
-            $pattern = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_split', 0, 'pattern');
+            $pattern = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'preg_split', 0, 'pattern');
             $subject = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'preg_split', 1, 'subject');
         }
 

@@ -44,6 +44,7 @@ final class VmString
      * mb_strlen/mb_substr/mb_strpos and iconv/iconv_strlen(+substr/strpos/strrpos input) soft-null (#21197).
      * preg_match/preg_replace/preg_split/preg_match_all/preg_replace_callback*
      * $subject (and str_replace family $subject) soft-null likewise (#21198, #21318).
+     * preg_match/preg_match_all/preg_split/preg_grep $pattern soft-null (#21479, reverts #20226).
      * json_decode/json_validate $json, unserialize $data soft-null (#21223).
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
      * parse_str $string is Z_PARAM_STR TypeError on 8.4 (#21380, re-#20113).
@@ -84,6 +85,7 @@ final class VmString
      * extension_loaded/defined/constant/method_exists/property_exists/define name args (#21281),
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode string
      * operands (#21189), stripos/strripos/strrpos/stristr/strchr/strrchr/strpbrk haystack (#21444),
+     * preg_match/preg_match_all/preg_split/preg_grep $pattern (#21479, reverts #20226),
      * substr_count/substr_replace haystack (#21196), ord() character (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),

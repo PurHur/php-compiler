@@ -30,8 +30,8 @@ final class preg_grep extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('preg_grep() requires two or three arguments in this compiler build');
         }
-        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226, ext/pcre/php_pcre.c).
-        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_grep', 0, 'pattern');
+        // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226; ext/pcre/php_pcre.c).
+        $pattern = VmString::trimFamilyStringArgForFrame($frame, 0, 'preg_grep', 0, 'pattern');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_grep', $pattern);
         $array = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
@@ -111,10 +111,10 @@ final class preg_grep extends Internal
             $invert = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $flags, $one);
         }
 
-        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
+        // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226).
         $pattern = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_grep', 0, 'pattern')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_grep', 0, 'pattern');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'preg_grep', 0, 'pattern');
 
         return JitPregGrep::invoke(
             $context,

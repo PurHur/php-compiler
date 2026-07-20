@@ -1,5 +1,5 @@
 --TEST--
-PCRE null $pattern: TypeError match/split/grep; soft replace on 8.4 (#20226, #21198)
+PCRE null $pattern soft-null DEP+WARN+false on 8.4 (#21479, reverts #20226; soft replace #21198)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -13,6 +13,7 @@ set_error_handler(static function (int $no, string $msg): bool {
 });
 foreach ([
     'preg_match' => static fn () => preg_match(null, 'x'),
+    'preg_match_all' => static fn () => preg_match_all(null, 'x'),
     'preg_split' => static fn () => preg_split(null, 'x'),
     'preg_grep' => static fn () => preg_grep(null, ['x']),
     'preg_replace' => static fn () => preg_replace(null, 'b', 'a'),
@@ -26,9 +27,18 @@ foreach ([
 }
 ?>
 --EXPECT--
-preg_match: preg_match(): Argument #1 ($pattern) must be of type string, null given
-preg_split: preg_split(): Argument #1 ($pattern) must be of type string, null given
-preg_grep: preg_grep(): Argument #1 ($pattern) must be of type string, null given
+DEP
+WARN
+preg_match OK false
+DEP
+WARN
+preg_match_all OK false
+DEP
+WARN
+preg_split OK false
+DEP
+WARN
+preg_grep OK false
 DEP
 WARN
 preg_replace OK NULL
