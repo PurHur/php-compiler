@@ -437,6 +437,12 @@ final class VmIni
 
             return true;
         }
+        if ('sendmail_path' === $key) {
+            // Mirror into PHP_COMPILER_INI_SENDMAIL_PATH so VmMail / ini_get see CLI -d (#3285).
+            VmIniIntrospection::setMirroredHostIniOverride('sendmail_path', $value);
+
+            return true;
+        }
         if ('phar.readonly' === $key) {
             \PHPCompiler\ext\phar\VmPhar::setStartupReadonly(self::parseBoolIni($value));
 

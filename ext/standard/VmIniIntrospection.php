@@ -38,6 +38,10 @@ final class VmIniIntrospection
 
     private static bool $iniSnapshotFrozen = false;
 
+    /** CLI -d / PHPT --INI-- overrides for MIRRORED_HOST_INI_KEYS (#3285). */
+    /** @var array<string, string> */
+    private static array $mirroredOverrides = [];
+
     /**
      * Registered string ini directives mirrored from host Zend ini_get() (#14187).
      *
@@ -400,6 +404,9 @@ final class VmIniIntrospection
         if (!\in_array($normalized, self::MIRRORED_HOST_INI_KEYS, true)) {
             return null;
         }
+        if (\array_key_exists($normalized, self::$mirroredOverrides)) {
+            return self::$mirroredOverrides[$normalized];
+        }
         $env = self::envString(self::mirroredIniEnvName($normalized));
         if ('' !== $env) {
             return $env;
@@ -412,6 +419,21 @@ final class VmIniIntrospection
         }
 
         return '';
+    }
+
+    /**
+     * CLI {@code bin/vm.php -d sendmail_path=...} / PHPT --INI-- startup override (#3285).
+     */
+    public static function setMirroredHostIniOverride(string $key, string $value): void
+    {
+        $normalized = strtolower($key);
+        if (!\in_array($normalized, self::MIRRORED_HOST_INI_KEYS, true)) {
+            return;
+        }
+        self::$mirroredOverrides[$normalized] = $value;
+        if (\function_exists('putenv')) {
+            \putenv(self::mirroredIniEnvName($normalized).'='.$value);
+        }
     }
 
     private static function mirroredIniEnvName(string $key): string
