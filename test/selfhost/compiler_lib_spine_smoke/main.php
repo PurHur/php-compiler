@@ -6161,6 +6161,7 @@ require_once __DIR__.'/../../../ext/odbc/odbc_num_rows.php';
 require_once __DIR__.'/../../../ext/odbc/odbc_pconnect.php';
 require_once __DIR__.'/../../../ext/odbc/odbc_prepare_fetch_builtins.php';
 require_once __DIR__.'/../../../ext/odbc/odbc_result.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_txn_builtins.php';
 require_once __DIR__.'/../../../ext/ffi/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/ffi/FfiExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/ffi/Module.php';

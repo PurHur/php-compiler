@@ -12,8 +12,8 @@ use PHPCompiler\VM;
  * odbc extension module entry (php-src ext/odbc/php_odbc.c; #6293 / #21258).
  *
  * Connect/close/exec/fetch/error + PHP 8.2 connection-string helpers +
- * prepare/execute/fetch_array/tables/columns/field_* surface. Thin unixODBC
- * FFI when libodbc is present (document unixodbc / libsqliteodbc in Docker).
+ * prepare/execute/fetch_array/tables/columns/field_* + autocommit/commit/rollback.
+ * Thin unixODBC FFI when libodbc is present (document unixodbc / libsqliteodbc in Docker).
  */
 class Module extends ModuleAbstract
 {
@@ -45,6 +45,7 @@ class Module extends ModuleAbstract
         }
 
         require_once __DIR__.'/odbc_prepare_fetch_builtins.php';
+        require_once __DIR__.'/odbc_txn_builtins.php';
 
         return [
             new odbc_connect(),
@@ -71,6 +72,9 @@ class Module extends ModuleAbstract
             new odbc_tables(),
             new odbc_columns(),
             new odbc_free_result(),
+            new odbc_autocommit(),
+            new odbc_commit(),
+            new odbc_rollback(),
             new odbc_error(),
             new odbc_errormsg(),
         ];

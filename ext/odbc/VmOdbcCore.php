@@ -284,6 +284,83 @@ final class VmOdbcCore
     }
 
     /**
+     * odbc_autocommit — get status (int) or set mode (bool) (php-src; #21277).
+     *
+     * @return int|bool
+     */
+    public static function autocommit(
+        ObjectEntry $connection,
+        ?bool $enable,
+        Context $ctx,
+        ?Frame $frame = null
+    ): int|bool {
+        if (!VmOdbcConnection::isLive($connection)) {
+            throw new \TypeError('odbc_autocommit(): supplied resource is not a valid ODBC connection resource');
+        }
+        $native = VmOdbcConnection::native($connection);
+        $hdbc = $native['hdbc'];
+        if (null === $hdbc) {
+            self::warn($ctx, 'odbc_autocommit(): SQL error: Failed to fetch error message, SQL state HY000 in Set autocommit', $frame);
+
+            return false;
+        }
+        if (null === $enable) {
+            $status = VmOdbcNative::getAutocommit($hdbc);
+            if (null === $status) {
+                VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+                self::warn($ctx, 'odbc_autocommit(): SQL error: Failed to fetch error message, SQL state HY000 in Get commit status', $frame);
+
+                return false;
+            }
+            VmOdbcConnection::setLastError('', '');
+
+            return $status;
+        }
+        if (!VmOdbcNative::setAutocommit($hdbc, $enable)) {
+            VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+            self::warn($ctx, 'odbc_autocommit(): SQL error: Failed to fetch error message, SQL state HY000 in Set autocommit', $frame);
+
+            return false;
+        }
+        VmOdbcConnection::setLastError('', '');
+
+        return true;
+    }
+
+    /**
+     * odbc_commit / odbc_rollback via SQLTransact (php-src odbc_transact; #21277).
+     */
+    public static function transact(
+        ObjectEntry $connection,
+        bool $commit,
+        Context $ctx,
+        ?Frame $frame = null
+    ): bool {
+        $fn = $commit ? 'odbc_commit' : 'odbc_rollback';
+        if (!VmOdbcConnection::isLive($connection)) {
+            throw new \TypeError($fn.'(): supplied resource is not a valid ODBC connection resource');
+        }
+        $native = VmOdbcConnection::native($connection);
+        $henv = $native['henv'];
+        $hdbc = $native['hdbc'];
+        if (null === $henv || null === $hdbc) {
+            VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+            self::warn($ctx, $fn.'(): SQL error: Failed to fetch error message, SQL state HY000 in SQLTransact', $frame);
+
+            return false;
+        }
+        if (!VmOdbcNative::transact($henv, $hdbc, $commit)) {
+            VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+            self::warn($ctx, $fn.'(): SQL error: Failed to fetch error message, SQL state HY000 in SQLTransact', $frame);
+
+            return false;
+        }
+        VmOdbcConnection::setLastError('', '');
+
+        return true;
+    }
+
+    /**
      * odbc_fetch_array — BOTH keys (numeric + associative), like php_odbc_fetch with ODBC_BOTH.
      *
      * @return HashTable|false

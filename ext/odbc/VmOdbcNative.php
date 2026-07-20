@@ -36,6 +36,17 @@ final class VmOdbcNative
 
     public const SQL_HANDLE_STMT = 3;
 
+    /** ODBC 2 SQL_AUTOCOMMIT / SQL_ATTR_AUTOCOMMIT (sql.h). */
+    public const SQL_AUTOCOMMIT = 102;
+
+    public const SQL_AUTOCOMMIT_OFF = 0;
+
+    public const SQL_AUTOCOMMIT_ON = 1;
+
+    public const SQL_COMMIT = 0;
+
+    public const SQL_ROLLBACK = 1;
+
     /** @var \FFI|null */
     private static $ffi = null;
 
@@ -470,6 +481,66 @@ final class VmOdbcNative
     }
 
     /**
+     * Set SQL_AUTOCOMMIT (php-src SQLSetConnectOption; #21277).
+     */
+    public static function setAutocommit(\FFI\CData $hdbc, bool $enable): bool
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $value = $enable ? self::SQL_AUTOCOMMIT_ON : self::SQL_AUTOCOMMIT_OFF;
+            $rc = (int) $ffi->SQLSetConnectOption($hdbc, self::SQL_AUTOCOMMIT, $value);
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get SQL_AUTOCOMMIT status (0/1). null on error.
+     */
+    public static function getAutocommit(\FFI\CData $hdbc): ?int
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return null;
+            }
+            $status = $ffi->new('SQLULEN');
+            $rc = (int) $ffi->SQLGetConnectOption($hdbc, self::SQL_AUTOCOMMIT, \FFI::addr($status));
+            if (!self::ok($rc)) {
+                return null;
+            }
+
+            return (int) $status->cdata;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * SQLTransact commit/rollback (php-src odbc_transact; #21277).
+     */
+    public static function transact(\FFI\CData $henv, \FFI\CData $hdbc, bool $commit): bool
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $type = $commit ? self::SQL_COMMIT : self::SQL_ROLLBACK;
+            $rc = (int) $ffi->SQLTransact($henv, $hdbc, $type);
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Buffer all current result rows + column metadata.
      *
      * @return array{rows: list<list<mixed>>, colnames: list<string>, coltypes: list<string>, collens: list<int>}|null
@@ -566,6 +637,9 @@ SQLRETURN SQLGetData(SQLHSTMT hstmt, SQLUSMALLINT icol, SQLSMALLINT fCType, SQLP
 SQLRETURN SQLBindParameter(SQLHSTMT hstmt, SQLUSMALLINT ipar, SQLSMALLINT fParamType, SQLSMALLINT fCType, SQLSMALLINT fSqlType, SQLULEN cbColDef, SQLSMALLINT ibScale, SQLPOINTER rgbValue, SQLLEN cbValueMax, SQLLEN *pcbValue);
 SQLRETURN SQLTables(SQLHSTMT hstmt, SQLCHAR *szTableQualifier, SQLSMALLINT cbTableQualifier, SQLCHAR *szTableOwner, SQLSMALLINT cbTableOwner, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLCHAR *szTableType, SQLSMALLINT cbTableType);
 SQLRETURN SQLColumns(SQLHSTMT hstmt, SQLCHAR *szTableQualifier, SQLSMALLINT cbTableQualifier, SQLCHAR *szTableOwner, SQLSMALLINT cbTableOwner, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLCHAR *szColumnName, SQLSMALLINT cbColumnName);
+SQLRETURN SQLSetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLULEN vParam);
+SQLRETURN SQLGetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLPOINTER pvParam);
+SQLRETURN SQLTransact(SQLHENV henv, SQLHDBC hdbc, SQLUSMALLINT fType);
 CDEF;
         foreach (['libodbc.so.2', 'libodbc.so.1', 'libodbc.so', 'libiodbc.so.2', 'libiodbc.so'] as $lib) {
             try {
