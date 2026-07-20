@@ -1,5 +1,5 @@
 --TEST--
-stdlib implode()/join() soft-null; token_get_all TypeError; sscanf soft-null on 8.4 (#21210/#21209)
+stdlib implode()/join()/token_get_all()/sscanf soft-null on 8.4 (#21210/#21209/#21503)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --RUNFILE--
@@ -7,5 +7,5 @@ implode_token_sscanf_null_forward84.php
 --EXPECT--
 implode: uncaught
 join: uncaught
-token_get_all: token_get_all(): Argument #1 ($source) must be of type string, null given
+token_get_all: uncaught
 sscanf: uncaught

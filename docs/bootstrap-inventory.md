@@ -23877,7 +23877,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGmmktime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitGzclose.php`
 
@@ -24241,7 +24241,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitMktime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitMoveUploadedFile.php`
 
@@ -29881,8 +29881,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1805)
-- new Error (line 1816)
+- new Error (line 1807)
+- new Error (line 1818)
 - 218 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -35425,8 +35425,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tokenizer/JitTokenGetAll.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 4 class method(s)
+- new ArgumentCountError (line 23)
+- 5 class method(s)
 
 ### `ext/tokenizer/JitTokenName.php`
 
@@ -44353,7 +44353,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 486)
+- new Variable (line 488)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
@@ -49221,9 +49221,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 101)
 - new Variable (line 137)
 - new Variable (line 151)
-- new Variable (line 188)
-- new Variable (line 192)
-- new ClassEntry (line 217)
+- new Variable (line 190)
+- new Variable (line 194)
+- new ClassEntry (line 219)
 - 12 class method(s)
 
 ### `lib/VM/ShutdownQueue.php`

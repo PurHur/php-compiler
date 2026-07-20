@@ -1,10 +1,11 @@
 --TEST--
-AOT: token_get_all(null) TypeError on 8.4 forward profile (#19894)
+AOT: token_get_all(null) soft-null on 8.4 (#21503, reverts #19894 TypeError)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-token_get_all(null);
+error_reporting(E_ALL & ~E_DEPRECATED);
+echo count(token_get_all(null)), "\n";
+?>
 --EXPECT--
---EXPECT_EXIT--
-255
+0
