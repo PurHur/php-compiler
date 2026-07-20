@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
 /**
- * Shared wiring for xml_set_* handler registration (php-src ext/xml/xml.c; #18203, #19343).
+ * Shared wiring for xml_set_* handler registration (php-src ext/xml/xml.c; #18203, #19343, #21522).
  */
 abstract class XmlSetHandlerFunction extends XmlFunction
 {
@@ -19,7 +19,11 @@ abstract class XmlSetHandlerFunction extends XmlFunction
             return;
         }
         $parser = XmlParserSupport::requireParser($frame->calledArgs[0], $this->getName(), 1);
-        $handler = $this->resolveHandler($frame->calledArgs[$handlerArgIndex] ?? null);
+        $sawNonCallableString = false;
+        $handler = $this->resolveHandler($frame->calledArgs[$handlerArgIndex] ?? null, $frame, $sawNonCallableString);
+        if ($sawNonCallableString) {
+            XmlHandlerDeprecation::emitNonCallableString($frame, $this->getName());
+        }
         $frame->returnVar->bool(XmlParserHandlers::setHandler($parser, $slot, $handler));
     }
 
@@ -29,8 +33,13 @@ abstract class XmlSetHandlerFunction extends XmlFunction
             return;
         }
         $parser = XmlParserSupport::requireParser($frame->calledArgs[0], $this->getName(), 1);
-        $start = $this->resolveHandler($frame->calledArgs[$startIndex] ?? null);
-        $end = $this->resolveHandler($frame->calledArgs[$endIndex] ?? null);
+        $sawNonCallableString = false;
+        $start = $this->resolveHandler($frame->calledArgs[$startIndex] ?? null, $frame, $sawNonCallableString);
+        $end = $this->resolveHandler($frame->calledArgs[$endIndex] ?? null, $frame, $sawNonCallableString);
+        if ($sawNonCallableString) {
+            // One E_DEPRECATED per call when any handler takes the OS method-name path (xml.c; #21522).
+            XmlHandlerDeprecation::emitNonCallableString($frame, $this->getName());
+        }
         $ok = XmlParserHandlers::setHandler($parser, $startSlot, $start)
             && XmlParserHandlers::setHandler($parser, $endSlot, $end);
         $frame->returnVar->bool($ok);
@@ -38,8 +47,10 @@ abstract class XmlSetHandlerFunction extends XmlFunction
 
     /**
      * Resolve a SAX handler argument to a callable Variable (string name, Closure, or array).
+     *
+     * @param-out bool $sawNonCallableString
      */
-    protected function resolveHandler(?Variable $arg): ?Variable
+    protected function resolveHandler(?Variable $arg, Frame $frame, bool &$sawNonCallableString): ?Variable
     {
         if (null === $arg) {
             return null;
@@ -49,6 +60,9 @@ abstract class XmlSetHandlerFunction extends XmlFunction
             return null;
         }
         if (Variable::TYPE_STRING === $arg->type) {
+            if (XmlHandlerDeprecation::isNonCallableStringHandler($arg, $frame)) {
+                $sawNonCallableString = true;
+            }
             $name = $arg->toString();
             if ('' === $name) {
                 return null;
@@ -68,6 +82,9 @@ abstract class XmlSetHandlerFunction extends XmlFunction
         // Scalar coercion — Zend converts non-callable scalars to string function names.
         $out = new Variable();
         $out->string($arg->toString());
+        if (XmlHandlerDeprecation::isNonCallableStringHandler($out, $frame)) {
+            $sawNonCallableString = true;
+        }
 
         return $out;
     }

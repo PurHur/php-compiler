@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6177 |
-| Phase A inventory files (M2 ratio SSOT) | 6177 |
+| PHP files on vm.php path | 6178 |
+| Phase A inventory files (M2 ratio SSOT) | 6178 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19440 |
+| Source constructs flagged (warnings) | 19443 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4125,6 +4125,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/VmXmlStructBuilder.php` | 0 | 18 |
 | `ext/xml/XmlConstants.php` | 0 | 1 |
 | `ext/xml/XmlFunction.php` | 0 | 1 |
+| `ext/xml/XmlHandlerDeprecation.php` | 0 | 3 |
 | `ext/xml/XmlParserHandlers.php` | 0 | 7 |
 | `ext/xml/XmlParserSupport.php` | 0 | 4 |
 | `ext/xml/XmlSetHandlerFunction.php` | 0 | 4 |
@@ -29880,8 +29881,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1801)
-- new Error (line 1812)
+- new Error (line 1805)
+- new Error (line 1816)
 - 218 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -35993,6 +35994,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/xml/XmlHandlerDeprecation.php`
+
+**Warnings** (review for bootstrap subset):
+- new DeprecatedMetadata (line 28)
+- new Variable (line 54)
+- 4 class method(s)
+
 ### `ext/xml/XmlParserHandlers.php`
 
 **Warnings** (review for bootstrap subset):
@@ -36015,9 +36023,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/XmlSetHandlerFunction.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 56)
-- new Variable (line 63)
-- new Variable (line 69)
+- new Variable (line 70)
+- new Variable (line 77)
+- new Variable (line 83)
 - 3 class method(s)
 
 ### `ext/xml/xml_error_string.php`
@@ -36053,15 +36061,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/xml_parse.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/xml/xml_parse_into_struct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- new Variable (line 43)
-- new Variable (line 48)
+- new ArgumentCountError (line 27)
+- new Variable (line 45)
+- new Variable (line 50)
 - 2 class method(s)
 
 ### `ext/xml/xml_parser_create.php`
