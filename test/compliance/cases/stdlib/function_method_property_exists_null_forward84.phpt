@@ -1,35 +1,27 @@
 --TEST--
-stdlib function_exists()/method_exists()/property_exists(null) TypeError on 8.4 (#20360)
+stdlib function_exists()/method_exists()/property_exists(null) soft-null on 8.4 (#21281, re-#20360)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-try {
-    function_exists(null);
-    echo "fail function_exists\n";
-} catch (TypeError $e) {
-    echo "ok function_exists\n";
-}
-try {
-    method_exists('stdClass', null);
-    echo "fail method_exists\n";
-} catch (TypeError $e) {
-    echo "ok method_exists\n";
-}
-try {
-    property_exists('stdClass', null);
-    echo "fail property_exists\n";
-} catch (TypeError $e) {
-    echo "ok property_exists\n";
-}
-try {
-    class_exists(null);
-    echo "fail class_exists\n";
-} catch (TypeError $e) {
-    echo "ok class_exists\n";
-}
+error_reporting(E_ALL);
+$seen = [];
+set_error_handler(static function (int $no, string $str) use (&$seen): bool {
+    if (E_DEPRECATED === $no) {
+        $seen[] = $str;
+    }
+    return true;
+});
+echo 'function_exists=', var_export(function_exists(null), true), "\n";
+echo 'method_exists=', var_export(method_exists('stdClass', null), true), "\n";
+echo 'property_exists=', var_export(property_exists('stdClass', null), true), "\n";
+echo 'class_exists=', var_export(class_exists(null), true), "\n";
+restore_error_handler();
+echo 'depr=', (int) (count($seen) >= 4), "\n";
+?>
 --EXPECT--
-ok function_exists
-ok method_exists
-ok property_exists
-ok class_exists
+function_exists=false
+method_exists=false
+property_exists=false
+class_exists=false
+depr=1

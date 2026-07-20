@@ -27,8 +27,8 @@ final class function_exists extends Internal
             return;
         }
         $ctx = VmReflection::requireContext($frame);
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20360, zend_builtin_functions.c).
-        $name = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'function_exists', 0, 'function');
+        // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, zend_builtin_functions.c).
+        $name = VmString::trimFamilyStringArgForFrame($frame, 0, 'function_exists', 0, 'function');
         $frame->returnVar->bool(VmReflection::functionExists($ctx, $name));
     }
 

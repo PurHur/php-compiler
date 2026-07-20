@@ -39,8 +39,8 @@ final class constant_ extends Internal
             InternalStrictArg::requireString($frame, 0, 'constant', 'name');
             $name = $frame->calledArgs[0]->resolveIndirect()->toString();
         } else {
-            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c).
-            $name = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'constant', 0, 'name');
+            // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, ext/standard/basic_functions.c).
+            $name = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'constant', 0, 'name');
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('constant() requires VM context');
@@ -80,9 +80,8 @@ final class constant_ extends Internal
             return $arg;
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            // Z_PARAM_STR — null TypeError on 8.4; empty string on older profiles (#19652).
-            // Do not set compileTimeString — avoid folding away the runtime TypeError/abort.
-            $str = JitStringBuiltinArg::lowerZparamStr($context, $arg, 'constant', 0, 'name');
+            // Z_PARAM_STR — soft-null DEP+coerce on 8.4; empty name → Undefined constant (#21281).
+            $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'constant', 0, 'name');
 
             return new JITVariable(
                 $context,
@@ -92,7 +91,7 @@ final class constant_ extends Internal
             );
         }
         if (JITVariable::TYPE_HASHTABLE === $arg->type || 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
-            JitStringBuiltinArg::lowerZparamStr($context, $arg, 'constant', 0, 'name');
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'constant', 0, 'name');
 
             return $arg;
         }

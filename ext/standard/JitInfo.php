@@ -204,19 +204,19 @@ final class JitInfo
     public static function extension_loaded(Context $context, JITVariable $extension): Value
     {
         StringInfo::ensureLinked($context);
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/info.c).
+        // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21281, ext/standard/info.c).
         $nullExt = JITVariable::TYPE_NULL === $extension->type || ($extension->isNullConstant ?? false);
-        $extStr = JitStringBuiltinArg::lowerZparamStr($context, $extension, 'extension_loaded', 0, 'extension');
+        $extStr = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $extension,
+            'extension_loaded',
+            0,
+            'extension'
+        );
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
-        if (
-            $nullExt
-            && (
-                $context->callerStrictTypes
-                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            )
-        ) {
-            // lowerZparamStr already emitted TypeError+abort; skip runtime call (#20254).
+        if ($nullExt && !$context->callerStrictTypes) {
+            // Empty extension name is never loaded — skip C runtime after soft-null (#21281).
             JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
 
             return $ptr;

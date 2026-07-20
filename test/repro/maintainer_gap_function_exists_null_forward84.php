@@ -1,26 +1,9 @@
 <?php
-// Repro #20360 — function_exists/method_exists/property_exists(null) TypeError under PROFILE=8.4
-try {
-    function_exists(null);
-    echo "fail function_exists\n";
-} catch (TypeError $e) {
-    echo "ok function_exists\n";
-}
-try {
-    method_exists('stdClass', null);
-    echo "fail method_exists\n";
-} catch (TypeError $e) {
-    echo "ok method_exists\n";
-}
-try {
-    property_exists('stdClass', null);
-    echo "fail property_exists\n";
-} catch (TypeError $e) {
-    echo "ok property_exists\n";
-}
-try {
-    class_exists(null);
-    echo "fail class_exists\n";
-} catch (TypeError $e) {
-    echo "ok class_exists\n";
-}
+// Repro #20360 — function_exists/method_exists/property_exists(null) soft-null under PROFILE=8.4 (#21281)
+set_error_handler(static function (int $no, string $msg): bool {
+    return E_DEPRECATED === $no;
+});
+echo 'function_exists=', var_export(function_exists(null), true), "\n";
+echo 'method_exists=', var_export(method_exists('stdClass', null), true), "\n";
+echo 'property_exists=', var_export(property_exists('stdClass', null), true), "\n";
+echo 'class_exists=', var_export(class_exists(null), true), "\n";

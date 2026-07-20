@@ -1,10 +1,9 @@
 --TEST--
-AOT: extension_loaded/get_extension_funcs/version_compare/set_include_path(null) TypeError on 8.4 (#20254)
+AOT: defined(null) soft-null on 8.4 (#21281, re-#20254 info sibling)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-extension_loaded(null);
+echo var_export(defined(null), true), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+false

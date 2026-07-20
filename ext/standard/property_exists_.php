@@ -35,8 +35,8 @@ final class property_exists_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         self::requireValidObjectOrClass($frame->calledArgs[0]->resolveIndirect());
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20360, zend_builtin_functions.c).
-        $property = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'property_exists', 1, 'property');
+        // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, zend_builtin_functions.c).
+        $property = VmString::trimFamilyStringArgForFrame($frame, 1, 'property_exists', 1, 'property');
         $exists = VmReflection::propertyExists($ctx, $frame->calledArgs[0], $property);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
@@ -52,8 +52,7 @@ final class property_exists_ extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR property — null TypeError on 8.4 forward profile (#20360).
-        // Compile-time null must not enter JitPropertyExists (runaway LLVM on TYPE_NULL property slot).
+        // Z_PARAM_STR property — soft-null DEP+coerce on 8.4 (#21281); empty property never exists.
         if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
             self::jitPropertyNameArg($context, $args[1]);
             $i1 = $context->getTypeFromString('int1');
@@ -93,7 +92,7 @@ final class property_exists_ extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'property_exists',

@@ -67,11 +67,12 @@ final class define_ extends Internal
         return JitDefine::invoke($context, $args[0], $args[1]);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c). */
+    /** Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, ext/standard/basic_functions.c). */
     private static function vmConstantNameArg(Frame $frame): string
     {
-        return VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
+        return VmString::trimFamilyStringArgForFrame(
+            $frame,
+            0,
             'define',
             0,
             'constant_name'

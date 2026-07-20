@@ -43,6 +43,7 @@ final class VmString
      * mb_strlen/mb_substr/mb_strpos and iconv/iconv_strlen(+substr/strpos/strrpos input) soft-null (#21197).
      * preg_match/preg_replace $subject (and str_replace family $subject) soft-null likewise (#21198).
      * json_decode/json_validate $json, unserialize $data, parse_str $string soft-null (#21223).
+     * introspection name args (function_exists/class_exists/defined/…) soft-null (#21281).
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare is Z_PARAM_STR TypeError on 8.4 (#20164), not soft-null.
      */
@@ -61,6 +62,8 @@ final class VmString
      * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * mb_strtolower/mb_convert_encoding/mb_substr_count string inputs (#21282),
+     * function_exists/class_exists/interface_exists/trait_exists/enum_exists/
+     * extension_loaded/defined/constant/method_exists/property_exists/define name args (#21281),
      * preg_match $subject (#21198), and substr/strpos/strstr/explode string
      * operands (#21189), ord() character (#21222),
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).

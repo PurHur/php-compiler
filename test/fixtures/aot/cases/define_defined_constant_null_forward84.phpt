@@ -1,10 +1,9 @@
 --TEST--
-AOT: define()/defined()/constant(null) — TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c)
+AOT: define(null) soft-null on 8.4 (#21281, re-#19652)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-define(null, 1);
+echo var_export(define(null, 1), true), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+true

@@ -43,15 +43,23 @@ final class defined_ extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('defined() requires exactly one argument');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c).
-        $nameStr = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'defined', 0, 'constant_name');
+        $i1 = $context->getTypeFromString('int1');
+        // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281); empty name is never defined.
+        $nameStr = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $args[0],
+            'defined',
+            0,
+            'constant_name'
+        );
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            return $i1->constInt(0, false);
+        }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             $literal = VmReflection::normalizeGlobalIntrospectionName($literal);
             if (null !== $context->runtime->vmContext
                 && VmConstants::constantDefined($context->runtime->vmContext, $literal)) {
-                $i1 = $context->getTypeFromString('int1');
-
                 return $i1->constInt(1, false);
             }
             $nameStr = $context->builder->load($context->constantStringFromString($literal));
@@ -63,11 +71,12 @@ final class defined_ extends Internal
         return DefineRuntime::emitDefined($context, $nameStr);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c). */
+    /** Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281, ext/standard/basic_functions.c). */
     private static function vmConstantNameArg(Frame $frame): string
     {
-        return VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
+        return VmString::trimFamilyStringArgForFrame(
+            $frame,
+            0,
             'defined',
             0,
             'constant_name'
