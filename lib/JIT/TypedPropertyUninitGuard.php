@@ -67,6 +67,13 @@ final class TypedPropertyUninitGuard
         $context->builder->branchIf($isUndef, $raiseBlock, $okBlock);
 
         $context->builder->positionAtEnd($raiseBlock);
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            ErrorRaise::ensureStandaloneBodies($context);
+        }
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         ErrorRaise::emitRaise(
             $context,
             sprintf(
@@ -75,6 +82,10 @@ final class TypedPropertyUninitGuard
                 $var->objectPropertyName
             )
         );
+        // Thin user-script AOT skips end-of-main abort (#21467); abort here.
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+        }
         self::emitRaiseAndTerminate($context);
 
         $context->builder->positionAtEnd($okBlock);
@@ -116,6 +127,13 @@ final class TypedPropertyUninitGuard
         $context->builder->branchIf($isInit, $okBlock, $raiseBlock);
 
         $context->builder->positionAtEnd($raiseBlock);
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            ErrorRaise::ensureStandaloneBodies($context);
+        }
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         ErrorRaise::emitRaise(
             $context,
             sprintf(
@@ -124,6 +142,9 @@ final class TypedPropertyUninitGuard
                 $propertyName
             )
         );
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+        }
         self::emitRaiseAndTerminate($context);
 
         $context->builder->positionAtEnd($okBlock);
