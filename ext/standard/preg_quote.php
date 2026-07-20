@@ -28,9 +28,10 @@ final class preg_quote extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // Z_PARAM_STR $str — null TypeError on 8.4 forward profile (#19320, ext/pcre/php_pcre.c).
-        $subject = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR $str — Zend 8.4 DEP+coerces null (#21234, ext/pcre/php_pcre.c).
+        $subject = VmString::trimFamilyStringArgForFrame(
+            $frame,
+            0,
             'preg_quote',
             0,
             'str'
@@ -56,7 +57,7 @@ final class preg_quote extends Internal
 
         StringPregQuote::ensureLinked($context);
 
-        $subject = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_quote', 0, 'str');
+        $subject = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'preg_quote', 0, 'str');
         $null = $context->getTypeFromString('__string__*')->constNull();
         if (1 === $argc) {
             return $context->builder->call(

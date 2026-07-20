@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * printf() — formatted write to SAPI output (VM; JIT/AOT via __compiler_printf, issue #3681).
  *
  * php-src: ext/standard/formatted_print.c — PHP_FUNCTION(printf)
- * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20197).
+ * Z_PARAM_STR $format: Zend 8.4 DEP+coerces null (#21234; reverts #20197 TypeError).
  */
 final class printf_ extends Internal
 {
@@ -28,8 +28,8 @@ final class printf_ extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireAtLeastArgCount($frame, 'printf', 1);
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20197, formatted_print.c).
-        $format = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'printf', 0, 'format');
+        // Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21234, formatted_print.c).
+        $format = VmString::trimFamilyStringArgForFrame($frame, 0, 'printf', 0, 'format');
         $argc = \count($frame->calledArgs);
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {

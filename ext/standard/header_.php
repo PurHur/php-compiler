@@ -27,7 +27,7 @@ use PHPLLVM\Value;
 /**
  * header() for HTTP response headers (VM ResponseContext + JIT pending queue; issue #5344, #8274).
  *
- * Z_PARAM_STR $header — null TypeError on 8.4 forward profile (#19224, php-src ext/standard/head.c).
+ * Z_PARAM_STR $header — Zend 8.4 DEP+coerces null (#21234, php-src ext/standard/head.c).
  */
 final class header_ extends Internal
 {
@@ -108,14 +108,14 @@ final class header_ extends Internal
         return $context->getTypeFromString('int32')->constInt(0, false);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19224, ext/standard/head.c). */
+    /** Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21234, ext/standard/head.c). */
     private static function vmHeaderArg(Frame $frame): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, 0, 'header', 'header')->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'header',
             0,
@@ -135,7 +135,7 @@ final class header_ extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'header',

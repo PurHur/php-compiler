@@ -1,10 +1,12 @@
 --TEST--
-AOT: header(null) — TypeError on 8.4 forward profile (#19224, ext/standard/head.c)
+AOT: header(null) soft-null on 8.4 forward profile (#21234, reverts #19224)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-header(null);
+$h = null;
+header($h); // DEP+coerce to ''; must not TypeError
+header('Content-Type: text/plain'); // keep CGI flush well-defined after empty soft-null
+echo "OK\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+OK

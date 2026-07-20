@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * LLVM JIT/AOT helper for fprintf() — __compiler_sprintf + __compiler_fwrite (#3301).
  *
- * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20197).
+ * Z_PARAM_STR $format: Zend 8.4 DEP+coerces null (#21234; reverts #20197 TypeError).
  */
 final class JitFprintf
 {
@@ -28,19 +28,13 @@ final class JitFprintf
             JitLongArg::lower($context, $args[0], 'fprintf() stream'),
             $i64
         );
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20197, formatted_print.c).
+        // Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21234, formatted_print.c).
         $nullFormat = JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false);
         $fmt = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'fprintf', 1, 'format')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'fprintf', 1, 'format');
-        if (
-            $nullFormat
-            && (
-                $context->callerStrictTypes
-                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            )
-        ) {
-            // lower* already emitted TypeError+abort; do not lower sprintf/fwrite after terminator.
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'fprintf', 1, 'format');
+        if ($nullFormat && $context->callerStrictTypes) {
+            // lowerStrict* already emitted TypeError+abort; do not lower sprintf/fwrite after terminator.
             return $context->constantFromInteger(0, 'int64');
         }
         $numArgs = $argc - 2;
