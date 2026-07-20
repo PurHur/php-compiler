@@ -33,6 +33,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/tidy_diagnose.php';
         require_once __DIR__.'/tidy_get_error_buffer.php';
         require_once __DIR__.'/tidy_getopt.php';
+        require_once __DIR__.'/tidy_get_opt_doc.php';
         require_once __DIR__.'/tidy_get_config.php';
         require_once __DIR__.'/tidy_get_status.php';
         require_once __DIR__.'/tidy_error_count.php';
@@ -80,6 +81,7 @@ class Module extends ModuleAbstract
             new tidy_diagnose(),
             new tidy_get_error_buffer(),
             new tidy_getopt(),
+            new tidy_get_opt_doc(),
             new tidy_get_config(),
             new tidy_get_status(),
             new tidy_error_count(),
