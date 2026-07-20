@@ -1,64 +1,57 @@
 --TEST--
-Dom\ ParentNode::$children — live Dom\HTMLCollection (#21033)
+Dom\ ParentNode::$children — undefined on PROFILE=8.4 (Zend 8.4.23; #21559, re-#21033)
 --SKIPIF--
 <?php
 if (!class_exists('Dom\\HTMLDocument')) {
-    die('skip Dom\\HTMLDocument requires PHP_COMPILER_PROFILE=8.4 (#21033)');
+    die('skip Dom\\HTMLDocument requires PHP_COMPILER_PROFILE=8.4 (#21559)');
+}
+if (\PHPCompiler\CompilerVersion::supportsDomParentNodeChildren()) {
+    die('skip $children advertised on PROFILE=8.5+ — see dom_parentnode_children_htmlcollection_85.phpt');
 }
 ?>
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+set_error_handler(function (int $n, string $m): bool {
+    if (E_WARNING === $n || 2 === $n) {
+        echo "ERR\n";
+        return true;
+    }
+    return false;
+});
 $doc = Dom\HTMLDocument::createFromString(
     '<!doctype html><html><body><div id="a"><p>1</p><!--c--><span>2</span>text</div></body></html>',
     LIBXML_NOERROR
 );
 $el = $doc->getElementById('a');
 echo 'isset=', isset($el->children) ? 'yes' : 'no', "\n";
-echo 'type=', get_class($el->children), "\n";
-echo 'isa=', ($el->children instanceof Dom\HTMLCollection) ? 'yes' : 'no', "\n";
-echo 'len=', $el->children->length, "\n";
-echo 'item0=', $el->children->item(0)->tagName, "\n";
-echo 'item1=', $el->children->item(1)->tagName, "\n";
-$el->appendChild($doc->createElement('b'));
-echo 'live=', $el->children->length, "\n";
+$c = $el->children;
+echo 'type=', get_debug_type($c), "\n";
+echo 'count=', $el->childElementCount, "\n";
+echo 'first=', null !== $el->firstElementChild ? $el->firstElementChild->tagName : 'null', "\n";
+echo 'last=', null !== $el->lastElementChild ? $el->lastElementChild->tagName : 'null', "\n";
 
 echo 'doc_isset=', isset($doc->children) ? 'yes' : 'no', "\n";
-echo 'doc_type=', get_class($doc->children), "\n";
-echo 'doc_len=', $doc->children->length, "\n";
-echo 'doc_item0=', $doc->children->item(0)->tagName, "\n";
+$dc = $doc->children;
+echo 'doc_type=', get_debug_type($dc), "\n";
 
 $frag = $doc->createDocumentFragment();
 $frag->appendChild($doc->createElement('x'));
-$frag->appendChild($doc->createTextNode('t'));
-$frag->appendChild($doc->createElement('y'));
 echo 'frag_isset=', isset($frag->children) ? 'yes' : 'no', "\n";
-echo 'frag_type=', get_class($frag->children), "\n";
-echo 'frag_len=', $frag->children->length, "\n";
-echo 'frag_item0=', $frag->children->item(0)->tagName, "\n";
-echo 'frag_item1=', $frag->children->item(1)->tagName, "\n";
-
-$legacy = new DOMDocument();
-$legacy->loadHTML('<div id="z"><p>1</p></div>', LIBXML_NOERROR);
-$leg = $legacy->getElementById('z');
-echo 'legacy_isset=', isset($leg->children) ? 'yes' : 'no', "\n";
+$fc = $frag->children;
+echo 'frag_type=', get_debug_type($fc), "\n";
 ?>
 --EXPECT--
-isset=yes
-type=Dom\HTMLCollection
-isa=yes
-len=2
-item0=P
-item1=SPAN
-live=3
-doc_isset=yes
-doc_type=Dom\HTMLCollection
-doc_len=1
-doc_item0=HTML
-frag_isset=yes
-frag_type=Dom\HTMLCollection
-frag_len=2
-frag_item0=X
-frag_item1=Y
-legacy_isset=no
+isset=no
+ERR
+type=null
+count=2
+first=P
+last=SPAN
+doc_isset=no
+ERR
+doc_type=null
+frag_isset=no
+ERR
+frag_type=null

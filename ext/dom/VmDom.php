@@ -164,7 +164,7 @@ final class VmDom
 
     /**
      * Dom\* ParentNode::$children — live Dom\HTMLCollection of element children
-     * (php-src ext/dom/php_dom.stub.php / html_collection.c; #21033).
+     * (php-src PHP-8.5+ php_dom.stub.php; gated by {@see CompilerVersion::supportsDomParentNodeChildren()}; #21559).
      */
     public const PROP_CHILDREN = 'children';
 
@@ -8678,9 +8678,10 @@ final class VmDom
             if (!$entry->hasProperty(self::PROP_CHILD_ELEMENT_COUNT)) {
                 $entry->allocateProperty(self::PROP_CHILD_ELEMENT_COUNT)->int(0);
             }
-            // Dom\* ParentNode::$children (php-src php_dom.stub.php; #21033).
+            // Dom\* ParentNode::$children — PHP 8.5+ only (#21559, re-#21033).
             $props = $entry->propertiesWithNames();
-            if (str_starts_with(strtolower($entry->class->name), 'dom\\')
+            if (CompilerVersion::supportsDomParentNodeChildren()
+                && str_starts_with(strtolower($entry->class->name), 'dom\\')
                 && !isset($props[self::PROP_CHILDREN])
             ) {
                 $entry->allocateProperty(self::PROP_CHILDREN)->null();
@@ -9035,9 +9036,12 @@ final class VmDom
         return $var;
     }
 
-    /** True for Dom\Element / Document / DocumentFragment ParentNode::$children (#21033). */
+    /** True for Dom\Element / Document / DocumentFragment ParentNode::$children (#21559, re-#21033). */
     public static function isLivingParentNodeForChildren(ObjectEntry $node): bool
     {
+        if (!CompilerVersion::supportsDomParentNodeChildren()) {
+            return false;
+        }
         if (!DomRegistry::has($node)) {
             return false;
         }

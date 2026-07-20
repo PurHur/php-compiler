@@ -2792,6 +2792,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ Dom\ ParentNode::$children live HTMLCollection
+     * (php-src PHP-8.5+ ext/dom/php_dom.stub.php; #21559, re-#21033).
+     *
+     * Withheld on PROFILE=8.4 / Zend 8.4.23 — `$el->children` is an undefined property
+     * (E_WARNING + null). Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsDomParentNodeChildren(): bool
+    {
+        return self::supportsDomApiSince('8.5.0');
+    }
+
+    /**
      * PHP 8.4+ DOMXPath::quote() static XPath literal escaper (ext/dom/xpath.c, #18650).
      */
     public static function supportsDomXPathQuote(): bool

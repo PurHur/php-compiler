@@ -17,7 +17,7 @@ final class DomNodePropertySupport
 {
     /**
      * php-src ext/dom/php_dom.c — DOMAttr::$specified is read-only (#20605).
-     * Dom\* ParentNode::$children is private(set) (#21033).
+     * Dom\* ParentNode::$children is private(set) when advertised (PHP 8.5+; #21559).
      */
     public static function rejectReadOnlyPropertyWrite(ObjectEntry $owner, string $name): void
     {
@@ -68,7 +68,7 @@ final class DomNodePropertySupport
                 || strtolower(VmDom::PROP_XPATH_DOCUMENT) === $lc;
         }
 
-        // Dom\* ParentNode::$children (php-src php_dom.stub.php; #21033).
+        // Dom\* ParentNode::$children (PHP 8.5+; #21559, re-#21033).
         if (VmDom::isLivingParentNodeForChildren($object)
             && strtolower(VmDom::PROP_CHILDREN) === $lc
         ) {
@@ -155,7 +155,7 @@ final class DomNodePropertySupport
             }
         }
 
-        // Dom\* ParentNode::$children (php-src html_collection.c; #21033).
+        // Dom\* ParentNode::$children (PHP 8.5+ html_collection.c; #21559).
         if (VmDom::isLivingParentNodeForChildren($object)
             && strtolower(VmDom::PROP_CHILDREN) === $lc
         ) {
