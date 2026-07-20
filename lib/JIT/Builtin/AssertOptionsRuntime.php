@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\BasicBlock;
@@ -17,8 +17,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * assert_options() JIT/AOT bridge via AssertOptionsJitHelper PHP (#9513).
+ * assert_options() JIT/AOT bridge via AssertOptionsJitHelper PHP (#9513, #21528).
  *
+ * Embed + thin standalone AOT: always NestedJIT / helper-runtime {@see AssertOptionsJitHelper}
+ * (ValueEcho #21513 / Unlink #19186 shape — no dishonest STANDALONE false stub).
  * php-src: ext/standard/assert.c — PHP_FUNCTION(assert_options)
  */
 final class AssertOptionsRuntime
@@ -92,42 +94,37 @@ final class AssertOptionsRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::implement($context);
-        }
+        self::implement($context);
     }
 
-    /** Assert INI emit path: compile helper on JIT embed; standalone uses const defaults (#9894). */
+    /** Assert INI emit path: compile helper (embed + standalone) — no const-default fork (#21528). */
     public static function ensureAssertIniLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            self::ensureJitHelperCompiled($context);
-            self::ensureValueHelpers($context);
-        }
+        self::ensureJitHelperCompiled($context);
+        self::ensureValueHelpers($context);
     }
 
+    /**
+     * @param bool $standaloneDefault retained for call-site compatibility; unused (#21528)
+     */
     public static function emitLoadBoolHelper(Context $context, string $helperLogical, bool $standaloneDefault): Value
     {
-        $i1 = $context->getTypeFromString('int1');
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return $i1->constInt($standaloneDefault ? 1 : 0, false);
-        }
+        unset($standaloneDefault);
         self::ensureAssertIniLinked($context);
 
         return $context->builder->call(self::lookupHelper($context, $helperLogical));
     }
 
+    /**
+     * @param string $standaloneLiteral retained for call-site compatibility; unused (#21528)
+     */
     public static function emitIniGetToValue(
         Context $context,
         string $helperLogical,
         Value $out,
         string $standaloneLiteral
     ): void {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::writeValueStringFromLiteral($context, $out, $standaloneLiteral);
-
-            return;
-        }
+        unset($standaloneLiteral);
         self::ensureAssertIniLinked($context);
         $str = $context->builder->call(self::lookupHelper($context, $helperLogical));
         $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
@@ -135,9 +132,6 @@ final class AssertOptionsRuntime
 
     public static function emitIniSetFromCstr(Context $context, string $helperLogical, Value $valCstr): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
         self::ensureAssertIniLinked($context);
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
@@ -154,7 +148,7 @@ final class AssertOptionsRuntime
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implementStandaloneStubs($context);
+        self::ensureLinked($context);
     }
 
     public static function lookupHelper(Context $context, string $logical): LlvmFunction
@@ -171,55 +165,24 @@ final class AssertOptionsRuntime
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_assert_options');
         if (null === $probe || $probe->countBasicBlocks() > 0) {
             return;
         }
 
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::ensureValueHelpers($context);
         self::implementAssertOptions($context, $probe);
-    }
-
-    /** Standalone AOT: const/default assert_options stub without nested AssertOptionsJitHelper JIT (#9225). */
-    private static function implementStandaloneStubs(Context $context): void
-    {
-        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-
-        $probe = $context->module->getNamedFunction('__compiler_assert_options');
-        if (null !== $probe && 0 === $probe->countBasicBlocks()) {
-            $entry = $probe->appendBasicBlock('aopt_standalone_stub');
-            $context->builder->positionAtEnd($entry);
-            self::writeBoolFalse($context, $probe->getParam(3));
-            $context->builder->returnVoid();
-            $context->registerFunction('__compiler_assert_options', $probe);
-        }
-
         if (null !== $restoreBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }
-    }
-
-    private static function writeValueStringFromLiteral(Context $context, Value $out, string $literal): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $cstr = $context->constantFromString($literal);
-        $len = $sizeT->constInt(\strlen($literal), false);
-        $str = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->sext($len, $i64),
-            $context->builder->pointerCast($cstr, $context->getTypeFromString('char*'))
-        );
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
-        self::ensureExternal($context, '__string__init', $context->context->functionType(
-            $context->getTypeFromString('__string__*'),
-            false,
-            $i64,
-            $context->getTypeFromString('char*')
-        ));
     }
 
     private static function implementAssertOptions(Context $context, Value $fn): void
@@ -314,10 +277,11 @@ final class AssertOptionsRuntime
         $i64 = $context->getTypeFromString('int64');
 
         $old = $context->builder->call(self::lookupHelper($context, $getHelper));
+        $oldI64 = JitNestedHelperCoerce::coerceHelperScalarResult($context, $old, $i64);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $out,
-            $context->builder->sext($old, $i64)
+            $oldI64
         );
 
         $applyBb = $fn->appendBasicBlock('aopt_apply_'.(string) ++self::$blockSeq);
@@ -327,7 +291,13 @@ final class AssertOptionsRuntime
 
         $context->builder->positionAtEnd($applyBb);
         $truthy = self::coerceTruthyFromValue($context, $fn, $valueIn);
-        $context->builder->call(self::lookupHelper($context, $setHelper), $truthy);
+        $setFn = self::lookupHelper($context, $setHelper);
+        $truthyArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $truthy,
+            $setFn->getParam(0)->typeOf()
+        );
+        $context->builder->call($setFn, $truthyArg);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
@@ -349,7 +319,11 @@ final class AssertOptionsRuntime
         $hasCb = $context->builder->call(self::lookupHelper($context, self::HAS_CALLBACK));
         $nullBb = $fn->appendBasicBlock('aopt_cb_null_'.(string) ++self::$blockSeq);
         $strBb = $fn->appendBasicBlock('aopt_cb_str_'.(string) self::$blockSeq);
-        $hasCbBool = $context->builder->icmp(Builder::INT_NE, $hasCb, $i32->constInt(0, false));
+        $hasCbBool = $context->builder->icmp(
+            Builder::INT_NE,
+            $hasCb,
+            $hasCb->typeOf()->constInt(0, false)
+        );
         $context->builder->branchIf($hasCbBool, $strBb, $nullBb);
 
         $context->builder->positionAtEnd($nullBb);

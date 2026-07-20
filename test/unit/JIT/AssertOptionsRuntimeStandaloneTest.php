@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9513 / #9894: AOT standalone assert_options must not use LLVM globals or __phpc_assert_* ABI.
+ * Issue #9513 / #9894 / #21528: AOT standalone assert_options uses AssertOptionsJitHelper, not false stub.
  *
  * @group aot-lint
  */
@@ -25,9 +25,22 @@ final class AssertOptionsRuntimeStandaloneTest extends TestCase
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
 
+        $entryNames = [];
+        foreach ($fn->getBasicBlocks() as $block) {
+            $entryNames[] = $block->getName();
+        }
+        $this->assertNotContains('aopt_standalone_stub', $entryNames);
+        $this->assertContains('aopt_entry', $entryNames);
+
         $this->assertNull($ctx->module->getNamedFunction('__phpc_assert_enabled'));
         $this->assertNull($ctx->module->getNamedFunction('__phpc_assert_ini_get_active'));
         $this->assertNull($ctx->module->getNamedGlobal('phpc_assert_active'));
         $this->assertNull($ctx->module->getNamedGlobal('phpc_assert_callback'));
+
+        // Helper symbols from AssertOptionsJitHelper must be present after link.
+        $this->assertArrayHasKey(
+            strtolower(AssertOptionsRuntime::IS_ENABLED),
+            $ctx->functions
+        );
     }
 }
