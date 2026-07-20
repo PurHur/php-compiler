@@ -649,6 +649,65 @@ final class VmOdbcCore
     }
 
     /**
+     * odbc_setoption — which=1 SQLSetConnectOption, which=2 SQLSetStmtOption (php-src; #21267).
+     *
+     * @param ObjectEntry $handle Odbc\Connection or Odbc\Result
+     */
+    public static function setoption(
+        ObjectEntry $handle,
+        int $which,
+        int $option,
+        int $value,
+        Context $ctx,
+        ?Frame $frame = null
+    ): bool {
+        if (1 === $which) {
+            if (!VmOdbcConnection::isLive($handle)) {
+                throw new \TypeError('odbc_setoption(): supplied resource is not a valid ODBC connection resource');
+            }
+            $native = VmOdbcConnection::native($handle);
+            $hdbc = $native['hdbc'];
+            if (null === $hdbc) {
+                VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+                self::warn($ctx, 'odbc_setoption(): SQL error: Failed to fetch error message, SQL state HY000 in SetConnectOption', $frame);
+
+                return false;
+            }
+            if (!VmOdbcNative::setConnectOption($hdbc, $option, $value)) {
+                VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+                self::warn($ctx, 'odbc_setoption(): SQL error: Failed to fetch error message, SQL state HY000 in SetConnectOption', $frame);
+
+                return false;
+            }
+            VmOdbcConnection::setLastError('', '');
+
+            return true;
+        }
+        if (2 === $which) {
+            if (!VmOdbcResult::isLive($handle)) {
+                throw new \TypeError('odbc_setoption(): supplied resource is not a valid ODBC result resource');
+            }
+            $hstmt = VmOdbcResult::hstmt($handle);
+            if (null === $hstmt) {
+                VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+                self::warn($ctx, 'odbc_setoption(): SQL error: Failed to fetch error message, SQL state HY000 in SetStmtOption', $frame);
+
+                return false;
+            }
+            if (!VmOdbcNative::setStmtOption($hstmt, $option, $value)) {
+                VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+                self::warn($ctx, 'odbc_setoption(): SQL error: Failed to fetch error message, SQL state HY000 in SetStmtOption', $frame);
+
+                return false;
+            }
+            VmOdbcConnection::setLastError('', '');
+
+            return true;
+        }
+        throw new \ValueError('odbc_setoption(): Argument #2 ($which) must be 1 for SQLSetConnectOption(), or 2 for SQLSetStmtOption()');
+    }
+
+    /**
      * @param callable(\FFI\CData): bool $runner
      *
      * @return Variable|false

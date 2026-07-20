@@ -13,7 +13,7 @@ use PHPCompiler\VM;
  *
  * Connect/close/exec/fetch/error + PHP 8.2 connection-string helpers +
  * prepare/execute/fetch_array/tables/columns/field_* + autocommit/commit/rollback +
- * next_result/data_source/binmode/longreadlen +
+ * next_result/data_source/binmode/longreadlen/setoption +
  * primarykeys/foreignkeys/statistics/gettypeinfo catalog APIs.
  * Thin unixODBC FFI when libodbc is present (document unixodbc / libsqliteodbc in Docker).
  */
@@ -87,6 +87,7 @@ class Module extends ModuleAbstract
             new odbc_data_source(),
             new odbc_binmode(),
             new odbc_longreadlen(),
+            new odbc_setoption(),
             new odbc_error(),
             new odbc_errormsg(),
         ];
