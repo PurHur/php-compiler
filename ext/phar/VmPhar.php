@@ -21,6 +21,13 @@ final class VmPhar
 
     public const COMPRESSED_BZ2 = 0x00002000;
 
+    /** php-src PHAR_FORMAT_* / Phar::PHAR|TAR|ZIP (phar_internal.h). */
+    public const FORMAT_PHAR = 1;
+
+    public const FORMAT_TAR = 2;
+
+    public const FORMAT_ZIP = 3;
+
     /** Startup {@code -d phar.readonly=} override (bin/vm.php −d → VmIni::applyStartupIniOverride). */
     private static ?bool $startupReadonly = null;
 
