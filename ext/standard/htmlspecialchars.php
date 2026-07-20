@@ -110,14 +110,14 @@ final class htmlspecialchars extends Internal
         return JitHtmlspecialchars::escape($context, $str, $flags);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#21351, ext/standard/html.c). */
+    /** Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21405). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'htmlspecialchars', $paramName)->toString();
         }
 
-        return VmString::zparamStrBuiltinArgForFrame(
+        return VmString::trimFamilyStringArgForFrame(
             $frame,
             $argIndex,
             'htmlspecialchars',
@@ -142,7 +142,7 @@ final class htmlspecialchars extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'htmlspecialchars',
