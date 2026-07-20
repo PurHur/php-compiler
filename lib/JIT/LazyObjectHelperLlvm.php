@@ -43,6 +43,53 @@ final class LazyObjectHelperLlvm
         );
     }
 
+    /**
+     * Mark lazy only when the runtime class has real (non-pad) instance properties (#21570).
+     *
+     * MCJIT empty-class pad {@see \PHPCompiler\JitMcjitEmbed::CLASS_PAD_PROPERTY} must not
+     * count — Zend treats zero declared properties as immediately non-lazy.
+     *
+     * @see Zend/zend_lazy_objects.c zend_object_make_lazy
+     */
+    public static function registerLazyObjectForRuntimeClass(
+        Context $context,
+        Value $obj,
+        int $initIndex,
+        bool $ghost,
+        Value $classIdVal
+    ): void {
+        $fn = BasicBlockHelper::parentFunction($context);
+        $done = $fn->appendBasicBlock('lazy_reg_done');
+        $check = $context->builder->getInsertBlock();
+        $objectType = $context->type->object;
+        $pad = \PHPCompiler\JitMcjitEmbed::CLASS_PAD_PROPERTY;
+        foreach (array_keys($objectType->allClassNamesById()) as $id) {
+            $id = (int) $id;
+            $eligible = 0;
+            foreach ($objectType->instancePropertySets($id) as $propset) {
+                if (($propset[1] ?? '') !== $pad) {
+                    ++$eligible;
+                }
+            }
+            if (0 === $eligible) {
+                continue;
+            }
+            $caseBlock = $fn->appendBasicBlock('lazy_reg_case_'.$id);
+            $next = $fn->appendBasicBlock('lazy_reg_try_'.$id);
+            $context->builder->positionAtEnd($check);
+            $expected = $context->constantFromInteger($id, 'int64');
+            $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expected);
+            $context->builder->branchIf($isId, $caseBlock, $next);
+            $context->builder->positionAtEnd($caseBlock);
+            self::registerLazyObject($context, $obj, $initIndex, $ghost);
+            $context->builder->branch($done);
+            $check = $next;
+        }
+        $context->builder->positionAtEnd($check);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($done);
+    }
+
     public static function emitEnsureInitialized(Context $context, Value $obj): void
     {
         if ([] === $context->lazyInitProxies) {

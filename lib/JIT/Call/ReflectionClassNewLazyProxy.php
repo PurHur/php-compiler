@@ -34,7 +34,7 @@ final class ReflectionClassNewLazyProxy implements Call
 
         $classIdVal = self::loadClassIdFromReflection($context, $args[0]);
         $obj = $context->type->object->allocateForRuntimeClassId($classIdVal);
-        LazyObjectHelper::registerLazyObject($context, $obj, $initIndex, false);
+        LazyObjectHelper::registerLazyObjectForRuntimeClass($context, $obj, $initIndex, false, $classIdVal);
 
         $slot = JitValueBox::alloc($context);
         $context->builder->call(
