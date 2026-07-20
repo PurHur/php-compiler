@@ -50,6 +50,9 @@ final class str_getcsv extends Internal
         }
         if (isset($frame->calledArgs[3])) {
             $escape = VmString::requireStringBuiltinArg($frame->calledArgs[3], 'str_getcsv', 3, 'escape');
+        } else {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
+            VmCsvArg::emitOmittedEscapeDeprecation($frame, 'str_getcsv');
         }
         if (null === $frame->returnVar) {
             return;
@@ -79,6 +82,9 @@ final class str_getcsv extends Internal
         }
         if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             $escape = JitStringBuiltinArg::lowerRequiredString($context, $args[3], 'str_getcsv', 3, 'escape');
+        } else {
+            // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
+            VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'str_getcsv');
         }
 
         return JitStrGetcsv::invoke($context, $input, $separator, $enclosure, $escape);
