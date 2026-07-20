@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\curl;
 
 /**
- * curl extension constants (php-src ext/curl/curl.stub.php; issue #6999, #3325, #21137).
+ * curl extension constants (php-src ext/curl/curl.stub.php; issue #6999, #3325, #21137, #21336).
  *
  * CURLOPT_RETURNTRANSFER / CURLOPT_BINARYTRANSFER / CURLOPT_SAFE_UPLOAD are PHP-level
  * options (not forwarded to libcurl). Values match Zend/php-src + libcurl curl.h.
@@ -25,6 +25,7 @@ final class CurlConstants
     public const CURLINFO_LOCAL_IP = 1048617;
     public const CURLINFO_LOCAL_PORT = 2097194;
     public const CURLINFO_NAMELOOKUP_TIME = 3145732;
+    public const CURLINFO_POSTTRANSFER_TIME_T = 6291523;
     public const CURLINFO_PRETRANSFER_TIME = 3145734;
     public const CURLINFO_PRIMARY_IP = 1048608;
     public const CURLINFO_PRIMARY_PORT = 2097192;
@@ -77,6 +78,8 @@ final class CurlConstants
     public const CURLOPT_COOKIELIST = 10135;
     public const CURLOPT_COOKIESESSION = 96;
     public const CURLOPT_CUSTOMREQUEST = 10036;
+    /** libcurl CURLOPT_DEBUGFUNCTION (curl.h; php-src curl.stub.php; #21336). */
+    public const CURLOPT_DEBUGFUNCTION = 20094;
     public const CURLOPT_DEFAULT_PROTOCOL = 10238;
     public const CURLOPT_DNS_CACHE_TIMEOUT = 92;
     public const CURLOPT_DNS_SERVERS = 10211;
@@ -115,6 +118,8 @@ final class CurlConstants
     public const CURLOPT_POSTFIELDS = 10015;
     public const CURLOPT_POSTREDIR = 161;
     public const CURLOPT_PRIVATE = 10103;
+    /** libcurl CURLOPT_PREREQFUNCTION (curl.h; php-src curl.stub.php; #21336). */
+    public const CURLOPT_PREREQFUNCTION = 20312;
     public const CURLOPT_PROGRESSFUNCTION = 20056;
     public const CURLOPT_PROTOCOLS = 181;
     public const CURLOPT_PROXY = 10004;
@@ -127,6 +132,8 @@ final class CurlConstants
     public const CURLOPT_READFUNCTION = 20012;
     public const CURLOPT_REDIR_PROTOCOLS = 182;
     public const CURLOPT_REFERER = 10016;
+    /** libcurl CURLOPT_SERVER_RESPONSE_TIMEOUT (curl.h; php-src curl.stub.php; #21336). */
+    public const CURLOPT_SERVER_RESPONSE_TIMEOUT = 112;
     public const CURLOPT_RESUME_FROM = 21;
     /** PHP-only — see php-src ext/curl/interface.c */
     public const CURLOPT_RETURNTRANSFER = 19913;
@@ -145,6 +152,8 @@ final class CurlConstants
     public const CURLOPT_TCP_KEEPALIVE = 213;
     public const CURLOPT_TCP_KEEPIDLE = 214;
     public const CURLOPT_TCP_KEEPINTVL = 215;
+    /** libcurl CURLOPT_TCP_KEEPCNT (curl.h; php-src curl.stub.php; #21336). */
+    public const CURLOPT_TCP_KEEPCNT = 326;
     public const CURLOPT_TCP_NODELAY = 121;
     public const CURLOPT_TIMEOUT = 13;
     public const CURLOPT_TIMEOUT_MS = 155;
@@ -159,6 +168,16 @@ final class CurlConstants
     public const CURLOPT_VERBOSE = 41;
     public const CURLOPT_WRITEDATA = 10001;
     public const CURLOPT_WRITEFUNCTION = 20011;
+    /** CURLOPT_HTTP_VERSION enum values (curl.h CURL_HTTP_VERSION_*; php-src curl.stub.php; #21336). */
+    public const CURL_HTTP_VERSION_NONE = 0;
+    public const CURL_HTTP_VERSION_1_0 = 1;
+    public const CURL_HTTP_VERSION_1_1 = 2;
+    public const CURL_HTTP_VERSION_2 = 3;
+    public const CURL_HTTP_VERSION_2_0 = 3;
+    public const CURL_HTTP_VERSION_2TLS = 4;
+    public const CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE = 5;
+    public const CURL_HTTP_VERSION_3 = 30;
+    public const CURL_HTTP_VERSION_3ONLY = 31;
     public const CURLPAUSE_ALL = 5;
     public const CURLPAUSE_CONT = 0;
     /** curl_easy_pause bitmasks (curl/curl.h; php-src curl.stub.php; #20494). */
@@ -266,6 +285,10 @@ final class CurlConstants
         self::CURLOPT_TCP_KEEPALIVE => true,
         self::CURLOPT_TCP_KEEPIDLE => true,
         self::CURLOPT_TCP_KEEPINTVL => true,
+        self::CURLOPT_TCP_KEEPCNT => true,
+        self::CURLOPT_SERVER_RESPONSE_TIMEOUT => true,
+        self::CURLOPT_PREREQFUNCTION => true,
+        self::CURLOPT_DEBUGFUNCTION => true,
         self::CURLOPT_EXPECT_100_TIMEOUT_MS => true,
         self::CURLOPT_CONNECT_TO => true,
         self::CURLOPT_TLS13_CIPHERS => true,
@@ -419,6 +442,20 @@ final class CurlConstants
             'CURLOPT_USERNAME' => self::CURLOPT_USERNAME,
             'CURLOPT_PASSWORD' => self::CURLOPT_PASSWORD,
             'CURLOPT_HTTP_VERSION' => self::CURLOPT_HTTP_VERSION,
+            'CURL_HTTP_VERSION_NONE' => self::CURL_HTTP_VERSION_NONE,
+            'CURL_HTTP_VERSION_1_0' => self::CURL_HTTP_VERSION_1_0,
+            'CURL_HTTP_VERSION_1_1' => self::CURL_HTTP_VERSION_1_1,
+            'CURL_HTTP_VERSION_2' => self::CURL_HTTP_VERSION_2,
+            'CURL_HTTP_VERSION_2_0' => self::CURL_HTTP_VERSION_2_0,
+            'CURL_HTTP_VERSION_2TLS' => self::CURL_HTTP_VERSION_2TLS,
+            'CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE' => self::CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE,
+            'CURL_HTTP_VERSION_3' => self::CURL_HTTP_VERSION_3,
+            'CURL_HTTP_VERSION_3ONLY' => self::CURL_HTTP_VERSION_3ONLY,
+            'CURLINFO_POSTTRANSFER_TIME_T' => self::CURLINFO_POSTTRANSFER_TIME_T,
+            'CURLOPT_TCP_KEEPCNT' => self::CURLOPT_TCP_KEEPCNT,
+            'CURLOPT_SERVER_RESPONSE_TIMEOUT' => self::CURLOPT_SERVER_RESPONSE_TIMEOUT,
+            'CURLOPT_PREREQFUNCTION' => self::CURLOPT_PREREQFUNCTION,
+            'CURLOPT_DEBUGFUNCTION' => self::CURLOPT_DEBUGFUNCTION,
             'CURLOPT_PROTOCOLS' => self::CURLOPT_PROTOCOLS,
             'CURLOPT_REDIR_PROTOCOLS' => self::CURLOPT_REDIR_PROTOCOLS,
             'CURLOPT_FRESH_CONNECT' => self::CURLOPT_FRESH_CONNECT,
