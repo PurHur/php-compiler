@@ -6,15 +6,21 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringOffsetRuntime routes semantics through StringOffsetJitHelper PHP (#10245). */
+/** StringOffsetRuntime routes semantics through StringOffsetJitHelper PHP (#10245, #21497). */
 final class StringOffsetRuntimeShrinkTest extends TestCase
 {
-    public function testStringOffsetRuntimeUsesCompiledJitHelper(): void
+    public function testStringOffsetRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringOffsetRuntime.php');
         $this->assertStringContainsString('StringOffsetJitHelper', $source);
         $this->assertStringContainsString('normalizeByteIndex', $source);
-        $this->assertStringContainsString('ensureJitHelperCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringContainsString('ensureBridge', $source);
+        $this->assertStringNotContainsString('implementStandaloneNormalizeBridge', $source);
+        $this->assertStringNotContainsString('Builtin::LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        // NestedJIT leaf may keep LLVM; user-script path must not fork on load type.
+        $this->assertStringContainsString('implementNestedLeafNormalizeBridge', $source);
     }
 
     public function testStringOffsetHelperDelegatesToRuntime(): void

@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\VM\StringOffsetJitHelper;
@@ -16,9 +15,14 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for string offset semantics via StringOffsetJitHelper PHP (#10245).
+ * JIT/AOT link for string offset semantics via StringOffsetJitHelper PHP (#10245, #21497).
  *
+ * Embed + thin standalone AOT: {@see StringOffsetJitHelper} via {@see JitVmHelperLink}
+ * (ChunkSplit #21399 / ObOutput #21476 shape — no user-script standalone inline LLVM fork).
+ * Nested helper compile leaf: inline LLVM matching {@see StringOffsetJitHelper::normalizeByteIndex}
+ * without re-entering NestedJIT (#17279 / MathFpow Kernel shape).
  * SSOT: {@see \PHPCompiler\VM\StringOffsetJitHelper}, {@see \PHPCompiler\VM\Variable}
+ * php-src: Zend/zend_operators.c — string offset fetch/write
  */
 final class StringOffsetRuntime
 {
@@ -39,6 +43,8 @@ final class StringOffsetRuntime
         self::BYTE_FROM_STRING_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'string_offset_norm_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -46,34 +52,38 @@ final class StringOffsetRuntime
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::ensureLinked($context);
     }
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_NORMALIZE);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        // Nested helper compile of unrelated units that still need normalize:
+        // thin LLVM leaf without re-entering StringOffsetJitHelper (#21497 / #17279).
+        if (NestedJitCompileScope::isActive()) {
+            self::implementNestedLeafNormalizeBridge($context);
+
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
+        $probe = $context->module->getNamedFunction(self::ABI_NORMALIZE);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_NORMALIZE, $probe);
+
+            return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::implementStandaloneNormalizeBridge($context);
-        } else {
-            self::ensureJitHelperCompiled($context);
-            self::implementEmbedNormalizeBridge($context);
-        }
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        $i64 = $context->getTypeFromString('int64');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_NORMALIZE,
+            self::BRIDGE_ENTRY,
+            [$i64, $i64],
+            $i64,
+            self::NORMALIZE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21497'
+        );
     }
 
     public static function emitIncDecError(Context $context): void
@@ -157,13 +167,31 @@ final class StringOffsetRuntime
     private static function assignByte(Context $context, JitVariable $value): Value
     {
         $i8 = $context->getTypeFromString('int8');
+        // Nested leaf: avoid NestedJIT of byte helpers while another helper compiles (#21497).
+        if (NestedJitCompileScope::isActive()) {
+            switch ($value->type) {
+                case JitVariable::TYPE_NATIVE_LONG:
+                    return $context->builder->truncOrBitCast(
+                        $context->helper->loadValue($value),
+                        $i8
+                    );
+                case JitVariable::TYPE_STRING:
+                    $str = $context->helper->loadValue($value);
+                    $map = $context->structFieldMap['__string__'];
+                    $chars = $context->builder->structGep($str, $map['value']);
+
+                    return $context->builder->load($chars);
+                default:
+                    throw new \LogicException(
+                        'String offset assignment supports int or string RHS in JIT (got type '.$value->type.')'
+                    );
+            }
+        }
+
+        self::ensureHelpersCompiled($context);
         switch ($value->type) {
             case JitVariable::TYPE_NATIVE_LONG:
                 $long = $context->helper->loadValue($value);
-                if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-                    return $context->builder->truncOrBitCast($long, $i8);
-                }
-                self::ensureLinked($context);
 
                 return $context->builder->truncOrBitCast(
                     $context->builder->call(
@@ -174,13 +202,6 @@ final class StringOffsetRuntime
                 );
             case JitVariable::TYPE_STRING:
                 $str = $context->helper->loadValue($value);
-                if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-                    $map = $context->structFieldMap['__string__'];
-                    $chars = $context->builder->structGep($str, $map['value']);
-
-                    return $context->builder->load($chars);
-                }
-                self::ensureLinked($context);
                 $byteInt = $context->builder->call(
                     self::helperFunction($context, self::BYTE_FROM_STRING_HELPER),
                     $str
@@ -194,7 +215,11 @@ final class StringOffsetRuntime
         }
     }
 
-    private static function implementEmbedNormalizeBridge(Context $context): void
+    /**
+     * NestedJIT leaf only — mirrors {@see StringOffsetJitHelper::normalizeByteIndex} in LLVM.
+     * Not used for user-script / thin standalone AOT (those take {@see JitVmHelperLink::ensureBridge}).
+     */
+    private static function implementNestedLeafNormalizeBridge(Context $context): void
     {
         $abiName = self::ABI_NORMALIZE;
         $probe = $context->module->getNamedFunction($abiName);
@@ -204,33 +229,10 @@ final class StringOffsetRuntime
             return;
         }
 
-        $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($i64, false, $i64, $i64);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('string_offset_norm_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue(
-            $context->builder->call(
-                self::helperFunction($context, self::NORMALIZE_HELPER),
-                $fn->getParam(0),
-                $fn->getParam(1)
-            )
-        );
-        $context->registerFunction($abiName, $fn);
-    }
-
-    /** Standalone AOT: inline LLVM matching StringOffsetJitHelper PHP SSOT (#10245). */
-    private static function implementStandaloneNormalizeBridge(Context $context): void
-    {
-        $abiName = self::ABI_NORMALIZE;
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
         }
 
         $i64 = $context->getTypeFromString('int64');
@@ -239,10 +241,10 @@ final class StringOffsetRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('string_offset_norm_entry');
-        $negBlock = $fn->appendBasicBlock('string_offset_norm_neg');
-        $posBlock = $fn->appendBasicBlock('string_offset_norm_pos');
-        $doneBlock = $fn->appendBasicBlock('string_offset_norm_done');
+        $entry = $fn->appendBasicBlock('string_offset_norm_nested_leaf_entry');
+        $negBlock = $fn->appendBasicBlock('string_offset_norm_nested_leaf_neg');
+        $posBlock = $fn->appendBasicBlock('string_offset_norm_nested_leaf_pos');
+        $doneBlock = $fn->appendBasicBlock('string_offset_norm_nested_leaf_done');
         $context->builder->positionAtEnd($entry);
         $index = $fn->getParam(0);
         $len = $fn->getParam(1);
@@ -263,48 +265,33 @@ final class StringOffsetRuntime
         $phi->addIncoming($index, $posBlock);
         $context->builder->returnValue($phi);
         $context->registerFunction($abiName, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
+        self::ensureHelpersCompiled($context);
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after StringOffsetJitHelper compile (#10245)');
+            throw new \LogicException($logical.' missing after StringOffsetJitHelper compile (#21497)');
         }
 
         return $fn;
     }
 
-    private static function ensureJitHelperCompiled(Context $context): void
+    private static function ensureHelpersCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StringOffsetJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StringOffsetJitHelper.php parseAndCompile failed (#10245)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10245)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21497'
+        );
     }
 }
