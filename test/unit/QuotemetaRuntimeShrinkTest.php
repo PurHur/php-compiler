@@ -8,13 +8,17 @@ use PHPCompiler\ext\standard\QuotemetaJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** quotemeta() JIT routes through QuotemetaJitHelper PHP not inline LLVM (#14705). */
+/** quotemeta() JIT routes through QuotemetaJitHelper + JitVmHelperLink (#14705, #21589). */
 final class QuotemetaRuntimeShrinkTest extends TestCase
 {
     public function testStringQuotemetaUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringQuotemeta.php');
         $this->assertStringContainsString('QuotemetaJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('quotemeta_count_head', $source);
         $this->assertStringNotContainsString('shouldEscape', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitQuotemeta.php');
