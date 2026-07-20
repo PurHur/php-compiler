@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * SessionLifecycle LLVM quarantined in ext/standard (#9446, #19896).
+ * SessionLifecycle LLVM quarantined in ext/standard (#9446, #19896, #21564).
  */
 final class SessionLifecycleRuntimeShrinkTest extends TestCase
 {
@@ -32,16 +32,31 @@ final class SessionLifecycleRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitSessionLifecycleKernel', $source);
         $this->assertStringContainsString('__phpc_session_generate_new_id', $source);
+        $this->assertStringContainsString('__phpc_session_start_apply', $source);
         $this->assertStringContainsString('implementStandaloneRuntime', $source);
         $this->assertStringContainsString('ensureRandomIdStringLinked', $source);
         $this->assertStringContainsString('phpc_session_random_id_string', $source);
         $this->assertStringContainsString('SessionStorageGlobals::emitCallEnsureDefaults', $source);
+        $this->assertStringNotContainsString('phpc_session_start_runtime', $source);
+        $this->assertStringNotContainsString('RUNTIME_C_SYMBOL', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('emitEnsureDefaultSessionName', $source);
         $this->assertStringNotContainsString('__compiler_random_bytes', $source);
         $this->assertStringNotContainsString('sgen_loop_head', $source);
         $this->assertStringNotContainsString('HEX_TABLE', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
         $this->assertLessThan(450, \substr_count($source, "\n") + 1);
+    }
+
+    public function testSessionStartHasNoStandaloneForwarder(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionStart.php');
+        $this->assertStringNotContainsString('implementStandaloneForwarder', $source);
+        $this->assertStringNotContainsString('phpc_session_start_runtime', $source);
+        $this->assertStringNotContainsString('RUNTIME_C_SYMBOL', $source);
+        $this->assertStringNotContainsString('registerRuntimeDeclaration', $source);
+        $this->assertStringNotContainsString('ss_forward', $source);
+        $this->assertStringContainsString('emitWriteBool', $source);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void
