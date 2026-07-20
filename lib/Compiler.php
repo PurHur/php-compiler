@@ -12554,15 +12554,32 @@ class Compiler {
 
             return $fetches[0];
         }
+        // Map leaf PropertyFetches onto dead-temp arg indices (skip embedded literals).
+        // two('L', $el->tagName) after @$doc->loadXML() — raw argIndex 1 must match the
+        // sole dead-temp slot, not firstPropertyArgIndex=0 (#21439, re-#19719/#18860).
+        $deadTempArgIndices = [];
+        foreach ($callArgs as $i => $callArg) {
+            if (
+                $callArg instanceof Operand
+                && !$this->isEmbeddedCallLiteralArg($callArg)
+                && $this->callArgIsDeadInlineTemporary($callArg)
+            ) {
+                $deadTempArgIndices[] = (int) $i;
+            }
+        }
+        $deadOrdinal = array_search($argIndex, $deadTempArgIndices, true);
+        if (!\is_int($deadOrdinal)) {
+            return null;
+        }
         // MethodCall/FuncCall producers fill leading dead-temp args; PropertyFetch
         // leaves map to the trailing propertyArgCount slots (#19719):
         // insertBefore($d->createElement('x'), $r->lastChild).
         $fetchCount = \count($fetches);
-        $firstPropertyArgIndex = $propertyArgCount - $fetchCount;
-        if ($argIndex < $firstPropertyArgIndex) {
+        $firstFetchDeadOrdinal = \count($deadTempArgIndices) - $fetchCount;
+        if ($deadOrdinal < $firstFetchDeadOrdinal) {
             return null;
         }
-        $ordinal = $fetchCount - 1 - ($argIndex - $firstPropertyArgIndex);
+        $ordinal = $fetchCount - 1 - ($deadOrdinal - $firstFetchDeadOrdinal);
         if ($ordinal < 0 || $ordinal >= $fetchCount) {
             return null;
         }
@@ -12584,12 +12601,14 @@ class Compiler {
             }
         }
 
-        return $this->slotForInlineCallArgProducerResult(
-            $block,
-            $prelude,
-            $cfgCallOp,
-            null !== $block->orig ? $block->orig->children : null
-        ) ?? $block->slotForOperand($prelude->result);
+        return $this->compiledExpressionPreludeResultSlotBeforePendingFuncCall($block, $prelude)
+            ?? $this->slotForInlineCallArgProducerResult(
+                $block,
+                $prelude,
+                $cfgCallOp,
+                null !== $block->orig ? $block->orig->children : null
+            )
+            ?? $block->slotForOperand($prelude->result);
     }
 
     private function compileStaticPropertyFetchRead(
@@ -33355,6 +33374,14 @@ class Compiler {
         }
         if (\is_int($callIndex) && $callIndex > 0) {
             $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
+            // two('L', $el->tagName) — PropertyFetch prelude is not a nested call producer; do not
+            // fall through to a prior @$doc->loadXML() EXEC_RETURN (#21439).
+            if (
+                $immediatePrelude instanceof Op\Expr\PropertyFetch
+                || $immediatePrelude instanceof Op\Expr\NullsafePropertyFetch
+            ) {
+                return null;
+            }
             // method_exists(I::class, 'm') after var_dump(...) — immediate ::class prelude is arg #0 (#9486).
             if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
                 // tempnam(g(), E::A) — skip trailing enum; probe loop finds nested FuncCall (#10303, #16558).
@@ -41291,20 +41318,24 @@ class Compiler {
                     continue;
                 }
             }
+            // PropertyFetch as any call-arg position (not only arg #0) — two('L', $el->tagName)
+            // after @$doc->loadXML() must not steal the loadXML return slot (#21439, re-#16057).
             if (
-                0 === (int) $argIndex
-                && null !== $cfgCallOp
+                null !== $cfgCallOp
                 && null !== $block->orig
             ) {
                 $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
                 if (\is_int($callIndex) && $callIndex > 0) {
-                    $prelude = $this->propertyFetchPreludeMatchingCallArg(
+                    $matchedPrelude = $this->propertyFetchPreludeMatchingCallArg(
                         $block,
                         $cfgCallOp,
                         $callIndex,
                         (int) $argIndex,
                         $arg
-                    ) ?? ($block->orig->children[$callIndex - 1] ?? null);
+                    );
+                    // Bare immediate prelude only for arg #0 (legacy trim($obj->prop) path).
+                    $prelude = $matchedPrelude
+                        ?? (0 === (int) $argIndex ? ($block->orig->children[$callIndex - 1] ?? null) : null);
                     if (
                         $prelude instanceof Op\Expr\PropertyFetch
                         || $prelude instanceof Op\Expr\NullsafePropertyFetch
@@ -41322,13 +41353,7 @@ class Compiler {
                                 $this->operandsReferToSameVariable($callArgOperand, $prelude->result)
                                 || (
                                     $this->callArgIsDeadInlineTemporary($arg)
-                                    && $prelude === $this->propertyFetchPreludeMatchingCallArg(
-                                        $block,
-                                        $cfgCallOp,
-                                        $callIndex,
-                                        (int) $argIndex,
-                                        $arg
-                                    )
+                                    && $prelude === $matchedPrelude
                                 )
                             );
                         if (!$propertyFetchIsMethodReceiver && $preludeFetchFeedsCallArg) {
@@ -41341,11 +41366,12 @@ class Compiler {
                                 $this->syncPropertyFetchResultToFollowingFuncCallArg($prelude, $block);
                             }
                             $propertyFetchArgSlot = $this->propertyFetchPreludeResultSlot($block, $prelude, $cfgCallOp)
+                                ?? $this->compiledExpressionPreludeResultSlotBeforePendingFuncCall($block, $prelude)
                                 ?? $this->lastPropertyFetchResultSlotBeforePendingCall($block);
                             if (null !== $propertyFetchArgSlot) {
                                 $sends[] = new OpCode(
                                     OpCode::TYPE_ARG_SEND,
-                                    $propertyFetchArgSlot,
+                                    (string) $propertyFetchArgSlot,
                                     $nameSlot,
                                     $unpackFlag
                                 );
