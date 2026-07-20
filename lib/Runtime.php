@@ -278,6 +278,7 @@ class Runtime {
         $this->load(new ext\dba\Module);
         $this->load(new ext\mailparse\Module);
         $this->load(new ext\enchant\Module);
+        $this->load(new ext\tidy\Module);
         $this->load(new ext\pdo\Module);
         $this->load(new ext\phar\Module);
         $this->load(new ext\uri\Module);
