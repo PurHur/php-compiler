@@ -66,6 +66,7 @@ final class VmString
      * extension_loaded/defined/constant/method_exists/property_exists/define name args (#21281),
      * preg_match $subject (#21198), and substr/strpos/strstr/explode string
      * operands (#21189), ord() character (#21222),
+     * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
      * unpack($string) soft-null (#21246).

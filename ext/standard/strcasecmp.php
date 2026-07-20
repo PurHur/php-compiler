@@ -47,8 +47,8 @@ final class strcasecmp extends Internal
             throw new \LogicException('strcasecmp() requires exactly two arguments');
         }
         StringStrcasecmp::ensureLinked($context);
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strcasecmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strcasecmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, self::jitStringArg($context, $args[0], 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, self::jitStringArg($context, $args[1], 1, 'string2'));
         $fn = $context->lookupFunction('strcasecmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
@@ -62,8 +62,34 @@ final class strcasecmp extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strcasecmp', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21190).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
+            'strcasecmp',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'strcasecmp',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $arg,
             'strcasecmp',
             $argIndex,
             $paramName

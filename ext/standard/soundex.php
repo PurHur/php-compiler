@@ -46,11 +46,12 @@ final class soundex extends Internal
             throw new \LogicException('soundex() requires exactly one argument in this compiler build');
         }
 
+        $input = self::jitStringArg($context, $args[0], 1, 'string');
         StringSoundex::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_soundex'),
-            self::jitStringArg($context, $args[0], 1, 'string')
+            $input
         );
     }
 
@@ -60,8 +61,8 @@ final class soundex extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'soundex', $paramName)->toString();
         }
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19243, string.c).
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21190; reverts #19243 TypeError).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'soundex',
             $argIndex,
@@ -85,7 +86,7 @@ final class soundex extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'soundex',

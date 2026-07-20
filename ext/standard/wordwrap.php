@@ -118,7 +118,8 @@ final class wordwrap extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'wordwrap', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21190).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'wordwrap',
             $argIndex,
@@ -142,7 +143,7 @@ final class wordwrap extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'wordwrap',

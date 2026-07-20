@@ -29,7 +29,8 @@ final class chunk_split extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('chunk_split() requires one to three arguments in this compiler build');
         }
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'chunk_split', 0, 'string');
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21190; reverts zparam TypeError).
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'chunk_split', 0, 'string');
         $length = 76;
         if ($argc >= 2) {
             $length = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'chunk_split', 2, 'length');
@@ -94,7 +95,7 @@ final class chunk_split extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'chunk_split',

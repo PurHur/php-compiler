@@ -99,7 +99,8 @@ final class str_pad extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'str_pad', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21190).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'str_pad',
             $argIndex,
@@ -123,7 +124,7 @@ final class str_pad extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'str_pad',
