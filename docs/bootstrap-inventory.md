@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6214 |
-| Phase A inventory files (M2 ratio SSOT) | 6214 |
+| PHP files on vm.php path | 6230 |
+| Phase A inventory files (M2 ratio SSOT) | 6230 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19604 |
+| Source constructs flagged (warnings) | 19641 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1626,6 +1626,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_string.php` | 0 | 2 |
+| `ext/snmp/BuiltinClasses.php` | 0 | 1 |
+| `ext/snmp/Module.php` | 0 | 4 |
+| `ext/snmp/SNMPClose.php` | 0 | 2 |
+| `ext/snmp/SNMPConstruct.php` | 0 | 3 |
+| `ext/snmp/SNMPGetErrno.php` | 0 | 2 |
+| `ext/snmp/SNMPGetError.php` | 0 | 2 |
+| `ext/snmp/SNMPGetMethod.php` | 0 | 3 |
+| `ext/snmp/SNMPWalkMethod.php` | 0 | 3 |
+| `ext/snmp/SnmpClassMethod.php` | 0 | 1 |
+| `ext/snmp/SnmpConstants.php` | 0 | 1 |
+| `ext/snmp/SnmpExtensionPolicy.php` | 0 | 1 |
+| `ext/snmp/SnmpFunction.php` | 0 | 1 |
+| `ext/snmp/VmSnmp.php` | 0 | 10 |
+| `ext/snmp/snmpget.php` | 0 | 1 |
+| `ext/snmp/snmpwalk.php` | 0 | 1 |
 | `ext/soap/BuiltinClasses.php` | 0 | 9 |
 | `ext/soap/Module.php` | 0 | 3 |
 | `ext/soap/SoapClassMethod.php` | 0 | 1 |
@@ -5506,7 +5521,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 107 |
+| `lib/Runtime.php` | 0 | 108 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -19237,6 +19252,102 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - 2 class method(s)
+
+### `ext/snmp/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 39)
+- new snmpget (line 53)
+- new snmpwalk (line 54)
+- 4 class method(s)
+
+### `ext/snmp/SNMPClose.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/snmp/SNMPConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 26)
+- 1 class method(s)
+
+### `ext/snmp/SNMPGetErrno.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/snmp/SNMPGetError.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/snmp/SNMPGetMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+
+### `ext/snmp/SNMPWalkMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+
+### `ext/snmp/SnmpClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/snmp/SnmpConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/SnmpExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/SnmpFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/VmSnmp.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 37)
+- new Variable (line 40)
+- new SNMPConstruct (line 47)
+- new SNMPGetMethod (line 52)
+- new SNMPWalkMethod (line 53)
+- new SNMPClose (line 54)
+- new SNMPGetError (line 55)
+- new SNMPGetErrno (line 56)
+- new SnmpState (line 79)
+- 14 class method(s)
+
+### `ext/snmp/snmpget.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmpwalk.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/soap/BuiltinClasses.php`
 
@@ -39312,7 +39423,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 221 class method(s)
+- 222 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -45441,39 +45552,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\yaml\Module (line 268)
 - new ext\redis\Module (line 269)
 - new ext\mongodb\Module (line 270)
-- new ext\zstd\Module (line 271)
-- new ext\lzf\Module (line 272)
-- new ext\bz2\Module (line 273)
-- new ext\brotli\Module (line 274)
-- new ext\sodium\Module (line 275)
-- new ext\sqlite3\Module (line 276)
-- new ext\pgsql\Module (line 277)
-- new ext\odbc\Module (line 278)
-- new ext\dba\Module (line 279)
-- new ext\mailparse\Module (line 280)
-- new ext\enchant\Module (line 281)
-- new ext\tidy\Module (line 282)
-- new ext\pdo\Module (line 283)
-- new ext\phar\Module (line 284)
-- new ext\uri\Module (line 285)
-- new ext\uuid\Module (line 286)
-- new ext\uploadprogress\Module (line 287)
-- new ext\apcu\Module (line 288)
-- new ext\sysvshm\Module (line 289)
-- new ext\sysvsem\Module (line 290)
-- new ext\sysvmsg\Module (line 291)
-- new ext\reflection\Module (line 292)
-- new ext\standard\Module (line 293)
-- new JIT (line 369)
-- new JITContext (line 383)
-- new SealedClassPreprocessor (line 449)
-- new StaticClassPreprocessor (line 452)
-- new SourcePreprocessor\PropertyHooks (line 455)
-- new State (line 596)
-- new ReflectionProperty (line 623)
-- new ReflectionProperty (line 626)
-- new LintCompiler (line 1037)
-- new Variable (line 1167)
+- new ext\snmp\Module (line 271)
+- new ext\zstd\Module (line 272)
+- new ext\lzf\Module (line 273)
+- new ext\bz2\Module (line 274)
+- new ext\brotli\Module (line 275)
+- new ext\sodium\Module (line 276)
+- new ext\sqlite3\Module (line 277)
+- new ext\pgsql\Module (line 278)
+- new ext\odbc\Module (line 279)
+- new ext\dba\Module (line 280)
+- new ext\mailparse\Module (line 281)
+- new ext\enchant\Module (line 282)
+- new ext\tidy\Module (line 283)
+- new ext\pdo\Module (line 284)
+- new ext\phar\Module (line 285)
+- new ext\uri\Module (line 286)
+- new ext\uuid\Module (line 287)
+- new ext\uploadprogress\Module (line 288)
+- new ext\apcu\Module (line 289)
+- new ext\sysvshm\Module (line 290)
+- new ext\sysvsem\Module (line 291)
+- new ext\sysvmsg\Module (line 292)
+- new ext\reflection\Module (line 293)
+- new ext\standard\Module (line 294)
+- new JIT (line 370)
+- new JITContext (line 384)
+- new SealedClassPreprocessor (line 450)
+- new StaticClassPreprocessor (line 453)
+- new SourcePreprocessor\PropertyHooks (line 456)
+- new State (line 597)
+- new ReflectionProperty (line 624)
+- new ReflectionProperty (line 627)
+- new LintCompiler (line 1038)
+- new Variable (line 1168)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
