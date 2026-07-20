@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\tidy;
 
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM\Variable;
 
 /**
  * tidy extension module entry (php-src ext/tidy/tidy.c; #21464 / #3664).
@@ -49,6 +50,11 @@ class Module extends ModuleAbstract
         parent::init($runtime);
         if (!TidyExtensionPolicy::advertisesExtension()) {
             return;
+        }
+        foreach (TidyConstants::registeredConstants() as $name => $value) {
+            $var = new Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
         }
         BuiltinClasses::register($runtime->vmContext);
     }
