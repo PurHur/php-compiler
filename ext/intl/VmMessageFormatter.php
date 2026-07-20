@@ -505,30 +505,303 @@ final class VmMessageFormatter
      */
     private static function applyPattern(string $locale, string $pattern, array $args): string
     {
-        // Match {arg}, {arg, type}, {arg, type, style} — nested braces deferred (plural/select).
-        return (string) preg_replace_callback(
-            '/\{([A-Za-z_][A-Za-z0-9_]*|[0-9]+)(?:,\s*([a-zA-Z]+)(?:,\s*([^}]+))?)?\}/',
-            static function (array $m) use ($locale, $args): string {
-                $name = $m[1];
-                $type = isset($m[2]) ? strtolower($m[2]) : null;
-                $style = isset($m[3]) ? trim($m[3]) : null;
-                $has = \array_key_exists($name, $args)
-                    || (ctype_digit($name) && \array_key_exists((int) $name, $args));
-                if (!$has) {
-                    return $m[0];
-                }
-                $val = self::lookupArg($args, $name);
-                if (null === $type || 'none' === $type) {
-                    return self::stringify($val);
-                }
-                if ('number' === $type) {
-                    return self::formatNumberSimple($locale, $val, $style);
-                }
+        return self::formatMessagePattern($locale, $pattern, $args);
+    }
 
-                return self::stringify($val);
-            },
-            $pattern
-        );
+    /**
+     * ICU MessageFormat subset: simple args, number, plural, select (#21099).
+     *
+     * @param array<int|string, mixed> $args
+     */
+    private static function formatMessagePattern(string $locale, string $pattern, array $args): string
+    {
+        $out = '';
+        $i = 0;
+        $len = \strlen($pattern);
+        while ($i < $len) {
+            $ch = $pattern[$i];
+            if ("'" === $ch) {
+                // ICU quoted literal: '…' ('' → single quote).
+                ++$i;
+                if ($i < $len && "'" === $pattern[$i]) {
+                    $out .= "'";
+                    ++$i;
+                    continue;
+                }
+                while ($i < $len) {
+                    if ("'" === $pattern[$i]) {
+                        ++$i;
+                        if ($i < $len && "'" === $pattern[$i]) {
+                            $out .= "'";
+                            ++$i;
+                            continue;
+                        }
+                        break;
+                    }
+                    $out .= $pattern[$i];
+                    ++$i;
+                }
+                continue;
+            }
+            if ('{' !== $ch) {
+                $out .= $ch;
+                ++$i;
+                continue;
+            }
+            [$replacement, $end] = self::expandPlaceholder($locale, $pattern, $i, $args);
+            $out .= $replacement;
+            $i = $end;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<int|string, mixed> $args
+     *
+     * @return array{0: string, 1: int} replacement + index after closing brace
+     */
+    private static function expandPlaceholder(string $locale, string $pattern, int $start, array $args): array
+    {
+        $len = \strlen($pattern);
+        if ($start >= $len || '{' !== $pattern[$start]) {
+            return ['{', $start + 1];
+        }
+        $depth = 0;
+        $end = $start;
+        for ($i = $start; $i < $len; ++$i) {
+            $ch = $pattern[$i];
+            if ("'" === $ch) {
+                ++$i;
+                while ($i < $len) {
+                    if ("'" === $pattern[$i]) {
+                        if ($i + 1 < $len && "'" === $pattern[$i + 1]) {
+                            $i += 2;
+                            continue;
+                        }
+                        break;
+                    }
+                    ++$i;
+                }
+                continue;
+            }
+            if ('{' === $ch) {
+                ++$depth;
+            } elseif ('}' === $ch) {
+                --$depth;
+                if (0 === $depth) {
+                    $end = $i;
+                    break;
+                }
+            }
+        }
+        if (0 !== $depth) {
+            // Unbalanced — leave literal remainder.
+            return [\substr($pattern, $start), $len];
+        }
+        $inner = \substr($pattern, $start + 1, $end - $start - 1);
+        $parts = self::splitPlaceholderParts($inner);
+        $name = $parts[0];
+        $type = isset($parts[1]) ? strtolower(trim($parts[1])) : null;
+        $style = $parts[2] ?? null;
+        $has = \array_key_exists($name, $args)
+            || (ctype_digit($name) && \array_key_exists((int) $name, $args));
+        if (!$has) {
+            return [\substr($pattern, $start, $end - $start + 1), $end + 1];
+        }
+        $val = self::lookupArg($args, $name);
+        if (null === $type || 'none' === $type) {
+            return [self::stringify($val), $end + 1];
+        }
+        if ('number' === $type) {
+            return [self::formatNumberSimple($locale, $val, null !== $style ? trim($style) : null), $end + 1];
+        }
+        if ('plural' === $type) {
+            $sub = self::choosePluralSelect($style ?? '', $val, true, $locale);
+
+            return [self::formatMessagePattern($locale, $sub, $args), $end + 1];
+        }
+        if ('select' === $type) {
+            $sub = self::choosePluralSelect($style ?? '', $val, false, $locale);
+
+            return [self::formatMessagePattern($locale, $sub, $args), $end + 1];
+        }
+
+        return [self::stringify($val), $end + 1];
+    }
+
+    /** @return list<string> name[, type[, style…]] */
+    private static function splitPlaceholderParts(string $inner): array
+    {
+        $parts = [];
+        $buf = '';
+        $depth = 0;
+        $len = \strlen($inner);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $inner[$i];
+            if ("'" === $ch) {
+                $buf .= $ch;
+                ++$i;
+                while ($i < $len) {
+                    $buf .= $inner[$i];
+                    if ("'" === $inner[$i]) {
+                        if ($i + 1 < $len && "'" === $inner[$i + 1]) {
+                            $buf .= "'";
+                            $i += 2;
+                            continue;
+                        }
+                        break;
+                    }
+                    ++$i;
+                }
+                continue;
+            }
+            if ('{' === $ch) {
+                ++$depth;
+                $buf .= $ch;
+                continue;
+            }
+            if ('}' === $ch) {
+                if ($depth > 0) {
+                    --$depth;
+                }
+                $buf .= $ch;
+                continue;
+            }
+            if (',' === $ch && 0 === $depth && \count($parts) < 2) {
+                $parts[] = trim($buf);
+                $buf = '';
+                continue;
+            }
+            $buf .= $ch;
+        }
+        $parts[] = $buf;
+
+        return $parts;
+    }
+
+    /**
+     * Parse plural/select style body and pick a sub-message.
+     * Plural: exact =N first, then keyword (one/other/…); `#` → number.
+     *
+     * @param mixed $val
+     */
+    private static function choosePluralSelect(string $style, $val, bool $plural, string $locale): string
+    {
+        $cases = self::parsePluralSelectCases($style);
+        if ([] === $cases) {
+            return self::stringify($val);
+        }
+        $chosen = null;
+        if ($plural) {
+            $num = 0.0;
+            if (\is_int($val) || \is_float($val) || (\is_string($val) && is_numeric($val))) {
+                $num = (float) $val;
+            }
+            // Prefer =N / =n exact forms.
+            foreach ($cases as [$key, $msg]) {
+                if (str_starts_with($key, '=')) {
+                    $rhs = substr($key, 1);
+                    if (is_numeric($rhs) && (float) $rhs == $num) {
+                        $chosen = $msg;
+                        break;
+                    }
+                }
+            }
+            if (null === $chosen) {
+                $keyword = self::pluralKeyword($locale, $num);
+                foreach ([$keyword, 'other'] as $want) {
+                    foreach ($cases as [$key, $msg]) {
+                        if ($key === $want) {
+                            $chosen = $msg;
+                            break 2;
+                        }
+                    }
+                }
+            }
+            if (null === $chosen) {
+                $chosen = $cases[\count($cases) - 1][1];
+            }
+            $numberText = self::formatNumberSimple($locale, $val, null);
+
+            return str_replace('#', $numberText, $chosen);
+        }
+        $sel = self::stringify($val);
+        foreach ($cases as [$key, $msg]) {
+            if ($key === $sel) {
+                return $msg;
+            }
+        }
+        foreach ($cases as [$key, $msg]) {
+            if ('other' === $key) {
+                return $msg;
+            }
+        }
+
+        return $cases[\count($cases) - 1][1];
+    }
+
+    /** @return list<array{0: string, 1: string}> */
+    private static function parsePluralSelectCases(string $style): array
+    {
+        $cases = [];
+        $len = \strlen($style);
+        $i = 0;
+        while ($i < $len) {
+            while ($i < $len && ctype_space($style[$i])) {
+                ++$i;
+            }
+            if ($i >= $len) {
+                break;
+            }
+            $key = '';
+            if ('=' === $style[$i]) {
+                $key .= '=';
+                ++$i;
+                while ($i < $len && (ctype_digit($style[$i]) || '.' === $style[$i] || '-' === $style[$i])) {
+                    $key .= $style[$i];
+                    ++$i;
+                }
+            } else {
+                while ($i < $len && (ctype_alnum($style[$i]) || '_' === $style[$i])) {
+                    $key .= $style[$i];
+                    ++$i;
+                }
+            }
+            while ($i < $len && ctype_space($style[$i])) {
+                ++$i;
+            }
+            if ($i >= $len || '{' !== $style[$i]) {
+                break;
+            }
+            $depth = 0;
+            $msgStart = $i + 1;
+            for (; $i < $len; ++$i) {
+                if ('{' === $style[$i]) {
+                    ++$depth;
+                } elseif ('}' === $style[$i]) {
+                    --$depth;
+                    if (0 === $depth) {
+                        $cases[] = [$key, \substr($style, $msgStart, $i - $msgStart)];
+                        ++$i;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $cases;
+    }
+
+    /** English-oriented CLDR plural keyword (enough for en_* php-src-strict). */
+    private static function pluralKeyword(string $locale, float $n): string
+    {
+        unset($locale);
+        if (1.0 === $n) {
+            return 'one';
+        }
+
+        return 'other';
     }
 
     /**
