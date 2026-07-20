@@ -1455,6 +1455,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phar_delete_count_buffer')) {
                 continue;
             }
+            // Phar metadata API: VM green (#21229); same Phar ctor MCJIT harness skip as #21228.
+            if (str_contains($name, 'phar_metadata')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }

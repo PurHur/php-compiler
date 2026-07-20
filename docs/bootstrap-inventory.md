@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6131 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19067 |
+| Source constructs flagged (warnings) | 19068 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1443,7 +1443,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/pg_untrace.php` | 0 | 2 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
 | `ext/phar/Module.php` | 0 | 1 |
-| `ext/phar/PharBuiltin.php` | 0 | 18 |
+| `ext/phar/PharBuiltin.php` | 0 | 19 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 15 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 1 |
@@ -17378,23 +17378,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new PharConstruct (line 36)
-- new ArgumentCountError (line 82)
-- new ArgumentCountError (line 98)
-- new ArgumentCountError (line 116)
-- new ArgumentCountError (line 132)
-- new ArgumentCountError (line 152)
-- new ArgumentCountError (line 173)
-- new UnexpectedValueException (line 191)
-- new ArgumentCountError (line 207)
-- new ArgumentCountError (line 226)
-- new ArgumentCountError (line 257)
-- new ArgumentCountError (line 341)
-- new ArgumentCountError (line 360)
-- new ArgumentCountError (line 386)
-- new ArgumentCountError (line 402)
-- new ArgumentCountError (line 422)
-- new ArgumentCountError (line 439)
-- 24 class method(s)
+- new ArgumentCountError (line 93)
+- new ArgumentCountError (line 109)
+- new ArgumentCountError (line 127)
+- new ArgumentCountError (line 143)
+- new ArgumentCountError (line 163)
+- new ArgumentCountError (line 184)
+- new UnexpectedValueException (line 202)
+- new ArgumentCountError (line 218)
+- new ArgumentCountError (line 237)
+- new ArgumentCountError (line 268)
+- new ArgumentCountError (line 352)
+- new ArgumentCountError (line 401)
+- new ArgumentCountError (line 428)
+- new ArgumentCountError (line 454)
+- new ArgumentCountError (line 470)
+- new ArgumentCountError (line 490)
+- new ArgumentCountError (line 507)
+- 28 class method(s)
 
 ### `ext/phar/PharDataBuiltin.php`
 
@@ -17428,27 +17429,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharArchive.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 61)
-- new UnexpectedValueException (line 71)
-- new UnexpectedValueException (line 83)
-- new UnexpectedValueException (line 95)
-- new UnexpectedValueException (line 107)
-- new UnexpectedValueException (line 120)
-- new UnexpectedValueException (line 124)
-- new UnexpectedValueException (line 138)
-- new RecursiveIteratorIterator (line 141)
-- new RecursiveDirectoryIterator (line 142)
-- new UnexpectedValueException (line 225)
-- new BadMethodCallException (line 298)
-- new BadMethodCallException (line 316)
-- new BadMethodCallException (line 340)
-- new BadMethodCallException (line 343)
-- new Variable (line 345)
-- new Error (line 391)
-- new UnexpectedValueException (line 425)
-- new UnexpectedValueException (line 440)
-- new Error (line 471)
-- 32 class method(s)
+- new UnexpectedValueException (line 68)
+- new UnexpectedValueException (line 86)
+- new UnexpectedValueException (line 98)
+- new UnexpectedValueException (line 110)
+- new UnexpectedValueException (line 122)
+- new UnexpectedValueException (line 135)
+- new UnexpectedValueException (line 139)
+- new UnexpectedValueException (line 153)
+- new RecursiveIteratorIterator (line 156)
+- new RecursiveDirectoryIterator (line 157)
+- new UnexpectedValueException (line 240)
+- new BadMethodCallException (line 313)
+- new BadMethodCallException (line 367)
+- new BadMethodCallException (line 391)
+- new BadMethodCallException (line 394)
+- new Variable (line 396)
+- new Error (line 442)
+- new UnexpectedValueException (line 476)
+- new UnexpectedValueException (line 495)
+- new Error (line 526)
+- 36 class method(s)
 
 ### `ext/phar/VmPharData.php`
 

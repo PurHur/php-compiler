@@ -25,7 +25,10 @@ final class VmPharArchive
 
     private const HALT = "__HALT_COMPILER(); ?>";
 
-    /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string}> */
+    /** Reserved ustar member for archive metadata (#21229). */
+    private const META_ENTRY = '.phar/metadata';
+
+    /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string, hasMetadata: bool, metadata: mixed}> */
     private static array $state = [];
 
     public static function bind(
@@ -36,7 +39,9 @@ final class VmPharArchive
         array $dirs = [],
         string $stub = '',
         string $alias = '',
-        bool $buffering = false
+        bool $buffering = false,
+        bool $hasMetadata = false,
+        mixed $metadata = null
     ): void {
         if ('' === $stub) {
             $stub = self::createDefaultStub();
@@ -49,6 +54,8 @@ final class VmPharArchive
             'buffering' => $buffering,
             'stub' => $stub,
             'alias' => $alias,
+            'hasMetadata' => $hasMetadata,
+            'metadata' => $metadata,
         ];
     }
 
@@ -62,7 +69,15 @@ final class VmPharArchive
             }
             [$stub, $payload] = self::splitStub($binary);
             $entries = VmPharTar::readArchiveEntries($payload);
-            self::bind($object, $path, $entries['files'], false, $entries['dirs'], $stub);
+            $hasMetadata = false;
+            $metadata = null;
+            if (isset($entries['files'][self::META_ENTRY])) {
+                $hasMetadata = true;
+                $raw = $entries['files'][self::META_ENTRY];
+                $metadata = '' === $raw ? null : \unserialize($raw);
+                unset($entries['files'][self::META_ENTRY]);
+            }
+            self::bind($object, $path, $entries['files'], false, $entries['dirs'], $stub, '', false, $hasMetadata, $metadata);
 
             return;
         }
@@ -303,6 +318,42 @@ final class VmPharArchive
         return true;
     }
 
+    /** php-src zim_Phar_hasMetadata (#21229). */
+    public static function hasMetadata(ObjectEntry $object): bool
+    {
+        return self::requireState($object)['hasMetadata'];
+    }
+
+    /** php-src zim_Phar_getMetadata (#21229). */
+    public static function getMetadata(ObjectEntry $object): mixed
+    {
+        $st = self::requireState($object);
+
+        return $st['hasMetadata'] ? $st['metadata'] : null;
+    }
+
+    /** php-src zim_Phar_setMetadata (#21229). */
+    public static function setMetadata(ObjectEntry $object, mixed $metadata): void
+    {
+        self::requireWritable('Phar::setMetadata');
+        self::requireState($object);
+        self::$state[$object->id]['hasMetadata'] = true;
+        self::$state[$object->id]['metadata'] = $metadata;
+        self::markDirty($object);
+    }
+
+    /** php-src zim_Phar_delMetadata (#21229). */
+    public static function delMetadata(ObjectEntry $object): bool
+    {
+        self::requireWritable('Phar::delMetadata');
+        self::requireState($object);
+        self::$state[$object->id]['hasMetadata'] = false;
+        self::$state[$object->id]['metadata'] = null;
+        self::markDirty($object);
+
+        return true;
+    }
+
     public static function compressFiles(ObjectEntry $object, int $compression): void
     {
         self::requireWritable('Phar::compressFiles');
@@ -435,7 +486,11 @@ final class VmPharArchive
                 $stub .= self::HALT;
             }
         }
-        $binary = $stub.VmPharTar::writeArchive($st['files'], $st['dirs']);
+        $files = $st['files'];
+        if ($st['hasMetadata']) {
+            $files[self::META_ENTRY] = \serialize($st['metadata']);
+        }
+        $binary = $stub.VmPharTar::writeArchive($files, $st['dirs']);
         if (false === VmFs::filePutContents($path, $binary)) {
             throw new \UnexpectedValueException('phar error: unable to write phar "'.$path.'"');
         }
@@ -464,7 +519,7 @@ final class VmPharArchive
         return [\substr($binary, 0, $stubEnd), \substr($binary, $stubEnd)];
     }
 
-    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string} */
+    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, buffering: bool, stub: string, alias: string, hasMetadata: bool, metadata: mixed} */
     private static function requireState(ObjectEntry $object): array
     {
         if (!isset(self::$state[$object->id])) {
