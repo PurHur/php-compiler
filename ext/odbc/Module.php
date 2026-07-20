@@ -9,12 +9,13 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * odbc extension module entry (php-src ext/odbc/php_odbc.c; #6293 / #21258 / #21278).
+ * odbc extension module entry (php-src ext/odbc/php_odbc.c; #6293 / #21258 / #21278 / #21279).
  *
  * Connect/close/exec/fetch/error + PHP 8.2 connection-string helpers +
  * prepare/execute/fetch_array/tables/columns/field_* + autocommit/commit/rollback +
- * next_result/data_source/binmode/longreadlen. Thin unixODBC FFI when libodbc
- * is present (document unixodbc / libsqliteodbc in Docker).
+ * next_result/data_source/binmode/longreadlen +
+ * primarykeys/foreignkeys/statistics/gettypeinfo catalog APIs.
+ * Thin unixODBC FFI when libodbc is present (document unixodbc / libsqliteodbc in Docker).
  */
 class Module extends ModuleAbstract
 {
@@ -48,6 +49,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/odbc_prepare_fetch_builtins.php';
         require_once __DIR__.'/odbc_txn_builtins.php';
         require_once __DIR__.'/odbc_result_driver_builtins.php';
+        require_once __DIR__.'/odbc_catalog_builtins.php';
 
         return [
             new odbc_connect(),
@@ -73,6 +75,10 @@ class Module extends ModuleAbstract
             new odbc_field_num(),
             new odbc_tables(),
             new odbc_columns(),
+            new odbc_primarykeys(),
+            new odbc_foreignkeys(),
+            new odbc_statistics(),
+            new odbc_gettypeinfo(),
             new odbc_free_result(),
             new odbc_autocommit(),
             new odbc_commit(),
