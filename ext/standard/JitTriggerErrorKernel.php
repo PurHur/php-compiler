@@ -61,7 +61,7 @@ final class JitTriggerErrorKernel
 
         LastErrorRuntime::ensureLinked($context);
         SilenceRuntime::ensureLinked($context);
-        ErrorHandlerJitRuntime::ensureLinked($context, true);
+        ErrorHandlerJitRuntime::ensureLinked($context);
 
         self::ensureUndefHelpersCompiled($context);
         self::ensureValueHelpers($context);

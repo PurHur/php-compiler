@@ -8,7 +8,10 @@ use PHPCompiler\JIT\Builtin\ErrorHandlerJitRuntime;
 use PHPCompiler\JIT\Builtin\ErrorHandlerOutput;
 use PHPUnit\Framework\TestCase;
 
-/** Error-handler stack uses module globals on standalone AOT (#17671); no thin ABI fork (#21346). */
+/**
+ * Error-handler stack uses module globals on standalone AOT (#17671); no thin ABI fork (#21346).
+ * VM SSOT stays ErrorHandlerJitHelper.
+ */
 final class ErrorHandlerRuntimeShrinkTest extends TestCase
 {
     public function testNoStandaloneThinAbiFork(): void
@@ -27,6 +30,8 @@ final class ErrorHandlerRuntimeShrinkTest extends TestCase
     public function testErrorHandlerJitRuntimeUsesModuleStackGlobals(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ErrorHandlerJitRuntime.php');
+        $this->assertStringContainsString('phpc_eh_stack_depth', $source);
+        $this->assertStringContainsString('ensureStackGlobals', $source);
         $this->assertStringNotContainsString("GLOBAL_DEPTH = 'phpc_error_handler_depth'", $source);
         $this->assertStringNotContainsString('malloc', $source);
     }

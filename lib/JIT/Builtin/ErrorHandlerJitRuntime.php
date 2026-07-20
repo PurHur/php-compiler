@@ -18,7 +18,8 @@ use llvm\LLVMValueRef_ptr;
  *
  * Stack state uses LLVM module globals ({@see DefineRuntime} pattern) because nested-JIT
  * static property stores in {@see ErrorHandlerJitHelper} omit string slots on standalone AOT.
- * Thin no-op ABI stubs deleted (#21346). Depth/top/saved mirrors exception-handler stack shape.
+ * Thin no-op ABI stubs deleted (#21346). VM SSOT remains {@see ErrorHandlerJitHelper}.
+ * Depth/top/saved mirrors exception-handler stack shape.
  * php-src: ext/standard/basic_functions.c — set_error_handler, restore_error_handler
  */
 final class ErrorHandlerJitRuntime
@@ -47,17 +48,17 @@ final class ErrorHandlerJitRuntime
         '__phpc_error_handler_get_apply',
     ];
 
-    public static function ensureLinked(Context $context, bool $requireFullStack = false): void
-    {
-        self::implement($context, $requireFullStack);
-    }
-
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context, false);
+        self::implement($context);
     }
 
-    public static function implement(Context $context, bool $requireFullStack = false): void
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function implement(Context $context): void
     {
         if (self::fullStackReady($context)) {
             self::registerLinkedRuntime($context);
@@ -68,7 +69,6 @@ final class ErrorHandlerJitRuntime
         $restoreBlock = self::captureInsertBlock($context);
         self::ensureValueWriters($context);
         self::ensureStackGlobals($context);
-
         self::implementDispatchBridge($context);
         self::implementSetApplyBridge($context);
         self::implementRestoreApplyBridge($context);
