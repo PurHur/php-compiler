@@ -70,6 +70,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -6033,6 +6034,7 @@ require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove_from_session.php
 require_once __DIR__.'/../../../ext/enchant/enchant_dict_store_replacement.php';
 require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
 require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
+require_once __DIR__.'/../../../ext/phar/bootstrap_pharexception.php';
 require_once __DIR__.'/../../../ext/apcu/ApcuFunction.php';
 require_once __DIR__.'/../../../ext/apcu/Module.php';
 require_once __DIR__.'/../../../ext/apcu/VmApcu.php';
