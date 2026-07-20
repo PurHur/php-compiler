@@ -16,7 +16,8 @@ use PHPCompiler\VM;
  * next_result/data_source/binmode/longreadlen/setoption +
  * primarykeys/foreignkeys/statistics/gettypeinfo +
  * specialcolumns/procedures/procedurecolumns +
- * tableprivileges/columnprivileges catalog APIs.
+ * tableprivileges/columnprivileges catalog APIs +
+ * odbc_cursor (SQLGetCursorName).
  * Thin unixODBC FFI when libodbc is present (document unixodbc / libsqliteodbc in Docker).
  */
 class Module extends ModuleAbstract
@@ -89,6 +90,7 @@ class Module extends ModuleAbstract
             new odbc_tableprivileges(),
             new odbc_columnprivileges(),
             new odbc_free_result(),
+            new odbc_cursor(),
             new odbc_autocommit(),
             new odbc_commit(),
             new odbc_rollback(),

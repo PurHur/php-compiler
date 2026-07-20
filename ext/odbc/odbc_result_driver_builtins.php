@@ -12,9 +12,51 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * odbc_next_result / odbc_data_source / odbc_binmode / odbc_longreadlen
- * (php-src ext/odbc/php_odbc.c; #21278).
+ * odbc_next_result / odbc_data_source / odbc_binmode / odbc_longreadlen / odbc_cursor
+ * (php-src ext/odbc/php_odbc.c; #21278 / #21307).
  */
+
+final class odbc_cursor extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('odbc_cursor');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'odbc_cursor() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $res = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $res->type || !VmOdbcResult::isLive($res->toObject())) {
+            throw new \TypeError('odbc_cursor(): supplied resource is not a valid ODBC result resource');
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('odbc_cursor() requires a VM context');
+        }
+        $name = VmOdbcCore::cursor($res->toObject(), $ctx, $frame);
+        if (false === $name) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($name);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('odbc_cursor() is not implemented for JIT (#21307)');
+    }
+}
 
 final class odbc_next_result extends Internal
 {

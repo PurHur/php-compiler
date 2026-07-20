@@ -49,6 +49,12 @@ final class VmOdbcNative
 
     public const SQL_ROLLBACK = 1;
 
+    /** SQLGetInfo option (sql.h) — max cursor name length. */
+    public const SQL_MAX_CURSOR_NAME_LEN = 1;
+
+    /** SQLError message buffer size (sql.h SQL_MAX_MESSAGE_LENGTH). */
+    public const SQL_MAX_MESSAGE_LENGTH = 512;
+
     /** @var \FFI|null */
     private static $ffi = null;
 
@@ -1006,6 +1012,136 @@ final class VmOdbcNative
     }
 
     /**
+     * SQLGetInfo numeric (SQLUSMALLINT) — used by odbc_cursor (#21307).
+     */
+    public static function getInfoUSmallInt(\FFI\CData $hdbc, int $infoType): ?int
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return null;
+            }
+            $value = $ffi->new('SQLUSMALLINT');
+            $len = $ffi->new('SQLSMALLINT');
+            $rc = (int) $ffi->SQLGetInfo(
+                $hdbc,
+                $infoType,
+                \FFI::addr($value),
+                \FFI::sizeof($value),
+                \FFI::addr($len)
+            );
+            if (!self::ok($rc)) {
+                return null;
+            }
+
+            return (int) $value->cdata;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * SQLGetCursorName — returns name, or null on hard failure (caller checks SQLError).
+     *
+     * @return array{ok: true, name: string}|array{ok: false}|null null = FFI unavailable
+     */
+    public static function getCursorName(\FFI\CData $hstmt, int $maxLen): ?array
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return null;
+            }
+            if ($maxLen < 1) {
+                return ['ok' => false];
+            }
+            $buf = $ffi->new('SQLCHAR['.($maxLen + 1).']');
+            $len = $ffi->new('SQLSMALLINT');
+            $rc = (int) $ffi->SQLGetCursorName(
+                $hstmt,
+                $buf,
+                $maxLen,
+                \FFI::addr($len)
+            );
+            if (!self::ok($rc)) {
+                return ['ok' => false];
+            }
+            $nameLen = (int) $len->cdata;
+            if ($nameLen < 0) {
+                $nameLen = 0;
+            }
+            if ($nameLen > $maxLen) {
+                $nameLen = $maxLen;
+            }
+
+            return ['ok' => true, 'name' => self::ffiString($buf, $nameLen)];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * SQLSetCursorName (php-src odbc_cursor S1015 fallback; #21307).
+     */
+    public static function setCursorName(\FFI\CData $hstmt, string $name): bool
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $buf = self::cString($ffi, $name);
+            $rc = (int) $ffi->SQLSetCursorName($hstmt, $buf, self::SQL_NTS);
+
+            return self::SQL_SUCCESS === $rc;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * SQLError — returns SQLSTATE + message for the last diagnostic.
+     *
+     * @return array{state: string, message: string}|null
+     */
+    public static function sqlError(
+        ?\FFI\CData $henv,
+        ?\FFI\CData $hdbc,
+        ?\FFI\CData $hstmt
+    ): ?array {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return null;
+            }
+            $state = $ffi->new('SQLCHAR[6]');
+            $native = $ffi->new('SQLINTEGER');
+            $msg = $ffi->new('SQLCHAR['.self::SQL_MAX_MESSAGE_LENGTH.']');
+            $msgLen = $ffi->new('SQLSMALLINT');
+            $rc = (int) $ffi->SQLError(
+                $henv,
+                $hdbc,
+                $hstmt,
+                $state,
+                \FFI::addr($native),
+                $msg,
+                self::SQL_MAX_MESSAGE_LENGTH - 1,
+                \FFI::addr($msgLen)
+            );
+            if (!self::ok($rc)) {
+                return null;
+            }
+
+            return [
+                'state' => self::ffiString($state, 5),
+                'message' => self::ffiString($msg),
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * SQLColAttribute numeric attribute (php-src odbc_column_lengths; #21306).
      * SQL_COLUMN_PRECISION=4, SQL_COLUMN_SCALE=5 (ODBC 2).
      */
@@ -1101,6 +1237,10 @@ SQLRETURN SQLGetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLPOINTER pvP
 SQLRETURN SQLTransact(SQLHENV henv, SQLHDBC hdbc, SQLUSMALLINT fType);
 SQLRETURN SQLMoreResults(SQLHSTMT hstmt);
 SQLRETURN SQLDataSources(SQLHENV henv, SQLUSMALLINT fDirection, SQLCHAR *szDSN, SQLSMALLINT cbDSNMax, SQLSMALLINT *pcbDSN, SQLCHAR *szDescription, SQLSMALLINT cbDescriptionMax, SQLSMALLINT *pcbDescription);
+SQLRETURN SQLGetInfo(SQLHDBC hdbc, SQLUSMALLINT fInfoType, SQLPOINTER rgbInfoValue, SQLSMALLINT cbInfoValueMax, SQLSMALLINT *pcbInfoValue);
+SQLRETURN SQLGetCursorName(SQLHSTMT hstmt, SQLCHAR *szCursor, SQLSMALLINT cbCursorMax, SQLSMALLINT *pcbCursor);
+SQLRETURN SQLSetCursorName(SQLHSTMT hstmt, SQLCHAR *szCursor, SQLSMALLINT cbCursor);
+SQLRETURN SQLError(SQLHENV henv, SQLHDBC hdbc, SQLHSTMT hstmt, SQLCHAR *szSqlState, SQLINTEGER *pfNativeError, SQLCHAR *szErrorMsg, SQLSMALLINT cbErrorMsgMax, SQLSMALLINT *pcbErrorMsg);
 CDEF;
         foreach (['libodbc.so.2', 'libodbc.so.1', 'libodbc.so', 'libiodbc.so.2', 'libiodbc.so'] as $lib) {
             try {
