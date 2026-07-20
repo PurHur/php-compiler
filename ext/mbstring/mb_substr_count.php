@@ -30,21 +30,12 @@ final class mb_substr_count extends Internal
                 $argc
             ));
         }
-        $haystack = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_substr_count',
-            0,
-            'haystack'
-        );
+        // Z_PARAM_STR — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21282).
+        $haystack = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_substr_count', 0, 'haystack');
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[1],
-            'mb_substr_count',
-            1,
-            'needle'
-        );
+        $needle = VmString::trimFamilyStringArgForFrame($frame, 1, 'mb_substr_count', 1, 'needle');
         if ('' === $needle) {
             throw new \ValueError('mb_substr_count(): Argument #2 ($needle) must not be empty');
         }

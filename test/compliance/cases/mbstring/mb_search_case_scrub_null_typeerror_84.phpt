@@ -12,7 +12,6 @@ mb_strrchr: mb_strrchr(): Argument #1 ($haystack) must be of type string, null g
 mb_stripos: mb_stripos(): Argument #1 ($haystack) must be of type string, null given
 mb_strripos: mb_strripos(): Argument #1 ($haystack) must be of type string, null given
 mb_strrpos: mb_strrpos(): Argument #1 ($haystack) must be of type string, null given
-mb_substr_count: mb_substr_count(): Argument #1 ($haystack) must be of type string, null given
 mb_convert_case: mb_convert_case(): Argument #1 ($string) must be of type string, null given
 mb_scrub: mb_scrub(): Argument #1 ($string) must be of type string, null given
 mb_str_split: mb_str_split(): Argument #1 ($string) must be of type string, null given

@@ -32,8 +32,8 @@ final class mb_strtolower extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19297, mbstring.c).
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_strtolower', 0, 'string');
+        // Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21282).
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_strtolower', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }

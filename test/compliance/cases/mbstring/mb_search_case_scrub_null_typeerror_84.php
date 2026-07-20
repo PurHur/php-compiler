@@ -1,5 +1,6 @@
 <?php
-// Guard #21061 — mb_strwidth/search/case/scrub family null TypeError under PROFILE=8.4
+// Guard #21061 / #21282 — mb_strwidth/search/case/scrub family null TypeError under PROFILE=8.4
+// mb_substr_count soft-null moved to #21282 (Zend DEP+coerce).
 $cases = [
     'mb_strwidth' => static fn () => mb_strwidth(null),
     'mb_strstr' => static fn () => mb_strstr(null, 'a'),
@@ -8,7 +9,6 @@ $cases = [
     'mb_stripos' => static fn () => mb_stripos(null, 'a'),
     'mb_strripos' => static fn () => mb_strripos(null, 'a'),
     'mb_strrpos' => static fn () => mb_strrpos(null, 'a'),
-    'mb_substr_count' => static fn () => mb_substr_count(null, 'a'),
     'mb_convert_case' => static fn () => mb_convert_case(null, MB_CASE_UPPER),
     'mb_scrub' => static fn () => mb_scrub(null),
     'mb_str_split' => static fn () => mb_str_split(null),
