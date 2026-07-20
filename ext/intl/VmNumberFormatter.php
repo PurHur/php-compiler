@@ -349,25 +349,7 @@ final class VmNumberFormatter
                 'NumberFormatter::format(): Argument #2 ($type) must be a NumberFormatter::TYPE_* constant'
             );
         }
-        $style = $state['style'];
-        $locale = $state['locale'];
-        if (self::PERCENT === $style) {
-            return self::formatDecimal($num * 100.0, $locale, null).'%';
-        }
-        if (self::SCIENTIFIC === $style) {
-            return self::formatScientific($num, $locale);
-        }
-        if (self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style) {
-            return self::formatDecimal($num, $locale, 2);
-        }
-        if (self::SPELLOUT === $style || self::ORDINAL === $style || self::DURATION === $style
-            || self::PATTERN_RULEBASED === $style) {
-            throw new \Error(
-                'NumberFormatter::format() style requires full ext/intl ICU (issue #5154)'
-            );
-        }
-
-        return self::formatDecimal($num, $locale, null);
+        return self::formatFromState($state, $num);
     }
 
     /**
@@ -383,17 +365,14 @@ final class VmNumberFormatter
         }
         $currency = strtoupper($currency);
         $symbol = self::currencySymbol($currency);
-        $body = self::formatDecimal($amount, $state['locale'], 2);
+        $body = self::formatDecimalFromState($state, abs($amount), 2);
         self::clearObjectError($formatter);
         IntlError::clear();
         if ('$' === $symbol || '£' === $symbol || '€' === $symbol || '¥' === $symbol) {
-            $negative = str_starts_with($body, '-');
-            $abs = $negative ? substr($body, 1) : $body;
-
-            return ($negative ? '-' : '').$symbol.$abs;
+            return ($amount < 0 ? '-' : '').$symbol.$body;
         }
 
-        return $body.' '.$currency;
+        return ($amount < 0 ? '-' : '').$body.' '.$currency;
     }
 
     /**
@@ -882,25 +861,173 @@ final class VmNumberFormatter
         };
     }
 
-    private static function formatDecimal(float $num, string $locale, ?int $forceFrac): string
+    /**
+     * Honor attributes/symbols/textAttributes in format() (#21121).
+     *
+     * @param array{
+     *   locale: string,
+     *   style: int,
+     *   pattern: ?string,
+     *   attributes: array<int, int|float>,
+     *   symbols: array<int, string>,
+     *   textAttributes: array<int, string>,
+     *   errorCode: int,
+     *   errorMessage: string
+     * } $state
+     */
+    private static function formatFromState(array $state, float $num): string
     {
-        [$grouping, $decimal] = self::separatorsForLocale($locale);
-        $negative = $num < 0;
-        $abs = abs($num);
-        if (null !== $forceFrac) {
-            $scaled = round($abs, $forceFrac);
-            $intPart = (int) floor($scaled + 1e-12);
-            $fracInt = (int) round(($scaled - $intPart) * (10 ** $forceFrac));
-            $intStr = self::groupDigits((string) $intPart, $grouping);
-            $fracStr = str_pad((string) $fracInt, $forceFrac, '0', STR_PAD_LEFT);
-            $out = $intStr.$decimal.$fracStr;
-
-            return $negative ? '-'.$out : $out;
+        $style = $state['style'];
+        if (self::SPELLOUT === $style || self::ORDINAL === $style || self::DURATION === $style
+            || self::PATTERN_RULEBASED === $style) {
+            throw new \Error(
+                'NumberFormatter::format() style requires full ext/intl ICU (issue #5154)'
+            );
         }
+        if (self::SCIENTIFIC === $style) {
+            $body = self::formatScientificFromState($state, $num);
+
+            return self::applyTextAffixes($state, $body, $num < 0);
+        }
+        if (self::PERCENT === $style) {
+            $body = self::formatDecimalFromState($state, abs($num) * 100.0, null);
+            $pct = $state['symbols'][self::PERCENT_SYMBOL] ?? '%';
+
+            return self::applyTextAffixes($state, $body.$pct, $num < 0);
+        }
+        $forceFrac = null;
+        if (self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style) {
+            $forceFrac = 2;
+        }
+        $body = self::formatDecimalFromState($state, abs($num), $forceFrac);
+        if (self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style) {
+            $symbol = $state['symbols'][self::CURRENCY_SYMBOL] ?? '$';
+            if (self::CURRENCY_ACCOUNTING === $style && $num < 0) {
+                return '('.$symbol.$body.')';
+            }
+
+            return self::applyTextAffixes($state, $symbol.$body, $num < 0);
+        }
+
+        return self::applyTextAffixes($state, $body, $num < 0);
+    }
+
+    /**
+     * @param array{
+     *   attributes: array<int, int|float>,
+     *   textAttributes: array<int, string>
+     * } $state
+     */
+    private static function applyTextAffixes(array $state, string $body, bool $negative): string
+    {
+        $text = $state['textAttributes'];
+        if ($negative) {
+            $prefix = $text[self::NEGATIVE_PREFIX] ?? '-';
+            $suffix = $text[self::NEGATIVE_SUFFIX] ?? '';
+
+            return $prefix.$body.$suffix;
+        }
+        $prefix = $text[self::POSITIVE_PREFIX] ?? '';
+        $suffix = $text[self::POSITIVE_SUFFIX] ?? '';
+
+        return $prefix.$body.$suffix;
+    }
+
+    /**
+     * @param array{
+     *   locale: string,
+     *   attributes: array<int, int|float>,
+     *   symbols: array<int, string>
+     * } $state
+     */
+    private static function formatDecimalFromState(array $state, float $abs, ?int $forceFrac): string
+    {
+        $attrs = $state['attributes'];
+        $symbols = $state['symbols'];
+        $grouping = $symbols[self::GROUPING_SEPARATOR_SYMBOL]
+            ?? self::separatorsForLocale($state['locale'])[0];
+        $decimal = $symbols[self::DECIMAL_SEPARATOR_SYMBOL]
+            ?? self::separatorsForLocale($state['locale'])[1];
+        $groupingUsed = (int) ($attrs[self::GROUPING_USED] ?? 1) !== 0;
+        $groupSize = (int) ($attrs[self::GROUPING_SIZE] ?? 3);
+        if ($groupSize < 1) {
+            $groupSize = 3;
+        }
+        if (!$groupingUsed) {
+            $grouping = '';
+        }
+
+        $fracDigitsAttr = $attrs[self::FRACTION_DIGITS] ?? -1;
+        $minFrac = null;
+        $maxFrac = null;
+        if (null !== $forceFrac) {
+            $minFrac = $forceFrac;
+            $maxFrac = $forceFrac;
+        } elseif (is_numeric($fracDigitsAttr) && (int) $fracDigitsAttr >= 0) {
+            $minFrac = (int) $fracDigitsAttr;
+            $maxFrac = (int) $fracDigitsAttr;
+        } else {
+            if (isset($attrs[self::MIN_FRACTION_DIGITS]) && (int) $attrs[self::MIN_FRACTION_DIGITS] >= 0) {
+                $minFrac = (int) $attrs[self::MIN_FRACTION_DIGITS];
+            }
+            if (isset($attrs[self::MAX_FRACTION_DIGITS]) && (int) $attrs[self::MAX_FRACTION_DIGITS] >= 0) {
+                $maxFrac = (int) $attrs[self::MAX_FRACTION_DIGITS];
+            }
+        }
+
+        if (null !== $minFrac && null !== $maxFrac) {
+            $scaled = round($abs, $maxFrac);
+            $intPart = (int) floor($scaled + 1e-12);
+            $fracInt = (int) round(($scaled - $intPart) * (10 ** $maxFrac));
+            $intStr = self::groupDigits((string) $intPart, $grouping, $groupSize);
+            if ($maxFrac <= 0) {
+                return $intStr;
+            }
+            $fracStr = str_pad((string) $fracInt, $maxFrac, '0', STR_PAD_LEFT);
+            if ($minFrac < $maxFrac) {
+                $fracStr = substr($fracStr, 0, max($minFrac, strlen(rtrim($fracStr, '0'))));
+                if ($minFrac > 0) {
+                    $fracStr = str_pad($fracStr, $minFrac, '0', STR_PAD_RIGHT);
+                }
+            }
+            if ('' === $fracStr && 0 === $minFrac) {
+                return $intStr;
+            }
+
+            return $intStr.$decimal.str_pad($fracStr, max($minFrac, strlen($fracStr)), '0', STR_PAD_RIGHT);
+        }
+        if (null !== $maxFrac) {
+            $scaled = round($abs, $maxFrac);
+            $intPart = (int) floor($scaled + 1e-12);
+            $frac = $scaled - $intPart;
+            $intStr = self::groupDigits((string) $intPart, $grouping, $groupSize);
+            if ($maxFrac <= 0 || $frac <= 0.0) {
+                return $intStr;
+            }
+            $fracStr = rtrim(rtrim(sprintf('%0.'.$maxFrac.'F', $frac), '0'), '.');
+            if (str_starts_with($fracStr, '0.')) {
+                $fracStr = substr($fracStr, 2);
+            }
+
+            return '' !== $fracStr ? $intStr.$decimal.$fracStr : $intStr;
+        }
+        if (null !== $minFrac) {
+            $scaled = round($abs, max($minFrac, 6));
+            $intPart = (int) floor($scaled + 1e-12);
+            $frac = $scaled - $intPart;
+            $intStr = self::groupDigits((string) $intPart, $grouping, $groupSize);
+            $raw = rtrim(rtrim(sprintf('%.6F', $frac), '0'), '.');
+            $fracStr = str_starts_with($raw, '0.') ? substr($raw, 2) : '';
+            $fracStr = str_pad($fracStr, $minFrac, '0', STR_PAD_RIGHT);
+
+            return $intStr.$decimal.$fracStr;
+        }
+
+        // Default DECIMAL: trim trailing zeros (historic formatDecimal behavior).
         $intPart = (int) floor($abs);
         $frac = $abs - $intPart;
         $fracStr = '';
-        if ($frac > 0.0 || (string) $num !== (string) (int) $num) {
+        if ($frac > 0.0 || (string) $abs !== (string) (int) $abs) {
             $raw = rtrim(rtrim(sprintf('%.6F', $frac), '0'), '.');
             if (str_starts_with($raw, '0.')) {
                 $fracStr = substr($raw, 2);
@@ -908,19 +1035,45 @@ final class VmNumberFormatter
                 $fracStr = $raw;
             }
         }
-        $intStr = self::groupDigits((string) $intPart, $grouping);
-        $out = '' !== $fracStr ? $intStr.$decimal.$fracStr : $intStr;
+        $intStr = self::groupDigits((string) $intPart, $grouping, $groupSize);
 
-        return $negative ? '-'.$out : $out;
+        return '' !== $fracStr ? $intStr.$decimal.$fracStr : $intStr;
+    }
+
+    /**
+     * @param array{locale: string, symbols: array<int, string>} $state
+     */
+    private static function formatScientificFromState(array $state, float $num): string
+    {
+        $decimal = $state['symbols'][self::DECIMAL_SEPARATOR_SYMBOL]
+            ?? self::separatorsForLocale($state['locale'])[1];
+        $s = sprintf('%.6E', $num);
+
+        return str_replace('.', $decimal, $s);
+    }
+
+    /** @deprecated kept for parse helpers that still take locale-only separators */
+    private static function formatDecimal(float $num, string $locale, ?int $forceFrac): string
+    {
+        $state = [
+            'locale' => $locale,
+            'attributes' => [
+                self::GROUPING_USED => 1,
+                self::FRACTION_DIGITS => -1,
+            ],
+            'symbols' => self::defaultSymbolsForLocale($locale),
+        ];
+        $body = self::formatDecimalFromState($state, abs($num), $forceFrac);
+
+        return $num < 0 ? '-'.$body : $body;
     }
 
     private static function formatScientific(float $num, string $locale): string
     {
-        [$grouping, $decimal] = self::separatorsForLocale($locale);
-        unset($grouping);
-        $s = sprintf('%.6E', $num);
-
-        return str_replace('.', $decimal, $s);
+        return self::formatScientificFromState([
+            'locale' => $locale,
+            'symbols' => self::defaultSymbolsForLocale($locale),
+        ], $num);
     }
 
     /** @return float|null */
@@ -999,15 +1152,15 @@ final class VmNumberFormatter
         ];
     }
 
-    private static function groupDigits(string $digits, string $sep): string
+    private static function groupDigits(string $digits, string $sep, int $groupSize = 3): string
     {
-        if ('' === $sep || strlen($digits) <= 3) {
+        if ('' === $sep || strlen($digits) <= $groupSize || $groupSize < 1) {
             return $digits;
         }
         $out = '';
         $len = strlen($digits);
         for ($i = 0; $i < $len; ++$i) {
-            if (0 !== $i && 0 === ($len - $i) % 3) {
+            if (0 !== $i && 0 === ($len - $i) % $groupSize) {
                 $out .= $sep;
             }
             $out .= $digits[$i];
