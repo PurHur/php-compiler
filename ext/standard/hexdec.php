@@ -16,13 +16,15 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathBaseConvert;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
  * hexdec() for string arguments (subset of PHP standard library).
  *
- * php-src: ext/standard/math.c — PHP_FUNCTION(hexdec) / Z_PARAM_STR (#20658).
+ * php-src: ext/standard/math.c — PHP_FUNCTION(hexdec) / Z_PARAM_STR (#20658, #21244 soft-null).
  */
 final class hexdec extends Internal
 {
@@ -31,8 +33,7 @@ final class hexdec extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('hexdec() requires exactly one argument');
         }
-        // Z_PARAM_STR $hex_string — null TypeError on 8.4 forward profile (#20658).
-        $hexString = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'hexdec', 0, 'hex_string');
+        $hexString = self::vmStringArg($frame, 0);
         VmMath::assignRadixToReturn($frame->returnVar, $hexString, 16);
     }
 
@@ -45,12 +46,17 @@ final class hexdec extends Internal
             throw new \LogicException('hexdec() requires exactly one argument');
         }
 
-        // Null operand: TypeError under PROFILE=8.4 / strict_types without linking
-        // MathBaseConvert (AOT IR still clears insert block on abort; #20658).
-        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+        if (
+            !$context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
             self::jitStringArg($context, $args[0]);
-
-            return $context->getTypeFromString('__value__*')->constNull();
+            if ($args[0]->isNullConstant ?? false) {
+                return JitValueBox::coerceToValuePtrForStore(
+                    $context,
+                    $context->getTypeFromString('int64')->constInt(0, false)
+                );
+            }
         }
 
         return MathBaseConvert::baseToZvalCall(
@@ -60,6 +66,20 @@ final class hexdec extends Internal
                 self::jitStringArg($context, $args[0])
             ),
             16
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'hexdec', 'hex_string')->toString();
+        }
+
+        return VmString::coerceTrimFamilyStringArg(
+            $frame->calledArgs[$argIndex],
+            'hexdec',
+            0,
+            'hex_string'
         );
     }
 
@@ -75,7 +95,7 @@ final class hexdec extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'hexdec',

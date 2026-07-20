@@ -30,7 +30,7 @@ final class dechex extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $num = VmMath::parseIntBuiltinArgForFrame(
+        $num = VmMath::parseChrCodepointForFrame(
             $frame,
             0,
             'dechex',
@@ -48,7 +48,7 @@ final class dechex extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('dechex() requires exactly one argument');
         }
-        $num = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[0], 'dechex', 1, 'num');
+        $num = JitChr::lowerZParamLongArg($context, $args[0], 'dechex', 1, 'num');
 
         return $this->formatToString($context, $num, '%x');
     }
