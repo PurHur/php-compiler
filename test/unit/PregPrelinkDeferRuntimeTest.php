@@ -36,7 +36,7 @@ final class PregPrelinkDeferRuntimeTest extends TestCase
             $source
         );
         $this->assertStringContainsString(
-            'JitPregMatchKernel stubs',
+            'PregJitHelper via PregMatchRuntime',
             $source
         );
         $this->assertStringNotContainsString('$this->jitContext = null;', $source);
