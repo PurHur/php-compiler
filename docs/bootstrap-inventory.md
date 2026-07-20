@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6165 |
-| Phase A inventory files (M2 ratio SSOT) | 6165 |
+| PHP files on vm.php path | 6170 |
+| Phase A inventory files (M2 ratio SSOT) | 6170 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19382 |
+| Source constructs flagged (warnings) | 19403 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/igbinary/IgbinaryExtensionPolicy.php` | 0 | 1 |
 | `ext/igbinary/IgbinaryFunction.php` | 0 | 3 |
 | `ext/igbinary/Module.php` | 0 | 5 |
-| `ext/igbinary/VmIgbinary.php` | 0 | 21 |
+| `ext/igbinary/VmIgbinary.php` | 0 | 29 |
 | `ext/igbinary/igbinary_pack.php` | 0 | 3 |
 | `ext/igbinary/igbinary_serialize.php` | 0 | 3 |
 | `ext/igbinary/igbinary_unpack.php` | 0 | 2 |
@@ -4062,6 +4062,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvshm/shmop_read.php` | 0 | 2 |
 | `ext/sysvshm/shmop_size.php` | 0 | 2 |
 | `ext/sysvshm/shmop_write.php` | 0 | 2 |
+| `ext/tidy/BuiltinClasses.php` | 0 | 4 |
+| `ext/tidy/Module.php` | 0 | 2 |
+| `ext/tidy/TidyExtensionPolicy.php` | 0 | 1 |
+| `ext/tidy/VmTidy.php` | 0 | 3 |
+| `ext/tidy/tidy_parse_string.php` | 0 | 2 |
 | `ext/tokenizer/BuiltinClasses.php` | 0 | 1 |
 | `ext/tokenizer/JitTokenGetAll.php` | 0 | 2 |
 | `ext/tokenizer/JitTokenName.php` | 0 | 1 |
@@ -5464,7 +5469,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 105 |
+| `lib/Runtime.php` | 0 | 106 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -11896,27 +11901,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/igbinary/VmIgbinary.php`
 
 **Warnings** (review for bootstrap subset):
-- new IgbinarySerializeState (line 48)
-- new IgbinaryUnserializeState (line 58)
-- new Exception (line 115)
+- new IgbinarySerializeState (line 59)
+- new IgbinaryUnserializeState (line 69)
 - new Exception (line 129)
-- new Exception (line 157)
-- new IgbinaryUnpackException (line 284)
-- new IgbinaryUnpackException (line 288)
-- new IgbinaryUnpackException (line 317)
-- new IgbinaryUnpackException (line 318)
-- new IgbinaryUnpackException (line 319)
-- new IgbinaryUnpackException (line 320)
-- new IgbinaryUnpackException (line 334)
-- new IgbinaryUnpackException (line 354)
-- new IgbinaryUnpackException (line 365)
+- new Exception (line 146)
+- new Exception (line 174)
+- new IgbinaryUnpackException (line 370)
 - new IgbinaryUnpackException (line 374)
-- new IgbinaryUnpackException (line 379)
-- new IgbinaryUnpackException (line 388)
-- new IgbinaryUnpackException (line 393)
-- new IgbinaryUnpackException (line 402)
 - new IgbinaryUnpackException (line 408)
-- 24 class method(s)
+- new IgbinaryUnpackException (line 409)
+- new IgbinaryUnpackException (line 410)
+- new IgbinaryUnpackException (line 411)
+- new IgbinaryUnpackException (line 412)
+- new IgbinaryUnpackException (line 413)
+- new IgbinaryUnpackException (line 414)
+- new IgbinaryUnpackException (line 415)
+- new IgbinaryUnpackException (line 427)
+- new stdClass (line 429)
+- new IgbinaryUnpackException (line 436)
+- new IgbinaryUnpackException (line 442)
+- new IgbinaryUnpackException (line 460)
+- new IgbinaryUnpackException (line 480)
+- new IgbinaryUnpackException (line 491)
+- new IgbinaryUnpackException (line 500)
+- new IgbinaryUnpackException (line 505)
+- new IgbinaryUnpackException (line 514)
+- new IgbinaryUnpackException (line 519)
+- new IgbinaryUnpackException (line 528)
+- new IgbinaryUnpackException (line 534)
+- 28 class method(s)
 
 ### `ext/igbinary/igbinary_pack.php`
 
@@ -35297,6 +35310,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 25)
 - 3 class method(s)
 
+### `ext/tidy/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 27)
+- new TidyCleanRepair (line 29)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/tidy/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new tidy_parse_string (line 46)
+- 4 class method(s)
+
+### `ext/tidy/TidyExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/tidy/VmTidy.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 70)
+- new Variable (line 73)
+- 8 class method(s)
+
+### `ext/tidy/tidy_parse_string.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 41)
+- 2 class method(s)
+
 ### `ext/tokenizer/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -45029,27 +45074,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\dba\Module (line 278)
 - new ext\mailparse\Module (line 279)
 - new ext\enchant\Module (line 280)
-- new ext\pdo\Module (line 281)
-- new ext\phar\Module (line 282)
-- new ext\uri\Module (line 283)
-- new ext\uuid\Module (line 284)
-- new ext\uploadprogress\Module (line 285)
-- new ext\apcu\Module (line 286)
-- new ext\sysvshm\Module (line 287)
-- new ext\sysvsem\Module (line 288)
-- new ext\sysvmsg\Module (line 289)
-- new ext\reflection\Module (line 290)
-- new ext\standard\Module (line 291)
-- new JIT (line 367)
-- new JITContext (line 381)
-- new SealedClassPreprocessor (line 447)
-- new StaticClassPreprocessor (line 450)
-- new SourcePreprocessor\PropertyHooks (line 453)
-- new State (line 594)
-- new ReflectionProperty (line 621)
-- new ReflectionProperty (line 624)
-- new LintCompiler (line 1035)
-- new Variable (line 1165)
+- new ext\tidy\Module (line 281)
+- new ext\pdo\Module (line 282)
+- new ext\phar\Module (line 283)
+- new ext\uri\Module (line 284)
+- new ext\uuid\Module (line 285)
+- new ext\uploadprogress\Module (line 286)
+- new ext\apcu\Module (line 287)
+- new ext\sysvshm\Module (line 288)
+- new ext\sysvsem\Module (line 289)
+- new ext\sysvmsg\Module (line 290)
+- new ext\reflection\Module (line 291)
+- new ext\standard\Module (line 292)
+- new JIT (line 368)
+- new JITContext (line 382)
+- new SealedClassPreprocessor (line 448)
+- new StaticClassPreprocessor (line 451)
+- new SourcePreprocessor\PropertyHooks (line 454)
+- new State (line 595)
+- new ReflectionProperty (line 622)
+- new ReflectionProperty (line 625)
+- new LintCompiler (line 1036)
+- new Variable (line 1166)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
