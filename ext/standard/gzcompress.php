@@ -8,10 +8,15 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** gzcompress() — zlib compress (ext/zlib/zlib.c parity, issue #3194). */
+/**
+ * gzcompress() — zlib compress (ext/zlib/zlib.c parity, issue #3194).
+ *
+ * Soft-null $data on forward profile — Zend 8.4 deprecate+coerce (#21280; gzencode sibling: #21210).
+ */
 final class gzcompress extends Internal
 {
     public function __construct()
@@ -25,7 +30,8 @@ final class gzcompress extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzcompress() expects one to three arguments in this compiler build');
         }
-        $data = VmZlibArg::resolveDataString($frame, 'gzcompress');
+        // Soft-null — Zend 8.4 deprecate+coerce (#21280); leave shared VmZlibArg Z_PARAM_STR for siblings.
+        $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'gzcompress', 0, 'data');
         $level = -1;
         $encoding = \ZLIB_ENCODING_DEFLATE;
         if ($argc >= 2) {
@@ -66,9 +72,30 @@ final class gzcompress extends Internal
 
         return JitZlib::compress(
             $context,
-            VmZlibArg::jitDataString($context, $args[0], 'gzcompress'),
+            self::jitDataString($context, $args[0]),
             $level,
             $encoding
+        );
+    }
+
+    private static function jitDataString(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'gzcompress',
+                0,
+                'data'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $arg,
+            'gzcompress',
+            0,
+            'data'
         );
     }
 }

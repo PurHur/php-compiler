@@ -65,7 +65,8 @@ final class str_rot13 extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'str_rot13', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21280; reverts #19309 TypeError).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'str_rot13',
             $argIndex,
@@ -89,7 +90,7 @@ final class str_rot13 extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'str_rot13',
