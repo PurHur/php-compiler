@@ -363,6 +363,32 @@ final class VmOdbcResult
         return self::$state[$object->id]['longreadlen'];
     }
 
+    /**
+     * @return list<list<mixed>>
+     */
+    public static function rows(ObjectEntry $object): array
+    {
+        self::requireLive($object);
+
+        return self::$state[$object->id]['rows'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function coltypes(ObjectEntry $object): array
+    {
+        self::requireLive($object);
+
+        return self::$state[$object->id]['coltypes'];
+    }
+
+    public static function setCursor(ObjectEntry $object, int $cursor): void
+    {
+        self::requireLive($object);
+        self::$state[$object->id]['cursor'] = $cursor;
+    }
+
     public static function setNumParams(ObjectEntry $object, int $n): void
     {
         self::requireLive($object);
