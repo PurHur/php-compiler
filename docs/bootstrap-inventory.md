@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6197 |
-| Phase A inventory files (M2 ratio SSOT) | 6197 |
+| PHP files on vm.php path | 6201 |
+| Phase A inventory files (M2 ratio SSOT) | 6201 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19510 |
+| Source constructs flagged (warnings) | 19558 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4063,20 +4063,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvshm/shmop_read.php` | 0 | 2 |
 | `ext/sysvshm/shmop_size.php` | 0 | 2 |
 | `ext/sysvshm/shmop_write.php` | 0 | 2 |
-| `ext/tidy/BuiltinClasses.php` | 0 | 37 |
-| `ext/tidy/Module.php` | 0 | 20 |
+| `ext/tidy/BuiltinClasses.php` | 0 | 68 |
+| `ext/tidy/Module.php` | 0 | 24 |
 | `ext/tidy/TidyExtensionPolicy.php` | 0 | 1 |
-| `ext/tidy/VmTidy.php` | 0 | 5 |
+| `ext/tidy/VmTidy.php` | 0 | 10 |
 | `ext/tidy/tidy_access_count.php` | 0 | 2 |
 | `ext/tidy/tidy_clean_repair.php` | 0 | 2 |
 | `ext/tidy/tidy_config_count.php` | 0 | 2 |
 | `ext/tidy/tidy_diagnose.php` | 0 | 2 |
 | `ext/tidy/tidy_error_count.php` | 0 | 2 |
+| `ext/tidy/tidy_get_body.php` | 0 | 2 |
 | `ext/tidy/tidy_get_config.php` | 0 | 2 |
 | `ext/tidy/tidy_get_error_buffer.php` | 0 | 2 |
+| `ext/tidy/tidy_get_head.php` | 0 | 2 |
+| `ext/tidy/tidy_get_html.php` | 0 | 2 |
 | `ext/tidy/tidy_get_html_ver.php` | 0 | 2 |
 | `ext/tidy/tidy_get_output.php` | 0 | 2 |
 | `ext/tidy/tidy_get_release.php` | 0 | 2 |
+| `ext/tidy/tidy_get_root.php` | 0 | 2 |
 | `ext/tidy/tidy_get_status.php` | 0 | 2 |
 | `ext/tidy/tidy_getopt.php` | 0 | 2 |
 | `ext/tidy/tidy_is_xhtml.php` | 0 | 2 |
@@ -35346,66 +35350,101 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tidy/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 29)
-- new Variable (line 32)
-- new Variable (line 33)
-- new ClassProperty (line 34)
-- new ClassProperty (line 42)
-- new Variable (line 44)
-- new TidyCleanRepair (line 51)
-- new TidyDiagnose (line 56)
-- new TidyParseStringMethod (line 61)
-- new TidyParseFileMethod (line 66)
-- new TidyRepairString (line 71)
-- new TidyRepairFile (line 76)
-- new TidyGetOpt (line 81)
-- new TidyGetConfig (line 86)
-- new TidyGetStatus (line 91)
-- new TidyGetRelease (line 96)
-- new TidyGetHtmlVer (line 101)
-- new TidyIsXhtml (line 106)
-- new TidyIsXml (line 111)
-- new ArgumentCountError (line 194)
-- new ArgumentCountError (line 199)
-- new ArgumentCountError (line 226)
-- new ArgumentCountError (line 231)
-- new ArgumentCountError (line 259)
-- new ArgumentCountError (line 262)
-- new ArgumentCountError (line 291)
-- new ArgumentCountError (line 294)
-- new ArgumentCountError (line 322)
-- new ArgumentCountError (line 327)
-- new ArgumentCountError (line 362)
-- new ArgumentCountError (line 391)
-- new ArgumentCountError (line 420)
-- new ArgumentCountError (line 445)
-- new ArgumentCountError (line 474)
-- new ArgumentCountError (line 503)
-- 15 class method(s)
-- 13 closure(s)
+- new ClassEntry (line 35)
+- new Variable (line 38)
+- new Variable (line 39)
+- new ClassProperty (line 40)
+- new ClassProperty (line 48)
+- new Variable (line 50)
+- new TidyCleanRepair (line 57)
+- new TidyDiagnose (line 62)
+- new TidyParseStringMethod (line 67)
+- new TidyParseFileMethod (line 72)
+- new TidyRepairString (line 77)
+- new TidyRepairFile (line 82)
+- new TidyGetOpt (line 87)
+- new TidyGetConfig (line 92)
+- new TidyGetStatus (line 97)
+- new TidyGetRelease (line 102)
+- new TidyGetHtmlVer (line 107)
+- new TidyIsXhtml (line 112)
+- new TidyIsXml (line 117)
+- new TidyRoot (line 122)
+- new TidyHtml (line 127)
+- new TidyHead (line 132)
+- new TidyBody (line 137)
+- new ClassEntry (line 154)
+- new Variable (line 158)
+- new Variable (line 159)
+- new Variable (line 160)
+- new Variable (line 161)
+- new Variable (line 162)
+- new ClassProperty (line 164)
+- new ClassProperty (line 165)
+- new ClassProperty (line 166)
+- new ClassProperty (line 167)
+- new ClassProperty (line 168)
+- new ClassProperty (line 169)
+- new ClassProperty (line 170)
+- new ClassProperty (line 171)
+- new ClassProperty (line 172)
+- new TidyNodeConstruct (line 174)
+- new TidyNodeHasChildren (line 180)
+- new TidyNodeHasSiblings (line 181)
+- new TidyNodeIsComment (line 182)
+- new TidyNodeIsText (line 183)
+- new TidyNodeGetParent (line 184)
+- new TidyNodeGetPreviousSibling (line 185)
+- new TidyNodeGetNextSibling (line 186)
+- new ArgumentCountError (line 272)
+- new ArgumentCountError (line 277)
+- new ArgumentCountError (line 304)
+- new ArgumentCountError (line 309)
+- new ArgumentCountError (line 337)
+- new ArgumentCountError (line 340)
+- new ArgumentCountError (line 369)
+- new ArgumentCountError (line 372)
+- new ArgumentCountError (line 400)
+- new ArgumentCountError (line 405)
+- new ArgumentCountError (line 440)
+- new ArgumentCountError (line 469)
+- new ArgumentCountError (line 498)
+- new ArgumentCountError (line 523)
+- new ArgumentCountError (line 552)
+- new ArgumentCountError (line 581)
+- new ArgumentCountError (line 609)
+- new Error (line 694)
+- new ArgumentCountError (line 710)
+- new ArgumentCountError (line 793)
+- 35 class method(s)
+- 16 closure(s)
 
 ### `ext/tidy/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new tidy_parse_string (line 64)
-- new tidy_parse_file (line 65)
-- new tidy_repair_string (line 66)
-- new tidy_repair_file (line 67)
-- new tidy_clean_repair (line 68)
-- new tidy_get_output (line 69)
-- new tidy_diagnose (line 70)
-- new tidy_get_error_buffer (line 71)
-- new tidy_getopt (line 72)
-- new tidy_get_config (line 73)
-- new tidy_get_status (line 74)
-- new tidy_error_count (line 75)
-- new tidy_warning_count (line 76)
-- new tidy_access_count (line 77)
-- new tidy_config_count (line 78)
-- new tidy_get_release (line 79)
-- new tidy_get_html_ver (line 80)
-- new tidy_is_xhtml (line 81)
-- new tidy_is_xml (line 82)
+- new tidy_parse_string (line 68)
+- new tidy_parse_file (line 69)
+- new tidy_repair_string (line 70)
+- new tidy_repair_file (line 71)
+- new tidy_clean_repair (line 72)
+- new tidy_get_output (line 73)
+- new tidy_diagnose (line 74)
+- new tidy_get_error_buffer (line 75)
+- new tidy_getopt (line 76)
+- new tidy_get_config (line 77)
+- new tidy_get_status (line 78)
+- new tidy_error_count (line 79)
+- new tidy_warning_count (line 80)
+- new tidy_access_count (line 81)
+- new tidy_config_count (line 82)
+- new tidy_get_release (line 83)
+- new tidy_get_html_ver (line 84)
+- new tidy_is_xhtml (line 85)
+- new tidy_is_xml (line 86)
+- new tidy_get_root (line 87)
+- new tidy_get_html (line 88)
+- new tidy_get_head (line 89)
+- new tidy_get_body (line 90)
 - 4 class method(s)
 
 ### `ext/tidy/TidyExtensionPolicy.php`
@@ -35416,11 +35455,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tidy/VmTidy.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 152)
-- new Variable (line 156)
-- new HashTable (line 494)
-- new Variable (line 496)
-- 31 class method(s)
+- new ObjectEntry (line 166)
+- new Variable (line 170)
+- new ObjectEntry (line 197)
+- new Variable (line 201)
+- new HashTable (line 534)
+- new Variable (line 536)
+- new HashTable (line 963)
+- new Variable (line 965)
+- new HashTable (line 990)
+- 46 class method(s)
 
 ### `ext/tidy/tidy_access_count.php`
 
@@ -35452,6 +35496,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 33)
 - 2 class method(s)
 
+### `ext/tidy/tidy_get_body.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 40)
+- 2 class method(s)
+
 ### `ext/tidy/tidy_get_config.php`
 
 **Warnings** (review for bootstrap subset):
@@ -35462,6 +35512,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 39)
+- 2 class method(s)
+
+### `ext/tidy/tidy_get_head.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 40)
+- 2 class method(s)
+
+### `ext/tidy/tidy_get_html.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 40)
 - 2 class method(s)
 
 ### `ext/tidy/tidy_get_html_ver.php`
@@ -35480,6 +35542,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 32)
+- 2 class method(s)
+
+### `ext/tidy/tidy_get_root.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 40)
 - 2 class method(s)
 
 ### `ext/tidy/tidy_get_status.php`
