@@ -37,7 +37,8 @@ final class curl_multi_select extends Internal
         $timeout = 1.0;
         if (isset($frame->calledArgs[1])) {
             $tv = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_DOUBLE === $tv->type) {
+            // VM float kind is TYPE_FLOAT (not TYPE_DOUBLE — #21569 / #17708 / #12044).
+            if (Variable::TYPE_FLOAT === $tv->type) {
                 $timeout = $tv->toFloat();
             } else {
                 $timeout = (float) VmMath::parseIntBuiltinArg($tv, 'curl_multi_select', 1, 'timeout');
