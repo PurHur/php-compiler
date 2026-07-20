@@ -68,6 +68,7 @@ final class JitNumberFormat
 
         $argc = \count($args);
 
+        // strict_types only — PROFILE=8.4 still soft-nulls like Zend Z_PARAM_DOUBLE (#21429).
         self::rejectNullNum($context, $args[0]);
 
         $number = JitFdiv::lowerSingleOperand(
@@ -77,7 +78,7 @@ final class JitNumberFormat
             'num',
             'number_format',
             'float',
-            true
+            false
         );
         $i64 = $context->getTypeFromString('int64');
         $decimals = ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]))
@@ -124,7 +125,8 @@ final class JitNumberFormat
 
     private static function rejectNullNum(Context $context, JITVariable $arg): void
     {
-        if (!$context->callerStrictTypes && !VmMath::requiresForwardProfileStrictDoubleNull()) {
+        // Only declare(strict_types=1) rejects null; forward profile soft-nulls (#21429).
+        if (!$context->callerStrictTypes) {
             return;
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
