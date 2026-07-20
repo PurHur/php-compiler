@@ -63,6 +63,9 @@ final class PharBuiltin
             'iswritable' => [PharIsWritable::class, 'isWritable'],
             'getmodified' => [PharGetModified::class, 'getModified'],
             'compressfiles' => [PharCompressFiles::class, 'compressFiles'],
+            'decompressfiles' => [PharDecompressFiles::class, 'decompressFiles'],
+            'setdefaultstub' => [PharSetDefaultStub::class, 'setDefaultStub'],
+            'copy' => [PharCopy::class, 'copy'],
             'getpath' => [PharGetPath::class, 'getPath'],
             'offsetset' => [PharOffsetSet::class, 'offsetSet'],
             'offsetget' => [PharOffsetGet::class, 'offsetGet'],
@@ -476,6 +479,61 @@ final class PharCompressFiles extends VmClassMethod
             VmPharArchive::requireReceiver($frame, 'Phar::compressFiles'),
             $frame->calledArgs[1]->resolveIndirect()->toInt()
         );
+    }
+}
+
+final class PharDecompressFiles extends VmClassMethod
+{
+    public function __construct() { parent::__construct('decompressFiles'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPharArchive::decompressFiles(
+                VmPharArchive::requireReceiver($frame, 'Phar::decompressFiles')
+            ));
+        }
+    }
+}
+
+final class PharSetDefaultStub extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setDefaultStub'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        $object = VmPharArchive::requireReceiver($frame, 'Phar::setDefaultStub');
+        $index = null;
+        $web = null;
+        if ($argc >= 2) {
+            $index = $frame->calledArgs[1]->resolveIndirect()->toString();
+        }
+        if ($argc >= 3) {
+            $web = $frame->calledArgs[2]->resolveIndirect()->toString();
+        }
+        $ok = VmPharArchive::setDefaultStub($object, $index, $web);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+final class PharCopy extends VmClassMethod
+{
+    public function __construct() { parent::__construct('copy'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(\sprintf('Phar::copy() expects at least 2 arguments, %d given', \max(0, $argc - 1)));
+        }
+        $ok = VmPharArchive::copy(
+            VmPharArchive::requireReceiver($frame, 'Phar::copy'),
+            VmPharArchive::coercePathArg($frame->calledArgs[1], 'Phar::copy', 0, 'from'),
+            VmPharArchive::coercePathArg($frame->calledArgs[2], 'Phar::copy', 1, 'to')
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 }
 
