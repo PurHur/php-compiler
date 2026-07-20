@@ -127,6 +127,7 @@ final class JitStringBuiltinArg
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
      * date/gmdate $format and strtotime $datetime soft-null (#21208, reverts #19651).
+     * idate $format soft-null (#21491, reverts #20227 TypeError).
      * timezone_open/DateTimeZone/date_default_timezone_set timezone id soft-null (#21369, ext/date/php_date.stub.php).
      * password_verify/password_needs_rehash/password_hash string operands soft-null (#21314/#21210; hash_equals stays TypeError).
      * hash_pbkdf2($algo/$password/$salt) and hash_hkdf($algo/$key/$info/$salt) soft-null (#21319, reverts #20659/#21079).
