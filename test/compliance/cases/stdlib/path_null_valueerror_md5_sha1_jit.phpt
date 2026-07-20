@@ -1,5 +1,5 @@
 --TEST--
-stdlib md5_file/sha1_file/hash_file null path JIT — TypeError on 8.4 forward profile (#21062, ext/standard/md5.c)
+stdlib md5_file/sha1_file/hash_file null path JIT — empty-path ValueError on 8.4 (#21235, ext/standard/md5.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -29,8 +29,8 @@ try {
 }
 ?>
 --EXPECT--
-md5_file:md5_file(): Argument #1 ($filename) must be of type string, null given
-sha1_file:sha1_file(): Argument #1 ($filename) must be of type string, null given
-hash_file:hash_file(): Argument #2 ($filename) must be of type string, null given
-hash_hmac_file:hash_hmac_file(): Argument #2 ($filename) must be of type string, null given
+md5_file:VALUEERROR:Path cannot be empty
+sha1_file:VALUEERROR:Path cannot be empty
+hash_file:VALUEERROR:Path cannot be empty
+hash_hmac_file:VALUEERROR:Path cannot be empty
 empty:Path cannot be empty

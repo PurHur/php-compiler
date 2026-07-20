@@ -1,5 +1,5 @@
 --TEST--
-stdlib fopen/copy/readfile/file null path JIT — TypeError on 8.4 forward profile (#21076, ext/standard/file.c)
+stdlib fopen/copy/readfile/file null path JIT — empty-path ValueError on 8.4 (#21235, ext/standard/file.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -23,7 +23,7 @@ foreach ([
 }
 ?>
 --EXPECT--
-fopen:fopen(): Argument #1 ($filename) must be of type string, null given
-copy:copy(): Argument #1 ($from) must be of type string, null given
-readfile:readfile(): Argument #1 ($filename) must be of type string, null given
-file:file(): Argument #1 ($filename) must be of type string, null given
+fopen:VALUEERROR:Path cannot be empty
+copy:VALUEERROR:Path cannot be empty
+readfile:VALUEERROR:Path cannot be empty
+file:VALUEERROR:Path cannot be empty

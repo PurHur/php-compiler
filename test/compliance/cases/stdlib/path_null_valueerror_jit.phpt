@@ -1,5 +1,5 @@
 --TEST--
-stdlib fopen/copy/readfile/file null path JIT — TypeError on 8.4 forward profile (#21076, ext/standard/file.c)
+stdlib fopen/copy/readfile/file null path JIT — empty-path ValueError on 8.4 (#21235, ext/standard/file.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -23,10 +23,10 @@ foreach (['md5_file', 'sha1_file', 'file_get_contents', 'fopen', 'copy', 'readfi
 }
 ?>
 --EXPECT--
-md5_file:md5_file(): Argument #1 ($filename) must be of type string, null given
-sha1_file:sha1_file(): Argument #1 ($filename) must be of type string, null given
-file_get_contents:file_get_contents(): Argument #1 ($filename) must be of type string, null given
-fopen:fopen(): Argument #1 ($filename) must be of type string, null given
-copy:copy(): Argument #1 ($from) must be of type string, null given
-readfile:readfile(): Argument #1 ($filename) must be of type string, null given
-file:file(): Argument #1 ($filename) must be of type string, null given
+md5_file:VALUEERROR:Path cannot be empty
+sha1_file:VALUEERROR:Path cannot be empty
+file_get_contents:VALUEERROR:Path cannot be empty
+fopen:VALUEERROR:Path cannot be empty
+copy:VALUEERROR:Path cannot be empty
+readfile:VALUEERROR:Path cannot be empty
+file:VALUEERROR:Path cannot be empty
