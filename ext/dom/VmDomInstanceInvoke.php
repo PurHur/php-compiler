@@ -86,6 +86,7 @@ final class VmDomInstanceInvoke
             'remove' => VmDomJitDispatch::tokenListRemove($ctx, $self, $extra),
             'contains' => VmDomJitDispatch::dispatchContains($self, $extra),
             'item' => VmDomJitDispatch::dispatchItem($ctx, $self, $extra),
+            'getiterator' => VmDomJitDispatch::dispatchGetIterator($ctx, $self, $extra),
             'toggle' => VmDomJitDispatch::tokenListToggle($ctx, $self, $extra),
             'toggleattribute' => VmDomJitDispatch::toggleAttribute($ctx, $self, $extra),
             'getrootnode' => VmDomJitDispatch::getRootNode($self, $extra),
