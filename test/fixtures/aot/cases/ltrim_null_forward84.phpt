@@ -1,9 +1,10 @@
 --TEST--
-AOT: ltrim null — coerce on 8.4 forward profile (#19983)
+AOT: ltrim(null) — TypeError on 8.4 forward profile (#21350, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-echo var_export(ltrim(null), true), "\n";
+ltrim(null);
 --EXPECT--
-''
+--EXPECT_EXIT--
+255

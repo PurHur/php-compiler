@@ -36,7 +36,7 @@ final class VmString
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
      * wordwrap/str_pad, substr_compare, str_increment/str_decrement,
      * and other typed string builtins use this guard (php-src ext/standard/string.c).
-     * trim/ltrim/rtrim/chop, str_repeat/str_shuffle/ucfirst/lcfirst/ucwords,
+     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords,
      * strlen/strtolower/strtoupper/strrev, and md5/sha1/crc32/bin2hex/hash($data)/hash_hmac($data) coerce null with
      * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181 #21209).
      * base64_encode/base64_decode, urlencode/urldecode/rawurlencode/rawurldecode, parse_url soft-null (#21188).
@@ -56,7 +56,7 @@ final class VmString
     /**
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
-     * Used by trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
+     * Used by str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
      * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data) (#21181),
      * HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/addcslashes/stripcslashes/nl2br/quotemeta
      * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
