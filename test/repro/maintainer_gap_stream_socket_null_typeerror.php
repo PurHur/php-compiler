@@ -2,28 +2,22 @@
 
 declare(strict_types=1);
 
+// VM: PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/maintainer_gap_stream_socket_null_typeerror.php
+
 putenv('PHP_COMPILER_PROFILE=8.4');
 $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
-$_SERVER['PHP_COMPILER_PROFILE'] = '8.4';
 
-$checks = [
-    ['stream_socket_client', static fn () => stream_socket_client(null)],
-    ['fsockopen', static fn () => fsockopen(null)],
-];
-
-foreach ($checks as [$fn, $call]) {
+foreach (
+    [
+        'stream_socket_client' => static fn () => stream_socket_client(null),
+        'fsockopen' => static fn () => fsockopen(null),
+    ] as $fn => $call
+) {
     try {
         $call();
-        fwrite(STDERR, "fail: {$fn}(null) expected TypeError\n");
-        exit(1);
+        echo $fn, " COERCED\n";
     } catch (TypeError $e) {
-        $expected = $fn.'(): Argument #1 ($'.($fn === 'fsockopen' ? 'hostname' : 'remote_socket').') must be of type string, null given';
-        if ($expected !== $e->getMessage()) {
-            fwrite(STDERR, "fail: {$fn}(null) got ".$e->getMessage()."\n");
-            exit(1);
-        }
-    } catch (Throwable $e) {
-        fwrite(STDERR, "fail: {$fn}(null) got ".get_class($e).': '.$e->getMessage()."\n");
+        echo $fn, ': ', $e->getMessage(), "\n";
         exit(1);
     }
 }

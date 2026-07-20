@@ -52,6 +52,8 @@ final class VmString
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare is Z_PARAM_STR TypeError on 8.4 (#20164), not soft-null.
      * glob()/fnmatch() pattern soft-null on 8.4 (#21366, ext/standard/file.c, fnmatch.c).
+     * error_log($message), fsockopen/pfsockopen/stream_socket_client hostname/remote,
+     * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
@@ -100,6 +102,8 @@ final class VmString
      * dechex/decbin/decoct $num, hexdec/bindec/octdec/base_convert string operands soft-null (#21244).
      * zlib one-shot $data (gzdeflate/gzinflate/gzdecode/gzuncompress/gzcompress/gzencode) soft-null (#21311, reverts #19332).
      * openssl_encrypt/openssl_decrypt $data soft-null (#21445, reverts #20263; ext/openssl/openssl.c).
+     * error_log($message), fsockopen/pfsockopen/stream_socket_client hostname/remote,
+     * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

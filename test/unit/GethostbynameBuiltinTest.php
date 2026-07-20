@@ -51,8 +51,8 @@ final class GethostbynameBuiltinTest extends TestCase
         $this->assertSame('no-such-phpc-host.invalid.', $resolved->toString());
     }
 
-    /** @see https://github.com/PurHur/php-compiler/issues/20555 */
-    public function testNullHostnameTypeErrorOnForward84(): void
+    /** @see https://github.com/PurHur/php-compiler/issues/21446 */
+    public function testNullHostnameCoercesOnForward84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
@@ -65,11 +65,8 @@ final class GethostbynameBuiltinTest extends TestCase
             $hostVar->null();
             $frame->calledArgs = [$hostVar];
             $frame->returnVar = new VMVariable();
-            $this->expectException(\TypeError::class);
-            $this->expectExceptionMessage(
-                'gethostbyname(): Argument #1 ($hostname) must be of type string, null given'
-            );
             $fn->execute($frame);
+            self::assertSame('', $frame->returnVar->resolveIndirect()->toString());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * gethostbyname() — forward DNS returning first IPv4 (ext/standard/dns.c parity, #7419).
  *
- * Z_PARAM_STR $hostname — null TypeError on 8.4 forward profile (#20555, re-#19098).
+ * $hostname soft-null DEP+coerce on 8.4 forward profile (#21446, reverts #20555).
  *
  * VM: VmDns (reuses gethostbynamel getaddrinfo path). JIT/AOT: JitGethostbyname LLVM delegate.
  *
@@ -34,7 +34,7 @@ final class gethostbyname extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('gethostbyname() requires exactly one argument in this compiler build');
         }
-        $hostname = VmString::coerceZparamStrBuiltinArg(
+        $hostname = VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'gethostbyname',
             0,
@@ -54,7 +54,7 @@ final class gethostbyname extends Internal
 
         GethostbynamelRuntime::ensureLinked($context);
         $hostnameArg = $args[0];
-        $hostname = JitStringBuiltinArg::lowerZparamStr(
+        $hostname = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $hostnameArg,
             'gethostbyname',
@@ -63,8 +63,7 @@ final class gethostbyname extends Internal
         );
         $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
             || ($hostnameArg->isNullConstant ?? false);
-        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
-            // TypeError already emitted; skip DNS IR after abort (#20555, dns_get_record pattern).
+        if ($nullOperand && $context->callerStrictTypes) {
             $slot = JitValueBox::alloc($context);
 
             return JitValueBox::pointer($context, $slot);

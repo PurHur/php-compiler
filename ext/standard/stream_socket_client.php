@@ -36,7 +36,7 @@ final class stream_socket_client extends Internal
             return;
         }
 
-        $remote = VmString::coerceTypedStringBuiltinArg(
+        $remote = VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'stream_socket_client',
             0,
