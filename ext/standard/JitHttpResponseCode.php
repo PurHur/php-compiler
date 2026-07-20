@@ -10,6 +10,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\HttpResponseCode as Hrc;
 use PHPCompiler\JIT\Builtin\HttpResponseCodeJit;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -81,6 +82,16 @@ final class JitHttpResponseCode
         }
 
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            // Z_PARAM_LONG — null TypeError on PROFILE=8.4 (#20962, ext/standard/head.c).
+            if (VmMath::requiresForwardProfileStrictLongNull()) {
+                TypeErrorRaise::registerDeclarations($context);
+                TypeErrorRaise::ensureLinked($context);
+                TypeErrorRaise::emitRaise(
+                    $context,
+                    'http_response_code(): Argument #1 ($response_code) must be of type int, null given'
+                );
+                $context->builder->call($context->lookupFunction('abort'));
+            }
             $context->builder->call(
                 $context->lookupFunction('__phpc_http_response_code_apply'),
                 $i8->constInt(Hrc::APPLY_GET, false),

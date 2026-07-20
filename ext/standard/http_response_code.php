@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitHttpResponseCodeArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -34,6 +35,10 @@ final class http_response_code extends Internal
                 return;
             }
             if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
+                if (VmMath::requiresForwardProfileStrictLongNull()) {
+                    InternalStrictArg::rejectNullInt($frame->calledArgs[0], 'http_response_code', 'response_code', 0);
+                }
+
                 return;
             }
             $code = VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code');
@@ -53,6 +58,9 @@ final class http_response_code extends Internal
             return;
         }
         if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
+            if (VmMath::requiresForwardProfileStrictLongNull()) {
+                InternalStrictArg::rejectNullInt($frame->calledArgs[0], 'http_response_code', 'response_code', 0);
+            }
             VmHttpResponse::assignReadResult(
                 $frame->returnVar,
                 VmHttpResponse::readHttpResponseCode($ctx),

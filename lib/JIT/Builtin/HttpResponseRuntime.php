@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -224,10 +225,24 @@ final class HttpResponseRuntime
         );
         $bbMaybeEnum = $fn->appendBasicBlock('hr_box_maybe_enum');
         $bbBoxGet = $fn->appendBasicBlock('hr_box_get');
+        $bbBoxNullTe = $fn->appendBasicBlock('hr_box_null_te');
         $bbBoxSet = $fn->appendBasicBlock('hr_box_set');
         $bbBoxEnum = $fn->appendBasicBlock('hr_box_enum');
         $bbBoxBadType = $fn->appendBasicBlock('hr_box_bad_type');
-        $context->builder->branchIf($isNull, $bbBoxGet, $bbMaybeEnum);
+        if (VmMath::requiresForwardProfileStrictLongNull()) {
+            $context->builder->branchIf($isNull, $bbBoxNullTe, $bbMaybeEnum);
+            $context->builder->positionAtEnd($bbBoxNullTe);
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitRaise(
+                $context,
+                'http_response_code(): Argument #1 ($response_code) must be of type int, null given'
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->returnVoid();
+        } else {
+            $context->builder->branchIf($isNull, $bbBoxGet, $bbMaybeEnum);
+        }
 
         $context->builder->positionAtEnd($bbBoxGet);
         self::emitWriteFromGetSentinel($context, $outPtr);
