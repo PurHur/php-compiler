@@ -3586,6 +3586,7 @@ final class VmDom
         $trimmed = trim($xml);
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
+        $dtdDefaultAttrs = self::parseDoctypeDefaultAttributes($trimmed);
         $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
         $substituteEntities = 0 !== ($options & LibxmlConstants::LIBXML_NOENT);
         $parts = self::splitXmlDocumentParts($trimmed);
@@ -3671,8 +3672,14 @@ final class VmDom
         if (self::shouldStripBlankNodesOnLoad($document, $options)) {
             self::stripBlankTextNodesFromSubtree($root);
         }
-        self::syncSubtree($ctx, $document);
+        // Index explicit ID attrs before synthesizing ATTLIST defaults (#21456).
+        // libxml still exposes default/FIXED attrs via getAttribute, but default-only
+        // ID values are not registered in the document ID table (Zend getElementById null).
         self::reindexDocumentIds($document, $root);
+        if ([] !== $dtdDefaultAttrs) {
+            self::applyDtdDefaultAttributesToSubtree($root, $dtdDefaultAttrs);
+        }
+        self::syncSubtree($ctx, $document);
         self::syncElementIdMapProperty($document);
         // Living Dom\* docs: unset URL → about:blank (php-src follow_spec; #20898).
         $state->documentUri = VmDomLiving::isLivingDocument($document) ? null : self::defaultDocumentUri();
@@ -4476,6 +4483,110 @@ final class VmDom
         }
 
         return $idAttrs;
+    }
+
+    /**
+     * ATTLIST default / #FIXED values from the internal subset (libxml XML_PARSE_DTDATTR;
+     * php-src ext/dom/document.c loadXML; #21456).
+     *
+     * @return array<string, array<string, string>> elementName => (attrName => defaultValue)
+     */
+    private static function parseDoctypeDefaultAttributes(string $xml): array
+    {
+        $defaults = [];
+        $subset = self::extractDoctypeInternalSubset($xml);
+        if (null === $subset) {
+            return $defaults;
+        }
+        if (!preg_match_all('/<!ATTLIST\s+(\S+)\s+([^>]*)>/is', $subset, $blocks, PREG_SET_ORDER)) {
+            return $defaults;
+        }
+        foreach ($blocks as $block) {
+            $elementName = $block[1];
+            $body = $block[2];
+            $pos = 0;
+            $len = \strlen($body);
+            while ($pos < $len) {
+                if (!preg_match('/\G\s*(\S+)\s+/A', $body, $attrMatch, 0, $pos)) {
+                    break;
+                }
+                $attrName = $attrMatch[1];
+                $pos += \strlen($attrMatch[0]);
+                if (preg_match('/\GNOTATION\s*\([^)]*\)/A', $body, $typeMatch, 0, $pos)
+                    || preg_match('/\G\([^)]*\)/A', $body, $typeMatch, 0, $pos)
+                    || preg_match('/\G\S+/A', $body, $typeMatch, 0, $pos)
+                ) {
+                    $pos += \strlen($typeMatch[0]);
+                } else {
+                    break;
+                }
+                if (!preg_match(
+                    '/\G\s*(#REQUIRED|#IMPLIED|#FIXED\s+"([^"]*)"|#FIXED\s+\'([^\']*)\'|"([^"]*)"|\'([^\']*)\')/A',
+                    $body,
+                    $defMatch,
+                    0,
+                    $pos
+                )) {
+                    break;
+                }
+                $pos += \strlen($defMatch[0]);
+                $decl = $defMatch[1];
+                if ('#REQUIRED' === $decl || '#IMPLIED' === $decl) {
+                    continue;
+                }
+                $value = null;
+                if (preg_match('/^#FIXED\s+"([^"]*)"$/', $decl, $vm)
+                    || preg_match('/^#FIXED\s+\'([^\']*)\'$/', $decl, $vm)
+                    || preg_match('/^"([^"]*)"$/', $decl, $vm)
+                    || preg_match('/^\'([^\']*)\'$/', $decl, $vm)
+                ) {
+                    $value = $vm[1];
+                }
+                if (null === $value) {
+                    continue;
+                }
+                if (!isset($defaults[$elementName])) {
+                    $defaults[$elementName] = [];
+                }
+                // First declaration wins (libxml keeps the first ATTLIST default for a name).
+                if (!\array_key_exists($attrName, $defaults[$elementName])) {
+                    $defaults[$elementName][$attrName] = $value;
+                }
+            }
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * Synthesize missing attributes from ATTLIST defaults (#21456). Does not overwrite
+     * attributes present in the instance markup.
+     *
+     * @param array<string, array<string, string>> $defaults
+     */
+    private static function applyDtdDefaultAttributesToSubtree(ObjectEntry $node, array $defaults): void
+    {
+        if (self::isElement($node)) {
+            $state = DomRegistry::state($node);
+            $elDefaults = $defaults[$state->nodeName] ?? null;
+            if (null !== $elDefaults) {
+                foreach ($elDefaults as $attrName => $value) {
+                    if (!\array_key_exists($attrName, $state->attributes)) {
+                        $state->attributes[$attrName] = $value;
+                        if (str_starts_with($attrName, 'xml:')) {
+                            $state->attributeNamespaces[$attrName] = self::XML_NAMESPACE_URI;
+                        }
+                    }
+                }
+            }
+        }
+        $state = DomRegistry::state($node);
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::applyDtdDefaultAttributesToSubtree($child, $defaults);
+            }
+        }
     }
 
     /**
