@@ -284,6 +284,109 @@ final class VmOdbcCore
     }
 
     /**
+     * @return Variable|false
+     */
+    public static function primaryKeys(
+        ObjectEntry $connection,
+        ?string $catalog,
+        string $schema,
+        string $table,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_primarykeys',
+            'SQLPrimaryKeys',
+            static function ($hstmt) use ($catalog, $schema, $table): bool {
+                return VmOdbcNative::primaryKeys($hstmt, $catalog, $schema, $table);
+            }
+        );
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function foreignKeys(
+        ObjectEntry $connection,
+        ?string $pkCatalog,
+        string $pkSchema,
+        string $pkTable,
+        string $fkCatalog,
+        string $fkSchema,
+        string $fkTable,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_foreignkeys',
+            'SQLForeignKeys',
+            static function ($hstmt) use ($pkCatalog, $pkSchema, $pkTable, $fkCatalog, $fkSchema, $fkTable): bool {
+                return VmOdbcNative::foreignKeys(
+                    $hstmt,
+                    $pkCatalog,
+                    $pkSchema,
+                    $pkTable,
+                    $fkCatalog,
+                    $fkSchema,
+                    $fkTable
+                );
+            }
+        );
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function statistics(
+        ObjectEntry $connection,
+        ?string $catalog,
+        string $schema,
+        string $table,
+        int $unique,
+        int $accuracy,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_statistics',
+            'SQLStatistics',
+            static function ($hstmt) use ($catalog, $schema, $table, $unique, $accuracy): bool {
+                return VmOdbcNative::statistics($hstmt, $catalog, $schema, $table, $unique, $accuracy);
+            }
+        );
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function getTypeInfo(
+        ObjectEntry $connection,
+        int $dataType,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_gettypeinfo',
+            'SQLGetTypeInfo',
+            static function ($hstmt) use ($dataType): bool {
+                return VmOdbcNative::getTypeInfo($hstmt, $dataType);
+            }
+        );
+    }
+
+    /**
      * odbc_autocommit — get status (int) or set mode (bool) (php-src; #21277).
      *
      * @return int|bool

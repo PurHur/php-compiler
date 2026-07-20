@@ -569,6 +569,132 @@ final class VmOdbcNative
     }
 
     /**
+     * SQLPrimaryKeys (php-src odbc_primarykeys; #21279).
+     */
+    public static function primaryKeys(
+        \FFI\CData $hstmt,
+        ?string $catalog,
+        string $schema,
+        string $table
+    ): bool {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $catBuf = null === $catalog ? null : self::cString($ffi, $catalog);
+            $schBuf = self::cString($ffi, $schema);
+            $tabBuf = self::cString($ffi, $table);
+            $rc = (int) $ffi->SQLPrimaryKeys(
+                $hstmt,
+                $catBuf,
+                null === $catalog ? 0 : self::SQL_NTS,
+                $schBuf,
+                self::SQL_NTS,
+                $tabBuf,
+                self::SQL_NTS
+            );
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * SQLForeignKeys (php-src odbc_foreignkeys; #21279).
+     */
+    public static function foreignKeys(
+        \FFI\CData $hstmt,
+        ?string $pkCatalog,
+        string $pkSchema,
+        string $pkTable,
+        string $fkCatalog,
+        string $fkSchema,
+        string $fkTable
+    ): bool {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $pcat = null === $pkCatalog ? null : self::cString($ffi, $pkCatalog);
+            $rc = (int) $ffi->SQLForeignKeys(
+                $hstmt,
+                $pcat,
+                null === $pkCatalog ? 0 : self::SQL_NTS,
+                self::cString($ffi, $pkSchema),
+                self::SQL_NTS,
+                self::cString($ffi, $pkTable),
+                self::SQL_NTS,
+                self::cString($ffi, $fkCatalog),
+                self::SQL_NTS,
+                self::cString($ffi, $fkSchema),
+                self::SQL_NTS,
+                self::cString($ffi, $fkTable),
+                self::SQL_NTS
+            );
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * SQLStatistics (php-src odbc_statistics; #21279).
+     */
+    public static function statistics(
+        \FFI\CData $hstmt,
+        ?string $catalog,
+        string $schema,
+        string $table,
+        int $unique,
+        int $accuracy
+    ): bool {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $catBuf = null === $catalog ? null : self::cString($ffi, $catalog);
+            $rc = (int) $ffi->SQLStatistics(
+                $hstmt,
+                $catBuf,
+                null === $catalog ? 0 : self::SQL_NTS,
+                self::cString($ffi, $schema),
+                self::SQL_NTS,
+                self::cString($ffi, $table),
+                self::SQL_NTS,
+                $unique,
+                $accuracy
+            );
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * SQLGetTypeInfo (php-src odbc_gettypeinfo; #21279).
+     */
+    public static function getTypeInfo(\FFI\CData $hstmt, int $dataType): bool
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $rc = (int) $ffi->SQLGetTypeInfo($hstmt, $dataType);
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Set SQL_AUTOCOMMIT (php-src SQLSetConnectOption; #21277).
      */
     public static function setAutocommit(\FFI\CData $hdbc, bool $enable): bool
@@ -725,6 +851,10 @@ SQLRETURN SQLGetData(SQLHSTMT hstmt, SQLUSMALLINT icol, SQLSMALLINT fCType, SQLP
 SQLRETURN SQLBindParameter(SQLHSTMT hstmt, SQLUSMALLINT ipar, SQLSMALLINT fParamType, SQLSMALLINT fCType, SQLSMALLINT fSqlType, SQLULEN cbColDef, SQLSMALLINT ibScale, SQLPOINTER rgbValue, SQLLEN cbValueMax, SQLLEN *pcbValue);
 SQLRETURN SQLTables(SQLHSTMT hstmt, SQLCHAR *szTableQualifier, SQLSMALLINT cbTableQualifier, SQLCHAR *szTableOwner, SQLSMALLINT cbTableOwner, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLCHAR *szTableType, SQLSMALLINT cbTableType);
 SQLRETURN SQLColumns(SQLHSTMT hstmt, SQLCHAR *szTableQualifier, SQLSMALLINT cbTableQualifier, SQLCHAR *szTableOwner, SQLSMALLINT cbTableOwner, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLCHAR *szColumnName, SQLSMALLINT cbColumnName);
+SQLRETURN SQLPrimaryKeys(SQLHSTMT hstmt, SQLCHAR *szCatalogName, SQLSMALLINT cbCatalogName, SQLCHAR *szSchemaName, SQLSMALLINT cbSchemaName, SQLCHAR *szTableName, SQLSMALLINT cbTableName);
+SQLRETURN SQLForeignKeys(SQLHSTMT hstmt, SQLCHAR *szPkCatalogName, SQLSMALLINT cbPkCatalogName, SQLCHAR *szPkSchemaName, SQLSMALLINT cbPkSchemaName, SQLCHAR *szPkTableName, SQLSMALLINT cbPkTableName, SQLCHAR *szFkCatalogName, SQLSMALLINT cbFkCatalogName, SQLCHAR *szFkSchemaName, SQLSMALLINT cbFkSchemaName, SQLCHAR *szFkTableName, SQLSMALLINT cbFkTableName);
+SQLRETURN SQLStatistics(SQLHSTMT hstmt, SQLCHAR *szCatalogName, SQLSMALLINT cbCatalogName, SQLCHAR *szSchemaName, SQLSMALLINT cbSchemaName, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLUSMALLINT fUnique, SQLUSMALLINT fAccuracy);
+SQLRETURN SQLGetTypeInfo(SQLHSTMT hstmt, SQLSMALLINT fSqlType);
 SQLRETURN SQLSetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLULEN vParam);
 SQLRETURN SQLGetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLPOINTER pvParam);
 SQLRETURN SQLTransact(SQLHENV henv, SQLHDBC hdbc, SQLUSMALLINT fType);
