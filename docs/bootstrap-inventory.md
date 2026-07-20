@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6170 |
-| Phase A inventory files (M2 ratio SSOT) | 6170 |
+| PHP files on vm.php path | 6172 |
+| Phase A inventory files (M2 ratio SSOT) | 6172 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19403 |
+| Source constructs flagged (warnings) | 19415 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4062,11 +4062,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvshm/shmop_read.php` | 0 | 2 |
 | `ext/sysvshm/shmop_size.php` | 0 | 2 |
 | `ext/sysvshm/shmop_write.php` | 0 | 2 |
-| `ext/tidy/BuiltinClasses.php` | 0 | 4 |
-| `ext/tidy/Module.php` | 0 | 2 |
+| `ext/tidy/BuiltinClasses.php` | 0 | 10 |
+| `ext/tidy/Module.php` | 0 | 4 |
 | `ext/tidy/TidyExtensionPolicy.php` | 0 | 1 |
 | `ext/tidy/VmTidy.php` | 0 | 3 |
 | `ext/tidy/tidy_parse_string.php` | 0 | 2 |
+| `ext/tidy/tidy_repair_file.php` | 0 | 2 |
+| `ext/tidy/tidy_repair_string.php` | 0 | 2 |
 | `ext/tokenizer/BuiltinClasses.php` | 0 | 1 |
 | `ext/tokenizer/JitTokenGetAll.php` | 0 | 2 |
 | `ext/tokenizer/JitTokenName.php` | 0 | 1 |
@@ -35313,15 +35315,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tidy/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 27)
-- new TidyCleanRepair (line 29)
-- 2 class method(s)
-- 1 closure(s)
+- new ClassEntry (line 28)
+- new TidyCleanRepair (line 30)
+- new TidyRepairString (line 35)
+- new TidyRepairFile (line 40)
+- new ArgumentCountError (line 100)
+- new ArgumentCountError (line 103)
+- new ArgumentCountError (line 132)
+- new ArgumentCountError (line 135)
+- 5 class method(s)
+- 3 closure(s)
 
 ### `ext/tidy/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new tidy_parse_string (line 46)
+- new tidy_parse_string (line 48)
+- new tidy_repair_string (line 49)
+- new tidy_repair_file (line 50)
 - 4 class method(s)
 
 ### `ext/tidy/TidyExtensionPolicy.php`
@@ -35334,12 +35344,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 70)
 - new Variable (line 73)
-- 8 class method(s)
+- 10 class method(s)
 
 ### `ext/tidy/tidy_parse_string.php`
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 41)
+- 2 class method(s)
+
+### `ext/tidy/tidy_repair_file.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/tidy/tidy_repair_string.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 39)
 - 2 class method(s)
 
 ### `ext/tokenizer/BuiltinClasses.php`
@@ -38832,19 +38854,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/NewWithoutParensCompileCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 31)
-- new CompileError (line 86)
-- new CompileError (line 89)
-- new CompileError (line 95)
-- new CompileError (line 100)
-- new CompileError (line 127)
-- new CompileError (line 148)
-- new CompileError (line 166)
-- new CompileError (line 188)
-- new CompileError (line 191)
-- new CompileError (line 197)
-- new CompileError (line 202)
-- new CompileError (line 231)
+- new self (line 32)
+- new CompileError (line 88)
+- new CompileError (line 91)
+- new CompileError (line 97)
+- new CompileError (line 102)
+- new CompileError (line 129)
+- new CompileError (line 150)
+- new CompileError (line 168)
+- new CompileError (line 190)
+- new CompileError (line 193)
+- new CompileError (line 199)
+- new CompileError (line 204)
+- new CompileError (line 233)
 - 10 class method(s)
 
 ### `lib/Compiler/NoDiscardMetadata.php`

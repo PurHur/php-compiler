@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 /**
  * tidy extension module entry (php-src ext/tidy/tidy.c; #21464 / #3664).
  *
- * v1: register tidy_parse_string + tidy::cleanRepair; delegate to host ext/tidy when present.
+ * Register tidy_parse_string / tidy_repair_* + tidy::cleanRepair/repair*; host bridge when present.
  */
 class Module extends ModuleAbstract
 {
@@ -24,6 +24,8 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/BuiltinClasses.php';
         require_once __DIR__.'/VmTidy.php';
         require_once __DIR__.'/tidy_parse_string.php';
+        require_once __DIR__.'/tidy_repair_string.php';
+        require_once __DIR__.'/tidy_repair_file.php';
         parent::init($runtime);
         if (!TidyExtensionPolicy::advertisesExtension()) {
             return;
@@ -44,6 +46,8 @@ class Module extends ModuleAbstract
 
         return [
             new tidy_parse_string(),
+            new tidy_repair_string(),
+            new tidy_repair_file(),
         ];
     }
 }
