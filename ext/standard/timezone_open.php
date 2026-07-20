@@ -36,8 +36,8 @@ final class timezone_open extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('timezone_open() requires VM context in this compiler build');
         }
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (php_date.stub.php; #20959 / re-#18763)
-        $timezone = VmString::zparamStrBuiltinArgForFrame(
+        // php_date.stub.php — null DEP+coerce on 8.4 forward profile (#21369, re-#20959)
+        $timezone = VmString::trimFamilyStringArgForFrame(
             $frame,
             0,
             'timezone_open',

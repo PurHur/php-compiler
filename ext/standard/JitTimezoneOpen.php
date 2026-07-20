@@ -25,12 +25,8 @@ final class JitTimezoneOpen
 
         $literal = JitStringBuiltinArg::compileTimeLiteral($args[0]);
         if (null === $literal && (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)) {
-            // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20959 / re-#18763)
-            if (JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
-                throw new \TypeError(
-                    VmString::stringBuiltinTypeError('timezone_open', 0, 'timezone', 'null')
-                );
-            }
+            // php_date.stub.php — null DEP+coerce on 8.4 forward profile (#21369, re-#20959)
+            VmNullStringParamDeprecation::emit(null, 'timezone_open', 0, 'timezone');
             $literal = '';
         }
         if (null === $literal) {

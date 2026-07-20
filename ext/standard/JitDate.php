@@ -77,8 +77,8 @@ final class JitDate
     {
         DefaultTimezoneRuntime::ensureLinked($context);
 
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20959)
-        $tz = JitStringBuiltinArg::lowerZparamStr(
+        // php_date.stub.php — null DEP+coerce on 8.4 forward profile (#21369, re-#20959)
+        $tz = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $timezoneId,
             'date_default_timezone_set',
