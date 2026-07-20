@@ -805,6 +805,101 @@ PHP;
         self::assertStringNotContainsString('parent::$x->get()', $out);
     }
 
+    /** @covers issue #21296 — parent::$prop::get()/::set() (documented PHP 8.4 form) */
+    public function testRewriteParentPropertyHookColonColonGetSet(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class Base {
+    public string $name {
+        get => 'BASE';
+        set { }
+    }
+}
+class Child extends Base {
+    public string $name {
+        get => parent::$name::get() . '+C';
+        set => parent::$name::set($value);
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('parent::__phpc_property_get_name()', $out);
+        self::assertStringContainsString('parent::__phpc_property_set_name($value)', $out);
+        self::assertStringNotContainsString('parent::$name::get()', $out);
+        self::assertStringNotContainsString('parent::$name::set(', $out);
+    }
+
+    /** @covers issue #21296 — parent::$prop::get()/::set() colon form (php.net / zend_property_hooks.c) */
+    public function testRewriteParentPropertyHookColonGetSetCall(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class Base {
+    public string $name {
+        get => 'BASE';
+        set { }
+    }
+}
+class Child extends Base {
+    public string $name {
+        get => parent::$name::get() . '+C';
+        set {
+            parent::$name::set($value);
+        }
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('parent::__phpc_property_get_name()', $out);
+        self::assertStringContainsString('parent::__phpc_property_set_name($value)', $out);
+        self::assertStringNotContainsString('parent::$name::get()', $out);
+        self::assertStringNotContainsString('parent::$name::set(', $out);
+    }
+
+    /** @covers issue #21296 — process() must not skip later hooked classes when rewritten bodies grow */
+    public function testProcessRewritesAllHookedClassesWhenBufferGrows(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+        $src = <<<'PHP'
+<?php
+class Base {
+    public string $name {
+        get => 'BASE';
+        set { }
+    }
+}
+class Child extends Base {
+    public string $name {
+        get => parent::$name::get() . '+C';
+        set { }
+    }
+}
+class BaseStore {
+    public string $v = '';
+    public string $name {
+        get => $this->v;
+        set => $this->v = $value;
+    }
+}
+class ChildStore extends BaseStore {
+    public string $name {
+        get => parent::$name::get();
+        set => parent::$name::set(strtoupper($value));
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertArrayHasKey('childstore', $registry);
+        self::assertStringContainsString(
+            'parent::__phpc_property_set_name(strtoupper($value))',
+            $out
+        );
+        self::assertStringNotContainsString('parent::$name::', $out);
+    }
+
     /** @covers issue #16861 — virtual default + hook block rejected with Zend compile error on forward profile */
     public function testDefaultInitializerWithVirtualPropertyHooksRejectedOnForwardProfile(): void
     {

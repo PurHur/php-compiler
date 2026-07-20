@@ -43,8 +43,9 @@ final class PropertyHooks
     {
         $this->registry = [];
         $offset = 0;
-        $len = strlen($code);
-        while ($offset < $len) {
+        // Recompute length each iteration: rewritten hook methods grow the buffer, so a
+        // stale strlen would skip later hooked classes in the same file (#21296).
+        while ($offset < strlen($code)) {
             $decl = $this->findNextDeclarable($code, $offset);
             if (null === $decl) {
                 break;
@@ -1680,6 +1681,10 @@ final class PropertyHooks
         if ($isStatic && preg_match('/^self::\$\w+\s*=/', $expr)) {
             return true;
         }
+        // parent::$prop::set(...) / parent::$prop->set(...) — invoke parent set hook (void), #21296
+        if (preg_match('/^parent::\$\w+(?:->|::)set\s*\(/', $expr)) {
+            return true;
+        }
 
         return false;
     }
@@ -1739,12 +1744,14 @@ final class PropertyHooks
     }
 
     /**
-     * parent::$prop->get()/set() → parent::__phpc_property_get_*() for VM parent dispatch (#18170, zend_property_hooks.c).
+     * parent::$prop->get()/set() and parent::$prop::get()/::set() → parent::__phpc_property_*()
+     * for VM parent hook dispatch (#18170 arrow, #21296 colon; zend_property_hooks.c).
      */
     private function rewriteParentPropertyHookRefCalls(string $source): string
     {
+        // Arrow form (legacy / early docs) and colon form (php.net / PHP 8.4).
         $rewritten = preg_replace_callback(
-            '/parent::\$(\w+)->get\(\)/',
+            '/parent::\$(\w+)(?:->|::)get\(\)/',
             fn (array $m): string => 'parent::'.self::GET_METHOD_PREFIX.$m[1].'()',
             $source
         );
@@ -1752,7 +1759,7 @@ final class PropertyHooks
             return $source;
         }
         $rewritten = preg_replace_callback(
-            '/parent::\$(\w+)->set\(([^)]*)\)/',
+            '/parent::\$(\w+)(?:->|::)set\(([^)]*)\)/',
             fn (array $m): string => 'parent::'.self::SET_METHOD_PREFIX.$m[1].'('.$m[2].')',
             $rewritten
         );
