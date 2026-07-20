@@ -11,8 +11,9 @@ use PHPCompiler\VM;
 /**
  * odbc extension module entry (php-src ext/odbc/php_odbc.c; #6293).
  *
- * Phase 1: connect/close/exec/fetch/error surface. Thin unixODBC FFI when
- * libodbc is present (document unixodbc / unixodbc-dev in Docker).
+ * Phase 1: connect/close/exec/fetch/error surface + PHP 8.2 connection-string
+ * quoting helpers. Thin unixODBC FFI when libodbc is present (document
+ * unixodbc / unixodbc-dev in Docker).
  */
 class Module extends ModuleAbstract
 {
@@ -48,6 +49,9 @@ class Module extends ModuleAbstract
             new odbc_pconnect(),
             new odbc_close(),
             new odbc_close_all(),
+            new odbc_connection_string_is_quoted(),
+            new odbc_connection_string_should_quote(),
+            new odbc_connection_string_quote(),
             new odbc_exec(),
             new odbc_fetch_row(),
             new odbc_result(),
