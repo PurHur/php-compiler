@@ -367,6 +367,105 @@ final class PcntlLibcThinAbi
         return true;
     }
 
+    public static function setnsAvailable(): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        return \is_callable([$ffi, 'setns']) && \is_callable([$ffi, 'close'])
+            && \is_callable([$ffi, 'syscall']);
+    }
+
+    public static function getpid(): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi || !\is_callable([$ffi, 'getpid'])) {
+            return (int) \getmypid();
+        }
+
+        return (int) $ffi->getpid();
+    }
+
+    /**
+     * pidfd_open + setns + close (php-src PHP_FUNCTION(pcntl_setns); #21257).
+     *
+     * @param-out int $errno
+     * @param-out string $stage 'pidfd'|'setns'|''
+     */
+    public static function setns(int $pid, int $nstype, int &$errno, string &$stage = ''): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi || !\is_callable([$ffi, 'setns']) || !\is_callable([$ffi, 'close'])
+            || !\is_callable([$ffi, 'syscall'])) {
+            $errno = PcntlConstants::PCNTL_EINVAL;
+            $stage = 'pidfd';
+
+            return false;
+        }
+        $fd = self::pidfdOpen($ffi, $pid, $errno);
+        if ($fd < 0) {
+            $stage = 'pidfd';
+
+            return false;
+        }
+        self::clearErrno($ffi);
+        $rc = (int) $ffi->setns($fd, $nstype);
+        $setnsErrno = self::errno($ffi);
+        $ffi->close($fd);
+        if (-1 === $rc) {
+            $errno = $setnsErrno;
+            $stage = 'setns';
+
+            return false;
+        }
+        $errno = 0;
+        $stage = '';
+
+        return true;
+    }
+
+    /**
+     * @param-out int $errno
+     */
+    private static function pidfdOpen(\FFI $ffi, int $pid, int &$errno): int
+    {
+        $sysno = self::sysPidfdOpen();
+        if (null === $sysno || !\is_callable([$ffi, 'syscall'])) {
+            $errno = PcntlConstants::PCNTL_EINVAL;
+
+            return -1;
+        }
+        self::clearErrno($ffi);
+        try {
+            $fd = (int) $ffi->syscall($sysno, $pid, 0);
+        } catch (\Throwable) {
+            $errno = PcntlConstants::PCNTL_EINVAL;
+
+            return -1;
+        }
+        if ($fd >= 0) {
+            $errno = 0;
+
+            return $fd;
+        }
+        $errno = self::errno($ffi);
+
+        return -1;
+    }
+
+    /** Linux SYS_pidfd_open — 434 on x86_64/aarch64/riscv64. */
+    private static function sysPidfdOpen(): ?int
+    {
+        $m = \php_uname('m');
+        if (\in_array($m, ['x86_64', 'amd64', 'aarch64', 'arm64', 'riscv64'], true)) {
+            return 434;
+        }
+
+        return null;
+    }
+
     public static function cpuAffinityAvailable(): bool
     {
         return null !== self::ffi();
@@ -532,6 +631,9 @@ int setpriority(int which, id_t who, int prio);
 int *__errno_location(void);
 char *strerror(int errnum);
 int unshare(int flags);
+int setns(int fd, int nstype);
+int close(int fd);
+long syscall(long number, long a, long b);
 unsigned int alarm(unsigned int seconds);
 int execv(const char *path, char *const argv[]);
 int execve(const char *path, char *const argv[], char *const envp[]);

@@ -1258,6 +1258,7 @@ require_once __DIR__.'/../../../ext/pcntl/pcntl_fork.php';
 require_once __DIR__.'/../../../ext/pcntl/pcntl_get_last_error.php';
 require_once __DIR__.'/../../../ext/pcntl/pcntl_getpriority.php';
 require_once __DIR__.'/../../../ext/pcntl/pcntl_setpriority.php';
+require_once __DIR__.'/../../../ext/pcntl/pcntl_setns.php';
 require_once __DIR__.'/../../../ext/pcntl/pcntl_signal.php';
 require_once __DIR__.'/../../../ext/pcntl/pcntl_signal_dispatch.php';
 require_once __DIR__.'/../../../ext/pcntl/pcntl_signal_get_handler.php';

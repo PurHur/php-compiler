@@ -48,6 +48,7 @@ class Module extends ModuleAbstract
             new pcntl_setcpuaffinity(),
             new pcntl_getcpu(),
             new pcntl_unshare(),
+            new pcntl_setns(),
             new pcntl_strerror(),
             new pcntl_get_last_error(),
         ];

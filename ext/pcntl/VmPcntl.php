@@ -104,6 +104,117 @@ final class VmPcntl
         throw new \Error('pcntl_unshare() is not available in this compiler build');
     }
 
+    /**
+     * php-src pcntl_setns() — pidfd_open(2) + setns(2) (ext/pcntl/pcntl.c; #21257).
+     */
+    public static function setns(?int $pid, int $nstype): bool
+    {
+        if (PcntlHostBridge::setnsAvailable()) {
+            try {
+                $ok = PcntlHostBridge::setns($pid, $nstype);
+            } catch (\ValueError $e) {
+                self::syncLastErrorFromHost();
+                throw $e;
+            }
+            if (!$ok) {
+                self::syncLastErrorFromHost();
+            }
+
+            return $ok;
+        }
+        if (PcntlLibcThinAbi::setnsAvailable()) {
+            $processId = null === $pid ? PcntlLibcThinAbi::getpid() : $pid;
+            $errno = 0;
+            $stage = '';
+            $ok = PcntlLibcThinAbi::setns($processId, $nstype, $errno, $stage);
+            if ($ok) {
+                return true;
+            }
+            self::$lastError = $errno;
+            if ('pidfd' === $stage) {
+                if (PcntlConstants::PCNTL_EINVAL === $errno || PcntlConstants::PCNTL_ESRCH === $errno) {
+                    throw new \ValueError(
+                        \sprintf(
+                            'pcntl_setns(): Argument #1 ($process_id) is not a valid process (%d)',
+                            $processId
+                        )
+                    );
+                }
+                self::setnsWarnPidfd($errno);
+
+                return false;
+            }
+            if ('setns' === $stage) {
+                if (PcntlConstants::PCNTL_ESRCH === $errno) {
+                    throw new \ValueError(
+                        \sprintf(
+                            'pcntl_setns(): Argument #1 ($process_id) process no longer available (%d)',
+                            $processId
+                        )
+                    );
+                }
+                if (PcntlConstants::PCNTL_EINVAL === $errno) {
+                    throw new \ValueError(
+                        \sprintf(
+                            'pcntl_setns(): Argument #2 ($nstype) is an invalid nstype (%d)',
+                            $nstype
+                        )
+                    );
+                }
+                self::setnsWarnSetns($errno);
+
+                return false;
+            }
+            self::setnsWarnSetns($errno);
+
+            return false;
+        }
+
+        throw new \Error('pcntl_setns() is not available in this compiler build');
+    }
+
+    private static function setnsWarnPidfd(int $errno): void
+    {
+        if (PcntlConstants::PCNTL_ENFILE === $errno) {
+            \trigger_error(
+                \sprintf('pcntl_setns(): Error %d: File descriptors per-process limit reached', $errno),
+                \E_USER_WARNING
+            );
+
+            return;
+        }
+        if (19 === $errno) { // ENODEV
+            \trigger_error(
+                \sprintf('pcntl_setns(): Error %d: Anonymous inode fs unsupported', $errno),
+                \E_USER_WARNING
+            );
+
+            return;
+        }
+        if (PcntlConstants::PCNTL_ENOMEM === $errno) {
+            \trigger_error(
+                \sprintf('pcntl_setns(): Error %d: Insufficient memory for pidfd_open', $errno),
+                \E_USER_WARNING
+            );
+
+            return;
+        }
+        \trigger_error(\sprintf('pcntl_setns(): Error %d', $errno), \E_USER_WARNING);
+    }
+
+    private static function setnsWarnSetns(int $errno): void
+    {
+        if (PcntlConstants::PCNTL_EPERM === $errno) {
+            \trigger_error(
+                \sprintf('pcntl_setns(): Error %d: No required capability for this process', $errno),
+                \E_USER_WARNING
+            );
+
+            return;
+        }
+        \trigger_error(\sprintf('pcntl_setns(): Error %d', $errno), \E_USER_WARNING);
+    }
+
     /** Locale-stable English fallbacks for PCNTL_E* when host/FFI strerror is unavailable. */
     private static function strerrorFallback(int $error): string
     {
