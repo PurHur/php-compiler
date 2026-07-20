@@ -1,11 +1,22 @@
 <?php
-foreach (['str_replace' => static fn () => str_replace('a', 'b', null),
-           'str_ireplace' => static fn () => str_ireplace('a', 'b', null),
-           'preg_replace' => static fn () => preg_replace('//', 'x', null)] as $label => $factory) {
+set_error_handler(static function (int $no, string $msg): bool {
+    if (E_DEPRECATED === $no) {
+        echo "DEP\n";
+
+        return true;
+    }
+
+    return false;
+});
+foreach ([
+    'str_replace' => static fn () => str_replace('a', 'b', null),
+    'str_ireplace' => static fn () => str_ireplace('a', 'b', null),
+    'preg_replace' => static fn () => preg_replace('//', 'x', null),
+] as $label => $factory) {
     try {
-        $factory();
-        echo "$label: uncaught\n";
-    } catch (TypeError $e) {
-        echo $label.': '.$e->getMessage()."\n";
+        $r = $factory();
+        echo $label, ' OK ', var_export($r, true), "\n";
+    } catch (Throwable $e) {
+        echo $label, ': ', get_class($e), ' ', $e->getMessage(), "\n";
     }
 }

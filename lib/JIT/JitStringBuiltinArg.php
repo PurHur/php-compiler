@@ -111,7 +111,8 @@ final class JitStringBuiltinArg
      * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data) (#21181),
      * HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/nl2br/quotemeta
      * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
-     * and mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197).
+     * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
+     * and preg_match $subject (#21198).
      */
     public static function lowerTrimFamilyString(
         Context $context,

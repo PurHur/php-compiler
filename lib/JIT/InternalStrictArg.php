@@ -303,7 +303,10 @@ final class InternalStrictArg
 
     /**
      * Reject null for array|string internal parameters when caller uses strict_types (#11015)
-     * or 8.4 forward profile requires Z_PARAM_STR_OR_ARR null TypeError (#18914, #19241).
+     * or (optionally) 8.4 forward profile Z_PARAM_STR_OR_ARR TypeError.
+     *
+     * Soft-null subjects (preg_replace/str_replace $subject, #21198) pass
+     * `$rejectNullOnForwardProfile = false` — Zend DEP+coerces null→'' on 8.4.
      *
      * Uses {@see VmString::requiresZparamStrStrictNullOnForwardProfile} — not the retired
      * {@see VmString::requiresForwardProfileStrictStringNull} global switch (always false).
@@ -316,11 +319,12 @@ final class InternalStrictArg
         Variable $arg,
         string $function,
         string $paramName,
-        int $argNumber
+        int $argNumber,
+        bool $rejectNullOnForwardProfile = true
     ): bool {
         if (
             !$context->callerStrictTypes
-            && !VmString::requiresZparamStrStrictNullOnForwardProfile()
+            && !($rejectNullOnForwardProfile && VmString::requiresZparamStrStrictNullOnForwardProfile())
         ) {
             return false;
         }
