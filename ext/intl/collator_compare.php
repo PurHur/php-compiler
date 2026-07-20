@@ -13,6 +13,8 @@ use PHPLLVM\Value;
 
 /**
  * collator_compare() — procedural alias of Collator::compare (php-src collator_compare.c; #20753).
+ *
+ * Z_PARAM_STR null TypeError on 8.4 forward (#21077, collator.stub.php).
  */
 final class collator_compare extends Internal
 {

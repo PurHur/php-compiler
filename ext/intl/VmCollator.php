@@ -521,9 +521,12 @@ final class VmCollator
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'locale');
     }
 
+    /**
+     * Z_PARAM_STR for compare/getSortKey — null TypeError on 8.4 forward (#21077, collator.stub.php).
+     */
     public static function coerceStringArg(Variable $var, string $function, int $position, string $name): string
     {
-        return VmString::coerceStringBuiltinArg($var, $function, $position, $name);
+        return VmString::coerceZparamStrBuiltinArg($var, $function, $position, $name);
     }
 
     public static function coerceIntArg(Variable $var, string $function, int $position, string $name): int
@@ -1021,7 +1024,7 @@ final class CollatorCreate extends VmClassMethod
     }
 }
 
-/** Collator::compare() — php-src collator_compare (#5747). */
+/** Collator::compare() — php-src collator_compare (#5747). Z_PARAM_STR null TypeError on 8.4 (#21077). */
 final class CollatorCompare extends VmClassMethod
 {
     public function __construct()
@@ -1043,8 +1046,9 @@ final class CollatorCompare extends VmClassMethod
             || !VmCollator::isCollatorObject($receiver->toObject())) {
             throw new \Error('Collator::compare() called on incompatible object');
         }
-        $string1 = VmCollator::coerceStringArg($frame->calledArgs[1], 'Collator::compare', 1, 'string1');
-        $string2 = VmCollator::coerceStringArg($frame->calledArgs[2], 'Collator::compare', 2, 'string2');
+        // User arg indices (exclude $this) — Argument #1/$string1, #2/$string2 (#21077).
+        $string1 = VmCollator::coerceStringArg($frame->calledArgs[1], 'Collator::compare', 0, 'string1');
+        $string2 = VmCollator::coerceStringArg($frame->calledArgs[2], 'Collator::compare', 1, 'string2');
         $result = VmCollator::compare($receiver->toObject(), $string1, $string2);
         if (null === $frame->returnVar) {
             return;
@@ -1156,7 +1160,7 @@ final class CollatorSortWithSortKeys extends VmClassMethod
     }
 }
 
-/** Collator::getSortKey() — php-src collator_get_sort_key (#20717). */
+/** Collator::getSortKey() — php-src collator_get_sort_key (#20717). Z_PARAM_STR null TypeError on 8.4 (#21077). */
 final class CollatorGetSortKey extends VmClassMethod
 {
     public function __construct()
@@ -1178,7 +1182,8 @@ final class CollatorGetSortKey extends VmClassMethod
             || !VmCollator::isCollatorObject($receiver->toObject())) {
             throw new \Error('Collator::getSortKey() called on incompatible object');
         }
-        $string = VmCollator::coerceStringArg($frame->calledArgs[1], 'Collator::getSortKey', 1, 'string');
+        // User arg index (exclude $this) — Argument #1/$string (#21077).
+        $string = VmCollator::coerceStringArg($frame->calledArgs[1], 'Collator::getSortKey', 0, 'string');
         $result = VmCollator::getSortKey($receiver->toObject(), $string);
         if (null === $frame->returnVar) {
             return;
