@@ -10,7 +10,7 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
 /**
- * hash_update() — append data to HashContext (php-src ext/hash/hash.c; issue #7174, #20195).
+ * hash_update() — append data to HashContext (php-src ext/hash/hash.c; #7174, #21557).
  */
 final class hash_update extends HashFunction
 {
@@ -20,8 +20,8 @@ final class hash_update extends HashFunction
             throw new \LogicException('hash_update() requires exactly two arguments in this compiler build');
         }
         $ctx = VmHashContext::requireHashContext($frame->calledArgs[0], 'hash_update', 1);
-        // Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#20195, ext/hash/hash.c).
-        $data = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'hash_update', 1, 'data');
+        // Z_PARAM_STR $data — non-strict null is E_DEPRECATED + '' on 8.4 (#21557, reverts #20195).
+        $data = VmString::trimFamilyStringArgForFrame($frame, 1, 'hash_update', 1, 'data');
         VmHashContext::update($ctx, $data);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret): void {
             $ret->bool(true);

@@ -81,10 +81,10 @@ final class JitHashContext
         HashContextEmbedBridge::ensureLinked($context);
         $obj = self::readContextObject($context, $args[0]);
         $handle = self::loadHandle($context, $obj);
-        // Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#20195, ext/hash/hash.c).
+        // Z_PARAM_STR $data — non-strict null is E_DEPRECATED + '' on 8.4 (#21557, reverts #20195).
         $chunkStr = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash_update', 1, 'data')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'hash_update', 1, 'data');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'hash_update', 1, 'data');
         self::callHelper($context, self::UPDATE_HELPER, $handle, $chunkStr);
         $bufPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_BUF);
         $map = $context->structFieldMap['__string__'];
