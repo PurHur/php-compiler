@@ -161,8 +161,22 @@ final class ReflectionSetup
         string $propName
     ): array {
         $propVar = $context->type->object->propertyFetch($obj, $className, $propName);
-        $propVar = JitNativeString::coerce($context, $propVar);
-        $strPtr = $context->helper->loadValue($propVar);
+        // emitSetStringPropertyFromCstr stores a heap __value__* (string box) in the
+        // property slot even when the declared JIT type is TYPE_STRING. Reading the
+        // slot as a raw __string__* segfaults under AOT (#21551) — mirror
+        // ReflectionAttributeGetName / ExceptionGetMessage via __value__readString.
+        if (Variable::TYPE_VALUE === $propVar->type) {
+            $valuePtr = JitValueBox::valuePtrFromVariable($context, $propVar);
+        } else {
+            $valuePtr = $context->builder->pointerCast(
+                $context->helper->loadValue($propVar),
+                $context->getTypeFromString('__value__*')
+            );
+        }
+        $strPtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
         $i8p = $context->getTypeFromString('int8*');
         $raw = $context->builder->pointerCast($strPtr, $i8p);
         $lenPtr = $context->builder->pointerCast(

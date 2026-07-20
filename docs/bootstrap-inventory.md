@@ -43619,7 +43619,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/ReflectionConstantGetShortName.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/Call/ReflectionConstantToString.php`
 

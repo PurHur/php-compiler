@@ -16,13 +16,13 @@ final class ReflectionConstantGetName implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        [$cstr, $len] = ReflectionSetup::stringPropertyAsCstr($context, $obj, 'ReflectionConstant', 'constant');
-        $i64 = $context->getTypeFromString('int64');
+        // Slot holds heap __value__* from emitSetStringPropertyFromCstr (see ReflectionSetup).
+        $nameVar = $context->type->object->propertyFetch($obj, 'ReflectionConstant', 'constant');
+        $valuePtr = $context->helper->loadValue($nameVar);
 
         return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->zExt($len, $i64),
-            $cstr
+            $context->lookupFunction('__value__readString'),
+            $context->builder->pointerCast($valuePtr, $context->getTypeFromString('__value__*'))
         );
     }
 }
