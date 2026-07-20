@@ -43,8 +43,8 @@ final class strcmp extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        $left = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strcmp', 0, 'string1');
-        $right = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strcmp', 1, 'string2');
+        $left = self::jitStringArg($context, $args[0], 0, 'string1');
+        $right = self::jitStringArg($context, $args[1], 1, 'string2');
 
         return JitStringCompare::strcmp($context, $left, $right);
     }
@@ -55,8 +55,34 @@ final class strcmp extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strcmp', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21190).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
+            'strcmp',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'strcmp',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $arg,
             'strcmp',
             $argIndex,
             $paramName

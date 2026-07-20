@@ -114,6 +114,7 @@ final class JitStringBuiltinArg
      * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * preg_match $subject (#21198), and substr/strpos/strstr/explode (#21189), ord() (#21222),
+     * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
      * introspection name args (function_exists/class_exists/defined/…) (#21281).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
