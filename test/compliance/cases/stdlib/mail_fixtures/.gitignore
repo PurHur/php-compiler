@@ -1,1 +1,3 @@
 mock_sendmail.last
+mock_sendmail_argv.last
+inject_trap
