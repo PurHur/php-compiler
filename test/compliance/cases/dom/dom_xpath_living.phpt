@@ -47,7 +47,7 @@ Dom\XPath
 Dom\NodeList
 isa
 len=2
-item=p
+item=P
 count=2
 ns=1
 legacy_type

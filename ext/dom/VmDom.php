@@ -2934,6 +2934,35 @@ final class VmDom
         return $state->localName ?? $state->nodeName;
     }
 
+    /**
+     * Node.nodeName / Element.tagName (php-src ext/dom/node.c + element.c; #21558).
+     *
+     * HTML namespace elements owned by Dom\HTMLDocument expose ASCII-uppercase names;
+     * localName stays lowercase. Legacy DOM* and Dom\XMLDocument keep stored casing.
+     */
+    public static function readNodeName(ObjectEntry $node): string
+    {
+        if (!DomRegistry::has($node)) {
+            return '';
+        }
+        $state = DomRegistry::state($node);
+        $name = $state->nodeName;
+        if (DomConstants::XML_ELEMENT_NODE !== $state->nodeType
+            || VmDomLiving::HTML_NS !== $state->namespaceUri
+        ) {
+            return $name;
+        }
+        $owner = self::ownerDocumentEntry($node);
+        if (null === $owner
+            || VmDomLiving::CLASS_HTML_DOCUMENT !== strtolower($owner->class->name)
+        ) {
+            return $name;
+        }
+
+        // WHATWG: uppercase ASCII form of local name (qualified name equals local for HTML).
+        return strtoupper($state->localName ?? $name);
+    }
+
     public static function readPrefix(ObjectEntry $node): string
     {
         if (!DomRegistry::has($node)) {

@@ -47,7 +47,7 @@ Node: 1
 Element: 1
 hi
 empty_body
-body=body
+body=BODY
 title=T
 isset_body=1 empty_body=0
 isset_title=1 empty_title=0
@@ -57,6 +57,6 @@ gid=yes
 cff=yes
 sh=yes
 span=s
-id=div
+id=DIV
 save=ok
 file_title=T
