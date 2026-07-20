@@ -11,7 +11,7 @@ use PHPCompiler\VM\DateTimeSupport;
 /**
  * DateTime::format(string $format) — VM (#3072).
  *
- * Z_PARAM_STR $format — null TypeError on 8.4 forward profile (#20693, ext/date/php_date.c).
+ * Soft-null $format on 8.4 — Zend deprecate+coerce (ext/date/php_date.c; #21536, reverts #20693 TypeError).
  */
 final class DateTimeFormat extends VmClassMethod
 {
@@ -29,8 +29,8 @@ final class DateTimeFormat extends VmClassMethod
         $formatFn = (false !== stripos($receiver->class->name, 'immutable'))
             ? 'DateTimeImmutable::format'
             : 'DateTime::format';
-        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 / strict_types (#20693).
-        $format = VmString::zparamStrBuiltinArgForFrame($frame, 1, $formatFn, 0, 'format');
+        // Soft-null on 8.4 — Zend deprecate+coerce (#21536, reverts #20693 TypeError).
+        $format = VmString::trimFamilyStringArgForFrame($frame, 1, $formatFn, 0, 'format');
         if (null === $frame->returnVar) {
             return;
         }

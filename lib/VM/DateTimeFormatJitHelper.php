@@ -40,8 +40,8 @@ final class DateTimeFormatJitHelper
             $context->lookupFunction('__value__readString'),
             JitValueBox::valuePtrFromVariable($context, $tzVar)
         );
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20693, ext/date/php_date.c).
-        $formatPtr = JitStringBuiltinArg::lowerZparamStr(
+        // Soft-null on 8.4 — Zend deprecate+coerce (#21536, reverts #20693 TypeError).
+        $formatPtr = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $formatArg,
             $function,
