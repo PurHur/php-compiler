@@ -1,15 +1,16 @@
 --TEST--
-stdlib touch() — null $filename TypeError JIT (#18245, #18817, ext/standard/file.c)
+stdlib touch() — null $filename soft-coerces on 8.4 JIT (#20362 supersedes #18245, ext/standard/file.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED);
 try {
-    touch(null);
-    echo "uncaught\n";
+    $r = @touch(null);
+    echo var_export($r, true), "\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-touch(): Argument #1 ($filename) must be of type string, null given
+false

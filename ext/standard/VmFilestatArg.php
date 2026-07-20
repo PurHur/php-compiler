@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 final class VmFilestatArg
 {
     /**
-     * Z_PARAM_PATH filename — TypeError on 8.4 forward profile; else "" + deprecation (#14597, #20474).
+     * Z_PARAM_PATH filename — soft-null DEP+coerce on 8.4; TypeError under caller strict_types (#14597, #20362).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -23,7 +23,7 @@ final class VmFilestatArg
         int $argIndex = 0,
         string $paramName = 'filename',
         ?Frame $frame = null,
-        bool $softNullPath = false
+        bool $softNullPath = true
     ): string {
         if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
@@ -33,7 +33,7 @@ final class VmFilestatArg
     }
 
     /**
-     * Z_PARAM_PATH for compiled call sites — TypeError on 8.4; else "" (deprecated) (#20474).
+     * Z_PARAM_PATH for compiled call sites — soft-null DEP+coerce on 8.4 (#20362, #19146).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -53,7 +53,7 @@ final class VmFilestatArg
     }
 
     /**
-     * basename/dirname/pathinfo $path — soft-null on forward profile (#19997; TypeError tracked in #20099).
+     * basename/dirname/pathinfo $path — soft-null on forward profile (#19997 / #20362).
      */
     public static function pathComponentFilenameArgForFrame(
         Frame $frame,

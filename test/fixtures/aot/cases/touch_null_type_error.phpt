@@ -1,10 +1,10 @@
 --TEST--
-AOT: touch() — null $filename TypeError (#18245, #18817, ext/standard/file.c)
+AOT: touch() — null $filename soft-coerces (#20362 supersedes #18245, ext/standard/file.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-touch(null);
+error_reporting(E_ALL & ~E_DEPRECATED);
+echo var_export(@touch(null), true), "\n";
 --EXPECT--
---EXPECT_EXIT--
-134
+false

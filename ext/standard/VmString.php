@@ -396,6 +396,9 @@ final class VmString
     /**
      * Coerce a path builtin operand (php-src Z_PARAM_PATH; rejects embedded NUL, #4401).
      *
+     * Null soft-coerces with E_DEPRECATED through PHP 8.4 (php-src Z_PARAM_PATH / #20362).
+     * $softNullPath is retained for call-site clarity; Z_PARAM_PATH is always soft-null.
+     *
      * @throws \ValueError when the path contains a null byte
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -404,17 +407,13 @@ final class VmString
         string $function,
         int $argIndex = 0,
         string $paramName = 'path',
-        bool $softNullPath = false
+        bool $softNullPath = true
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            // Z_PARAM_PATH: TypeError on 8.4 forward profile (#18817, #20474; php-src filestat.c).
-            // $softNullPath keeps basename/dirname/pathinfo soft-coerce (#19997) until #20099.
-            if (!$softNullPath && self::requiresZparamStrStrictNullOnForwardProfile()) {
-                throw new \TypeError(
-                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', 'string')
-                );
-            }
+            // Z_PARAM_PATH: soft-null DEP+coerce on 8.4 (php-src filestat.c / file.c; #20362, #19146).
+            // TypeError for null→string is PHP 9 (deprecate_null_to_scalar_internal_arg), not 8.4.
+            // $softNullPath retained for call-site API compatibility.
             VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';

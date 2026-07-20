@@ -238,9 +238,9 @@ final class JitStringBuiltinArg
     }
 
     /**
-     * Z_PARAM_PATH — TypeError on 8.4 forward profile / strict_types; else coerce+deprecate (#13419, #20474).
+     * Z_PARAM_PATH — soft-null DEP+coerce on 8.4; TypeError only under caller strict_types (#20362, #19146).
      *
-     * $softNullPath keeps basename/dirname/pathinfo soft-coerce on 8.4 (#19997) until #20099.
+     * $softNullPath is retained for call-site clarity; Z_PARAM_PATH is always soft-null outside strict_types.
      */
     public static function lowerPath(
         Context $context,
@@ -250,25 +250,23 @@ final class JitStringBuiltinArg
         string $paramName,
         string $expectedType = 'string',
         ?string $arrayExpectedType = null,
-        bool $softNullPath = false
+        bool $softNullPath = true
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
-            if (
-                (!$softNullPath && $context->callerStrictTypes)
-                || (!$softNullPath && self::requiresZparamStrStrictNullOnForwardProfile())
-            ) {
+            if ($context->callerStrictTypes) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
             }
 
+            // $softNullPath retained for call-site API compatibility.
             self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName, $expectedType);
 
             return $context->builder->load($context->constantStringFromString(''));
         }
 
-        // Boxed null / VALUE: TypeError on 8.4 when !$softNullPath (#20474); else soft-coerce (#19997).
+        // Boxed null / VALUE: soft-coerce + DEP (Z_PARAM_PATH; #20362). Strict_types still TypeError via lower().
         return self::lower(
             $context,
             $arg,
@@ -278,7 +276,7 @@ final class JitStringBuiltinArg
             $expectedType,
             $arrayExpectedType,
             false,
-            !$softNullPath
+            false
         );
     }
 
