@@ -100,6 +100,7 @@ class Module extends ModuleAbstract
             new floor(),
             new round(),
             new number_format(),
+            new money_format(),
             new sqrt(),
             new pi(),
             new deg2rad(),
