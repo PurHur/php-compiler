@@ -114,6 +114,7 @@ final class JitStringBuiltinArg
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * mb_strtolower/mb_strtoupper/mb_convert_case/mb_strstr/mb_stristr/mb_strrchr/mb_stripos/mb_strrpos/mb_strripos (#21313),
      * mb_strcut/mb_strimwidth/mb_encode_mimeheader (#21430),
+     * mb_scrub/mb_detect_encoding (#21516, reverts #21061/#20225 TypeError),
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode (#21189),
      * substr_count/substr_replace haystack (#21196), ord() (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),

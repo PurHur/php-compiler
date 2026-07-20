@@ -1,5 +1,6 @@
 <?php
 // VM: PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/issue_21061_mbstring_null_profile84.php
+// #21516 — mb_scrub soft-null (reverts #21061 TypeError polarity)
 foreach ([
     'mb_strwidth' => static fn () => mb_strwidth(null),
     'mb_strstr' => static fn () => mb_strstr(null, 'a'),

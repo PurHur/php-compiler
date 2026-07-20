@@ -8,7 +8,6 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -31,13 +30,8 @@ final class mb_scrub extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21061, mbstring.c).
-        $string = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_scrub',
-            0,
-            'string'
-        );
+        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516, reverts #21061 TypeError).
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_scrub', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -58,10 +52,7 @@ final class mb_scrub extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('mb_scrub() requires one or two arguments');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21061).
-        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            return JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'mb_scrub', 0, 'string');
-        }
+        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516, reverts #21061 TypeError).
         $folded = JitMbScrub::tryCompileTimeFold($context, $args);
         if (null !== $folded) {
             return $folded;

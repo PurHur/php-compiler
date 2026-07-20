@@ -1,6 +1,6 @@
 <?php
-// Guard #21061 / #21282 / #21313 — mb_strwidth/search/case/scrub family null under PROFILE=8.4
-// Soft-null: mb_strtoupper/mb_convert_case/mb_str* search (#21313); mb_substr_count (#21282).
+// Guard #21061 / #21282 / #21313 / #21516 — mb_strwidth/search/case/scrub family null under PROFILE=8.4
+// Soft-null: mb_strtoupper/mb_convert_case/mb_str* search (#21313); mb_scrub/mb_encode_mimeheader (#21516/#21430).
 $cases = [
     'mb_strwidth' => static fn () => mb_strwidth(null),
     'mb_strstr' => static fn () => mb_strstr(null, 'a'),
@@ -19,7 +19,7 @@ $cases = [
 ];
 $softOk = array_fill_keys([
     'mb_strstr', 'mb_stristr', 'mb_strrchr', 'mb_stripos', 'mb_strripos', 'mb_strrpos',
-    'mb_convert_case', 'mb_strtoupper',
+    'mb_convert_case', 'mb_strtoupper', 'mb_scrub', 'mb_encode_mimeheader',
 ], true);
 foreach ($cases as $name => $fn) {
     try {

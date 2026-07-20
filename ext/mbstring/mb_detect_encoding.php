@@ -33,8 +33,8 @@ final class mb_detect_encoding extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20225, mbstring.c).
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_detect_encoding', 0, 'string');
+        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516, reverts #20225 TypeError).
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_detect_encoding', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -63,8 +63,18 @@ final class mb_detect_encoding extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('mb_detect_encoding() expects 1 to 3 arguments in this compiler build');
+        }
+        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21516); compile-time fold for 1-arg form.
+        $folded = JitMbDetectEncoding::tryCompileTimeFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         throw new \LogicException(
-            'mb_detect_encoding() is not lowered for JIT/AOT in this compiler build'
+            'mb_detect_encoding() JIT requires a compile-time string literal (1-arg) in this compiler build'
         );
     }
 }
