@@ -67,10 +67,8 @@ final class VmNumberFormat
                 if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
                     throw new \TypeError(self::numTypeError('null'));
                 }
-                if (VmMath::requiresForwardProfileStrictDoubleNull()) {
-                    throw new \TypeError(self::numTypeError('null'));
-                }
-                // Z_PARAM_DOUBLE $num: E_DEPRECATED then coerce to 0.0 (#19756).
+                // Z_PARAM_DOUBLE $num: E_DEPRECATED then coerce to 0.0 on all profiles
+                // including PROFILE=8.4 (#21429, reverts #21379 TypeError; php-src formatted_print.c).
                 VmNullNumberParamDeprecation::emit($frame, 'number_format', 1, 'num', 'float');
 
                 return 0.0;
