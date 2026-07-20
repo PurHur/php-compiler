@@ -5,12 +5,24 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\uri;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\VM\Builtin\ExceptionConstruct;
+use PHPCompiler\VM\Builtin\ExceptionGetCode;
+use PHPCompiler\VM\Builtin\ExceptionGetFile;
+use PHPCompiler\VM\Builtin\ExceptionGetLine;
+use PHPCompiler\VM\Builtin\ExceptionGetMessage;
+use PHPCompiler\VM\Builtin\ExceptionGetPrevious;
+use PHPCompiler\VM\Builtin\ExceptionGetTrace;
+use PHPCompiler\VM\Builtin\ExceptionGetTraceAsString;
+use PHPCompiler\VM\Builtin\ExceptionToString;
+use PHPCompiler\VM\Builtin\ExceptionWakeup;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
+use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\ThrowableManifest;
 
 /**
  * Register ext/uri builtin classes and enums (php-src ext/uri/php_uri.stub.php; #9051).
@@ -36,27 +48,163 @@ final class BuiltinClasses
 
     private static function registerExceptions(Context $ctx): void
     {
-        $uriException = new ClassEntry('Uri\\UriException');
-        if (isset($ctx->classes['exception'])) {
-            $uriException->parentLc = 'exception';
-        }
+        $uriException = self::newExceptionFamilyEntry($ctx, 'Uri\\UriException', 'exception');
         $ctx->classes[VmUri::CLASS_URI_EXCEPTION] = $uriException;
 
-        $uriError = new ClassEntry('Uri\\UriError');
-        if (isset($ctx->classes['error'])) {
-            $uriError->parentLc = 'error';
-        }
+        $uriError = self::newErrorFamilyEntry($ctx, 'Uri\\UriError', 'error');
         $ctx->classes[VmUri::CLASS_URI_ERROR] = $uriError;
 
-        $invalidUri = new ClassEntry('Uri\\InvalidUriException');
-        $invalidUri->parentLc = VmUri::CLASS_URI_EXCEPTION;
+        $invalidUri = self::newExceptionFamilyEntry($ctx, 'Uri\\InvalidUriException', VmUri::CLASS_URI_EXCEPTION);
         $ctx->classes[VmUri::CLASS_INVALID_URI_EXCEPTION] = $invalidUri;
 
-        $invalidUrl = new ClassEntry('Uri\\WhatWg\\InvalidUrlException');
-        $invalidUrl->parentLc = VmUri::CLASS_INVALID_URI_EXCEPTION;
+        $invalidUrl = self::newExceptionFamilyEntry($ctx, 'Uri\\WhatWg\\InvalidUrlException', VmUri::CLASS_INVALID_URI_EXCEPTION);
         $ctx->classes[VmUri::CLASS_WHATWG_INVALID_URL] = $invalidUrl;
 
         self::registerUrlValidationError($ctx);
+    }
+
+    /**
+     * Exception-family throwable with zend_exceptions.stub.php slots (ThrowableManifest shape).
+     */
+    private static function newExceptionFamilyEntry(Context $ctx, string $name, string $parentLc): ClassEntry
+    {
+        $entry = new ClassEntry($name);
+        $entry->isInternal = true;
+        if (isset($ctx->classes[$parentLc])) {
+            $entry->parentLc = $parentLc;
+        } elseif (isset($ctx->classes['exception'])) {
+            $entry->parentLc = 'exception';
+        }
+
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $intProto = new Variable(Variable::TYPE_INTEGER);
+        $nullProto = new Variable(Variable::TYPE_NULL);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
+        $emptyTrace = new Variable();
+        $emptyTrace->newArray();
+        $emptyString = new Variable(Variable::TYPE_STRING);
+        $emptyString->string('');
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $prot = CfgFunc::FLAG_PROTECTED;
+        $priv = CfgFunc::FLAG_PRIVATE;
+        $exceptionLc = ThrowableManifest::LC_EXCEPTION;
+
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto, false, $prot);
+        $entry->properties[] = new ClassProperty(
+            ExceptionSupport::PROP_PREVIOUS,
+            null,
+            $nullProto,
+            false,
+            $priv,
+            $exceptionLc
+        );
+        $entry->properties[] = new ClassProperty(
+            ExceptionSupport::PROP_TRACE,
+            $emptyTrace,
+            $arrayProto,
+            false,
+            $priv,
+            $exceptionLc
+        );
+        $entry->properties[] = new ClassProperty(
+            ExceptionSupport::PROP_STRING,
+            $emptyString,
+            $strProto,
+            false,
+            $priv,
+            $exceptionLc
+        );
+
+        $entry->constructor = new ExceptionConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['__wakeup'] = new ExceptionWakeup();
+        $entry->methodVisibility['__wakeup'] = $pub;
+        foreach (
+            [
+                'getmessage' => new ExceptionGetMessage(),
+                'getcode' => new ExceptionGetCode(),
+                'getfile' => new ExceptionGetFile(),
+                'getline' => new ExceptionGetLine(),
+                'getprevious' => new ExceptionGetPrevious(),
+                'gettrace' => new ExceptionGetTrace(),
+                'gettraceasstring' => new ExceptionGetTraceAsString(),
+                '__tostring' => new ExceptionToString(),
+            ] as $methodName => $method
+        ) {
+            $entry->methods[$methodName] = $method;
+            $entry->methodVisibility[$methodName] = $pub;
+        }
+
+        return $entry;
+    }
+
+    /** Error-family throwable slots for Uri\UriError. */
+    private static function newErrorFamilyEntry(Context $ctx, string $name, string $parentLc): ClassEntry
+    {
+        $entry = new ClassEntry($name);
+        $entry->isInternal = true;
+        if (isset($ctx->classes[$parentLc])) {
+            $entry->parentLc = $parentLc;
+        } elseif (isset($ctx->classes['error'])) {
+            $entry->parentLc = 'error';
+        }
+
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $intProto = new Variable(Variable::TYPE_INTEGER);
+        $nullProto = new Variable(Variable::TYPE_NULL);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
+        $emptyTrace = new Variable();
+        $emptyTrace->newArray();
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $prot = CfgFunc::FLAG_PROTECTED;
+        $priv = CfgFunc::FLAG_PRIVATE;
+        $errorLc = ThrowableManifest::LC_ERROR;
+
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto, false, $prot);
+        $entry->properties[] = new ClassProperty(
+            ExceptionSupport::PROP_PREVIOUS,
+            null,
+            $nullProto,
+            false,
+            $priv,
+            $errorLc
+        );
+        $entry->properties[] = new ClassProperty(
+            ExceptionSupport::PROP_TRACE,
+            $emptyTrace,
+            $arrayProto,
+            false,
+            $priv,
+            $errorLc
+        );
+
+        $entry->constructor = new ExceptionConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        foreach (
+            [
+                'getmessage' => new ExceptionGetMessage(),
+                'getcode' => new ExceptionGetCode(),
+                'getfile' => new ExceptionGetFile(),
+                'getline' => new ExceptionGetLine(),
+                'getprevious' => new ExceptionGetPrevious(),
+                'gettrace' => new ExceptionGetTrace(),
+                'gettraceasstring' => new ExceptionGetTraceAsString(),
+                '__tostring' => new ExceptionToString(),
+            ] as $methodName => $method
+        ) {
+            $entry->methods[$methodName] = $method;
+            $entry->methodVisibility[$methodName] = $pub;
+        }
+
+        return $entry;
     }
 
     private static function registerUrlValidationError(Context $ctx): void
@@ -178,6 +326,10 @@ final class BuiltinClasses
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
 
         $entry = new ClassEntry('Uri\\Rfc3986\\Uri');
+        $ctor = new Rfc3986UriConstruct();
+        $entry->constructor = $ctor;
+        $entry->methods['__construct'] = $ctor;
+        $entry->methodVisibility['__construct'] = $pub;
         $entry->methods['parse'] = new Rfc3986UriParse();
         $entry->methodVisibility['parse'] = $pubStatic;
         foreach ([
@@ -211,10 +363,16 @@ final class BuiltinClasses
             'gethosttype' => new Rfc3986UriGetHostType(),
             'resolve' => new Rfc3986UriResolve(),
             'equals' => new Rfc3986UriEquals(),
+            '__serialize' => new Rfc3986UriSerialize(),
+            '__unserialize' => new Rfc3986UriUnserialize(),
+            '__debuginfo' => new Rfc3986UriDebugInfo(),
         ] as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
         }
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
+        $entry->methodNames['__serialize'] = '__serialize';
+        $entry->methodNames['__unserialize'] = '__unserialize';
 
         $ctx->classes[VmUri::CLASS_RFC3986_URI] = $entry;
     }
@@ -259,6 +417,10 @@ final class BuiltinClasses
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
 
         $entry = new ClassEntry('Uri\\WhatWg\\Url');
+        $ctor = new WhatWgUrlConstruct();
+        $entry->constructor = $ctor;
+        $entry->methods['__construct'] = $ctor;
+        $entry->methodVisibility['__construct'] = $pub;
         $entry->methods['parse'] = new WhatWgUrlParse();
         $entry->methodVisibility['parse'] = $pubStatic;
         foreach ([
@@ -285,10 +447,16 @@ final class BuiltinClasses
             'isspecialscheme' => new WhatWgUrlIsSpecialScheme(),
             'gethosttype' => new WhatWgUrlGetHostType(),
             'resolve' => new WhatWgUrlResolve(),
+            '__serialize' => new WhatWgUrlSerialize(),
+            '__unserialize' => new WhatWgUrlUnserialize(),
+            '__debuginfo' => new WhatWgUrlDebugInfo(),
         ] as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
         }
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
+        $entry->methodNames['__serialize'] = '__serialize';
+        $entry->methodNames['__unserialize'] = '__unserialize';
 
         $ctx->classes[VmUri::CLASS_WHATWG_URL] = $entry;
     }

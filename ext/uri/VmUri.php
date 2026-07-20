@@ -223,9 +223,46 @@ final class VmUri
         return $var;
     }
 
+    public static function hasRfc3986State(ObjectEntry $object): bool
+    {
+        return isset(self::$rfc3986State[$object->id]);
+    }
+
+    /**
+     * Bind parsed components onto an existing Uri instance (__construct / __unserialize; #21468).
+     *
+     * @param array<string, mixed> $state
+     */
+    public static function bindRfc3986State(ObjectEntry $object, array $state): void
+    {
+        self::$rfc3986State[$object->id] = $state;
+        $object->constructed = true;
+    }
+
     public static function rfc3986State(ObjectEntry $object): array
     {
         return self::$rfc3986State[$object->id] ?? throw new \LogicException('Uri state missing');
+    }
+
+    /**
+     * Debug/var_dump property bag (php-src uri_get_debug_properties; #21468).
+     *
+     * @param array<string, mixed> $state
+     *
+     * @return array{scheme: ?string, username: ?string, password: ?string, host: ?string, port: ?int, path: string, query: ?string, fragment: ?string}
+     */
+    public static function debugInfoFromState(array $state): array
+    {
+        return [
+            'scheme' => isset($state['scheme']) && \is_string($state['scheme']) ? $state['scheme'] : null,
+            'username' => isset($state['username']) && \is_string($state['username']) ? $state['username'] : null,
+            'password' => isset($state['password']) && \is_string($state['password']) ? $state['password'] : null,
+            'host' => isset($state['host']) && \is_string($state['host']) ? $state['host'] : null,
+            'port' => isset($state['port']) && \is_int($state['port']) ? $state['port'] : null,
+            'path' => (string) ($state['path'] ?? ''),
+            'query' => isset($state['query']) && \is_string($state['query']) ? $state['query'] : null,
+            'fragment' => isset($state['fragment']) && \is_string($state['fragment']) ? $state['fragment'] : null,
+        ];
     }
 
     public static function tryParseWhatWg(Context $ctx, string $uri): ?Variable
@@ -416,6 +453,20 @@ final class VmUri
         $var->object($entry);
 
         return $var;
+    }
+
+    public static function hasWhatWgState(ObjectEntry $object): bool
+    {
+        return isset(self::$whatWgState[$object->id]);
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    public static function bindWhatWgState(ObjectEntry $object, array $state): void
+    {
+        self::$whatWgState[$object->id] = $state;
+        $object->constructed = true;
     }
 
     public static function whatWgState(ObjectEntry $object): array
