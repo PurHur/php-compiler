@@ -1087,13 +1087,13 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testMbUcwordsAdvertisedOnForwardProfile(): void
+    public function testMbUcwordsWithheldOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsMbUcwords());
-            $this->assertTrue(CompilerVersion::advertisesMbUcwords());
+            $this->assertFalse(CompilerVersion::supportsMbUcwords());
+            $this->assertFalse(CompilerVersion::advertisesMbUcwords());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

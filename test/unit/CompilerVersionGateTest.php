@@ -1582,13 +1582,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersMbUcwordsOnForwardProfile(): void
+    public function testVmDoesNotRegisterMbUcwordsOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['mb_ucwords']));
+            $this->assertFalse(isset($runtime->vmContext->functions['mb_ucwords']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -2218,44 +2218,23 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ mb_ucwords() (ext/mbstring/mbstring.c, issue #20799).
+     * mb_ucwords() — never shipped by Zend/php-src (ext/mbstring/mbstring.c).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * Prior forward-profile registration (#20799 / #21394) was wrong-direction: Zend 8.4/8.5
+     * keep `function_exists('mb_ucwords') === false` (use `mb_convert_case(..., MB_CASE_TITLE)`).
+     * Always withheld — #21458.
      */
     public static function supportsMbUcwords(): bool
     {
-        if (version_compare(self::VERSION, '8.4', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
-     * mb_ucwords() visible to function_exists() — stable runtime or forward 8.4+ (#20799).
+     * mb_ucwords() visible to function_exists() — always false (Zend never ships it; #21458).
      */
     public static function advertisesMbUcwords(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
