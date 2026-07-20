@@ -70,7 +70,7 @@ final class VmTidy
         $entry = new ObjectEntry(self::requireClass($ctx));
         $entry->constructed = true;
         self::$hostObjects[$entry->id] = $host;
-        self::syncValueProperty($entry, $host);
+        self::syncHostProperties($entry, $host);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
 
@@ -147,6 +147,70 @@ final class VmTidy
     }
 
     /**
+     * tidy_diagnose() / tidy::diagnose() — host bridge (#21500).
+     */
+    public static function diagnose(ObjectEntry $object, ?Frame $frame): bool
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_diagnose(): tidy object has no host backend');
+
+            return false;
+        }
+        if (!\is_callable([$host, 'diagnose'])) {
+            self::emitWarning($frame, 'tidy_diagnose(): host tidy lacks diagnose()');
+
+            return false;
+        }
+
+        try {
+            $ok = (bool) $host->diagnose();
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_diagnose(): '.$e->getMessage());
+
+            return false;
+        }
+        self::syncHostProperties($object, $host);
+
+        return $ok;
+    }
+
+    /**
+     * tidy_get_error_buffer() / $tidy->errorBuffer — host bridge (#21500).
+     *
+     * @return string|false
+     */
+    public static function getErrorBuffer(ObjectEntry $object, ?Frame $frame)
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_get_error_buffer(): tidy object has no host backend');
+
+            return false;
+        }
+        try {
+            if (\function_exists('tidy_get_error_buffer')) {
+                $buf = \tidy_get_error_buffer($host);
+            } else {
+                $buf = $host->errorBuffer ?? false;
+            }
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_get_error_buffer(): '.$e->getMessage());
+
+            return false;
+        }
+        if (false === $buf) {
+            self::syncErrorBufferProperty($object, null);
+
+            return false;
+        }
+        $str = (string) $buf;
+        self::syncErrorBufferProperty($object, $str);
+
+        return $str;
+    }
+
+    /**
      * tidy_get_output() / $tidy->value — host document string (#21499).
      */
     public static function getOutput(ObjectEntry $object, ?Frame $frame): string
@@ -199,6 +263,34 @@ final class VmTidy
             return;
         }
         $slot->string((string) $raw);
+    }
+
+    /** Keep public $errorBuffer in sync with host tidy (#21500). */
+    public static function syncErrorBufferProperty(ObjectEntry $object, ?string $forced): void
+    {
+        if (!$object->hasProperty('errorBuffer')) {
+            return;
+        }
+        $slot = $object->getProperty('errorBuffer');
+        if (null === $forced) {
+            $slot->null();
+
+            return;
+        }
+        $slot->string($forced);
+    }
+
+    public static function syncHostProperties(ObjectEntry $object, object $host): void
+    {
+        self::syncValueProperty($object, $host);
+        try {
+            $buf = $host->errorBuffer ?? null;
+        } catch (\Throwable $e) {
+            self::syncErrorBufferProperty($object, null);
+
+            return;
+        }
+        self::syncErrorBufferProperty($object, null === $buf ? null : (string) $buf);
     }
 
     /**

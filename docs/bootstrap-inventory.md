@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6174 |
-| Phase A inventory files (M2 ratio SSOT) | 6174 |
+| PHP files on vm.php path | 6176 |
+| Phase A inventory files (M2 ratio SSOT) | 6176 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19424 |
+| Source constructs flagged (warnings) | 19431 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4062,11 +4062,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvshm/shmop_read.php` | 0 | 2 |
 | `ext/sysvshm/shmop_size.php` | 0 | 2 |
 | `ext/sysvshm/shmop_write.php` | 0 | 2 |
-| `ext/tidy/BuiltinClasses.php` | 0 | 13 |
-| `ext/tidy/Module.php` | 0 | 6 |
+| `ext/tidy/BuiltinClasses.php` | 0 | 16 |
+| `ext/tidy/Module.php` | 0 | 8 |
 | `ext/tidy/TidyExtensionPolicy.php` | 0 | 1 |
 | `ext/tidy/VmTidy.php` | 0 | 3 |
 | `ext/tidy/tidy_clean_repair.php` | 0 | 2 |
+| `ext/tidy/tidy_diagnose.php` | 0 | 2 |
+| `ext/tidy/tidy_get_error_buffer.php` | 0 | 2 |
 | `ext/tidy/tidy_get_output.php` | 0 | 2 |
 | `ext/tidy/tidy_parse_string.php` | 0 | 2 |
 | `ext/tidy/tidy_repair_file.php` | 0 | 2 |
@@ -4996,7 +4998,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringNetworkServicesNameLookup.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringNetworkServicesStringReturn.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringNl2br.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringOffsetRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringOffsetRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringOpendir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPack.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringParseStr.php` | 0 | 1 |
@@ -9146,63 +9148,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 6419)
 - new DOMException (line 7316)
 - new Variable (line 7371)
-- new DOMException (line 7653)
-- new DOMException (line 7771)
-- new DOMException (line 7816)
-- new HashTable (line 7901)
-- new Variable (line 7905)
-- new ObjectEntry (line 7927)
-- new DomNodeState (line 7931)
-- new Variable (line 7938)
-- new ObjectEntry (line 7956)
-- new DomNodeState (line 7960)
-- new Variable (line 7967)
-- new ObjectEntry (line 7985)
-- new DomNodeState (line 7989)
-- new Variable (line 7996)
-- new DOMException (line 8079)
-- new HashTable (line 8355)
-- new Variable (line 8368)
-- new ObjectEntry (line 8410)
-- new DomNodeState (line 8414)
-- new Variable (line 8423)
-- new ObjectEntry (line 8473)
-- new DomNodeState (line 8476)
-- new Variable (line 8484)
-- new Variable (line 8688)
-- new DOMException (line 8825)
-- new DOMException (line 8832)
-- new DOMException (line 8839)
-- new DOMException (line 8843)
-- new DOMException (line 8846)
-- new DOMException (line 8855)
-- new DOMException (line 8867)
-- new Variable (line 8977)
-- new DOMException (line 10069)
-- new Variable (line 10128)
-- new Variable (line 10151)
-- new Variable (line 10180)
-- new Variable (line 10218)
-- new DOMException (line 10229)
-- new Variable (line 10231)
-- new DOMException (line 10405)
-- new DOMException (line 10432)
-- new DOMException (line 10468)
-- new DOMException (line 10564)
-- new DOMException (line 10572)
-- new DOMException (line 10585)
-- new DOMException (line 10596)
-- new DOMException (line 10601)
+- new DOMException (line 7658)
+- new DOMException (line 7797)
+- new DOMException (line 7842)
+- new HashTable (line 7927)
+- new Variable (line 7931)
+- new ObjectEntry (line 7953)
+- new DomNodeState (line 7957)
+- new Variable (line 7964)
+- new ObjectEntry (line 7982)
+- new DomNodeState (line 7986)
+- new Variable (line 7993)
+- new ObjectEntry (line 8011)
+- new DomNodeState (line 8015)
+- new Variable (line 8022)
+- new DOMException (line 8105)
+- new HashTable (line 8381)
+- new Variable (line 8394)
+- new ObjectEntry (line 8436)
+- new DomNodeState (line 8440)
+- new Variable (line 8449)
+- new ObjectEntry (line 8499)
+- new DomNodeState (line 8502)
+- new Variable (line 8510)
+- new Variable (line 8714)
+- new DOMException (line 8851)
+- new DOMException (line 8858)
+- new DOMException (line 8865)
+- new DOMException (line 8869)
+- new DOMException (line 8872)
+- new DOMException (line 8881)
+- new DOMException (line 8893)
+- new Variable (line 9003)
+- new DOMException (line 10095)
+- new Variable (line 10154)
+- new Variable (line 10177)
+- new Variable (line 10206)
+- new Variable (line 10244)
+- new DOMException (line 10255)
+- new Variable (line 10257)
+- new DOMException (line 10431)
+- new DOMException (line 10458)
+- new DOMException (line 10494)
+- new DOMException (line 10590)
+- new DOMException (line 10598)
+- new DOMException (line 10611)
+- new DOMException (line 10622)
 - new DOMException (line 10627)
-- new DOMException (line 10648)
-- new DOMException (line 10706)
-- new DOMException (line 10711)
-- new DOMException (line 10714)
-- new DOMException (line 10717)
-- new DOMException (line 10746)
-- new Error (line 11788)
-- new Error (line 11792)
-- 462 class method(s)
+- new DOMException (line 10653)
+- new DOMException (line 10674)
+- new DOMException (line 10732)
+- new DOMException (line 10737)
+- new DOMException (line 10740)
+- new DOMException (line 10743)
+- new DOMException (line 10772)
+- new Error (line 11814)
+- new Error (line 11818)
+- 463 class method(s)
 - 3 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -35321,24 +35323,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 32)
 - new Variable (line 33)
 - new ClassProperty (line 34)
-- new TidyCleanRepair (line 43)
-- new TidyRepairString (line 48)
-- new TidyRepairFile (line 53)
-- new ArgumentCountError (line 113)
-- new ArgumentCountError (line 116)
-- new ArgumentCountError (line 145)
-- new ArgumentCountError (line 148)
-- 5 class method(s)
-- 3 closure(s)
+- new ClassProperty (line 42)
+- new Variable (line 44)
+- new TidyCleanRepair (line 51)
+- new TidyDiagnose (line 56)
+- new TidyRepairString (line 61)
+- new TidyRepairFile (line 66)
+- new ArgumentCountError (line 150)
+- new ArgumentCountError (line 153)
+- new ArgumentCountError (line 182)
+- new ArgumentCountError (line 185)
+- 6 class method(s)
+- 4 closure(s)
 
 ### `ext/tidy/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new tidy_parse_string (line 50)
-- new tidy_repair_string (line 51)
-- new tidy_repair_file (line 52)
-- new tidy_clean_repair (line 53)
-- new tidy_get_output (line 54)
+- new tidy_parse_string (line 52)
+- new tidy_repair_string (line 53)
+- new tidy_repair_file (line 54)
+- new tidy_clean_repair (line 55)
+- new tidy_get_output (line 56)
+- new tidy_diagnose (line 57)
+- new tidy_get_error_buffer (line 58)
 - 4 class method(s)
 
 ### `ext/tidy/TidyExtensionPolicy.php`
@@ -35351,12 +35358,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 70)
 - new Variable (line 74)
-- 14 class method(s)
+- 18 class method(s)
 
 ### `ext/tidy/tidy_clean_repair.php`
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 34)
+- 2 class method(s)
+
+### `ext/tidy/tidy_diagnose.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 33)
+- 2 class method(s)
+
+### `ext/tidy/tidy_get_error_buffer.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 39)
 - 2 class method(s)
 
 ### `ext/tidy/tidy_get_output.php`
@@ -42062,9 +42081,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringOffsetRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 300)
-- 15 class method(s)
-- 1 closure(s)
+- 14 class method(s)
 
 ### `lib/JIT/Builtin/StringOpendir.php`
 
