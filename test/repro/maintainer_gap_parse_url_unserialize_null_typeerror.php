@@ -1,23 +1,12 @@
 <?php
-
-$fail = 0;
-
-foreach ([
-    'unserialize' => static fn () => unserialize(null),
-] as $label => $factory) {
-    try {
-        $factory();
-        echo "fail: $label did not throw\n";
-        ++$fail;
-    } catch (TypeError $e) {
-        if (!str_contains($e->getMessage(), 'must be of type string, null given')) {
-            echo "fail: $label wrong message: ", $e->getMessage(), "\n";
-            ++$fail;
-        }
-    } catch (Throwable $e) {
-        echo "fail: $label ", get_class($e), ': ', $e->getMessage(), "\n";
-        ++$fail;
+// #21223 — unserialize(null) soft-null under PROFILE=8.4 (was TypeError under mistaken #19222).
+error_reporting(E_ALL);
+$seen = 0;
+set_error_handler(static function (int $no) use (&$seen): bool {
+    if (E_DEPRECATED === $no) {
+        $seen++;
     }
-}
-
-echo 0 === $fail ? "ok\n" : "fail\n";
+    return true;
+});
+echo var_export(unserialize(null), true), "\n";
+echo 'depr=', (int) ($seen >= 1), "\n";

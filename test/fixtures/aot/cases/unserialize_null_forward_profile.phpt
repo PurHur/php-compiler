@@ -1,10 +1,20 @@
 --TEST--
-AOT: unserialize(null) — TypeError on 8.4 forward profile (#18840, ext/standard/var.c)
+AOT: unserialize(null) — E_DEPRECATED + false on 8.4 forward profile (#21223)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-unserialize(null);
+error_reporting(E_ALL);
+$seen = 0;
+set_error_handler(static function (int $no) use (&$seen): bool {
+    if (E_DEPRECATED === $no) {
+        $seen++;
+    }
+    return true;
+});
+echo var_export(unserialize(null), true), "\n";
+echo 'depr=', (int) ($seen >= 1), "\n";
+?>
 --EXPECT--
---EXPECT_EXIT--
-134
+false
+depr=1

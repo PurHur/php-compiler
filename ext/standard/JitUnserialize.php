@@ -16,7 +16,8 @@ final class JitUnserialize
     public static function decodeRuntime(Context $context, JITVariable $payload): Value
     {
         StringUnserialize::ensureLinked($context);
-        $payloadString = JitStringBuiltinArg::lowerZparamStr(
+        // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #18840 TypeError).
+        $payloadString = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $payload,
             'unserialize',
