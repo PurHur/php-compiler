@@ -755,6 +755,7 @@ class Context {
             'phpc_hypot_kernel',
             'phpc_sqrt_kernel',
             'phpc_rename_kernel',
+            'phpc_ob_write_stdout_kernel',
             'phpc_random_bytes_kernel',
             'phpc_chdir_kernel',
             'phpc_gethostname_kernel',

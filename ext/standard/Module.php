@@ -668,6 +668,7 @@ class Module extends ModuleAbstract
             new phpc_native_ht_set_string_key_long(),
             new phpc_native_environ_mirror_into_ht(),
             new phpc_rename_kernel(),
+            new phpc_ob_write_stdout_kernel(),
             new phpc_random_bytes_kernel(),
             new phpc_chdir_kernel(),
             new phpc_gethostname_kernel(),

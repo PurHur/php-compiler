@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\JitObOutputKernel;
 use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\ext\standard\ob_end_flush;
 use PHPCompiler\ext\standard\ob_flush;
@@ -19,12 +18,9 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951, #19422, #20443, #21066).
+ * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951, #19422, #20443, #21066, #21469).
  *
- * Embed + thin inventory (non-user-script): NestedJIT {@see ObOutputJitHelper} bridges — no constant-0
- * inventory stub fork (peer StreamFilter #21041).
- * User-script / bootstrap-aot: {@see JitObOutputKernel} (ExecCapture + Echo); missing ABI padded via
- * {@see finishUserScriptEmit} (NestedJIT ObOutputJitHelper under user-script AOT regresses echo).
+ * Always NestedJIT {@see ObOutputJitHelper} bridges — no user-script ExecCapture/AbiPads fork (#21469).
  * SSOT: {@see \PHPCompiler\ext\standard\ObOutputJitHelper}.
  * php-src: ext/standard/output.c
  */
@@ -95,12 +91,6 @@ final class ObOutputJitBridge
 
     public static function implement(Context $context): void
     {
-        if (JitObOutputKernel::shouldUse($context)) {
-            JitObOutputKernel::implement($context);
-
-            return;
-        }
-
         self::implementObStack($context, false);
     }
 
@@ -595,8 +585,7 @@ final class ObOutputJitBridge
     }
 
     /**
-     * @param bool $requireAll When false (user-script ExecCapture partial stack), register only
-     *                         ABI bodies that already exist — do not invent constant-0 stubs (#21066).
+     * @param bool $requireAll When false, register only ABI bodies that already exist.
      */
     private static function registerLinkedRuntime(Context $context, bool $requireAll = true): void
     {
@@ -638,84 +627,11 @@ final class ObOutputJitBridge
         }
     }
 
-    /** @internal User-script AOT preamble shared with {@see JitObOutputKernel} (#13822, #19422). */
+    /** @internal Shared preamble for exec-capture / echo emit (#13822, #19422). */
     public static function prepareUserScriptEmit(Context $context): void
     {
         self::ensureExtraGlobals($context);
         self::ensureLibc($context);
-    }
-
-    /** @internal User-script AOT epilogue shared with {@see JitObOutputKernel} (#13822, #19422, #21066). */
-    public static function finishUserScriptEmit(Context $context): void
-    {
-        // Pad unused ABI for link completeness. NestedJIT ObOutputJitHelper here regresses echo
-        // under user-script AOT; do not replace with helper bridges until that is fixed.
-        self::implementMissingUserScriptAbiPads($context);
-        self::registerLinkedRuntime($context);
-    }
-
-    /**
-     * Link-only pads for ABI not covered by ExecCapture/Echo under user-script AOT (#13301, #21066).
-     * Not used for thin inventory — that path NestedJITs ObOutputJitHelper.
-     */
-    private static function implementMissingUserScriptAbiPads(Context $context): void
-    {
-        ObOutputEchoJitEmit::ensureEchoAbiDeclared($context);
-
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $zero32 = $i32->constInt(0, false);
-        $zero64 = $i64->constInt(0, false);
-
-        $voidNames = [
-            '__phpc_ob_start',
-            '__phpc_ob_start_with_gzhandler',
-            '__phpc_ob_append_bytes',
-            '__phpc_ob_echo_cstr',
-            '__phpc_ob_echo_char',
-            '__phpc_ob_echo_ll',
-            '__phpc_ob_echo_double',
-            '__phpc_ob_echo_substr',
-            '__phpc_ob_end_all',
-            '__phpc_flush',
-            '__phpc_shutdown_mark_registered',
-            '__phpc_ob_implicit_flush',
-        ];
-        foreach ($voidNames as $name) {
-            self::implementIfMissing($context, $name, static function (Context $context, LlvmFunction $fn): void {
-                $entry = $fn->appendBasicBlock('ob_us_pad_void');
-                $context->builder->positionAtEnd($entry);
-                $context->builder->returnVoid();
-            });
-        }
-
-        foreach (
-            [
-                '__phpc_ob_get_level',
-                '__phpc_ob_get_contents',
-                '__phpc_ob_get_length',
-                '__phpc_ob_end_clean',
-                '__phpc_ob_get_clean',
-                '__phpc_ob_end_flush',
-                '__phpc_ob_get_flush',
-                '__phpc_ob_flush',
-                '__phpc_ob_clean',
-            ] as $name
-        ) {
-            self::implementIfMissing($context, $name, static function (Context $context, LlvmFunction $fn) use ($zero32): void {
-                $entry = $fn->appendBasicBlock('ob_us_pad_i32');
-                $context->builder->positionAtEnd($entry);
-                $context->builder->returnValue($zero32);
-            });
-        }
-
-        self::implementIfMissing($context, '__phpc_ob_buffer_used_at', static function (Context $context, LlvmFunction $fn) use ($zero64): void {
-            $entry = $fn->appendBasicBlock('ob_us_pad_i64');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($zero64);
-        });
-
-        $context->builder->clearInsertionPosition();
     }
 
     private static function captureInsertBlock(Context $context): ?BasicBlock

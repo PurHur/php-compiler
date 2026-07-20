@@ -8,6 +8,8 @@ namespace PHPCompiler\ext\standard;
  * Output-buffer stack for compiled JIT/AOT modules (#9268, php-in-PHP).
  *
  * Mirrors {@see \PHPCompiler\VM\OutputBuffer} semantics for standalone JIT/AOT.
+ * Direct stdout uses {@see phpc_ob_write_stdout_kernel} (not echo) so NestedJIT does not
+ * recurse through `__phpc_ob_echo_*` (#21469 / #21066).
  * VM SSOT for user-facing builtins remains {@see NativeObStorage} / OutputBuffer.
  * php-src: ext/standard/output.c
  */
@@ -69,7 +71,9 @@ final class ObOutputJitHelper
         if ('' === $chunk) {
             return 0;
         }
-        if ([] === self::$stack) {
+        // Prefer getLevel() over `0 === self::getLevel()` — NestedJIT standalone AOT
+        // lowers empty-array identity to __hashtable__alloc vs static (never equal; #21469).
+        if (0 === self::getLevel()) {
             self::writeStdout($chunk);
 
             return 1;
@@ -94,12 +98,12 @@ final class ObOutputJitHelper
 
     public static function hasActiveBuffer(): int
     {
-        return [] === self::$stack ? 0 : 1;
+        return 0 === self::getLevel() ? 0 : 1;
     }
 
     public static function getContents(): ?string
     {
-        if ([] === self::$stack) {
+        if (0 === self::getLevel()) {
             return null;
         }
 
@@ -118,7 +122,7 @@ final class ObOutputJitHelper
 
     public static function endClean(): int
     {
-        if ([] === self::$stack) {
+        if (0 === self::getLevel()) {
             return 0;
         }
         \array_pop(self::$stack);
@@ -128,7 +132,7 @@ final class ObOutputJitHelper
 
     public static function getClean(): ?string
     {
-        if ([] === self::$stack) {
+        if (0 === self::getLevel()) {
             return null;
         }
         $level = \array_pop(self::$stack);
@@ -138,7 +142,7 @@ final class ObOutputJitHelper
 
     public static function endFlush(): int
     {
-        if ([] === self::$stack) {
+        if (0 === self::getLevel()) {
             return 0;
         }
         $content = self::popWithHandler();
@@ -151,7 +155,7 @@ final class ObOutputJitHelper
 
     public static function getFlush(): ?string
     {
-        if ([] === self::$stack) {
+        if (0 === self::getLevel()) {
             return null;
         }
         $content = self::popWithHandler();
@@ -164,7 +168,7 @@ final class ObOutputJitHelper
 
     public static function flushBuffer(): int
     {
-        if ([] === self::$stack) {
+        if (0 === self::getLevel()) {
             return 0;
         }
         $idx = \count(self::$stack) - 1;
@@ -188,7 +192,7 @@ final class ObOutputJitHelper
 
     public static function clean(): int
     {
-        if ([] === self::$stack) {
+        if (0 === self::getLevel()) {
             return 0;
         }
         $idx = \count(self::$stack) - 1;
@@ -199,7 +203,7 @@ final class ObOutputJitHelper
 
     public static function endAll(): void
     {
-        while ([] !== self::$stack) {
+        while (0 !== self::getLevel()) {
             self::endFlush();
         }
         self::flushStdout();
@@ -257,6 +261,7 @@ final class ObOutputJitHelper
         if ('' === $chunk) {
             return;
         }
-        echo $chunk;
+        // Must not use echo — NestedJIT lowers echo to __phpc_ob_echo_* → append_bytes → here (#21469 / #21066).
+        \phpc_ob_write_stdout_kernel($chunk);
     }
 }

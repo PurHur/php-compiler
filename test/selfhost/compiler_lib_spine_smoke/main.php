@@ -2278,7 +2278,7 @@ require_once __DIR__.'/../../../ext/standard/JitObGzhandler.php';
 require_once __DIR__.'/../../../ext/standard/JitObImplicitFlush.php';
 require_once __DIR__.'/../../../ext/standard/JitObListHandlers.php';
 require_once __DIR__.'/../../../ext/standard/JitObOutputExecCaptureKernel.php';
-require_once __DIR__.'/../../../ext/standard/JitObOutputKernel.php';
+require_once __DIR__.'/../../../ext/standard/JitObWriteStdoutKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitObStart.php';
 require_once __DIR__.'/../../../ext/standard/JitOpendir.php';
 require_once __DIR__.'/../../../ext/standard/JitOpensslRandomPseudoBytes.php';
@@ -3626,6 +3626,7 @@ require_once __DIR__.'/../../../ext/standard/phpc_object_invoke_destructor_nativ
 require_once __DIR__.'/../../../ext/standard/phpc_object_is_constructed_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_object_release_storage_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_readfile_kernel.php';
+require_once __DIR__.'/../../../ext/standard/phpc_ob_write_stdout_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_rename_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_run_command.php';
 require_once __DIR__.'/../../../ext/standard/phpc_sqrt_kernel.php';
