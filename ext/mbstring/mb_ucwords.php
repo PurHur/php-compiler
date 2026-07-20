@@ -32,6 +32,7 @@ final class mb_ucwords extends Internal
                 $argc
             ));
         }
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19433, mbstring.c).
         $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_ucwords', 0, 'string');
         if (null === $frame->returnVar) {
             return;

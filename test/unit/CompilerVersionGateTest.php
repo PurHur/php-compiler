@@ -1582,6 +1582,28 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testVmRegistersMbUcwordsOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['mb_ucwords']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterMbUcwordsOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['mb_ucwords']));
+    }
+
     public function testVmDoesNotRegisterClockGettimeOnReferenceProfile(): void
     {
         $runtime = new Runtime();

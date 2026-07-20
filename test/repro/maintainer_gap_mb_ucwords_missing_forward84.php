@@ -1,5 +1,5 @@
 <?php
-// Repro #21394 — mb_ucwords() on PHP_COMPILER_PROFILE=8.4 forward profile
+// Repro #21394 / #20799 — mb_ucwords() on PHP_COMPILER_PROFILE=8.4 forward profile
 if (!function_exists('mb_ucfirst')) {
     echo "fail: mb_ucfirst not registered\n";
     exit(1);
