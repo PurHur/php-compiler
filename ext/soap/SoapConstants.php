@@ -73,18 +73,32 @@ final class SoapConstants
     public const XSD_ENTITY = 129;
     public const XSD_ENTITIES = 130;
     public const XSD_INTEGER = 131;
+    public const XSD_NONPOSITIVEINTEGER = 132;
+    public const XSD_NEGATIVEINTEGER = 133;
     public const XSD_LONG = 134;
     public const XSD_INT = 135;
     public const XSD_SHORT = 136;
     public const XSD_BYTE = 137;
+    public const XSD_NONNEGATIVEINTEGER = 138;
+    public const XSD_UNSIGNEDLONG = 139;
+    public const XSD_UNSIGNEDINT = 140;
+    public const XSD_UNSIGNEDSHORT = 141;
+    public const XSD_UNSIGNEDBYTE = 142;
+    public const XSD_POSITIVEINTEGER = 143;
     public const XSD_NMTOKENS = 144;
     public const XSD_ANYTYPE = 145;
     public const XSD_ANYXML = 147;
+    public const APACHE_MAP = 200;
     public const SOAP_ENC_ARRAY = 300;
     public const SOAP_ENC_OBJECT = 301;
+    public const XSD_1999_TIMEINSTANT = 401;
     public const UNKNOWN_TYPE = 999998;
 
-    /** @return array<string, int> */
+    /** php-src php_encoding.h string namespaces (#21624). */
+    public const XSD_NAMESPACE = 'http://www.w3.org/2001/XMLSchema';
+    public const XSD_1999_NAMESPACE = 'http://www.w3.org/1999/XMLSchema';
+
+    /** @return array<string, int|string> */
     public static function registeredConstants(): array
     {
         return [
@@ -147,16 +161,28 @@ final class SoapConstants
             'XSD_ENTITY' => self::XSD_ENTITY,
             'XSD_ENTITIES' => self::XSD_ENTITIES,
             'XSD_INTEGER' => self::XSD_INTEGER,
+            'XSD_NONPOSITIVEINTEGER' => self::XSD_NONPOSITIVEINTEGER,
+            'XSD_NEGATIVEINTEGER' => self::XSD_NEGATIVEINTEGER,
             'XSD_LONG' => self::XSD_LONG,
             'XSD_INT' => self::XSD_INT,
             'XSD_SHORT' => self::XSD_SHORT,
             'XSD_BYTE' => self::XSD_BYTE,
+            'XSD_NONNEGATIVEINTEGER' => self::XSD_NONNEGATIVEINTEGER,
+            'XSD_UNSIGNEDLONG' => self::XSD_UNSIGNEDLONG,
+            'XSD_UNSIGNEDINT' => self::XSD_UNSIGNEDINT,
+            'XSD_UNSIGNEDSHORT' => self::XSD_UNSIGNEDSHORT,
+            'XSD_UNSIGNEDBYTE' => self::XSD_UNSIGNEDBYTE,
+            'XSD_POSITIVEINTEGER' => self::XSD_POSITIVEINTEGER,
             'XSD_NMTOKENS' => self::XSD_NMTOKENS,
             'XSD_ANYTYPE' => self::XSD_ANYTYPE,
             'XSD_ANYXML' => self::XSD_ANYXML,
+            'APACHE_MAP' => self::APACHE_MAP,
             'SOAP_ENC_ARRAY' => self::SOAP_ENC_ARRAY,
             'SOAP_ENC_OBJECT' => self::SOAP_ENC_OBJECT,
+            'XSD_1999_TIMEINSTANT' => self::XSD_1999_TIMEINSTANT,
             'UNKNOWN_TYPE' => self::UNKNOWN_TYPE,
+            'XSD_NAMESPACE' => self::XSD_NAMESPACE,
+            'XSD_1999_NAMESPACE' => self::XSD_1999_NAMESPACE,
         ];
     }
 }
