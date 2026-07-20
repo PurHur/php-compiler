@@ -30,6 +30,10 @@ final class pow extends Internal
         }
         $base = $frame->calledArgs[0]->resolveIndirect();
         $exp = $frame->calledArgs[1]->resolveIndirect();
+        if (VmMath::requiresForwardProfileStrictDoubleNull()) {
+            VmMath::parseDoubleBuiltinArg($base, 'pow', 1, 'num', $frame);
+            VmMath::parseDoubleBuiltinArg($exp, 'pow', 2, 'exponent', $frame);
+        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -38,6 +42,18 @@ final class pow extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (2 !== \count($args)) {
+            throw new \LogicException('pow() requires exactly two arguments');
+        }
+        if (VmMath::requiresForwardProfileStrictDoubleNull()) {
+            if (JITVariable::TYPE_NULL === $args[0]->type) {
+                JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'pow', 'float');
+            }
+            if (JITVariable::TYPE_NULL === $args[1]->type) {
+                JitFdiv::lowerSingleOperand($context, $args[1], 2, 'exponent', 'pow', 'float');
+            }
+        }
+
         return JitPow::invoke($context, ...$args);
     }
 
