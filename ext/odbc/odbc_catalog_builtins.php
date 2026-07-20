@@ -14,7 +14,8 @@ use PHPLLVM\Value;
 
 /**
  * odbc catalog metadata: primarykeys/foreignkeys/statistics/gettypeinfo
- * (php-src ext/odbc/php_odbc.c; #21279).
+ * + specialcolumns/procedures/procedurecolumns
+ * (php-src ext/odbc/php_odbc.c; #21279 / #21294).
  */
 
 final class odbc_primarykeys extends Internal
@@ -250,5 +251,205 @@ final class odbc_gettypeinfo extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException('odbc_gettypeinfo() is not implemented for JIT (#21279)');
+    }
+}
+
+final class odbc_specialcolumns extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('odbc_specialcolumns');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (7 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'odbc_specialcolumns() expects exactly 7 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $conn->type || !VmOdbcConnection::isLive($conn->toObject())) {
+            throw new \TypeError('odbc_specialcolumns(): supplied resource is not a valid ODBC connection resource');
+        }
+        $type = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $catalog = self::nullableString($frame->calledArgs[2], 'odbc_specialcolumns', 2, 'catalog');
+        $schema = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'odbc_specialcolumns', 3, 'schema');
+        $table = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'odbc_specialcolumns', 4, 'table');
+        $scope = $frame->calledArgs[5]->resolveIndirect()->toInt();
+        $nullable = $frame->calledArgs[6]->resolveIndirect()->toInt();
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('odbc_specialcolumns() requires a VM context');
+        }
+        $result = VmOdbcCore::specialColumns(
+            $conn->toObject(),
+            $type,
+            $catalog,
+            $schema,
+            $table,
+            $scope,
+            $nullable,
+            $ctx,
+            $frame
+        );
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->copyFrom($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('odbc_specialcolumns() is not implemented for JIT (#21294)');
+    }
+
+    private static function nullableString(Variable $var, string $fn, int $idx, string $name): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $fn, $idx, $name);
+    }
+}
+
+final class odbc_procedures extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('odbc_procedures');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'odbc_procedures() expects between 1 and 4 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $conn->type || !VmOdbcConnection::isLive($conn->toObject())) {
+            throw new \TypeError('odbc_procedures(): supplied resource is not a valid ODBC connection resource');
+        }
+        $catalog = self::nullableStr($frame, 1, 'odbc_procedures', 'catalog');
+        $schema = self::nullableStr($frame, 2, 'odbc_procedures', 'schema');
+        $procedure = self::nullableStr($frame, 3, 'odbc_procedures', 'procedure');
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('odbc_procedures() requires a VM context');
+        }
+        $result = VmOdbcCore::procedures(
+            $conn->toObject(),
+            $catalog,
+            $schema,
+            $procedure,
+            $ctx,
+            $frame
+        );
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->copyFrom($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('odbc_procedures() is not implemented for JIT (#21294)');
+    }
+
+    private static function nullableStr(Frame $frame, int $idx, string $fn, string $name): ?string
+    {
+        if (!isset($frame->calledArgs[$idx])) {
+            return null;
+        }
+        $var = $frame->calledArgs[$idx]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $fn, $idx, $name);
+    }
+}
+
+final class odbc_procedurecolumns extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('odbc_procedurecolumns');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'odbc_procedurecolumns() expects between 1 and 5 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $conn->type || !VmOdbcConnection::isLive($conn->toObject())) {
+            throw new \TypeError('odbc_procedurecolumns(): supplied resource is not a valid ODBC connection resource');
+        }
+        $catalog = self::nullableStr($frame, 1, 'odbc_procedurecolumns', 'catalog');
+        $schema = self::nullableStr($frame, 2, 'odbc_procedurecolumns', 'schema');
+        $procedure = self::nullableStr($frame, 3, 'odbc_procedurecolumns', 'procedure');
+        $column = self::nullableStr($frame, 4, 'odbc_procedurecolumns', 'column');
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('odbc_procedurecolumns() requires a VM context');
+        }
+        $result = VmOdbcCore::procedureColumns(
+            $conn->toObject(),
+            $catalog,
+            $schema,
+            $procedure,
+            $column,
+            $ctx,
+            $frame
+        );
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->copyFrom($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('odbc_procedurecolumns() is not implemented for JIT (#21294)');
+    }
+
+    private static function nullableStr(Frame $frame, int $idx, string $fn, string $name): ?string
+    {
+        if (!isset($frame->calledArgs[$idx])) {
+            return null;
+        }
+        $var = $frame->calledArgs[$idx]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $fn, $idx, $name);
     }
 }

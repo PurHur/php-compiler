@@ -695,6 +695,113 @@ final class VmOdbcNative
     }
 
     /**
+     * SQLSpecialColumns (php-src odbc_specialcolumns; #21294).
+     */
+    public static function specialColumns(
+        \FFI\CData $hstmt,
+        int $type,
+        ?string $catalog,
+        string $schema,
+        string $table,
+        int $scope,
+        int $nullable
+    ): bool {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $catBuf = null === $catalog ? null : self::cString($ffi, $catalog);
+            $rc = (int) $ffi->SQLSpecialColumns(
+                $hstmt,
+                $type,
+                $catBuf,
+                null === $catalog ? 0 : self::SQL_NTS,
+                self::cString($ffi, $schema),
+                self::SQL_NTS,
+                self::cString($ffi, $table),
+                self::SQL_NTS,
+                $scope,
+                $nullable
+            );
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * SQLProcedures (php-src odbc_procedures; #21294).
+     */
+    public static function procedures(
+        \FFI\CData $hstmt,
+        ?string $catalog,
+        ?string $schema,
+        ?string $procedure
+    ): bool {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $catBuf = null === $catalog ? null : self::cString($ffi, $catalog);
+            $schBuf = null === $schema ? null : self::cString($ffi, $schema);
+            $procBuf = null === $procedure ? null : self::cString($ffi, $procedure);
+            $rc = (int) $ffi->SQLProcedures(
+                $hstmt,
+                $catBuf,
+                null === $catalog ? 0 : self::SQL_NTS,
+                $schBuf,
+                null === $schema ? 0 : self::SQL_NTS,
+                $procBuf,
+                null === $procedure ? 0 : self::SQL_NTS
+            );
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * SQLProcedureColumns (php-src odbc_procedurecolumns; #21294).
+     */
+    public static function procedureColumns(
+        \FFI\CData $hstmt,
+        ?string $catalog,
+        ?string $schema,
+        ?string $procedure,
+        ?string $column
+    ): bool {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $catBuf = null === $catalog ? null : self::cString($ffi, $catalog);
+            $schBuf = null === $schema ? null : self::cString($ffi, $schema);
+            $procBuf = null === $procedure ? null : self::cString($ffi, $procedure);
+            $colBuf = null === $column ? null : self::cString($ffi, $column);
+            $rc = (int) $ffi->SQLProcedureColumns(
+                $hstmt,
+                $catBuf,
+                null === $catalog ? 0 : self::SQL_NTS,
+                $schBuf,
+                null === $schema ? 0 : self::SQL_NTS,
+                $procBuf,
+                null === $procedure ? 0 : self::SQL_NTS,
+                $colBuf,
+                null === $column ? 0 : self::SQL_NTS
+            );
+
+            return self::ok($rc);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Set SQL_AUTOCOMMIT (php-src SQLSetConnectOption; #21277).
      */
     public static function setAutocommit(\FFI\CData $hdbc, bool $enable): bool
@@ -882,6 +989,9 @@ SQLRETURN SQLPrimaryKeys(SQLHSTMT hstmt, SQLCHAR *szCatalogName, SQLSMALLINT cbC
 SQLRETURN SQLForeignKeys(SQLHSTMT hstmt, SQLCHAR *szPkCatalogName, SQLSMALLINT cbPkCatalogName, SQLCHAR *szPkSchemaName, SQLSMALLINT cbPkSchemaName, SQLCHAR *szPkTableName, SQLSMALLINT cbPkTableName, SQLCHAR *szFkCatalogName, SQLSMALLINT cbFkCatalogName, SQLCHAR *szFkSchemaName, SQLSMALLINT cbFkSchemaName, SQLCHAR *szFkTableName, SQLSMALLINT cbFkTableName);
 SQLRETURN SQLStatistics(SQLHSTMT hstmt, SQLCHAR *szCatalogName, SQLSMALLINT cbCatalogName, SQLCHAR *szSchemaName, SQLSMALLINT cbSchemaName, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLUSMALLINT fUnique, SQLUSMALLINT fAccuracy);
 SQLRETURN SQLGetTypeInfo(SQLHSTMT hstmt, SQLSMALLINT fSqlType);
+SQLRETURN SQLSpecialColumns(SQLHSTMT hstmt, SQLSMALLINT fColType, SQLCHAR *szTableQualifier, SQLSMALLINT cbTableQualifier, SQLCHAR *szTableOwner, SQLSMALLINT cbTableOwner, SQLCHAR *szTableName, SQLSMALLINT cbTableName, SQLSMALLINT fScope, SQLSMALLINT fNullable);
+SQLRETURN SQLProcedures(SQLHSTMT hstmt, SQLCHAR *szProcQualifier, SQLSMALLINT cbProcQualifier, SQLCHAR *szProcOwner, SQLSMALLINT cbProcOwner, SQLCHAR *szProcName, SQLSMALLINT cbProcName);
+SQLRETURN SQLProcedureColumns(SQLHSTMT hstmt, SQLCHAR *szProcQualifier, SQLSMALLINT cbProcQualifier, SQLCHAR *szProcOwner, SQLSMALLINT cbProcOwner, SQLCHAR *szProcName, SQLSMALLINT cbProcName, SQLCHAR *szColumnName, SQLSMALLINT cbColumnName);
 SQLRETURN SQLSetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLULEN vParam);
 SQLRETURN SQLSetStmtOption(SQLHSTMT hstmt, SQLUSMALLINT fOption, SQLULEN vParam);
 SQLRETURN SQLGetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLPOINTER pvParam);
