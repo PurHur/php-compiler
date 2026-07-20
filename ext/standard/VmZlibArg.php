@@ -17,17 +17,17 @@ use PHPLLVM\Value;
 final class VmZlibArg
 {
     /**
-     * Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#19332, #19112).
+     * Z_PARAM_STR $data — soft-null DEP+coerce through PHP 8.4 (#21311, reverts #19332).
      *
-     * Also covers declare(strict_types=1) caller edge before coercion.
+     * declare(strict_types=1) caller edge still TypeErrors before coercion (#19112).
      */
     public static function resolveDataString(Frame $frame, string $function, int $argIndex = 0): string
     {
-        return VmString::zparamStrBuiltinArgForFrame($frame, $argIndex, $function, $argIndex, 'data');
+        return VmString::trimFamilyStringArgForFrame($frame, $argIndex, $function, $argIndex, 'data');
     }
 
     /**
-     * JIT Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#19332).
+     * JIT Z_PARAM_STR $data — soft-null DEP+coerce through PHP 8.4 (#21311, reverts #19332).
      */
     public static function jitDataString(Context $context, JITVariable $arg, string $function): Value
     {
@@ -37,11 +37,14 @@ final class VmZlibArg
                 $arg,
                 $function,
                 0,
-                'data'
+                'data',
+                'string',
+                null,
+                false
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             $function,
