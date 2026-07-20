@@ -9,9 +9,10 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mb_internal_encoding() — internal charset (php-src ext/mbstring/mbstring.c; #13376, #20014 AOT). */
+/** mb_internal_encoding() — internal charset (php-src ext/mbstring/mbstring.c; #13376, #20014 AOT, #21538). */
 final class mb_internal_encoding extends Internal
 {
     public function __construct()
@@ -31,7 +32,10 @@ final class mb_internal_encoding extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (0 === $argc) {
+        // php-src Z_PARAM_STRING_OR_NULL — omitted/null selects getter (mbstring.stub.php ?string = null).
+        if (0 === $argc
+            || Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type
+        ) {
             $frame->returnVar->string(MbstringState::internalEncoding());
 
             return;
@@ -53,7 +57,9 @@ final class mb_internal_encoding extends Internal
                 $argc
             ));
         }
-        if (0 === $argc) {
+        if (0 === $argc
+            || (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
+        ) {
             $enc = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
 
             return $context->builder->load($context->constantStringFromString($enc));

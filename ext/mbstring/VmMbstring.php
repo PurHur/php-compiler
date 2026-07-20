@@ -132,9 +132,10 @@ final class VmMbstring
     public static function coerceLanguageArg(Variable $var, string $function, int $argIndex = 0): string
     {
         $var = $var->resolveIndirect();
+        // Caller must treat TYPE_NULL as getter (Z_PARAM_STR_OR_NULL / mbstring.stub.php ?string).
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($language) must be of type string, %s given',
+                '%s(): Argument #%d ($language) must be of type ?string, %s given',
                 $function,
                 $argIndex + 1,
                 EnumCaseSupport::typeNameForVariable($var)
@@ -142,7 +143,7 @@ final class VmMbstring
         }
         if (Variable::TYPE_STRING !== $var->type) {
             throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($language) must be of type string, %s given',
+                '%s(): Argument #%d ($language) must be of type ?string, %s given',
                 $function,
                 $argIndex + 1,
                 self::typeLabel($var)

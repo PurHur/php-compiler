@@ -9,9 +9,10 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mb_http_output() — HTTP output encoding (php-src ext/mbstring/mbstring.c; #13100, #20014 AOT). */
+/** mb_http_output() — HTTP output encoding (php-src ext/mbstring/mbstring.c; #13100, #20014 AOT, #21538). */
 final class mb_http_output extends Internal
 {
     public function __construct()
@@ -31,8 +32,11 @@ final class mb_http_output extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (0 === $argc) {
-            $frame->returnVar->string(MbstringState::httpOutput());
+        // php-src Z_PARAM_PATH_OR_NULL — omitted/null selects getter (mbstring.stub.php ?string = null).
+        if (0 === $argc
+            || Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type
+        ) {
+            $frame->returnVar->string((string) MbstringState::httpOutput());
 
             return;
         }
@@ -53,7 +57,9 @@ final class mb_http_output extends Internal
                 $argc
             ));
         }
-        if (0 === $argc) {
+        if (0 === $argc
+            || (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
+        ) {
             $enc = MbstringAotFoldState::httpOutput($context) ?? (string) MbstringState::httpOutput();
 
             return $context->builder->load($context->constantStringFromString($enc));
