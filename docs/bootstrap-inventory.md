@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6166 |
-| Phase A inventory files (M2 ratio SSOT) | 6166 |
+| PHP files on vm.php path | 6165 |
+| Phase A inventory files (M2 ratio SSOT) | 6165 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19295 |
+| Source constructs flagged (warnings) | 19293 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2386,7 +2386,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitObGzhandler.php` | 0 | 1 |
 | `ext/standard/JitObImplicitFlush.php` | 0 | 1 |
 | `ext/standard/JitObListHandlers.php` | 0 | 1 |
-| `ext/standard/JitObOutputExecCaptureKernel.php` | 0 | 2 |
 | `ext/standard/JitObStart.php` | 0 | 1 |
 | `ext/standard/JitObWriteStdoutKernel.php` | 0 | 1 |
 | `ext/standard/JitOpendir.php` | 0 | 1 |
@@ -24326,12 +24325,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
-### `ext/standard/JitObOutputExecCaptureKernel.php`
-
-**Warnings** (review for bootstrap subset):
-- 21 class method(s)
-- 7 closure(s)
-
 ### `ext/standard/JitObStart.php`
 
 **Warnings** (review for bootstrap subset):
@@ -26614,7 +26607,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ObOutputExecCaptureJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/standard/ObOutputJitHelper.php`
 
@@ -45214,79 +45207,79 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 11591)
 - new VM\PropertyHookRefWriteSignal (line 11596)
 - new VM\PropertyHookFiberSuspendSignal (line 11599)
-- new Error (line 12098)
-- new Error (line 12108)
-- new Error (line 12118)
-- new Error (line 12128)
-- new ClassEntry (line 12898)
-- new Variable (line 12899)
-- new VM\ClassProperty (line 12900)
-- new ObjectEntry (line 12903)
-- new Variable (line 12906)
-- new Variable (line 12987)
-- new Error (line 13073)
-- new Variable (line 13165)
-- new VM\GeneratorUncaughtThrow (line 13167)
-- new Error (line 13236)
-- new Variable (line 13281)
-- new VM\GeneratorUncaughtThrow (line 13295)
-- new Variable (line 13384)
-- new VM\GeneratorUncaughtThrow (line 13404)
-- new Variable (line 13472)
+- new Error (line 12100)
+- new Error (line 12110)
+- new Error (line 12120)
+- new Error (line 12130)
+- new ClassEntry (line 12900)
+- new Variable (line 12901)
+- new VM\ClassProperty (line 12902)
+- new ObjectEntry (line 12905)
+- new Variable (line 12908)
+- new Variable (line 12989)
+- new Error (line 13075)
+- new Variable (line 13167)
+- new VM\GeneratorUncaughtThrow (line 13169)
+- new Error (line 13238)
+- new Variable (line 13283)
+- new VM\GeneratorUncaughtThrow (line 13297)
+- new Variable (line 13386)
+- new VM\GeneratorUncaughtThrow (line 13406)
 - new Variable (line 13474)
-- new Variable (line 13478)
-- new Variable (line 13608)
-- new Variable (line 13650)
-- new Variable (line 13821)
-- new Variable (line 13837)
-- new Variable (line 13882)
-- new Variable (line 14023)
-- new Variable (line 14097)
-- new Variable (line 14261)
-- new VM\PropertyIsInitializedHandler (line 14270)
-- new Error (line 14385)
-- new VM\EnumFromHandler (line 14410)
-- new CompileError (line 15136)
-- new VM\ClassProperty (line 15301)
-- new Variable (line 15614)
-- new Variable (line 15809)
+- new Variable (line 13476)
+- new Variable (line 13480)
+- new Variable (line 13610)
+- new Variable (line 13652)
+- new Variable (line 13823)
+- new Variable (line 13839)
+- new Variable (line 13884)
+- new Variable (line 14025)
+- new Variable (line 14099)
+- new Variable (line 14263)
+- new VM\PropertyIsInitializedHandler (line 14272)
+- new Error (line 14387)
+- new VM\EnumFromHandler (line 14412)
+- new CompileError (line 15138)
+- new VM\ClassProperty (line 15303)
+- new Variable (line 15616)
 - new Variable (line 15811)
-- new ClassEntry (line 15854)
-- new Func\PHP (line 15861)
-- new VM\ClassProperty (line 15989)
-- new Func\PHP (line 16136)
-- new Variable (line 16212)
-- new Variable (line 16219)
-- new Variable (line 16225)
-- new Variable (line 16262)
-- new Variable (line 16291)
-- new Variable (line 16476)
-- new Variable (line 16522)
-- new VM\ClassProperty (line 16587)
-- new Error (line 16633)
-- new Error (line 16668)
-- new Error (line 16671)
-- new Error (line 16674)
-- new Error (line 16677)
-- new ObjectEntry (line 16679)
-- new Error (line 16692)
-- new Error (line 16695)
-- new Error (line 16698)
-- new Error (line 16717)
-- new ObjectEntry (line 16721)
-- new Variable (line 16723)
-- new Variable (line 16737)
-- new Variable (line 16764)
-- new Variable (line 16777)
-- new Error (line 16907)
-- new Error (line 16912)
-- new VM\ObjectEntry (line 16916)
-- new Variable (line 17060)
-- new Variable (line 17078)
-- new NoDiscardMetadata (line 17247)
-- new Variable (line 17416)
+- new Variable (line 15813)
+- new ClassEntry (line 15856)
+- new Func\PHP (line 15863)
+- new VM\ClassProperty (line 15991)
+- new Func\PHP (line 16138)
+- new Variable (line 16214)
+- new Variable (line 16221)
+- new Variable (line 16227)
+- new Variable (line 16264)
+- new Variable (line 16293)
+- new Variable (line 16478)
+- new Variable (line 16524)
+- new VM\ClassProperty (line 16589)
+- new Error (line 16635)
+- new Error (line 16670)
+- new Error (line 16673)
+- new Error (line 16676)
+- new Error (line 16679)
+- new ObjectEntry (line 16681)
+- new Error (line 16694)
+- new Error (line 16697)
+- new Error (line 16700)
+- new Error (line 16719)
+- new ObjectEntry (line 16723)
+- new Variable (line 16725)
+- new Variable (line 16739)
+- new Variable (line 16766)
+- new Variable (line 16779)
+- new Error (line 16909)
+- new Error (line 16914)
+- new VM\ObjectEntry (line 16918)
+- new Variable (line 17062)
+- new Variable (line 17080)
+- new NoDiscardMetadata (line 17249)
 - new Variable (line 17418)
-- new Variable (line 17518)
+- new Variable (line 17420)
+- new Variable (line 17520)
 - 493 class method(s)
 - 25 closure(s)
 

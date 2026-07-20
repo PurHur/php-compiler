@@ -8,6 +8,8 @@ namespace PHPCompiler\ext\standard;
  * Minimal ob stack for exec()/passthru()/system() stdout capture in user-script AOT (#10492).
  *
  * Avoids array_pop() lowering that nested-JIT misroutes to HashTable::popLast().
+ * Direct stdout uses {@see phpc_ob_write_stdout_kernel} (not echo) so NestedJIT does not
+ * recurse through `__phpc_ob_echo_*` (#21476 / #21469).
  * php-src: ext/standard/output.c + exec.c
  */
 final class ObOutputExecCaptureJitHelper
@@ -41,7 +43,7 @@ final class ObOutputExecCaptureJitHelper
             return 0;
         }
         if (self::$depth <= 0) {
-            echo $chunk;
+            self::writeStdout($chunk);
 
             return 1;
         }
@@ -99,5 +101,14 @@ final class ObOutputExecCaptureJitHelper
         self::$buffers[self::$depth] = '';
 
         return 1;
+    }
+
+    private static function writeStdout(string $chunk): void
+    {
+        if ('' === $chunk) {
+            return;
+        }
+        // Must not use echo — NestedJIT lowers echo to __phpc_ob_echo_* → append_bytes → here (#21476 / #21469).
+        \phpc_ob_write_stdout_kernel($chunk);
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\JitObOutputExecCaptureKernel;
 use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -14,11 +13,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Lazy minimal ob stack for user-script AOT exec stdout capture (#10492, #19136, #20169).
+ * Lazy minimal ob stack for user-script AOT exec stdout capture (#10492, #19136, #20169, #21476).
  *
- * Embed / non-thin: {@see \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper} via {@see JitVmHelperLink}.
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20156 shape): {@see JitObOutputExecCaptureKernel}
- * (NestedJIT of the helper segfaults under user-script AOT — #16075).
+ * Always {@see \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper} via {@see JitVmHelperLink}
+ * (embed + thin standalone / user-script AOT). Former thin-standalone LLVM kernel fork deleted —
+ * helper direct stdout uses {@see phpc_ob_write_stdout_kernel} (#21469 shape).
  * php-src: ext/standard/output.c
  */
 final class ObOutputExecCaptureRuntime
@@ -59,12 +58,6 @@ final class ObOutputExecCaptureRuntime
             return;
         }
 
-        if ($context->isThinStandaloneAotMain()) {
-            JitObOutputExecCaptureKernel::ensureLinked($context);
-
-            return;
-        }
-
         $restore = self::captureInsertBlock($context);
         ObOutputJitBridge::prepareUserScriptEmit($context);
         ObOutputEchoJitEmit::ensureEchoAbiDeclared($context);
@@ -85,12 +78,6 @@ final class ObOutputExecCaptureRuntime
     public static function ensureReadApiLinked(Context $context): void
     {
         if (self::isReadApiLinked($context)) {
-            return;
-        }
-
-        if ($context->isThinStandaloneAotMain()) {
-            JitObOutputExecCaptureKernel::ensureReadApiLinked($context);
-
             return;
         }
 

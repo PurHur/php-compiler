@@ -54,12 +54,12 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ObOutputExecCaptureJitHelper', $execCaptureRuntime);
         $this->assertStringContainsString('implementGetContents', $execCaptureRuntime);
         $this->assertStringContainsString('ensureReadApiLinked', $execCaptureRuntime);
-        $this->assertStringContainsString('JitObOutputExecCaptureKernel::ensureLinked', $execCaptureRuntime);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $execCaptureRuntime);
+        $this->assertStringNotContainsString('JitObOutputExecCaptureKernel', $execCaptureRuntime);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $execCaptureRuntime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $execCaptureRuntime);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $execCaptureRuntime);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitObOutputExecCaptureKernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitObOutputExecCaptureKernel.php');
 
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ObOutputJitHelper.php');
         $this->assertStringContainsString('phpc_ob_write_stdout_kernel', $helper);
@@ -68,6 +68,10 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('[] !== self::$stack', $helper);
         $this->assertStringNotContainsString('use PHPCompiler\VM\ObStackLimits', $helper);
         $this->assertStringNotContainsString('ObStackLimits::BUF_SIZE', $helper);
+
+        $execHelper = (string) file_get_contents(__DIR__.'/../../ext/standard/ObOutputExecCaptureJitHelper.php');
+        $this->assertStringContainsString('phpc_ob_write_stdout_kernel', $execHelper);
+        $this->assertStringNotContainsString('echo $chunk', $execHelper);
 
         $writeKernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitObWriteStdoutKernel.php');
         $this->assertStringContainsString('lookupFunction(\'write\')', $writeKernel);
@@ -78,8 +82,9 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('JitObWriteStdoutKernel.php', $spine);
         $this->assertStringContainsString('phpc_ob_write_stdout_kernel.php', $spine);
-        $this->assertStringContainsString('JitObOutputExecCaptureKernel.php', $spine);
+        $this->assertStringNotContainsString('JitObOutputExecCaptureKernel.php', $spine);
         $this->assertStringContainsString('ObOutputJitHelper.php', $spine);
+        $this->assertStringContainsString('ObOutputExecCaptureJitHelper.php', $spine);
         $this->assertStringNotContainsString('JitObOutputKernel.php', $spine);
         $this->assertStringNotContainsString('ObOutputUserScriptLlvm.php', $spine);
         $this->assertStringNotContainsString('ObOutputExecCaptureLlvm.php', $spine);
