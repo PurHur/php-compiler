@@ -277,6 +277,11 @@ final class JitStringBuiltinArg
             return $context->builder->load($context->constantStringFromString(''));
         }
 
+        // filestat stubs: typed string $filename on 8.4+ (#5122, ext/standard/filestat.c).
+        if (VmString::requiresTypedPathStringOnForwardProfile()) {
+            return self::lowerRequiredString($context, $arg, $function, $argIndex, $paramName, $expectedType);
+        }
+
         // Boxed null / VALUE: soft-coerce + DEP (Z_PARAM_PATH; #20362). Strict_types still TypeError via lower().
         return self::lower(
             $context,

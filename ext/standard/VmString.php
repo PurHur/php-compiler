@@ -55,6 +55,14 @@ final class VmString
     }
 
     /**
+     * filestat/path builtins — stub `string $filename` rejects int/float/bool on 8.4+ (#5122, ext/standard/filestat.c).
+     */
+    public static function requiresTypedPathStringOnForwardProfile(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
      * Used by str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
@@ -435,7 +443,19 @@ final class VmString
 
             return '';
         }
-        $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName, 'string', false);
+        if (self::requiresTypedPathStringOnForwardProfile()) {
+            if (Variable::TYPE_STRING === $var->type) {
+                $str = $var->toString();
+            } elseif (\in_array($var->type, [Variable::TYPE_INTEGER, Variable::TYPE_FLOAT, Variable::TYPE_BOOLEAN], true)) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, self::builtinScalarTypeName($var))
+                );
+            } else {
+                $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName, 'string', false);
+            }
+        } else {
+            $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName, 'string', false);
+        }
         if (str_contains($str, "\0")) {
             throw new \ValueError(
                 sprintf(
