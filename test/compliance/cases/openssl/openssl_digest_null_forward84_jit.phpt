@@ -1,18 +1,25 @@
 --TEST--
-openssl openssl_digest(null) TypeError on 8.4 forward JIT (#20207, ext/openssl/openssl.c)
+openssl openssl_digest(null) soft-null on 8.4 forward JIT (#21517, reverts #20207, ext/openssl/openssl.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
-try {
-    echo openssl_digest(null, 'sha256'), "\n";
-    echo "uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
-echo openssl_digest('', 'sha256'), "\n";
+$deps = [];
+set_error_handler(static function (int $n, string $m) use (&$deps): bool {
+    if (E_DEPRECATED === $n) {
+        $deps[] = $m;
+    }
+
+    return true;
+});
+$empty = openssl_digest('', 'sha256');
+$null = openssl_digest(null, 'sha256');
+echo 'same='.(($empty === $null) ? '1' : '0')."\n";
+echo 'digest=', $null, "\n";
+echo 'dep=', (isset($deps[0]) && false !== strpos($deps[0], 'openssl_digest(): Passing null to parameter #1 ($data)')) ? '1' : '0', "\n";
 ?>
 --EXPECT--
-openssl_digest(): Argument #1 ($data) must be of type string, null given
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+same=1
+digest=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+dep=1

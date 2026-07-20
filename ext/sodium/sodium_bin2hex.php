@@ -24,8 +24,9 @@ final class sodium_bin2hex extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, $this->getName(), 1);
-        // Z_PARAM_STR $string — null TypeError on 8.4 forward profile (#20196, ext/sodium/sodium.c).
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'sodium_bin2hex', 0, 'string');
+        // Z_PARAM_STR $string — soft-null DEP+coerce on forward profile (#21517, reverts #20196;
+        // php-src ext/sodium — Zend 8.4 still deprecates null → '').
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'sodium_bin2hex', 0, 'string');
         $result = VmSodium::bin2hex($string);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             $ret->string($result);

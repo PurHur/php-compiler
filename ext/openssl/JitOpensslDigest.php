@@ -31,7 +31,8 @@ final class JitOpensslDigest
         JITVariable $method,
         ?JITVariable $rawOutput = null
     ): Value {
-        $dataVal = JitStringBuiltinArg::lowerZparamStr($context, $data, 'openssl_digest', 0, 'data');
+        // Soft-null $data on 8.4 — Zend deprecate+coerce (#21517, reverts #20207 TypeError).
+        $dataVal = JitStringBuiltinArg::lowerTrimFamilyString($context, $data, 'openssl_digest', 0, 'data');
         $rawI1 = null === $rawOutput
             ? $context->getTypeFromString('int1')->constInt(0, false)
             : JitBoolArg::lower($context, $rawOutput, 'openssl_digest(): Argument #3 ($raw_output)');
