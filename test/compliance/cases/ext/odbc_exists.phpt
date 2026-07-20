@@ -12,6 +12,9 @@ foreach ([
     'odbc_num_rows',
     'odbc_error',
     'odbc_errormsg',
+    'odbc_connection_string_is_quoted',
+    'odbc_connection_string_should_quote',
+    'odbc_connection_string_quote',
 ] as $fn) {
     echo $fn, '=', var_export(function_exists($fn), true), "\n";
 }
@@ -27,4 +30,7 @@ odbc_result=true
 odbc_num_rows=true
 odbc_error=true
 odbc_errormsg=true
+odbc_connection_string_is_quoted=true
+odbc_connection_string_should_quote=true
+odbc_connection_string_quote=true
 extension_loaded=true

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6133 |
-| Phase A inventory files (M2 ratio SSOT) | 6133 |
+| PHP files on vm.php path | 6137 |
+| Phase A inventory files (M2 ratio SSOT) | 6137 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19088 |
+| Source constructs flagged (warnings) | 19096 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1248,16 +1248,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
 | `ext/odbc/BuiltinClasses.php` | 0 | 1 |
-| `ext/odbc/Module.php` | 0 | 12 |
+| `ext/odbc/Module.php` | 0 | 15 |
 | `ext/odbc/OdbcConstants.php` | 0 | 1 |
 | `ext/odbc/OdbcExtensionPolicy.php` | 0 | 1 |
 | `ext/odbc/VmOdbcConnection.php` | 0 | 4 |
+| `ext/odbc/VmOdbcConnstr.php` | 0 | 1 |
 | `ext/odbc/VmOdbcCore.php` | 0 | 1 |
 | `ext/odbc/VmOdbcNative.php` | 0 | 1 |
 | `ext/odbc/VmOdbcResult.php` | 0 | 4 |
 | `ext/odbc/odbc_close.php` | 0 | 2 |
 | `ext/odbc/odbc_close_all.php` | 0 | 2 |
 | `ext/odbc/odbc_connect.php` | 0 | 2 |
+| `ext/odbc/odbc_connection_string_is_quoted.php` | 0 | 2 |
+| `ext/odbc/odbc_connection_string_quote.php` | 0 | 2 |
+| `ext/odbc/odbc_connection_string_should_quote.php` | 0 | 2 |
 | `ext/odbc/odbc_error.php` | 0 | 2 |
 | `ext/odbc/odbc_errormsg.php` | 0 | 2 |
 | `ext/odbc/odbc_exec.php` | 0 | 2 |
@@ -4761,7 +4765,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 3 |
+| `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpen.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpenEmbedBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessOpenJit.php` | 0 | 1 |
@@ -12561,39 +12565,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 168)
 - new Variable (line 270)
 - new HashTable (line 274)
-- new Variable (line 639)
-- new HashTable (line 643)
-- new Variable (line 874)
-- new Variable (line 876)
-- new HashTable (line 889)
-- new Variable (line 892)
-- new Error (line 899)
-- new ArgumentCountError (line 984)
-- new ArgumentCountError (line 1011)
-- new ArgumentCountError (line 1036)
-- new Error (line 1044)
-- new ArgumentCountError (line 1073)
-- new Error (line 1081)
-- new ArgumentCountError (line 1107)
-- new Error (line 1115)
-- new ArgumentCountError (line 1141)
-- new Error (line 1149)
-- new ArgumentCountError (line 1171)
-- new Error (line 1179)
-- new ArgumentCountError (line 1207)
-- new Error (line 1215)
-- new ArgumentCountError (line 1236)
-- new Error (line 1244)
-- new ArgumentCountError (line 1267)
-- new Error (line 1275)
-- new ArgumentCountError (line 1303)
-- new Error (line 1311)
-- new ArgumentCountError (line 1335)
-- new Error (line 1343)
-- new ArgumentCountError (line 1371)
-- new Error (line 1379)
-- new ArgumentCountError (line 1400)
-- new Error (line 1408)
+- new Variable (line 642)
+- new HashTable (line 646)
+- new Variable (line 877)
+- new Variable (line 879)
+- new HashTable (line 892)
+- new Variable (line 895)
+- new Error (line 902)
+- new ArgumentCountError (line 987)
+- new ArgumentCountError (line 1014)
+- new ArgumentCountError (line 1039)
+- new Error (line 1047)
+- new ArgumentCountError (line 1077)
+- new Error (line 1085)
+- new ArgumentCountError (line 1111)
+- new Error (line 1119)
+- new ArgumentCountError (line 1145)
+- new Error (line 1153)
+- new ArgumentCountError (line 1175)
+- new Error (line 1183)
+- new ArgumentCountError (line 1212)
+- new Error (line 1220)
+- new ArgumentCountError (line 1241)
+- new Error (line 1249)
+- new ArgumentCountError (line 1272)
+- new Error (line 1280)
+- new ArgumentCountError (line 1308)
+- new Error (line 1316)
+- new ArgumentCountError (line 1340)
+- new Error (line 1348)
+- new ArgumentCountError (line 1376)
+- new Error (line 1384)
+- new ArgumentCountError (line 1405)
+- new Error (line 1413)
 - 47 class method(s)
 - 2 closure(s)
 
@@ -13327,8 +13331,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/collator_compare.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
-- new Error (line 59)
+- new ArgumentCountError (line 30)
+- new Error (line 61)
 - 2 class method(s)
 
 ### `ext/intl/collator_create.php`
@@ -13369,8 +13373,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/collator_get_sort_key.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new Error (line 59)
+- new ArgumentCountError (line 31)
+- new Error (line 61)
 - 2 class method(s)
 
 ### `ext/intl/collator_get_strength.php`
@@ -15708,17 +15712,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/odbc/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 31)
-- new odbc_connect (line 47)
-- new odbc_pconnect (line 48)
-- new odbc_close (line 49)
-- new odbc_close_all (line 50)
-- new odbc_exec (line 51)
-- new odbc_fetch_row (line 52)
-- new odbc_result (line 53)
-- new odbc_num_rows (line 54)
-- new odbc_error (line 55)
-- new odbc_errormsg (line 56)
+- new VM\Variable (line 32)
+- new odbc_connect (line 48)
+- new odbc_pconnect (line 49)
+- new odbc_close (line 50)
+- new odbc_close_all (line 51)
+- new odbc_connection_string_is_quoted (line 52)
+- new odbc_connection_string_should_quote (line 53)
+- new odbc_connection_string_quote (line 54)
+- new odbc_exec (line 55)
+- new odbc_fetch_row (line 56)
+- new odbc_result (line 57)
+- new odbc_num_rows (line 58)
+- new odbc_error (line 59)
+- new odbc_errormsg (line 60)
 - 3 class method(s)
 
 ### `ext/odbc/OdbcConstants.php`
@@ -15738,6 +15745,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 60)
 - new Variable (line 68)
 - 9 class method(s)
+
+### `ext/odbc/VmOdbcConnstr.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/odbc/VmOdbcCore.php`
 
@@ -15774,6 +15786,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - 4 class method(s)
+
+### `ext/odbc/odbc_connection_string_is_quoted.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/odbc/odbc_connection_string_quote.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/odbc/odbc_connection_string_should_quote.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
 
 ### `ext/odbc/odbc_error.php`
 
@@ -25118,8 +25148,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitUnpack.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 33)
 - 1 class method(s)
 
 ### `ext/standard/JitUnserialize.php`
@@ -29526,8 +29556,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1745)
-- new Error (line 1756)
+- new Error (line 1746)
+- new Error (line 1757)
 - 217 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -40425,9 +40455,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ProcessIdentityJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 124)
-- 7 class method(s)
-- 1 closure(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ProcessOpen.php`
 
@@ -43804,7 +43832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 460)
+- new Variable (line 461)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
