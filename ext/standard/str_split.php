@@ -31,7 +31,7 @@ final class str_split extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('str_split() requires one or two arguments');
         }
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'str_split', 0, 'string');
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'str_split', 0, 'string');
         $length = 1;
         if (2 === $argc) {
             $length = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_split', 2, 'length');
@@ -94,7 +94,7 @@ final class str_split extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'str_split',

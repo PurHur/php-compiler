@@ -38,7 +38,7 @@ final class str_getcsv extends Internal
                 ));
             }
         }
-        $input = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'str_getcsv', 0, 'string');
+        $input = VmString::trimFamilyStringArgForFrame($frame, 0, 'str_getcsv', 0, 'string');
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
@@ -106,7 +106,7 @@ final class str_getcsv extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'str_getcsv',

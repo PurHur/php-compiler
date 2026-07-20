@@ -142,7 +142,7 @@ final class str_word_count extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'str_word_count', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'str_word_count',
             $argIndex,
@@ -166,7 +166,7 @@ final class str_word_count extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'str_word_count',
