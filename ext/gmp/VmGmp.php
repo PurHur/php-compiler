@@ -16,6 +16,7 @@ use PHPCompiler\ext\standard\VmStreamArg;
  * Phase 4: seedable random + import/export — no runtime/*.c growth.
  * Phase 5: prime / bit-index / number-theory (#20394, re-#19540) — no runtime/*.c growth.
  * Phase 5b: gmp_binomial (#20519) — no runtime/*.c growth.
+ * Object operators (+ - * / % ** & | ^ << >> unary -/~, compare) (#21265).
  * PROFILE=8.4: null init/operand TypeError (stub int|string; #20210).
  */
 final class VmGmp
@@ -323,6 +324,38 @@ final class VmGmp
     public static function bitwiseXor(string $left, string $right): string
     {
         return self::bitwiseOp($left, $right, 'xor');
+    }
+
+    /** mpz_mul_2exp — left << shift (php-src gmp_do_operation ZEND_SL). */
+    public static function shiftLeft(string $left, int $shift): string
+    {
+        if ($shift < 0) {
+            throw new \ValueError('Shift must be greater than or equal to 0');
+        }
+        if (0 === $shift) {
+            return self::normalizeSignedDecimal($left);
+        }
+
+        return self::mul($left, self::pow('2', $shift));
+    }
+
+    /** mpz_fdiv_q_2exp — left >> shift, floor toward −∞ (php-src gmp_do_operation ZEND_SR). */
+    public static function shiftRight(string $left, int $shift): string
+    {
+        if ($shift < 0) {
+            throw new \ValueError('Shift must be greater than or equal to 0');
+        }
+        if (0 === $shift) {
+            return self::normalizeSignedDecimal($left);
+        }
+        $divisor = self::pow('2', $shift);
+        [$q, $r] = self::divQr($left, $divisor);
+        // Floor when negative with nonzero remainder (tdiv → fdiv).
+        if (self::cmp($left, '0') < 0 && '0' !== $r) {
+            $q = self::sub($q, '1');
+        }
+
+        return $q;
     }
 
     /** Truncate like mpz_get_si into PHP int. */
