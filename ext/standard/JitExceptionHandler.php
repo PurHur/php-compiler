@@ -141,12 +141,15 @@ final class JitExceptionHandler
             $exception
         );
 
+        // Prefer getParam(i) over getParams() — php-llvm Function_::getParams() misses
+        // `use llvm\LLVMValueRef_ptr` and fatals under AOT (#21325; peer JitErrorHandler).
         $callArgs = [];
-        foreach ($userFn->function->getParams() as $index => $param) {
+        $paramCount = $userFn->function->countParams();
+        for ($index = 0; $index < $paramCount; ++$index) {
             $callArgs[] = self::valueArgForNativeParam(
                 $context,
                 $exceptionSlot,
-                $param->typeOf()
+                $userFn->function->getParam($index)->typeOf()
             );
         }
         $result = $context->builder->call($userFn->function, ...$callArgs);
