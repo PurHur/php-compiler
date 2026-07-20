@@ -14,7 +14,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * Register tidy + tidyNode classes (php-src ext/tidy/tidy.stub.php; #21464, #21498, #21499, #21540, #21543).
+ * Register tidy + tidyNode classes (php-src ext/tidy/tidy.stub.php; #21464, #21498, #21499, #21540, #21543, #21606).
  */
 final class BuiltinClasses
 {
@@ -180,7 +180,11 @@ final class BuiltinClasses
             'hasChildren' => new TidyNodeHasChildren(),
             'hasSiblings' => new TidyNodeHasSiblings(),
             'isComment' => new TidyNodeIsComment(),
+            'isHtml' => new TidyNodeIsHtml(),
             'isText' => new TidyNodeIsText(),
+            'isJste' => new TidyNodeIsJste(),
+            'isAsp' => new TidyNodeIsAsp(),
+            'isPhp' => new TidyNodeIsPhp(),
             'getParent' => new TidyNodeGetParent(),
             'getPreviousSibling' => new TidyNodeGetPreviousSibling(),
             'getNextSibling' => new TidyNodeGetNextSibling(),
@@ -764,6 +768,20 @@ final class TidyNodeIsComment extends TidyNodeBoolMethod
     }
 }
 
+/** tidyNode::isHtml() (#21606). */
+final class TidyNodeIsHtml extends TidyNodeBoolMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isHtml');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'isHtml';
+    }
+}
+
 /** tidyNode::isText() (#21543). */
 final class TidyNodeIsText extends TidyNodeBoolMethod
 {
@@ -775,6 +793,48 @@ final class TidyNodeIsText extends TidyNodeBoolMethod
     protected function hostMethod(): string
     {
         return 'isText';
+    }
+}
+
+/** tidyNode::isJste() (#21606). */
+final class TidyNodeIsJste extends TidyNodeBoolMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isJste');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'isJste';
+    }
+}
+
+/** tidyNode::isAsp() (#21606). */
+final class TidyNodeIsAsp extends TidyNodeBoolMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isAsp');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'isAsp';
+    }
+}
+
+/** tidyNode::isPhp() (#21606). */
+final class TidyNodeIsPhp extends TidyNodeBoolMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isPhp');
+    }
+
+    protected function hostMethod(): string
+    {
+        return 'isPhp';
     }
 }
 
