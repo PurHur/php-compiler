@@ -51,9 +51,12 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenvAll.php');
         $this->assertStringContainsString('GetenvJitHelper::mergeLocalOverlayIntoNative', $source);
-        $this->assertStringContainsString('JitEnvironMirrorKernel::mirrorIntoHashtablePtr', $source);
+        $this->assertStringContainsString('EnvironMirrorRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('EnvironMirrorRuntime::emitFillCall', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('getenv_all_bridge_entry', $source);
+        $this->assertStringNotContainsString('JitEnvironMirrorKernel', $source);
+        $this->assertStringNotContainsString('mirrorIntoHashtablePtr', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('getenv_all_thin_stub', $source);
         $this->assertStringNotContainsString('implementThinStub', $source);

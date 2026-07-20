@@ -19,6 +19,9 @@ final class EnvironMirrorRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorRuntime.php');
         $this->assertStringContainsString('MIRROR_HELPER', $runtime);
         $this->assertStringContainsString('implementEmbedBridge', $runtime);
+        $this->assertStringContainsString('implementThinKernelBridge', $runtime);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $runtime);
+        $this->assertStringContainsString('JitEnvironMirrorKernel::mirrorIntoHashtablePtr', $runtime);
         $this->assertStringContainsString('__superglobals__mirror_process_environ', $runtime);
         $this->assertStringNotContainsString('EnvironMirrorRuntimeUserScriptCstr', $runtime);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
