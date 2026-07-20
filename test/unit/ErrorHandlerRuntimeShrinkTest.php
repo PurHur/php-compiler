@@ -8,14 +8,25 @@ use PHPCompiler\JIT\Builtin\ErrorHandlerJitRuntime;
 use PHPCompiler\JIT\Builtin\ErrorHandlerOutput;
 use PHPUnit\Framework\TestCase;
 
-/** Error-handler stack uses module globals on standalone AOT (#17671); VM SSOT stays ErrorHandlerJitHelper. */
+/** Error-handler stack uses module globals on standalone AOT (#17671); no thin ABI fork (#21346). */
 final class ErrorHandlerRuntimeShrinkTest extends TestCase
 {
+    public function testNoStandaloneThinAbiFork(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ErrorHandlerJitRuntime.php');
+        $this->assertStringNotContainsString('implementStandaloneThinAbi', $source);
+        $this->assertStringNotContainsString('standaloneAbiFunction', $source);
+        $this->assertStringNotContainsString('standaloneLinkStubsReady', $source);
+        $this->assertStringContainsString('phpc_eh_stack_depth', $source);
+        $this->assertStringContainsString('ensureStackGlobals', $source);
+        $this->assertStringContainsString('implementDispatchBridge', $source);
+        $this->assertStringContainsString('implementSetApplyBridge', $source);
+        $this->assertStringContainsString('implementGetApplyBridge', $source);
+    }
+
     public function testErrorHandlerJitRuntimeUsesModuleStackGlobals(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ErrorHandlerJitRuntime.php');
-        $this->assertStringContainsString('phpc_eh_stack_depth', $source);
-        $this->assertStringContainsString('ensureStackGlobals', $source);
         $this->assertStringNotContainsString("GLOBAL_DEPTH = 'phpc_error_handler_depth'", $source);
         $this->assertStringNotContainsString('malloc', $source);
     }
@@ -25,7 +36,7 @@ final class ErrorHandlerRuntimeShrinkTest extends TestCase
         $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
         $ctx = new \PHPCompiler\JIT\Context($runtime, \PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE);
         ErrorHandlerOutput::registerExternals($ctx);
-        ErrorHandlerJitRuntime::ensureLinked($ctx, true);
+        ErrorHandlerJitRuntime::ensureLinked($ctx);
         $this->assertNotNull($ctx->module->getNamedGlobal('phpc_eh_stack_depth'));
         $this->assertNotNull($ctx->module->getNamedGlobal('phpc_eh_stack_top_name'));
     }
