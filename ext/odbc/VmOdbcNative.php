@@ -36,6 +36,17 @@ final class VmOdbcNative
 
     public const SQL_VARCHAR = 12;
 
+    /** sql.h binary / long types used by odbc_result_all (#21308). */
+    public const SQL_LONGVARCHAR = -1;
+
+    public const SQL_BINARY = -2;
+
+    public const SQL_VARBINARY = -3;
+
+    public const SQL_LONGVARBINARY = -4;
+
+    public const SQL_WLONGVARCHAR = -10;
+
     public const SQL_HANDLE_STMT = 3;
 
     /** ODBC 2 SQL_AUTOCOMMIT / SQL_ATTR_AUTOCOMMIT (sql.h). */

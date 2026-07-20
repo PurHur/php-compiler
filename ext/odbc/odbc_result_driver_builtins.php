@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\odbc;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -12,9 +13,63 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * odbc_next_result / odbc_data_source / odbc_binmode / odbc_longreadlen / odbc_cursor
- * (php-src ext/odbc/php_odbc.c; #21278 / #21307).
+ * odbc_next_result / odbc_data_source / odbc_binmode / odbc_longreadlen /
+ * odbc_cursor / odbc_result_all (php-src ext/odbc/php_odbc.c; #21278 / #21307 / #21308).
  */
+
+final class odbc_result_all extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('odbc_result_all');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'odbc_result_all() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $res = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $res->type || !VmOdbcResult::isLive($res->toObject())) {
+            throw new \TypeError('odbc_result_all(): supplied resource is not a valid ODBC result resource');
+        }
+        $format = '';
+        if (2 === $argc) {
+            $format = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'odbc_result_all', 1, 'format');
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('odbc_result_all() requires a VM context');
+        }
+        // #[\Deprecated(since: '8.1')] — php-src odbc.stub.php
+        $ctx->errors->internalDeprecated(
+            'Function odbc_result_all() is deprecated since 8.1',
+            $ctx,
+            $frame
+        );
+        if (null === $frame->returnVar) {
+            VmOdbcCore::resultAll($res->toObject(), $format, $ctx, $frame);
+
+            return;
+        }
+        $n = VmOdbcCore::resultAll($res->toObject(), $format, $ctx, $frame);
+        if (false === $n) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($n);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('odbc_result_all() is not implemented for JIT (#21308)');
+    }
+}
 
 final class odbc_cursor extends Internal
 {

@@ -9,6 +9,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -679,6 +680,83 @@ final class VmOdbcCore
         }
 
         return $ht;
+    }
+
+    /**
+     * odbc_result_all — HTML table dump of buffered rows (php-src php_odbc.c; #21308).
+     *
+     * Rows are already buffered after exec/execute; dump matches Zend table shape
+     * without re-fetching the live hstmt.
+     */
+    public static function resultAll(
+        ObjectEntry $result,
+        string $format,
+        Context $ctx,
+        ?Frame $frame = null
+    ): int|false {
+        VmOdbcResult::requireLive($result);
+        $colnames = VmOdbcResult::colnames($result);
+        if (0 === \count($colnames)) {
+            self::warn($ctx, 'odbc_result_all(): No tuples available at this result index', $frame);
+
+            return false;
+        }
+        $rows = VmOdbcResult::rows($result);
+        if (0 === \count($rows)) {
+            OutputBuffer::append("<h2>No rows found</h2>\n", $frame?->scriptPath ?: null);
+
+            return 0;
+        }
+        // Stub default format "" → Zend still takes the format branch (`<table %s >`).
+        OutputBuffer::append('<table '.$format.' ><tr>', $frame?->scriptPath ?: null);
+        foreach ($colnames as $name) {
+            OutputBuffer::append('<th>'.$name.'</th>', $frame?->scriptPath ?: null);
+        }
+        OutputBuffer::append("</tr>\n", $frame?->scriptPath ?: null);
+
+        $coltypes = VmOdbcResult::coltypes($result);
+        $binmode = VmOdbcResult::binmode($result);
+        $longreadlen = VmOdbcResult::longreadlen($result);
+        $fetched = 0;
+        foreach ($rows as $row) {
+            ++$fetched;
+            OutputBuffer::append('<tr>', $frame?->scriptPath ?: null);
+            foreach ($row as $i => $val) {
+                $type = isset($coltypes[$i]) ? (int) $coltypes[$i] : 0;
+                if (self::resultAllNotPrintable($type, $binmode, $longreadlen)) {
+                    OutputBuffer::append('<td>Not printable</td>', $frame?->scriptPath ?: null);
+                    continue;
+                }
+                if (null === $val) {
+                    OutputBuffer::append('<td>NULL</td>', $frame?->scriptPath ?: null);
+                    continue;
+                }
+                OutputBuffer::append('<td>'.(string) $val.'</td>', $frame?->scriptPath ?: null);
+            }
+            OutputBuffer::append("</tr>\n", $frame?->scriptPath ?: null);
+        }
+        OutputBuffer::append("</table>\n", $frame?->scriptPath ?: null);
+        // Consume buffered cursor like Zend after SQLFetch loop.
+        VmOdbcResult::setCursor($result, $fetched - 1);
+
+        return $fetched;
+    }
+
+    private static function resultAllNotPrintable(int $coltype, int $binmode, int $longreadlen): bool
+    {
+        if (VmOdbcNative::SQL_BINARY === $coltype
+            || VmOdbcNative::SQL_VARBINARY === $coltype
+            || VmOdbcNative::SQL_LONGVARBINARY === $coltype
+        ) {
+            return $binmode <= 0;
+        }
+        if (VmOdbcNative::SQL_LONGVARCHAR === $coltype
+            || VmOdbcNative::SQL_WLONGVARCHAR === $coltype
+        ) {
+            return $longreadlen <= 0;
+        }
+
+        return false;
     }
 
     /**

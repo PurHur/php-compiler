@@ -17,7 +17,7 @@ use PHPCompiler\VM;
  * primarykeys/foreignkeys/statistics/gettypeinfo +
  * specialcolumns/procedures/procedurecolumns +
  * tableprivileges/columnprivileges catalog APIs +
- * odbc_cursor (SQLGetCursorName).
+ * odbc_cursor / odbc_result_all / odbc_do (alias of odbc_exec).
  * Thin unixODBC FFI when libodbc is present (document unixodbc / libsqliteodbc in Docker).
  */
 class Module extends ModuleAbstract
@@ -63,6 +63,7 @@ class Module extends ModuleAbstract
             new odbc_connection_string_should_quote(),
             new odbc_connection_string_quote(),
             new odbc_exec(),
+            new odbc_exec('odbc_do'),
             new odbc_prepare(),
             new odbc_execute(),
             new odbc_fetch_row(),
@@ -91,6 +92,7 @@ class Module extends ModuleAbstract
             new odbc_columnprivileges(),
             new odbc_free_result(),
             new odbc_cursor(),
+            new odbc_result_all(),
             new odbc_autocommit(),
             new odbc_commit(),
             new odbc_rollback(),
