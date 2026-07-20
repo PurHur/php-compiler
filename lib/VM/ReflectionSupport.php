@@ -2946,6 +2946,92 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionConstant::getNamespaceName() — php-src zend_memrchr on constant name (#21551).
+     */
+    public static function globalConstantNamespaceName(string $name): string
+    {
+        $pos = strrpos($name, '\\');
+        if (false === $pos) {
+            return '';
+        }
+
+        return substr($name, 0, $pos);
+    }
+
+    /**
+     * ReflectionConstant::getShortName() — php-src suffix after last backslash (#21551).
+     */
+    public static function globalConstantShortName(string $name): string
+    {
+        $pos = strrpos($name, '\\');
+        if (false === $pos) {
+            return $name;
+        }
+
+        return substr($name, $pos + 1);
+    }
+
+    /**
+     * ReflectionConstant::__toString() — php-src _const_string (#21551).
+     */
+    public static function globalReflectionConstantToString(Context $ctx, ObjectEntry $reflection): string
+    {
+        $name = self::constantNameFromReflection($reflection);
+        $value = \PHPCompiler\ext\standard\VmConstants::constantLookup($ctx, $name);
+        if (null === $value) {
+            self::throwReflectionException(self::globalConstantNotFoundMessage($name));
+        }
+        $value = $value->resolveIndirect();
+        $type = EnumCaseSupport::typeNameForVariable($value);
+        $flags = [];
+        if (!$ctx->isUserConstantDefined($name)) {
+            $flags[] = 'persistent';
+        }
+        $meta = $ctx->globalConstDeprecated[strtolower($name)] ?? null;
+        if (null !== $meta && $meta->isDeprecatedForReflection()) {
+            $flags[] = 'deprecated';
+        }
+        $flagPart = [] !== $flags ? '<' . implode(', ', $flags) . '> ' : '';
+        if (Variable::TYPE_ARRAY === $value->type) {
+            $printed = 'Array';
+        } else {
+            $printed = $value->toString();
+        }
+
+        return sprintf("Constant [ %s%s %s ] { %s }\n", $flagPart, $type, $name, $printed);
+    }
+
+    /**
+     * ReflectionConstant::getFileName() — user filename or null for internals (#21551).
+     */
+    public static function globalReflectionConstantFileName(Context $ctx, ObjectEntry $reflection): ?string
+    {
+        $name = self::constantNameFromReflection($reflection);
+        if (!$ctx->isUserConstantDefined($name)) {
+            return null;
+        }
+
+        return $ctx->globalConstantFilenames[$name] ?? null;
+    }
+
+    /**
+     * ReflectionConstant::getExtensionName() — null means user constant (return false/null) (#21551).
+     */
+    public static function globalReflectionConstantExtensionName(Context $ctx, ObjectEntry $reflection): ?string
+    {
+        $name = self::constantNameFromReflection($reflection);
+        if ($ctx->isUserConstantDefined($name)) {
+            return null;
+        }
+        $ext = \PHPCompiler\ext\standard\ExtensionConstantGroups::extensionNameForConstant($name);
+        if (null !== $ext) {
+            return $ext;
+        }
+
+        return 'Core';
+    }
+
+    /**
      * ReflectionEnumUnitCase::__toString() — php-src reflection_class_constant_to_string (#19785).
      */
     public static function enumCaseReflectionToString(ObjectEntry $reflection): string
