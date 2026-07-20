@@ -15,11 +15,24 @@ use PHPCompiler\ext\standard\VmZlib;
  */
 final class VmPharStream
 {
+    public const MUNG_PHP_SELF = 1;
+
+    public const MUNG_REQUEST_URI = 2;
+
+    public const MUNG_SCRIPT_NAME = 4;
+
+    public const MUNG_SCRIPT_FILENAME = 8;
+
     private static bool $interceptFileFuncs = false;
 
     private static string $mappedArchivePath = '';
 
     private static string $mappedAlias = '';
+
+    /** @var array<string, array<string, string>> archive path → internal entry → external path (#21327) */
+    private static array $mounts = [];
+
+    private static int $serverMungList = 0;
 
     /** @var array<string, array{files: array<string, string>, dirs: array<string, true>}> */
     private static array $entryCache = [];
@@ -108,10 +121,132 @@ final class VmPharStream
             return false;
         }
         if (!isset($entries['files'][$entry])) {
+            $mounted = self::readMountedFile($archive, $entry);
+            if (false !== $mounted) {
+                return $mounted;
+            }
+
             return false;
         }
 
         return $entries['files'][$entry];
+    }
+
+    /**
+     * Phar::mount() — map internal phar path to external filesystem path (#21327, phar_object.c).
+     */
+    public static function mount(string $internalPath, string $externalPath, string $executedScript): void
+    {
+        $internalPath = \str_replace('\\', '/', $internalPath);
+        $externalPath = \str_replace('\\', '/', $externalPath);
+        $executedScript = \str_replace('\\', '/', $executedScript);
+
+        if (str_starts_with($executedScript, 'phar://') && str_starts_with($internalPath, 'phar://')) {
+            throw new \PharException(
+                'Can only mount internal paths within a phar archive, use a relative path instead of "'.$internalPath.'"'
+            );
+        }
+
+        $archivePath = '';
+        $entryPath = $internalPath;
+        if (str_starts_with($internalPath, 'phar://')) {
+            $parsed = self::parseUri($internalPath);
+            if (null === $parsed) {
+                throw new \PharException('Mounting of '.$internalPath.' to '.$externalPath.' failed');
+            }
+            [$archivePath, $entryPath] = $parsed;
+        } else {
+            $archivePath = self::archivePathFromExecutedScript($executedScript);
+            if ('' === $archivePath && '' !== $executedScript && VmStatPath::isFile($executedScript)) {
+                $archivePath = $executedScript;
+            }
+            if ('' === $archivePath) {
+                throw new \PharException('Mounting of '.$internalPath.' to '.$externalPath.' failed');
+            }
+        }
+
+        $entryPath = VmPharArchive::normalizeEntryNamePublic($entryPath);
+        if (!VmStatPath::isFile($externalPath) && !VmStatPath::isDir($externalPath)) {
+            throw new \PharException(
+                'Mounting of '.$entryPath.' to '.$externalPath.' within phar '.$archivePath.' failed'
+            );
+        }
+
+        self::$mounts[$archivePath][$entryPath] = $externalPath;
+        unset(self::$entryCache[$archivePath]);
+    }
+
+    /**
+     * Phar::mungServer() — register $_SERVER keys to rewrite for web phars (#21327).
+     *
+     * @param list<string> $variables
+     */
+    public static function mungServer(array $variables): void
+    {
+        if ([] === $variables) {
+            throw new \PharException(
+                'No values passed to Phar::mungServer(), expecting an array of any of these strings: PHP_SELF, REQUEST_URI, SCRIPT_FILENAME, SCRIPT_NAME'
+            );
+        }
+        if (\count($variables) > 4) {
+            throw new \PharException(
+                'Too many values passed to Phar::mungServer(), expecting an array of any of these strings: PHP_SELF, REQUEST_URI, SCRIPT_FILENAME, SCRIPT_NAME'
+            );
+        }
+
+        foreach ($variables as $name) {
+            switch ($name) {
+                case 'PHP_SELF':
+                    self::$serverMungList |= self::MUNG_PHP_SELF;
+                    break;
+                case 'REQUEST_URI':
+                    self::$serverMungList |= self::MUNG_REQUEST_URI;
+                    break;
+                case 'SCRIPT_NAME':
+                    self::$serverMungList |= self::MUNG_SCRIPT_NAME;
+                    break;
+                case 'SCRIPT_FILENAME':
+                    self::$serverMungList |= self::MUNG_SCRIPT_FILENAME;
+                    break;
+                default:
+                    throw new \PharException(
+                        'Invalid value passed to Phar::mungServer(), expecting an array of any of these strings: PHP_SELF, REQUEST_URI, SCRIPT_FILENAME, SCRIPT_NAME'
+                    );
+            }
+        }
+    }
+
+    public static function serverMungList(): int
+    {
+        return self::$serverMungList;
+    }
+
+    /**
+     * Phar::webPhar() — mapPhar + web front-controller entry (#21327, phar_object.c).
+     *
+     * Non-web SAPI returns after registering the archive (php-src early exit).
+     */
+    public static function webPhar(
+        ?string $alias,
+        ?string $index,
+        ?string $fileNotFoundScript,
+        array $mimeTypes,
+        ?callable $rewrite,
+        string $scriptPath,
+        ?string $requestMethod
+    ): void {
+        unset($fileNotFoundScript, $mimeTypes, $rewrite);
+
+        self::mapPhar($alias, 0, $scriptPath);
+
+        $method = null !== $requestMethod ? \strtoupper($requestMethod) : '';
+        $webMethods = ['GET', 'POST', 'DELETE', 'HEAD', 'OPTIONS', 'PATCH', 'PUT'];
+        if ('' === $method || !\in_array($method, $webMethods, true)) {
+            return;
+        }
+
+        // Full MIME/header dispatch is php-src phar_file_action; CLI/compliance stops after mapPhar.
+        unset($index);
     }
 
     /**
@@ -254,12 +389,41 @@ final class VmPharStream
         return '' !== $mode && !\str_contains($mode, 'w') && !\str_contains($mode, 'a') && !\str_contains($mode, '+');
     }
 
+    /** @return string|false */
+    private static function readMountedFile(string $archivePath, string $entry)
+    {
+        $archivePath = \str_replace('\\', '/', $archivePath);
+        if (!isset(self::$mounts[$archivePath][$entry])) {
+            return false;
+        }
+        $external = self::$mounts[$archivePath][$entry];
+        if (VmStatPath::isDir($external)) {
+            return false;
+        }
+        if (VmFsOpenNative::available()) {
+            $handle = VmFsOpenNative::open($external, 'rb');
+            if (false === $handle) {
+                return false;
+            }
+            $data = VmFs::streamGetContents($handle);
+            VmFs::fclose($handle);
+
+            return false !== $data ? $data : false;
+        }
+
+        $data = @\file_get_contents($external);
+
+        return false !== $data ? $data : false;
+    }
+
     /** @internal PHPUnit */
     public static function resetForTests(): void
     {
         self::$interceptFileFuncs = false;
         self::$mappedArchivePath = '';
         self::$mappedAlias = '';
+        self::$mounts = [];
+        self::$serverMungList = 0;
         self::$entryCache = [];
     }
 }
