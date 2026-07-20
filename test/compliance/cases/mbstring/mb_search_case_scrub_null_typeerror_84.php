@@ -1,6 +1,6 @@
 <?php
-// Guard #21061 / #21282 — mb_strwidth/search/case/scrub family null TypeError under PROFILE=8.4
-// mb_substr_count soft-null moved to #21282 (Zend DEP+coerce).
+// Guard #21061 / #21282 / #21313 — mb_strwidth/search/case/scrub family null under PROFILE=8.4
+// Soft-null: mb_strtoupper/mb_convert_case/mb_str* search (#21313); mb_substr_count (#21282).
 $cases = [
     'mb_strwidth' => static fn () => mb_strwidth(null),
     'mb_strstr' => static fn () => mb_strstr(null, 'a'),
@@ -10,15 +10,24 @@ $cases = [
     'mb_strripos' => static fn () => mb_strripos(null, 'a'),
     'mb_strrpos' => static fn () => mb_strrpos(null, 'a'),
     'mb_convert_case' => static fn () => mb_convert_case(null, MB_CASE_UPPER),
+    'mb_strtoupper' => static fn () => mb_strtoupper(null),
     'mb_scrub' => static fn () => mb_scrub(null),
     'mb_str_split' => static fn () => mb_str_split(null),
     'mb_encode_mimeheader' => static fn () => mb_encode_mimeheader(null),
     'mb_decode_mimeheader' => static fn () => mb_decode_mimeheader(null),
     'mb_convert_kana' => static fn () => mb_convert_kana(null),
 ];
+$softOk = array_fill_keys([
+    'mb_strstr', 'mb_stristr', 'mb_strrchr', 'mb_stripos', 'mb_strripos', 'mb_strrpos',
+    'mb_convert_case', 'mb_strtoupper',
+], true);
 foreach ($cases as $name => $fn) {
     try {
-        $fn();
+        $r = $fn();
+        if (isset($softOk[$name])) {
+            echo "$name: OK\n";
+            continue;
+        }
         echo "$name: uncaught\n";
     } catch (TypeError $e) {
         echo $name.': '.$e->getMessage()."\n";

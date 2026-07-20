@@ -1,7 +1,7 @@
 <?php
 // Guard #19297 / #21197 / #21282 — mbstring null under PROFILE=8.4
-// Soft-null: mb_strlen/mb_substr/mb_strpos (#21197), mb_strtolower/mb_convert_encoding (#21282).
-// Remaining TypeError until follow-ups (e.g. mb_strtoupper).
+// Soft-null: mb_strlen/mb_substr/mb_strpos (#21197), mb_strtolower/mb_convert_encoding (#21282), mb_strtoupper (#21313).
+// Remaining TypeError until follow-ups.
 error_reporting(E_ALL);
 set_error_handler(static function (int $no, string $str): bool {
     if (E_DEPRECATED === $no) {

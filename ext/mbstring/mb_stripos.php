@@ -37,21 +37,11 @@ final class mb_stripos extends Internal
                 max(\array_keys($frame->calledArgs)) + 1
             ));
         }
-        $haystack = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_stripos',
-            0,
-            'haystack'
-        );
+        $haystack = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_stripos', 0, 'haystack');
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[1],
-            'mb_stripos',
-            1,
-            'needle'
-        );
+        $needle = VmString::trimFamilyStringArgForFrame($frame, 1, 'mb_stripos', 1, 'needle');
         $offset = isset($frame->calledArgs[2])
             ? VmMbstring::coerceOffsetArg($frame, 'mb_stripos', 2)
             : 0;
