@@ -87,14 +87,14 @@ final class nl2br extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#21351, ext/standard/string.c). */
+    /** Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21406). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'nl2br', $paramName)->toString();
         }
 
-        return VmString::zparamStrBuiltinArgForFrame(
+        return VmString::trimFamilyStringArgForFrame(
             $frame,
             $argIndex,
             'nl2br',
@@ -119,7 +119,7 @@ final class nl2br extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'nl2br',
