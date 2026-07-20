@@ -9387,6 +9387,10 @@ restart:
             return $this->dispatchVmLogicException($e, $callerFrame);
         } catch (VM\NativeRequestParseBodyException $e) {
             return $this->dispatchVmRequestParseBodyException($e, $callerFrame);
+        } catch (\Uri\WhatWg\InvalidUrlException $e) {
+            return $this->dispatchVmInvalidUrlException($e, $callerFrame);
+        } catch (\Uri\InvalidUriException $e) {
+            return $this->dispatchVmInvalidUriException($e, $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
             $this->clearTryCatchUnwindState();
             $callerFrame->call = null;
@@ -9469,6 +9473,34 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeRequestParseBodyException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge host Uri\InvalidUriException into VM catch handlers (#21468). */
+    private function dispatchVmInvalidUriException(\Uri\InvalidUriException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeInvalidUriException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge host Uri\WhatWg\InvalidUrlException into VM catch handlers (#21468). */
+    private function dispatchVmInvalidUrlException(\Uri\WhatWg\InvalidUrlException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeInvalidUrlException(
             $this->context,
             $error->getMessage(),
             $file,

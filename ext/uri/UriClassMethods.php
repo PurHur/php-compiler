@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\uri;
 
+use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -710,6 +712,186 @@ final class Rfc3986UriEquals extends Rfc3986UriGetter
             === VmUri::composeUrlString($right, $includeFragment);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($eq): void {
             $ret->bool($eq);
+        });
+    }
+}
+
+/** Uri\Rfc3986\Uri::__construct — php-src create_rfc3986_uri(is_constructor=true); #21468. */
+final class Rfc3986UriConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\Rfc3986\\Uri::__construct() requires VM context');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('Uri\\Rfc3986\\Uri::__construct() called without $this');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        if (VmUri::hasRfc3986State($self)) {
+            throw new \Error('Cannot modify readonly object of class Uri\\Rfc3986\\Uri');
+        }
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\Uri::__construct() expects at least 1 argument, 0 given');
+        }
+        $uri = VmReflection::stringArg($frame->calledArgs[1], 'Uri\\Rfc3986\\Uri::__construct() uri', 0);
+        $base = null;
+        if (\count($frame->calledArgs) >= 3) {
+            $baseArg = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $baseArg->type) {
+                if (Variable::TYPE_OBJECT !== $baseArg->type
+                    || VmUri::CLASS_RFC3986_URI !== strtolower($baseArg->toObject()->class->name)
+                ) {
+                    throw new \TypeError(
+                        'Uri\\Rfc3986\\Uri::__construct(): Argument #2 ($baseUrl) must be of type ?Uri\\Rfc3986\\Uri, '
+                        .EnumCaseSupport::typeNameForVariable($baseArg).' given'
+                    );
+                }
+                $base = $baseArg->toObject();
+            }
+        }
+
+        if (null !== $base) {
+            $resolved = VmUri::rfc3986Resolve($ctx, $base, $uri);
+            VmUri::bindRfc3986State($self, VmUri::rfc3986State($resolved->toObject()));
+
+            return;
+        }
+
+        $parts = VmUri::tryParseRfc3986Parts($uri);
+        if (null === $parts) {
+            throw new \Uri\InvalidUriException('The specified URI is malformed');
+        }
+        VmUri::bindRfc3986State($self, $parts);
+    }
+}
+
+/** Uri\Rfc3986\Uri::__serialize — php-src returns [[uri=>raw], []]; #21468. */
+final class Rfc3986UriSerialize extends Rfc3986UriGetter
+{
+    public function __construct()
+    {
+        parent::__construct('__serialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $uri = VmUri::composeUrlString($this->receiverState($frame), true);
+        $inner = new HashTable();
+        $uriVar = new Variable(Variable::TYPE_STRING);
+        $uriVar->string($uri);
+        $inner->addNew('uri', $uriVar);
+        $innerVar = new Variable(Variable::TYPE_ARRAY);
+        $innerVar->array($inner);
+        $props = new HashTable();
+        $propsVar = new Variable(Variable::TYPE_ARRAY);
+        $propsVar->array($props);
+        $outer = new HashTable();
+        $outer->addNewIndex(0, $innerVar);
+        $outer->addNewIndex(1, $propsVar);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($outer): void {
+            $ret->array($outer);
+        });
+    }
+}
+
+/** Uri\Rfc3986\Uri::__unserialize — php-src uri_unserialize; #21468. */
+final class Rfc3986UriUnserialize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__unserialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('Uri\\Rfc3986\\Uri::__unserialize() called without $this');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $className = $self->class->name;
+        if (VmUri::hasRfc3986State($self)) {
+            throw new \Error('Cannot modify readonly object of class '.$className);
+        }
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\Rfc3986\\Uri::__unserialize() expects exactly 1 argument, 0 given');
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(
+                'Uri\\Rfc3986\\Uri::__unserialize(): Argument #1 ($data) must be of type array'
+            );
+        }
+        $data = $arg->toArray();
+        $pairs = [];
+        foreach ($data->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $key->type) {
+                throw new \Exception('Invalid serialization data for '.$className.' object');
+            }
+            $pairs[$key->toInt(null)] = $valVar->resolveIndirect();
+        }
+        if (2 !== \count($pairs) || !isset($pairs[0], $pairs[1])) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        $stateBag = $pairs[0];
+        $propsBag = $pairs[1];
+        if (Variable::TYPE_ARRAY !== $stateBag->type || Variable::TYPE_ARRAY !== $propsBag->type) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        $uriString = null;
+        $stateCount = 0;
+        foreach ($stateBag->toArray()->iterateKeyed(true) as [$keyVar, $valVar]) {
+            ++$stateCount;
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type || 'uri' !== $key->toString(null)) {
+                throw new \Exception('Invalid serialization data for '.$className.' object');
+            }
+            $val = $valVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $val->type) {
+                throw new \Exception('Invalid serialization data for '.$className.' object');
+            }
+            $uriString = $val->toString(null);
+        }
+        if (1 !== $stateCount || null === $uriString) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        $propCount = 0;
+        foreach ($propsBag->toArray()->iterateKeyed(true) as $_) {
+            ++$propCount;
+        }
+        if ($propCount > 0) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        $parts = VmUri::tryParseRfc3986Parts($uriString);
+        if (null === $parts) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        VmUri::bindRfc3986State($self, $parts);
+    }
+}
+
+/** Uri\Rfc3986\Uri::__debugInfo — php-src uri_get_debug_properties; #21468. */
+final class Rfc3986UriDebugInfo extends Rfc3986UriGetter
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $info = VmUri::debugInfoFromState($this->receiverState($frame));
+        $ht = new HashTable();
+        foreach ($info as $name => $value) {
+            $slot = VmJson::import($value);
+            $ht->addNew((string) $name, $slot);
+        }
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ht): void {
+            $ret->array($ht);
         });
     }
 }
@@ -1523,6 +1705,186 @@ final class WhatWgUrlResolve extends WhatWgUrlGetter
         $next = VmUri::whatWgResolve($ctx, $self, $uri);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
             $ret->copyFrom($next);
+        });
+    }
+}
+
+/** Uri\WhatWg\Url::__construct — php-src create_whatwg_uri(is_constructor=true); #21468. */
+final class WhatWgUrlConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::__construct() requires VM context');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('Uri\\WhatWg\\Url::__construct() called without $this');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        if (VmUri::hasWhatWgState($self)) {
+            throw new \Error('Cannot modify readonly object of class Uri\\WhatWg\\Url');
+        }
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::__construct() expects at least 1 argument, 0 given');
+        }
+        $uri = VmReflection::stringArg($frame->calledArgs[1], 'Uri\\WhatWg\\Url::__construct() uri', 0);
+        $base = null;
+        if (\count($frame->calledArgs) >= 3) {
+            $baseArg = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $baseArg->type) {
+                if (Variable::TYPE_OBJECT !== $baseArg->type
+                    || VmUri::CLASS_WHATWG_URL !== strtolower($baseArg->toObject()->class->name)
+                ) {
+                    throw new \TypeError(
+                        'Uri\\WhatWg\\Url::__construct(): Argument #2 ($baseUrl) must be of type ?Uri\\WhatWg\\Url, '
+                        .EnumCaseSupport::typeNameForVariable($baseArg).' given'
+                    );
+                }
+                $base = $baseArg->toObject();
+            }
+        }
+
+        if (null !== $base) {
+            $resolved = VmUri::whatWgResolve($ctx, $base, $uri);
+            VmUri::bindWhatWgState($self, VmUri::whatWgState($resolved->toObject()));
+
+            return;
+        }
+
+        $parsed = VmUri::tryParseWhatWg($ctx, $uri);
+        if (null === $parsed) {
+            throw new \Uri\WhatWg\InvalidUrlException('The specified URI is malformed');
+        }
+        VmUri::bindWhatWgState($self, VmUri::whatWgState($parsed->toObject()));
+    }
+}
+
+/** Uri\WhatWg\Url::__serialize (#21468). */
+final class WhatWgUrlSerialize extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('__serialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $uri = VmUri::composeUrlString($this->receiverState($frame), true);
+        $inner = new HashTable();
+        $uriVar = new Variable(Variable::TYPE_STRING);
+        $uriVar->string($uri);
+        $inner->addNew('uri', $uriVar);
+        $innerVar = new Variable(Variable::TYPE_ARRAY);
+        $innerVar->array($inner);
+        $props = new HashTable();
+        $propsVar = new Variable(Variable::TYPE_ARRAY);
+        $propsVar->array($props);
+        $outer = new HashTable();
+        $outer->addNewIndex(0, $innerVar);
+        $outer->addNewIndex(1, $propsVar);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($outer): void {
+            $ret->array($outer);
+        });
+    }
+}
+
+/** Uri\WhatWg\Url::__unserialize (#21468). */
+final class WhatWgUrlUnserialize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__unserialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::__unserialize() requires VM context');
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('Uri\\WhatWg\\Url::__unserialize() called without $this');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $className = $self->class->name;
+        if (VmUri::hasWhatWgState($self)) {
+            throw new \Error('Cannot modify readonly object of class '.$className);
+        }
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::__unserialize() expects exactly 1 argument, 0 given');
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(
+                'Uri\\WhatWg\\Url::__unserialize(): Argument #1 ($data) must be of type array'
+            );
+        }
+        $pairs = [];
+        foreach ($arg->toArray()->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $key->type) {
+                throw new \Exception('Invalid serialization data for '.$className.' object');
+            }
+            $pairs[$key->toInt(null)] = $valVar->resolveIndirect();
+        }
+        if (2 !== \count($pairs) || !isset($pairs[0], $pairs[1])) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        $stateBag = $pairs[0];
+        $propsBag = $pairs[1];
+        if (Variable::TYPE_ARRAY !== $stateBag->type || Variable::TYPE_ARRAY !== $propsBag->type) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        $uriString = null;
+        $stateCount = 0;
+        foreach ($stateBag->toArray()->iterateKeyed(true) as [$keyVar, $valVar]) {
+            ++$stateCount;
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type || 'uri' !== $key->toString(null)) {
+                throw new \Exception('Invalid serialization data for '.$className.' object');
+            }
+            $val = $valVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $val->type) {
+                throw new \Exception('Invalid serialization data for '.$className.' object');
+            }
+            $uriString = $val->toString(null);
+        }
+        if (1 !== $stateCount || null === $uriString) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        $propCount = 0;
+        foreach ($propsBag->toArray()->iterateKeyed(true) as $_) {
+            ++$propCount;
+        }
+        if ($propCount > 0) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        $parsed = VmUri::tryParseWhatWg($ctx, $uriString);
+        if (null === $parsed) {
+            throw new \Exception('Invalid serialization data for '.$className.' object');
+        }
+        VmUri::bindWhatWgState($self, VmUri::whatWgState($parsed->toObject()));
+    }
+}
+
+/** Uri\WhatWg\Url::__debugInfo (#21468). */
+final class WhatWgUrlDebugInfo extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $info = VmUri::debugInfoFromState($this->receiverState($frame));
+        $ht = new HashTable();
+        foreach ($info as $name => $value) {
+            $slot = VmJson::import($value);
+            $ht->addNew((string) $name, $slot);
+        }
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ht): void {
+            $ret->array($ht);
         });
     }
 }
