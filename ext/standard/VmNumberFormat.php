@@ -67,6 +67,9 @@ final class VmNumberFormat
                 if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
                     throw new \TypeError(self::numTypeError('null'));
                 }
+                if (VmMath::requiresForwardProfileStrictDoubleNull()) {
+                    throw new \TypeError(self::numTypeError('null'));
+                }
                 // Z_PARAM_DOUBLE $num: E_DEPRECATED then coerce to 0.0 (#19756).
                 VmNullNumberParamDeprecation::emit($frame, 'number_format', 1, 'num', 'float');
 

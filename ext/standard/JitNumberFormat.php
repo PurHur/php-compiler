@@ -124,7 +124,7 @@ final class JitNumberFormat
 
     private static function rejectNullNum(Context $context, JITVariable $arg): void
     {
-        if (!$context->callerStrictTypes) {
+        if (!$context->callerStrictTypes && !VmMath::requiresForwardProfileStrictDoubleNull()) {
             return;
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {

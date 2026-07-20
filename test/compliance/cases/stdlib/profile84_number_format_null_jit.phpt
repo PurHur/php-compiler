@@ -1,11 +1,11 @@
 --TEST--
-stdlib number_format(null) JIT — TypeError on PHP 8.4 forward profile (#21379)
+JIT PROFILE=8.4: number_format(null) TypeError (#21379)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
-function check_number_format_null_84(): void
+function check(): void
 {
     try {
         number_format(null);
@@ -14,7 +14,7 @@ function check_number_format_null_84(): void
         echo $e->getMessage(), "\n";
     }
 }
-check_number_format_null_84();
+check();
 ?>
 --EXPECT--
 number_format(): Argument #1 ($num) must be of type float, null given
