@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xml;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -11,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** xml_parse_into_struct() — SAX struct builder (php-src ext/xml/xml.c; #3494). */
+/** xml_parse_into_struct() — SAX struct builder (php-src ext/xml/xml.c; #3494, soft-null #21505). */
 final class xml_parse_into_struct extends Internal
 {
     public function __construct()
@@ -30,8 +31,9 @@ final class xml_parse_into_struct extends Internal
         }
 
         $parser = XmlParserSupport::requireParser($frame->calledArgs[0], 'xml_parse_into_struct', 1);
-        $dataArg = $frame->calledArgs[1]->resolveIndirect();
-        $data = Variable::TYPE_STRING === $dataArg->type ? $dataArg->toString() : (string) $dataArg->toInt();
+        // Z_PARAM_STR $data — soft-null DEP+coerce on forward profile (#21505;
+        // php-src ext/xml/xml.c — Zend deprecates null → ''; empty data still returns 0).
+        $data = VmString::trimFamilyStringArgForFrame($frame, 1, 'xml_parse_into_struct', 1, 'data');
 
         $parsed = VmXml::parseIntoStruct(
             $frame->vmContext,

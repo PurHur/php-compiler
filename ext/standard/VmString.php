@@ -106,7 +106,11 @@ final class VmString
      * error_log($message), fsockopen/pfsockopen/stream_socket_client hostname/remote,
      * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
      * implode/join $separator soft-null (#21210, reverts #19894).
+<<<<<<< HEAD
      * header($header), preg_quote($str), printf/fprintf($format) soft-null (#21234, reverts #19224/#20197).
+=======
+     * xml_parse/xml_parse_into_struct $data soft-null (#21505, ext/xml/xml.c).
+>>>>>>> f179e9f95 (ext/xml: soft-null xml_parse $data + default is_final=false (#21505))
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xml;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -11,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** xml_parse() — feed parser; malformed XML records libxml errors (#3494, #6058). */
+/** xml_parse() — feed parser; malformed XML records libxml errors (#3494, #6058, soft-null #21505). */
 final class xml_parse extends Internal
 {
     public function __construct()
@@ -30,13 +31,15 @@ final class xml_parse extends Internal
         }
 
         $parser = XmlParserSupport::requireParser($frame->calledArgs[0], 'xml_parse', 1);
-        $dataArg = $frame->calledArgs[1]->resolveIndirect();
-        $data = Variable::TYPE_STRING === $dataArg->type ? $dataArg->toString() : (string) $dataArg->toInt();
+        // Z_PARAM_STR $data — soft-null DEP+coerce on forward profile (#21505;
+        // php-src ext/xml/xml.c — Zend still deprecates null → '', parse succeeds as '').
+        $data = VmString::trimFamilyStringArgForFrame($frame, 1, 'xml_parse', 1, 'data');
 
-        $isFinal = true;
+        // php-src stub: bool $is_final = false (ext/xml/xml.stub.php; #21505).
+        $isFinal = false;
         if (3 === $argc) {
             $finalArg = $frame->calledArgs[2]->resolveIndirect();
-            $isFinal = Variable::TYPE_NULL === $finalArg->type ? true : (bool) $finalArg->toInt();
+            $isFinal = Variable::TYPE_NULL === $finalArg->type ? false : (bool) $finalArg->toInt();
         }
 
         $status = VmXml::parse(
