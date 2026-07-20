@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\VmHttpResponse;
-use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\JIT\Builtin\HttpResponseCodeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -25,8 +24,15 @@ final class JitHttpResponseCodeArg
         }
 
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            // Z_PARAM_LONG — null TypeError on PROFILE=8.4 (#20962).
-            if (VmMath::requiresForwardProfileStrictLongNull()) {
+            // Soft-null DEP+coerce on 8.4 (php-src head.c Z_PARAM_LONG; #21480, reverts #20962 TypeError).
+            if (!$context->callerStrictTypes) {
+                \PHPCompiler\ext\standard\JitIntdiv::emitNullIntDeprecation(
+                    $context,
+                    'http_response_code',
+                    0,
+                    'response_code'
+                );
+            } else {
                 self::emitTypeErrorAndAbort($context, $fn, 'null');
             }
 

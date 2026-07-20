@@ -1,5 +1,5 @@
 --TEST--
-stdlib parse_str(null) — TypeError on 8.4 forward profile JIT (#21380, re-#20113)
+stdlib parse_str(null) — soft-null DEP+coerce on 8.4 JIT (#21480, reverts #21380)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -25,7 +25,8 @@ parse_str('', $empty);
 echo var_export($empty, true), "\n";
 ?>
 --EXPECT--
-TypeError
-depr=0
+array (
+)
+depr=1
 array (
 )

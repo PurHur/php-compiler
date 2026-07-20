@@ -1,10 +1,17 @@
 --TEST--
-stdlib http_response_code(null) — TypeError JIT on PROFILE=8.4 (#20962, ext/standard/head.c)
+stdlib http_response_code(null) — soft-null DEP+coerce JIT on PROFILE=8.4 (#21480, reverts #20962)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
+$seen = 0;
+set_error_handler(static function (int $no) use (&$seen): bool {
+    if (E_DEPRECATED === $no) {
+        $seen++;
+    }
+    return true;
+});
 try {
     var_export(http_response_code(null));
     echo "\n";
@@ -20,7 +27,9 @@ try {
 }
 var_export(http_response_code());
 echo " get-ok\n";
+echo 'depr=', (int) ($seen >= 1), "\n";
 --EXPECT--
-http_response_code(): Argument #1 ($response_code) must be of type int, null given
-http_response_code(): Argument #1 ($response_code) must be of type int, null given
+false
+404
 404 get-ok
+depr=1

@@ -47,7 +47,8 @@ final class VmString
      * preg_match/preg_match_all/preg_split/preg_grep $pattern soft-null (#21479, reverts #20226).
      * json_decode/json_validate $json, unserialize $data soft-null (#21223).
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
-     * parse_str $string is Z_PARAM_STR TypeError on 8.4 (#21380, re-#20113).
+     * parse_str $string soft-null (#21480, reverts #21380 TypeError).
+     * trigger_error/user_error $message soft-null (#21480, reverts #21035 TypeError).
      * introspection name args (function_exists/class_exists/defined/…) soft-null (#21281).
      * htmlspecialchars/htmlentities/nl2br/addslashes soft-null on 8.4 (#21405/#21406; reverts #21351 TypeError).
      * convert_uudecode soft-null on 8.4 (#21420; empty decode → warning+false like Zend).
@@ -118,6 +119,7 @@ final class VmString
      * xml_parse/xml_parse_into_struct $data soft-null (#21505, ext/xml/xml.c).
      * token_get_all($source) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).
      * ini_get/ini_set $option and putenv $assignment soft-null (#21312, reverts #20361/#21004 TypeError).
+     * parse_str $string / trigger_error|user_error $message soft-null (#21480).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,
