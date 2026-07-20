@@ -8,6 +8,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -43,6 +44,12 @@ final class php_uname extends Internal
         }
         if (!isset($args[0])) {
             return JitInfo::php_uname($context, null);
+        }
+        if ($context->isUserScriptAot()) {
+            $lit = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
+            if (null !== $lit) {
+                return JitInfo::emitUserScriptStringLiteral($context, InfoJitHelper::php_uname($lit));
+            }
         }
         $mode = JitStringBuiltinArg::lower(
             $context,
