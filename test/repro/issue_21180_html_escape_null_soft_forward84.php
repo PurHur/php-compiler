@@ -1,17 +1,22 @@
 <?php
-// Repro #21180 — HTML/escape soft-null under PHP_COMPILER_PROFILE=8.4 (Zend DEP+coerce)
-set_error_handler(static function (int $no, string $msg): bool {
-    if (E_DEPRECATED === $no) {
-        echo "DEP\n";
-        return true;
-    }
-    return false;
-});
-foreach (['htmlspecialchars','htmlentities','addslashes','stripslashes','nl2br','quotemeta'] as $f) {
+// Repro #21351 — htmlspecialchars/htmlentities/nl2br/addslashes TypeError under PROFILE=8.4
+$failed = 0;
+foreach (['htmlspecialchars', 'htmlentities', 'addslashes', 'nl2br'] as $f) {
     try {
-        $r = $f(null);
-        echo $f, " OK\n";
-    } catch (Throwable $e) {
-        echo $f, ' ', get_class($e), "\n";
+        $f(null);
+        echo "$f: FAIL expected TypeError\n";
+        ++$failed;
+    } catch (TypeError $e) {
+        echo "$f: ok\n";
     }
 }
+foreach (['stripslashes', 'quotemeta'] as $f) {
+    try {
+        $r = $f(null);
+        echo "$f: soft-null ok\n";
+    } catch (TypeError $e) {
+        echo "$f: unexpected TypeError\n";
+        ++$failed;
+    }
+}
+exit($failed > 0 ? 1 : 0);

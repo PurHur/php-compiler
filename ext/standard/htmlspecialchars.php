@@ -101,7 +101,7 @@ final class htmlspecialchars extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'htmlspecialchars', 0, 'string');
+        $str = self::jitStringArg($context, $args[0], 0, 'string');
         $flags = $context->getTypeFromString('int64')->constInt(self::DEFAULT_FLAGS, false);
         if ($effectiveArgc >= 2) {
             $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');
@@ -110,15 +110,41 @@ final class htmlspecialchars extends Internal
         return JitHtmlspecialchars::escape($context, $str, $flags);
     }
 
-    /** Soft-null — coerce+deprecate on forward profile (#21180, ext/standard/html.c). */
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#21351, ext/standard/html.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'htmlspecialchars', $paramName)->toString();
         }
 
-        return VmString::coerceTrimFamilyStringArg(
-            $frame->calledArgs[$argIndex],
+        return VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            'htmlspecialchars',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'htmlspecialchars',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
             'htmlspecialchars',
             $argIndex,
             $paramName

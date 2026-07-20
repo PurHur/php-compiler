@@ -8,7 +8,7 @@ error_reporting(E_ALL & ~E_DEPRECATED);
 $cases = [
     'chunk_split' => [fn () => chunk_split(null), "\r\n"],
     'explode' => [fn () => explode(',', null), ['']],
-    'addslashes' => [fn () => addslashes(null), ''],
+    'addslashes' => [fn () => addslashes(null), null],
     'str_rot13' => [fn () => str_rot13(null), ''],
     'count_chars' => [fn () => count_chars(null, 3), null],
     'str_word_count' => [fn () => str_word_count(null), null],
@@ -34,7 +34,7 @@ echo addslashes('') === '' ? "addslashes_empty OK\n" : "addslashes_empty BAD\n";
 --EXPECT--
 chunk_split OK
 explode OK
-addslashes OK
+addslashes TypeError
 str_rot13 OK
 count_chars TypeError
 str_word_count TypeError

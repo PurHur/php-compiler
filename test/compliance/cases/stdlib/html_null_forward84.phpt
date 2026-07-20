@@ -1,5 +1,5 @@
 --TEST--
-htmlspecialchars/htmlentities decode family soft-null on 8.4 (#21180, ext/standard/html.c)
+htmlspecialchars/htmlentities TypeError; decode family soft-null on 8.4 (#21351/#21180, ext/standard/html.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -25,10 +25,8 @@ foreach ([
     }
 }
 --EXPECT--
-DEP
-htmlspecialchars: uncaught ''
-DEP
-htmlentities: uncaught ''
+htmlspecialchars: htmlspecialchars(): Argument #1 ($string) must be of type string, null given
+htmlentities: htmlentities(): Argument #1 ($string) must be of type string, null given
 DEP
 htmlspecialchars_decode: uncaught ''
 DEP

@@ -68,18 +68,7 @@ final class nl2br extends Internal
             );
         }
 
-        // Null → soft-coerce to "" without helper IR (nl2br("") === ""; #21180 / #20007).
-        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes) {
-                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'nl2br', 0, 'string');
-
-                return $context->getTypeFromString('__string__*')->constNull();
-            }
-
-            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'nl2br', 0, 'string');
-        }
-
-        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'nl2br', 0, 'string');
+        $str = self::jitStringArg($context, $args[0], 0, 'string');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {
@@ -98,15 +87,41 @@ final class nl2br extends Internal
         );
     }
 
-    /** Soft-null — coerce+deprecate on forward profile (#21180, ext/standard/string.c). */
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#21351, ext/standard/string.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'nl2br', $paramName)->toString();
         }
 
-        return VmString::coerceTrimFamilyStringArg(
-            $frame->calledArgs[$argIndex],
+        return VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            'nl2br',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'nl2br',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
             'nl2br',
             $argIndex,
             $paramName
