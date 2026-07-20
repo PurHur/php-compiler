@@ -72,13 +72,13 @@ final class strpos extends Internal
         }
 
         StringStrpos::ensureLinked($context);
-        // Z_PARAM_STR haystack/needle: null TypeError on 8.4 forward profile (#19242, #20176).
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21189).
         $hay = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strpos', 0, 'haystack')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strpos', 0, 'haystack');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strpos', 0, 'haystack');
         $needle = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'strpos', 1, 'needle')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strpos', 1, 'needle');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'strpos', 1, 'needle');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'strpos', 3, 'offset')
             : null;
@@ -110,8 +110,8 @@ final class strpos extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strpos', $paramName)->toString();
         }
 
-        // Haystack and needle are both Z_PARAM_STR (#19242 haystack, #20176 needle).
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21189; reverts #19242/#20176).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'strpos',
             $argIndex,

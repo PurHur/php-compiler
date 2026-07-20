@@ -1,10 +1,9 @@
 --TEST--
-AOT: substr(null) — TypeError on 8.4 forward profile (#18980, ext/standard/string.c)
+AOT: substr(null) — soft-null on 8.4 forward profile (#21189)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-substr(null, 0);
+echo '[', substr(null, 0), ']', "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+[]

@@ -1,9 +1,11 @@
 --TEST--
-stdlib PHP 8.4 profile — str* search haystack null TypeError (#19242)
+stdlib PHP 8.4 profile — str* search haystack null (#19242/#21189 soft for strpos/strstr)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL);
+set_error_handler(static function (): bool { return true; });
 foreach (['strpos', 'stripos', 'strrpos', 'strripos', 'strstr', 'stristr', 'strchr', 'strrchr', 'strpbrk', 'strtok'] as $f) {
     try {
         $r = $f === 'strtok' ? strtok(null, '.') : $f(null, 'x');
@@ -14,11 +16,11 @@ foreach (['strpos', 'stripos', 'strrpos', 'strripos', 'strstr', 'stristr', 'strc
 }
 ?>
 --EXPECT--
-strpos: TypeError
+strpos: OK false
 stripos: TypeError
 strrpos: TypeError
 strripos: TypeError
-strstr: TypeError
+strstr: OK false
 stristr: TypeError
 strchr: TypeError
 strrchr: TypeError

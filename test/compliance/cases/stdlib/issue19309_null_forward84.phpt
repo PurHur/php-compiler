@@ -28,12 +28,14 @@ echo var_export(addslashes(''), true), "\n";
 ?>
 --EXPECT--
 chunk_split(): Argument #1 ($string) must be of type string, null given
-explode(): Argument #2 ($string) must be of type string, null given
+explode: uncaught array (
+  0 => '',
+)
 addslashes: uncaught ''
 str_rot13(): Argument #1 ($string) must be of type string, null given
 count_chars(): Argument #1 ($string) must be of type string, null given
 str_word_count(): Argument #1 ($string) must be of type string, null given
-crc32: uncaught
+crc32: uncaught 0
 base_convert(): Argument #1 ($num) must be of type string, null given
 convert_uuencode(): Argument #1 ($string) must be of type string, null given
 quotemeta: uncaught ''

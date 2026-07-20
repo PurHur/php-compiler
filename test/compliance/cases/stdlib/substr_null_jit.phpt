@@ -1,17 +1,15 @@
 --TEST--
-stdlib substr(null) — TypeError on 8.4 forward profile JIT (#18980, ext/standard/string.c)
+stdlib substr(null) — soft-null on 8.4 forward profile JIT (#21189)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
+--JIT--
 --FILE--
 <?php
-try {
-    substr(null, 0);
-    echo "uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+error_reporting(E_ALL);
+set_error_handler(static function (): bool { return true; });
+echo var_export(substr(null, 0), true), "\n";
 echo var_export(substr('hello', 1, 3), true), "\n";
 ?>
 --EXPECT--
-substr(): Argument #1 ($string) must be of type string, null given
+''
 'ell'
