@@ -112,8 +112,8 @@ final class levenshtein extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'levenshtein', $paramName)->toString();
         }
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19243, levenshtein.c).
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21195, peers #21190).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'levenshtein',
             $argIndex,
@@ -151,7 +151,7 @@ final class levenshtein extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'levenshtein',
