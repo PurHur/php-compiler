@@ -16,7 +16,5 @@ echo "\n";
 --EXPECT--
 true
 true
-array (
-)
-array (
-)
+NULL
+NULL

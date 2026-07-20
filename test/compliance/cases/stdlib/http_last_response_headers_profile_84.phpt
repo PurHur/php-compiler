@@ -10,7 +10,7 @@ var_export(function_exists('http_clear_last_response_headers'));
 echo "\n";
 var_export(function_exists('get_last_response_headers'));
 echo "\n";
-var_export(is_array(http_get_last_response_headers()));
+var_export(null === http_get_last_response_headers());
 ?>
 --EXPECT--
 true
