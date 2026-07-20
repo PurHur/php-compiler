@@ -9287,25 +9287,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomLiving.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 143)
-- new ObjectEntry (line 223)
-- new ObjectEntry (line 241)
-- new DOMException (line 270)
-- new Variable (line 273)
-- new DOMException (line 313)
-- new DOMException (line 401)
-- new DOMException (line 406)
-- new DOMException (line 413)
-- new DOMException (line 444)
-- new DOMException (line 456)
-- new Exception (line 603)
-- new DOMException (line 629)
-- new Variable (line 635)
-- new Variable (line 669)
-- new ObjectEntry (line 1202)
-- new HashTable (line 1226)
-- new Variable (line 1228)
-- 55 class method(s)
+- new ObjectEntry (line 144)
+- new ObjectEntry (line 224)
+- new ObjectEntry (line 242)
+- new DOMException (line 275)
+- new Variable (line 278)
+- new DOMException (line 318)
+- new DOMException (line 414)
+- new DOMException (line 419)
+- new DOMException (line 426)
+- new DOMException (line 457)
+- new DOMException (line 469)
+- new Exception (line 616)
+- new DOMException (line 642)
+- new Variable (line 648)
+- new Variable (line 682)
+- new ObjectEntry (line 1385)
+- new HashTable (line 1409)
+- new Variable (line 1411)
+- 58 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -39731,7 +39731,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/AssertOptionsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 17 class method(s)
 
 ### `lib/JIT/Builtin/AssertionErrorRaise.php`
 
