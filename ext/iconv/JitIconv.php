@@ -22,9 +22,9 @@ final class JitIconv
             throw new \LogicException('iconv() requires exactly three arguments');
         }
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19387, re-#18993/#18242).
-        // Do not map null→'' before the fold guard — that incorrectly constant-folds
-        // iconv(null, …) to the default-charset conversion under AOT (#19387).
+        // Z_PARAM_STR $string — soft-null DEP+coerce on 8.4 (#21197); encodings stay TypeError (#19387).
+        // Do not map null→'' before the fold guard for encoding args — that incorrectly constant-folds
+        // iconv(null, …) under AOT (#19387).
         $fromIsNull = self::encodingArgIsNullConstant($args[0]);
         $toIsNull = self::encodingArgIsNullConstant($args[1]);
         $inputIsNull = JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant;
@@ -32,22 +32,30 @@ final class JitIconv
             || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
         $fromLit = $fromIsNull ? null : JitStringBuiltinArg::compileTimeLiteral($args[0]);
         $toLit = $toIsNull ? null : JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        $inputLit = $inputIsNull ? null : JitStringBuiltinArg::compileTimeLiteral($args[2]);
+        // Soft-null input: fold null→'' outside strict_types (#21197).
+        $inputLit = $inputIsNull
+            ? ($context->callerStrictTypes ? null : '')
+            : JitStringBuiltinArg::compileTimeLiteral($args[2]);
         if (
             null !== $fromLit
             && null !== $toLit
             && null !== $inputLit
-            && !($rejectNullZparam && ($fromIsNull || $toIsNull || $inputIsNull))
+            && !($rejectNullZparam && ($fromIsNull || $toIsNull))
+            && !($context->callerStrictTypes && $inputIsNull)
             && null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($fromLit, true))
             && null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($toLit, false))
         ) {
+            if ($inputIsNull) {
+                JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'iconv', 2, 'string');
+            }
+
             return self::foldCompileTime($context, $fromLit, $toLit, $inputLit);
         }
 
         IconvRuntimeLink::ensureLinked($context);
 
-        // Always use Z_PARAM_STR lowering so PROFILE=8.4 null TypeError is baked into AOT
-        // the same way as JIT (lowerStrictOrCoercible alone uses the legacy off switch).
+        // Encoding args: Z_PARAM_STR TypeError on PROFILE=8.4 (#19387).
+        // $string: soft-null DEP+coerce (#21197).
         $from = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv', 0, 'from_encoding')
             : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'iconv', 0, 'from_encoding');
@@ -56,7 +64,7 @@ final class JitIconv
             : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'iconv', 1, 'to_encoding');
         $input = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv', 2, 'string')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'iconv', 2, 'string');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[2], 'iconv', 2, 'string');
 
         $result = $context->builder->call(
             $context->lookupFunction('__compiler_iconv'),
@@ -77,10 +85,19 @@ final class JitIconv
     {
         $converted = VmIconv::iconv($from, $to, $input);
         if (false === $converted) {
-            return $context->getTypeFromString('bool')->constInt(0, false);
+            // Match runtime materializeStringOrFalse failure shape (value-box false).
+            $slot = JitValueBox::alloc($context);
+            $i1 = $context->getTypeFromString('int1');
+            JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+            return JitValueBox::pointer($context, $slot);
         }
 
-        return $context->constantFromString($converted);
+        // constantFromString() is a C-string global — must box as __string__ like the runtime path
+        // so AOT can infer the builtin return type (#21197; unblocks empty/null soft-null folds).
+        $strPtr = $context->builder->load($context->constantStringFromString($converted));
+
+        return self::materializeStringOrFalse($context, $strPtr);
     }
 
     private static function materializeStringOrFalse(Context $context, Value $contents): Value

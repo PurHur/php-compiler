@@ -34,8 +34,9 @@ final class iconv extends Internal
         }
         $from = VmIconv::coerceEncodingArg($frame->calledArgs[0], 'iconv', 0, 'from_encoding', $frame);
         $to = VmIconv::coerceEncodingArg($frame->calledArgs[1], 'iconv', 1, 'to_encoding', $frame);
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19387, re-#18242; iconv.c).
-        $input = VmString::zparamStrBuiltinArgForFrame($frame, 2, 'iconv', 2, 'string');
+        // Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src iconv.c / #21197).
+        // Encoding args stay Z_PARAM_STR TypeError on 8.4 until a follow-up softens them (#19387).
+        $input = VmString::trimFamilyStringArgForFrame($frame, 2, 'iconv', 2, 'string');
         if (null === $frame->returnVar) {
             return;
         }

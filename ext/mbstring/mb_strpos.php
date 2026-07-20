@@ -37,22 +37,12 @@ final class mb_strpos extends Internal
                 max(\array_keys($frame->calledArgs)) + 1
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19297, mbstring.c).
-        $haystack = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_strpos',
-            0,
-            'haystack'
-        );
+        // Z_PARAM_STR — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c / #21197).
+        $haystack = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_strpos', 0, 'haystack');
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[1],
-            'mb_strpos',
-            1,
-            'needle'
-        );
+        $needle = VmString::trimFamilyStringArgForFrame($frame, 1, 'mb_strpos', 1, 'needle');
         $offset = isset($frame->calledArgs[2])
             ? VmMbstring::coerceOffsetArg($frame, 'mb_strpos', 2)
             : 0;

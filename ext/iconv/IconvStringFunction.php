@@ -25,11 +25,11 @@ abstract class IconvStringFunction extends Internal
     }
 
     /**
-     * Z_PARAM_STR — null TypeError on 8.4 forward profile (#20208; iconv.c / iconv.stub.php).
+     * Z_PARAM_STR — non-strict null is E_DEPRECATED + '' on 8.4 (php-src iconv.c / #21197).
      */
     protected function coerceInputString(Frame $frame, int $index, string $param): string
     {
-        return VmString::zparamStrBuiltinArgForFrame($frame, $index, $this->getName(), $index, $param);
+        return VmString::trimFamilyStringArgForFrame($frame, $index, $this->getName(), $index, $param);
     }
 
     protected function coerceEncoding(Frame $frame, int $index): string
