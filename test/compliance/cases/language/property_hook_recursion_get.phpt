@@ -1,7 +1,21 @@
 --TEST--
-Language: get hook reading same virtual property throws Error (#10005, zend_object_handlers.c)
+Language: get-hook self-read on backed typed property — Zend uninitialized Error (#21467, re-#10005, zend_object_handlers.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+putenv('PHP_COMPILER_PROFILE=8.4');
+if (!PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+    die('skip property hooks require PHP_COMPILER_PROFILE=8.4');
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+// Hook body references $this->x → non-virtual backing slot (ReflectionProperty::isVirtual() false).
+// Recursive get skips the hook and reads the uninitialized typed backing — php-src-strict.
 class C {
     public string $x {
         get { return $this->x; }
@@ -18,5 +32,5 @@ try {
 echo "after\n";
 --EXPECT--
 before
-Error: Must not read from virtual property C::$x
+Error: Typed property C::$x must not be accessed before initialization
 after

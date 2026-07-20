@@ -11832,7 +11832,9 @@ restart:
     }
 
     /**
-     * Inside a property hook, $this->prop reads/writes backing — virtual hooks have none (#10005, zend_object_handlers.c).
+     * Inside a property hook, re-entrant $this->prop skips the hook (zend_should_call_hook).
+     * Virtual: "Must not read/write virtual property" (#10005).
+     * Backed typed, uninitialized: typed-property Error (#21467, php-src-strict).
      */
     private function enforceVirtualPropertyHookRawAccess(
         ObjectEntry $object,
