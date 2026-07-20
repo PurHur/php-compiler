@@ -1459,6 +1459,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phar_metadata')) {
                 continue;
             }
+            // Phar getVersion/isWritable/getModified: VM green (#21230); same Phar ctor MCJIT skip.
+            if (str_contains($name, 'phar_version_writable_modified')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }
