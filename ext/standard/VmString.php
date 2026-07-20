@@ -113,6 +113,7 @@ final class VmString
      * header($header), preg_quote($str), printf/fprintf($format) soft-null (#21234, reverts #19224/#20197).
      * xml_parse/xml_parse_into_struct $data soft-null (#21505, ext/xml/xml.c).
      * token_get_all($source) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).
+     * ini_get/ini_set $option and putenv $assignment soft-null (#21312, reverts #20361/#21004 TypeError).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

@@ -693,14 +693,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ini_get()/ini_set() $option strict Z_PARAM_STR — int operand TypeError (#17268).
+     * PHP 8.4+ ini_get()/ini_set() $option — historically gated int TypeError (#17268).
      *
-     * Reference 8.2 profile (unset PHP_COMPILER_PROFILE on 8.4.0-dev) coerces int like Zend 8.2 (#17291).
-     * php-src: ext/standard/ini.c ZEND_ARG_TYPE(1, IS_STRING).
+     * Zend 8.4 Z_PARAM_STR soft-coerces null and int; callers must use trim-family /
+     * soft helpers (#21312). Kept returning false so leftover gates stay soft.
+     * php-src: ext/standard/ini.c / basic_functions.stub.php.
      */
     public static function iniOptionRequiresStrictStringType(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
