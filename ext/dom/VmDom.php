@@ -7636,21 +7636,45 @@ final class VmDom
             return str_repeat('  ', $depth).$text;
         }
         if (self::isCdataNode($entry)) {
-            return '<![CDATA['.(DomRegistry::state($entry)->textContent ?? '').']]>';
+            $cdata = '<![CDATA['.(DomRegistry::state($entry)->textContent ?? '').']]>';
+
+            return $format ? str_repeat('  ', $depth).$cdata : $cdata;
         }
         if (self::isCommentNode($entry)) {
-            return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
+            $comment = '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
+
+            return $format ? str_repeat('  ', $depth).$comment : $comment;
         }
         if (self::isProcessingInstruction($entry)) {
             $pi = DomRegistry::state($entry);
+            $out = '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
 
-            return '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
+            return $format ? str_repeat('  ', $depth).$out : $out;
         }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
         }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
+    }
+
+    /**
+     * libxml xmlNodeDump formatOutput: any text/cdata/entity-ref child keeps content inline
+     * (php-src ext/dom/document.c → libxml; #21489).
+     */
+    private static function elementHasInlineFormatContent(ObjectEntry $entry): bool
+    {
+        foreach (DomRegistry::state($entry)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (self::isTextNode($child) || self::isCdataNode($child) || self::isEntityReference($child)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function serializeElement(ObjectEntry $entry, int $depth = 0, bool $format = false, bool $noEmptyTag = false): string
@@ -7665,7 +7689,8 @@ final class VmDom
 
             return $format ? str_repeat('  ', $depth).$tag : $tag;
         }
-        if (!$format) {
+        // Text/cdata/entity-ref children suppress pretty-print (libxml; #21489).
+        if (!$format || self::elementHasInlineFormatContent($entry)) {
             $parts = [];
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
@@ -7673,8 +7698,9 @@ final class VmDom
                     $parts[] = self::serializeNode($child, 0, false, $noEmptyTag);
                 }
             }
+            $tag = '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
 
-            return '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
+            return $format ? str_repeat('  ', $depth).$tag : $tag;
         }
 
         $indent = str_repeat('  ', $depth);
