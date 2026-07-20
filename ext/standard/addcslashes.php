@@ -46,6 +46,16 @@ final class addcslashes extends Internal
             );
         }
 
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'addcslashes', 0, 'string');
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'addcslashes', 0, 'string');
+        }
+
         StringCslashes::ensureLinked($context);
         $subject = self::jitStringArg($context, $args[0], 0, 'string');
         if (null !== $charlistLit) {
@@ -70,7 +80,7 @@ final class addcslashes extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'addcslashes', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'addcslashes',
             $argIndex,
@@ -94,7 +104,7 @@ final class addcslashes extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'addcslashes',
