@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Lowered into JIT/AOT modules for string offset read/write/index (#10245, php-in-PHP).
+ * Lowered into JIT/AOT modules for string offset read/write/index (#10245, #21497, php-in-PHP).
  *
  * php-src: Zend/zend_operators.c — string offset fetch/write, increment on string offsets
  * SSOT: {@see Variable::readStringOffset()}, {@see Variable::writeStringOffset()}
