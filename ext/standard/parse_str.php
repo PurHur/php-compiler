@@ -49,8 +49,8 @@ final class parse_str extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20113, ext/standard/string.c).
-        $encodedStr = VmString::zparamStrBuiltinArgForFrame(
+        // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #20113 TypeError).
+        $encodedStr = VmString::trimFamilyStringArgForFrame(
             $frame,
             0,
             'parse_str',

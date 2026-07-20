@@ -1,20 +1,32 @@
 --TEST--
-stdlib parse_str(null) — TypeError on 8.4 forward profile JIT (#20113, ext/standard/string.c)
+stdlib parse_str(null) — E_DEPRECATED + empty result on 8.4 forward profile JIT (#21223)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
+error_reporting(E_ALL);
+$seen = [];
+set_error_handler(static function (int $no, string $str) use (&$seen): bool {
+    if (E_DEPRECATED === $no) {
+        $seen[] = $str;
+    }
+    return true;
+});
 try {
     parse_str(null, $o);
-    echo "uncaught\n";
+    echo var_export($o, true), "\n";
 } catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
+    echo "TypeError\n";
 }
+restore_error_handler();
+echo 'depr=', (int) (count($seen) >= 1), "\n";
 parse_str('', $empty);
 echo var_export($empty, true), "\n";
 ?>
 --EXPECT--
-parse_str(): Argument #1 ($string) must be of type string, null given
+array (
+)
+depr=1
 array (
 )

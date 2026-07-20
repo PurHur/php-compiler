@@ -33,8 +33,8 @@ final class JitParseStr
             return;
         }
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20113).
-        $encodedStr = JitStringBuiltinArg::lowerZparamStr($context, $encoded, 'parse_str', 0, 'string');
+        // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #20113 TypeError).
+        $encodedStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $encoded, 'parse_str', 0, 'string');
         $parsedHt = HashTableHelper::alloc($context);
         $context->builder->call(
             $context->lookupFunction('__compiler_parse_str'),
@@ -67,8 +67,8 @@ final class JitParseStr
             return;
         }
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20113).
-        $encodedStr = JitStringBuiltinArg::lowerZparamStr($context, $encoded, 'parse_str', 0, 'string');
+        // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #20113 TypeError).
+        $encodedStr = JitStringBuiltinArg::lowerTrimFamilyString($context, $encoded, 'parse_str', 0, 'string');
         $parsedHt = HashTableHelper::alloc($context);
         self::emitRuntimeParse($context, $parsedHt, $encodedStr, $separator, $delimiter);
         $valPtr = JitValueBox::valuePtrFromVariable($context, $result);

@@ -702,13 +702,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ json_decode()/json_validate() typed string $json — null operand TypeError (#18852).
+     * json_decode()/json_validate() $json — always soft-null (DEP+coerce), matching Zend Z_PARAM_STR (#21223).
      *
-     * Distinct from general Z_PARAM_STR null coerce (#19161): ext/json/json.stub.php declares `string $json`.
+     * Earlier #18852 assumed typed stub `string $json` meant TypeError on 8.4; Zend 8.4 still
+     * deprecates and coerces null (same as other Z_PARAM_STR builtins). Kept as a named gate so
+     * callers can share {@see \PHPCompiler\ext\standard\JsonStringOperandArg}.
      */
     public static function jsonStringOperandRequiresStrictType(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

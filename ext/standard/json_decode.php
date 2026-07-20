@@ -90,6 +90,18 @@ final class json_decode extends Internal
         $flags = self::resolveFlagsJit($context, $args);
         $assoc = self::resolveAssocFlag($context, $args, $flags);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (
+            null === $literal
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
+            if ($context->callerStrictTypes) {
+                JsonStringOperandArg::jitJson($context, $args[0], 'json_decode');
+
+                return JitJsonDecode::materializeNull($context);
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'json_decode', 0, 'json');
+            $literal = '';
+        }
         if (null !== $literal) {
             $decoded = VmJsonFormat::decode($literal, $assoc, $depth, $flags);
 
@@ -104,7 +116,7 @@ final class json_decode extends Internal
             return JitJsonDecode::decodeRuntime($context, $args[0]);
         }
 
-        // assoc=false runtime path is unsupported; still reject enum/null operands first (#5907, #18665, #18852).
+        // assoc=false runtime path is unsupported; soft-null / enum TypeError still apply first (#5907, #18665, #21223).
         JsonStringOperandArg::jitJson($context, $args[0], 'json_decode');
 
         return JitJsonDecode::decodeRuntimeObjectMode($context, $args[0]);

@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
@@ -34,7 +35,8 @@ final class unserialize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $payload = VmString::coerceZparamStrBuiltinArg(
+        // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #18840 TypeError).
+        $payload = VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'unserialize',
             0,
@@ -104,7 +106,7 @@ final class unserialize extends Internal
     private static function compileTimeUnserialize(Context $context, JITVariable $arg, ?array $options = null): ?Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes || VmString::requiresZparamStrStrictNullOnForwardProfile()) {
+            if ($context->callerStrictTypes) {
                 $message = 'unserialize(): Argument #1 ($data) must be of type string, null given';
                 if (null !== TryCatchHelper::resolveThrowHandler($context)) {
                     TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
@@ -114,6 +116,8 @@ final class unserialize extends Internal
 
                 return null;
             }
+            // Soft-null: empty payload → false (same as unserialize('')) (#21223).
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'unserialize', 0, 'data');
 
             return $context->helper->loadValue(
                 new JITVariable(

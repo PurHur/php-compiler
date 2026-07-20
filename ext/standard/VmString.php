@@ -34,14 +34,15 @@ final class VmString
      * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222, #19254, #19318).
      *
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
-     * wordwrap/str_pad, unserialize/substr, substr_compare, str_increment/str_decrement,
-     * and other typed string builtins use this guard (php-src ext/standard/string.c, var_unserializer.c).
+     * wordwrap/str_pad, substr_compare, str_increment/str_decrement,
+     * and other typed string builtins use this guard (php-src ext/standard/string.c).
      * trim/ltrim/rtrim/chop, str_repeat/str_shuffle/ucfirst/lcfirst/ucwords,
      * strlen/strtolower/strtoupper/strrev, and md5/sha1/crc32/bin2hex/hash($data) coerce null with
      * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181).
      * base64_encode/base64_decode, urlencode/urldecode/rawurlencode/rawurldecode, parse_url soft-null (#21188).
      * mb_strlen/mb_substr/mb_strpos and iconv/iconv_strlen(+substr/strpos/strrpos input) soft-null (#21197).
      * preg_match/preg_replace $subject (and str_replace family $subject) soft-null likewise (#21198).
+     * json_decode/json_validate $json, unserialize $data, parse_str $string soft-null (#21223).
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare is Z_PARAM_STR TypeError on 8.4 (#20164), not soft-null.
      */
@@ -60,7 +61,8 @@ final class VmString
      * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * preg_match $subject (#21198), and substr/strpos/strstr/explode string
-     * operands (#21189), ord() character (#21222).
+     * operands (#21189), ord() character (#21222),
+     * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,
