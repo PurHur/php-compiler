@@ -31,12 +31,8 @@ final class mb_encode_mimeheader extends Internal
                 $argc
             ));
         }
-        $str = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_encode_mimeheader',
-            0,
-            'str'
-        );
+        // Soft-null DEP+coerce on 8.4 (php-src mbstring.c; #21430).
+        $str = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_encode_mimeheader', 0, 'str');
         if (null === $frame->returnVar) {
             return;
         }

@@ -1,5 +1,6 @@
 <?php
-// Issue #20225 — mb_strcut/mb_strimwidth/mb_detect_encoding null TypeError under PROFILE=8.4
+// Issue #21430 — mb_strcut/mb_strimwidth soft-null; mb_detect_encoding TypeError under PROFILE=8.4
+error_reporting(E_ALL & ~E_DEPRECATED);
 foreach ([
     static fn () => mb_strcut(null, 0),
     static fn () => mb_strimwidth(null, 0, 5),
