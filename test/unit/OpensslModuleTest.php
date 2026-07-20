@@ -177,7 +177,7 @@ PHP;
         }
     }
 
-    public function test_openssl_encrypt_null_typeerror_on_forward84_when_ffi_available(): void
+    public function test_openssl_encrypt_null_soft_coerces_on_forward84_when_ffi_available(): void
     {
         if (!\PHPCompiler\ext\openssl\VmOpensslCipherNative::available()) {
             self::markTestSkipped('libcrypto FFI unavailable');
@@ -188,25 +188,39 @@ PHP;
         try {
             $runtime = new Runtime();
             $encryptFn = new \PHPCompiler\ext\openssl\openssl_encrypt();
-            $frame = $encryptFn->getFrame($runtime->vmContext);
-            $dataVar = new \PHPCompiler\VM\Variable();
-            $dataVar->null();
-            $cipherVar = new \PHPCompiler\VM\Variable();
-            $cipherVar->string('aes-256-cbc');
-            $keyVar = new \PHPCompiler\VM\Variable();
-            $keyVar->string(str_repeat('k', 32));
-            $optionsVar = new \PHPCompiler\VM\Variable();
-            $optionsVar->int(0);
-            $ivVar = new \PHPCompiler\VM\Variable();
-            $ivVar->string(str_repeat('i', 16));
-            $frame->calledArgs = [$dataVar, $cipherVar, $keyVar, $optionsVar, $ivVar];
-            $frame->returnVar = new \PHPCompiler\VM\Variable();
+            $key = str_repeat('k', 32);
+            $iv = str_repeat('i', 16);
 
-            $this->expectException(\TypeError::class);
-            $this->expectExceptionMessage(
-                'openssl_encrypt(): Argument #1 ($data) must be of type string, null given'
-            );
-            $encryptFn->execute($frame);
+            $makeFrame = static function (?\PHPCompiler\VM\Variable $dataVar) use ($runtime, $encryptFn, $key, $iv) {
+                $frame = $encryptFn->getFrame($runtime->vmContext);
+                $cipherVar = new \PHPCompiler\VM\Variable();
+                $cipherVar->string('aes-256-cbc');
+                $keyVar = new \PHPCompiler\VM\Variable();
+                $keyVar->string($key);
+                $optionsVar = new \PHPCompiler\VM\Variable();
+                $optionsVar->int(0);
+                $ivVar = new \PHPCompiler\VM\Variable();
+                $ivVar->string($iv);
+                $frame->calledArgs = [$dataVar, $cipherVar, $keyVar, $optionsVar, $ivVar];
+                $frame->returnVar = new \PHPCompiler\VM\Variable();
+
+                return $frame;
+            };
+
+            $emptyVar = new \PHPCompiler\VM\Variable();
+            $emptyVar->string('');
+            $emptyFrame = $makeFrame($emptyVar);
+            $encryptFn->execute($emptyFrame);
+
+            $nullVar = new \PHPCompiler\VM\Variable();
+            $nullVar->null();
+            $nullFrame = $makeFrame($nullVar);
+            $encryptFn->execute($nullFrame);
+
+            self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $emptyFrame->returnVar->type);
+            self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $nullFrame->returnVar->type);
+            self::assertNotSame('', $emptyFrame->returnVar->toString());
+            self::assertSame($emptyFrame->returnVar->toString(), $nullFrame->returnVar->toString());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

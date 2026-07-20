@@ -134,6 +134,7 @@ final class JitStringBuiltinArg
      * hebrev($string) soft-null (#21421, ext/standard/string.c).
      * zlib one-shot $data (gzdeflate/gzinflate/gzdecode/gzuncompress/gzcompress/gzencode) soft-null (#21311, reverts #19332).
      * glob() pattern and fnmatch() pattern soft-null (#21366, ext/standard/file.c, fnmatch.c).
+     * openssl_encrypt/openssl_decrypt $data soft-null (#21445, reverts #20263; ext/openssl/openssl.c).
      */
     public static function lowerTrimFamilyString(
         Context $context,

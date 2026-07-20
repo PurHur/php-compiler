@@ -48,7 +48,7 @@ final class JitOpensslEncrypt
 
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_openssl_encrypt'),
-            JitStringBuiltinArg::lowerZparamStr($context, $data, 'openssl_encrypt', 0, 'data'),
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $data, 'openssl_encrypt', 0, 'data'),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $cipherAlgo, 'openssl_encrypt', 1, 'cipher_algo'),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $passphrase, 'openssl_encrypt', 2, 'passphrase'),
             $optionsVal,
@@ -88,7 +88,7 @@ final class JitOpensslEncrypt
 
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_openssl_decrypt'),
-            JitStringBuiltinArg::lowerZparamStr($context, $data, 'openssl_decrypt', 0, 'data'),
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $data, 'openssl_decrypt', 0, 'data'),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $cipherAlgo, 'openssl_decrypt', 1, 'cipher_algo'),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $passphrase, 'openssl_decrypt', 2, 'passphrase'),
             $optionsVal,
