@@ -58,7 +58,8 @@ final class JitGetimagesize
         if ($argc >= 2) {
             throw new \LogicException('getimagesizefromstring() imageinfo by-ref is VM-only in this compiler build (#3271)');
         }
-        $data = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'getimagesizefromstring', 0, 'string');
+        // Soft-null DEP+coerce on PROFILE=8.4 (php-src image.c; #21492, reverts #20353 TypeError).
+        $data = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'getimagesizefromstring', 0, 'string');
 
         return self::lowerBytesValue($context, $data, null, 'getimagesizefromstring', $data);
     }
