@@ -38,6 +38,10 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/tidy_warning_count.php';
         require_once __DIR__.'/tidy_access_count.php';
         require_once __DIR__.'/tidy_config_count.php';
+        require_once __DIR__.'/tidy_get_release.php';
+        require_once __DIR__.'/tidy_get_html_ver.php';
+        require_once __DIR__.'/tidy_is_xhtml.php';
+        require_once __DIR__.'/tidy_is_xml.php';
         parent::init($runtime);
         if (!TidyExtensionPolicy::advertisesExtension()) {
             return;
@@ -72,6 +76,10 @@ class Module extends ModuleAbstract
             new tidy_warning_count(),
             new tidy_access_count(),
             new tidy_config_count(),
+            new tidy_get_release(),
+            new tidy_get_html_ver(),
+            new tidy_is_xhtml(),
+            new tidy_is_xml(),
         ];
     }
 }

@@ -542,6 +542,109 @@ final class VmTidy
     }
 
     /**
+     * tidy_get_release() / tidy::getRelease() — host bridge (#21542).
+     */
+    public static function getRelease(?Frame $frame): string
+    {
+        if (!self::hostAvailable() || !\function_exists('tidy_get_release')) {
+            self::emitWarning($frame, 'tidy_get_release(): host ext/tidy is not available');
+
+            return '';
+        }
+        try {
+            return (string) \tidy_get_release();
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_get_release(): '.$e->getMessage());
+
+            return '';
+        }
+    }
+
+    /**
+     * tidy_get_html_ver() / tidy::getHtmlVer() — host bridge (#21542).
+     */
+    public static function getHtmlVer(ObjectEntry $object, ?Frame $frame): int
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_get_html_ver(): tidy object has no host backend');
+
+            return 0;
+        }
+        try {
+            if (\function_exists('tidy_get_html_ver')) {
+                return (int) \tidy_get_html_ver($host);
+            }
+            if (\is_callable([$host, 'getHtmlVer'])) {
+                return (int) $host->getHtmlVer();
+            }
+            self::emitWarning($frame, 'tidy_get_html_ver(): host tidy lacks getHtmlVer()');
+
+            return 0;
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_get_html_ver(): '.$e->getMessage());
+
+            return 0;
+        }
+    }
+
+    /**
+     * tidy_is_xhtml() / tidy::isXhtml() — host bridge (#21542).
+     */
+    public static function isXhtml(ObjectEntry $object, ?Frame $frame): bool
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_is_xhtml(): tidy object has no host backend');
+
+            return false;
+        }
+        try {
+            if (\function_exists('tidy_is_xhtml')) {
+                return (bool) \tidy_is_xhtml($host);
+            }
+            if (\is_callable([$host, 'isXhtml'])) {
+                return (bool) $host->isXhtml();
+            }
+            self::emitWarning($frame, 'tidy_is_xhtml(): host tidy lacks isXhtml()');
+
+            return false;
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_is_xhtml(): '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * tidy_is_xml() / tidy::isXml() — host bridge (#21542).
+     */
+    public static function isXml(ObjectEntry $object, ?Frame $frame): bool
+    {
+        $host = self::hostFrom($object);
+        if (null === $host) {
+            self::emitWarning($frame, 'tidy_is_xml(): tidy object has no host backend');
+
+            return false;
+        }
+        try {
+            if (\function_exists('tidy_is_xml')) {
+                return (bool) \tidy_is_xml($host);
+            }
+            if (\is_callable([$host, 'isXml'])) {
+                return (bool) $host->isXml();
+            }
+            self::emitWarning($frame, 'tidy_is_xml(): host tidy lacks isXml()');
+
+            return false;
+        } catch (\Throwable $e) {
+            self::emitWarning($frame, 'tidy_is_xml(): '.$e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * tidy_repair_string() / tidy::repairString() — host bridge (#21498).
      *
      * @return string|false

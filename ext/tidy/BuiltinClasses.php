@@ -93,6 +93,26 @@ final class BuiltinClasses
         $entry->methodVisibility['getstatus'] = $pub;
         $entry->methodNames['getstatus'] = 'getStatus';
 
+        $getRelease = new TidyGetRelease();
+        $entry->methods['getrelease'] = $getRelease;
+        $entry->methodVisibility['getrelease'] = $pub;
+        $entry->methodNames['getrelease'] = 'getRelease';
+
+        $getHtmlVer = new TidyGetHtmlVer();
+        $entry->methods['gethtmlver'] = $getHtmlVer;
+        $entry->methodVisibility['gethtmlver'] = $pub;
+        $entry->methodNames['gethtmlver'] = 'getHtmlVer';
+
+        $isXhtml = new TidyIsXhtml();
+        $entry->methods['isxhtml'] = $isXhtml;
+        $entry->methodVisibility['isxhtml'] = $pub;
+        $entry->methodNames['isxhtml'] = 'isXhtml';
+
+        $isXml = new TidyIsXml();
+        $entry->methods['isxml'] = $isXml;
+        $entry->methodVisibility['isxml'] = $pub;
+        $entry->methodNames['isxml'] = 'isXml';
+
         $ctx->classes[VmTidy::CLASS_LC] = $entry;
     }
 
@@ -379,6 +399,118 @@ final class TidyGetStatus extends VmClassMethod
         $status = VmTidy::getStatus($self->toObject(), $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($status): void {
             $ret->int($status);
+        });
+    }
+}
+
+/** tidy::getRelease() — host bridge (#21542). */
+final class TidyGetRelease extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getRelease');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidy::getRelease() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidy::getRelease() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $rel = VmTidy::getRelease($frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($rel): void {
+            $ret->string($rel);
+        });
+    }
+}
+
+/** tidy::getHtmlVer() — host bridge (#21542). */
+final class TidyGetHtmlVer extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getHtmlVer');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidy::getHtmlVer() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidy::getHtmlVer() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::getHtmlVer() called without $this');
+        }
+        $ver = VmTidy::getHtmlVer($self->toObject(), $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ver): void {
+            $ret->int($ver);
+        });
+    }
+}
+
+/** tidy::isXhtml() — host bridge (#21542). */
+final class TidyIsXhtml extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isXhtml');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidy::isXhtml() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidy::isXhtml() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::isXhtml() called without $this');
+        }
+        $ok = VmTidy::isXhtml($self->toObject(), $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
+            $ret->bool($ok);
+        });
+    }
+}
+
+/** tidy::isXml() — host bridge (#21542). */
+final class TidyIsXml extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isXml');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException('tidy::isXml() called without $this');
+        }
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'tidy::isXml() expects exactly 0 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $self->type) {
+            throw new \LogicException('tidy::isXml() called without $this');
+        }
+        $ok = VmTidy::isXml($self->toObject(), $frame);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
+            $ret->bool($ok);
         });
     }
 }
