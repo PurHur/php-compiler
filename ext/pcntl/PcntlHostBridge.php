@@ -218,6 +218,20 @@ final class PcntlHostBridge
         return (bool) @\pcntl_unshare($flags);
     }
 
+    public static function setnsAvailable(): bool
+    {
+        return \function_exists('pcntl_setns');
+    }
+
+    public static function setns(?int $pid, int $nstype): bool
+    {
+        if (null === $pid) {
+            return (bool) @\pcntl_setns(null, $nstype);
+        }
+
+        return (bool) @\pcntl_setns($pid, $nstype);
+    }
+
     private static function ffiCallbackAvailable(): bool
     {
         return \class_exists(\FFI::class, false) && \method_exists(\FFI::class, 'callback');
