@@ -441,6 +441,111 @@ final class VmOdbcCore
     }
 
     /**
+     * odbc_next_result — SQLMoreResults + re-buffer (php-src php_odbc.c).
+     */
+    public static function nextResult(
+        ObjectEntry $result,
+        Context $ctx,
+        ?Frame $frame = null
+    ): bool {
+        VmOdbcResult::requireLive($result);
+        $hstmt = VmOdbcResult::hstmt($result);
+        if (null === $hstmt) {
+            self::warn($ctx, 'odbc_next_result(): SQL error: Failed to fetch error message, SQL state HY000 in SQLMoreResults', $frame);
+
+            return false;
+        }
+        $more = VmOdbcNative::moreResults($hstmt);
+        if (true === $more) {
+            VmOdbcNative::unbindStmt($hstmt);
+            $numparams = VmOdbcNative::numParams($hstmt);
+            VmOdbcResult::setNumParams($result, $numparams);
+            $buffered = VmOdbcNative::bufferResult($hstmt);
+            if (null === $buffered) {
+                self::warn($ctx, 'odbc_next_result(): SQL error: Failed to fetch error message, SQL state HY000 in SQLFetch', $frame);
+
+                return false;
+            }
+            VmOdbcResult::applyBuffered(
+                $result,
+                $buffered['rows'],
+                $buffered['colnames'],
+                $buffered['coltypes'],
+                $buffered['collens']
+            );
+            VmOdbcConnection::setLastError('', '');
+
+            return true;
+        }
+        if (false === $more) {
+            return false;
+        }
+        self::warn($ctx, 'odbc_next_result(): SQL error: Failed to fetch error message, SQL state HY000 in SQLMoreResults', $frame);
+
+        return false;
+    }
+
+    /**
+     * odbc_data_source — SQLDataSources (php-src php_odbc.c).
+     *
+     * @return HashTable|null|false
+     */
+    public static function dataSource(
+        ObjectEntry $connection,
+        int $fetchType,
+        Context $ctx,
+        ?Frame $frame = null
+    ): HashTable|null|false {
+        if (!VmOdbcConnection::isLive($connection)) {
+            throw new \TypeError('odbc_data_source(): supplied resource is not a valid ODBC connection resource');
+        }
+        if (OdbcConstants::SQL_FETCH_FIRST !== $fetchType && OdbcConstants::SQL_FETCH_NEXT !== $fetchType) {
+            throw new \ValueError('odbc_data_source(): Argument #2 ($fetch_type) must be either SQL_FETCH_FIRST or SQL_FETCH_NEXT');
+        }
+        $native = VmOdbcConnection::native($connection);
+        $henv = $native['henv'];
+        if (null === $henv) {
+            self::warn($ctx, 'odbc_data_source(): SQL error: Failed to fetch error message, SQL state HY000 in SQLDataSources', $frame);
+
+            return false;
+        }
+        $row = VmOdbcNative::dataSources($henv, $fetchType);
+        if (null === $row) {
+            return null;
+        }
+        if (false === $row) {
+            self::warn($ctx, 'odbc_data_source(): SQL error: Failed to fetch error message, SQL state HY000 in SQLDataSources', $frame);
+            VmOdbcConnection::setLastError('HY000', 'Failed to fetch error message');
+
+            return false;
+        }
+        VmOdbcConnection::setLastError('', '');
+        $ht = new HashTable();
+        $server = new Variable();
+        $server->string($row['server']);
+        $ht->add('server', $server);
+        $desc = new Variable();
+        $desc->string($row['description']);
+        $ht->add('description', $desc);
+
+        return $ht;
+    }
+
+    public static function binmode(ObjectEntry $result, int $mode): bool
+    {
+        VmOdbcResult::setBinmode($result, $mode);
+
+        return true;
+    }
+
+    public static function longreadlen(ObjectEntry $result, int $length): bool
+    {
+        VmOdbcResult::setLongreadlen($result, $length);
+
+        return true;
+    }
+
+    /**
      * @param callable(\FFI\CData): bool $runner
      *
      * @return Variable|false

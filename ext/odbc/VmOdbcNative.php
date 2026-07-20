@@ -26,6 +26,8 @@ final class VmOdbcNative
 
     public const SQL_DROP = 1;
 
+    public const SQL_UNBIND = 2;
+
     public const SQL_RESET_PARAMS = 3;
 
     public const SQL_PARAM_INPUT = 1;
@@ -175,6 +177,92 @@ final class VmOdbcNative
         try {
             @$ffi->SQLFreeStmt($hstmt, self::SQL_DROP);
         } catch (\Throwable $e) {
+        }
+    }
+
+    public static function unbindStmt(?\FFI\CData $hstmt): void
+    {
+        if (null === $hstmt) {
+            return;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        try {
+            @$ffi->SQLFreeStmt($hstmt, self::SQL_UNBIND);
+        } catch (\Throwable $e) {
+        }
+    }
+
+    /**
+     * SQLMoreResults — true on success, false on SQL_NO_DATA, null on error.
+     */
+    public static function moreResults(\FFI\CData $hstmt): ?bool
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return null;
+            }
+            $rc = (int) $ffi->SQLMoreResults($hstmt);
+            if (self::ok($rc)) {
+                return true;
+            }
+            if (self::SQL_NO_DATA === $rc) {
+                return false;
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
+     * SQLDataSources — array{server, description}|null when no data|false on error.
+     *
+     * @return array{server: string, description: string}|null|false
+     */
+    public static function dataSources(\FFI\CData $henv, int $fetchType): array|null|false
+    {
+        try {
+            $ffi = self::ffi();
+            if (null === $ffi) {
+                return false;
+            }
+            $server = $ffi->new('SQLCHAR[100]');
+            $desc = $ffi->new('SQLCHAR[200]');
+            $len1 = $ffi->new('SQLSMALLINT');
+            $len2 = $ffi->new('SQLSMALLINT');
+            $rc = (int) $ffi->SQLDataSources(
+                $henv,
+                $fetchType,
+                $server,
+                100,
+                \FFI::addr($len1),
+                $desc,
+                200,
+                \FFI::addr($len2)
+            );
+            if (self::SQL_NO_DATA === $rc) {
+                return null;
+            }
+            if (!self::ok($rc)) {
+                return false;
+            }
+            $n1 = (int) $len1->cdata;
+            $n2 = (int) $len2->cdata;
+            if (0 === $n1 || 0 === $n2) {
+                return false;
+            }
+
+            return [
+                'server' => self::ffiString($server, $n1),
+                'description' => self::ffiString($desc, $n2),
+            ];
+        } catch (\Throwable $e) {
+            return false;
         }
     }
 
@@ -640,6 +728,8 @@ SQLRETURN SQLColumns(SQLHSTMT hstmt, SQLCHAR *szTableQualifier, SQLSMALLINT cbTa
 SQLRETURN SQLSetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLULEN vParam);
 SQLRETURN SQLGetConnectOption(SQLHDBC hdbc, SQLUSMALLINT fOption, SQLPOINTER pvParam);
 SQLRETURN SQLTransact(SQLHENV henv, SQLHDBC hdbc, SQLUSMALLINT fType);
+SQLRETURN SQLMoreResults(SQLHSTMT hstmt);
+SQLRETURN SQLDataSources(SQLHENV henv, SQLUSMALLINT fDirection, SQLCHAR *szDSN, SQLSMALLINT cbDSNMax, SQLSMALLINT *pcbDSN, SQLCHAR *szDescription, SQLSMALLINT cbDescriptionMax, SQLSMALLINT *pcbDescription);
 CDEF;
         foreach (['libodbc.so.2', 'libodbc.so.1', 'libodbc.so', 'libiodbc.so.2', 'libiodbc.so'] as $lib) {
             try {
