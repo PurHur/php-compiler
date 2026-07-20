@@ -62,13 +62,14 @@ final class convert_uudecode extends Internal
         );
     }
 
+    /** Zend 8.4 DEP+coerces null (not TypeError until 9.0); use soft-null path (#21420). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'convert_uudecode', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'convert_uudecode',
             $argIndex,
@@ -92,7 +93,7 @@ final class convert_uudecode extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'convert_uudecode',

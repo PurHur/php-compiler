@@ -1,5 +1,5 @@
 --TEST--
-stdlib Z_PARAM_STR builtins — null TypeError/coerce mix on 8.4 JIT (#19161/#19309/#19319)
+stdlib Z_PARAM_STR builtins — null soft-coerce mix on 8.4 JIT (#19161/#19309/#19319/#21420)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -26,10 +26,12 @@ foreach ([
 }
 ?>
 --EXPECT--
-str_word_count: str_word_count(): Argument #1 ($string) must be of type string, null given
+str_word_count: 0
 hex2bin: ''
-chunk_split: chunk_split(): Argument #1 ($string) must be of type string, null given
-str_split: str_split(): Argument #1 ($string) must be of type string, null given
-strrev: strrev(): Argument #1 ($string) must be of type string, null given
-convert_uudecode: convert_uudecode(): Argument #1 ($string) must be of type string, null given
+chunk_split: '
+'
+str_split: array (
+)
+strrev: ''
+convert_uudecode: false
 timezone_name_from_abbr: false

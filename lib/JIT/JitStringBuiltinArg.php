@@ -123,7 +123,7 @@ final class JitStringBuiltinArg
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
      * parse_str $string is Z_PARAM_STR TypeError on 8.4 (#21380).
      * introspection name args (function_exists/class_exists/defined/…) (#21281).
-     * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
+     * hex2bin/convert_uuencode/convert_uudecode/sscanf($string), pack($values) soft-null (#21209/#21420).
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
      * date/gmdate $format and strtotime $datetime soft-null (#21208, reverts #19651).
