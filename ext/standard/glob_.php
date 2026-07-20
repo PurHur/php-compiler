@@ -25,7 +25,8 @@ final class glob_ extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireArgCountRange($frame, 'glob', 1, 2);
-        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'glob', 1, 'pattern');
+        // php-src file.c php_glob — pattern null DEP+coerce on 8.4 (#20554, #21366), not Z_PARAM_STR TypeError.
+        $pattern = VmString::stringBuiltinArgForFrame($frame, 0, 'glob', 1, 'pattern', false);
         $flags = 0;
         if (isset($frame->calledArgs[1])) {
             $flags = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'glob', 2, 'flags');
@@ -57,7 +58,7 @@ final class glob_ extends Internal
             );
         }
 
-        $pattern = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'glob', 1, 'pattern');
+        $pattern = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'glob', 1, 'pattern');
         StringFsGlob::ensureLinked($context);
 
         return JitFsGlob::glob($context, $pattern, $flags);
