@@ -14,7 +14,9 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_ucwords() — multibyte title-case words (php-src ext/mbstring/mbstring.c; PHP 8.4, #20799).
+ * mb_ucwords() — multibyte title-case words (not shipped by Zend; kept unregistered, #21458).
+ *
+ * Historical forward-profile experiment (#20799). Zend uses mb_convert_case(..., MB_CASE_TITLE).
  */
 final class mb_ucwords extends Internal
 {

@@ -389,7 +389,8 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsMbUcwords()
                 && str_contains($name, 'mb_ucwords')
-                && !str_contains($name, 'mb_ucwords_phantom')) {
+                && !str_contains($name, 'mb_ucwords_phantom')
+                && !str_contains($name, 'mb_ucwords_forward')) {
                 continue;
             }
             if (CompilerVersion::supportsMbUcwords()
