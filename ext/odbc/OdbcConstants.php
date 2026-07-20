@@ -17,6 +17,12 @@ final class OdbcConstants
 
     public const SQL_CUR_DEFAULT = -1;
 
+    /** SQL_FETCH_NEXT — odbc_data_source() (sqlext.h). */
+    public const SQL_FETCH_NEXT = 1;
+
+    /** SQL_FETCH_FIRST — odbc_data_source() (sqlext.h). */
+    public const SQL_FETCH_FIRST = 2;
+
     /**
      * @return array<string, int>
      */
@@ -27,6 +33,8 @@ final class OdbcConstants
             'SQL_CUR_USE_ODBC' => self::SQL_CUR_USE_ODBC,
             'SQL_CUR_USE_DRIVER' => self::SQL_CUR_USE_DRIVER,
             'SQL_CUR_DEFAULT' => self::SQL_CUR_DEFAULT,
+            'SQL_FETCH_NEXT' => self::SQL_FETCH_NEXT,
+            'SQL_FETCH_FIRST' => self::SQL_FETCH_FIRST,
         ];
     }
 }

@@ -33,10 +33,18 @@ final class VmOdbcResult
      *   hstmt: ?\FFI\CData,
      *   numparams: int,
      *   executed: bool,
-     *   binds: list<mixed>
+     *   binds: list<mixed>,
+     *   binmode: int,
+     *   longreadlen: int
      * }>
      */
     private static array $state = [];
+
+    /** php.ini odbc.defaultbinmode default. */
+    public const DEFAULT_BINMODE = 1;
+
+    /** php.ini odbc.defaultlrl default. */
+    public const DEFAULT_LONGREADLEN = 4096;
 
     public static function registerClass(Context $ctx): void
     {
@@ -90,6 +98,8 @@ final class VmOdbcResult
             'numparams' => $numparams,
             'executed' => $executed,
             'binds' => $binds,
+            'binmode' => self::DEFAULT_BINMODE,
+            'longreadlen' => self::DEFAULT_LONGREADLEN,
         ];
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
@@ -285,6 +295,38 @@ final class VmOdbcResult
         self::requireLive($object);
 
         return self::$state[$object->id]['connection'];
+    }
+
+    public static function setBinmode(ObjectEntry $object, int $mode): void
+    {
+        self::requireLive($object);
+        self::$state[$object->id]['binmode'] = $mode;
+    }
+
+    public static function setLongreadlen(ObjectEntry $object, int $length): void
+    {
+        self::requireLive($object);
+        self::$state[$object->id]['longreadlen'] = $length;
+    }
+
+    public static function binmode(ObjectEntry $object): int
+    {
+        self::requireLive($object);
+
+        return self::$state[$object->id]['binmode'];
+    }
+
+    public static function longreadlen(ObjectEntry $object): int
+    {
+        self::requireLive($object);
+
+        return self::$state[$object->id]['longreadlen'];
+    }
+
+    public static function setNumParams(ObjectEntry $object, int $n): void
+    {
+        self::requireLive($object);
+        self::$state[$object->id]['numparams'] = $n;
     }
 
     /**
