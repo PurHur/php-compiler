@@ -15,7 +15,8 @@ use PHPCompiler\VM;
  * prepare/execute/fetch_array/tables/columns/field_* + autocommit/commit/rollback +
  * next_result/data_source/binmode/longreadlen/setoption +
  * primarykeys/foreignkeys/statistics/gettypeinfo +
- * specialcolumns/procedures/procedurecolumns catalog APIs.
+ * specialcolumns/procedures/procedurecolumns +
+ * tableprivileges/columnprivileges catalog APIs.
  * Thin unixODBC FFI when libodbc is present (document unixodbc / libsqliteodbc in Docker).
  */
 class Module extends ModuleAbstract
@@ -83,6 +84,8 @@ class Module extends ModuleAbstract
             new odbc_specialcolumns(),
             new odbc_procedures(),
             new odbc_procedurecolumns(),
+            new odbc_tableprivileges(),
+            new odbc_columnprivileges(),
             new odbc_free_result(),
             new odbc_autocommit(),
             new odbc_commit(),

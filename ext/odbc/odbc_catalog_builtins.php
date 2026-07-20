@@ -15,7 +15,8 @@ use PHPLLVM\Value;
 /**
  * odbc catalog metadata: primarykeys/foreignkeys/statistics/gettypeinfo
  * + specialcolumns/procedures/procedurecolumns
- * (php-src ext/odbc/php_odbc.c; #21279 / #21294).
+ * + tableprivileges/columnprivileges
+ * (php-src ext/odbc/php_odbc.c; #21279 / #21294 / #21295).
  */
 
 final class odbc_primarykeys extends Internal
@@ -446,6 +447,132 @@ final class odbc_procedurecolumns extends Internal
             return null;
         }
         $var = $frame->calledArgs[$idx]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $fn, $idx, $name);
+    }
+}
+
+final class odbc_tableprivileges extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('odbc_tableprivileges');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (4 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'odbc_tableprivileges() expects exactly 4 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $conn->type || !VmOdbcConnection::isLive($conn->toObject())) {
+            throw new \TypeError('odbc_tableprivileges(): supplied resource is not a valid ODBC connection resource');
+        }
+        $catalog = self::nullableString($frame->calledArgs[1], 'odbc_tableprivileges', 1, 'catalog');
+        $schema = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'odbc_tableprivileges', 2, 'schema');
+        $table = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'odbc_tableprivileges', 3, 'table');
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('odbc_tableprivileges() requires a VM context');
+        }
+        $result = VmOdbcCore::tablePrivileges(
+            $conn->toObject(),
+            $catalog,
+            $schema,
+            $table,
+            $ctx,
+            $frame
+        );
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->copyFrom($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('odbc_tableprivileges() is not implemented for JIT (#21295)');
+    }
+
+    private static function nullableString(Variable $var, string $fn, int $idx, string $name): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $fn, $idx, $name);
+    }
+}
+
+final class odbc_columnprivileges extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('odbc_columnprivileges');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (5 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'odbc_columnprivileges() expects exactly 5 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $conn->type || !VmOdbcConnection::isLive($conn->toObject())) {
+            throw new \TypeError('odbc_columnprivileges(): supplied resource is not a valid ODBC connection resource');
+        }
+        $catalog = self::nullableString($frame->calledArgs[1], 'odbc_columnprivileges', 1, 'catalog');
+        $schema = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'odbc_columnprivileges', 2, 'schema');
+        $table = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'odbc_columnprivileges', 3, 'table');
+        $column = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'odbc_columnprivileges', 4, 'column');
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('odbc_columnprivileges() requires a VM context');
+        }
+        $result = VmOdbcCore::columnPrivileges(
+            $conn->toObject(),
+            $catalog,
+            $schema,
+            $table,
+            $column,
+            $ctx,
+            $frame
+        );
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->copyFrom($result);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('odbc_columnprivileges() is not implemented for JIT (#21295)');
+    }
+
+    private static function nullableString(Variable $var, string $fn, int $idx, string $name): ?string
+    {
+        $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             return null;
         }

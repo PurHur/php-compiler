@@ -468,6 +468,53 @@ final class VmOdbcCore
     }
 
     /**
+     * @return Variable|false
+     */
+    public static function tablePrivileges(
+        ObjectEntry $connection,
+        ?string $catalog,
+        string $schema,
+        string $table,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_tableprivileges',
+            'SQLTablePrivileges',
+            static function ($hstmt) use ($catalog, $schema, $table): bool {
+                return VmOdbcNative::tablePrivileges($hstmt, $catalog, $schema, $table);
+            }
+        );
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function columnPrivileges(
+        ObjectEntry $connection,
+        ?string $catalog,
+        string $schema,
+        string $table,
+        string $column,
+        Context $ctx,
+        ?Frame $frame = null
+    ): Variable|false {
+        return self::catalogResult(
+            $connection,
+            $ctx,
+            $frame,
+            'odbc_columnprivileges',
+            'SQLColumnPrivileges',
+            static function ($hstmt) use ($catalog, $schema, $table, $column): bool {
+                return VmOdbcNative::columnPrivileges($hstmt, $catalog, $schema, $table, $column);
+            }
+        );
+    }
+
+    /**
      * odbc_autocommit — get status (int) or set mode (bool) (php-src; #21277).
      *
      * @return int|bool

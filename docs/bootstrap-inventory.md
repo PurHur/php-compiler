@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6153 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19175 |
+| Source constructs flagged (warnings) | 19179 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1248,7 +1248,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
 | `ext/odbc/BuiltinClasses.php` | 0 | 1 |
-| `ext/odbc/Module.php` | 0 | 43 |
+| `ext/odbc/Module.php` | 0 | 45 |
 | `ext/odbc/OdbcConstants.php` | 0 | 1 |
 | `ext/odbc/OdbcExtensionPolicy.php` | 0 | 1 |
 | `ext/odbc/VmOdbcConnection.php` | 0 | 4 |
@@ -1256,7 +1256,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/odbc/VmOdbcCore.php` | 0 | 11 |
 | `ext/odbc/VmOdbcNative.php` | 0 | 1 |
 | `ext/odbc/VmOdbcResult.php` | 0 | 4 |
-| `ext/odbc/odbc_catalog_builtins.php` | 0 | 8 |
+| `ext/odbc/odbc_catalog_builtins.php` | 0 | 10 |
 | `ext/odbc/odbc_close.php` | 0 | 2 |
 | `ext/odbc/odbc_close_all.php` | 0 | 2 |
 | `ext/odbc/odbc_connect.php` | 0 | 2 |
@@ -15727,48 +15727,50 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/odbc/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 35)
-- new odbc_connect (line 56)
-- new odbc_pconnect (line 57)
-- new odbc_close (line 58)
-- new odbc_close_all (line 59)
-- new odbc_connection_string_is_quoted (line 60)
-- new odbc_connection_string_should_quote (line 61)
-- new odbc_connection_string_quote (line 62)
-- new odbc_exec (line 63)
-- new odbc_prepare (line 64)
-- new odbc_execute (line 65)
-- new odbc_fetch_row (line 66)
-- new odbc_fetch_array (line 67)
-- new odbc_fetch_object (line 68)
-- new odbc_fetch_into (line 69)
-- new odbc_result (line 70)
-- new odbc_num_rows (line 71)
-- new odbc_num_fields (line 72)
-- new odbc_field_name (line 73)
-- new odbc_field_type (line 74)
-- new odbc_field_len (line 75)
-- new odbc_field_num (line 76)
-- new odbc_tables (line 77)
-- new odbc_columns (line 78)
-- new odbc_primarykeys (line 79)
-- new odbc_foreignkeys (line 80)
-- new odbc_statistics (line 81)
-- new odbc_gettypeinfo (line 82)
-- new odbc_specialcolumns (line 83)
-- new odbc_procedures (line 84)
-- new odbc_procedurecolumns (line 85)
-- new odbc_free_result (line 86)
-- new odbc_autocommit (line 87)
-- new odbc_commit (line 88)
-- new odbc_rollback (line 89)
-- new odbc_next_result (line 90)
-- new odbc_data_source (line 91)
-- new odbc_binmode (line 92)
-- new odbc_longreadlen (line 93)
-- new odbc_setoption (line 94)
-- new odbc_error (line 95)
-- new odbc_errormsg (line 96)
+- new VM\Variable (line 36)
+- new odbc_connect (line 57)
+- new odbc_pconnect (line 58)
+- new odbc_close (line 59)
+- new odbc_close_all (line 60)
+- new odbc_connection_string_is_quoted (line 61)
+- new odbc_connection_string_should_quote (line 62)
+- new odbc_connection_string_quote (line 63)
+- new odbc_exec (line 64)
+- new odbc_prepare (line 65)
+- new odbc_execute (line 66)
+- new odbc_fetch_row (line 67)
+- new odbc_fetch_array (line 68)
+- new odbc_fetch_object (line 69)
+- new odbc_fetch_into (line 70)
+- new odbc_result (line 71)
+- new odbc_num_rows (line 72)
+- new odbc_num_fields (line 73)
+- new odbc_field_name (line 74)
+- new odbc_field_type (line 75)
+- new odbc_field_len (line 76)
+- new odbc_field_num (line 77)
+- new odbc_tables (line 78)
+- new odbc_columns (line 79)
+- new odbc_primarykeys (line 80)
+- new odbc_foreignkeys (line 81)
+- new odbc_statistics (line 82)
+- new odbc_gettypeinfo (line 83)
+- new odbc_specialcolumns (line 84)
+- new odbc_procedures (line 85)
+- new odbc_procedurecolumns (line 86)
+- new odbc_tableprivileges (line 87)
+- new odbc_columnprivileges (line 88)
+- new odbc_free_result (line 89)
+- new odbc_autocommit (line 90)
+- new odbc_commit (line 91)
+- new odbc_rollback (line 92)
+- new odbc_next_result (line 93)
+- new odbc_data_source (line 94)
+- new odbc_binmode (line 95)
+- new odbc_longreadlen (line 96)
+- new odbc_setoption (line 97)
+- new odbc_error (line 98)
+- new odbc_errormsg (line 99)
 - 3 class method(s)
 
 ### `ext/odbc/OdbcConstants.php`
@@ -15797,22 +15799,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/odbc/VmOdbcCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 562)
-- new Variable (line 564)
-- new Variable (line 568)
-- new ObjectEntry (line 594)
-- new HashTable (line 617)
-- new Variable (line 619)
-- new HashTable (line 707)
-- new Variable (line 708)
-- new Variable (line 711)
-- 29 class method(s)
-- 9 closure(s)
+- new HashTable (line 609)
+- new Variable (line 611)
+- new Variable (line 615)
+- new ObjectEntry (line 641)
+- new HashTable (line 664)
+- new Variable (line 666)
+- new HashTable (line 754)
+- new Variable (line 755)
+- new Variable (line 758)
+- 31 class method(s)
+- 11 closure(s)
 
 ### `ext/odbc/VmOdbcNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 36 class method(s)
+- 38 class method(s)
 
 ### `ext/odbc/VmOdbcResult.php`
 
@@ -15825,14 +15827,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/odbc/odbc_catalog_builtins.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
-- new ArgumentCountError (line 87)
-- new ArgumentCountError (line 155)
-- new ArgumentCountError (line 221)
-- new ArgumentCountError (line 268)
-- new ArgumentCountError (line 336)
-- new ArgumentCountError (line 401)
-- 20 class method(s)
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 88)
+- new ArgumentCountError (line 156)
+- new ArgumentCountError (line 222)
+- new ArgumentCountError (line 269)
+- new ArgumentCountError (line 337)
+- new ArgumentCountError (line 402)
+- new ArgumentCountError (line 469)
+- new ArgumentCountError (line 531)
+- 26 class method(s)
 
 ### `ext/odbc/odbc_close.php`
 
@@ -29662,8 +29666,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1748)
-- new Error (line 1759)
+- new Error (line 1751)
+- new Error (line 1762)
 - 217 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -30704,7 +30708,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 56)
-- new JITVariable (line 87)
+- new JITVariable (line 86)
 - 5 class method(s)
 
 ### `ext/standard/convert_cyr_string.php`
@@ -31005,15 +31009,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/define_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 119)
-- new Variable (line 122)
-- new Variable (line 126)
-- new Variable (line 162)
-- new Variable (line 164)
-- new Variable (line 169)
-- new Variable (line 186)
-- new Variable (line 194)
-- new Variable (line 203)
+- new Variable (line 120)
+- new Variable (line 123)
+- new Variable (line 127)
+- new Variable (line 163)
+- new Variable (line 165)
+- new Variable (line 170)
+- new Variable (line 187)
+- new Variable (line 195)
+- new Variable (line 204)
 - 11 class method(s)
 
 ### `ext/standard/defined_.php`
@@ -43936,7 +43940,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 461)
+- new Variable (line 462)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
