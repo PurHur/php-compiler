@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * date_format() — procedural DateTimeInterface::format wrapper (ext/date/php_date.c, #9219).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_format)
- * Z_PARAM_STR $format — null TypeError on 8.4 forward profile (#20693).
+ * Soft-null $format on 8.4 — Zend deprecate+coerce (#21536, reverts #20693 TypeError).
  */
 final class date_format extends Internal
 {
@@ -40,8 +40,8 @@ final class date_format extends Internal
             1,
             'object'
         );
-        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 / strict_types (#20693).
-        $format = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'date_format', 1, 'format');
+        // Soft-null on 8.4 — Zend deprecate+coerce (#21536, reverts #20693 TypeError).
+        $format = VmString::trimFamilyStringArgForFrame($frame, 1, 'date_format', 1, 'format');
         $formatted = DateTimeSupport::format($datetime, $format);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($formatted): void {
             $ret->string($formatted);
@@ -54,7 +54,7 @@ final class date_format extends Internal
             throw new \LogicException('date_format() expects exactly 2 arguments');
         }
 
-        // Same lowering as DateTime::format — Z_PARAM_STR null TypeError on 8.4 (#20693).
+        // Same lowering as DateTime::format — soft-null on 8.4 (#21536).
         return \PHPCompiler\VM\DateTimeFormatJitHelper::compileFormat(
             $context,
             $args[0],

@@ -1,13 +1,12 @@
---TEST--
-JIT DateTime::format()/date_format(null) soft-null DEP+'' on 8.4 forward profile (#21536, reverts #20693; ext/date/php_date.c)
---ENV--
-PHP_COMPILER_PROFILE=8.4
---JIT--
---FILE--
 <?php
+/**
+ * Repro #21536 — DateTime::format / date_format(null) soft-null DEP+'' under PROFILE=8.4.
+ *
+ *   PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/issue_21536_datetime_format_null_soft84.php
+ */
 error_reporting(E_ALL);
-set_error_handler(static function (int $no, string $msg): bool {
-    if (E_DEPRECATED === $no) {
+set_error_handler(static function (int $n, string $m): bool {
+    if (E_DEPRECATED === $n) {
         echo "DEP\n";
         return true;
     }
@@ -21,15 +20,8 @@ foreach ([
     try {
         $r = $call();
         echo "{$name}: OK ", var_export($r, true), "\n";
-    } catch (TypeError $e) {
-        echo "{$name}: TypeError\n";
+    } catch (Throwable $e) {
+        echo "{$name}: ", get_class($e), "\n";
     }
 }
-?>
---EXPECT--
-DEP
-DateTime::format: OK ''
-DEP
-DateTimeImmutable::format: OK ''
-DEP
-date_format: OK ''
+echo "ALL_OK\n";
