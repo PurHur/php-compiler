@@ -1,22 +1,27 @@
 --TEST--
-stdlib trim()/ltrim()/rtrim()/chop() null — TypeError on 8.4 forward profile (#21350, ext/standard/string.c)
+stdlib trim()/ltrim()/rtrim()/chop() null — DEP+coerce on 8.4 forward profile (#21404, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL);
+set_error_handler(static function (int $no, string $msg): bool {
+    echo "DEP:{$msg}\n";
+    return true;
+});
 foreach (['trim', 'ltrim', 'rtrim', 'chop'] as $fn) {
-    try {
-        $fn(null);
-        echo "{$fn}: uncaught\n";
-    } catch (TypeError $e) {
-        echo $e->getMessage(), "\n";
-    }
+    $result = $fn(null);
+    echo "{$fn}:[{$result}]\n";
 }
 echo var_export(trim(''), true), "\n";
 ?>
 --EXPECT--
-trim(): Argument #1 ($string) must be of type string, null given
-ltrim(): Argument #1 ($string) must be of type string, null given
-rtrim(): Argument #1 ($string) must be of type string, null given
-chop(): Argument #1 ($string) must be of type string, null given
+DEP:trim(): Passing null to parameter #1 ($string) of type string is deprecated
+trim:[]
+DEP:ltrim(): Passing null to parameter #1 ($string) of type string is deprecated
+ltrim:[]
+DEP:rtrim(): Passing null to parameter #1 ($string) of type string is deprecated
+rtrim:[]
+DEP:chop(): Passing null to parameter #1 ($string) of type string is deprecated
+chop:[]
 ''
