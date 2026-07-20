@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6155 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19184 |
+| Source constructs flagged (warnings) | 19182 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2583,7 +2583,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitTmpfile.php` | 0 | 1 |
 | `ext/standard/JitTouch.php` | 0 | 1 |
 | `ext/standard/JitTraitExists.php` | 0 | 1 |
-| `ext/standard/JitTriggerErrorKernel.php` | 0 | 3 |
+| `ext/standard/JitTriggerErrorKernel.php` | 0 | 1 |
 | `ext/standard/JitUmask.php` | 0 | 1 |
 | `ext/standard/JitUnitEnumExists.php` | 0 | 1 |
 | `ext/standard/JitUnlink.php` | 0 | 1 |
@@ -25250,9 +25250,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTriggerErrorKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 459)
-- 16 class method(s)
-- 1 closure(s)
+- 13 class method(s)
 
 ### `ext/standard/JitUmask.php`
 
