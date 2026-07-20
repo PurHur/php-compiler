@@ -8,7 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\PregReplaceCallbackArrayRuntime;
 use PHPCompiler\JIT\Builtin\StringPregMatch;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -24,10 +24,24 @@ final class JitPregReplaceCallbackArray
         StringPregMatch::ensureLinked($context);
         PregReplaceCallbackArrayRuntime::ensureLinked($context);
 
+        // $subject soft-null DEP+coerce on 8.4 (#21318; php-src php_pcre.c).
+        $subjectStr = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $subject, 'preg_replace_callback_array', 1, 'subject')
+            : JitStringBuiltinArg::lower(
+                $context,
+                $subject,
+                'preg_replace_callback_array',
+                1,
+                'subject',
+                'array|string',
+                null,
+                false
+            );
+
         $raw = $context->builder->call(
             $context->lookupFunction(PregReplaceCallbackArrayRuntime::ABI_REPLACE_CALLBACK_ARRAY),
             PregReplaceCallbackArrayRuntime::patternsToHashtable($context, $patterns),
-            JitStringArg::lower($context, $subject, 'preg_replace_callback_array() subject')
+            $subjectStr
         );
 
         $strPtrTy = $context->getTypeFromString('__string__*');

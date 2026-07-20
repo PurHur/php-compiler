@@ -41,7 +41,8 @@ final class VmString
      * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181 #21209).
      * base64_encode/base64_decode, urlencode/urldecode/rawurlencode/rawurldecode, parse_url soft-null (#21188).
      * mb_strlen/mb_substr/mb_strpos and iconv/iconv_strlen(+substr/strpos/strrpos input) soft-null (#21197).
-     * preg_match/preg_replace $subject (and str_replace family $subject) soft-null likewise (#21198).
+     * preg_match/preg_replace/preg_split/preg_match_all/preg_replace_callback*
+     * $subject (and str_replace family $subject) soft-null likewise (#21198, #21318).
      * json_decode/json_validate $json, unserialize $data, parse_str $string soft-null (#21223).
      * introspection name args (function_exists/class_exists/defined/…) soft-null (#21281).
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
@@ -64,7 +65,7 @@ final class VmString
      * mb_strtolower/mb_convert_encoding/mb_substr_count string inputs (#21282),
      * function_exists/class_exists/interface_exists/trait_exists/enum_exists/
      * extension_loaded/defined/constant/method_exists/property_exists/define name args (#21281),
-     * preg_match $subject (#21198), and substr/strpos/strstr/explode string
+     * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode string
      * operands (#21189), ord() character (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
