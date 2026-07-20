@@ -329,6 +329,18 @@ final class M3EmitTuTrivialEchoAot
         return $phi;
     }
 
+    /** Ensure __compiler_copy + resolve sidecar ABIs before standalone stub builder swap (#21417). */
+    public static function ensureSidecarCopyAbisForLink(Context $context): void
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringFsDir::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
     /**
      * Runtime::standalone dispatch: sidecar copy unless PHP_COMPILER_KEEP_OBJECT_FILE=1 and no
      * sentinel match — then call real standalone lowering (vendor prelink .o — #3036).
@@ -400,7 +412,7 @@ final class M3EmitTuTrivialEchoAot
             return;
         }
         // Sidecar copy lowering calls __compiler_resolve_sidecar_source_path + __compiler_copy (#6982).
-        StringFsDir::ensureLinked($context);
+        // ABIs are pre-linked in {@see ensureSidecarCopyAbisForLink} before stub builder swap (#21417).
         $objPtr = $context->getTypeFromString('__object__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
