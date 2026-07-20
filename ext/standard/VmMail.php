@@ -265,6 +265,9 @@ final class VmMail
                 $headers = null;
             }
         }
+        if (VmIni::mailAddXHeaderEnabled()) {
+            $headers = self::prependOriginatingScriptHeader($frame, $headers);
+        }
 
         $sendmailPath = VmIniIntrospection::mirroredHostIniGet('sendmail_path');
         if (null === $sendmailPath || '' === $sendmailPath) {
@@ -300,6 +303,27 @@ final class VmMail
         }
 
         return true;
+    }
+
+    /**
+     * php-src php_mail() PG(mail_x_header) — X-PHP-Originating-Script (#21433).
+     */
+    private static function prependOriginatingScriptHeader(Frame $frame, ?string $headers): string
+    {
+        $sep = "\r\n";
+        $uid = VmProcessIdentityNative::getuid() ?? 0;
+        $script = $frame->scriptPath;
+        if ('' === $script || '-' === $script || str_starts_with($script, 'Command line')) {
+            $base = 'Command line code';
+        } else {
+            $base = VmString::basename($script);
+        }
+        $origin = 'X-PHP-Originating-Script: '.$uid.':'.$base;
+        if (null !== $headers && '' !== $headers) {
+            return $origin.$sep.$headers;
+        }
+
+        return $origin;
     }
 
     /**

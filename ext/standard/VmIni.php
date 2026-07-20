@@ -97,7 +97,6 @@ final class VmIni
         'disable_functions',
         'disable_classes',
         'open_basedir',
-        'mail.add_x_header',
         'error_append_string',
         'error_prepend_string',
         'upload_tmp_dir',
@@ -118,7 +117,6 @@ final class VmIni
         'user_dir',
         'disable_functions',
         'disable_classes',
-        'mail.add_x_header',
     ];
 
     /** @var list<string> */
@@ -244,6 +242,9 @@ final class VmIni
             }
 
             return '';
+        }
+        if ('mail.add_x_header' === $key) {
+            return self::formatRegisterArgcArgvIniGet(self::$mailAddXHeader);
         }
         if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
             return '';
@@ -409,6 +410,9 @@ final class VmIni
 
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
 
+    /** php-src PG(mail_x_header) — mail.add_x_header (#21433). */
+    private static bool $mailAddXHeader = false;
+
     /** php-src PG(register_argc_argv) — startup/-d only; runtime ini_set() returns false (#4515). */
     private static bool $registerArgcArgv = true;
 
@@ -443,6 +447,11 @@ final class VmIni
 
             return true;
         }
+        if ('mail.add_x_header' === $key) {
+            self::$mailAddXHeader = self::parseBoolIni($value);
+
+            return true;
+        }
         if ('phar.readonly' === $key) {
             \PHPCompiler\ext\phar\VmPhar::setStartupReadonly(self::parseBoolIni($value));
 
@@ -450,6 +459,12 @@ final class VmIni
         }
 
         return false;
+    }
+
+    /** php-src PG(mail_x_header) for mail() X-PHP-Originating-Script (#21433). */
+    public static function mailAddXHeaderEnabled(): bool
+    {
+        return self::$mailAddXHeader;
     }
 
     /** Observable ini_get('max_execution_time') after set_time_limit / ini_set (#12481). */
