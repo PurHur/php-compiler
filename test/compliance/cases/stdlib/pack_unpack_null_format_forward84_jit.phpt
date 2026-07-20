@@ -1,5 +1,5 @@
 --TEST--
-stdlib pack()/unpack() null format/data TypeError on 8.4 — JIT (#20241)
+stdlib pack()/unpack() null format TypeError; unpack data soft-null on 8.4 — JIT (#20241, #21246)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -21,7 +21,7 @@ foreach ([
 echo bin2hex(pack('a*', 'ok')), "\n";
 --EXPECT--
 pack_fmt TypeError
-unpack_data TypeError
+unpack_data COERCED
 unpack_fmt TypeError
 pack_val COERCED
 6f6b

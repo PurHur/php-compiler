@@ -16,7 +16,8 @@ use PHPLLVM\Value;
 /**
  * unpack() — binary decode (VM via UnpackEngine; JIT/AOT via __compiler_unpack, #3188/#5442).
  *
- * Z_PARAM_STR $format / $data: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241, pack.c).
+ * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241, pack.c).
+ * $string soft-null: E_DEPRECATED + '' on 8.4 (php-src pack.c / #21246); not TypeError.
  */
 final class unpack extends Internal
 {
@@ -24,9 +25,10 @@ final class unpack extends Internal
     {
         $this->requireArgCountRange($frame, 'unpack', 2, 3);
         $argc = \count($frame->calledArgs);
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20241, ext/standard/pack.c).
+        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20241, ext/standard/pack.c).
         $fmt = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'unpack', 0, 'format');
-        $data = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'unpack', 1, 'string');
+        // $string soft-null on 8.4 (#21246) — Zend Warning on empty input after coerce, not TypeError.
+        $data = VmString::trimFamilyStringArgForFrame($frame, 1, 'unpack', 1, 'string');
         $offset = 0;
         if (3 === $argc) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'unpack', 3, 'offset');

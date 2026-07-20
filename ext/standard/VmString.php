@@ -64,6 +64,7 @@ final class VmString
      * operands (#21189), ord() character (#21222),
      * json_decode/json_validate $json, unserialize $data, parse_str $string (#21223).
      * hex2bin/convert_uuencode/sscanf($string), pack($values) soft-null (#21209).
+     * unpack($string) soft-null (#21246).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,
