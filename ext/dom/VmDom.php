@@ -3231,6 +3231,117 @@ final class VmDom
     }
 
     /**
+     * After importNode copy: place ancestor-scoped xmlns on the imported subtree root
+     * (php-src/libxml xmlDOMWrapCloneNode; #21482).
+     *
+     * Bindings already declared on a node inside the subtree stay put; only bindings that
+     * were in scope from outside the cloned fragment are materialized on the root.
+     */
+    private static function reconcileImportedSubtreeNamespaceDeclarations(ObjectEntry $imported): void
+    {
+        if (self::isDocumentFragment($imported)) {
+            $state = DomRegistry::state($imported);
+            foreach ($state->childIds as $childId) {
+                $child = DomRegistry::entry($childId);
+                if (null !== $child && self::isElement($child)) {
+                    self::reconcileImportedSubtreeNamespaceDeclarations($child);
+                }
+            }
+
+            return;
+        }
+        if (!self::isElement($imported)) {
+            return;
+        }
+        self::walkReconcileImportedNamespaceUses($imported, $imported);
+    }
+
+    private static function walkReconcileImportedNamespaceUses(ObjectEntry $node, ObjectEntry $subtreeRoot): void
+    {
+        $state = DomRegistry::state($node);
+        if (self::isElement($node)) {
+            $uri = $state->namespaceUri;
+            if (null !== $uri && '' !== $uri) {
+                $prefix = $state->prefix ?? '';
+                self::ensureImportedNamespaceDeclaration($node, $subtreeRoot, $prefix, $uri);
+            }
+            foreach ($state->attributeNamespaces as $qName => $attrUri) {
+                if (null === $attrUri || '' === $attrUri) {
+                    continue;
+                }
+                if (!str_contains($qName, ':')) {
+                    continue;
+                }
+                $attrPrefix = explode(':', $qName, 2)[0];
+                if ('xmlns' === $attrPrefix || 'xml' === $attrPrefix) {
+                    continue;
+                }
+                self::ensureImportedNamespaceDeclaration($node, $subtreeRoot, $attrPrefix, $attrUri);
+            }
+        }
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::walkReconcileImportedNamespaceUses($child, $subtreeRoot);
+            }
+        }
+    }
+
+    /**
+     * If $prefix=>$uri is not declared on the path from $useSite up to $subtreeRoot (inclusive),
+     * add the nsDef on $subtreeRoot (libxml import placement; #21482).
+     */
+    private static function ensureImportedNamespaceDeclaration(
+        ObjectEntry $useSite,
+        ObjectEntry $subtreeRoot,
+        string $prefix,
+        string $uri
+    ): void {
+        if ('xml' === $prefix || 'xmlns' === $prefix) {
+            return;
+        }
+        if (self::XML_NAMESPACE_URI === $uri || self::XMLNS_NAMESPACE_URI === $uri) {
+            return;
+        }
+        if (self::namespaceDeclaredOnPathToSubtreeRoot($useSite, $subtreeRoot, $prefix, $uri)) {
+            return;
+        }
+        if (!self::isElement($subtreeRoot)) {
+            return;
+        }
+        DomRegistry::state($subtreeRoot)->namespaceDeclarations[$prefix] = $uri;
+    }
+
+    private static function namespaceDeclaredOnPathToSubtreeRoot(
+        ObjectEntry $useSite,
+        ObjectEntry $subtreeRoot,
+        string $prefix,
+        string $uri
+    ): bool {
+        $cur = $useSite;
+        while (true) {
+            if (self::isElement($cur)) {
+                $decls = DomRegistry::state($cur)->namespaceDeclarations;
+                if (\array_key_exists($prefix, $decls) && $decls[$prefix] === $uri) {
+                    return true;
+                }
+            }
+            if ($cur->id === $subtreeRoot->id) {
+                return false;
+            }
+            $parentId = DomRegistry::state($cur)->parentId;
+            if (null === $parentId) {
+                return false;
+            }
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent) {
+                return false;
+            }
+            $cur = $parent;
+        }
+    }
+
+    /**
      * In-scope namespace URI from ancestors only (php-src/libxml ns dump; #19397).
      */
     private static function parentNamespaceUri(ObjectEntry $entry, string $prefix): ?string
@@ -10035,6 +10146,8 @@ final class VmDom
             throw new \TypeError('DOMDocument::importNode(): Argument #1 ($importedNode) must be of type DOMNode');
         }
         $imported = self::importNodeEntry($ctx, $document, $node, $deep);
+        // libxml xmlDOMWrapCloneNode — materialize ancestor-scoped xmlns on import root (#21482).
+        self::reconcileImportedSubtreeNamespaceDeclarations($imported);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($imported);
 
@@ -10063,6 +10176,7 @@ final class VmDom
             );
         }
         $imported = self::importNodeEntry($ctx, $document, $node, $deep);
+        self::reconcileImportedSubtreeNamespaceDeclarations($imported);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($imported);
 
