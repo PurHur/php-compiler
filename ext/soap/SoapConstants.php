@@ -15,7 +15,8 @@ final class SoapConstants
     public const SOAP_LITERAL = 2;
     public const SOAP_ACTOR_NEXT = 1;
     public const SOAP_ACTOR_NONE = 2;
-    public const SOAP_ACTOR_UNLIMATED = 3;
+    /** php-src php_soap.h — intentional misspelling of "unlimited" (#21621). */
+    public const SOAP_ACTOR_UNLIMATERECEIVER = 3;
     public const SOAP_PERSISTENCE_SESSION = 1;
     public const SOAP_PERSISTENCE_REQUEST = 2;
     public const SOAP_FUNCTIONS_ALL = 999;
@@ -76,7 +77,7 @@ final class SoapConstants
             'SOAP_LITERAL' => self::SOAP_LITERAL,
             'SOAP_ACTOR_NEXT' => self::SOAP_ACTOR_NEXT,
             'SOAP_ACTOR_NONE' => self::SOAP_ACTOR_NONE,
-            'SOAP_ACTOR_UNLIMATED' => self::SOAP_ACTOR_UNLIMATED,
+            'SOAP_ACTOR_UNLIMATERECEIVER' => self::SOAP_ACTOR_UNLIMATERECEIVER,
             'SOAP_PERSISTENCE_SESSION' => self::SOAP_PERSISTENCE_SESSION,
             'SOAP_PERSISTENCE_REQUEST' => self::SOAP_PERSISTENCE_REQUEST,
             'SOAP_FUNCTIONS_ALL' => self::SOAP_FUNCTIONS_ALL,
