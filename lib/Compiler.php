@@ -29738,6 +29738,14 @@ class Compiler {
                 if ($child instanceof Op\Expr\MethodCall && $this->methodCallHasStatementLevelSideEffects($child)) {
                     continue;
                 }
+                // Prior loadXML()-style MethodCalls compile as EXEC_NORETURN — do not inflate
+                // the EXEC_RETURN ordinal base used for sibling MethodCall arg producers (#21182).
+                if (
+                    $child instanceof Op\Expr\MethodCall
+                    && !$this->methodCallInlineProducerSuppliesCallArgValue($child)
+                ) {
+                    continue;
+                }
                 $method = $this->staticNameFromOperand($child->name);
                 if (null === $method || !$this->methodCallIsKnownVoidReturn($method)) {
                     ++$base;
@@ -30265,11 +30273,12 @@ class Compiler {
         ) {
             return null;
         }
-        if ('var_export' === strtolower($this->resolveCfgFuncCallName($consumer) ?? '')) {
-            $paired = $this->slotForMethodOrStaticCallInitFollowingExecReturn($block, $producer);
-            if (null !== $paired) {
-                return $paired;
-            }
+        // Pair METHODCALL_INIT → EXEC_RETURN by callee name. Ordinal EXEC_RETURN indexing
+        // drifts when prior stmts (loadXML) are EXEC_NORETURN but still inflate legacyBase
+        // — bare $d->documentElement->replaceChild(createElement, item) (#21182).
+        $paired = $this->slotForMethodOrStaticCallInitFollowingExecReturn($block, $producer);
+        if (null !== $paired) {
+            return $paired;
         }
         $producerIndex = array_search($producer, $cfgChildren, true);
         $consumerIndex = array_search($consumer, $cfgChildren, true);
@@ -41086,19 +41095,34 @@ class Compiler {
                                 || $mixedProducer instanceof Op\Expr\NsFuncCall
                                 || $mixedProducer instanceof Op\Expr\StaticCall
                             ) {
-                                if (
-                                    $mixedProducer instanceof Op\Expr\MethodCall
-                                    && (
-                                        $this->methodCallIsStmtLevelDiscardPrelude($mixedProducer)
-                                        || !$this->methodCallInlineProducerSuppliesCallArgValue($mixedProducer)
-                                        || (
-                                            null !== ($mn = $this->staticNameFromOperand($mixedProducer->name))
-                                            && $this->methodCallIsKnownVoidReturn($mn)
+                                if ($mixedProducer instanceof Op\Expr\MethodCall) {
+                                    // Skip loadXML-style prior stmts; keep trailing item()/unknown
+                                    // producers inside the dead-arg window (#19719, #21171, #21182).
+                                    // Bare $d->documentElement->replaceChild(createElement, item)
+                                    // mixes a PropertyFetch receiver with MethodCall arg producers —
+                                    // the blunt !suppliesCallArgValue skip dropped item().
+                                    $mixedProducerIndex = array_search(
+                                        $mixedProducer,
+                                        $block->orig->children,
+                                        true
+                                    );
+                                    $mixedConsumerIndex = array_search(
+                                        $cfgCallOp,
+                                        $block->orig->children,
+                                        true
+                                    );
+                                    if (
+                                        !\is_int($mixedProducerIndex)
+                                        || !\is_int($mixedConsumerIndex)
+                                        || $this->methodCallIsSkippedHoistedSiblingProducer(
+                                            $mixedProducer,
+                                            $mixedProducerIndex,
+                                            $mixedConsumerIndex,
+                                            $mixedDeadTempCount
                                         )
-                                    )
-                                ) {
-                                    // loadXML() / discard preludes — not call-arg values (#19719 hang).
-                                    continue;
+                                    ) {
+                                        continue;
+                                    }
                                 }
                                 $orderedMixed[] = $mixedProducer;
                                 continue;
