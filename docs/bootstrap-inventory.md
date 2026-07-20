@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6200 |
-| Phase A inventory files (M2 ratio SSOT) | 6200 |
+| PHP files on vm.php path | 6197 |
+| Phase A inventory files (M2 ratio SSOT) | 6197 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19515 |
+| Source constructs flagged (warnings) | 19510 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5257,9 +5257,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/ReflectionConstantConstruct.php` | 0 | 2 |
 | `lib/JIT/Call/ReflectionConstantGetAttributes.php` | 0 | 2 |
 | `lib/JIT/Call/ReflectionConstantGetName.php` | 0 | 1 |
-| `lib/JIT/Call/ReflectionConstantGetNamespaceName.php` | 0 | 1 |
-| `lib/JIT/Call/ReflectionConstantGetShortName.php` | 0 | 1 |
-| `lib/JIT/Call/ReflectionConstantToString.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionEnumConstruct.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionEnumGetCase.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionEnumGetName.php` | 0 | 1 |
@@ -5315,7 +5312,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 81 |
+| `lib/JIT/Context.php` | 0 | 77 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 19 |
 | `lib/JIT/DomInstanceMethodJit.php` | 0 | 49 |
 | `lib/JIT/DynamicObjectReadonlyGuard.php` | 0 | 1 |
@@ -5982,7 +5979,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/LateStaticBinding.php` | 0 | 1 |
 | `lib/VM/LateStaticJitHelper.php` | 0 | 1 |
 | `lib/VM/LazyGhostTraitSupport.php` | 0 | 4 |
-| `lib/VM/LazyObjectSupport.php` | 0 | 11 |
+| `lib/VM/LazyObjectSupport.php` | 0 | 13 |
 | `lib/VM/LazyPropertySupport.php` | 0 | 1 |
 | `lib/VM/ListUnpackJitHelper.php` | 0 | 1 |
 | `lib/VM/MagicMethodJitHelper.php` | 0 | 1 |
@@ -29909,8 +29906,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1812)
-- new Error (line 1823)
+- new Error (line 1814)
+- new Error (line 1825)
 - 218 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -33111,7 +33108,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 34)
 - new ArgumentCountError (line 41)
 - new ArgumentCountError (line 47)
-- new Variable (line 87)
+- new Variable (line 89)
 - 2 class method(s)
 
 ### `ext/standard/parse_url.php`
@@ -43611,21 +43608,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
-### `lib/JIT/Call/ReflectionConstantGetNamespaceName.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `lib/JIT/Call/ReflectionConstantGetShortName.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `lib/JIT/Call/ReflectionConstantToString.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
 ### `lib/JIT/Call/ReflectionEnumConstruct.php`
 
 **Warnings** (review for bootstrap subset):
@@ -43989,42 +43971,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionPropertyConstruct (line 942)
 - new Call\ReflectionPropertyGetAttributes (line 943)
 - new Call\ReflectionConstantConstruct (line 944)
-- new Call\ReflectionConstantGetName (line 945)
-- new Call\ReflectionConstantGetNamespaceName (line 946)
-- new Call\ReflectionConstantGetShortName (line 947)
-- new Call\ReflectionConstantToString (line 948)
-- new Call\ReflectionConstantGetAttributes (line 949)
-- new Call\ReflectionMethodGetAttributes (line 950)
-- new Call\ReflectionParameterIsSensitiveParameter (line 952)
-- new Call\ReflectionFunctionGetNamedArguments (line 955)
-- new Call\ReflectionMethodGetNamedArguments (line 956)
-- new Call\ReflectionAttributeGetName (line 958)
-- new Call\ReflectionAttributeNewInstance (line 959)
-- new Call\ReflectionEnumConstruct (line 960)
-- new Call\ReflectionEnumGetName (line 961)
-- new Call\ReflectionEnumHasCase (line 962)
-- new Call\ReflectionEnumGetCase (line 963)
-- new Call\ReflectionEnumIsBacked (line 964)
-- new Call\ReflectionEnumUnitCaseGetName (line 965)
-- new Call\ReflectionEnumUnitCaseGetName (line 966)
-- new Call\ExceptionGetMessage (line 967)
-- new Call\DatePeriodCreateFromISO8601String (line 973)
-- new Call\DatePeriodIteratorMethod (line 975)
-- new Call\DateTimeFormat (line 978)
-- new Call\DateTimeFormat (line 979)
-- new Result (line 1322)
-- new Result (line 1344)
-- new Variable (line 1945)
-- new Variable (line 2082)
-- new Variable (line 2308)
-- new Variable (line 2366)
-- new VMVariable (line 2504)
-- new VMVariable (line 2520)
-- new VMVariable (line 2526)
-- new VMVariable (line 2532)
-- new VMVariable (line 2543)
-- new Variable (line 2573)
-- new Variable (line 2613)
+- new Call\ReflectionConstantGetAttributes (line 945)
+- new Call\ReflectionMethodGetAttributes (line 946)
+- new Call\ReflectionParameterIsSensitiveParameter (line 948)
+- new Call\ReflectionFunctionGetNamedArguments (line 951)
+- new Call\ReflectionMethodGetNamedArguments (line 952)
+- new Call\ReflectionAttributeGetName (line 954)
+- new Call\ReflectionAttributeNewInstance (line 955)
+- new Call\ReflectionEnumConstruct (line 956)
+- new Call\ReflectionEnumGetName (line 957)
+- new Call\ReflectionEnumHasCase (line 958)
+- new Call\ReflectionEnumGetCase (line 959)
+- new Call\ReflectionEnumIsBacked (line 960)
+- new Call\ReflectionEnumUnitCaseGetName (line 961)
+- new Call\ReflectionEnumUnitCaseGetName (line 962)
+- new Call\ExceptionGetMessage (line 963)
+- new Call\DatePeriodCreateFromISO8601String (line 969)
+- new Call\DatePeriodIteratorMethod (line 971)
+- new Call\DateTimeFormat (line 974)
+- new Call\DateTimeFormat (line 975)
+- new Result (line 1318)
+- new Result (line 1340)
+- new Variable (line 1941)
+- new Variable (line 2078)
+- new Variable (line 2304)
+- new Variable (line 2362)
+- new VMVariable (line 2500)
+- new VMVariable (line 2516)
+- new VMVariable (line 2522)
+- new VMVariable (line 2528)
+- new VMVariable (line 2539)
+- new Variable (line 2569)
+- new Variable (line 2609)
 - 102 class method(s)
 - 28 closure(s)
 
@@ -44499,7 +44477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 492)
+- new Variable (line 493)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
@@ -44546,14 +44524,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/LazyObjectHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/LazyObjectHelperLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 125)
-- new Variable (line 131)
-- 3 class method(s)
+- new Variable (line 172)
+- new Variable (line 178)
+- 4 class method(s)
 
 ### `lib/JIT/LibcExtern.php`
 
@@ -49080,17 +49058,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/LazyObjectSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 92)
-- new ObjectEntry (line 106)
-- new Variable (line 169)
-- new Variable (line 197)
-- new Variable (line 222)
-- new ReflectionException (line 461)
-- new ReflectionException (line 489)
-- new Error (line 548)
-- new Error (line 551)
-- new Variable (line 567)
-- 33 class method(s)
+- new ObjectEntry (line 125)
+- new ObjectEntry (line 131)
+- new ObjectEntry (line 147)
+- new ObjectEntry (line 153)
+- new Variable (line 216)
+- new Variable (line 244)
+- new Variable (line 269)
+- new ReflectionException (line 523)
+- new ReflectionException (line 566)
+- new Error (line 625)
+- new Error (line 628)
+- new Variable (line 644)
+- 35 class method(s)
 
 ### `lib/VM/LazyPropertySupport.php`
 
