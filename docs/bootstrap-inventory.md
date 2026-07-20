@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6201 |
-| Phase A inventory files (M2 ratio SSOT) | 6201 |
+| PHP files on vm.php path | 6212 |
+| Phase A inventory files (M2 ratio SSOT) | 6212 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19560 |
+| Source constructs flagged (warnings) | 19585 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1252,6 +1252,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_trim.php` | 0 | 1 |
 | `ext/mbstring/mb_ucfirst.php` | 0 | 3 |
 | `ext/mbstring/mb_ucwords.php` | 0 | 3 |
+| `ext/mongodb/BuiltinClasses.php` | 0 | 1 |
+| `ext/mongodb/BulkWriteConstruct.php` | 0 | 1 |
+| `ext/mongodb/ManagerConstruct.php` | 0 | 1 |
+| `ext/mongodb/ManagerExecuteBulkWrite.php` | 0 | 2 |
+| `ext/mongodb/ManagerExecuteQuery.php` | 0 | 2 |
+| `ext/mongodb/Module.php` | 0 | 1 |
+| `ext/mongodb/MongodbClassMethod.php` | 0 | 1 |
+| `ext/mongodb/MongodbExtensionPolicy.php` | 0 | 1 |
+| `ext/mongodb/QueryConstruct.php` | 0 | 2 |
+| `ext/mongodb/VmMongodb.php` | 0 | 12 |
 | `ext/msgpack/Module.php` | 0 | 3 |
 | `ext/msgpack/MsgpackExtensionPolicy.php` | 0 | 1 |
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
@@ -5494,7 +5504,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 106 |
+| `lib/Runtime.php` | 0 | 107 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -15822,6 +15832,70 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 32)
 - 2 class method(s)
 - 1 closure(s)
+
+### `ext/mongodb/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mongodb/BulkWriteConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mongodb/ManagerConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mongodb/ManagerExecuteBulkWrite.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/mongodb/ManagerExecuteQuery.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/mongodb/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/mongodb/MongodbClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/mongodb/MongodbExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mongodb/QueryConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 1 class method(s)
+
+### `ext/mongodb/VmMongodb.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 49)
+- new ClassEntry (line 63)
+- new ManagerConstruct (line 66)
+- new ManagerExecuteBulkWrite (line 70)
+- new ManagerExecuteQuery (line 73)
+- new ClassEntry (line 85)
+- new BulkWriteConstruct (line 88)
+- new ClassEntry (line 101)
+- new QueryConstruct (line 104)
+- new ClassEntry (line 116)
+- new ManagerState (line 124)
+- 11 class method(s)
 
 ### `ext/msgpack/Module.php`
 
@@ -39207,7 +39281,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 220 class method(s)
+- 221 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -45337,39 +45411,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\msgpack\Module (line 267)
 - new ext\yaml\Module (line 268)
 - new ext\redis\Module (line 269)
-- new ext\zstd\Module (line 270)
-- new ext\lzf\Module (line 271)
-- new ext\bz2\Module (line 272)
-- new ext\brotli\Module (line 273)
-- new ext\sodium\Module (line 274)
-- new ext\sqlite3\Module (line 275)
-- new ext\pgsql\Module (line 276)
-- new ext\odbc\Module (line 277)
-- new ext\dba\Module (line 278)
-- new ext\mailparse\Module (line 279)
-- new ext\enchant\Module (line 280)
-- new ext\tidy\Module (line 281)
-- new ext\pdo\Module (line 282)
-- new ext\phar\Module (line 283)
-- new ext\uri\Module (line 284)
-- new ext\uuid\Module (line 285)
-- new ext\uploadprogress\Module (line 286)
-- new ext\apcu\Module (line 287)
-- new ext\sysvshm\Module (line 288)
-- new ext\sysvsem\Module (line 289)
-- new ext\sysvmsg\Module (line 290)
-- new ext\reflection\Module (line 291)
-- new ext\standard\Module (line 292)
-- new JIT (line 368)
-- new JITContext (line 382)
-- new SealedClassPreprocessor (line 448)
-- new StaticClassPreprocessor (line 451)
-- new SourcePreprocessor\PropertyHooks (line 454)
-- new State (line 595)
-- new ReflectionProperty (line 622)
-- new ReflectionProperty (line 625)
-- new LintCompiler (line 1036)
-- new Variable (line 1166)
+- new ext\mongodb\Module (line 270)
+- new ext\zstd\Module (line 271)
+- new ext\lzf\Module (line 272)
+- new ext\bz2\Module (line 273)
+- new ext\brotli\Module (line 274)
+- new ext\sodium\Module (line 275)
+- new ext\sqlite3\Module (line 276)
+- new ext\pgsql\Module (line 277)
+- new ext\odbc\Module (line 278)
+- new ext\dba\Module (line 279)
+- new ext\mailparse\Module (line 280)
+- new ext\enchant\Module (line 281)
+- new ext\tidy\Module (line 282)
+- new ext\pdo\Module (line 283)
+- new ext\phar\Module (line 284)
+- new ext\uri\Module (line 285)
+- new ext\uuid\Module (line 286)
+- new ext\uploadprogress\Module (line 287)
+- new ext\apcu\Module (line 288)
+- new ext\sysvshm\Module (line 289)
+- new ext\sysvsem\Module (line 290)
+- new ext\sysvmsg\Module (line 291)
+- new ext\reflection\Module (line 292)
+- new ext\standard\Module (line 293)
+- new JIT (line 369)
+- new JITContext (line 383)
+- new SealedClassPreprocessor (line 449)
+- new StaticClassPreprocessor (line 452)
+- new SourcePreprocessor\PropertyHooks (line 455)
+- new State (line 596)
+- new ReflectionProperty (line 623)
+- new ReflectionProperty (line 626)
+- new LintCompiler (line 1037)
+- new Variable (line 1167)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

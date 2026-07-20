@@ -49,6 +49,7 @@ function collectCapabilities(string $root): array
         'dba' => new PHPCompiler\ext\dba\Module(),
         'mailparse' => new PHPCompiler\ext\mailparse\Module(),
         'redis' => new PHPCompiler\ext\redis\Module(),
+        'mongodb' => new PHPCompiler\ext\mongodb\Module(),
         'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
         'apcu' => new PHPCompiler\ext\apcu\Module(),
         'sysvshm' => new PHPCompiler\ext\sysvshm\Module(),
