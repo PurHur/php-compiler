@@ -30,7 +30,7 @@ final class decoct extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $num = VmMath::parseIntBuiltinArgForFrame(
+        $num = VmMath::parseChrCodepointForFrame(
             $frame,
             0,
             'decoct',
@@ -48,7 +48,7 @@ final class decoct extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('decoct() requires exactly one argument');
         }
-        $num = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[0], 'decoct', 1, 'num');
+        $num = JitChr::lowerZParamLongArg($context, $args[0], 'decoct', 1, 'num');
 
         return $this->formatToString($context, $num, '%o');
     }

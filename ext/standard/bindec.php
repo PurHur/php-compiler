@@ -16,13 +16,15 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathBaseConvert;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
  * bindec() for string arguments (subset of PHP standard library).
  *
- * php-src: ext/standard/math.c — PHP_FUNCTION(bindec) / Z_PARAM_STR (#20658).
+ * php-src: ext/standard/math.c — PHP_FUNCTION(bindec) / Z_PARAM_STR (#20658, #21244 soft-null).
  */
 final class bindec extends Internal
 {
@@ -31,8 +33,7 @@ final class bindec extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('bindec() requires exactly one argument');
         }
-        // Z_PARAM_STR $binary_string — null TypeError on 8.4 forward profile (#20658).
-        $binaryString = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'bindec', 0, 'binary_string');
+        $binaryString = self::vmStringArg($frame, 0);
         VmMath::assignRadixToReturn($frame->returnVar, $binaryString, 2);
     }
 
@@ -45,12 +46,17 @@ final class bindec extends Internal
             throw new \LogicException('bindec() requires exactly one argument');
         }
 
-        // Null operand: TypeError under PROFILE=8.4 / strict_types without linking
-        // MathBaseConvert (AOT IR still clears insert block on abort; #20658).
-        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+        if (
+            !$context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
             self::jitStringArg($context, $args[0]);
-
-            return $context->getTypeFromString('__value__*')->constNull();
+            if ($args[0]->isNullConstant ?? false) {
+                return JitValueBox::coerceToValuePtrForStore(
+                    $context,
+                    $context->getTypeFromString('int64')->constInt(0, false)
+                );
+            }
         }
 
         return MathBaseConvert::baseToZvalCall(
@@ -60,6 +66,20 @@ final class bindec extends Internal
                 self::jitStringArg($context, $args[0])
             ),
             2
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'bindec', 'binary_string')->toString();
+        }
+
+        return VmString::coerceTrimFamilyStringArg(
+            $frame->calledArgs[$argIndex],
+            'bindec',
+            0,
+            'binary_string'
         );
     }
 
@@ -75,7 +95,7 @@ final class bindec extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'bindec',

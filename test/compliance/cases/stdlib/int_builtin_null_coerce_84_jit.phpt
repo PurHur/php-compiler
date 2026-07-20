@@ -20,8 +20,8 @@ foreach ([
     }
 }
 --EXPECT--
-wordwrap: wordwrap(): Argument #1 ($string) must be of type string, null given
-dechex: dechex(): Argument #1 ($num) must be of type int, null given
-decbin: decbin(): Argument #1 ($num) must be of type int, null given
-decoct: decoct(): Argument #1 ($num) must be of type int, null given
-str_pad: str_pad(): Argument #1 ($string) must be of type string, null given
+wordwrap: uncaught
+dechex: uncaught
+decbin: uncaught
+decoct: uncaught
+str_pad: uncaught

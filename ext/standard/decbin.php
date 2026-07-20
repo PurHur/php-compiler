@@ -30,7 +30,7 @@ final class decbin extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $num = VmMath::parseIntBuiltinArgForFrame(
+        $num = VmMath::parseChrCodepointForFrame(
             $frame,
             0,
             'decbin',
@@ -48,7 +48,7 @@ final class decbin extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('decbin() requires exactly one argument');
         }
-        $num = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[0], 'decbin', 1, 'num');
+        $num = JitChr::lowerZParamLongArg($context, $args[0], 'decbin', 1, 'num');
 
         return $this->formatToString($context, $num, '%b');
     }

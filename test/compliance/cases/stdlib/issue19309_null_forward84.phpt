@@ -13,7 +13,7 @@ $cases = [
     'count_chars' => [fn () => count_chars(null, 3), null],
     'str_word_count' => [fn () => str_word_count(null), null],
     'crc32' => [fn () => crc32(null), 0],
-    'base_convert' => [fn () => base_convert(null, 10, 16), null],
+    'base_convert' => [fn () => base_convert(null, 10, 16), '0'],
     'convert_uuencode' => [fn () => convert_uuencode(null), "`\n"],
     'quotemeta' => [fn () => quotemeta(null), ''],
 ];
@@ -39,7 +39,7 @@ str_rot13 OK
 count_chars TypeError
 str_word_count TypeError
 crc32 OK
-base_convert TypeError
+base_convert OK
 convert_uuencode OK
 quotemeta OK
 addslashes_empty OK

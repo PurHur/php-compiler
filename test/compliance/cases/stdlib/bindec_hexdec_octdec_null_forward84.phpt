@@ -1,9 +1,11 @@
 --TEST--
-stdlib bindec()/hexdec()/octdec() null TypeError on 8.4 forward (#20658, ext/standard/math.c)
+stdlib bindec()/hexdec()/octdec() null soft-null on 8.4 forward (#21244, reverts #20658)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL);
+set_error_handler(static function (): bool { return true; });
 foreach (['bindec' => 'binary_string', 'hexdec' => 'hex_string', 'octdec' => 'octal_string'] as $f => $param) {
     try {
         $r = $f(null);
@@ -15,7 +17,7 @@ foreach (['bindec' => 'binary_string', 'hexdec' => 'hex_string', 'octdec' => 'oc
 echo bindec('1010'), ',', hexdec('ff'), ',', octdec('17'), "\n";
 ?>
 --EXPECT--
-bindec(): Argument #1 ($binary_string) must be of type string, null given
-hexdec(): Argument #1 ($hex_string) must be of type string, null given
-octdec(): Argument #1 ($octal_string) must be of type string, null given
+bindec uncaught 0
+hexdec uncaught 0
+octdec uncaught 0
 10,255,15
