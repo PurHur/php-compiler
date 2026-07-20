@@ -4,32 +4,39 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\JIT\Builtin\ExceptionHandlerJitRuntime;
 use PHPCompiler\JIT\Builtin\ExceptionHandlerOutput;
 use PHPUnit\Framework\TestCase;
 
-/** ExceptionHandlerJitRuntime must route through ExceptionHandlerJitHelper PHP, not LLVM globals (#9473). */
+/**
+ * ExceptionHandlerJitRuntime: honest module-globals stack (ErrorHandler #17671 shape).
+ * No dishonest thin ABI fork (#21325). NestedJIT helper deferred (string static slots).
+ */
 final class ExceptionHandlerRuntimeShrinkTest extends TestCase
 {
-    public function testExceptionHandlerJitRuntimeUsesHelperNotLlvmGlobals(): void
+    public function testNoStandaloneThinAbiFork(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ExceptionHandlerJitRuntime.php');
-        $this->assertStringContainsString('ExceptionHandlerJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
-        $this->assertStringNotContainsString("GLOBAL_DEPTH = 'phpc_exception_handler_depth'", $source);
-        $this->assertStringNotContainsString("GLOBAL_FN = 'phpc_exception_handler_fn'", $source);
-        $this->assertStringNotContainsString('ensureGlobals', $source);
-        $this->assertStringNotContainsString('implementSetApply(', $source);
-        $this->assertStringNotContainsString('malloc', $source);
+        $this->assertStringNotContainsString('implementStandaloneThinAbi', $source);
+        $this->assertStringNotContainsString('implementStandaloneThinAbiReuseBuilder', $source);
+        $this->assertStringNotContainsString('standaloneAbiFunction', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('phpc_xh_stack_depth', $source);
+        $this->assertStringContainsString('ensureStackGlobals', $source);
+        $this->assertStringContainsString('implementDispatchBridge', $source);
+        $this->assertStringContainsString('implementSetApplyBridge', $source);
+        $this->assertStringContainsString('implementGetApplyBridge', $source);
     }
 
-    public function testStandaloneModuleHasNoExceptionHandlerLlvmGlobals(): void
+    public function testStandaloneFullStackDefinesExceptionHandlerGlobals(): void
     {
         $runtime = new \PHPCompiler\Runtime(\PHPCompiler\Runtime::MODE_AOT);
         $ctx = new \PHPCompiler\JIT\Context($runtime, \PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE);
         ExceptionHandlerOutput::registerExternals($ctx);
-        $this->assertNull($ctx->module->getNamedGlobal('phpc_exception_handler_depth'));
-        $this->assertNull($ctx->module->getNamedGlobal('phpc_exception_handler_fn'));
-        $this->assertNull($ctx->module->getNamedGlobal('phpc_exception_handler_name'));
+        ExceptionHandlerJitRuntime::ensureLinked($ctx);
+        $this->assertNotNull($ctx->module->getNamedGlobal('phpc_xh_stack_depth'));
+        $this->assertNotNull($ctx->module->getNamedGlobal('phpc_xh_stack_top_fn'));
+        $this->assertNotNull($ctx->module->getNamedGlobal('phpc_xh_stack_top_name'));
     }
 
     public function testExceptionHandlerJitHelperSemantics(): void
