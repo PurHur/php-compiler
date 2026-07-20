@@ -433,6 +433,15 @@ class VM {
             }
             $entry = $this->context->classes[$lcClass];
             if (isset($entry->methods[$methodLc])) {
+                // Parent-only PDO_*_Ext methods are not visible on subclasses (#21552).
+                if ($entry !== $class && isset($entry->methodNotInherited[$methodLc])) {
+                    if (null === $entry->parentLc) {
+                        return false;
+                    }
+                    $lcClass = $entry->parentLc;
+                    continue;
+                }
+
                 return true;
             }
             if (null === $entry->parentLc) {
@@ -15672,6 +15681,10 @@ restart:
                 $vis = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
                 // Private methods are not inherited into subclass tables (Zend zend_inheritance).
                 if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                    continue;
+                }
+                // PDO_*_Ext driver methods stay on PDO only (#21552).
+                if (isset($parent->methodNotInherited[$name])) {
                     continue;
                 }
                 $entry->methods[$name] = $method;

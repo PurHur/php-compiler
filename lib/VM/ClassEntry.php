@@ -124,6 +124,13 @@ class ClassEntry {
     public array $traitMethodSources = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> method (lowercase) => deprecation (#3569). */
     public array $methodDeprecated = [];
+    /**
+     * Methods that live on this class only and must not appear on subclasses via inheritance
+     * (php-src PDO_*_Ext driver methods; #21552).
+     *
+     * @var array<string, true> method name (lowercase) => true
+     */
+    public array $methodNotInherited = [];
     /** @var array<string, \PHPCompiler\Compiler\DeprecatedMetadata> constant (lowercase) => deprecation (#3569). */
     public array $constDeprecated = [];
     /** @var array<string, true> constant (lowercase) => final flag (#6516). */
