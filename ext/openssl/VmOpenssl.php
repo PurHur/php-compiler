@@ -649,9 +649,9 @@ final class VmOpenssl
             $aad,
             $tag
         );
+        // php-src ext/openssl/openssl.c — EVP decrypt failure returns false without a user
+        // warning (Zend 8.4+; #21465 after null-coerce empty ciphertext from #21445).
         if (false === $plain) {
-            self::userWarning('openssl_decrypt(): Decryption failed', $frame);
-
             return false;
         }
 
