@@ -2896,6 +2896,7 @@ require_once __DIR__.'/../../../ext/standard/VmJsonValidate.php';
 require_once __DIR__.'/../../../ext/standard/VmLocale.php';
 require_once __DIR__.'/../../../ext/standard/VmLocaleCollate.php';
 require_once __DIR__.'/../../../ext/standard/VmLocalePure.php';
+require_once __DIR__.'/../../../ext/standard/VmMail.php';
 require_once __DIR__.'/../../../ext/standard/VmMath.php';
 require_once __DIR__.'/../../../ext/standard/VmMemory.php';
 require_once __DIR__.'/../../../ext/standard/VmMetaTags.php';
