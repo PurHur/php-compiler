@@ -5,25 +5,32 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ValueEchoSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for echo/print value-box dispatch via ValueEchoJitHelper PHP (#10204).
+ * JIT/AOT link for echo/print value-box dispatch via ValueEchoJitHelper PHP (#10204, #21513).
  *
+ * Embed + thin standalone AOT: {@see ValueEchoJitHelper} type predicates via
+ * {@see JitVmHelperLink} (StringOffset #21497 / ChunkSplit #21399 shape — no STANDALONE
+ * icmp fork). Nested helper compile leaf: thin icmp matching {@see ValueEchoJitHelper::typeIs*}
+ * without re-entering NestedJIT (#17279).
  * SSOT: {@see \PHPCompiler\VM\ValueEchoSupport}, {@see \PHPCompiler\VM\ValueEchoJitHelper}
  */
 final class ValueEchoRuntime
 {
     private const HELPER_PATH = '/VM/ValueEchoJitHelper.php';
+
+    private const BRIDGE_ENTRY = 'value_echo_type_bridge_entry';
+
+    private const NESTED_LEAF_ENTRY = 'value_echo_type_nested_leaf_entry';
 
     private const TYPE_IS_NULL = 'PHPCompiler\\VM\\ValueEchoJitHelper::typeIsNull';
 
@@ -62,7 +69,7 @@ final class ValueEchoRuntime
     ];
 
     /** @var array<string, int> */
-    private const STANDALONE_TYPE_CONST_MAP = [
+    private const NESTED_LEAF_TYPE_CONST_MAP = [
         self::TYPE_IS_NULL => JitVariable::TYPE_NULL,
         self::TYPE_IS_NATIVE_LONG => JitVariable::TYPE_NATIVE_LONG,
         self::TYPE_IS_NATIVE_BOOL => JitVariable::TYPE_NATIVE_BOOL,
@@ -79,29 +86,36 @@ final class ValueEchoRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
+    }
+
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__value_echo__typeIsNull');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
+        // Nested helper compile of unrelated units that still need type predicates:
+        // thin icmp leaf without re-entering ValueEchoJitHelper (#21513 / #17279).
+        if (NestedJitCompileScope::isActive()) {
+            self::implementNestedLeafTypeBridges($context);
 
             return;
         }
 
         $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
-                self::implementStandaloneTypeBridge(
-                    $context,
-                    $abiName,
-                    self::STANDALONE_TYPE_CONST_MAP[$helperLogical]
-                );
-            }
-        } else {
-            self::ensureJitHelperCompiled($context);
-            foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
-                self::implementTypeBridge($context, $abiName, $helperLogical);
-            }
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
+            JitVmHelperLink::ensureBridge(
+                $context,
+                $abiName,
+                self::BRIDGE_ENTRY,
+                [$i8],
+                $i1,
+                $helperLogical,
+                self::HELPER_PATH,
+                self::COMPILED_HELPERS,
+                '#21513'
+            );
         }
         self::registerLinkedRuntime($context);
         if (null !== $restoreBlock) {
@@ -291,7 +305,27 @@ final class ValueEchoRuntime
         );
     }
 
-    private static function implementStandaloneTypeBridge(Context $context, string $abiName, int $expectedType): void
+    /**
+     * NestedJIT leaf only — mirrors {@see ValueEchoJitHelper::typeIs*} in LLVM icmp.
+     * Not used for user-script / thin standalone AOT (those take {@see JitVmHelperLink::ensureBridge}).
+     */
+    private static function implementNestedLeafTypeBridges(Context $context): void
+    {
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        foreach (self::TYPE_BRIDGE_MAP as $helperLogical => $abiName) {
+            self::implementNestedLeafTypeBridge(
+                $context,
+                $abiName,
+                self::NESTED_LEAF_TYPE_CONST_MAP[$helperLogical]
+            );
+        }
+        self::registerLinkedRuntime($context);
+        if (null !== $restoreBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+        }
+    }
+
+    private static function implementNestedLeafTypeBridge(Context $context, string $abiName, int $expectedType): void
     {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -307,7 +341,7 @@ final class ValueEchoRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('value_echo_type_standalone_entry');
+        $entry = $fn->appendBasicBlock(self::NESTED_LEAF_ENTRY);
         $context->builder->positionAtEnd($entry);
         $matches = $context->builder->icmp(
             Builder::INT_EQ,
@@ -316,49 +350,6 @@ final class ValueEchoRuntime
         );
         $context->builder->returnValue($matches);
         $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementTypeBridge(Context $context, string $abiName, string $helperLogical): void
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i8 = $context->getTypeFromString('int8');
-        $i1 = $context->getTypeFromString('int1');
-        $ft = $context->context->functionType($i1, false, $i8);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('value_echo_type_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, $helperLogical),
-            $fn->getParam(0)
-        );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#10204');
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10204'
-        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
