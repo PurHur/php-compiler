@@ -22,7 +22,7 @@ final class JitStripcslashes
             );
         }
 
-        StringCslashes::ensureLinked($context);
+        StringCslashes::ensureStripcslashes($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_stripcslashes'),
