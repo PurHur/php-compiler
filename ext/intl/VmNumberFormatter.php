@@ -16,14 +16,23 @@ use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * NumberFormatter — locale decimal/percent/currency subset (#5154, #20710, #20728).
+ * NumberFormatter — locale decimal/percent/currency + ICU rule-based styles
+ * (#5154, #20710, #20728, #21110).
  *
  * php-src: ext/intl/formatter/formatter_*.c, formatter.stub.php
  * Style/attr constants: unicode/unum.h UNumberFormatStyle / UNumberFormatAttribute.
+ * SPELLOUT / ORDINAL / DURATION / PATTERN_RULEBASED format via thin libicui18n FFI
+ * (unum_open / unum_formatDouble) — same ICU ABI php-src links; no new runtime C.
  */
 final class VmNumberFormatter
 {
     public const CLASS_LC = 'numberformatter';
+
+    private static ?\FFI $ffi = null;
+
+    private static bool $ffiUnavailable = false;
+
+    private static string $symSuffix = '_70';
 
     public const PATTERN_DECIMAL = 0;
     public const DECIMAL = 1;
@@ -309,8 +318,9 @@ final class VmNumberFormatter
      * ICU default DecimalFormat patterns for common UNumberFormatStyle values
      * (php-src numfmt_get_pattern / unum_toPattern; #21113).
      *
-     * Rule-based styles (SPELLOUT/ORDINAL/…) expose large ICU rulesets — left empty
-     * until #21110; DECIMAL/PERCENT/CURRENCY/SCIENTIFIC match Zend/ICU CLDR defaults.
+     * Rule-based styles leave '' here; {@see getPattern()} resolves the live ICU
+     * ruleset via unum_toPattern (#21110). DECIMAL/PERCENT/CURRENCY/SCIENTIFIC match
+     * Zend/ICU CLDR defaults.
      */
     public static function defaultPatternForStyle(int $style): string
     {
@@ -323,6 +333,14 @@ final class VmNumberFormatter
             self::SPELLOUT, self::ORDINAL, self::DURATION, self::PATTERN_RULEBASED => '',
             default => '#,##0.###',
         };
+    }
+
+    public static function isRuleBasedStyle(int $style): bool
+    {
+        return self::SPELLOUT === $style
+            || self::ORDINAL === $style
+            || self::DURATION === $style
+            || self::PATTERN_RULEBASED === $style;
     }
 
     /**
@@ -349,7 +367,12 @@ final class VmNumberFormatter
                 'NumberFormatter::format(): Argument #2 ($type) must be a NumberFormatter::TYPE_* constant'
             );
         }
-        return self::formatFromState($state, $num);
+        $result = self::formatFromState($state, $num);
+        if (false === $result) {
+            self::fail($formatter, 'numfmt_format: number formatting failed: U_ILLEGAL_ARGUMENT_ERROR');
+        }
+
+        return $result;
     }
 
     /**
@@ -742,8 +765,17 @@ final class VmNumberFormatter
         self::clearObjectError($formatter);
         IntlError::clear();
         $pattern = $state['pattern'] ?? null;
+        $style = (int) ($state['style'] ?? self::DECIMAL);
+        if (self::isRuleBasedStyle($style) && (null === $pattern || '' === $pattern)) {
+            $icuPattern = self::icuToPattern($state);
+            if (null !== $icuPattern) {
+                self::$state[$formatter->id]['pattern'] = $icuPattern;
+
+                return $icuPattern;
+            }
+        }
         if (null === $pattern) {
-            return self::defaultPatternForStyle((int) ($state['style'] ?? self::DECIMAL));
+            return self::defaultPatternForStyle($style);
         }
 
         return $pattern;
@@ -863,6 +895,7 @@ final class VmNumberFormatter
 
     /**
      * Honor attributes/symbols/textAttributes in format() (#21121).
+     * Rule-based styles use ICU unum_formatDouble (#21110).
      *
      * @param array{
      *   locale: string,
@@ -874,15 +907,19 @@ final class VmNumberFormatter
      *   errorCode: int,
      *   errorMessage: string
      * } $state
+     *
+     * @return string|false
      */
-    private static function formatFromState(array $state, float $num): string
+    private static function formatFromState(array $state, float $num)
     {
         $style = $state['style'];
-        if (self::SPELLOUT === $style || self::ORDINAL === $style || self::DURATION === $style
-            || self::PATTERN_RULEBASED === $style) {
-            throw new \Error(
-                'NumberFormatter::format() style requires full ext/intl ICU (issue #5154)'
-            );
+        if (self::isRuleBasedStyle($style)) {
+            $formatted = self::icuFormatDouble($state, $num);
+            if (null === $formatted) {
+                return false;
+            }
+
+            return $formatted;
         }
         if (self::SCIENTIFIC === $style) {
             $body = self::formatScientificFromState($state, $num);
@@ -1167,6 +1204,255 @@ final class VmNumberFormatter
         }
 
         return $out;
+    }
+
+    /**
+     * Format via ICU unum_formatDouble for SPELLOUT/ORDINAL/DURATION/PATTERN_RULEBASED
+     * (php-src formatter_format.c / unum.h; #21110).
+     *
+     * @param array{locale: string, style: int, pattern: ?string} $state
+     */
+    private static function icuFormatDouble(array $state, float $num): ?string
+    {
+        $fmt = self::icuOpen($state);
+        if (null === $fmt) {
+            return null;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $suffix = self::$symSuffix;
+        $format = 'unum_formatDouble'.$suffix;
+        $close = 'unum_close'.$suffix;
+        $toUtf8 = 'u_strToUTF8'.$suffix;
+        try {
+            $cap = 64;
+            for ($attempt = 0; $attempt < 4; ++$attempt) {
+                $buf = \FFI::new('uint16_t['.$cap.']');
+                $status = \FFI::new('int32_t');
+                $status->cdata = 0;
+                $n = (int) $ffi->$format($fmt[0], $num, $buf, $cap, null, \FFI::addr($status));
+                // ICU U_BUFFER_OVERFLOW_ERROR (15) — grow and retry (php-src unum_format*).
+                if (15 === $status->cdata) {
+                    $cap = max($cap * 2, $n + 8);
+                    continue;
+                }
+                // Warnings (<0) are acceptable; positive codes are failures.
+                if ($status->cdata > 0 || $n < 0) {
+                    $ffi->$close($fmt[0]);
+
+                    return null;
+                }
+                $byteCap = max(16, $n * 3 + 8);
+                $utf8len = \FFI::new('int32_t');
+                $cbuf = \FFI::new('char['.$byteCap.']');
+                $st2 = \FFI::new('int32_t');
+                $st2->cdata = 0;
+                $ffi->$toUtf8($cbuf, $byteCap, \FFI::addr($utf8len), $buf, $n, \FFI::addr($st2));
+                $ffi->$close($fmt[0]);
+                if ($st2->cdata > 0 || $utf8len->cdata < 0) {
+                    return null;
+                }
+
+                return \FFI::string($cbuf, $utf8len->cdata);
+            }
+            $ffi->$close($fmt[0]);
+        } catch (\Throwable) {
+            try {
+                $ffi->$close($fmt[0]);
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * unum_toPattern for rule-based formatters (#21110 / #21113).
+     *
+     * @param array{locale: string, style: int, pattern: ?string} $state
+     */
+    private static function icuToPattern(array $state): ?string
+    {
+        $fmt = self::icuOpen($state);
+        if (null === $fmt) {
+            return null;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $suffix = self::$symSuffix;
+        $toPattern = 'unum_toPattern'.$suffix;
+        $close = 'unum_close'.$suffix;
+        $toUtf8 = 'u_strToUTF8'.$suffix;
+        try {
+            $cap = 4096;
+            for ($attempt = 0; $attempt < 3; ++$attempt) {
+                $buf = \FFI::new('uint16_t['.$cap.']');
+                $status = \FFI::new('int32_t');
+                $status->cdata = 0;
+                $n = (int) $ffi->$toPattern($fmt[0], 0, $buf, $cap, \FFI::addr($status));
+                if (15 === $status->cdata) {
+                    $cap = max($cap * 2, $n + 8);
+                    continue;
+                }
+                if ($status->cdata > 0 || $n < 0) {
+                    $ffi->$close($fmt[0]);
+
+                    return null;
+                }
+                $utf8len = \FFI::new('int32_t');
+                $byteCap = max(64, $n * 3 + 8);
+                $cbuf = \FFI::new('char['.$byteCap.']');
+                $st2 = \FFI::new('int32_t');
+                $st2->cdata = 0;
+                $ffi->$toUtf8($cbuf, $byteCap, \FFI::addr($utf8len), $buf, $n, \FFI::addr($st2));
+                $ffi->$close($fmt[0]);
+                if ($st2->cdata > 0 || $utf8len->cdata < 0) {
+                    return null;
+                }
+
+                return \FFI::string($cbuf, $utf8len->cdata);
+            }
+            $ffi->$close($fmt[0]);
+        } catch (\Throwable) {
+            try {
+                $ffi->$close($fmt[0]);
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array{locale: string, style: int, pattern: ?string} $state
+     *
+     * @return array{0: object}|null FFI UNumberFormat*
+     */
+    private static function icuOpen(array $state): ?array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $style = (int) $state['style'];
+        $locale = (string) $state['locale'];
+        $pattern = $state['pattern'] ?? null;
+        if (self::PATTERN_RULEBASED === $style && (null === $pattern || '' === $pattern)) {
+            return null;
+        }
+        $suffix = self::$symSuffix;
+        $open = 'unum_open'.$suffix;
+        try {
+            $status = \FFI::new('int32_t');
+            $status->cdata = 0;
+            $patPtr = null;
+            $patLen = -1;
+            if (null !== $pattern && '' !== $pattern
+                && (self::PATTERN_RULEBASED === $style || self::PATTERN_DECIMAL === $style)) {
+                $u = self::utf8ToUChar($pattern);
+                if (null === $u) {
+                    return null;
+                }
+                $patPtr = $u[0];
+                $patLen = $u[1];
+            }
+            $fmt = $ffi->$open($style, $patPtr, $patLen, $locale, null, \FFI::addr($status));
+            // U_ZERO_ERROR (0) or warning (<0) are ok; positive = failure.
+            if (null === $fmt || $status->cdata > 0) {
+                return null;
+            }
+
+            return [$fmt];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @return array{0: object, 1: int}|null */
+    private static function utf8ToUChar(string $utf8): ?array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fromUtf8 = 'u_strFromUTF8'.self::$symSuffix;
+        try {
+            $len = \FFI::new('int32_t');
+            $status = \FFI::new('int32_t');
+            $status->cdata = 0;
+            $ffi->$fromUtf8(null, 0, \FFI::addr($len), $utf8, \strlen($utf8), \FFI::addr($status));
+            // Expected U_BUFFER_OVERFLOW_ERROR (-124) when dest is null.
+            $status->cdata = 0;
+            $cap = max(1, $len->cdata + 1);
+            $buf = \FFI::new('uint16_t['.$cap.']');
+            $ffi->$fromUtf8($buf, $cap, \FFI::addr($len), $utf8, \strlen($utf8), \FFI::addr($status));
+            if ($status->cdata > 0) {
+                return null;
+            }
+
+            return [$buf, (int) $len->cdata];
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function ffi(): ?\FFI
+    {
+        if (self::$ffiUnavailable) {
+            return null;
+        }
+        if (null !== self::$ffi) {
+            return self::$ffi;
+        }
+        if (!\class_exists(\FFI::class, false) && !\extension_loaded('FFI')) {
+            self::$ffiUnavailable = true;
+
+            return null;
+        }
+        $candidates = [
+            ['libicui18n.so.74', '_74'],
+            ['libicui18n.so.72', '_72'],
+            ['libicui18n.so.71', '_71'],
+            ['libicui18n.so.70', '_70'],
+            ['/usr/lib/x86_64-linux-gnu/libicui18n.so.70', '_70'],
+            ['/lib/x86_64-linux-gnu/libicui18n.so.70', '_70'],
+            ['/usr/lib/x86_64-linux-gnu/libicui18n.so.74', '_74'],
+            ['libicui18n.so', '_70'],
+            ['libicui18n.dylib', ''],
+        ];
+        foreach ($candidates as [$lib, $suffix]) {
+            try {
+                self::$ffi = \FFI::cdef(self::cdefForSuffix($suffix), $lib);
+                self::$symSuffix = $suffix;
+
+                return self::$ffi;
+            } catch (\Throwable) {
+                self::$ffi = null;
+            }
+        }
+        self::$ffiUnavailable = true;
+
+        return null;
+    }
+
+    private static function cdefForSuffix(string $suffix): string
+    {
+        return <<<C
+typedef int32_t UErrorCode;
+typedef uint16_t UChar;
+typedef struct UNumberFormat UNumberFormat;
+typedef struct UParseError UParseError;
+UNumberFormat *unum_open{$suffix}(int32_t style, const UChar *pattern, int32_t patternLength, const char *locale, UParseError *parseErr, UErrorCode *status);
+void unum_close{$suffix}(UNumberFormat *fmt);
+int32_t unum_formatDouble{$suffix}(const UNumberFormat *fmt, double number, UChar *result, int32_t resultLength, void *pos, UErrorCode *status);
+int32_t unum_toPattern{$suffix}(const UNumberFormat *fmt, int8_t isPatternLocalized, UChar *result, int32_t resultLength, UErrorCode *status);
+UChar *u_strFromUTF8{$suffix}(UChar *dest, int32_t destCapacity, int32_t *pDestLength, const char *src, int32_t srcLength, UErrorCode *pErrorCode);
+char *u_strToUTF8{$suffix}(char *dest, int32_t destCapacity, int32_t *pDestLength, const UChar *src, int32_t srcLength, UErrorCode *pErrorCode);
+C;
     }
 }
 
