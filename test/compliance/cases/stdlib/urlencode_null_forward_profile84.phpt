@@ -1,20 +1,22 @@
 --TEST--
-stdlib urlencode()/rawurlencode()/urldecode()/rawurldecode() null TypeError on 8.4 forward profile (#19272, ext/standard/url.c)
+stdlib urlencode()/rawurlencode()/urldecode()/rawurldecode() null soft-coerce on 8.4 forward profile (#21188, re-#19272, ext/standard/url.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+set_error_handler(static function (int $no): bool {
+    return E_DEPRECATED === $no;
+});
 foreach (['urlencode', 'rawurlencode', 'urldecode', 'rawurldecode'] as $fn) {
     try {
-        $fn(null);
-        echo "$fn: uncaught\n";
+        echo $fn, ': ', var_export($fn(null), true), "\n";
     } catch (TypeError $e) {
-        echo $fn.': '.$e->getMessage()."\n";
+        echo $fn, ': ', $e->getMessage(), "\n";
     }
 }
 ?>
 --EXPECT--
-urlencode: urlencode(): Argument #1 ($string) must be of type string, null given
-rawurlencode: rawurlencode(): Argument #1 ($string) must be of type string, null given
-urldecode: urldecode(): Argument #1 ($string) must be of type string, null given
-rawurldecode: rawurldecode(): Argument #1 ($string) must be of type string, null given
+urlencode: ''
+rawurlencode: ''
+urldecode: ''
+rawurldecode: ''

@@ -52,12 +52,13 @@ final class JitParseUrl
     public static function parseUrl(Context $context, JITVariable $url, ?JITVariable $component = null): Value
     {
         ParseUrlRuntime::ensureLinked($context);
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20110, ext/standard/url.c)
-        if (
-            (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false))
-            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
-        ) {
-            return JitStringBuiltinArg::lowerZparamStr($context, $url, 'parse_url', 0, 'url');
+        // Soft-null — coerce+deprecate on forward profile (#21188); fold '' → ['path'=>''].
+        if (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                return JitStringBuiltinArg::lowerStrictOrCoercible($context, $url, 'parse_url', 0, 'url');
+            }
+            // Side-effect: E_DEPRECATED + empty string (result folded below).
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $url, 'parse_url', 0, 'url');
         }
         if (null === $component) {
             $urlLiteral = $url->compileTimeString ?? null;
@@ -138,7 +139,7 @@ final class JitParseUrl
         return $ptr;
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20110, ext/standard/url.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#21188, ext/standard/url.c). */
     private static function jitUrlArg(Context $context, JITVariable $url): Value
     {
         if ($context->callerStrictTypes) {
@@ -151,7 +152,7 @@ final class JitParseUrl
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $url,
             'parse_url',

@@ -1,10 +1,9 @@
 --TEST--
-AOT: urlencode(null) — TypeError on 8.4 forward profile (#19272, ext/standard/url.c)
+AOT: urlencode(null) soft-null on 8.4 forward profile (#21188, ext/standard/url.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-urlencode(null);
+echo urlencode(null) === '' ? 'ok' : 'bad', "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+ok

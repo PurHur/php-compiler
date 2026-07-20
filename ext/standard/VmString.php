@@ -83,6 +83,7 @@ final class VmString
      * trim/ltrim/rtrim/chop, str_repeat/str_shuffle/ucfirst/lcfirst/ucwords,
      * strlen/strtolower/strtoupper/strrev, and md5/sha1/crc32/bin2hex/hash($data) coerce null with
      * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181).
+     * base64_encode/base64_decode, urlencode/urldecode/rawurlencode/rawurldecode, parse_url soft-null (#21188).
      * mb_strlen/mb_substr/mb_strpos and iconv/iconv_strlen(+substr/strpos/strrpos input) soft-null (#21197).
      * preg_match/preg_replace $subject (and str_replace family $subject) soft-null likewise (#21198).
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
@@ -100,6 +101,7 @@ final class VmString
      * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data) (#21181),
      * HTML/escape htmlspecialchars/htmlentities/addslashes/stripslashes/nl2br/quotemeta
      * (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
+     * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),
      * and preg_match $subject (#21198).
      */

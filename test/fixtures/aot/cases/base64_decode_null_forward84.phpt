@@ -1,10 +1,9 @@
 --TEST--
-AOT: base64_decode/hex2bin/quoted_printable null — TypeError on 8.4 forward profile (#19283)
+AOT: base64_decode(null) soft-null on 8.4 forward profile (#21188)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-base64_decode(null);
+echo base64_decode(null) === '' ? 'ok' : 'bad', "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+ok

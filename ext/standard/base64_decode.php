@@ -63,6 +63,16 @@ final class base64_decode extends Internal
                 $strictConst = (bool) $ct;
             }
         }
+        // Null → soft-coerce to "" without helper IR (base64_decode("") === ""; #21188).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base64_decode', 0, 'string');
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'base64_decode', 0, 'string');
+        }
         $literal = null;
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
             $maybeLiteral = $args[0]->compileTimeString ?? null;
@@ -89,14 +99,14 @@ final class base64_decode extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19283, ext/standard/base64.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#21188, ext/standard/base64.c). */
     private static function vmStringArg(Frame $frame): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, 0, 'base64_decode', 'string')->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'base64_decode',
             0,
@@ -116,7 +126,7 @@ final class base64_decode extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'base64_decode',

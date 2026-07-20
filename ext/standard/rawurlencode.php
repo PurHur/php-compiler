@@ -20,8 +20,8 @@ final class rawurlencode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('rawurlencode() requires exactly one argument');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19272, ext/standard/url.c)
-        $subject = VmString::zparamStrBuiltinArgForFrame(
+        // Soft-null — coerce+deprecate on forward profile (#21188, ext/standard/url.c)
+        $subject = VmString::trimFamilyStringArgForFrame(
             $frame,
             0,
             'rawurlencode',
@@ -40,20 +40,18 @@ final class rawurlencode extends Internal
             throw new \LogicException('rawurlencode() requires exactly one argument');
         }
 
-        if (
-            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
-            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
-        ) {
-            return JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'rawurlencode', 0, 'string');
+        // Null → soft-coerce to "" without helper IR (rawurlencode("") === ""; #21188).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'rawurlencode', 0, 'string');
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'rawurlencode', 0, 'string');
         }
 
         $literal = $args[0]->compileTimeString ?? null;
-        if (
-            null === $literal
-            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
-        ) {
-            $literal = '';
-        }
         if (null !== $literal) {
             return $context->builder->call(
                 $context->lookupFunction('__string__separate'),
@@ -69,7 +67,7 @@ final class rawurlencode extends Internal
         return JitUrlencode::rawurlencode($context, $str);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19272, ext/standard/url.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#21188, ext/standard/url.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
@@ -82,7 +80,7 @@ final class rawurlencode extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'rawurlencode',

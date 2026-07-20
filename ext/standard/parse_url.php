@@ -22,8 +22,8 @@ final class parse_url extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('parse_url() requires one or two arguments in this compiler build');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20110, ext/standard/url.c)
-        $url = VmString::zparamStrBuiltinArgForFrame(
+        // Soft-null — coerce+deprecate on forward profile (#21188, ext/standard/url.c)
+        $url = VmString::trimFamilyStringArgForFrame(
             $frame,
             0,
             'parse_url',
