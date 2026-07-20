@@ -1130,6 +1130,18 @@ final class VmMbstring
         );
     }
 
+    /** php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_ucwords) — MB_CASE_TITLE per word (#20799). */
+    public static function ucwords(string $string, string $encoding = 'UTF-8'): string
+    {
+        return self::convertCase(
+            $string,
+            MbstringConstants::MB_CASE_TITLE,
+            $encoding,
+            'mb_ucwords',
+            1
+        );
+    }
+
     private static function ulcfirst(
         string $string,
         int $mode,

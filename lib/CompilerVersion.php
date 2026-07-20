@@ -2235,6 +2235,44 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ mb_ucwords() (ext/mbstring/mbstring.c, issue #20799).
+     *
+     * Withheld on 8.4.0-dev reference profile until stable 8.4.0+ or forward `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsMbUcwords(): bool
+    {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** mb_ucwords() visible to function_exists() — stable runtime or forward profile (#20799). */
+    public static function advertisesMbUcwords(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ DateException / DateError hierarchy (ext/date/php_date.h, #7276, #7277, #13118, #15382, #16490).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 Exception on malformed DateInterval).

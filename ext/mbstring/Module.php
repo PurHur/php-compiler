@@ -66,6 +66,9 @@ class Module extends ModuleAbstract
                 new mb_ucfirst(),
                 new mb_lcfirst(),
             ] : []),
+            ...(CompilerVersion::supportsMbUcwords() ? [
+                new mb_ucwords(),
+            ] : []),
             new mb_scrub(),
             new mb_encode_numericentity(),
             new mb_decode_numericentity(),
