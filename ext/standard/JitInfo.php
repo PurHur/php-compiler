@@ -159,30 +159,21 @@ final class JitInfo
         }
 
         StringVersionCompare::ensureLinked($context);
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/versioning.c).
-        // Compile-time null must not continue into __compiler_version_compare after catchable abort.
-        $rejectNull = $context->callerStrictTypes
-            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
-        if (
-            $rejectNull
-            && (JITVariable::TYPE_NULL === $ver1->type || ($ver1->isNullConstant ?? false))
-        ) {
-            JitStringBuiltinArg::lowerZparamStr($context, $ver1, 'version_compare', 0, 'version1');
-            $slot = JitValueBox::alloc($context);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        $ver1Str = JitStringBuiltinArg::lowerZparamStr($context, $ver1, 'version_compare', 0, 'version1');
-        if (
-            $rejectNull
-            && (JITVariable::TYPE_NULL === $ver2->type || ($ver2->isNullConstant ?? false))
-        ) {
-            JitStringBuiltinArg::lowerZparamStr($context, $ver2, 'version_compare', 1, 'version2');
-            $slot = JitValueBox::alloc($context);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        $ver2Str = JitStringBuiltinArg::lowerZparamStr($context, $ver2, 'version_compare', 1, 'version2');
+        // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21556, reverts #20254 TypeError).
+        $ver1Str = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $ver1,
+            'version_compare',
+            0,
+            'version1'
+        );
+        $ver2Str = JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $ver2,
+            'version_compare',
+            1,
+            'version2'
+        );
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_version_compare'),
             $ver1Str,
