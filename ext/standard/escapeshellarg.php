@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -27,8 +28,8 @@ final class escapeshellarg extends Internal
         if (1 !== $argc) {
             throw new \ArgumentCountError('escapeshellarg() expects exactly 1 argument, '.$argc.' given');
         }
-        // php-src ext/standard/exec.c — Z_PARAM_PATH_STR; null → TypeError on 8.4 (#19333)
-        $arg = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'escapeshellarg', 0, 'arg');
+        // php-src ext/standard/exec.c — Z_PARAM_STR; null → E_DEPRECATED + '' on 8.4 (#21221, re-#19333)
+        $arg = VmString::trimFamilyStringArgForFrame($frame, 0, 'escapeshellarg', 0, 'arg');
         VmString::rejectNullByteBuiltinStringArg($arg, 'escapeshellarg', 0, 'arg');
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($arg): void {
             $ret->string(VmEscapeshell::escapeshellarg($arg));
@@ -41,39 +42,50 @@ final class escapeshellarg extends Internal
             throw new \ArgumentCountError('escapeshellarg() expects exactly 1 argument, '.\count($args).' given');
         }
 
+        if ($context->callerStrictTypes) {
+            return JitEscapeshellarg::invoke(
+                $context,
+                JitStringBuiltinArg::lowerStrictOrCoercible(
+                    $context,
+                    $args[0],
+                    'escapeshellarg',
+                    0,
+                    'arg'
+                )
+            );
+        }
+
+        // Soft-null → DEP + escapeshellarg("") without ProcessRuntime IR (#21221 / #21199).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'escapeshellarg', 0, 'arg');
+
+            return self::returnConstantQuoted($context, VmEscapeshell::escapeshellarg(''));
+        }
+
         $lit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
         if (null !== $lit) {
             VmString::rejectNullByteBuiltinStringArg($lit, 'escapeshellarg', 0, 'arg');
+
+            return self::returnConstantQuoted($context, VmEscapeshell::escapeshellarg($lit));
         }
 
         return JitEscapeshellarg::invoke(
             $context,
-            self::jitPathArg($context, $args[0], 0, 'arg')
+            JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $args[0],
+                'escapeshellarg',
+                0,
+                'arg'
+            )
         );
     }
 
-    private static function jitPathArg(
-        Context $context,
-        JITVariable $arg,
-        int $argIndex,
-        string $paramName
-    ): Value {
-        if ($context->callerStrictTypes) {
-            return JitStringBuiltinArg::lowerStrictOrCoercible(
-                $context,
-                $arg,
-                'escapeshellarg',
-                $argIndex,
-                $paramName
-            );
-        }
-
-        return JitStringBuiltinArg::lowerZparamStr(
+    private static function returnConstantQuoted(Context $context, string $quoted): Value
+    {
+        return JitValueBox::coerceToValuePtrForStore(
             $context,
-            $arg,
-            'escapeshellarg',
-            $argIndex,
-            $paramName
+            $context->builder->load($context->constantStringFromString($quoted))
         );
     }
 }

@@ -1,10 +1,11 @@
 --TEST--
-AOT: escapeshellcmd null — TypeError on 8.4 forward profile (#19333)
+AOT: escapeshellcmd null — soft-null on 8.4 forward profile (#21221, re-#19333)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-escapeshellcmd(null);
+error_reporting(E_ALL & ~E_DEPRECATED);
+echo escapeshellcmd(null) === '' ? "ok\n" : "bad\n";
+?>
 --EXPECT--
---EXPECT_EXIT--
-255
+ok
