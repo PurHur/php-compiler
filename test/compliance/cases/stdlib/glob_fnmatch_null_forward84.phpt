@@ -1,5 +1,5 @@
 --TEST--
-stdlib glob()/fnmatch() null pattern TypeError on 8.4 forward profile (#20554, ext/standard/file.c, fnmatch.c)
+stdlib glob()/fnmatch() null pattern DEP+coerce on 8.4 forward profile (#20554, #21366, ext/standard/file.c, fnmatch.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -14,5 +14,5 @@ foreach (['glob' => fn () => glob(null), 'fnmatch' => fn () => fnmatch(null, 'a'
 }
 ?>
 --EXPECT--
-glob TypeError
-fnmatch TypeError
+glob COERCED
+fnmatch COERCED

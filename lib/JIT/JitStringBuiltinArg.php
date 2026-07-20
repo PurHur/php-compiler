@@ -128,6 +128,7 @@ final class JitStringBuiltinArg
      * hash_pbkdf2($algo/$password/$salt) and hash_hkdf($algo/$key/$info/$salt) soft-null (#21319, reverts #20659/#21079).
      * str_rot13/crypt/uniqid/gzcompress soft-null (#21280).
      * zlib one-shot $data (gzdeflate/gzinflate/gzdecode/gzuncompress/gzcompress/gzencode) soft-null (#21311, reverts #19332).
+     * glob() pattern and fnmatch() pattern soft-null (#21366, ext/standard/file.c, fnmatch.c).
      */
     public static function lowerTrimFamilyString(
         Context $context,

@@ -48,6 +48,7 @@ final class VmString
      * htmlspecialchars/htmlentities/nl2br/addslashes are Z_PARAM_STR TypeError on 8.4 (#21351), not soft-null.
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare is Z_PARAM_STR TypeError on 8.4 (#20164), not soft-null.
+     * glob()/fnmatch() pattern soft-null on 8.4 (#21366, ext/standard/file.c, fnmatch.c).
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
