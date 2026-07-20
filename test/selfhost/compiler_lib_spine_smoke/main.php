@@ -2278,7 +2278,6 @@ require_once __DIR__.'/../../../ext/standard/JitObGetStatus.php';
 require_once __DIR__.'/../../../ext/standard/JitObGzhandler.php';
 require_once __DIR__.'/../../../ext/standard/JitObImplicitFlush.php';
 require_once __DIR__.'/../../../ext/standard/JitObListHandlers.php';
-require_once __DIR__.'/../../../ext/standard/JitObOutputExecCaptureKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitObWriteStdoutKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitObStart.php';
 require_once __DIR__.'/../../../ext/standard/JitOpendir.php';
