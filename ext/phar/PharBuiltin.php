@@ -59,6 +59,9 @@ final class PharBuiltin
             'getmetadata' => [PharGetMetadata::class, 'getMetadata'],
             'setmetadata' => [PharSetMetadata::class, 'setMetadata'],
             'delmetadata' => [PharDelMetadata::class, 'delMetadata'],
+            'getversion' => [PharGetVersion::class, 'getVersion'],
+            'iswritable' => [PharIsWritable::class, 'isWritable'],
+            'getmodified' => [PharGetModified::class, 'getModified'],
             'compressfiles' => [PharCompressFiles::class, 'compressFiles'],
             'getpath' => [PharGetPath::class, 'getPath'],
             'offsetset' => [PharOffsetSet::class, 'offsetSet'],
@@ -414,6 +417,48 @@ final class PharDelMetadata extends VmClassMethod
         $ok = VmPharArchive::delMetadata(VmPharArchive::requireReceiver($frame, 'Phar::delMetadata'));
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/** Phar::getVersion() — php-src zim_Phar_getVersion (#21230). */
+final class PharGetVersion extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getVersion'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmPharArchive::getVersion(
+                VmPharArchive::requireReceiver($frame, 'Phar::getVersion')
+            ));
+        }
+    }
+}
+
+/** Phar::isWritable() — php-src zim_Phar_isWritable (#21230). */
+final class PharIsWritable extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isWritable'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPharArchive::isWritable(
+                VmPharArchive::requireReceiver($frame, 'Phar::isWritable')
+            ));
+        }
+    }
+}
+
+/** Phar::getModified() — php-src zim_Phar_getModified (#21230). */
+final class PharGetModified extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getModified'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPharArchive::getModified(
+                VmPharArchive::requireReceiver($frame, 'Phar::getModified')
+            ));
         }
     }
 }

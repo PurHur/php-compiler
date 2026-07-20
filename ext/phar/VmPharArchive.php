@@ -354,6 +354,33 @@ final class VmPharArchive
         return true;
     }
 
+    /** php-src zim_Phar_getVersion — archive API version string (#21230). */
+    public static function getVersion(ObjectEntry $object): string
+    {
+        self::requireState($object);
+
+        return VmPhar::API_VERSION;
+    }
+
+    /**
+     * php-src zim_Phar_isWritable — !readonly (phar_object.c; #21230).
+     * Matches Phar::canWrite() for this VM subset (FS writability deferred).
+     */
+    public static function isWritable(ObjectEntry $object): bool
+    {
+        self::requireState($object);
+
+        return VmPhar::canWrite();
+    }
+
+    /**
+     * php-src zim_Phar_getModified — archive has unflushed changes (#21230).
+     */
+    public static function getModified(ObjectEntry $object): bool
+    {
+        return self::requireState($object)['dirty'];
+    }
+
     public static function compressFiles(ObjectEntry $object, int $compression): void
     {
         self::requireWritable('Phar::compressFiles');
