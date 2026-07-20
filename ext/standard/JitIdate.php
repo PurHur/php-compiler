@@ -68,8 +68,8 @@ final class JitIdate
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
-        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20227).
-        return JitStringBuiltinArg::lowerZparamStr(
+        // Soft-null on 8.4 — Zend deprecate+coerce (#21491, reverts #20227 TypeError).
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'idate',

@@ -78,8 +78,8 @@ final class idate extends Internal
 
     private static function resolveFormatArg(Frame $frame): string
     {
-        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20227, ext/date/php_date.c).
-        return VmString::zparamStrBuiltinArgForFrame($frame, 0, 'idate', 0, 'format');
+        // Soft-null on 8.4 — Zend deprecate+coerce (ext/date/php_date.c; #21491, reverts #20227 TypeError).
+        return VmString::trimFamilyStringArgForFrame($frame, 0, 'idate', 0, 'format');
     }
 
     private function triggerWarning(Frame $frame, string $message): void
