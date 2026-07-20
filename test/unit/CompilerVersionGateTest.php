@@ -1358,7 +1358,8 @@ final class CompilerVersionGateTest extends TestCase
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
+            // Zend 8.4 still rejects class-const `new` (#21493).
+            $this->assertFalse(CompilerVersion::supportsClassConstObjectExpressions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -1368,12 +1369,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsClassConstObjectExpressionsTrueWhenProfile83(): void
+    public function testSupportsClassConstObjectExpressionsFalseWhenProfile83(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.3');
         try {
-            $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
+            $this->assertFalse(CompilerVersion::supportsClassConstObjectExpressions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

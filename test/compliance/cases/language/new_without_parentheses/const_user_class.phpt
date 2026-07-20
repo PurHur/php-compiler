@@ -1,16 +1,7 @@
 --TEST--
-Language: class constant bare `new UserClass` on PHP 8.4 forward profile (#19046, Zend/zend_compile.c)
+Language: class constant bare `new UserClass` rejected under PROFILE=8.4 (#21493, re-#19046, Zend/zend_compile.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
---SKIPIF--
-<?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../../vendor/autoload.php';
-}
-if (!PHPCompiler\CompilerVersion::supportsNewWithoutParensInConstAndStaticInitializers()) {
-    die('skip bare new in class constants requires PHP_COMPILER_PROFILE=8.4');
-}
-?>
 --FILE--
 <?php
 class Foo {
@@ -22,7 +13,7 @@ class Holder {
 }
 
 echo Holder::BAR->n, "\n";
-echo get_class(Holder::BAR), "\n";
---EXPECT--
-7
-Foo
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: New expressions are not supported in this context

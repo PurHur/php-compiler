@@ -13,11 +13,12 @@ use PHPCfg\Op\Terminal\Const_ as ConstTerminal;
 
 /**
  * Reject invalid `new` in class **constant**, **static property**, and **instance property** initializers
- * (#6549, #9484, #10095, #10391, #10693).
+ * (#6549, #9484, #10095, #10391, #10693, #21493).
  *
  * php-src rejects all `new` in class constant expressions and property default expressions with
- * "New expressions are not supported in this context" (zend_compile_const_expr / zend_compile_property).
- * Constructor parameter defaults (including promoted properties) may still use `new` (#3391 RFC).
+ * "New expressions are not supported in this context" (zend_compile_const_expr / zend_compile_property)
+ * on every shipping PHP version including 8.4. Constructor parameter defaults (including promoted
+ * properties) and function static variables may still use `new` (new-in-initializers RFC).
  *
  * @see Zend/zend_compile.c — zend_compile_const_expr(), zend_compile_property()
  */
@@ -69,7 +70,8 @@ final class NewWithoutParensCompileCheck
     }
 
     /**
-     * PHP 8.3+ allows a single top-level `new Class(...)` in class constants (#12940, #16878).
+     * Historical allow-path when {@see CompilerVersion::supportsClassConstObjectExpressions()} was true.
+     * Gate is always false (#21493); keep for structure if php-src ever adds the feature.
      *
      * @param list<Op> $ops
      */

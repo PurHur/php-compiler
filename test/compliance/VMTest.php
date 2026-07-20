@@ -944,7 +944,7 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'typed_class_const_reference_profile'))) {
                 continue;
             }
-            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123, #15693).
+            // Reject gate: class const `new` is never enabled (Zend rejects all profiles, #21493).
             if (CompilerVersion::supportsClassConstObjectExpressions()) {
                 if (str_contains($name, 'class_const_new_rejected')
                     || str_contains($name, 'class_const_new_reject')

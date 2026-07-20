@@ -1,5 +1,5 @@
 --TEST--
-Language: class constant `new stdClass()` rejected on 8.4 forward profile (#15766, #21493, Zend/zend_compile.c)
+Language: class constant `new` rejected under PROFILE=8.4 (#21493, Zend/zend_compile.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -7,11 +7,11 @@ PHP_COMPILER_PROFILE=8.4
 
 declare(strict_types=1);
 
-class Holder {
-    public const OBJ = new \stdClass();
+class A {
+    public const X = new stdClass;
 }
 
-echo get_class(Holder::OBJ), "\n";
+echo gettype(A::X);
 --EXPECT_EXIT--
 255
 --EXPECTF--
