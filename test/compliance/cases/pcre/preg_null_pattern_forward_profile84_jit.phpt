@@ -1,9 +1,16 @@
 --TEST--
-PCRE preg_match/split/grep/replace null $pattern TypeError on 8.4 forward profile JIT (#20226)
+PCRE null $pattern JIT: TypeError match/split/grep; soft replace on 8.4 (#20226, #21198)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+set_error_handler(static function (int $no, string $msg): bool {
+    if (E_DEPRECATED === $no || E_WARNING === $no) {
+        echo (E_DEPRECATED === $no ? 'DEP' : 'WARN'), "\n";
+        return true;
+    }
+    return false;
+});
 foreach ([
     'preg_match' => static fn () => preg_match(null, 'x'),
     'preg_split' => static fn () => preg_split(null, 'x'),
@@ -11,8 +18,8 @@ foreach ([
     'preg_replace' => static fn () => preg_replace(null, 'b', 'a'),
 ] as $label => $factory) {
     try {
-        $factory();
-        echo "$label: uncaught\n";
+        $r = $factory();
+        echo $label, ' OK ', var_export($r, true), "\n";
     } catch (TypeError $e) {
         echo $label.': '.$e->getMessage()."\n";
     }
@@ -22,4 +29,6 @@ foreach ([
 preg_match: preg_match(): Argument #1 ($pattern) must be of type string, null given
 preg_split: preg_split(): Argument #1 ($pattern) must be of type string, null given
 preg_grep: preg_grep(): Argument #1 ($pattern) must be of type string, null given
-preg_replace: preg_replace(): Argument #1 ($pattern) must be of type array|string, null given
+DEP
+WARN
+preg_replace OK NULL
