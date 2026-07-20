@@ -62,6 +62,8 @@ final class TimeSleepRuntimeStandaloneTest extends TestCase
 
         $runtimeSource = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/TimeSleepRuntime.php');
         $this->assertStringContainsString('SleepJitHelper', $runtimeSource);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtimeSource);
+        $this->assertStringNotContainsString('parseAndCompile', $runtimeSource);
         $this->assertStringNotContainsString('lookupFunction(\'nanosleep\')', $runtimeSource);
         $this->assertStringNotContainsString('lookupFunction(\'gettimeofday\')', $runtimeSource);
 
