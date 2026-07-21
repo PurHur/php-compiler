@@ -13,6 +13,7 @@ $tmp = sys_get_temp_dir() . '/phar_compress_' . getmypid() . '.phar';
 @unlink(preg_replace('/\.phar$/', '.tar', $tmp));
 $p = new Phar($tmp);
 $p->addFromString('a.txt', 'hi');
+echo 'fmt_phar=', $p->isFileFormat(Phar::PHAR) ? '1' : '0', "\n";
 echo 'fmt_tar=', $p->isFileFormat(Phar::TAR) ? '1' : '0', "\n";
 echo 'fmt_zip=', $p->isFileFormat(Phar::ZIP) ? '1' : '0', "\n";
 echo 'comp0=', ($p->isCompressed() === false) ? 'F' : 'Y', "\n";
@@ -39,7 +40,8 @@ convertToData=1
 convertToExecutable=1
 isCompressed=1
 isFileFormat=1
-fmt_tar=1
+fmt_phar=1
+fmt_tar=0
 fmt_zip=0
 comp0=F
 gz_class=Phar
