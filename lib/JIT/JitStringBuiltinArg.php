@@ -123,6 +123,7 @@ final class JitStringBuiltinArg
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
+     * substr_compare haystack/needle (#21515, reverts #20164 TypeError),
      * json_decode/json_validate $json, unserialize $data (#21223).
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
      * parse_str $string soft-null (#21480, reverts #21380 TypeError).

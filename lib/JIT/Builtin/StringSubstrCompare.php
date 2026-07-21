@@ -48,9 +48,17 @@ final class StringSubstrCompare
             return;
         }
 
+        // Restore caller insert block after bridge emit (#21515 / peer #21556) —
+        // clearInsertionPosition left the user-script builder detached
+        // ("Current basic block has no parent function").
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void
