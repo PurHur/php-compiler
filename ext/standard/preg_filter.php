@@ -51,7 +51,8 @@ final class preg_filter extends Internal
         );
         $limit = -1;
         if (isset($frame->calledArgs[3])) {
-            $limit = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_filter', 4, 'limit');
+            // Z_PARAM_LONG $limit — soft-null DEP+coerce on 8.4 (php_pcre.c; #21655).
+            $limit = VmMath::parseChrCodepointForFrame($frame, 3, 'preg_filter', 4, 'limit');
         }
         // Named count: may skip limit — use isset not argc (#19697).
         $hasCount = isset($frame->calledArgs[4]);
@@ -161,7 +162,8 @@ final class preg_filter extends Internal
             return $context->constantFromInteger($lit, 'int64');
         }
 
-        return JitIntdiv::lowerIntBuiltinArg($context, $arg, 'preg_filter', 4, 'limit');
+        // Soft-null DEP+coerce on 8.4 (php_pcre.c Z_PARAM_LONG; #21655).
+        return JitChr::lowerZParamLongArg($context, $arg, 'preg_filter', 4, 'limit');
     }
 
     private static function compileTimeLimit(JITVariable $arg): ?int

@@ -76,7 +76,8 @@ final class preg_replace extends Internal
         );
         $limit = -1;
         if (isset($frame->calledArgs[3])) {
-            $limit = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_replace', 4, 'limit');
+            // Z_PARAM_LONG $limit — soft-null DEP+coerce on 8.4 (php_pcre.c; #21655).
+            $limit = VmMath::parseChrCodepointForFrame($frame, 3, 'preg_replace', 4, 'limit');
         }
 
         $pattern = self::patternOrReplacementOperand($patternVar, $frame->calledArgs[0], 'preg_replace', 0, 'pattern');
@@ -215,7 +216,8 @@ final class preg_replace extends Internal
             return $context->constantFromInteger($lit, 'int64');
         }
 
-        return JitIntdiv::lowerIntBuiltinArg($context, $arg, 'preg_replace', 4, 'limit');
+        // Soft-null DEP+coerce on 8.4 (php_pcre.c Z_PARAM_LONG; #21655).
+        return JitChr::lowerZParamLongArg($context, $arg, 'preg_replace', 4, 'limit');
     }
 
     private static function compileTimeLimit(JITVariable $arg): ?int
