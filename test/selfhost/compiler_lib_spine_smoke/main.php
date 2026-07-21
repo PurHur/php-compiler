@@ -3968,6 +3968,7 @@ require_once __DIR__.'/../../../ext/sysvmsg/msg_receive.php';
 require_once __DIR__.'/../../../ext/sysvmsg/msg_remove_queue.php';
 require_once __DIR__.'/../../../ext/sysvmsg/msg_send.php';
 require_once __DIR__.'/../../../ext/sysvmsg/msg_stat_queue.php';
+require_once __DIR__.'/../../../ext/sysvmsg/msg_set_queue.php';
 require_once __DIR__.'/../../../ext/sysvsem/Module.php';
 require_once __DIR__.'/../../../ext/sysvsem/SemArgs.php';
 require_once __DIR__.'/../../../ext/sysvsem/VmSem.php';

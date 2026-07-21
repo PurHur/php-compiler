@@ -44,6 +44,7 @@ class Module extends ModuleAbstract
             new msg_receive(),
             new msg_remove_queue(),
             new msg_stat_queue(),
+            new msg_set_queue(),
             new msg_queue_exists(),
         ];
     }
