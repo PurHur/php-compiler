@@ -19,6 +19,11 @@ final class JitVfprintf
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong, Value $fmt, JITVariable $args): Value
     {
+        // User-standalone init skips StringFormat::ensureLinked (#13571) —
+        // hashtable path calls __compiler_sprintf without going through JitSprintf (#21514).
+        if ('1' !== getenv('PHP_COMPILER_HELPER_RUNTIME_EMITTING')) {
+            \PHPCompiler\JIT\Builtin\StringFormat::implementIfDeclared($context, true);
+        }
         $i64 = $context->getTypeFromString('int64');
         $fmtVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $fmt);
 
@@ -140,7 +145,7 @@ final class JitVfprintf
     public static function loadArgsArray(Context $context, JITVariable $arg, string $fn = 'vprintf'): JITVariable
     {
         $valuesArgNum = 'vfprintf' === $fn ? 3 : 2;
-        JitVsprintf::requireValuesArrayArg($context, $arg, $fn, $valuesArgNum);
+        JitVsprintfArrayArg::requireValues($context, $arg, $fn, $valuesArgNum);
         if ($arg->type & JITVariable::IS_NATIVE_ARRAY) {
             return $arg;
         }
