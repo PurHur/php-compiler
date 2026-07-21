@@ -7,9 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -43,13 +45,16 @@ final class str_getcsv extends Internal
         $enclosure = '"';
         $escape = '\\';
         if (isset($frame->calledArgs[1])) {
-            $separator = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'str_getcsv', 1, 'separator');
+            self::rejectNullOptionalString($frame, $frame->calledArgs[1], 1, 'separator');
+            $separator = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'str_getcsv', 1, 'separator');
         }
         if (isset($frame->calledArgs[2])) {
-            $enclosure = VmString::requireStringBuiltinArg($frame->calledArgs[2], 'str_getcsv', 2, 'enclosure');
+            self::rejectNullOptionalString($frame, $frame->calledArgs[2], 2, 'enclosure');
+            $enclosure = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'str_getcsv', 2, 'enclosure');
         }
         if (isset($frame->calledArgs[3])) {
-            $escape = VmString::requireStringBuiltinArg($frame->calledArgs[3], 'str_getcsv', 3, 'escape');
+            self::rejectNullOptionalString($frame, $frame->calledArgs[3], 3, 'escape');
+            $escape = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'str_getcsv', 3, 'escape');
         } else {
             // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
             VmCsvArg::emitOmittedEscapeDeprecation($frame, 'str_getcsv');
@@ -75,13 +80,16 @@ final class str_getcsv extends Internal
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
-            $separator = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'str_getcsv', 1, 'separator');
+            self::rejectNullOptionalStringJit($context, $args[1], 1, 'separator');
+            $separator = JitStringBuiltinArg::lower($context, $args[1], 'str_getcsv', 1, 'separator');
         }
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-            $enclosure = JitStringBuiltinArg::lowerRequiredString($context, $args[2], 'str_getcsv', 2, 'enclosure');
+            self::rejectNullOptionalStringJit($context, $args[2], 2, 'enclosure');
+            $enclosure = JitStringBuiltinArg::lower($context, $args[2], 'str_getcsv', 2, 'enclosure');
         }
         if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
-            $escape = JitStringBuiltinArg::lowerRequiredString($context, $args[3], 'str_getcsv', 3, 'escape');
+            self::rejectNullOptionalStringJit($context, $args[3], 3, 'escape');
+            $escape = JitStringBuiltinArg::lower($context, $args[3], 'str_getcsv', 3, 'escape');
         } else {
             // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
             VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'str_getcsv');
@@ -113,5 +121,42 @@ final class str_getcsv extends Internal
             $argIndex,
             $paramName
         );
+    }
+
+    /** php-src Z_PARAM_STR — null TypeError only under declare(strict_types=1) (#21734, file.c). */
+    private static function rejectNullOptionalString(
+        Frame $frame,
+        Variable $var,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (!InternalStrictArg::isCallerStrict($frame)) {
+            return;
+        }
+        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            throw new \TypeError(\sprintf(
+                'str_getcsv(): Argument #%d ($%s) must be of type string, null given',
+                $argIndex + 1,
+                $paramName
+            ));
+        }
+    }
+
+    private static function rejectNullOptionalStringJit(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            ExceptionBridge::emitTypeErrorAndAbort($context, \sprintf(
+                'str_getcsv(): Argument #%d ($%s) must be of type string, null given',
+                $argIndex + 1,
+                $paramName
+            ));
+        }
     }
 }
