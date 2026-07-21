@@ -59,6 +59,8 @@ final class VmMysqli
             'rollback' => new MysqliRollback(),
             'savepoint' => new MysqliSavepoint(),
             'release_savepoint' => new MysqliReleaseSavepoint(),
+            'refresh' => new MysqliRefresh(),
+            'get_connection_stats' => new MysqliGetConnectionStats(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -295,6 +297,28 @@ final class VmMysqli
     private static function releaseSavepointSql(string $name): string
     {
         return 'RELEASE SAVEPOINT `'.str_replace('`', '``', $name).'`';
+    }
+
+    public static function refreshOnLink(ObjectEntry $entry, Context $ctx, int $options): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->refresh($options);
+    }
+
+    /** @return array<string, int|float|string|null> */
+    public static function connectionStatsOnLink(ObjectEntry $entry, Context $ctx): array
+    {
+        $native = self::requireNative($entry, $ctx);
+        if (!method_exists($native, 'get_connection_stats')) {
+            return [];
+        }
+        $stats = $native->get_connection_stats();
+        if (!\is_array($stats)) {
+            return [];
+        }
+
+        return $stats;
     }
 }
 
@@ -743,6 +767,45 @@ final class MysqliReleaseSavepoint extends MysqliClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmMysqli::releaseSavepointOnLink($receiver, $ctx, $name));
         }
+    }
+}
+
+final class MysqliRefresh extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('refresh');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::refresh()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::refresh() expects exactly 1 argument, 0 given');
+        }
+        $options = $this->intArg($frame->calledArgs[1], 'mysqli::refresh', 0, 'options', 0);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::refresh() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::refreshOnLink($receiver, $ctx, $options));
+        }
+    }
+}
+
+final class MysqliGetConnectionStats extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_connection_stats');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::get_connection_stats()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::get_connection_stats() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        VmMysqli::assignRow($frame->returnVar, VmMysqli::connectionStatsOnLink($receiver, $ctx));
     }
 }
 

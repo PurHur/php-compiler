@@ -32,6 +32,16 @@ final class MysqliConstants
     public const MYSQLI_TRANS_START_READ_WRITE = 2;
     public const MYSQLI_TRANS_START_READ_ONLY = 4;
 
+    public const MYSQLI_REFRESH_GRANT = 1;
+    public const MYSQLI_REFRESH_LOG = 2;
+    public const MYSQLI_REFRESH_TABLES = 4;
+    public const MYSQLI_REFRESH_HOSTS = 8;
+    public const MYSQLI_REFRESH_STATUS = 16;
+    public const MYSQLI_REFRESH_THREADS = 32;
+    public const MYSQLI_REFRESH_SLAVE = 64;
+    public const MYSQLI_REFRESH_MASTER = 128;
+    public const MYSQLI_REFRESH_BACKUP_LOG = 2097152;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -52,6 +62,15 @@ final class MysqliConstants
             'MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT' => self::MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT,
             'MYSQLI_TRANS_START_READ_WRITE' => self::MYSQLI_TRANS_START_READ_WRITE,
             'MYSQLI_TRANS_START_READ_ONLY' => self::MYSQLI_TRANS_START_READ_ONLY,
+            'MYSQLI_REFRESH_GRANT' => self::MYSQLI_REFRESH_GRANT,
+            'MYSQLI_REFRESH_LOG' => self::MYSQLI_REFRESH_LOG,
+            'MYSQLI_REFRESH_TABLES' => self::MYSQLI_REFRESH_TABLES,
+            'MYSQLI_REFRESH_HOSTS' => self::MYSQLI_REFRESH_HOSTS,
+            'MYSQLI_REFRESH_STATUS' => self::MYSQLI_REFRESH_STATUS,
+            'MYSQLI_REFRESH_THREADS' => self::MYSQLI_REFRESH_THREADS,
+            'MYSQLI_REFRESH_SLAVE' => self::MYSQLI_REFRESH_SLAVE,
+            'MYSQLI_REFRESH_MASTER' => self::MYSQLI_REFRESH_MASTER,
+            'MYSQLI_REFRESH_BACKUP_LOG' => self::MYSQLI_REFRESH_BACKUP_LOG,
         ];
     }
 

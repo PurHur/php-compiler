@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6309 |
-| Phase A inventory files (M2 ratio SSOT) | 6309 |
+| PHP files on vm.php path | 6311 |
+| Phase A inventory files (M2 ratio SSOT) | 6311 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19975 |
+| Source constructs flagged (warnings) | 19985 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1289,13 +1289,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
 | `ext/mysqli/BuiltinClasses.php` | 0 | 4 |
-| `ext/mysqli/Module.php` | 0 | 31 |
+| `ext/mysqli/Module.php` | 0 | 33 |
 | `ext/mysqli/MysqliClassMethod.php` | 0 | 1 |
 | `ext/mysqli/MysqliConstants.php` | 0 | 1 |
 | `ext/mysqli/MysqliExtensionPolicy.php` | 0 | 1 |
 | `ext/mysqli/MysqliProceduralLink.php` | 0 | 3 |
 | `ext/mysqli/MysqliReportMode.php` | 0 | 1 |
-| `ext/mysqli/VmMysqli.php` | 0 | 44 |
+| `ext/mysqli/VmMysqli.php` | 0 | 47 |
 | `ext/mysqli/VmMysqliStmt.php` | 0 | 11 |
 | `ext/mysqli/mysqli_affected_rows.php` | 0 | 3 |
 | `ext/mysqli/mysqli_autocommit.php` | 0 | 2 |
@@ -1311,11 +1311,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mysqli/mysqli_fetch_assoc.php` | 0 | 3 |
 | `ext/mysqli/mysqli_fetch_row.php` | 0 | 3 |
 | `ext/mysqli/mysqli_free_result.php` | 0 | 3 |
+| `ext/mysqli/mysqli_get_connection_stats.php` | 0 | 2 |
 | `ext/mysqli/mysqli_init.php` | 0 | 3 |
 | `ext/mysqli/mysqli_num_rows.php` | 0 | 3 |
 | `ext/mysqli/mysqli_prepare.php` | 0 | 3 |
 | `ext/mysqli/mysqli_query.php` | 0 | 3 |
 | `ext/mysqli/mysqli_real_escape_string.php` | 0 | 3 |
+| `ext/mysqli/mysqli_refresh.php` | 0 | 3 |
 | `ext/mysqli/mysqli_release_savepoint.php` | 0 | 3 |
 | `ext/mysqli/mysqli_report.php` | 0 | 2 |
 | `ext/mysqli/mysqli_rollback.php` | 0 | 2 |
@@ -16200,36 +16202,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 69)
-- new mysqli_connect (line 88)
-- new mysqli_init (line 89)
-- new mysqli_query (line 90)
-- new mysqli_fetch_assoc (line 91)
-- new mysqli_fetch_array (line 92)
-- new mysqli_fetch_row (line 93)
-- new mysqli_close (line 94)
-- new mysqli_connect_errno (line 95)
-- new mysqli_connect_error (line 96)
-- new mysqli_free_result (line 97)
-- new mysqli_real_escape_string (line 98)
-- new mysqli_real_escape_string (line 99)
-- new mysqli_num_rows (line 100)
-- new mysqli_affected_rows (line 101)
-- new mysqli_error (line 102)
-- new mysqli_errno (line 103)
-- new mysqli_report (line 104)
-- new mysqli_prepare (line 105)
-- new mysqli_stmt_bind_param (line 106)
-- new mysqli_stmt_bind_result (line 107)
-- new mysqli_stmt_close (line 108)
-- new mysqli_stmt_execute (line 109)
-- new mysqli_stmt_fetch (line 110)
-- new mysqli_autocommit (line 111)
-- new mysqli_begin_transaction (line 112)
-- new mysqli_commit (line 113)
-- new mysqli_rollback (line 114)
-- new mysqli_savepoint (line 115)
-- new mysqli_release_savepoint (line 116)
+- new Variable (line 71)
+- new mysqli_connect (line 90)
+- new mysqli_init (line 91)
+- new mysqli_query (line 92)
+- new mysqli_fetch_assoc (line 93)
+- new mysqli_fetch_array (line 94)
+- new mysqli_fetch_row (line 95)
+- new mysqli_close (line 96)
+- new mysqli_connect_errno (line 97)
+- new mysqli_connect_error (line 98)
+- new mysqli_free_result (line 99)
+- new mysqli_real_escape_string (line 100)
+- new mysqli_real_escape_string (line 101)
+- new mysqli_num_rows (line 102)
+- new mysqli_affected_rows (line 103)
+- new mysqli_error (line 104)
+- new mysqli_errno (line 105)
+- new mysqli_report (line 106)
+- new mysqli_prepare (line 107)
+- new mysqli_stmt_bind_param (line 108)
+- new mysqli_stmt_bind_result (line 109)
+- new mysqli_stmt_close (line 110)
+- new mysqli_stmt_execute (line 111)
+- new mysqli_stmt_fetch (line 112)
+- new mysqli_autocommit (line 113)
+- new mysqli_begin_transaction (line 114)
+- new mysqli_commit (line 115)
+- new mysqli_rollback (line 116)
+- new mysqli_savepoint (line 117)
+- new mysqli_release_savepoint (line 118)
+- new mysqli_refresh (line 119)
+- new mysqli_get_connection_stats (line 120)
 - 4 class method(s)
 
 ### `ext/mysqli/MysqliClassMethod.php`
@@ -16274,38 +16278,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new MysqliRollback (line 59)
 - new MysqliSavepoint (line 60)
 - new MysqliReleaseSavepoint (line 61)
-- new mysqli (line 98)
-- new ObjectEntry (line 135)
-- new MysqliState (line 136)
-- new ObjectEntry (line 151)
-- new MysqliState (line 152)
-- new mysqli_sql_exception (line 208)
-- new HashTable (line 218)
-- new Variable (line 220)
-- new MysqliState (line 237)
-- new ClassEntry (line 322)
-- new MysqliResultFetchAssoc (line 327)
-- new MysqliResultFetchArray (line 328)
-- new MysqliResultFetchRow (line 329)
-- new MysqliResultFree (line 330)
-- new MysqliResultFree (line 331)
-- new MysqliResultFree (line 332)
-- new MysqliResultFetchAll (line 333)
-- new ObjectEntry (line 353)
-- new MysqliResultState (line 354)
-- new mysqli_sql_exception (line 421)
-- new mysqli (line 436)
-- new mysqli_sql_exception (line 441)
-- new MysqliState (line 444)
-- new ArgumentCountError (line 482)
-- new ArgumentCountError (line 534)
-- new ArgumentCountError (line 556)
-- new ArgumentCountError (line 582)
-- new ArgumentCountError (line 718)
-- new ArgumentCountError (line 739)
-- new HashTable (line 850)
-- new Variable (line 852)
-- 49 class method(s)
+- new MysqliRefresh (line 62)
+- new MysqliGetConnectionStats (line 63)
+- new mysqli (line 100)
+- new ObjectEntry (line 137)
+- new MysqliState (line 138)
+- new ObjectEntry (line 153)
+- new MysqliState (line 154)
+- new mysqli_sql_exception (line 210)
+- new HashTable (line 220)
+- new Variable (line 222)
+- new MysqliState (line 239)
+- new ClassEntry (line 346)
+- new MysqliResultFetchAssoc (line 351)
+- new MysqliResultFetchArray (line 352)
+- new MysqliResultFetchRow (line 353)
+- new MysqliResultFree (line 354)
+- new MysqliResultFree (line 355)
+- new MysqliResultFree (line 356)
+- new MysqliResultFetchAll (line 357)
+- new ObjectEntry (line 377)
+- new MysqliResultState (line 378)
+- new mysqli_sql_exception (line 445)
+- new mysqli (line 460)
+- new mysqli_sql_exception (line 465)
+- new MysqliState (line 468)
+- new ArgumentCountError (line 506)
+- new ArgumentCountError (line 558)
+- new ArgumentCountError (line 580)
+- new ArgumentCountError (line 606)
+- new ArgumentCountError (line 742)
+- new ArgumentCountError (line 763)
+- new ArgumentCountError (line 784)
+- new HashTable (line 913)
+- new Variable (line 915)
+- 53 class method(s)
 
 ### `ext/mysqli/VmMysqliStmt.php`
 
@@ -16415,6 +16422,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 41)
 - 2 class method(s)
 
+### `ext/mysqli/mysqli_get_connection_stats.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 33)
+- 2 class method(s)
+
 ### `ext/mysqli/mysqli_init.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16448,6 +16461,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - new Error (line 41)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_refresh.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new Error (line 34)
 - 2 class method(s)
 
 ### `ext/mysqli/mysqli_release_savepoint.php`
@@ -45278,9 +45298,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 188)
 - new Variable (line 192)
 - new Variable (line 194)
-- new Variable (line 1840)
-- new Variable (line 1844)
-- new Variable (line 2106)
+- new Variable (line 1868)
+- new Variable (line 1872)
+- new Variable (line 2134)
 - 10 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
