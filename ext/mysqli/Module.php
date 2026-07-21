@@ -45,7 +45,13 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_affected_rows.php';
         require_once __DIR__.'/mysqli_error.php';
         require_once __DIR__.'/mysqli_errno.php';
-        require_once __DIR__.'/mysqli_init.php';
+        require_once __DIR__.'/VmMysqliStmt.php';
+        require_once __DIR__.'/mysqli_prepare.php';
+        require_once __DIR__.'/mysqli_stmt_bind_param.php';
+        require_once __DIR__.'/mysqli_stmt_bind_result.php';
+        require_once __DIR__.'/mysqli_stmt_close.php';
+        require_once __DIR__.'/mysqli_stmt_execute.php';
+        require_once __DIR__.'/mysqli_stmt_fetch.php';
         require_once __DIR__.'/MysqliReportMode.php';
         require_once __DIR__.'/mysqli_report.php';
         parent::init($runtime);
@@ -88,8 +94,13 @@ class Module extends ModuleAbstract
             new mysqli_affected_rows(),
             new mysqli_error(),
             new mysqli_errno(),
-            new mysqli_init(),
             new mysqli_report(),
+            new mysqli_prepare(),
+            new mysqli_stmt_bind_param(),
+            new mysqli_stmt_bind_result(),
+            new mysqli_stmt_close(),
+            new mysqli_stmt_execute(),
+            new mysqli_stmt_fetch(),
         ];
     }
 }

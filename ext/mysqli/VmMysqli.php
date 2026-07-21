@@ -501,8 +501,20 @@ final class MysqliPrepare extends MysqliClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, 'mysqli::prepare()');
-        throw new \Error('mysqli::prepare() is not yet implemented in this compiler build (issue #3435)');
+        $receiver = $this->receiver($frame, 'mysqli::prepare()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::prepare() expects exactly 1 argument, 0 given');
+        }
+        $sql = $this->stringArg($frame->calledArgs[1], 'mysqli::prepare', 0, 'query');
+        $result = VmMysqliStmt::prepareOnLink($receiver, $sql);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($result);
+        }
     }
 }
 

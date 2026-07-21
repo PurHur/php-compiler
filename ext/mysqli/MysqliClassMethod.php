@@ -59,6 +59,11 @@ abstract class MysqliClassMethod extends VmClassMethod
         ));
     }
 
+    public static function typeLabelPublic(Variable $var): string
+    {
+        return self::typeLabel($var);
+    }
+
     protected static function typeLabel(Variable $var): string
     {
         $resolved = $var->resolveIndirect();

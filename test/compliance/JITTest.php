@@ -1512,6 +1512,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'soap_client')) {
                 continue;
             }
+            // ext/mysqli — VM host bridge; JIT builtins deferred (#3435, #21788).
+            if (str_contains($name, 'mysqli')) {
+                continue;
+            }
             // FFI::cdef / dynamic C calls — VM + host libffi first (#4420); JIT class-method deferred.
             if (str_contains($name, 'ffi_puts')) {
                 continue;

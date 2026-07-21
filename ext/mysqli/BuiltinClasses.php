@@ -15,6 +15,7 @@ final class BuiltinClasses
         self::registerAuxiliaryClasses($ctx);
         VmMysqli::registerClass($ctx);
         VmMysqliResult::registerClass($ctx);
+        VmMysqliStmt::registerClass($ctx);
         VmMysqli::initStore($ctx);
     }
 
