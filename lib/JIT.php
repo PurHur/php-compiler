@@ -8859,9 +8859,19 @@ class JIT {
                             break;
                         case Variable::TYPE_NATIVE_DOUBLE:
                             $argValue = $this->context->helper->loadValue($arg);
-                            $this->context->builder->call(
-                                $this->context->lookupFunction('__phpc_ob_echo_double'),
+                            // PG(precision) via ZendDoubleStringRuntime (#21963).
+                            $formatted = JIT\Builtin\ZendDoubleStringRuntime::format(
+                                $this->context,
                                 $argValue
+                            );
+                            JIT\ValueEchoHelper::echoStringVariable(
+                                $this->context,
+                                new Variable(
+                                    $this->context,
+                                    Variable::TYPE_STRING,
+                                    Variable::KIND_VALUE,
+                                    $formatted
+                                )
                             );
                             break;
                         case Variable::TYPE_NATIVE_BOOL:

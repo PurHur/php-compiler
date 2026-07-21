@@ -83,11 +83,12 @@ final class JitNativeString
                     JitResourceIdString::formatNativeLong($context, $value)
                 );
             case Variable::TYPE_NATIVE_DOUBLE:
+                // PG(precision) via VmZendDoubleString (#21963, Zend/zend_operators.c).
                 return new Variable(
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VALUE,
-                    self::format($context, $value, '%.14g')
+                    Builtin\ZendDoubleStringRuntime::format($context, $value)
                 );
             case Variable::TYPE_NATIVE_BOOL:
                 self::ensureInsertBlock($context);

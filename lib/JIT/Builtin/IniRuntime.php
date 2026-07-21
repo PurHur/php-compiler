@@ -32,6 +32,8 @@ final class IniRuntime
 
     private const G_SERIALIZE_PRECISION = 'phpc_ini_serialize_precision';
 
+    private const G_PRECISION = 'phpc_ini_precision';
+
     private const INI_GET_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::iniGet';
 
     private const INI_SET_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::iniSet';
@@ -41,6 +43,8 @@ final class IniRuntime
     private const INI_RESTORE_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::iniRestore';
 
     private const SERIALIZE_PRECISION_INT_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::getSerializePrecisionInt';
+
+    private const PRECISION_INT_HELPER = 'PHPCompiler\\ext\\standard\\IniJitHelper::getPrecisionInt';
 
     private const GET_BRIDGE_ENTRY = 'ini_get_bridge_entry';
 
@@ -57,6 +61,7 @@ final class IniRuntime
         self::INI_CFG_GET_HELPER,
         self::INI_RESTORE_HELPER,
         self::SERIALIZE_PRECISION_INT_HELPER,
+        self::PRECISION_INT_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -84,6 +89,14 @@ final class IniRuntime
         $probe = $context->module->getNamedFunction('__compiler_ini_get');
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::GET_BRIDGE_ENTRY)) {
             SilenceRuntime::ensureLinked($context);
+            self::ensureGlobals($context);
+            // Pick up newly-listed helpers (e.g. getPrecisionInt #21963) without rebuilding bridges.
+            JitVmHelperLink::ensureCompiled(
+                $context,
+                self::HELPER_PATH,
+                self::COMPILED_HELPERS,
+                '#21200'
+            );
             self::registerLinkedRuntime($context);
 
             return;
@@ -196,6 +209,7 @@ final class IniRuntime
         );
         self::writeHelperStringOrFalseToValue($context, $fn->getParam(2), $result);
         self::syncSerializePrecisionGlobal($context);
+        self::syncPrecisionGlobal($context);
         $context->builder->returnVoid();
     }
 
@@ -208,6 +222,7 @@ final class IniRuntime
             $fn->getParam(0)
         );
         self::syncSerializePrecisionGlobal($context);
+        self::syncPrecisionGlobal($context);
         $context->builder->returnVoid();
     }
 
@@ -251,6 +266,29 @@ final class IniRuntime
         );
     }
 
+    private static function syncPrecisionGlobal(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $prec = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::PRECISION_INT_HELPER),
+            []
+        );
+        $context->builder->store(
+            $context->builder->trunc($prec, $i32),
+            self::globalPtr($context, self::G_PRECISION, $i32)
+        );
+    }
+
+    /** Load PG(precision) for float→string lowering (#21963). */
+    public static function loadPrecision(Context $context): Value
+    {
+        self::ensureLinked($context);
+        $i32 = $context->getTypeFromString('int32');
+
+        return $context->builder->load(self::globalPtr($context, self::G_PRECISION, $i32));
+    }
+
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         return JitVmHelperLink::lookupCompiled($context, $logical, '#21200');
@@ -268,6 +306,10 @@ final class IniRuntime
         if (null === $context->module->getNamedGlobal(self::G_SERIALIZE_PRECISION)) {
             $g = $context->module->addGlobal($i32, self::G_SERIALIZE_PRECISION);
             $g->setInitializer($i32->constInt(-1, true));
+        }
+        if (null === $context->module->getNamedGlobal(self::G_PRECISION)) {
+            $g = $context->module->addGlobal($i32, self::G_PRECISION);
+            $g->setInitializer($i32->constInt(14, true));
         }
     }
 

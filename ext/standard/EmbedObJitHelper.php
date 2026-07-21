@@ -19,6 +19,7 @@ final class EmbedObJitHelper
 
     public static function formatDouble(float $value): string
     {
-        return \sprintf('%.14g', $value);
+        // PG(precision) — same SSOT as (string) cast (#21963).
+        return VmZendDoubleString::format($value);
     }
 }
