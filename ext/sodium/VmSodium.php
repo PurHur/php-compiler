@@ -202,6 +202,19 @@ final class VmSodium
 
     public const CRYPTO_PWHASH_MEMLIMIT_SENSITIVE = 1073741824;
 
+    /** scrypt password hashing (php-src crypto_pwhash_scryptsalsa208sha256_*; #21460). */
+    public const CRYPTO_PWHASH_SCRYPTSALSA208SHA256_SALTBYTES = 32;
+
+    public const CRYPTO_PWHASH_SCRYPTSALSA208SHA256_STRPREFIX = '$7$';
+
+    public const CRYPTO_PWHASH_SCRYPTSALSA208SHA256_OPSLIMIT_INTERACTIVE = 524288;
+
+    public const CRYPTO_PWHASH_SCRYPTSALSA208SHA256_MEMLIMIT_INTERACTIVE = 16777216;
+
+    public const CRYPTO_PWHASH_SCRYPTSALSA208SHA256_OPSLIMIT_SENSITIVE = 33554432;
+
+    public const CRYPTO_PWHASH_SCRYPTSALSA208SHA256_MEMLIMIT_SENSITIVE = 1073741824;
+
     /** sodium_base64_VARIANT_* (libsodium helpers.h; #20675). */
     public const BASE64_VARIANT_ORIGINAL = 1;
 
@@ -217,6 +230,9 @@ final class VmSodium
     private const CRYPTO_PWHASH_OPSLIMIT_MIN = 1;
 
     private const CRYPTO_PWHASH_MEMLIMIT_MIN = 8192;
+
+    /** Internal: crypto_pwhash_scryptsalsa208sha256_STRBYTES (libsodium; not advertised). */
+    private const CRYPTO_PWHASH_SCRYPTSALSA208SHA256_STRBYTES = 102;
 
     private static ?\FFI $ffi = null;
 
@@ -249,6 +265,7 @@ final class VmSodium
             || \function_exists('sodium_crypto_shorthash')
             || \function_exists('sodium_crypto_kdf_derive_from_key')
             || \function_exists('sodium_crypto_pwhash')
+            || \function_exists('sodium_crypto_pwhash_scryptsalsa208sha256')
             || null !== self::ffi();
     }
 
@@ -1601,6 +1618,52 @@ final class VmSodium
         return self::ffiPwhashStrNeedsRehash($hash, $opslimit, $memlimit);
     }
 
+    /**
+     * sodium_crypto_pwhash_scryptsalsa208sha256() (php-src ext/sodium/libsodium.c; #21460).
+     */
+    public static function pwhashScrypt(
+        int $length,
+        string $password,
+        string $salt,
+        int $opslimit,
+        int $memlimit
+    ): string {
+        self::validatePwhashScrypt($length, $password, $salt, $opslimit, $memlimit);
+        if (\function_exists('sodium_crypto_pwhash_scryptsalsa208sha256')) {
+            return \sodium_crypto_pwhash_scryptsalsa208sha256($length, $password, $salt, $opslimit, $memlimit);
+        }
+
+        return self::ffiPwhashScrypt($length, $password, $salt, $opslimit, $memlimit);
+    }
+
+    /**
+     * sodium_crypto_pwhash_scryptsalsa208sha256_str() (php-src ext/sodium/libsodium.c; #21460).
+     */
+    public static function pwhashScryptStr(string $password, int $opslimit, int $memlimit): string
+    {
+        self::validatePwhashScryptStr($password, $opslimit, $memlimit);
+        if (\function_exists('sodium_crypto_pwhash_scryptsalsa208sha256_str')) {
+            return \sodium_crypto_pwhash_scryptsalsa208sha256_str($password, $opslimit, $memlimit);
+        }
+
+        return self::ffiPwhashScryptStr($password, $opslimit, $memlimit);
+    }
+
+    /**
+     * sodium_crypto_pwhash_scryptsalsa208sha256_str_verify() (php-src ext/sodium/libsodium.c; #21460).
+     */
+    public static function pwhashScryptStrVerify(string $hash, string $password): bool
+    {
+        if (\function_exists('sodium_crypto_pwhash_scryptsalsa208sha256_str_verify')) {
+            return \sodium_crypto_pwhash_scryptsalsa208sha256_str_verify($hash, $password);
+        }
+        if (\strlen($hash) !== self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_STRBYTES - 1) {
+            return false;
+        }
+
+        return self::ffiPwhashScryptStrVerify($hash, $password);
+    }
+
     public static function authVerify(string $mac, string $message, string $key): bool
     {
         if (\function_exists('sodium_crypto_auth_verify')) {
@@ -2029,6 +2092,74 @@ final class VmSodium
         }
     }
 
+    private static function validatePwhashScrypt(
+        int $length,
+        string $password,
+        string $salt,
+        int $opslimit,
+        int $memlimit
+    ): void {
+        // php-src: hash_len <= 0 || >= SIZE_MAX || > 0x1fffffffe0 → "must be greater than 0"
+        if ($length <= 0 || $length > 0x1fffffffe0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_scryptsalsa208sha256(): Argument #1 ($length) must be greater than 0'
+            );
+        }
+        if ($opslimit <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_scryptsalsa208sha256(): Argument #4 ($opslimit) must be greater than 0'
+            );
+        }
+        if ($memlimit <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_scryptsalsa208sha256(): Argument #5 ($memlimit) must be greater than 0'
+            );
+        }
+        if (\strlen($salt) !== self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_SALTBYTES) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_scryptsalsa208sha256(): Argument #3 ($salt) must be SODIUM_CRYPTO_PWHASH_SCRYPTSALSA208SHA256_SALTBYTES bytes long'
+            );
+        }
+        if ($opslimit < self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_OPSLIMIT_INTERACTIVE) {
+            self::throwSodium(\sprintf(
+                'sodium_crypto_pwhash_scryptsalsa208sha256(): Argument #4 ($opslimit) must be greater than or equal to %d',
+                self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_OPSLIMIT_INTERACTIVE
+            ));
+        }
+        if ($memlimit < self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_MEMLIMIT_INTERACTIVE) {
+            self::throwSodium(\sprintf(
+                'sodium_crypto_pwhash_scryptsalsa208sha256(): Argument #5 ($memlimit) must be greater than or equal to %d',
+                self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_MEMLIMIT_INTERACTIVE
+            ));
+        }
+    }
+
+    private static function validatePwhashScryptStr(string $password, int $opslimit, int $memlimit): void
+    {
+        if ($opslimit <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_scryptsalsa208sha256_str(): Argument #2 ($opslimit) must be greater than 0'
+            );
+        }
+        if ($memlimit <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_scryptsalsa208sha256_str(): Argument #3 ($memlimit) must be greater than 0'
+            );
+        }
+        if ($opslimit < self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_OPSLIMIT_INTERACTIVE) {
+            self::throwSodium(\sprintf(
+                'sodium_crypto_pwhash_scryptsalsa208sha256_str(): Argument #2 ($opslimit) must be greater than or equal to %d',
+                self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_OPSLIMIT_INTERACTIVE
+            ));
+        }
+        if ($memlimit < self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_MEMLIMIT_INTERACTIVE) {
+            self::throwSodium(\sprintf(
+                'sodium_crypto_pwhash_scryptsalsa208sha256_str(): Argument #3 ($memlimit) must be greater than or equal to %d',
+                self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_MEMLIMIT_INTERACTIVE
+            ));
+        }
+    }
+
     private static function ffiPwhash(
         int $length,
         string $password,
@@ -2094,6 +2225,69 @@ final class VmSodium
         $hashBuf = self::stringToUnsignedCharArray($ffi, $hash."\0");
 
         return 0 !== $ffi->crypto_pwhash_str_needs_rehash($hashBuf, $opslimit, $memlimit);
+    }
+
+    private static function ffiPwhashScrypt(
+        int $length,
+        string $password,
+        string $salt,
+        int $opslimit,
+        int $memlimit
+    ): string {
+        $ffi = self::requireFfi();
+        $outBuf = $ffi->new('unsigned char['.$length.']');
+        $passBuf = self::stringToUnsignedCharArray($ffi, $password);
+        $saltBuf = self::stringToUnsignedCharArray($ffi, $salt);
+        $rc = $ffi->crypto_pwhash_scryptsalsa208sha256(
+            $outBuf,
+            $length,
+            $passBuf,
+            \strlen($password),
+            $saltBuf,
+            $opslimit,
+            $memlimit
+        );
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($outBuf, $length);
+    }
+
+    private static function ffiPwhashScryptStr(string $password, int $opslimit, int $memlimit): string
+    {
+        $ffi = self::requireFfi();
+        $outBuf = $ffi->new('char['.self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_STRBYTES.']');
+        $passBuf = self::stringToUnsignedCharArray($ffi, $password);
+        $rc = $ffi->crypto_pwhash_scryptsalsa208sha256_str(
+            $outBuf,
+            $passBuf,
+            \strlen($password),
+            $opslimit,
+            $memlimit
+        );
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+        $out = '';
+        for ($i = 0; $i < self::CRYPTO_PWHASH_SCRYPTSALSA208SHA256_STRBYTES; ++$i) {
+            $ch = (int) $outBuf[$i];
+            if (0 === $ch) {
+                break;
+            }
+            $out .= \chr($ch);
+        }
+
+        return $out;
+    }
+
+    private static function ffiPwhashScryptStrVerify(string $hash, string $password): bool
+    {
+        $ffi = self::requireFfi();
+        $hashBuf = self::stringToUnsignedCharArray($ffi, $hash."\0");
+        $passBuf = self::stringToUnsignedCharArray($ffi, $password);
+
+        return 0 === $ffi->crypto_pwhash_scryptsalsa208sha256_str_verify($hashBuf, $passBuf, \strlen($password));
     }
 
     private static function ffiAuthVerify(string $mac, string $message, string $key): bool
@@ -4075,6 +4269,9 @@ final class VmSodium
                     int crypto_pwhash_str(char out[128], const char *passwd, unsigned long long passwdlen, unsigned long long opslimit, size_t memlimit);
                     int crypto_pwhash_str_verify(const char *str, const char *passwd, unsigned long long passwdlen);
                     int crypto_pwhash_str_needs_rehash(const char *str, unsigned long long opslimit, size_t memlimit);
+                    int crypto_pwhash_scryptsalsa208sha256(unsigned char *out, unsigned long long outlen, const char *passwd, unsigned long long passwdlen, const unsigned char *salt, unsigned long long opslimit, size_t memlimit);
+                    int crypto_pwhash_scryptsalsa208sha256_str(char out[102], const char *passwd, unsigned long long passwdlen, unsigned long long opslimit, size_t memlimit);
+                    int crypto_pwhash_scryptsalsa208sha256_str_verify(const char *str, const char *passwd, unsigned long long passwdlen);
                     int crypto_stream(unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *k);
                     int crypto_stream_xor(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char *k);
                     int crypto_stream_xchacha20(unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *k);
