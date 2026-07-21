@@ -34,6 +34,23 @@ final class ZipArchiveConstants
     public const FL_OPEN_FILE_NOW = 1 << 30;
 
     /**
+     * Use original data, ignoring changes (libzip ZIP_FL_UNCHANGED; getArchiveFlag $flags; #21831).
+     */
+    public const FL_UNCHANGED = 8;
+
+    /**
+     * Archive flags — libzip ZIP_AFL_* / php-src ZipArchive::AFL_* (#21831).
+     * ZIP_AFL_RDONLY cannot be cleared once set (libzip).
+     */
+    public const AFL_RDONLY = 2;
+
+    public const AFL_IS_TORRENTZIP = 4;
+
+    public const AFL_WANT_TORRENTZIP = 8;
+
+    public const AFL_CREATE_OR_KEEP_FILE_FOR_EMPTY_ARCHIVE = 16;
+
+    /**
      * Advertised libzip feature level for the pure-PHP ZipEngine (php-src ZipArchive::LIBZIP_VERSION).
      * Matches a libzip that defines LENGTH_UNCHECKED / ER_DATA_LENGTH / ER_TRUNCATED_ZIP (#20712).
      */
@@ -204,6 +221,11 @@ final class ZipArchiveConstants
         'length_to_end' => self::LENGTH_TO_END,
         'length_unchecked' => self::LENGTH_UNCHECKED,
         'fl_open_file_now' => self::FL_OPEN_FILE_NOW,
+        'fl_unchanged' => self::FL_UNCHANGED,
+        'afl_rdonly' => self::AFL_RDONLY,
+        'afl_is_torrentzip' => self::AFL_IS_TORRENTZIP,
+        'afl_want_torrentzip' => self::AFL_WANT_TORRENTZIP,
+        'afl_create_or_keep_file_for_empty_archive' => self::AFL_CREATE_OR_KEEP_FILE_FOR_EMPTY_ARCHIVE,
         'libzip_version' => self::LIBZIP_VERSION,
         'em_none' => self::EM_NONE,
         'em_trad_pkware' => self::EM_TRAD_PKWARE,
@@ -291,6 +313,11 @@ final class ZipArchiveConstants
         'length_to_end' => 'LENGTH_TO_END',
         'length_unchecked' => 'LENGTH_UNCHECKED',
         'fl_open_file_now' => 'FL_OPEN_FILE_NOW',
+        'fl_unchanged' => 'FL_UNCHANGED',
+        'afl_rdonly' => 'AFL_RDONLY',
+        'afl_is_torrentzip' => 'AFL_IS_TORRENTZIP',
+        'afl_want_torrentzip' => 'AFL_WANT_TORRENTZIP',
+        'afl_create_or_keep_file_for_empty_archive' => 'AFL_CREATE_OR_KEEP_FILE_FOR_EMPTY_ARCHIVE',
         'libzip_version' => 'LIBZIP_VERSION',
         'em_none' => 'EM_NONE',
         'em_trad_pkware' => 'EM_TRAD_PKWARE',
