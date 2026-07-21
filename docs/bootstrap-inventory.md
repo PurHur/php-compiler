@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6232 |
-| Phase A inventory files (M2 ratio SSOT) | 6232 |
+| PHP files on vm.php path | 6233 |
+| Phase A inventory files (M2 ratio SSOT) | 6233 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19642 |
+| Source constructs flagged (warnings) | 19645 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4073,7 +4073,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvsem/sem_get.php` | 0 | 2 |
 | `ext/sysvsem/sem_release.php` | 0 | 2 |
 | `ext/sysvsem/sem_remove.php` | 0 | 2 |
-| `ext/sysvshm/Module.php` | 0 | 13 |
+| `ext/sysvshm/Module.php` | 0 | 14 |
 | `ext/sysvshm/ShmopArgs.php` | 0 | 2 |
 | `ext/sysvshm/SysvShmArgs.php` | 0 | 2 |
 | `ext/sysvshm/VmShmop.php` | 0 | 4 |
@@ -4083,6 +4083,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvshm/shm_get_var.php` | 0 | 2 |
 | `ext/sysvshm/shm_has_var.php` | 0 | 2 |
 | `ext/sysvshm/shm_put_var.php` | 0 | 2 |
+| `ext/sysvshm/shm_remove.php` | 0 | 2 |
 | `ext/sysvshm/shm_remove_var.php` | 0 | 2 |
 | `ext/sysvshm/shmop_close.php` | 0 | 2 |
 | `ext/sysvshm/shmop_delete.php` | 0 | 2 |
@@ -35448,13 +35449,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new shm_get_var (line 33)
 - new shm_has_var (line 34)
 - new shm_put_var (line 35)
-- new shm_remove_var (line 36)
-- new shmop_open (line 37)
-- new shmop_read (line 38)
-- new shmop_write (line 39)
-- new shmop_size (line 40)
-- new shmop_close (line 41)
-- new shmop_delete (line 42)
+- new shm_remove (line 36)
+- new shm_remove_var (line 37)
+- new shmop_open (line 38)
+- new shmop_read (line 39)
+- new shmop_write (line 40)
+- new shmop_size (line 41)
+- new shmop_close (line 42)
+- new shmop_delete (line 43)
 - 3 class method(s)
 
 ### `ext/sysvshm/ShmopArgs.php`
@@ -35483,7 +35485,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 35)
 - new Variable (line 43)
 - new ObjectEntry (line 44)
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/sysvshm/shm_attach.php`
 
@@ -35513,6 +35515,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/sysvshm/shm_remove.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
 - 2 class method(s)
 
 ### `ext/sysvshm/shm_remove_var.php`
