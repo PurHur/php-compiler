@@ -7,6 +7,9 @@
 # Returns 0 when build/bin-compile-aot is present (pre-existing or installed).
 set -euo pipefail
 
+# shellcheck source=bootstrap-lowering-freshness.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-lowering-freshness.sh"
+
 bootstrap_gen0_prelinked_driver_path() {
   echo "${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
 }
@@ -119,6 +122,7 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
   done
   shopt -u nullglob
   bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
+  bootstrap_lowering_source_seed_build_stamp_from_prelinked 2>/dev/null || true
   return 0
 }
 
@@ -335,6 +339,9 @@ bootstrap_gen0_copy_prelinked_inventory_driver() {
     echo "bootstrap-gen0-install: prelinked inventory driver has stale /compiler sidecar paths — rebuild via Zend (BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=0) (#3046)" >&2
     return 1
   fi
+  if ! bootstrap_lowering_source_refuse_stale_reuse "$(bootstrap_lowering_source_prelinked_stamp)" "prelinked gen-0 inventory driver"; then
+    return 1
+  fi
   mkdir -p "${root}/build" "$(dirname "${aot_out}")"
   cp -f "${seed}" "${aot_out}"
   chmod +x "${aot_out}"
@@ -365,7 +372,8 @@ bootstrap_gen0_install_prelinked_driver() {
   local minimal_blob="${root}/build/.m3_compiler_minimal_aot_blob"
   if [[ -x "${out}" && -f "${minimal_blob}" ]] \
     && bootstrap_gen0_installed_driver_matches_prelinked "${out}" \
-    && bootstrap_gen0_installed_minimal_sidecar_matches_prelinked "${minimal_blob}"; then
+    && bootstrap_gen0_installed_minimal_sidecar_matches_prelinked "${minimal_blob}" \
+    && bootstrap_lowering_source_stamp_matches "$(bootstrap_lowering_source_build_stamp)"; then
     return 0
   fi
   if [[ -x "${out}" && -f "${minimal_blob}" ]]; then
@@ -393,6 +401,7 @@ bootstrap_gen0_install_prelinked_driver() {
   chmod +x "${blob}"
   cp -f "${minimal_seed}" "${minimal_blob}"
   chmod +x "${minimal_blob}"
+  bootstrap_lowering_source_seed_build_stamp_from_prelinked 2>/dev/null || true
   echo "bootstrap-gen0-install: installed ${out} + compiler_minimal sidecar from prelinked/bootstrap-gen0 (#3053)" >&2
   return 0
 }
