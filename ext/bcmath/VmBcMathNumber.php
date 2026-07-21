@@ -214,7 +214,7 @@ final class VmBcMathNumber
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             if (null !== $frame && version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
-                VmNullNumberParamDeprecation::emit($frame, $method, $argNum, 'scale', 'int');
+                VmNullNumberParamDeprecation::emit($frame, $method, $argNum, 'scale', '?int');
             }
 
             return null;
