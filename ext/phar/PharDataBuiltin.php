@@ -28,7 +28,8 @@ final class PharDataBuiltin
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['hasmetadata'])
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['setmetadata'])
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['copy'])
-            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['delete'])) {
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['delete'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['compressfiles'])) {
             return;
         }
 
@@ -73,6 +74,7 @@ final class PharDataBuiltin
             'delmetadata' => [PharDataDelMetadata::class, 'delMetadata'],
             'copy' => [PharDataCopy::class, 'copy'],
             'delete' => [PharDataDelete::class, 'delete'],
+            'compressfiles' => [PharDataCompressFiles::class, 'compressFiles'],
             'offsetset' => [PharDataOffsetSet::class, 'offsetSet'],
             'offsetget' => [PharDataOffsetGet::class, 'offsetGet'],
             'offsetexists' => [PharDataOffsetExists::class, 'offsetExists'],
@@ -551,5 +553,25 @@ final class PharDataDelete extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
+    }
+}
+
+/** PharData::compressFiles() — tar rejects per-file compression (#21693). */
+final class PharDataCompressFiles extends VmClassMethod
+{
+    public function __construct() { parent::__construct('compressFiles'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'PharData::compressFiles() expects at least 1 argument, %d given',
+                \max(0, $argc - 1)
+            ));
+        }
+        VmPharData::compressFiles(
+            VmPharData::requireReceiver($frame, 'PharData::compressFiles'),
+            $frame->calledArgs[1]->resolveIndirect()->toInt()
+        );
     }
 }
