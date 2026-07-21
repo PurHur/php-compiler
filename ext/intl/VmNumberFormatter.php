@@ -301,11 +301,9 @@ final class VmNumberFormatter
             'locale' => $resolvedLocale,
             'style' => $style,
             'pattern' => null !== $pattern ? $pattern : self::defaultPatternForStyle($style),
-            'attributes' => [
-                self::GROUPING_USED => 1,
-                self::FRACTION_DIGITS => self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style ? 2 : -1,
-                self::ROUNDING_MODE => self::ROUND_HALFEVEN,
-            ],
+            // php-src/ICU style defaults (#21894): PERCENT → 0 fraction digits
+            // (format(0.456) → "46%"); CURRENCY → 2; DECIMAL keeps unlimited (-1).
+            'attributes' => self::defaultAttributesForStyle($style),
             'symbols' => self::defaultSymbolsForLocale($resolvedLocale),
             'textAttributes' => self::defaultTextAttributes(),
             'errorCode' => IntlError::U_ZERO_ERROR,
@@ -333,6 +331,37 @@ final class VmNumberFormatter
             self::SPELLOUT, self::ORDINAL, self::DURATION, self::PATTERN_RULEBASED => '',
             default => '#,##0.###',
         };
+    }
+
+    /**
+     * ICU/php-src default UNumberFormatAttribute values per style (#21894).
+     * PERCENT CLDR patterns use 0 fraction digits; CURRENCY uses 2.
+     *
+     * @return array<int, int|float>
+     */
+    public static function defaultAttributesForStyle(int $style): array
+    {
+        $attrs = [
+            self::GROUPING_USED => 1,
+            self::ROUNDING_MODE => self::ROUND_HALFEVEN,
+        ];
+        if (self::PERCENT === $style) {
+            $attrs[self::FRACTION_DIGITS] = 0;
+            $attrs[self::MIN_FRACTION_DIGITS] = 0;
+            $attrs[self::MAX_FRACTION_DIGITS] = 0;
+
+            return $attrs;
+        }
+        if (self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style) {
+            $attrs[self::FRACTION_DIGITS] = 2;
+            $attrs[self::MIN_FRACTION_DIGITS] = 2;
+            $attrs[self::MAX_FRACTION_DIGITS] = 2;
+
+            return $attrs;
+        }
+        $attrs[self::FRACTION_DIGITS] = -1;
+
+        return $attrs;
     }
 
     public static function isRuleBasedStyle(int $style): bool
