@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableNestedExportLlvm;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -17,7 +17,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __compiler_strtr* via Strtr*JitHelper PHP (#9392).
  *
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\StrtrArrayJitHelper}; thin LLVM
- * bridge forwards the ABI. php-src: ext/standard/string.c
+ * bridge forwards the ABI. Helper compile: {@see JitVmHelperLink::ensureCompiled} (#21844).
+ * php-src: ext/standard/string.c
  */
 final class StringStrtr
 {
@@ -137,33 +138,22 @@ final class StringStrtr
         } else {
             self::ensureTwoStringHelperCompiled($context);
         }
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after Strtr JIT helper compile (#9392)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#21844');
     }
 
     private static function ensureTwoStringHelperCompiled(Context $context): void
     {
-        if (isset($context->functions[\strtolower(self::STRTR_TWO_STRING)])) {
-            return;
-        }
-
-        self::compileHelperFile($context, self::TWO_STRING_HELPER_PATH, 'StrtrTwoStringJitHelper.php');
-        if (!isset($context->functions[\strtolower(self::STRTR_TWO_STRING)])) {
-            throw new \LogicException(self::STRTR_TWO_STRING.' was not compiled for JIT (#9392)');
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::TWO_STRING_HELPER_PATH,
+            [self::STRTR_TWO_STRING],
+            '#21844'
+        );
     }
 
     private static function ensureArrayHelperCompiled(Context $context): void
     {
-        if (isset($context->functions[\strtolower(self::STRTR_ARRAY)])) {
-            return;
-        }
-
         HashTableNestedExportLlvm::ensureLinked($context);
         NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
@@ -171,24 +161,12 @@ final class StringStrtr
         NestedVmVariableMethodLlvm::ensureMethod($context, 'tofloat');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'tobool');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'toarray');
-        self::compileHelperFile($context, self::ARRAY_HELPER_PATH, 'StrtrArrayJitHelper.php');
-        if (!isset($context->functions[\strtolower(self::STRTR_ARRAY)])) {
-            throw new \LogicException(self::STRTR_ARRAY.' was not compiled for JIT (#9392)');
-        }
-    }
-
-    private static function compileHelperFile(Context $context, string $relativePath, string $label): void
-    {
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).$relativePath;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $label): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), $label);
-            if (null === $block) {
-                throw new \LogicException($label.' parseAndCompile failed (#9392)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::ARRAY_HELPER_PATH,
+            [self::STRTR_ARRAY],
+            '#21844'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void

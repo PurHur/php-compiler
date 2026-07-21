@@ -14,6 +14,8 @@ final class StrtrRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrtr.php');
         $this->assertStringContainsString('StrtrTwoStringJitHelper', $source);
         $this->assertStringContainsString('StrtrArrayJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('compileHelperFile', $source);
         $this->assertStringNotContainsString('StringStrtrJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringStrtrJit.php');
     }
