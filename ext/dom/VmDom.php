@@ -1019,7 +1019,8 @@ final class VmDom
         foreach ($state->elementIds as $id => $objectId) {
             $entry = DomRegistry::entry($objectId);
             if (null !== $entry) {
-                $ht->add($id, self::elementVariable($entry));
+                // PHP coerces numeric-string array keys to int ("1" → 1); HashTable::add needs string (#21644).
+                $ht->add((string) $id, self::elementVariable($entry));
             }
         }
         $var = new Variable();
