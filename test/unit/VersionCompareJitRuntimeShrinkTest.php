@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** version_compare JIT routes through VersionCompareJitHelper PHP, not hand-written LLVM (#9813). */
+/** version_compare JIT routes through VersionCompareJitHelper + JitVmHelperLink (#9813, #21706). */
 final class VersionCompareJitRuntimeShrinkTest extends TestCase
 {
     public function testVersionCompareJitHelperDelegatesToVmInfo(): void
@@ -19,6 +19,12 @@ final class VersionCompareJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringVersionCompare.php');
         $this->assertStringContainsString('VersionCompareJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $source);
         $this->assertStringNotContainsString('emitCanonicalizeVersion', $source);
         $this->assertStringNotContainsString('emitCompareSpecialForms', $source);
         $this->assertStringNotContainsString('emitVersionCompareChars', $source);
