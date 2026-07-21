@@ -785,7 +785,7 @@ final class VmPharArchive
         }
         $out = new ObjectEntry($ctx->classes[VmPharData::CLASS_LC]);
         $out->constructed = true;
-        VmPharData::bind($out, $outPath, $files, false, $dirs);
+        VmPharData::bind($out, $outPath, $files, false, $dirs, 0, '', null, VmPhar::FORMAT_ZIP);
 
         return $out;
     }
