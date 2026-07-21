@@ -63,4 +63,21 @@ final class VmNumericDivisionGuard
         TryCatchHelper::emitCatchableClassError($context, 'ArithmeticError', $message);
         $context->builder->positionAtEnd($okBlock);
     }
+
+    /**
+     * Zend shift_left/right_function — negative count is catchable ArithmeticError (#21912).
+     */
+    public static function emitNegativeBitShiftCountGuard(Context $context, Value $shiftCount): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $count = $context->builder->intCast($shiftCount, $i64);
+        $isNeg = $context->builder->icmp(Builder::INT_SLT, $count, $zero);
+        $okBlock = BasicBlockHelper::append($context, 'bitshift_count_ok');
+        $errBlock = BasicBlockHelper::append($context, 'bitshift_count_err');
+        $context->builder->branchIf($isNeg, $errBlock, $okBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TryCatchHelper::emitCatchableClassError($context, 'ArithmeticError', 'Bit shift by negative number');
+        $context->builder->positionAtEnd($okBlock);
+    }
 }

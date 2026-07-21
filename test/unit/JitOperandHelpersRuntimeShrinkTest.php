@@ -62,7 +62,7 @@ final class JitOperandHelpersRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/JitNumericDivisionGuard.php');
         $this->assertStringContainsString('VmNumericDivisionGuard', $source);
         $this->assertStringNotContainsString('emitCatchableClassError', $source);
-        $this->assertLessThanOrEqual(40, substr_count($source, "\n") + 1);
+        $this->assertLessThanOrEqual(50, substr_count($source, "\n") + 1);
     }
 
     public function testVmNumericDivisionGuardOwnsDivisionGuards(): void
@@ -70,6 +70,8 @@ final class JitOperandHelpersRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/VM/VmNumericDivisionGuard.php');
         $this->assertStringContainsString('emitCatchableClassError', $source);
         $this->assertStringContainsString('DivisionByZeroError', $source);
+        $this->assertStringContainsString('emitNegativeBitShiftCountGuard', $source);
+        $this->assertStringContainsString('Bit shift by negative number', $source);
         $this->assertGreaterThan(55, substr_count($source, "\n") + 1);
     }
 

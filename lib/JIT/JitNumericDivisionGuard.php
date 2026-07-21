@@ -32,4 +32,10 @@ final class JitNumericDivisionGuard
     ): void {
         VmNumericDivisionGuard::emitIntMinNegOneOverflowGuard($context, $dividend, $divisor, $message);
     }
+
+    /** Zend << / >> negative shift count (#21912). */
+    public static function emitNegativeBitShiftCountGuard(Context $context, Value $shiftCount): void
+    {
+        VmNumericDivisionGuard::emitNegativeBitShiftCountGuard($context, $shiftCount);
+    }
 }

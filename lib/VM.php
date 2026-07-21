@@ -4454,6 +4454,21 @@ restart:
                             goto restart;
                         }
                         break;
+                    } catch (\ArithmeticError $e) {
+                        // Negative << / >> — Zend ArithmeticError must be user-catchable (#21912).
+                        $catchFrame = $this->dispatchVmArithmeticError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    } catch (\Error $e) {
+                        $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     }
                     $this->markScopeSlotInitializedIfNamedLocal($frame, (int) $op->arg1);
                     break;
