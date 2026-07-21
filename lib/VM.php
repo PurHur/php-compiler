@@ -17918,6 +17918,9 @@ restart:
         $frame->callArgs = [];
         $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = null;
+        // Drop stale call-site line so later opcodes (e.g. dynamic property E_DEPRECATED)
+        // resolve via the current opcode source line, not the prior call (#21953).
+        $frame->callSiteLine = 0;
     }
 
     private function releaseOutgoingCallArgTemps(Frame $frame, ?int $keepReturnSlot = null): void

@@ -19,6 +19,10 @@ class DynamicPropertyDeprecationVMTest extends BaseTest
             __DIR__ . '/cases/language/dynamic_property_deprecation.phpt',
             'dynamic_property_deprecation.phpt'
         );
+        yield 'dynamic_property_deprecation_line.phpt' => self::parsePHPT(
+            __DIR__ . '/cases/language/dynamic_property_deprecation_line.phpt',
+            'dynamic_property_deprecation_line.phpt'
+        );
     }
 
     public function setUp(): void
