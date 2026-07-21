@@ -11842,19 +11842,54 @@ final class VmDom
         }
         $state = DomRegistry::state($node);
         if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
-            $rootVar = $node->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-            if (Variable::TYPE_OBJECT !== $rootVar->type) {
-                return '';
-            }
-
-            return self::c14nSerializeNode($rootVar->toObject(), $withComments, $exclusive, []);
+            // libxml xmlC14NDocDumpMemory on the document: emit child PIs/comments/element
+            // in document order, joined by "\n"; doctype is omitted (#21659).
+            return self::c14nSerializeDocumentChildren($node, $withComments, $exclusive);
         }
         // php-src zim_dom_node_C14N / xmlC14NDocDumpMemory: disconnected nodes → "" (#19741).
         if (!self::isConnected($node)) {
             return '';
         }
 
-        return self::c14nSerializeNode($node, $withComments, $exclusive, []);
+        $payload = self::c14nSerializeNode($node, $withComments, $exclusive, []);
+        if (false === $payload) {
+            return false;
+        }
+        // libxml appends a trailing newline when the C14N root is a PI or comment (#21659).
+        if ('' !== $payload
+            && (self::isProcessingInstruction($node) || self::isCommentNode($node))
+        ) {
+            return $payload."\n";
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Document-node C14N: serialize document children (PI/comment/element) with "\n" joins.
+     *
+     * Matches libxml xmlC14NDocDumpMemory on the document node (#21659). DocumentType is omitted.
+     */
+    private static function c14nSerializeDocumentChildren(
+        ObjectEntry $document,
+        bool $withComments,
+        bool $exclusive
+    ): string {
+        $state = DomRegistry::state($document);
+        $chunks = [];
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child || self::isDocumentType($child)) {
+                continue;
+            }
+            $chunk = self::c14nSerializeNode($child, $withComments, $exclusive, []);
+            if (false === $chunk || '' === $chunk) {
+                continue;
+            }
+            $chunks[] = $chunk;
+        }
+
+        return implode("\n", $chunks);
     }
 
     /**
@@ -11989,6 +12024,9 @@ final class VmDom
 
             return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
+        if (self::isProcessingInstruction($entry)) {
+            return self::c14nSerializeProcessingInstruction($entry);
+        }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
         }
@@ -12103,11 +12141,32 @@ final class VmDom
 
             return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
+        if (self::isProcessingInstruction($entry)) {
+            return self::c14nSerializeProcessingInstruction($entry);
+        }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
         }
 
         return false;
+    }
+
+    /**
+     * Canonical XML processing instruction (W3C C14N 1.0 / libxml xmlC14NDocDumpMemory; #21659).
+     *
+     * ProcessingInstruction(PI) ::= '<?' PITarget (S PIValue)? '?>'
+     * PIValue is not entity-escaped. Empty data omits the separating space.
+     */
+    private static function c14nSerializeProcessingInstruction(ObjectEntry $entry): string
+    {
+        $state = DomRegistry::state($entry);
+        $target = $state->nodeName;
+        $data = $state->textContent ?? '';
+        if ('' === $data) {
+            return '<?'.$target.'?>';
+        }
+
+        return '<?'.$target.' '.$data.'?>';
     }
 
     /**

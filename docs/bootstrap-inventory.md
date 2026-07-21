@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6233 |
-| Phase A inventory files (M2 ratio SSOT) | 6233 |
+| PHP files on vm.php path | 6237 |
+| Phase A inventory files (M2 ratio SSOT) | 6237 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19652 |
+| Source constructs flagged (warnings) | 19668 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1482,7 +1482,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/VmPhar.php` | 0 | 4 |
 | `ext/phar/VmPharArchive.php` | 0 | 55 |
 | `ext/phar/VmPharData.php` | 0 | 31 |
-| `ext/phar/VmPharFileInfo.php` | 0 | 8 |
+| `ext/phar/VmPharFileInfo.php` | 0 | 17 |
 | `ext/phar/VmPharStream.php` | 0 | 10 |
 | `ext/phar/VmPharTar.php` | 0 | 1 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
@@ -1706,7 +1706,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_strerror.php` | 0 | 3 |
 | `ext/sockets/socket_write.php` | 0 | 3 |
 | `ext/sodium/JitSodium.php` | 0 | 1 |
-| `ext/sodium/Module.php` | 0 | 109 |
+| `ext/sodium/Module.php` | 0 | 112 |
 | `ext/sodium/SodiumAeadDecryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAeadEncryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAuthFunction.php` | 0 | 4 |
@@ -1731,6 +1731,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/SodiumOneStringFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPadFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPwhashFunction.php` | 0 | 2 |
+| `ext/sodium/SodiumPwhashScryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumPwhashStrFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumPwhashStrNeedsRehashFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumPwhashStrVerifyFunction.php` | 0 | 3 |
@@ -1811,6 +1812,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_crypto_kx_seed_keypair.php` | 0 | 2 |
 | `ext/sodium/sodium_crypto_kx_server_session_keys.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_pwhash.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256_str.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256_str_verify.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_pwhash_str.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_pwhash_str_needs_rehash.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_pwhash_str_verify.php` | 0 | 1 |
@@ -5129,7 +5133,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringUnpack.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUnserialize.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrldecode.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringUrlencode.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUtf8Latin1.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUtf8Runtime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringVarDump.php` | 0 | 3 |
@@ -9257,9 +9261,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 10829)
 - new DOMException (line 10832)
 - new DOMException (line 10861)
-- new Error (line 11903)
-- new Error (line 11907)
-- 465 class method(s)
+- new Error (line 11938)
+- new Error (line 11942)
+- 467 class method(s)
 - 3 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -17980,14 +17984,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharFileInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 48)
-- new PharFileInfoConstruct (line 52)
-- new ObjectEntry (line 96)
-- new Error (line 153)
-- new ArgumentCountError (line 245)
-- new ArgumentCountError (line 391)
-- new ArgumentCountError (line 449)
-- 27 class method(s)
+- new ClassEntry (line 53)
+- new PharFileInfoConstruct (line 57)
+- new ObjectEntry (line 105)
+- new Error (line 163)
+- new BadMethodCallException (line 228)
+- new BadMethodCallException (line 256)
+- new BadMethodCallException (line 264)
+- new BadMethodCallException (line 274)
+- new BadMethodCallException (line 280)
+- new BadMethodCallException (line 300)
+- new BadMethodCallException (line 303)
+- new BadMethodCallException (line 308)
+- new ArgumentCountError (line 348)
+- new ArgumentCountError (line 501)
+- new ArgumentCountError (line 559)
+- new ArgumentCountError (line 599)
+- 32 class method(s)
 
 ### `ext/phar/VmPharStream.php`
 
@@ -20103,12 +20116,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new sodium_crypto_pwhash_str (line 142)
 - new sodium_crypto_pwhash_str_verify (line 143)
 - new sodium_crypto_pwhash_str_needs_rehash (line 144)
-- new sodium_crypto_aead_aegis128l_encrypt (line 157)
-- new sodium_crypto_aead_aegis128l_decrypt (line 158)
-- new sodium_crypto_aead_aegis128l_keygen (line 159)
-- new sodium_crypto_aead_aegis256_encrypt (line 162)
-- new sodium_crypto_aead_aegis256_decrypt (line 163)
-- new sodium_crypto_aead_aegis256_keygen (line 164)
+- new sodium_crypto_pwhash_scryptsalsa208sha256 (line 145)
+- new sodium_crypto_pwhash_scryptsalsa208sha256_str (line 146)
+- new sodium_crypto_pwhash_scryptsalsa208sha256_str_verify (line 147)
+- new sodium_crypto_aead_aegis128l_encrypt (line 160)
+- new sodium_crypto_aead_aegis128l_decrypt (line 161)
+- new sodium_crypto_aead_aegis128l_keygen (line 162)
+- new sodium_crypto_aead_aegis256_encrypt (line 165)
+- new sodium_crypto_aead_aegis256_decrypt (line 166)
+- new sodium_crypto_aead_aegis256_keygen (line 167)
 - 3 class method(s)
 
 ### `ext/sodium/SodiumAeadDecryptFunction.php`
@@ -20266,6 +20282,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 - 1 closure(s)
 
+### `ext/sodium/SodiumPwhashScryptFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 3 class method(s)
+- 1 closure(s)
+
 ### `ext/sodium/SodiumPwhashStrFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -20361,26 +20384,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/VmSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 1870)
-- new Exception (line 1882)
-- new Exception (line 1891)
-- new Exception (line 1907)
-- new Exception (line 2841)
-- new Exception (line 2858)
-- new Exception (line 2873)
-- new Exception (line 2890)
-- new Exception (line 2907)
-- new Exception (line 2943)
-- new Exception (line 3021)
-- new Exception (line 3099)
-- new Exception (line 3177)
-- new Exception (line 3254)
-- new Exception (line 3330)
-- new Exception (line 3923)
-- new Exception (line 3926)
-- new SodiumException (line 4036)
-- new Exception (line 4038)
-- 238 class method(s)
+- new Exception (line 1933)
+- new Exception (line 1945)
+- new Exception (line 1954)
+- new Exception (line 1970)
+- new Exception (line 3035)
+- new Exception (line 3052)
+- new Exception (line 3067)
+- new Exception (line 3084)
+- new Exception (line 3101)
+- new Exception (line 3137)
+- new Exception (line 3215)
+- new Exception (line 3293)
+- new Exception (line 3371)
+- new Exception (line 3448)
+- new Exception (line 3524)
+- new Exception (line 4117)
+- new Exception (line 4120)
+- new SodiumException (line 4230)
+- new Exception (line 4232)
+- 246 class method(s)
 
 ### `ext/sodium/VmSodiumSecretstream.php`
 
@@ -20717,6 +20740,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `ext/sodium/sodium_crypto_pwhash.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256_str.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256_str_verify.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -43001,9 +43039,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUrlencode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 133)
-- 7 class method(s)
-- 1 closure(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringUtf8Latin1.php`
 

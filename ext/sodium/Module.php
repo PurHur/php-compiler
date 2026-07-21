@@ -142,6 +142,9 @@ class Module extends ModuleAbstract
             new sodium_crypto_pwhash_str(),
             new sodium_crypto_pwhash_str_verify(),
             new sodium_crypto_pwhash_str_needs_rehash(),
+            new sodium_crypto_pwhash_scryptsalsa208sha256(),
+            new sodium_crypto_pwhash_scryptsalsa208sha256_str(),
+            new sodium_crypto_pwhash_scryptsalsa208sha256_str_verify(),
         ];
     }
 
