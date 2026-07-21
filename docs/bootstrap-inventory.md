@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6237 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19688 |
+| Source constructs flagged (warnings) | 19687 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1477,7 +1477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/BuiltinClasses.php` | 0 | 28 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharBuiltin.php` | 0 | 23 |
-| `ext/phar/PharDataBuiltin.php` | 0 | 17 |
+| `ext/phar/PharDataBuiltin.php` | 0 | 18 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 4 |
 | `ext/phar/VmPharArchive.php` | 0 | 60 |
@@ -5132,7 +5132,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringUnlink.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUnpack.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUnserialize.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringUrldecode.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringUrldecode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUtf8Latin1.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUtf8Runtime.php` | 0 | 3 |
@@ -17857,23 +17857,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/PharDataBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 31)
-- new PharDataConstruct (line 40)
-- new ArgumentCountError (line 80)
-- new ArgumentCountError (line 96)
-- new ArgumentCountError (line 115)
+- new ClassEntry (line 38)
+- new PharDataConstruct (line 47)
+- new ArgumentCountError (line 95)
+- new ArgumentCountError (line 111)
 - new ArgumentCountError (line 130)
-- new ArgumentCountError (line 147)
-- new ArgumentCountError (line 164)
-- new UnexpectedValueException (line 180)
-- new ArgumentCountError (line 194)
-- new ArgumentCountError (line 254)
-- new ArgumentCountError (line 268)
-- new ArgumentCountError (line 285)
+- new ArgumentCountError (line 145)
+- new ArgumentCountError (line 162)
+- new ArgumentCountError (line 179)
+- new UnexpectedValueException (line 195)
+- new ArgumentCountError (line 209)
+- new ArgumentCountError (line 269)
+- new ArgumentCountError (line 283)
 - new ArgumentCountError (line 300)
-- new ArgumentCountError (line 322)
-- new ArgumentCountError (line 363)
-- 20 class method(s)
+- new ArgumentCountError (line 315)
+- new ArgumentCountError (line 337)
+- new ArgumentCountError (line 378)
+- new ArgumentCountError (line 492)
+- 28 class method(s)
 
 ### `ext/phar/PharExtensionPolicy.php`
 
@@ -17955,38 +17956,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharData.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 64)
-- new UnexpectedValueException (line 75)
-- new UnexpectedValueException (line 94)
-- new UnexpectedValueException (line 106)
-- new UnexpectedValueException (line 119)
-- new UnexpectedValueException (line 123)
-- new UnexpectedValueException (line 136)
-- new RecursiveIteratorIterator (line 139)
-- new RecursiveDirectoryIterator (line 140)
-- new BadMethodCallException (line 195)
-- new BadMethodCallException (line 198)
-- new UnexpectedValueException (line 206)
-- new ObjectEntry (line 208)
-- new UnexpectedValueException (line 235)
-- new ObjectEntry (line 237)
-- new ObjectEntry (line 248)
-- new BadMethodCallException (line 258)
-- new BadMethodCallException (line 260)
-- new BadMethodCallException (line 308)
-- new BadMethodCallException (line 311)
-- new Variable (line 313)
-- new HashTable (line 354)
-- new Variable (line 356)
-- new Error (line 367)
-- new UnexpectedValueException (line 405)
-- new UnexpectedValueException (line 410)
-- new UnexpectedValueException (line 442)
-- new UnexpectedValueException (line 495)
-- new PharException (line 511)
-- new PharException (line 521)
-- new Error (line 534)
-- 29 class method(s)
+- new UnexpectedValueException (line 84)
+- new UnexpectedValueException (line 96)
+- new UnexpectedValueException (line 195)
+- new UnexpectedValueException (line 207)
+- new UnexpectedValueException (line 220)
+- new UnexpectedValueException (line 224)
+- new UnexpectedValueException (line 237)
+- new RecursiveIteratorIterator (line 240)
+- new RecursiveDirectoryIterator (line 241)
+- new BadMethodCallException (line 296)
+- new BadMethodCallException (line 299)
+- new UnexpectedValueException (line 307)
+- new ObjectEntry (line 309)
+- new UnexpectedValueException (line 348)
+- new ObjectEntry (line 350)
+- new ObjectEntry (line 373)
+- new BadMethodCallException (line 395)
+- new BadMethodCallException (line 397)
+- new BadMethodCallException (line 445)
+- new BadMethodCallException (line 448)
+- new Variable (line 450)
+- new HashTable (line 491)
+- new Variable (line 493)
+- new Error (line 504)
+- new UnexpectedValueException (line 542)
+- new UnexpectedValueException (line 547)
+- new UnexpectedValueException (line 611)
+- new UnexpectedValueException (line 665)
+- new PharException (line 681)
+- new PharException (line 691)
+- new Error (line 704)
+- 39 class method(s)
 
 ### `ext/phar/VmPharFileInfo.php`
 
@@ -19236,38 +19237,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 150)
 - new Exception (line 154)
 - new Exception (line 161)
-- new SimpleXmlNodeState (line 322)
-- new Variable (line 413)
-- new Variable (line 418)
-- new Variable (line 425)
-- new Variable (line 431)
-- new Variable (line 446)
-- new SimpleXmlNodeState (line 749)
-- new SimpleXmlNodeState (line 754)
-- new SimpleXmlNodeState (line 767)
-- new SimpleXmlNodeState (line 848)
-- new HashTable (line 929)
-- new Variable (line 952)
-- new Variable (line 961)
-- new Variable (line 1008)
-- new Variable (line 1029)
-- new SimpleXmlNodeState (line 1066)
-- new ObjectEntry (line 1090)
-- new SimpleXmlNodeState (line 1176)
-- new SimpleXmlNodeState (line 1181)
-- new SimpleXmlNodeState (line 1186)
-- new SimpleXmlNodeState (line 1189)
-- new ObjectEntry (line 1210)
-- new ObjectEntry (line 1221)
+- new SimpleXmlNodeState (line 219)
+- new SimpleXmlNodeState (line 358)
+- new Variable (line 449)
+- new Variable (line 454)
+- new Variable (line 461)
+- new Variable (line 467)
+- new Variable (line 482)
+- new SimpleXmlNodeState (line 785)
+- new SimpleXmlNodeState (line 790)
+- new SimpleXmlNodeState (line 803)
+- new SimpleXmlNodeState (line 884)
+- new HashTable (line 965)
+- new Variable (line 988)
+- new Variable (line 997)
+- new Variable (line 1044)
+- new Variable (line 1065)
+- new SimpleXmlNodeState (line 1102)
+- new ObjectEntry (line 1126)
+- new SimpleXmlNodeState (line 1212)
+- new SimpleXmlNodeState (line 1222)
 - new SimpleXmlNodeState (line 1225)
-- new ObjectEntry (line 1242)
-- new ObjectEntry (line 1258)
-- new Error (line 1334)
-- new ObjectEntry (line 1346)
-- new HashTable (line 1705)
-- new Variable (line 1707)
-- new SimpleXmlNodeState (line 1766)
-- new SimpleXmlNodeState (line 1775)
+- new ObjectEntry (line 1246)
+- new ObjectEntry (line 1257)
+- new SimpleXmlNodeState (line 1261)
+- new ObjectEntry (line 1278)
+- new ObjectEntry (line 1294)
+- new Error (line 1370)
+- new ObjectEntry (line 1382)
+- new HashTable (line 1741)
+- new Variable (line 1743)
+- new SimpleXmlNodeState (line 1802)
+- new SimpleXmlNodeState (line 1811)
 - 70 class method(s)
 - 4 closure(s)
 
@@ -23292,7 +23293,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitCheckdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitCheckdnsrr.php`
 
@@ -24380,7 +24381,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIntdiv.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 21 class method(s)
 
 ### `ext/standard/JitInterfaceExists.php`
 
@@ -32797,8 +32798,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/intdiv.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 49)
-- new ArithmeticError (line 52)
+- new DivisionByZeroError (line 50)
+- new ArithmeticError (line 53)
 - 2 class method(s)
 
 ### `ext/standard/interface_exists_.php`
@@ -43051,9 +43052,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUrldecode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 133)
-- 7 class method(s)
-- 1 closure(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringUrlencode.php`
 

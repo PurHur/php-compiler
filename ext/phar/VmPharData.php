@@ -15,12 +15,28 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\standard\VmZlib;
 use PHPCompiler\ext\zip\ZipEngine;
 
-/** PharData archive state — php-src ext/phar/phar_object.c (#6490, #19893, #21676). */
+/** PharData archive state — php-src ext/phar/phar_object.c (#6490, #19893, #21676, #21691). */
 final class VmPharData
 {
     public const CLASS_LC = 'phardata';
 
-    /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, sigFlags: int, signature: string, sigPrivateKey: ?string, format: int}> */
+    /** Reserved ustar/zip member for archive metadata (#21691; mirrors VmPharArchive). */
+    private const META_ENTRY = '.phar/metadata';
+
+    /**
+     * @var array<int, array{
+     *   path: string,
+     *   files: array<string, string>,
+     *   dirs: array<string, true>,
+     *   dirty: bool,
+     *   sigFlags: int,
+     *   signature: string,
+     *   sigPrivateKey: ?string,
+     *   format: int,
+     *   hasMetadata: bool,
+     *   metadata: mixed
+     * }>
+     */
     private static array $state = [];
 
     public static function bind(
@@ -32,7 +48,9 @@ final class VmPharData
         int $sigFlags = 0,
         string $signature = '',
         ?string $sigPrivateKey = null,
-        int $format = VmPhar::FORMAT_TAR
+        int $format = VmPhar::FORMAT_TAR,
+        bool $hasMetadata = false,
+        mixed $metadata = null
     ): void {
         self::$state[$object->id] = [
             'path' => $path,
@@ -43,6 +61,8 @@ final class VmPharData
             'signature' => $signature,
             'sigPrivateKey' => $sigPrivateKey,
             'format' => $format,
+            'hasMetadata' => $hasMetadata,
+            'metadata' => $metadata,
         ];
     }
 
@@ -66,7 +86,8 @@ final class VmPharData
                 $binary = $decoded;
             }
             $entries = VmPharTar::readArchiveEntries($binary);
-            self::bind($object, $path, $entries['files'], false, $entries['dirs'], 0, '', null, VmPhar::FORMAT_TAR);
+            [$files, $hasMetadata, $metadata] = self::extractArchiveMetadata($entries['files']);
+            self::bind($object, $path, $files, false, $entries['dirs'], 0, '', null, VmPhar::FORMAT_TAR, $hasMetadata, $metadata);
 
             return;
         }
@@ -76,6 +97,42 @@ final class VmPharData
         }
         $format = self::formatFromPath($path);
         self::bind($object, $path, [], true, [], 0, '', null, $format);
+    }
+
+    /** php-src zim_Phar_hasMetadata on PharData (#21691). */
+    public static function hasMetadata(ObjectEntry $object): bool
+    {
+        return self::requireState($object)['hasMetadata'];
+    }
+
+    /** php-src zim_Phar_getMetadata on PharData (#21691). */
+    public static function getMetadata(ObjectEntry $object): mixed
+    {
+        $st = self::requireState($object);
+
+        return $st['hasMetadata'] ? $st['metadata'] : null;
+    }
+
+    /** php-src zim_Phar_setMetadata on PharData (#21691). */
+    public static function setMetadata(ObjectEntry $object, mixed $metadata): void
+    {
+        self::requireState($object);
+        self::$state[$object->id]['hasMetadata'] = true;
+        self::$state[$object->id]['metadata'] = $metadata;
+        self::$state[$object->id]['dirty'] = true;
+        self::flush($object);
+    }
+
+    /** php-src zim_Phar_delMetadata on PharData (#21691). */
+    public static function delMetadata(ObjectEntry $object): bool
+    {
+        self::requireState($object);
+        self::$state[$object->id]['hasMetadata'] = false;
+        self::$state[$object->id]['metadata'] = null;
+        self::$state[$object->id]['dirty'] = true;
+        self::flush($object);
+
+        return true;
     }
 
     /** php-src zim_Phar_isFileFormat for PharData (#21676). */
@@ -244,14 +301,26 @@ final class VmPharData
         $ext = null !== $extension && '' !== $extension ? \ltrim($extension, '.') : 'gz';
         $path = $st['path'];
         $outPath = \str_ends_with(\strtolower($path), '.'.$ext) ? $path : $path.'.'.$ext;
-        $binary = VmPharTar::writeArchive($st['files'], $st['dirs']);
+        $binary = VmPharTar::writeArchive(self::filesForWrite($st), $st['dirs']);
         $encoded = VmZlib::gzencode($binary);
         if (false === $encoded || false === VmFs::filePutContents($outPath, $encoded)) {
             throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
         }
         $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $out->constructed = true;
-        self::bind($out, $outPath, $st['files'], false, $st['dirs'], 0, '', null, $st['format'] ?? VmPhar::FORMAT_TAR);
+        self::bind(
+            $out,
+            $outPath,
+            $st['files'],
+            false,
+            $st['dirs'],
+            0,
+            '',
+            null,
+            $st['format'] ?? VmPhar::FORMAT_TAR,
+            $st['hasMetadata'] ?? false,
+            $st['metadata'] ?? null
+        );
 
         return $out;
     }
@@ -274,13 +343,25 @@ final class VmPharData
         if (null !== $extension && '' !== $extension) {
             $outPath = \preg_replace('/\.[^.]+$/', '', $outPath).'.'.\ltrim($extension, '.');
         }
-        $binary = VmPharTar::writeArchive($st['files'], $st['dirs']);
+        $binary = VmPharTar::writeArchive(self::filesForWrite($st), $st['dirs']);
         if (false === VmFs::filePutContents($outPath, $binary)) {
             throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
         }
         $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $out->constructed = true;
-        self::bind($out, $outPath, $st['files'], false, $st['dirs'], 0, '', null, $st['format'] ?? VmPhar::FORMAT_TAR);
+        self::bind(
+            $out,
+            $outPath,
+            $st['files'],
+            false,
+            $st['dirs'],
+            0,
+            '',
+            null,
+            $st['format'] ?? VmPhar::FORMAT_TAR,
+            $st['hasMetadata'] ?? false,
+            $st['metadata'] ?? null
+        );
 
         return $out;
     }
@@ -291,7 +372,19 @@ final class VmPharData
         self::flush($object);
         $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $out->constructed = true;
-        self::bind($out, $st['path'], $st['files'], false, $st['dirs'], 0, '', null, $st['format'] ?? VmPhar::FORMAT_TAR);
+        self::bind(
+            $out,
+            $st['path'],
+            $st['files'],
+            false,
+            $st['dirs'],
+            0,
+            '',
+            null,
+            $st['format'] ?? VmPhar::FORMAT_TAR,
+            $st['hasMetadata'] ?? false,
+            $st['metadata'] ?? null
+        );
 
         return $out;
     }
@@ -436,12 +529,12 @@ final class VmPharData
         $path = $st['path'];
         $format = $st['format'] ?? VmPhar::FORMAT_TAR;
         if (VmPhar::FORMAT_ZIP === $format) {
-            self::flushZip($object, $path, $st['files'], $st['dirs']);
+            self::flushZip($object, $path, self::filesForWrite($st), $st['dirs']);
             self::$state[$object->id]['dirty'] = false;
 
             return;
         }
-        $binary = VmPharTar::writeArchive($st['files'], $st['dirs']);
+        $binary = VmPharTar::writeArchive(self::filesForWrite($st), $st['dirs']);
         $lower = \strtolower($path);
         if (\str_ends_with($lower, '.gz') || \str_ends_with($lower, '.tgz')) {
             $encoded = VmZlib::gzencode($binary);
@@ -455,6 +548,38 @@ final class VmPharData
         }
         self::refreshSignature($object, $binary);
         self::$state[$object->id]['dirty'] = false;
+    }
+
+    /**
+     * @param array<string, string> $files
+     * @return array{0: array<string, string>, 1: bool, 2: mixed}
+     */
+    private static function extractArchiveMetadata(array $files): array
+    {
+        $hasMetadata = false;
+        $metadata = null;
+        if (isset($files[self::META_ENTRY])) {
+            $hasMetadata = true;
+            $raw = $files[self::META_ENTRY];
+            $metadata = '' === $raw ? null : \unserialize($raw);
+            unset($files[self::META_ENTRY]);
+        }
+
+        return [$files, $hasMetadata, $metadata];
+    }
+
+    /**
+     * @param array{files: array<string, string>, hasMetadata?: bool, metadata?: mixed} $st
+     * @return array<string, string>
+     */
+    private static function filesForWrite(array $st): array
+    {
+        $files = $st['files'];
+        if (!empty($st['hasMetadata'])) {
+            $files[self::META_ENTRY] = \serialize($st['metadata'] ?? null);
+        }
+
+        return $files;
     }
 
     private static function looksLikeZip(string $binary): bool
@@ -498,7 +623,8 @@ final class VmPharData
             }
             $files[$name] = (string) ($entry['data'] ?? '');
         }
-        self::bind($object, $path, $files, false, $dirs, 0, '', null, VmPhar::FORMAT_ZIP);
+        [$files, $hasMetadata, $metadata] = self::extractArchiveMetadata($files);
+        self::bind($object, $path, $files, false, $dirs, 0, '', null, VmPhar::FORMAT_ZIP, $hasMetadata, $metadata);
     }
 
     /**
@@ -571,7 +697,7 @@ final class VmPharData
         self::$state[$object->id]['signature'] = VmPhar::computeHashSignature($binary, $sigFlags);
     }
 
-    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, sigFlags: int, signature: string, sigPrivateKey: ?string} */
+    /** @return array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, sigFlags: int, signature: string, sigPrivateKey: ?string, format?: int, hasMetadata?: bool, metadata?: mixed} */
     private static function requireState(ObjectEntry $object): array
     {
         if (!isset(self::$state[$object->id])) {
@@ -579,6 +705,10 @@ final class VmPharData
         }
         if (!isset(self::$state[$object->id]['dirs'])) {
             self::$state[$object->id]['dirs'] = [];
+        }
+        if (!\array_key_exists('hasMetadata', self::$state[$object->id])) {
+            self::$state[$object->id]['hasMetadata'] = false;
+            self::$state[$object->id]['metadata'] = null;
         }
 
         return self::$state[$object->id];
