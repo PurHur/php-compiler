@@ -156,6 +156,38 @@ make north-star5-verify-fast          # ~1–2 min
 ./script/north-star5-verify.sh --strict   # ~1h — pre-merge only
 ```
 
+### What an AOT compile actually costs (measure before planning a loop)
+
+Iterating on a **lowering** in `lib/`/`ext/` is expensive, and shrinking the test
+input does **not** help — the AOT path emits and links the whole runtime
+regardless of source size. Measured on this repo (16-core host, `22.04-dev`
+image, other containers competing):
+
+| Target | Wall time |
+|--------|-----------|
+| 3-line `echo $s` script, `bin/compile.php -o` | **~43 min** |
+| `test/selfhost/compiler_helloworld_smoke/main.php` | tens of minutes |
+| `north-star5-verify --strict` | ~1 h |
+
+Consequences for how to work:
+
+- **Do not plan a "small repro" fast loop.** A minimal `.php` file costs about
+  the same as a real one.
+- **`build/helper-runtime-cache` is the only large speedup** (cold ~6 min → warm
+  ~0.2 s, [#16809](https://github.com/PurHur/php-compiler/issues/16809)) — but the
+  lowering-fingerprint guard ([#21855](https://github.com/PurHur/php-compiler/issues/21855))
+  correctly invalidates it whenever `lib/`/`ext/` changes. Editing a lowering is
+  therefore always a cold run. Do not weaken the guard to buy speed: stale
+  artifacts are what produced the false-green ladder in
+  [#21860](https://github.com/PurHur/php-compiler/issues/21860).
+- **Parallelise hypotheses, don't chase a faster cycle.** Run several candidate
+  fixes concurrently in separate `docker run -d` containers.
+- **Prefer one IR dump over repeated compiles.** `PHP_COMPILER_DUMP_IR=1` writes
+  `/tmp/phpc-last.ll` just before module verification; reading it statically
+  located [#21886](https://github.com/PurHur/php-compiler/issues/21886) in a single
+  run instead of several. Raise `PHP_COMPILER_MEMORY_LIMIT` when dumping — the
+  printer needs headroom above the compile itself.
+
 ### Full generation ladder (weekly or before spine release)
 
 ```bash
