@@ -12,21 +12,10 @@ if (!PHPCompiler\CompilerVersion::supportsFtpConnection()) {
     die('skip FTP withheld on reference profile');
 }
 ?>
---FILE--
-<?php
-try {
-    var_export(@ftp_connect(null));
-    echo " COERCED\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
-try {
-    var_export(@ftp_ssl_connect(null));
-    echo " COERCED\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
-?>
+--RUNFILE--
+ftp_connect_null_forward84.php
 --EXPECT--
-false COERCED
-false COERCED
+DEP_NULL
+ftp_connect false COERCED
+DEP_NULL
+ftp_ssl_connect false COERCED
