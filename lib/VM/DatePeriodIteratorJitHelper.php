@@ -84,7 +84,14 @@ final class DatePeriodIteratorJitHelper
 
         $context->builder->positionAtEnd($countBb);
         $key = self::loadLongProperty($context, $obj, '__dp_iter_key');
-        $validCount = $context->builder->icmp(Builder::INT_SLT, $key, $recurrences);
+        // Stored count includes start slot; exclude-start yields userRecurrences only (#21939).
+        $includeStartCount = self::loadBoolProperty($context, $obj, 'include_start_date');
+        $limit = $context->builder->select(
+            $includeStartCount,
+            $recurrences,
+            $context->builder->sub($recurrences, $i64->constInt(1, false))
+        );
+        $validCount = $context->builder->icmp(Builder::INT_SLT, $key, $limit);
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($falseBb);
