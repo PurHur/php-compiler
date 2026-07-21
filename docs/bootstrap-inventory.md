@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6326 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20049 |
+| Source constructs flagged (warnings) | 20051 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -167,7 +167,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_multi_strerror.php` | 0 | 2 |
 | `ext/curl/curl_pause.php` | 0 | 2 |
 | `ext/curl/curl_reset.php` | 0 | 2 |
-| `ext/curl/curl_setopt.php` | 0 | 2 |
+| `ext/curl/curl_setopt.php` | 0 | 3 |
 | `ext/curl/curl_setopt_array.php` | 0 | 2 |
 | `ext/curl/curl_share_close.php` | 0 | 2 |
 | `ext/curl/curl_share_errno.php` | 0 | 2 |
@@ -5263,7 +5263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/UploadTempJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/UsortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ValueBoxWriteBoolJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/ValueEchoRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/ValueEchoRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ValueSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/VarArg.php` | 0 | 1 |
 | `lib/JIT/Builtin/VarFetchRuntime.php` | 0 | 3 |
@@ -7230,8 +7230,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/curl_setopt.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
-- 2 class method(s)
+- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 56)
+- 3 class method(s)
 
 ### `ext/curl/curl_setopt_array.php`
 
@@ -31138,7 +31139,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmZlibArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/VmZlibContext.php`
 
@@ -39954,15 +39955,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OpCode (line 48844)
 - new OpCode (line 48851)
 - new Operand\Literal (line 49616)
-- new OpCode (line 51079)
-- new Literal (line 51234)
-- new OpCode (line 51333)
-- new Variable (line 51340)
-- new Temporary (line 51342)
-- new OpCode (line 51345)
-- new CompileFatal (line 51680)
-- new CompileFatal (line 51935)
-- 1061 class method(s)
+- new OpCode (line 51148)
+- new Literal (line 51309)
+- new OpCode (line 51408)
+- new Variable (line 51415)
+- new Temporary (line 51417)
+- new OpCode (line 51420)
+- new CompileFatal (line 51755)
+- new CompileFatal (line 52010)
+- 1062 class method(s)
 - 49 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
@@ -44145,7 +44146,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ValueEchoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 227)
+- new Variable (line 240)
+- new Variable (line 273)
 - 15 class method(s)
 
 ### `lib/JIT/Builtin/ValueSortRuntime.php`
