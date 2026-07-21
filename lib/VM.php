@@ -9385,6 +9385,8 @@ restart:
             return $this->dispatchVmPDOException($e, $callerFrame);
         } catch (\SQLite3Exception $e) {
             return $this->dispatchVmSQLite3Exception($e, $callerFrame);
+        } catch (\mysqli_sql_exception $e) {
+            return $this->dispatchVmMysqliSqlException($e, $callerFrame);
         } catch (\PharException $e) {
             return $this->dispatchVmPharException($e, $callerFrame);
         } catch (\SoapFault $e) {
@@ -9635,6 +9637,21 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeSQLite3Exception(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line,
+            (int) $error->getCode()
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native mysqli_sql_exception from ext/mysqli builtins (#21803, #21815). */
+    private function dispatchVmMysqliSqlException(\mysqli_sql_exception $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeMysqliSqlException(
             $this->context,
             $error->getMessage(),
             $file,

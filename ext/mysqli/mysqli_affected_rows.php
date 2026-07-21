@@ -28,7 +28,8 @@ final class mysqli_affected_rows extends Internal
         if (Variable::TYPE_OBJECT !== $link->type) {
             throw new \TypeError('mysqli_affected_rows(): Argument #1 ($mysql) must be of type mysqli');
         }
-        $native = VmMysqli::requireNative($link->toObject());
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli_affected_rows() requires VM context');
+        $native = VmMysqli::requireNative($link->toObject(), $ctx);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($native->affected_rows);
         }

@@ -30,7 +30,8 @@ final class mysqli_query extends Internal
         }
         $obj = $link->toObject();
         $sql = $frame->calledArgs[1]->resolveIndirect()->toString();
-        $native = VmMysqli::requireNative($obj);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli_query() requires VM context');
+        $native = VmMysqli::requireNative($obj, $ctx);
         $result = $native->query($sql);
         if (null === $frame->returnVar) {
             return;
