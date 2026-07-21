@@ -26,9 +26,10 @@ final class checkdate extends Internal
                 'checkdate() expects exactly 3 arguments, '.\count($frame->calledArgs).' given'
             );
         }
-        $month = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'checkdate', 1, 'month');
-        $day = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'checkdate', 2, 'day');
-        $year = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'checkdate', 3, 'year');
+        // Z_PARAM_LONG — soft-null DEP+coerce on 8.4 (ext/standard/datetime.c; #21594, reverts #14674 TypeError).
+        $month = VmMath::parseChrCodepointForFrame($frame, 0, 'checkdate', 1, 'month');
+        $day = VmMath::parseChrCodepointForFrame($frame, 1, 'checkdate', 2, 'day');
+        $year = VmMath::parseChrCodepointForFrame($frame, 2, 'checkdate', 3, 'year');
         $valid = VmDate::checkdate($month, $day, $year);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($valid): void {
             $ret->bool($valid);
