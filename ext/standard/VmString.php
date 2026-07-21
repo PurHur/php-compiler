@@ -4010,6 +4010,8 @@ final class VmString
         $carry = false;
         $last = 0;
 
+        // php-src increment_string(): $last tracks the last alphanumeric class seen,
+        // including overflow ('z'/'Z'/'9'), so lengthening prepends the right case (#21911).
         do {
             $c = $incremented[$position];
             $ord = self::byteOrd($c);
@@ -4020,8 +4022,8 @@ final class VmString
                 } else {
                     $incremented[$position] = self::byteChr($ord + 1);
                     $carry = false;
-                    $last = 1;
                 }
+                $last = 1;
             } elseif ($ord >= 65 && $ord <= 90) {
                 if ('Z' === $c) {
                     $incremented[$position] = 'A';
@@ -4029,8 +4031,8 @@ final class VmString
                 } else {
                     $incremented[$position] = self::byteChr($ord + 1);
                     $carry = false;
-                    $last = 2;
                 }
+                $last = 2;
             } elseif ($ord >= 48 && $ord <= 57) {
                 if ('9' === $c) {
                     $incremented[$position] = '0';
@@ -4038,8 +4040,8 @@ final class VmString
                 } else {
                     $incremented[$position] = self::byteChr($ord + 1);
                     $carry = false;
-                    $last = 3;
                 }
+                $last = 3;
             } else {
                 if (!$carry) {
                     $incremented[$position] = self::byteChr($ord + 1);

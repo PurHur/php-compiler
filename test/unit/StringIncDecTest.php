@@ -53,6 +53,17 @@ final class StringIncDecTest extends TestCase
         $this->assertSame('hellp', VmString::incrementStringOperator('hello'));
     }
 
+    /** Zend increment_string lengthening uses last alphanumeric class (#21911). */
+    public function testIncrementStringOperatorCarryCaseAndDigitOverflow(): void
+    {
+        $this->assertSame('AA', VmString::incrementStringOperator('Z'));
+        $this->assertSame('10a', VmString::incrementStringOperator('9z'));
+        $this->assertSame('B0', VmString::incrementStringOperator('A9'));
+        $this->assertSame('AAA', VmString::incrementStringOperator('ZZ'));
+        $this->assertSame('aaa', VmString::incrementStringOperator('zz'));
+        $this->assertSame('1000', VmString::incrementStringOperator('999'));
+    }
+
     private function runIncDec(int $opCode, string $value): VMVariable
     {
         $left = new VMVariable();
