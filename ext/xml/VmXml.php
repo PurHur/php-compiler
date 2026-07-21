@@ -229,7 +229,12 @@ final class VmXml
         }
 
         self::recordSuccessfulParse($parser, $data);
-        $built = VmXmlStructBuilder::build($data);
+        $state = self::$parsers[$parser];
+        $built = VmXmlStructBuilder::build($data, [
+            'nsAware' => !empty($state['nsAware']),
+            'nsSeparator' => (string) ($state['nsSeparator'] ?? ':'),
+            'caseFolding' => 0 !== ($state['options'][XmlConstants::XML_OPTION_CASE_FOLDING] ?? 1),
+        ]);
         $result = $built->result();
 
         return [

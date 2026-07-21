@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** xml_parse_into_struct() — SAX struct builder (php-src ext/xml/xml.c; #3494, soft-null #21505). */
+/** xml_parse_into_struct() — SAX struct builder (php-src ext/xml/xml.c; #3494, soft-null #21505, NS #21631). */
 final class xml_parse_into_struct extends Internal
 {
     public function __construct()
