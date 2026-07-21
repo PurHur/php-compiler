@@ -191,6 +191,20 @@ final class VmMsg
     }
 
     /**
+     * msg_set_queue() — update queue attributes from msg_stat_queue-shaped array (#21633).
+     *
+     * @param array<string|int, mixed> $data
+     */
+    public static function setQueue(object $host, array $data): bool
+    {
+        if (!self::available() || !\function_exists('msg_set_queue')) {
+            return false;
+        }
+
+        return @\msg_set_queue($host, $data);
+    }
+
+    /**
      * @param array<string, int> $stat
      */
     public static function statToHashTable(array $stat): HashTable
