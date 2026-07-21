@@ -53,7 +53,7 @@ final class VmFilestatArg
     }
 
     /**
-     * basename/dirname/pathinfo $path — TypeError on null under PROFILE≥8.4 (#20099); DEP+coerce on 8.2 profile.
+     * basename/dirname/pathinfo $path — Z_PARAM_STR soft-null DEP+coerce on 8.4 (#21779, #20099).
      */
     public static function pathComponentFilenameArgForFrame(
         Frame $frame,
@@ -67,7 +67,7 @@ final class VmFilestatArg
             $argIndex,
             $paramName,
             $frame,
-            false
+            true
         );
     }
 
