@@ -150,6 +150,7 @@ final class ThrowableManifest
         'PDOException' => 'RuntimeException',
         'RedisException' => 'Exception',
         'SoapFault' => 'Exception',
+        'mysqli_sql_exception' => 'RuntimeException',
     ];
 
     /** @var array<string, class-string> */
@@ -191,6 +192,7 @@ final class ThrowableManifest
         'PDOException' => 'PDOException',
         'RedisException' => 'RedisException',
         'SoapFault' => 'SoapFault',
+        'mysqli_sql_exception' => 'mysqli_sql_exception',
     ];
 
     /** @return list<string> */
@@ -222,6 +224,7 @@ final class ThrowableManifest
             'PDOException' => \PHPCompiler\ext\pdo\PdoExtensionPolicy::advertisesExceptionClass(),
             'RedisException' => \PHPCompiler\ext\redis\RedisExtensionPolicy::advertisesExtension(),
             'SoapFault' => \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExceptionClass(),
+            'mysqli_sql_exception' => \PHPCompiler\ext\mysqli\MysqliExtensionPolicy::advertisesExtension(),
             default => true,
         };
     }

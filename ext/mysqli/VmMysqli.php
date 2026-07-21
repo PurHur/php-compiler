@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\mysqli;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\BuiltinExceptionSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -145,18 +147,13 @@ final class VmMysqli
             throw new \LogicException('mysqli class not registered');
         }
         $entry = new ObjectEntry($class);
-        self::initializeObject($ctx, $entry, $native);
-
-        return $entry;
-    }
-
-    public static function initializeObject(Context $ctx, ObjectEntry $entry, ?\mysqli $native = null): void
-    {
         $state = new MysqliState();
         $state->native = $native;
         $state->ctx = $ctx;
         self::$store[$entry->id] = $state;
         $entry->constructed = true;
+
+        return $entry;
     }
 
     public static function setConnectError(int $errno, string $error): void
@@ -173,6 +170,12 @@ final class VmMysqli
     public static function connectError(): string
     {
         return self::$connectError;
+    }
+
+    public static function attachState(ObjectEntry $entry, MysqliState $state): void
+    {
+        self::$store[$entry->id] = $state;
+        $entry->constructed = true;
     }
 
     public static function state(ObjectEntry $entry): MysqliState
@@ -331,13 +334,7 @@ final class MysqliConstruct extends MysqliClassMethod
         if ($receiver->constructed) {
             throw new \LogicException('mysqli object already initialized');
         }
-        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli requires VM context');
         $argc = \count($frame->calledArgs) - 1;
-        if (0 === $argc) {
-            VmMysqli::initializeObject($ctx, $receiver);
-
-            return;
-        }
         $hostname = $argc >= 1 ? $this->stringArgNullable($frame->calledArgs[1]) : null;
         $username = $argc >= 2 ? $this->stringArgNullable($frame->calledArgs[2]) : null;
         $password = $argc >= 3 ? $this->stringArgNullable($frame->calledArgs[3]) : null;
@@ -345,8 +342,25 @@ final class MysqliConstruct extends MysqliClassMethod
         $port = $argc >= 5 ? $this->intArgNullable($frame->calledArgs[5]) : null;
         $socket = $argc >= 6 ? $this->stringArgNullable($frame->calledArgs[6]) : null;
 
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli requires VM context');
+
         if (!MysqliExtensionPolicy::hasNativeDriver()) {
-            throw new \mysqli_sql_exception('mysqli extension not available on host PHP');
+            // No host ext/mysqli — mark object as constructed but with no native handle.
+            // php-src: new mysqli() with no args returns an unconnected object;
+            // with args and no driver it would throw mysqli_sql_exception.
+            if ($argc > 0) {
+                $ex = BuiltinExceptionSupport::materializeMysqliSqlException(
+                    $ctx,
+                    'mysqli extension not available on host PHP',
+                    '',
+                    0,
+                    2002
+                );
+                throw ExceptionSupport::vmThrowable($ex);
+            }
+            $receiver->constructed = true;
+
+            return;
         }
 
         $hostname = $hostname ?? ini_get('mysqli.default_host') ?: '127.0.0.1';
@@ -356,12 +370,33 @@ final class MysqliConstruct extends MysqliClassMethod
         $port = $port ?? (int) (ini_get('mysqli.default_port') ?: 3306);
         $socket = $socket ?? ini_get('mysqli.default_socket') ?: '';
 
-        $native = @new \mysqli($hostname, $username, $password, $database, $port, $socket);
+        try {
+            $native = @new \mysqli($hostname, $username, $password, $database, $port, $socket);
+        } catch (\mysqli_sql_exception $e) {
+            $ex = BuiltinExceptionSupport::materializeMysqliSqlException(
+                $ctx,
+                $e->getMessage(),
+                '',
+                0,
+                $e->getCode()
+            );
+            throw ExceptionSupport::vmThrowable($ex);
+        }
         if ($native->connect_errno) {
-            throw new \mysqli_sql_exception($native->connect_error ?? 'Connection error', $native->connect_errno);
+            $ex = BuiltinExceptionSupport::materializeMysqliSqlException(
+                $ctx,
+                $native->connect_error ?? 'Connection error',
+                '',
+                0,
+                $native->connect_errno
+            );
+            throw ExceptionSupport::vmThrowable($ex);
         }
 
-        VmMysqli::initializeObject($ctx, $receiver, $native);
+        $state = new MysqliState();
+        $state->native = $native;
+        $state->ctx = $ctx;
+        VmMysqli::attachState($receiver, $state);
     }
 
     private function stringArgNullable(Variable $var): ?string
