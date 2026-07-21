@@ -35,11 +35,7 @@ final class fnmatch extends Internal
         $filename = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[1], 'fnmatch', 2, 'filename');
         $flags = 0;
         if (3 === $argc) {
-            $flagsVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException('fnmatch() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'fnmatch', 3, 'flags');
         }
         $frame->returnVar->bool(VmFnmatch::match($pattern, $filename, $flags));
     }
