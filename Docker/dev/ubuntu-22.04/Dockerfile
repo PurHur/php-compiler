@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libodbc2 \
     unixodbc \
     libenchant-2-2 \
+    libgpgme11 \
+    libgpgme-dev \
     enchant-2 \
     hunspell-en-us \
     libaspell15 \

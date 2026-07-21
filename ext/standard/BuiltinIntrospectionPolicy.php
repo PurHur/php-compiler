@@ -277,6 +277,9 @@ final class BuiltinIntrospectionPolicy
         if ('ftp' === $ext) {
             return \PHPCompiler\ext\ftp\FtpExtensionPolicy::advertisesExtension();
         }
+        if ('gnupg' === $ext) {
+            return \PHPCompiler\ext\gnupg\GnupgExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }
