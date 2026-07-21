@@ -16,6 +16,9 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayFlipRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitArrayElem;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -34,7 +37,7 @@ final class array_flip extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_flip', 1, 'array');
+        $ht = VmArray::requireArrayParamForCaller($frame, $frame->calledArgs[0], 'array_flip', 1, 'array');
         $frame->returnVar->array(VmArray::flip($ht, $frame));
     }
 
@@ -46,6 +49,16 @@ final class array_flip extends Internal
             throw new \LogicException('array_flip() requires exactly one argument');
         }
         TypeErrorRaise::ensureLinked($context);
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitArrayElem::requireArrayParam($context, $args[0], 'array_flip', 1, 'array');
+
+                return HashTableHelper::emptyVariable($context)->value;
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'array_flip', 0, 'array');
+
+            return HashTableHelper::emptyVariable($context)->value;
+        }
         JitArrayElem::requireArrayParam($context, $args[0], 'array_flip', 1, 'array');
 
         foreach ($args as $i => $arg) {

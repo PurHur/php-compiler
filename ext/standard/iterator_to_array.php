@@ -14,8 +14,14 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\IterableCheck;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -43,6 +49,26 @@ final class iterator_to_array extends Internal
             throw new \LogicException('iterator_to_array() requires VM context in this compiler build');
         }
         $iterator = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $iterator->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    'iterator_to_array(): Argument #1 ($iterator) must be of type '
+                    .IterableCheck::TYPE_LABEL.', null given'
+                );
+            }
+            VmNullStringParamDeprecation::emit(
+                $frame,
+                'iterator_to_array',
+                0,
+                'iterator',
+                IterableCheck::TYPE_LABEL
+            );
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->array(new HashTable());
+            }
+
+            return;
+        }
         $preserveKeys = true;
         if (2 === $argc) {
             $preserveKeys = $frame->calledArgs[1]->resolveIndirect()->toBool();
@@ -58,6 +84,23 @@ final class iterator_to_array extends Internal
         $argc = \count($args);
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('iterator_to_array() requires one or two arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                throw new \TypeError(
+                    'iterator_to_array(): Argument #1 ($iterator) must be of type '
+                    .IterableCheck::TYPE_LABEL.', null given'
+                );
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                'iterator_to_array',
+                0,
+                'iterator',
+                IterableCheck::TYPE_LABEL
+            );
+
+            return HashTableHelper::emptyVariable($context)->value;
         }
         if (2 === $argc) {
             $preserveKeys = JitBoolArg::lower($context, $args[1], 'iterator_to_array() preserve_keys');

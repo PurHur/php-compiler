@@ -13,9 +13,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\ArrayMergeRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitArrayElem;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -34,7 +36,7 @@ final class array_merge extends Internal
 
             return;
         }
-        $first = VmArray::requireArrayArgNum($frame->calledArgs[0]->resolveIndirect(), 'array_merge', 1);
+        $first = VmArray::requireArrayArgNumForCaller($frame, $frame->calledArgs[0]->resolveIndirect(), 'array_merge', 1);
         if (1 === $argc) {
             $merged = VmArray::merge($first);
             BuiltinExecute::writeReturn($frame, static fn (Variable $ret) => $ret->array($merged));
@@ -43,7 +45,8 @@ final class array_merge extends Internal
         }
         $others = [];
         for ($i = 1, $n = $argc; $i < $n; ++$i) {
-            $others[] = VmArray::requireArrayArgNum(
+            $others[] = VmArray::requireArrayArgNumForCaller(
+                $frame,
                 $frame->calledArgs[$i]->resolveIndirect(),
                 'array_merge',
                 $i + 1
@@ -58,14 +61,37 @@ final class array_merge extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 1) {
-            return ArrayBuiltinHelper::emptyArray($context);
+            return HashTableHelper::emptyVariable($context)->value;
         }
 
+        $coerced = [];
         foreach ($args as $i => $arg) {
+            if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+                if ($context->callerStrictTypes) {
+                    JitArrayElem::requireArrayArgNum($context, $arg, 'array_merge', $i + 1);
+
+                    return HashTableHelper::emptyVariable($context)->value;
+                }
+                JitStringBuiltinArg::emitNullStringParamDeprecation(
+                    $context,
+                    'array_merge',
+                    $i,
+                    'array',
+                    'array'
+                );
+                $coerced[] = HashTableHelper::emptyVariable($context);
+
+                continue;
+            }
+            $coerced[] = $arg;
+        }
+
+        foreach ($coerced as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_merge() argument #'.((int) $i + 1));
             }
         }
-        return ArrayMergeRuntime::merge($context, ...$args);
+
+        return ArrayMergeRuntime::merge($context, ...$coerced);
     }
 }

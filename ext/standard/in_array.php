@@ -15,7 +15,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\InArrayRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitArrayElem;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -41,7 +43,8 @@ final class in_array extends Internal
             ));
         }
         $needle = $frame->calledArgs[0]->resolveIndirect();
-        $haystack = VmArray::requireArrayParam(
+        $haystack = VmArray::requireArrayParamForCaller(
+            $frame,
             $frame->calledArgs[1],
             'in_array',
             2,
@@ -85,6 +88,16 @@ final class in_array extends Internal
         }
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'in_array() needle');
+        }
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitArrayElem::requireArrayParam($context, $args[1], 'in_array', 2, 'haystack');
+
+                return $context->constantFromBool(false);
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'in_array', 1, 'haystack', 'array');
+
+            return $context->constantFromBool(false);
         }
         JitArrayElem::requireArrayParam($context, $args[1], 'in_array', 2, 'haystack');
 

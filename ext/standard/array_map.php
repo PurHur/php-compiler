@@ -18,10 +18,13 @@ use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -48,8 +51,20 @@ final class array_map extends Internal
         $arrays = [];
         for ($i = 1; $i < $argc; ++$i) {
             $arg = $frame->calledArgs[$i]->resolveIndirect();
+            if (Variable::TYPE_NULL === $arg->type) {
+                if (InternalStrictArg::isCallerStrict($frame)) {
+                    throw new \TypeError(\sprintf(
+                        'array_map(): Argument #%d ($array) must be of type array, null given',
+                        $i + 1
+                    ));
+                }
+                VmNullStringParamDeprecation::emit($frame, 'array_map', $i, 'array');
+                $arrays[] = new HashTable();
+
+                continue;
+            }
             if (Variable::TYPE_ARRAY !== $arg->type) {
-                throw new \TypeError(sprintf(
+                throw new \TypeError(\sprintf(
                     'array_map(): Argument #%d ($array) must be of type array, %s given',
                     $i + 1,
                     self::typeLabel($arg)
@@ -74,6 +89,18 @@ final class array_map extends Internal
         }
         $callback = $args[0];
         $arrays = \array_slice($args, 1);
+        foreach ($arrays as $i => $array) {
+            if (JITVariable::TYPE_NULL === $array->type || ($array->isNullConstant ?? false)) {
+                if ($context->callerStrictTypes) {
+                    throw new \TypeError(\sprintf(
+                        'array_map(): Argument #%d ($array) must be of type array, null given',
+                        $i + 2
+                    ));
+                }
+                JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'array_map', $i + 1, 'array');
+                $arrays[$i] = HashTableHelper::emptyVariable($context);
+            }
+        }
         foreach ($arrays as $i => $array) {
             if (JITVariable::TYPE_HASHTABLE !== ($array->type & ~JITVariable::IS_NATIVE_ARRAY)
                 && !ArrayBuiltinHelper::isNativeArray($array->type)
