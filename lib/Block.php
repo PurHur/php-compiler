@@ -1222,8 +1222,21 @@ class Block {
 
     public static function findVariableInParentFramesByName(string $name, Frame $frame): ?Variable
     {
+        // Limit the walk to the function that owns $frame. Foreach/merge blocks set
+        // inheritUndefinedLocals (so blocksScriptGlobalInheritance() is false) and must
+        // still share locals across CFG edges — but must not alias caller CVs of the same
+        // name. That alias made foreach-by-ref over &...$args bind the loop var to itself
+        // via the packed indirect (#21932; Zend/zend_execute.c FE_FETCH_RW).
+        $startFunc = null !== $frame->block ? $frame->block->func : null;
         $blockScriptGlobals = null !== $frame->block && $frame->block->blocksScriptGlobalInheritance();
         for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (
+                null !== $startFunc
+                && null !== $f->block
+                && (null === $f->block->func || $f->block->func !== $startFunc)
+            ) {
+                break;
+            }
             if (
                 $blockScriptGlobals
                 && null !== $f->block
