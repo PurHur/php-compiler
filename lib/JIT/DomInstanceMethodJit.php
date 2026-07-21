@@ -95,6 +95,7 @@ final class DomInstanceMethodJit
         'domnode::contains' => true,
         'domnode::getrootnode' => true,
         'domnode::isequalnode' => true,
+        'domnode::issamenode' => true,
         'domnode::c14n' => true,
         'domelement::c14n' => true,
         'domdocument::c14n' => true,
@@ -308,6 +309,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::issamenode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeIsSameNode();
+
+                return;
+            }
             if ('domnode::c14n' === $lc || 'domelement::c14n' === $lc || 'domdocument::c14n' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeC14N();
 
@@ -453,6 +459,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domnode::contains');
             self::ensureProxy($context, 'domnode::getrootnode');
             self::ensureProxy($context, 'domnode::isequalnode');
+            self::ensureProxy($context, 'domnode::issamenode');
             self::ensureProxy($context, 'domnode::c14n');
             self::ensureProxy($context, 'domelement::c14n');
             self::ensureProxy($context, 'domdocument::c14n');

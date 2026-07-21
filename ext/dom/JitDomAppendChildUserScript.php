@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** User-script AOT DOMDocument::appendChild() — documentElement store (#18927). */
+/** User-script AOT DOMDocument::appendChild() — documentElement store (#18927, #21687). */
 final class JitDomAppendChildUserScript
 {
     private const CLASS_DOCUMENT = 'DOMDocument';
@@ -33,6 +33,18 @@ final class JitDomAppendChildUserScript
             $objectType->propertySlotFor($document, self::CLASS_DOCUMENT, self::PROP_DOCUMENT_ELEMENT),
             $childJit,
             JITVariable::TYPE_OBJECT
+        );
+
+        // #21687: parentNode on child via DOMElement layout (allocation class).
+        $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $document);
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($child, 'DOMElement', VmDom::PROP_PARENT_NODE),
+            $docJit,
+            JITVariable::TYPE_VALUE
         );
 
         return self::boxObjectResult($context, $child);

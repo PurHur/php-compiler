@@ -44,11 +44,15 @@ final class JitDomCreateElement
             if (null !== $nameLit) {
                 $obj = self::materializeElementFromLiteral($context, $nameLit);
                 self::initTextContentSlot($context, $obj, null);
+                self::storeOwnerAndNullParent($context, $obj, $args[0]);
 
                 return $obj;
             }
 
-            return self::materializeElementFromRuntimeName($context, $args[1]);
+            $obj = self::materializeElementFromRuntimeName($context, $args[1]);
+            self::storeOwnerAndNullParent($context, $obj, $args[0]);
+
+            return $obj;
         }
 
         $nameLit = self::compileTimeStringArg($args[1]);
@@ -207,6 +211,13 @@ final class JitDomCreateElement
                 $objectType->defineProperty($classId, $prop, $type);
             }
         }
+        // #21687: parentNode / ownerDocument for contains()/getRootNode without DomRegistry.
+        if (!$objectType->hasProperty($classId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($classId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+        if (!$objectType->hasProperty($classId, VmDom::PROP_OWNER_DOCUMENT)) {
+            $objectType->defineProperty($classId, VmDom::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
+        }
     }
 
     private static function loadStringArg(Context $context, JITVariable $arg): Value
@@ -258,6 +269,39 @@ final class JitDomCreateElement
             $context->type->object->propertySlotFor($obj, $className, $prop),
             $propVar,
             JITVariable::TYPE_NULL
+        );
+    }
+
+    /**
+     * #21687: null parentNode + ownerDocument so living-API walks do not read garbage slots.
+     */
+    private static function storeOwnerAndNullParent(Context $context, Value $obj, JITVariable $documentArg): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        self::ensureElementPropertyLayout($objectType, $classId);
+
+        $nullSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $nullSlot)
+        );
+        $nullVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $nullSlot);
+        $docObj = self::loadObjectArg($context, $documentArg);
+        $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $docObj);
+        // DOMElement layout only — writing DOMNode slots into a DOMElement allocation corrupts memory.
+        if (!$objectType->hasProperty($classId, VmDom::PROP_OWNER_DOCUMENT)) {
+            $objectType->defineProperty($classId, VmDom::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
+        }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, VmDom::PROP_OWNER_DOCUMENT),
+            $docJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $nullVar,
+            JITVariable::TYPE_VALUE
         );
     }
 }
