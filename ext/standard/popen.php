@@ -33,6 +33,7 @@ final class popen extends Internal
             return;
         }
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'popen', 'command', false);
+        VmString::rejectEmptyBuiltinStringArg($command, 'popen', 0, 'command');
         $mode = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'popen',
@@ -54,9 +55,17 @@ final class popen extends Internal
             throw new \LogicException('popen() requires exactly two arguments in this compiler build');
         }
 
+        $command = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'popen', 0, 'command', 'string', null, false);
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[0],
+            $command,
+            'popen(): Argument #1 ($command) cannot be empty'
+        );
+
         return JitPopen::invoke(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'popen', 0, 'command', 'string', null, false),
+            $command,
             JitStringBuiltinArg::lower($context, $args[1], 'popen', 1, 'mode')
         );
     }

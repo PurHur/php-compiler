@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -79,6 +80,17 @@ final class ValueEchoRuntime
         self::TYPE_IS_OBJECT => JitVariable::TYPE_OBJECT,
     ];
 
+    /** @var array<string, int> */
+    private const BRIDGE_ABI_TYPE_MAP = [
+        '__value_echo__typeIsNull' => JitVariable::TYPE_NULL,
+        '__value_echo__typeIsNativeLong' => JitVariable::TYPE_NATIVE_LONG,
+        '__value_echo__typeIsNativeBool' => JitVariable::TYPE_NATIVE_BOOL,
+        '__value_echo__typeIsNativeDouble' => JitVariable::TYPE_NATIVE_DOUBLE,
+        '__value_echo__typeIsString' => JitVariable::TYPE_STRING,
+        '__value_echo__typeIsHashtable' => JitVariable::TYPE_HASHTABLE,
+        '__value_echo__typeIsObject' => JitVariable::TYPE_OBJECT,
+    ];
+
     private static int $seq = 0;
 
     public static function ensureLinked(Context $context): void
@@ -145,6 +157,7 @@ final class ValueEchoRuntime
         $boolBlock = BasicBlockHelper::append($context, 'echo_value_bool_'.$tag);
         $doubleBlock = BasicBlockHelper::append($context, 'echo_value_double_'.$tag);
         $stringBlock = BasicBlockHelper::append($context, 'echo_value_string_'.$tag);
+        $fallbackBlock = BasicBlockHelper::append($context, 'echo_value_fallback_'.$tag);
         $arrayBlock = BasicBlockHelper::append($context, 'echo_value_array_'.$tag);
         $objectBlock = BasicBlockHelper::append($context, 'echo_value_object_'.$tag);
         $doneBlock = BasicBlockHelper::append($context, 'echo_value_done_'.$tag);
@@ -234,7 +247,7 @@ final class ValueEchoRuntime
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterObject);
-        $context->builder->branchIf(self::callTypeIsString($context, $typeByte), $stringBlock, $doneBlock);
+        $context->builder->branchIf(self::callTypeIsString($context, $typeByte), $stringBlock, $fallbackBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $strPtr = $context->builder->call(
@@ -252,6 +265,18 @@ final class ValueEchoRuntime
             $strChars,
             $context->builder->zExt($strLen, $sizeT)
         );
+        $context->builder->branch($doneBlock);
+
+        // zend_print_variable: strval/coerce for boxes the dispatch chain missed (#21865).
+        $context->builder->positionAtEnd($fallbackBlock);
+        JitNativeString::ensureInsertBlock($context);
+        $boxed = new Variable(
+            $context,
+            JitVariable::TYPE_VALUE,
+            Variable::KIND_VALUE,
+            $valuePtr
+        );
+        ValueEchoHelper::echoStringVariable($context, JitNativeString::coerce($context, $boxed));
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
@@ -295,13 +320,17 @@ final class ValueEchoRuntime
 
     private static function callTypeBridge(Context $context, string $abiName, Value $typeByte): Value
     {
-        self::ensureLinked($context);
-        $fn = $context->lookupFunction($abiName);
+        if (!isset(self::BRIDGE_ABI_TYPE_MAP[$abiName])) {
+            throw new \LogicException('Unknown value echo type bridge: '.$abiName);
+        }
         $i8 = $context->getTypeFromString('int8');
+        $truncated = $context->builder->trunc($typeByte, $i8);
 
-        return $context->builder->call(
-            $fn,
-            $context->builder->trunc($typeByte, $i8)
+        // Thin standalone AOT: icmp matches ValueEchoSupport / strval (#21865); bridges stay for link inventory (#21513).
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $truncated,
+            $i8->constInt(self::BRIDGE_ABI_TYPE_MAP[$abiName], false)
         );
     }
 

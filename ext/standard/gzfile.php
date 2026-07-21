@@ -70,7 +70,7 @@ final class gzfile extends Internal
 
         return JitGzfile::invoke(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzfile', 0, 'filename'),
+            VmZlibArg::jitFilenamePath($context, $args[0], 'gzfile', 0),
             $useIncludePath
         );
     }

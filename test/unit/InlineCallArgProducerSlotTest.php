@@ -5548,6 +5548,66 @@ PHP;
         self::assertSame("count=4\n", ob_get_clean());
     }
 
+    /** Issue #21867 — count($ref->getAttributes(EnumCases::class)) wires MethodCall EXEC_RETURN, not hoisted ::class prelude. */
+    public function testCountNestedMethodCallFilteredGetAttributesUsesExecReturnSlot(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::advertisesEnumCasesAttributeClass()) {
+            self::markTestSkipped('EnumCases attribute requires forward profile 8.4');
+        }
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+enum Suit {
+    #[EnumCases('red')]
+    case Hearts;
+}
+$ref = new ReflectionEnumUnitCase(Suit::class, 'Hearts');
+echo count($ref->getAttributes(EnumCases::class)), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'count_enum_case_filtered_get_attributes.php');
+
+        $getAttributesExecSlot = null;
+        $countArgSendSlot = null;
+        $awaitingGetAttributesExec = false;
+        $awaitingCountArgSend = false;
+        foreach ($block->opCodes as $op) {
+            if (
+                OpCode::TYPE_METHODCALL_INIT === $op->type
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'getAttributes' === $block->constants[$op->arg2]->toString()
+            ) {
+                $awaitingGetAttributesExec = true;
+            }
+            if ($awaitingGetAttributesExec && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $getAttributesExecSlot = $op->arg1;
+                $awaitingGetAttributesExec = false;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_INIT === $op->type
+                && null !== $op->arg1
+                && isset($block->constants[$op->arg1])
+                && 'count' === $block->constants[$op->arg1]->toString()
+            ) {
+                $awaitingCountArgSend = true;
+            }
+            if ($awaitingCountArgSend && OpCode::TYPE_ARG_SEND === $op->type) {
+                $countArgSendSlot = $op->arg1;
+                break;
+            }
+        }
+
+        self::assertNotNull($getAttributesExecSlot, 'getAttributes must FUNCCALL_EXEC_RETURN');
+        self::assertNotNull($countArgSendSlot, 'count() must emit ARG_SEND');
+        self::assertSame($getAttributesExecSlot, $countArgSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n", ob_get_clean());
+    }
+
     /** Issue #11304 — array_map(fn, [new C()]) wires closure + outer Array_, not embedded New_. */
     public function testArrayMapClosureInlineObjectArrayUsesClosureAndArraySlots(): void
     {

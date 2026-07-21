@@ -23,10 +23,13 @@ try {
 } catch (TypeError $e) {
     echo "scandir: TypeError\n";
 }
-$r = popen(null, 'r');
-echo 'popen: ', is_resource($r) ? 'resource' : 'other', "\n";
-if (is_resource($r)) {
-    pclose($r);
+try {
+    popen(null, 'r');
+    echo "popen: no_exception\n";
+} catch (ValueError $e) {
+    echo "popen: ValueError\n";
+} catch (TypeError $e) {
+    echo "popen: TypeError\n";
 }
 ?>
 --EXPECT--
@@ -34,4 +37,4 @@ shell_exec: ValueError
 system: ValueError
 passthru: ValueError
 scandir: ValueError
-popen: resource
+popen: ValueError

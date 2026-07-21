@@ -29,7 +29,7 @@ final class gzopen extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzopen', 0, 'filename');
+        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'gzopen', 'filename');
         $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'gzopen', 1, 'mode');
         $useIncludePath = 0;
         if (3 === $argc) {
@@ -64,7 +64,7 @@ final class gzopen extends Internal
 
         return JitGzopen::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'gzopen', 0, 'filename'),
+            JitStreamPath::lowerNonEmptyPath($context, $args[0], 'gzopen', 0, 'filename'),
             JitStringBuiltinArg::lower($context, $args[1], 'gzopen', 1, 'mode'),
             $useIncludePath
         );
