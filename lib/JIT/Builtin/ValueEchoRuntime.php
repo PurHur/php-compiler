@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNativeString;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -184,14 +185,12 @@ final class ValueEchoRuntime
         $context->builder->branchIf(self::callTypeIsNativeBool($context, $typeByte), $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolVal = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $valuePtr
-        );
+        // __value__readLong has no TYPE_NATIVE_BOOL arm (#21892 / #21948).
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
         $isTrue = $context->builder->icmp(
             Builder::INT_NE,
-            $boolVal,
-            $boolVal->typeOf()->constInt(0, false)
+            $boolByte,
+            $context->getTypeFromString('int8')->constInt(0, false)
         );
         $trueBlock = BasicBlockHelper::append($context, 'echo_value_bool_true_'.$tag);
         $falseBlock = BasicBlockHelper::append($context, 'echo_value_bool_false_'.$tag);

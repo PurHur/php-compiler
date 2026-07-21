@@ -139,11 +139,12 @@ final class strval extends Internal
         );
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        // __value__readLong has no TYPE_NATIVE_BOOL arm (#21892 / #21948).
+        $boolByte = JitValueBox::readBoolByte($context, $valuePtr);
         $boolStr = $this->boolToString($context, $context->builder->icmp(
             Builder::INT_NE,
-            $boolVal,
-            $boolVal->typeOf()->constInt(0, false)
+            $boolByte,
+            $context->getTypeFromString('int8')->constInt(0, false)
         ));
         $boolEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

@@ -26,6 +26,8 @@ final class SessionAotPersistTest extends TestCase
         }
         putenv('PHP_COMPILER_SESSION_DIR');
         putenv('HTTP_COOKIE');
+        putenv('GATEWAY_INTERFACE');
+        putenv('REQUEST_METHOD');
         parent::tearDown();
     }
 
@@ -82,6 +84,61 @@ PHP;
         $this->assertSame('v', trim($this->runAot($code)));
     }
 
+    /** Thin AOT: int/bool session HT values cast and echo without segfault (#21948). */
+    public function testSessionIntBoolCastAndEchoUnderAot(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+
+        $this->sessionDir = sys_get_temp_dir().'/phpc_aot_session_ib_'.uniqid('', true);
+        @mkdir($this->sessionDir, 0700, true);
+        // Thin AOT session scalar HT matches CGI/file-backed path (#21948 issue repro).
+        putenv('GATEWAY_INTERFACE=CGI/1.1');
+        putenv('REQUEST_METHOD=GET');
+
+        $direct = <<<'PHP'
+<?php
+session_start();
+$_SESSION['n'] = 3;
+$_SESSION['t'] = true;
+echo 'cast=', (string)$_SESSION['n'], "\n";
+echo 'bool=', (string)$_SESSION['t'], "\n";
+echo 'echo=';
+echo $_SESSION['n'];
+echo "\n";
+echo 'truth=', $_SESSION['t'] ? '1' : '0', "\n";
+PHP;
+        $directOut = $this->stripCgiTrailer($this->runAot($direct));
+        $this->assertSame("cast=3\nbool=1\necho=3\ntruth=1\n", $directOut);
+
+        $sid = 'abcdefghij0123456789KL-nop';
+        file_put_contents($this->sessionDir.'/sess_'.$sid, 'n|i:3;t|b:1;');
+        putenv('HTTP_COOKIE=PHPSESSID='.$sid);
+
+        $loaded = <<<'PHP'
+<?php
+session_start();
+echo 'isset=', isset($_SESSION['n']) ? '1' : '0', "\n";
+echo 'cast=', (string)$_SESSION['n'], "\n";
+echo 'truth=', $_SESSION['t'] ? '1' : '0', "\n";
+echo 'bstr=', (string)$_SESSION['t'], "\n";
+PHP;
+        $loadedOut = $this->stripCgiTrailer($this->runAot($loaded));
+        $this->assertSame("isset=1\ncast=3\ntruth=1\nbstr=1\n", $loadedOut);
+    }
+
+    /** Drop CGI Set-Cookie trailer noise from session shutdown (#21948 asserts). */
+    private function stripCgiTrailer(string $output): string
+    {
+        $cut = strpos($output, 'Set-Cookie:');
+        if (false !== $cut) {
+            $output = substr($output, 0, $cut);
+        }
+
+        return $output;
+    }
+
     private function extractSessionId(string $output): string
     {
         $lines = preg_split('/\r?\n/', trim($output)) ?: [];
@@ -114,6 +171,12 @@ PHP;
         $cookie = getenv('HTTP_COOKIE');
         if (is_string($cookie) && '' !== $cookie) {
             $env['HTTP_COOKIE'] = $cookie;
+        }
+        foreach (['GATEWAY_INTERFACE', 'REQUEST_METHOD'] as $cgiKey) {
+            $cgiVal = getenv($cgiKey);
+            if (is_string($cgiVal) && '' !== $cgiVal) {
+                $env[$cgiKey] = $cgiVal;
+            }
         }
 
         $descriptorSpec = [
