@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6237 |
-| Phase A inventory files (M2 ratio SSOT) | 6237 |
+| PHP files on vm.php path | 6248 |
+| Phase A inventory files (M2 ratio SSOT) | 6248 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19703 |
+| Source constructs flagged (warnings) | 19728 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1547,6 +1547,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/posix_times.php` | 0 | 2 |
 | `ext/posix/posix_ttyname.php` | 0 | 2 |
 | `ext/posix/posix_uname.php` | 0 | 4 |
+| `ext/pspell/BuiltinClasses.php` | 0 | 1 |
+| `ext/pspell/Module.php` | 0 | 5 |
+| `ext/pspell/PspellConstants.php` | 0 | 1 |
+| `ext/pspell/PspellExtensionPolicy.php` | 0 | 1 |
+| `ext/pspell/VmPspellArg.php` | 0 | 1 |
+| `ext/pspell/VmPspellCore.php` | 0 | 3 |
+| `ext/pspell/VmPspellDictionary.php` | 0 | 4 |
+| `ext/pspell/VmPspellNative.php` | 0 | 1 |
+| `ext/pspell/pspell_check.php` | 0 | 2 |
+| `ext/pspell/pspell_new.php` | 0 | 3 |
+| `ext/pspell/pspell_suggest.php` | 0 | 2 |
 | `ext/random/AdditionalEnginesBuiltin.php` | 0 | 25 |
 | `ext/random/BuiltinClasses.php` | 0 | 4 |
 | `ext/random/BuiltinEnums.php` | 0 | 3 |
@@ -5528,7 +5539,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 108 |
+| `lib/Runtime.php` | 0 | 109 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -18494,6 +18505,74 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 52)
 - 2 class method(s)
 
+### `ext/pspell/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/pspell/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 31)
+- new pspell_new (line 44)
+- new pspell_check (line 45)
+- new pspell_suggest (line 46)
+- 3 class method(s)
+
+### `ext/pspell/PspellConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/pspell/PspellExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/pspell/VmPspellArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/pspell/VmPspellCore.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 68)
+- new Variable (line 70)
+- 4 class method(s)
+
+### `ext/pspell/VmPspellDictionary.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 29)
+- new ObjectEntry (line 37)
+- new Variable (line 43)
+- 5 class method(s)
+
+### `ext/pspell/VmPspellNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
+
+### `ext/pspell/pspell_check.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/pspell/pspell_new.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 38)
+- 2 class method(s)
+
+### `ext/pspell/pspell_suggest.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
 ### `ext/random/AdditionalEnginesBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -25241,8 +25320,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new VMVariable (line 153)
-- new JITVariable (line 231)
+- new VMVariable (line 151)
+- new JITVariable (line 229)
 - 5 class method(s)
 
 ### `ext/standard/JitStat.php`
@@ -45660,28 +45739,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\dba\Module (line 280)
 - new ext\mailparse\Module (line 281)
 - new ext\enchant\Module (line 282)
-- new ext\tidy\Module (line 283)
-- new ext\pdo\Module (line 284)
-- new ext\phar\Module (line 285)
-- new ext\uri\Module (line 286)
-- new ext\uuid\Module (line 287)
-- new ext\uploadprogress\Module (line 288)
-- new ext\apcu\Module (line 289)
-- new ext\sysvshm\Module (line 290)
-- new ext\sysvsem\Module (line 291)
-- new ext\sysvmsg\Module (line 292)
-- new ext\reflection\Module (line 293)
-- new ext\standard\Module (line 294)
-- new JIT (line 370)
-- new JITContext (line 384)
-- new SealedClassPreprocessor (line 450)
-- new StaticClassPreprocessor (line 453)
-- new SourcePreprocessor\PropertyHooks (line 456)
-- new State (line 597)
-- new ReflectionProperty (line 624)
-- new ReflectionProperty (line 627)
-- new LintCompiler (line 1038)
-- new Variable (line 1168)
+- new ext\pspell\Module (line 283)
+- new ext\tidy\Module (line 284)
+- new ext\pdo\Module (line 285)
+- new ext\phar\Module (line 286)
+- new ext\uri\Module (line 287)
+- new ext\uuid\Module (line 288)
+- new ext\uploadprogress\Module (line 289)
+- new ext\apcu\Module (line 290)
+- new ext\sysvshm\Module (line 291)
+- new ext\sysvsem\Module (line 292)
+- new ext\sysvmsg\Module (line 293)
+- new ext\reflection\Module (line 294)
+- new ext\standard\Module (line 295)
+- new JIT (line 371)
+- new JITContext (line 385)
+- new SealedClassPreprocessor (line 451)
+- new StaticClassPreprocessor (line 454)
+- new SourcePreprocessor\PropertyHooks (line 457)
+- new State (line 598)
+- new ReflectionProperty (line 625)
+- new ReflectionProperty (line 628)
+- new LintCompiler (line 1039)
+- new Variable (line 1169)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
