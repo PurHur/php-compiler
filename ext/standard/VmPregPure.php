@@ -390,6 +390,10 @@ final class VmPregPure
                     if (false === $replaced || null === $replaced) {
                         return $replaced;
                     }
+                    // Skip when limit left count at 0 (php-src filter; #21655).
+                    if (0 === $itemCount) {
+                        continue;
+                    }
                     $totalCount += $itemCount;
                     $out[$key] = $replaced;
                 }
@@ -409,7 +413,18 @@ final class VmPregPure
             return null;
         }
 
-        $result = self::pregReplaceString($pattern, $replacement, $subject, $limit, $count);
+        $localCount = 0;
+        $result = self::pregReplaceString($pattern, $replacement, $subject, $limit, $localCount);
+        if (null !== $count) {
+            $count = $localCount;
+        }
+        if (false === $result || null === $result) {
+            return $result;
+        }
+        // php-src php_pcre.c: string subject with 0 replacements → null (limit 0; #21655).
+        if (0 === $localCount) {
+            return null;
+        }
 
         return $result;
     }

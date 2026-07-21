@@ -35,7 +35,8 @@ final class preg_split extends Internal
         $limit = -1;
         $flags = 0;
         if ($argc >= 3) {
-            $limit = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'preg_split', 3, 'limit');
+            // Z_PARAM_LONG $limit — soft-null DEP+coerce on 8.4 (php_pcre.c; #21655).
+            $limit = VmMath::parseChrCodepointForFrame($frame, 2, 'preg_split', 3, 'limit');
         }
         if (4 === $argc) {
             $flags = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_split', 4, 'flags');
@@ -96,7 +97,8 @@ final class preg_split extends Internal
         $limit = $context->getTypeFromString('int64')->constInt(-1, true);
         $flags = $context->getTypeFromString('int64')->constInt(0, false);
         if ($argc >= 3) {
-            $limit = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'preg_split', 3, 'limit');
+            // Soft-null DEP+coerce on 8.4 (php_pcre.c Z_PARAM_LONG; #21655).
+            $limit = JitChr::lowerZParamLongArg($context, $args[2], 'preg_split', 3, 'limit');
         }
         if (4 === $argc) {
             $flags = JitIntdiv::lowerIntBuiltinArg($context, $args[3], 'preg_split', 4, 'flags');

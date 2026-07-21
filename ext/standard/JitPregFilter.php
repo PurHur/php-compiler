@@ -79,6 +79,12 @@ final class JitPregFilter
         $context->builder->branchIf($matched, $replaceBlock, $nomatchBlock);
 
         $context->builder->positionAtEnd($replaceBlock);
+        // php-src: limit 0 → no replacements → null for string subject (#21655).
+        $zeroLimit = $context->builder->icmp(Builder::INT_EQ, $limit, $i64->constInt(0, false));
+        $doReplaceBlock = BasicBlockHelper::append($context, 'preg_filter_str_do_replace_'.$id);
+        $context->builder->branchIf($zeroLimit, $nomatchBlock, $doReplaceBlock);
+
+        $context->builder->positionAtEnd($doReplaceBlock);
         $replaced = $context->builder->call(
             $context->lookupFunction('__compiler_preg_replace'),
             $pattern,
@@ -226,6 +232,12 @@ final class JitPregFilter
         $context->builder->branchIf($matched, $replaceBlock, $skipNoMatch);
 
         $context->builder->positionAtEnd($replaceBlock);
+        // php-src: limit 0 → skip entry (no replacements; #21655).
+        $zeroLimit = $context->builder->icmp(Builder::INT_EQ, $limit, $i64->constInt(0, false));
+        $doReplaceBlock = BasicBlockHelper::append($context, 'preg_filter_do_replace_'.$id);
+        $context->builder->branchIf($zeroLimit, $skipNoMatch, $doReplaceBlock);
+
+        $context->builder->positionAtEnd($doReplaceBlock);
         $replaced = $context->builder->call(
             $context->lookupFunction('__compiler_preg_replace'),
             $pattern,
