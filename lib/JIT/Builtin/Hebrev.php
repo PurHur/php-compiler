@@ -4,14 +4,27 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
-/** JIT/AOT link hook for hebrev() — compiles HebrevJitHelper into the module (#3450). */
+/**
+ * JIT/AOT link hook for hebrev() — compiles HebrevJitHelper into the module (#3450, #21828).
+ *
+ * Nested helper compile: {@see JitVmHelperLink::ensureCompiled} (HelperRuntimeCache + user-script
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringSubstrCompare #21816.
+ * php-src: ext/standard/string.c — PHP_FUNCTION(hebrev).
+ */
 final class Hebrev
 {
+    private const HELPER_PATH = '/ext/standard/HebrevJitHelper.php';
+
     private const HELPER_LOGICAL = 'PHPCompiler\\ext\\standard\\HebrevJitHelper::convert';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::HELPER_LOGICAL,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -23,37 +36,15 @@ final class Hebrev
         // Helper LLVM is compiled on first hebrev lowering (#3450).
     }
 
-    public static function helperFunction(Context $context): \PHPLLVM\Value\Function_
+    public static function helperFunction(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = strtolower(self::HELPER_LOGICAL);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException('HebrevJitHelper::convert missing after compile (#3450)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#21828');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = strtolower(self::HELPER_LOGICAL);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = dirname(__DIR__, 3).'/ext/standard/HebrevJitHelper.php';
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) file_get_contents($path), 'HebrevJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('HebrevJitHelper.php parseAndCompile failed (#3450)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException('HebrevJitHelper::convert was not compiled for JIT (#3450)');
-        }
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#21828');
     }
 }
