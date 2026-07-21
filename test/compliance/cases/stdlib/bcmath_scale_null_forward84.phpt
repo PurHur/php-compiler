@@ -4,40 +4,49 @@ stdlib bcmath optional $scale null soft-null on 8.4 (#21814, ext/bcmath/bcmath.s
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-error_reporting(E_ALL);
-$seen = [];
-set_error_handler(static function (int $no, string $str) use (&$seen): bool {
-    if (E_DEPRECATED === $no) {
-        $seen[] = $str;
+$dep = 0;
+set_error_handler(static function (int $no, string $msg) use (&$dep): bool {
+    if (E_DEPRECATED === $no && str_contains($msg, 'Passing null')) {
+        ++$dep;
+
+        return true;
     }
-    return true;
+
+    return false;
 });
-$ops = [
+$checks = [
+    'bcdiv' => static fn () => bcdiv('1', '3', null),
     'bcadd' => static fn () => bcadd('1', '2', null),
     'bcsub' => static fn () => bcsub('5', '2', null),
     'bcmul' => static fn () => bcmul('2', '3', null),
-    'bcdiv' => static fn () => bcdiv('1', '3', null),
     'bcmod' => static fn () => bcmod('10', '3', null),
     'bcpow' => static fn () => bcpow('2', '3', null),
     'bcsqrt' => static fn () => bcsqrt('2', null),
     'bccomp' => static fn () => bccomp('1', '2', null),
 ];
-foreach ($ops as $name => $fn) {
-    $seen = [];
-    echo $name, '=', $fn(), ' depr=', count($seen), "\n";
+foreach ($checks as $name => $fn) {
+    $dep = 0;
+    $r = $fn();
+    echo $name, '=', $r, ' dep=', $dep, "\n";
 }
-$seen = [];
-$pair = bcdivmod('10', '3', null);
-echo 'bcdivmod=', $pair[0], ',', $pair[1], ' depr=', count($seen), "\n";
-restore_error_handler();
+$dep = 0;
+[$q, $r] = bcdivmod('10', '3', null);
+echo "bcdivmod=$q,$r dep=$dep\n";
+try {
+    bcdiv('1', '1', 'x');
+    echo "bad_type uncaught\n";
+} catch (TypeError $e) {
+    echo "bad_type TypeError\n";
+}
 ?>
 --EXPECT--
-bcadd=3 depr=1
-bcsub=3 depr=1
-bcmul=6 depr=1
-bcdiv=0 depr=1
-bcmod=1 depr=1
-bcpow=8 depr=1
-bcsqrt=1 depr=1
-bccomp=-1 depr=1
-bcdivmod=3,1 depr=1
+bcdiv=0 dep=1
+bcadd=3 dep=1
+bcsub=3 dep=1
+bcmul=6 dep=1
+bcmod=1 dep=1
+bcpow=8 dep=1
+bcsqrt=1 dep=1
+bccomp=-1 dep=1
+bcdivmod=3,1 dep=1
+bad_type TypeError

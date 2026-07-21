@@ -209,17 +209,12 @@ final class VmBcMathNumber
         return VmString::coerceStringBuiltinArg($var, $method, $argNum, $paramName);
     }
 
-    public static function optionalScaleArg(
-        Variable $var,
-        string $method,
-        int $argNum,
-        ?Frame $frame = null,
-        string $paramName = 'scale'
-    ): ?int {
+    public static function optionalScaleArg(Variable $var, string $method, int $argNum, ?Frame $frame = null): ?int
+    {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
-                VmNullNumberParamDeprecation::emit($frame, $method, $argNum, $paramName, '?int');
+            if (null !== $frame && version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+                VmNullNumberParamDeprecation::emit($frame, $method, $argNum, 'scale', '?int');
             }
 
             return null;
