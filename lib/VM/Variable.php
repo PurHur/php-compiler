@@ -2323,9 +2323,16 @@ restart:
             case OpCode::TYPE_BITWISE_XOR:
                 return $left ^ $right;
             case OpCode::TYPE_SHIFT_LEFT:
-                return (int) $left << (int) $right;
             case OpCode::TYPE_SHIFT_RIGHT:
-                return (int) $left >> (int) $right;
+                // Zend shift_left/right_function — catchable ArithmeticError (#21912).
+                $shiftCount = (int) $right;
+                if ($shiftCount < 0) {
+                    throw new \ArithmeticError('Bit shift by negative number');
+                }
+
+                return OpCode::TYPE_SHIFT_LEFT === $opCode
+                    ? (int) $left << $shiftCount
+                    : (int) $left >> $shiftCount;
             default:
                 throw new \LogicException("Non-implemented bitwise operation $opCode");
         }
