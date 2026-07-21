@@ -33,7 +33,9 @@ final class BuiltinClasses
             && isset($ctx->classes[VmPhar::CLASS_LC]->methods['mapphar'])
             && isset($ctx->classes[VmPhar::CLASS_LC]->methods['webphar'])
             && isset($ctx->classes[VmPhar::CLASS_LC]->methods['mount'])
-            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['mungserver'])) {
+            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['mungserver'])
+            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['getsupportedcompression'])
+            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['getsupportedsignatures'])) {
             return;
         }
 
@@ -52,6 +54,14 @@ final class BuiltinClasses
         $entry->methods['cancompress'] = new PharCanCompress();
         $entry->methodVisibility['cancompress'] = $pubStatic;
         $entry->methodNames['cancompress'] = 'canCompress';
+
+        $entry->methods['getsupportedcompression'] = new PharGetSupportedCompression();
+        $entry->methodVisibility['getsupportedcompression'] = $pubStatic;
+        $entry->methodNames['getsupportedcompression'] = 'getSupportedCompression';
+
+        $entry->methods['getsupportedsignatures'] = new PharGetSupportedSignatures();
+        $entry->methodVisibility['getsupportedsignatures'] = $pubStatic;
+        $entry->methodNames['getsupportedsignatures'] = 'getSupportedSignatures';
 
         $entry->methods['apiversion'] = new PharApiVersion();
         $entry->methodVisibility['apiversion'] = $pubStatic;
@@ -159,6 +169,44 @@ final class PharCanCompress extends VmClassMethod
             $result = VmPhar::canCompress($method);
             BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
                 $ret->bool($result);
+            });
+        });
+    }
+}
+
+/** Phar::getSupportedCompression() — php-src zim_Phar_getSupportedCompression (#21650). */
+final class PharGetSupportedCompression extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSupportedCompression');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        BuiltinExecute::run($frame, static function (Frame $frame): void {
+            $list = VmPhar::getSupportedCompression();
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($list): void {
+                $ret->array(VmPharArchive::mapToHashTable($list));
+            });
+        });
+    }
+}
+
+/** Phar::getSupportedSignatures() — php-src zim_Phar_getSupportedSignatures (#21650). */
+final class PharGetSupportedSignatures extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSupportedSignatures');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        BuiltinExecute::run($frame, static function (Frame $frame): void {
+            $list = VmPhar::getSupportedSignatures();
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($list): void {
+                $ret->array(VmPharArchive::mapToHashTable($list));
             });
         });
     }
