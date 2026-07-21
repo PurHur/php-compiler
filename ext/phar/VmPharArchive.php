@@ -699,7 +699,7 @@ final class VmPharArchive
     }
 
     /**
-     * php-src zim_Phar_convertToData — emit PharData tar/zip archive (#21328, #21675).
+     * php-src zim_Phar_convertToData — emit PharData tar/zip archive (#21328, #21675, #21677).
      */
     public static function convertToData(ObjectEntry $object, Context $ctx, ?int $format = null, ?int $compression = null, ?string $extension = null): ObjectEntry
     {
@@ -710,17 +710,33 @@ final class VmPharArchive
         if (VmPhar::FORMAT_TAR !== $fmt && VmPhar::FORMAT_ZIP !== $fmt) {
             throw new \BadMethodCallException('Only tar/zip format is supported for Phar::convertToData() in this build');
         }
-        if (null !== $compression && VmPhar::COMPRESSED_NONE !== $compression && 0 !== $compression) {
-            throw new \BadMethodCallException('Only uncompressed archives are supported for Phar::convertToData() in this build');
+        $comp = null === $compression || 0 === $compression ? VmPhar::COMPRESSED_NONE : $compression;
+        if (VmPhar::COMPRESSED_NONE !== $comp && VmPhar::COMPRESSED_GZ !== $comp) {
+            throw new \BadMethodCallException('Only NONE/GZ compression is supported for Phar::convertToData() in this build');
+        }
+        if (VmPhar::FORMAT_ZIP === $fmt && VmPhar::COMPRESSED_NONE !== $comp) {
+            throw new \BadMethodCallException('ZIP convertToData does not support whole-archive compression in this build');
+        }
+        if (VmPhar::COMPRESSED_GZ === $comp && !VmPhar::canCompress(VmPhar::COMPRESSED_GZ)) {
+            throw new \BadMethodCallException('zlib extension is required for gzip compression');
         }
         $path = $st['path'];
         $base = \preg_replace('/\.phar(\.(gz|bz2))?$/i', '', $path) ?? $path;
         if (VmPhar::FORMAT_ZIP === $fmt) {
             return self::convertToDataZip($ctx, $base, $st['files'], $st['dirs'], $extension);
         }
-        $ext = null !== $extension && '' !== $extension ? \ltrim($extension, '.') : 'tar';
+        $ext = null !== $extension && '' !== $extension
+            ? \ltrim($extension, '.')
+            : (VmPhar::COMPRESSED_GZ === $comp ? 'tar.gz' : 'tar');
         $outPath = $base.'.'.$ext;
         $binary = VmPharTar::writeArchive($st['files'], $st['dirs']);
+        if (VmPhar::COMPRESSED_GZ === $comp) {
+            $encoded = VmZlib::gzencode($binary);
+            if (false === $encoded) {
+                throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
+            }
+            $binary = $encoded;
+        }
         if (false === VmFs::filePutContents($outPath, $binary)) {
             throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
         }
@@ -729,7 +745,7 @@ final class VmPharArchive
         }
         $out = new ObjectEntry($ctx->classes[VmPharData::CLASS_LC]);
         $out->constructed = true;
-        VmPharData::bind($out, $outPath, $st['files'], false, $st['dirs']);
+        VmPharData::bind($out, $outPath, $st['files'], false, $st['dirs'], 0, '', null, VmPhar::FORMAT_TAR);
 
         return $out;
     }

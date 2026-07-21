@@ -1502,6 +1502,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phar_data_zip_open')) {
                 continue;
             }
+            // Phar::convertToData(TAR, GZ): VM green (#21677); same Phar ctor MCJIT harness skip.
+            if (str_contains($name, 'phar_convert_to_data_tar_gz')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }
