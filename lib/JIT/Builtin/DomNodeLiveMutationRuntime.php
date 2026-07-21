@@ -350,6 +350,20 @@ final class DomNodeLiveMutationRuntime
             $lastJit,
             Variable::TYPE_VALUE
         );
+
+        // #21687: parentNode on DOMElement layout (elements are allocated as DOMElement).
+        $elementClassId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, Variable::TYPE_VALUE);
+        }
+        $parentJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $receiverObj);
+        foreach ([$firstChildObj, $lastChildObj] as $childObj) {
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($childObj, 'DOMElement', VmDom::PROP_PARENT_NODE),
+                $parentJit,
+                Variable::TYPE_VALUE
+            );
+        }
     }
 
     /**

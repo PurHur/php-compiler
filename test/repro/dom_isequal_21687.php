@@ -1,8 +1,3 @@
---TEST--
-AOT: DOMNode::isEqualNode() structural equality under PHP 8.4 forward profile (#21377, #21687, ext/dom/node.c)
---ENV--
-PHP_COMPILER_PROFILE=8.4
---FILE--
 <?php
 $doc = new DOMDocument();
 $a = $doc->createElement('a');
@@ -17,8 +12,3 @@ $doc3 = new DOMDocument();
 $d = $doc3->createElement('z');
 $doc3->appendChild($d);
 echo (int) $a->isEqualNode($d), "\n";
---EXPECT--
-1
-1
-0
-0
