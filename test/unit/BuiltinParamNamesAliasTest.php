@@ -710,8 +710,8 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testTokenGetAllFlagsNamedParamResolves(): void
     {
         $names = BuiltinParamNames::forFunction('token_get_all');
-        self::assertSame(['source', 'flags'], $names);
-        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'source', 'token_get_all'));
+        self::assertSame(['code', 'flags'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'code', 'token_get_all'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'token_get_all'));
     }
 
