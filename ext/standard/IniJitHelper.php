@@ -183,6 +183,18 @@ final class IniJitHelper
         return self::$serializePrecision;
     }
 
+    /** php-src PG(precision) — int for NestedJIT float→string (#21963). */
+    public static function getPrecisionInt(): int
+    {
+        return self::$precision;
+    }
+
+    /** Sync from VM ini_set path ({@see VmIni}); keeps JIT helpers aligned (#21963). */
+    public static function syncPrecision(int $precision): void
+    {
+        self::$precision = $precision;
+    }
+
     public static function getUnserializeMaxDepthInt(): int
     {
         return self::$unserializeMaxDepth;
@@ -583,6 +595,7 @@ final class IniJitHelper
     {
         $old = self::precisionAsIniString();
         self::$precision = VmIni::parsePrecision($newValue);
+        VmIni::syncPrecision(self::$precision);
 
         return $old;
     }

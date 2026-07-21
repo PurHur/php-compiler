@@ -71,7 +71,10 @@ final class strval extends Internal
                     $context->helper->loadValue($args[0])
                 );
             case JITVariable::TYPE_NATIVE_DOUBLE:
-                return $this->formatToString($context, $context->helper->loadValue($args[0]), '%.14g');
+                return \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::format(
+                    $context,
+                    $context->helper->loadValue($args[0])
+                );
             case JITVariable::TYPE_VALUE:
                 return $this->valueToString($context, $args[0]->value);
             default:
@@ -154,10 +157,9 @@ final class strval extends Internal
         );
 
         $context->builder->positionAtEnd($doubleBlock);
-        $doubleStr = $this->formatToString(
+        $doubleStr = \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::format(
             $context,
-            $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr),
-            '%.14g'
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr)
         );
         $doubleEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

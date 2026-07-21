@@ -369,6 +369,12 @@ final class VmIni
         return self::$precision;
     }
 
+    /** Sync from JIT ini_set path ({@see IniJitHelper}); keeps cast/echo NestedJIT aligned (#21963). */
+    public static function syncPrecision(int $precision): void
+    {
+        self::$precision = $precision;
+    }
+
     /** php-src PG(serialize_precision) default -1 (zend_dtoa mode 0; issue #7100). */
     public static function getSerializePrecision(): string
     {
@@ -561,6 +567,7 @@ final class VmIni
     private static function setPrecision(string $newValue) {
         $old = (string) self::$precision;
         self::$precision = self::parsePrecision($newValue);
+        IniJitHelper::syncPrecision(self::$precision);
 
         return $old;
     }
