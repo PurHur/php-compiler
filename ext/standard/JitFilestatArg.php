@@ -30,7 +30,7 @@ final class JitFilestatArg
         return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName, 'string', null, $softNullPath);
     }
 
-    /** basename/dirname/pathinfo — soft-null on forward profile (#19997 / #20362). */
+    /** basename/dirname/pathinfo — TypeError on null under PROFILE≥8.4 (#20099). */
     public static function lowerPathComponentFilename(
         Context $context,
         JITVariable $arg,
@@ -38,7 +38,7 @@ final class JitFilestatArg
         int $argIndex = 0,
         string $paramName = 'path'
     ): Value {
-        return self::lowerFilename($context, $arg, $function, $argIndex, $paramName, true);
+        return self::lowerFilename($context, $arg, $function, $argIndex, $paramName, false);
     }
 
     /** touch() $filename — typed string; reject null (#18245, ext/standard/file.c). */
