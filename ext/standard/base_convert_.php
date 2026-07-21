@@ -15,10 +15,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\MathBaseConvert;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitIntdiv;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -38,21 +38,17 @@ final class base_convert_ extends Internal
         if (3 !== \count($frame->calledArgs)) {
             throw new \LogicException('base_convert() requires exactly three arguments in this compiler build');
         }
-        $numVar = $frame->calledArgs[0]->resolveIndirect();
-        $fromVar = $frame->calledArgs[1]->resolveIndirect();
-        $toVar = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        $numStr = VmString::trimFamilyStringArgForFrame($frame, 0, 'base_convert', 0, 'num');
-        if (Variable::TYPE_INTEGER !== $fromVar->type || Variable::TYPE_INTEGER !== $toVar->type) {
-            throw new \LogicException('base_convert() base arguments must be integers in this compiler build');
-        }
+        $numStr = VmString::trimFamilyStringArgForFrame($frame, 0, 'base_convert', 1, 'num');
+        $fromBase = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'base_convert', 2, 'from_base');
+        $toBase = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'base_convert', 3, 'to_base');
 
         $frame->returnVar->string(VmMath::baseConvert(
             $numStr,
-            $fromVar->toInt(),
-            $toVar->toInt()
+            $fromBase,
+            $toBase
         ));
     }
 
@@ -78,8 +74,12 @@ final class base_convert_ extends Internal
         }
         MathBaseConvert::ensureLinked($context);
         $ptr = $this->stringDataPtr($context, $num);
-        $fromBase = $this->jitLong($context, $args[1], 'base_convert() argument #2');
-        $toBase = $this->jitLong($context, $args[2], 'base_convert() argument #3');
+        $fromBase = $context->callerStrictTypes
+            ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'base_convert', 2, 'from_base')
+            : JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'base_convert', 2, 'from_base');
+        $toBase = $context->callerStrictTypes
+            ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'base_convert', 3, 'to_base')
+            : JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'base_convert', 3, 'to_base');
         $fn = $context->lookupFunction('phpc_base_convert');
 
         return $context->builder->call($fn, $ptr, $fromBase, $toBase);
