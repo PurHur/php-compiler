@@ -145,13 +145,18 @@ final class VmMysqli
             throw new \LogicException('mysqli class not registered');
         }
         $entry = new ObjectEntry($class);
+        self::initializeObject($ctx, $entry, $native);
+
+        return $entry;
+    }
+
+    public static function initializeObject(Context $ctx, ObjectEntry $entry, ?\mysqli $native = null): void
+    {
         $state = new MysqliState();
         $state->native = $native;
         $state->ctx = $ctx;
         self::$store[$entry->id] = $state;
         $entry->constructed = true;
-
-        return $entry;
     }
 
     public static function setConnectError(int $errno, string $error): void
@@ -326,7 +331,13 @@ final class MysqliConstruct extends MysqliClassMethod
         if ($receiver->constructed) {
             throw new \LogicException('mysqli object already initialized');
         }
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli requires VM context');
         $argc = \count($frame->calledArgs) - 1;
+        if (0 === $argc) {
+            VmMysqli::initializeObject($ctx, $receiver);
+
+            return;
+        }
         $hostname = $argc >= 1 ? $this->stringArgNullable($frame->calledArgs[1]) : null;
         $username = $argc >= 2 ? $this->stringArgNullable($frame->calledArgs[2]) : null;
         $password = $argc >= 3 ? $this->stringArgNullable($frame->calledArgs[3]) : null;
@@ -350,11 +361,7 @@ final class MysqliConstruct extends MysqliClassMethod
             throw new \mysqli_sql_exception($native->connect_error ?? 'Connection error', $native->connect_errno);
         }
 
-        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli requires VM context');
-        $state = new MysqliState();
-        $state->native = $native;
-        $state->ctx = $ctx;
-        VmMysqli::state($receiver); // will throw — not yet stored
+        VmMysqli::initializeObject($ctx, $receiver, $native);
     }
 
     private function stringArgNullable(Variable $var): ?string
