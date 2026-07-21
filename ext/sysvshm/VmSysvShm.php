@@ -137,6 +137,21 @@ final class VmSysvShm
         return @\shm_has_var($host, $key);
     }
 
+    /**
+     * shm_remove() — destroy SysV shared memory segment (IPC_RMID; #21635).
+     *
+     * php-src leaves the SysvSharedMemory object usable for detach after remove;
+     * do not clear the host map here.
+     */
+    public static function remove(object $host): bool
+    {
+        if (!self::available() || !\function_exists('shm_remove')) {
+            return false;
+        }
+
+        return @\shm_remove($host);
+    }
+
     public static function detach(object $host, ?ObjectEntry $object = null): bool
     {
         if (!self::available()) {

@@ -3986,6 +3986,7 @@ require_once __DIR__.'/../../../ext/sysvshm/shm_detach.php';
 require_once __DIR__.'/../../../ext/sysvshm/shm_get_var.php';
 require_once __DIR__.'/../../../ext/sysvshm/shm_has_var.php';
 require_once __DIR__.'/../../../ext/sysvshm/shm_put_var.php';
+require_once __DIR__.'/../../../ext/sysvshm/shm_remove.php';
 require_once __DIR__.'/../../../ext/sysvshm/shm_remove_var.php';
 require_once __DIR__.'/../../../ext/sysvshm/shmop_close.php';
 require_once __DIR__.'/../../../ext/sysvshm/shmop_delete.php';
