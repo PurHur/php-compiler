@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\simplexml\SimpleXmlJsonExport;
 use PHPCompiler\ext\spl\SplArrayStorage;
 
 /**
@@ -53,6 +54,10 @@ final class CastSupport
                 $result->array($splCast);
 
                 return $result;
+            }
+            // SimpleXMLElement: @attributes + children (php-src sxe_object_cast_ex; #21666).
+            if (SimpleXmlJsonExport::handles($obj)) {
+                return SimpleXmlJsonExport::exportZendArrayCast($obj);
             }
             $result->newArray();
             self::objectToArray($obj, $result->toArray(), $classesByLc ?? []);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\simplexml\SimpleXmlJsonExport;
 use PHPCompiler\Block;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
@@ -2171,11 +2172,16 @@ final class VmReflection
                 EnumCaseSupport::typeNameForVariable($object)
             ));
         }
+        // SimpleXMLElement: same property map as (array) cast (php-src sxe.c; #21666).
+        $obj = $object->toObject();
+        if (SimpleXmlJsonExport::handles($obj)) {
+            return SimpleXmlJsonExport::exportZendArrayCast($obj);
+        }
         $ctx = self::requireContext($frame);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach ($ctx->runtime->vm()->collectObjectVarsForBuiltin($object->toObject(), $frame) as $name => $value) {
+        foreach ($ctx->runtime->vm()->collectObjectVarsForBuiltin($obj, $frame) as $name => $value) {
             self::addObjectPropertyEntry($ht, $name, $value);
         }
 
@@ -2238,11 +2244,16 @@ final class VmReflection
                 EnumCaseSupport::typeNameForVariable($object)
             ));
         }
+        // SimpleXMLElement: same public property map (no mangling; php-src sxe.c; #21666).
+        $obj = $object->toObject();
+        if (SimpleXmlJsonExport::handles($obj)) {
+            return SimpleXmlJsonExport::exportZendArrayCast($obj);
+        }
         $ctx = self::requireContext($frame);
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach ($ctx->runtime->vm()->collectMangledObjectVarsForBuiltin($object->toObject(), $frame) as $name => $value) {
+        foreach ($ctx->runtime->vm()->collectMangledObjectVarsForBuiltin($obj, $frame) as $name => $value) {
             $ht->add($name, $value);
         }
 
