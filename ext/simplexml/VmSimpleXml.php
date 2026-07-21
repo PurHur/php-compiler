@@ -1192,7 +1192,20 @@ final class VmSimpleXml
         return SimpleXmlRegistry::state($entry);
     }
 
-    private static function wrapNode(Context $ctx, ClassEntry $class, SimpleXmlNodeState $node, ?int $documentKey = null): ObjectEntry
+    /**
+     * Materialize a live SimpleXMLElement for (array)/get_object_vars nested values (#21666).
+     *
+     * Context is unused (registry attach only); kept private wrapNode signature for call sites.
+     */
+    public static function wrapNodeForExport(
+        ClassEntry $class,
+        SimpleXmlNodeState $node,
+        ?int $documentKey = null
+    ): ObjectEntry {
+        return self::wrapNode(null, $class, $node, $documentKey);
+    }
+
+    private static function wrapNode(?Context $ctx, ClassEntry $class, SimpleXmlNodeState $node, ?int $documentKey = null): ObjectEntry
     {
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
