@@ -35,15 +35,18 @@ final class http_build_query extends Internal
             throw new \LogicException('http_build_query() accepts at most four arguments in this compiler build');
         }
 
-        VmArray::requireArrayParam($frame->calledArgs[0], 'http_build_query', 1, 'data');
+        // php-src Z_PARAM_ARRAY_OR_OBJECT — TypeError text still says "array" on 8.2 (#21950).
         $data = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $data->type && Variable::TYPE_OBJECT !== $data->type) {
+            VmArray::requireArrayParam($frame->calledArgs[0], 'http_build_query', 1, 'data');
+        }
 
         $prefix = self::resolveOptionalStringArg($frame->calledArgs, 1, 'numeric_prefix', '');
         [$separator, $encoding, $legacyEncoding] = self::resolveSeparatorAndEncoding($frame->calledArgs);
 
         $exported = VmHttpBuildQuery::export($data, $frame);
         if (!\is_array($exported)) {
-            throw new \LogicException('http_build_query() argument #1 must be an array in this compiler build');
+            throw new \LogicException('http_build_query() argument #1 must be array|object in this compiler build');
         }
         $frame->returnVar->string(
             VmHttpBuildQuery::build($exported, $prefix, $separator, $encoding, $legacyEncoding)
@@ -137,9 +140,7 @@ final class http_build_query extends Internal
         }
 
         TypeErrorRaise::ensureLinked($context);
-        JitArrayElem::requireArrayParam($context, $args[0], 'http_build_query', 1, 'data');
-
-        $data = $args[0];
+        $data = JitHttpBuildQuery::normalizeDataArg($context, $args[0]);
         $prefix = $this->optionalStringArg($context, $args, 1, '');
         [$separator, $encoding] = $this->resolveSeparatorAndEncodingJit($context, $args);
 
