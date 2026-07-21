@@ -200,7 +200,14 @@ final class DatePeriodSupport
             return $cmp < 0;
         }
 
-        return $state->key < $recurrences;
+        // Stored count is userRecurrences+1 (includes start slot). When start is
+        // excluded, php-src still yields exactly userRecurrences dates (#21939).
+        $limit = $recurrences;
+        if (!self::requireBoolProperty($period, 'include_start_date')->toBool()) {
+            --$limit;
+        }
+
+        return $state->key < $limit;
     }
 
     public static function iteratorCurrent(ObjectEntry $period): ?ObjectEntry
@@ -289,14 +296,34 @@ final class DatePeriodSupport
      */
     public static function createFromISO8601String(Context $ctx, string $spec, int $options = 0): ObjectEntry
     {
-        $label = 'DatePeriod::createFromISO8601String()';
-        $parsed = self::parseISO8601PeriodSpec($spec, $label);
         $class = $ctx->classes[self::CLASS_DATEPERIOD] ?? null;
         if (null === $class) {
             throw new \LogicException('DatePeriod is not registered in this compiler build');
         }
 
         $period = new ObjectEntry($class);
+        self::initFromISO8601String(
+            $period,
+            $ctx,
+            $spec,
+            $options,
+            'DatePeriod::createFromISO8601String()'
+        );
+
+        return $period;
+    }
+
+    /**
+     * php-src date_period_init_iso8601_string into an existing DatePeriod (#21939 ctor / #7296 factory).
+     */
+    public static function initFromISO8601String(
+        ObjectEntry $period,
+        Context $ctx,
+        string $spec,
+        int $options = 0,
+        string $label = 'DatePeriod::__construct()'
+    ): void {
+        $parsed = self::parseISO8601PeriodSpec($spec, $label);
         $start = self::parsePeriodDateTimeImmutable($ctx, $parsed['start'], $label, $spec);
         $interval = self::parsePeriodInterval($ctx, $parsed['interval'], $label, $spec);
 
@@ -306,8 +333,6 @@ final class DatePeriodSupport
         } else {
             self::initFromRecurrenceCount($period, $start, $interval, $parsed['recurrences'], $options, $ctx);
         }
-
-        return $period;
     }
 
     /**
