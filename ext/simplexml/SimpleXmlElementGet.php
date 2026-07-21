@@ -8,7 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Variable;
 
-/** SimpleXMLElement::__get — child element access (#3338). */
+/**
+ * SimpleXMLElement::__get — child / attributes-view property access
+ * (#3338, #21667; php-src sxe_prop_dim_read).
+ */
 final class SimpleXmlElementGet extends VmClassMethod
 {
     public function __construct()
@@ -34,7 +37,11 @@ final class SimpleXmlElementGet extends VmClassMethod
         }
         $child = VmSimpleXml::childByName($frame->vmContext, $entry, $nameVar->toString());
         if (null !== $frame->returnVar) {
-            $frame->returnVar->object($child);
+            if (null === $child) {
+                $frame->returnVar->null();
+            } else {
+                $frame->returnVar->object($child);
+            }
         }
     }
 }

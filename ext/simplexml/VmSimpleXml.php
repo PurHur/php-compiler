@@ -196,9 +196,30 @@ final class VmSimpleXml
         return $entry;
     }
 
-    public static function childByName(Context $ctx, ObjectEntry $entry, string $name): ObjectEntry
+    /**
+     * $sxe->name property read (php-src sxe_prop_dim_read; #21667).
+     *
+     * On attributes() views, named properties resolve attributes (missing ⇒ null).
+     * On children()/element nodes, named properties are live child selections.
+     */
+    public static function childByName(Context $ctx, ObjectEntry $entry, string $name): ?ObjectEntry
     {
         $docKey = SimpleXmlRegistry::documentKey($entry);
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            $map = self::attributesMap($entry);
+            if (!\array_key_exists($name, $map)) {
+                // php-src: missing attribute property read yields null (not an empty SXE).
+                return null;
+            }
+
+            // Same shape as attributes() foreach (#19351): name + text value node.
+            return self::wrapNode(
+                $ctx,
+                $entry->class,
+                new SimpleXmlNodeState($name, [], [], $map[$name]),
+                $docKey
+            );
+        }
         // Property access is always a live named-sibling selection under the context
         // parent (php-src sxe.c; #20483) — never a frozen snapshot or bare single node.
         return self::wrapNamedChildView(
@@ -212,9 +233,14 @@ final class VmSimpleXml
 
     /**
      * isset($sxe->child) — true when a matching child element exists (#19707, sxe.c has_property).
+     * On attributes() views, true when the named attribute is present (#21667).
      */
     public static function childPropertyExists(ObjectEntry $entry, string $name): bool
     {
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            return \array_key_exists($name, self::attributesMap($entry));
+        }
+
         return [] !== self::matchingElements($entry, $name);
     }
 
@@ -223,9 +249,19 @@ final class VmSimpleXml
      *
      * php-src sxe has_property with ZEND_ISEMPTY checks the concatenated text of matching
      * children (not object truthiness — SimpleXMLElement objects are always truthy).
+     * On attributes() views, uses the attribute value the same way (#21667).
      */
     public static function childPropertyIsEmpty(ObjectEntry $entry, string $name): bool
     {
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            $map = self::attributesMap($entry);
+            if (!\array_key_exists($name, $map)) {
+                return true;
+            }
+            $text = $map[$name];
+
+            return '' === $text || '0' === $text;
+        }
         $elements = self::matchingElements($entry, $name);
         if ([] === $elements) {
             return true;
@@ -1176,9 +1212,9 @@ final class VmSimpleXml
             return $matches[0] ?? new SimpleXmlNodeState('');
         }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
-            $els = self::childrenViewElements($entry);
-
-            return $els[0] ?? new SimpleXmlNodeState('');
+            // Live children() views share the parent element — `$ch->name` selects among
+            // that parent's children (php-src sxe.c; #21667), not under the first child.
+            return SimpleXmlRegistry::state($entry);
         }
         if (SimpleXmlRegistry::isView($entry)) {
             $els = self::viewElements($entry);

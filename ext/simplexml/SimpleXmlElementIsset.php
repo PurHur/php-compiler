@@ -9,7 +9,8 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Variable;
 
 /**
- * SimpleXMLElement::__isset — child element presence (php-src sxe.c has_property; #19707).
+ * SimpleXMLElement::__isset — child / attributes-view presence
+ * (php-src sxe.c has_property; #19707, #21667).
  */
 final class SimpleXmlElementIsset extends VmClassMethod
 {
