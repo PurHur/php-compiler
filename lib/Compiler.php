@@ -27410,6 +27410,41 @@ class Compiler {
             return $leadingEmbedded + $ordinal;
         }
 
+        // MethodCall ChildNode: replaceWith($el, 'txt', $el2) — remap producer ordinal onto
+        // non-embedded dead-temp args only when an embedded literal is present (#21901).
+        // Scoped to ChildNode mutators so insertBefore($new, $list->item(1)) ordinal legacy is unchanged.
+        if (
+            (
+                $consumer instanceof Op\Expr\MethodCall
+                || $consumer instanceof Op\Expr\NullsafeMethodCall
+            )
+            && property_exists($consumer, 'args')
+            && is_array($consumer->args)
+        ) {
+            $consumerMethod = strtolower((string) ($this->staticNameFromOperand($consumer->name) ?? ''));
+            if (
+                \in_array($consumerMethod, ['replacewith', 'before', 'after', 'append', 'prepend'], true)
+            ) {
+                $nonEmbeddedDeadIndices = [];
+                $hasEmbeddedLiteral = false;
+                foreach ($consumer->args as $i => $callArg) {
+                    if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                        $hasEmbeddedLiteral = true;
+                        continue;
+                    }
+                    if (
+                        $callArg instanceof Operand
+                        && $this->callArgIsDeadInlineTemporary($callArg)
+                    ) {
+                        $nonEmbeddedDeadIndices[] = (int) $i;
+                    }
+                }
+                if ($hasEmbeddedLiteral && isset($nonEmbeddedDeadIndices[$ordinal])) {
+                    return $nonEmbeddedDeadIndices[$ordinal];
+                }
+            }
+        }
+
         return $ordinal;
     }
 
@@ -30211,6 +30246,119 @@ class Compiler {
     }
 
     /**
+     * Pair METHODCALL_INIT → EXEC_RETURN by callee name and embedded literal args (#21901).
+     *
+     * When php-cfg emits createElement('y') before createElement('x') (RTL), ordinal pairing
+     * by same-named MethodCall alone binds the wrong EXEC_RETURN. Matching the ARG_SEND
+     * literal(s) after INIT (Nth occurrence in CFG) disambiguates.
+     */
+    private function slotForMethodOrStaticCallInitFollowingExecReturnMatchingArgs(
+        Block $block,
+        Op\Expr $producer
+    ): ?string {
+        if (
+            !$producer instanceof Op\Expr\MethodCall
+            && !$producer instanceof Op\Expr\StaticCall
+        ) {
+            return null;
+        }
+        $methodName = $this->staticNameFromOperand($producer->name);
+        if (null === $methodName) {
+            return null;
+        }
+        $needle = strtolower($methodName);
+        $expectedArgLiterals = [];
+        if (property_exists($producer, 'args') && \is_array($producer->args)) {
+            foreach ($producer->args as $producerArg) {
+                if ($producerArg instanceof Operand\Literal) {
+                    $expectedArgLiterals[] = (string) $producerArg->value;
+                } else {
+                    return $this->slotForMethodOrStaticCallInitFollowingExecReturn($block, $producer);
+                }
+            }
+        }
+        $occurrence = 0;
+        if (null !== $block->orig) {
+            foreach ($block->orig->children as $child) {
+                if ($child === $producer) {
+                    break;
+                }
+                if (
+                    !($child instanceof Op\Expr\MethodCall || $child instanceof Op\Expr\StaticCall)
+                ) {
+                    continue;
+                }
+                $priorName = $this->staticNameFromOperand($child->name);
+                if (null === $priorName || $needle !== strtolower($priorName)) {
+                    continue;
+                }
+                if (!property_exists($child, 'args') || !\is_array($child->args)) {
+                    continue;
+                }
+                $priorLiterals = [];
+                $allLiteral = true;
+                foreach ($child->args as $priorArg) {
+                    if ($priorArg instanceof Operand\Literal) {
+                        $priorLiterals[] = (string) $priorArg->value;
+                    } else {
+                        $allLiteral = false;
+                        break;
+                    }
+                }
+                if ($allLiteral && $priorLiterals === $expectedArgLiterals) {
+                    ++$occurrence;
+                }
+            }
+        }
+        $initType = $producer instanceof Op\Expr\StaticCall
+            ? OpCode::TYPE_STATICCALL_INIT
+            : OpCode::TYPE_METHODCALL_INIT;
+        $ops = $block->opCodes;
+        $seenMatch = 0;
+        foreach ($ops as $i => $op) {
+            if ($initType !== $op->type || null === $op->arg2) {
+                continue;
+            }
+            $name = $this->resolveCompileTimeStringSlot((int) $op->arg2, $block);
+            if ($needle !== strtolower($name ?? '')) {
+                continue;
+            }
+            $argLiterals = [];
+            $execSlot = null;
+            for ($j = $i + 1, $n = \count($ops); $j < $n; ++$j) {
+                $scan = $ops[$j];
+                if (OpCode::TYPE_ARG_SEND === $scan->type && null !== $scan->arg1) {
+                    $lit = $this->resolveCompileTimeStringSlot((int) $scan->arg1, $block);
+                    if (null !== $lit) {
+                        $argLiterals[] = $lit;
+                    }
+                    continue;
+                }
+                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scan->type && null !== $scan->arg1) {
+                    $execSlot = (string) $scan->arg1;
+                    break;
+                }
+                if (
+                    OpCode::TYPE_FUNCCALL_INIT === $scan->type
+                    || OpCode::TYPE_METHODCALL_INIT === $scan->type
+                    || OpCode::TYPE_STATICCALL_INIT === $scan->type
+                ) {
+                    break;
+                }
+            }
+            if (null === $execSlot || $argLiterals !== $expectedArgLiterals) {
+                continue;
+            }
+            if ($seenMatch === $occurrence) {
+                return $execSlot;
+            }
+            ++$seenMatch;
+        }
+
+        return null;
+    }
+
+    /**
      * var_export(..., true) — hoisted ConstFetch true may not be emitted before ARG_SEND rewire (#18164).
      */
     private function slotForVarExportHoistedReturnTruePrelude(Block $block, Op $cfgCallOp): ?string
@@ -30669,7 +30817,34 @@ class Compiler {
                 return $adjacentNestedSlot;
             }
         }
-        $producerOrdinal = $argIndex - $leadingEmbedded;
+        // replaceWith($d->createElement('x'), 'txt', $d->createElement('y')) — when an embedded
+        // literal sits between MethodCall producers, map by non-embedded dead-temp ordinal (#21901).
+        $hasEmbeddedLiteralArg = false;
+        foreach ($cfgCallOp->args as $scanArg) {
+            if ($this->isEmbeddedCallLiteralArg($scanArg)) {
+                $hasEmbeddedLiteralArg = true;
+                break;
+            }
+        }
+        if ($hasEmbeddedLiteralArg) {
+            $nonEmbeddedDeadIndices = [];
+            foreach ($cfgCallOp->args as $i => $scanArg) {
+                if (
+                    $scanArg instanceof Operand
+                    && $this->callArgIsDeadInlineTemporary($scanArg)
+                    && !$this->isEmbeddedCallLiteralArg($scanArg)
+                ) {
+                    $nonEmbeddedDeadIndices[] = (int) $i;
+                }
+            }
+            $producerOrdinal = array_search($argIndex, $nonEmbeddedDeadIndices, true);
+            if (false === $producerOrdinal) {
+                return null;
+            }
+            $producerOrdinal = (int) $producerOrdinal;
+        } else {
+            $producerOrdinal = $argIndex - $leadingEmbedded;
+        }
         if ($producerOrdinal < 0 || $producerOrdinal >= $siblingFuncCount) {
             return null;
         }
@@ -30693,6 +30868,18 @@ class Compiler {
         );
         if (null !== $targetArgForProducer && $targetArgForProducer !== $argIndex) {
             return null;
+        }
+        if (
+            $hasEmbeddedLiteralArg
+            && ($producer instanceof Op\Expr\MethodCall || $producer instanceof Op\Expr\StaticCall)
+        ) {
+            $methodSlot = $this->slotForMethodOrStaticCallInitFollowingExecReturnMatchingArgs(
+                $block,
+                $producer
+            );
+            if (null !== $methodSlot) {
+                return $methodSlot;
+            }
         }
         $execReturn = $this->slotForInlineFuncCallProducerExecReturnByCfgIndex(
             $block,
