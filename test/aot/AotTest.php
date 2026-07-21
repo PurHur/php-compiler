@@ -429,6 +429,10 @@ class AotTest extends BaseTest
                 && str_contains($name, 'try_catch_else')) {
                 continue;
             }
+            // ext/mysqli — VM host bridge; user-script AOT deferred (#3435, #21788).
+            if (str_contains($name, 'mysqli')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
