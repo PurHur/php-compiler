@@ -8281,7 +8281,30 @@ class JIT {
                             $leftVar,
                             $rightVar
                         );
-                        $this->context->builder->store($newStr, $result->value);
+                        // A KIND_VALUE destination has no slot to store into: ->value IS the
+                        // immediate. The promotion above only covers TYPE_STRING, so a dest whose
+                        // inferred type never settled on string reached here and emitted
+                        // `store %__string__* %x, i64 N`, failing module verification (#21886).
+                        $destSlot = $result->value;
+                        if (null === $destSlot
+                            || Variable::KIND_VALUE === $result->kind
+                            || '__string__*' !== $this->context->getStringFromType($destSlot->typeOf())) {
+                            $destSlot = JIT\BasicBlockHelper::entryAllocaForFunction(
+                                $this->context,
+                                $func,
+                                $this->context->getTypeFromString('__string__*')
+                            );
+                            $promoted = new Variable(
+                                $this->context,
+                                Variable::TYPE_STRING,
+                                Variable::KIND_VARIABLE,
+                                $destSlot
+                            );
+                            $promoted->initialize();
+                            $this->context->setVariableOp($destOp, $promoted);
+                            $result = $promoted;
+                        }
+                        $this->context->builder->store($newStr, $destSlot);
                     }
                     if (
                         null !== ($left->compileTimeString ?? null)
