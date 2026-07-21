@@ -1,0 +1,22 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
+@@ -20,6 +20,7 @@ class Builder implements CoreBuilder {
+     public LLVM $llvm;
+     public Context $context;
+     public LLVMBuilderRef $builder;
++    private bool $disposed = false;
+ 
+     public function __construct(LLVM $llvm, Context $context, LLVMBuilderRef $builder) {
+         $this->llvm = $llvm;
+@@ -60,7 +61,11 @@ class Builder implements CoreBuilder {
+     }
+ 
+     public function dispose(): void {
++        if ($this->disposed) {
++            return;
++        }
++        $this->disposed = true;
+         $this->llvm->lib->LLVMDisposeBuilder($this->builder);
+     }
+ 
+     public function setCurrentDebugLocation(CoreValue $l): void {

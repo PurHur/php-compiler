@@ -25,6 +25,10 @@ patch_already_applied() {
     php-llvm-structgep-assert.patch)
       grep -q 'PHP_COMPILER_LLVM_ASSERT' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
+    php-llvm-builder-dispose-idempotent.patch)
+      grep -q 'private bool \$disposed = false' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null \
+        || grep -q 'private bool $disposed = false' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
+      ;;
     php-llvm-chooser.patch)
       grep -q 'PHP_COMPILER_LLVM_PATH' "$ROOT/vendor/ircmaxell/php-llvm/lib/Chooser.php" 2>/dev/null
       ;;
@@ -6217,6 +6221,7 @@ apply_patch "$PATCH_DIR/php-llvm-no-closures-array-map.patch"
 apply_patch "$PATCH_DIR/php-llvm-context-empty-arrays.patch"
 apply_patch "$PATCH_DIR/php-llvm-makearray-empty.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-select.patch"
+apply_patch "$PATCH_DIR/php-llvm-builder-dispose-idempotent.patch"
 apply_patch "$PATCH_DIR/php-llvm-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-llvmabstract-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
