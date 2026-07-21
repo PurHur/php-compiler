@@ -590,7 +590,8 @@ final class JitIntdiv
         Context $context,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        string $expectedType = 'int'
     ): void {
         if (NestedJitCompileScope::isActive()) {
             return;
@@ -600,7 +601,7 @@ final class JitIntdiv
         }
         JitBuiltinWarning::emitDeprecated(
             $context,
-            VmNullNumberParamDeprecation::message($function, $argIndex, $paramName, 'int')
+            VmNullNumberParamDeprecation::message($function, $argIndex, $paramName, $expectedType)
         );
     }
 }
