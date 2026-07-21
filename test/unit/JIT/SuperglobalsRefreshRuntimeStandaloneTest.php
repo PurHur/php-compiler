@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5330 / #13031: AOT standalone defines __superglobals__refresh via PHP bridge only.
+ * Issue #5330 / #13031 / #21888: AOT standalone defines __superglobals__refresh via kernel.
  *
  * @group aot-lint
  */
@@ -26,11 +26,15 @@ final class SuperglobalsRefreshRuntimeStandaloneTest extends TestCase
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
     }
 
-    public function testSuperglobalRefreshRuntimeUsesPhpBridgeOnly(): void
+    public function testSuperglobalRefreshRuntimeUsesKernelNotNestedJitBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/SuperglobalRefreshRuntime.php');
-        $this->assertStringContainsString('SuperglobalRefreshJitHelper', $source);
+        $this->assertStringContainsString('JitSuperglobalRefreshKernel', $source);
+        $this->assertStringContainsString('SuperglobalRefreshJitHelper', $source); // doc: retired NestedJIT path
+        $this->assertStringContainsString('#21888', $source);
         $this->assertStringNotContainsString('SuperglobalRefreshStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $source);
+        $this->assertStringNotContainsString('implementRefreshBridge', $source);
     }
 
     public function testSuperglobalsRefreshCFileRemoved(): void
