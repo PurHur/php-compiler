@@ -164,7 +164,7 @@ Defaults are exported from [`script/ci-defaults.env`](../script/ci-defaults.env)
 | `FILE_UPLOAD_WEB_SMOKE_GATE` | `1` | `ci-fast.sh`, `ci-local.sh` | `examples-web-smoke.sh --fileupload-only` / 006 multipart upload curls ([#2009](https://github.com/PurHur/php-compiler/issues/2009), [#1999](https://github.com/PurHur/php-compiler/issues/1999)) |
 | `FILE_UPLOAD_WEB_SERVE_AOT_SMOKE_GATE` | `1` | `ci-local.sh` (`ci_run_file_upload_web_serve_aot_smoke`) | `examples-web-smoke.sh --fileupload-only --aot` — 006 `phpc serve --aot` multipart POST ([#2333](https://github.com/PurHur/php-compiler/issues/2333), default-on [#2371](https://github.com/PurHur/php-compiler/issues/2371)); set `0` to skip |
 | `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest::test005SessionsWebAotLink` — 005 native link ([#1946](https://github.com/PurHur/php-compiler/issues/1946)); set `0` to skip during iteration |
-| `SESSIONS_WEB_AOT_SMOKE_GATE` | `0` | `ci-local.sh` (`ci_run_sessions_web_aot_execute`) | `SessionsWebAotExecuteTest` two-request execute ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1923](https://github.com/PurHur/php-compiler/issues/1923)) |
+| `SESSIONS_WEB_AOT_SMOKE_GATE` | `1` | `ci-local.sh` (`ci_run_sessions_web_aot_execute`) | `SessionsWebAotExecuteTest` two-request execute ([#1891](https://github.com/PurHur/php-compiler/issues/1891), [#1923](https://github.com/PurHur/php-compiler/issues/1923)); set `0` to skip |
 | `MINIWEBAPP_WEB_SMOKE_GATE` | `1` | `ci-local.sh` | `examples-web-smoke.sh --miniwebapp-only` ([#664](https://github.com/PurHur/php-compiler/issues/664)) |
 | `MINIWEBAPP_WEB_SMOKE_AOT_GATE` | `1` | `ci-local.sh` | `ci_run_miniwebapp_web_smoke_aot` → `examples-web-smoke.sh --miniwebapp-only --aot` ([#1523](https://github.com/PurHur/php-compiler/issues/1523), [#833](https://github.com/PurHur/php-compiler/issues/833)) |
 | `MINIWEBAPP_AOT_LINK_GATE` | `1` | `ci-local.sh` (PHPUnit `@group aot-link`) | `ExamplesCompileTest` 003 native link ([#754](https://github.com/PurHur/php-compiler/issues/754)) |
@@ -296,10 +296,10 @@ Progressive ladder (VM → AOT link → AOT execute → deploy CGI). Probe with 
 | VM session flash | `SESSIONS_WEB_SMOKE_GATE` | `1` | `make examples-sessions-smoke` / `ci-fast` ([#1887](https://github.com/PurHur/php-compiler/issues/1887)) |
 | AOT serve | `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE` | `1` | `ci-local.sh` · `examples-web-smoke.sh --sessions-only --aot` ([#2333](https://github.com/PurHur/php-compiler/issues/2333), [#2371](https://github.com/PurHur/php-compiler/issues/2371)); set `0` to skip |
 | AOT link | `SESSIONS_WEB_AOT_LINK_GATE` | `1` | `./script/ci-local.sh --filter test005SessionsWebAotLink` ([#1946](https://github.com/PurHur/php-compiler/issues/1946)) |
-| AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `0` | `SessionsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` ([#1891](https://github.com/PurHur/php-compiler/issues/1891) ✅) |
+| AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `1` | `SessionsWebAotExecuteTest` or `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` ([#1891](https://github.com/PurHur/php-compiler/issues/1891) ✅, [#1923](https://github.com/PurHur/php-compiler/issues/1923)) |
 | Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `0` | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke-all` ([#1893](https://github.com/PurHur/php-compiler/issues/1893), [#1962](https://github.com/PurHur/php-compiler/issues/1962), [#2077](https://github.com/PurHur/php-compiler/issues/2077)) |
 
-Stages 2–4 require LLVM 9. Execute landed ([#1891](https://github.com/PurHur/php-compiler/issues/1891)); default-on for execute/deploy gates tracked in [#1923](https://github.com/PurHur/php-compiler/issues/1923) / [#1967](https://github.com/PurHur/php-compiler/issues/1967).
+Stages 2–4 require LLVM 9. Execute landed ([#1891](https://github.com/PurHur/php-compiler/issues/1891)); AOT execute default-on ([#1923](https://github.com/PurHur/php-compiler/issues/1923)); deploy gate default-on tracked in [#1967](https://github.com/PurHur/php-compiler/issues/1967).
 
 ```bash
 ./phpc doctor --gates | grep -E 'SESSIONS_WEB|005-SessionsWeb'

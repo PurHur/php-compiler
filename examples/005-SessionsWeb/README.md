@@ -40,7 +40,7 @@ The last response should include `Flash: Saved`.
 | VM `phpc serve` | ✅ with `PHP_COMPILER_SESSION_DIR` + cookie jar |
 | JIT | ✅ `session_start` ([#1882](https://github.com/PurHur/php-compiler/issues/1882)) |
 | AOT link | ✅ `ExamplesCompileTest::test005SessionsWebAotLink` ([#1946](https://github.com/PurHur/php-compiler/issues/1946); `SESSIONS_WEB_AOT_LINK_GATE=1` default) |
-| AOT execute | ✅ `SessionsWebAotExecuteTest` ([#1891](https://github.com/PurHur/php-compiler/issues/1891); `SESSIONS_WEB_AOT_SMOKE_GATE=1`) |
+| AOT execute | ✅ `SessionsWebAotExecuteTest` ([#1891](https://github.com/PurHur/php-compiler/issues/1891); `SESSIONS_WEB_AOT_SMOKE_GATE` default `1` [#1923](https://github.com/PurHur/php-compiler/issues/1923)) |
 | AOT deploy + CGI flash | ✅ `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1` ([#1893](https://github.com/PurHur/php-compiler/issues/1893)) |
 
 Deploy + two-request CGI (no HTTP server):
@@ -76,7 +76,7 @@ Probe all four stages (defaults from `script/ci-defaults.env`):
 | VM flash | `SESSIONS_WEB_SMOKE_GATE` | `make examples-sessions-smoke` |
 | AOT serve | `SESSIONS_WEB_SERVE_AOT_SMOKE_GATE` | `ci-local.sh` · `examples-web-smoke.sh --sessions-only --aot` ([#2333](https://github.com/PurHur/php-compiler/issues/2333), default-on [#2371](https://github.com/PurHur/php-compiler/issues/2371)); set `0` to skip |
 | AOT link | `SESSIONS_WEB_AOT_LINK_GATE` | `./script/ci-local.sh --filter test005SessionsWebAotLink` |
-| AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` |
+| AOT execute | `SESSIONS_WEB_AOT_SMOKE_GATE` | `ci-local.sh` · `EXAMPLES_AOT_SMOKE_ONLY=005 ./script/examples-aot-smoke.sh` (default `1` [#1923](https://github.com/PurHur/php-compiler/issues/1923)); set `0` to skip |
 | Deploy CGI | `SESSIONS_WEB_DEPLOY_SMOKE_GATE` | `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1 make deploy-smoke` |
 
 See [#1969](https://github.com/PurHur/php-compiler/issues/1969) and `docs/local-ci-matrix.md`.
@@ -85,6 +85,6 @@ See [#1969](https://github.com/PurHur/php-compiler/issues/1969) and `docs/local-
 
 - [#1887](https://github.com/PurHur/php-compiler/issues/1887) — `SESSIONS_WEB_SMOKE_GATE=1` (default): `make examples-sessions-smoke`, `ci-fast.sh`, `ExamplesCompileTest::test005SessionsWebServeFlashRoundTrip`
 - [#1946](https://github.com/PurHur/php-compiler/issues/1946) — `SESSIONS_WEB_AOT_LINK_GATE=1`: `ExamplesCompileTest::test005SessionsWebAotLink`
-- [#1891](https://github.com/PurHur/php-compiler/issues/1891) — `SESSIONS_WEB_AOT_SMOKE_GATE=1`: `SessionsWebAotExecuteTest`
+- [#1891](https://github.com/PurHur/php-compiler/issues/1891) — `SessionsWebAotExecuteTest` (default-on [#1923](https://github.com/PurHur/php-compiler/issues/1923))
 - [#1893](https://github.com/PurHur/php-compiler/issues/1893) — `SESSIONS_WEB_DEPLOY_SMOKE_GATE=1`: `deploy-smoke.sh --example 005`, `docs/deploy-web-aot.md`
 - [#1886](https://github.com/PurHur/php-compiler/issues/1886) — `phpc init --profile sessionsweb` copies from `templates/init-sessionsweb/` (see `PhpcInitSessionsWebTest`)

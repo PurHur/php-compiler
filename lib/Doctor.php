@@ -843,7 +843,7 @@ final class Doctor
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';
         $aotExecuteNote = $llvmReady
-            ? ($aotOn ? '#1891 ✅' : '#1891 ✅ · opt-in until #1923 (#1921)')
+            ? ($aotOn ? '#1891 ✅ · default-on #1923' : '#1891 ✅ · set gate=0 to skip (#1923)')
             : 'LLVM required; #1891 ✅ when gate=1';
         fwrite(STDOUT, "  [{$aotStatus}] Stage 3 AOT execute — SESSIONS_WEB_AOT_SMOKE_GATE default {$aotDefault} ({$aotExecuteNote})\n");
         fwrite(STDOUT, "      PHPUnit: ./script/ci-local.sh --filter SessionsWebAotExecuteTest\n");
