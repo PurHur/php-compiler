@@ -67,7 +67,34 @@ final class SessionStorageJitHelper
 
     public static function readCookieId(string $sessionName, ?HashTable $cookies): string
     {
-        if ('' === $sessionName || null === $cookies) {
+        if ('' === $sessionName) {
+            return '';
+        }
+        // Prefer HTTP_COOKIE env parse — NestedJIT HashTable::find / explode abort (#21900).
+        $header = \getenv('HTTP_COOKIE');
+        if (\is_string($header) && '' !== $header) {
+            $prefix = $sessionName.'=';
+            $offset = 0;
+            $len = \strlen($header);
+            while ($offset < $len) {
+                $semi = \strpos($header, ';', $offset);
+                $part = \trim(
+                    false === $semi
+                        ? \substr($header, $offset)
+                        : \substr($header, $offset, $semi - $offset)
+                );
+                if (\str_starts_with($part, $prefix)) {
+                    return SessionFileStorage::sanitizeId(\substr($part, \strlen($prefix)));
+                }
+                if (false === $semi) {
+                    break;
+                }
+                $offset = $semi + 1;
+            }
+
+            return '';
+        }
+        if (null === $cookies) {
             return '';
         }
         // HashTable::find() nested-JIT via HashTableFind + HashTableNestedReceiver (#21849, #1974).

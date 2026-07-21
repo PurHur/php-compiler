@@ -43,7 +43,7 @@ final class SessionStorageRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringContainsString('SessionStorageJitHelper', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(550, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(620, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void

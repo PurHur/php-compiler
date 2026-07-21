@@ -72,6 +72,8 @@ final class JitSessionStorageKernel
         StringSerialize::ensureLinked($context);
         StringFileGetContents::implement($context);
         StringFilePutContents::implement($context);
+        // readCookieId parses getenv('HTTP_COOKIE') (#21900).
+        \PHPCompiler\JIT\Builtin\StringGetenv::ensureLinked($context);
         self::implement($context);
     }
 
@@ -310,31 +312,95 @@ final class JitSessionStorageKernel
         $context->builder->branchIf($hasId, $bbWork, $bbDone);
 
         $context->builder->positionAtEnd($bbWork);
-        $nameStr = self::bufferToString(
-            $context,
-            SessionStorageGlobals::$nameBufGlobal,
-            $context->builder->load(SessionStorageGlobals::$nameLenGlobal)
-        );
-        $valueStr = self::bufferToString($context, SessionStorageGlobals::$idBufGlobal, $idLen);
-        $pathStr = self::literalString($context, '/');
-        // NestedJIT PendingHeadersJitHelper::addSetcookie expects string, not null (#21892).
-        $emptyStr = self::literalString($context, '');
-        $context->builder->call(
-            $context->lookupFunction('__phpc_setcookie_add'),
-            $nameStr,
-            $valueStr,
-            $i64->constInt(0, false),
-            $pathStr,
-            $emptyStr,
-            $i32->constInt(0, false),
-            $i32->constInt(0, false),
-            $emptyStr,
-            $i32->constInt(0, false)
-        );
+        // Thin AOT keeps __phpc_setcookie_add as a no-op *_link_stub (#21900). Print
+        // CGI Set-Cookie from session globals (not __string__init — buffer-backed
+        // strings mis-feed %.*s). NestedJIT PendingHeaders upgrade still TODO.
+        if (self::pendingSetcookieIsThinLinkStub($context)) {
+            self::emitSetcookiePrintfFromGlobals($context, $idLen);
+        } else {
+            $nameStr = self::bufferToString(
+                $context,
+                SessionStorageGlobals::$nameBufGlobal,
+                $context->builder->load(SessionStorageGlobals::$nameLenGlobal)
+            );
+            $valueStr = self::bufferToString($context, SessionStorageGlobals::$idBufGlobal, $idLen);
+            $pathStr = self::literalString($context, '/');
+            $emptyStr = self::literalString($context, '');
+            $context->builder->call(
+                $context->lookupFunction('__phpc_setcookie_add'),
+                $nameStr,
+                $valueStr,
+                $i64->constInt(0, false),
+                $pathStr,
+                $emptyStr,
+                $i32->constInt(0, false),
+                $i32->constInt(0, false),
+                $emptyStr,
+                $i32->constInt(0, false)
+            );
+        }
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
         $context->builder->returnVoid();
+    }
+
+    /**
+     * True when thin AOT filled {@see __phpc_setcookie_add} with a no-op *_link_stub (#21900).
+     */
+    private static function pendingSetcookieIsThinLinkStub(Context $context): bool
+    {
+        $fn = $context->module->getNamedFunction('__phpc_setcookie_add');
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            return true;
+        }
+        try {
+            foreach ($fn->getBasicBlocks() as $block) {
+                if (str_contains($block->getName(), '_link_stub')) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
+    }
+
+    /** Direct printf from session name/id byte buffers (#21900). */
+    private static function emitSetcookiePrintfFromGlobals(Context $context, Value $idLen): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $nameLen = $context->builder->load(SessionStorageGlobals::$nameLenGlobal);
+        $namePtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP(
+                SessionStorageGlobals::$nameBufGlobal,
+                $i32->constInt(0, false),
+                $i64->constInt(0, false)
+            ),
+            $i8p
+        );
+        $idPtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP(
+                SessionStorageGlobals::$idBufGlobal,
+                $i32->constInt(0, false),
+                $i64->constInt(0, false)
+            ),
+            $i8p
+        );
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString("Set-Cookie: %.*s=%.*s; path=/\r\n"),
+            $context->getTypeFromString('char*')
+        );
+        $context->builder->call(
+            $context->lookupFunction('printf'),
+            $fmt,
+            $nameLen,
+            $namePtr,
+            $idLen,
+            $idPtr
+        );
     }
 
     private static function emitCopyIdStringToGlobals(Context $context, Value $idStr): void
