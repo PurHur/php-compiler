@@ -23,7 +23,7 @@ $checks = [
     'in_array' => static fn () => in_array('a', null) === false,
     'array_flip' => static fn () => array_flip(null) === [],
     'array_sum' => static fn () => array_sum(null) === 0,
-    'iterator_to_array' => static fn () => iterator_to_array(null) === [],
+    // iterator_to_array(null) is always TypeError (typed Traversable|array) — #21893
     'array_map' => static fn () => array_map(static fn ($x) => $x, null) === [],
 ];
 
