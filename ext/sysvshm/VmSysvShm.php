@@ -127,6 +127,16 @@ final class VmSysvShm
         return @\shm_remove_var($host, $key);
     }
 
+    /** shm_has_var() — whether variable key exists in segment (#21634). */
+    public static function hasVar(object $host, int $key): bool
+    {
+        if (!self::available() || !\function_exists('shm_has_var')) {
+            return false;
+        }
+
+        return @\shm_has_var($host, $key);
+    }
+
     public static function detach(object $host, ?ObjectEntry $object = null): bool
     {
         if (!self::available()) {

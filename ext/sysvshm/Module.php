@@ -31,6 +31,7 @@ class Module extends ModuleAbstract
             new shm_attach(),
             new shm_detach(),
             new shm_get_var(),
+            new shm_has_var(),
             new shm_put_var(),
             new shm_remove_var(),
             new shmop_open(),
