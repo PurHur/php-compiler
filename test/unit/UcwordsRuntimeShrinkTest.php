@@ -8,13 +8,19 @@ use PHPCompiler\ext\standard\UcwordsJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** ucwords() JIT routes through UcwordsJitHelper PHP not inline LLVM (#14717). */
+/** ucwords() JIT routes through UcwordsJitHelper + JitVmHelperLink (#14717, #21726). */
 final class UcwordsRuntimeShrinkTest extends TestCase
 {
     public function testStringUcwordsUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUcwords.php');
         $this->assertStringContainsString('UcwordsJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $source);
         $this->assertStringNotContainsString('transformInPlace', $source);
         $this->assertStringNotContainsString('emitCharInStringCheck', $source);
 
