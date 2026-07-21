@@ -10,7 +10,10 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 
-/** SimpleXMLElement Iterator/Traversable (php-src ext/simplexml/sxe.c; #19089). */
+/**
+ * SimpleXMLElement Iterator / RecursiveIterator
+ * (php-src ext/simplexml/simplexml.c + simplexml.stub.php; #19089, #21887).
+ */
 final class SimpleXmlElementIterator
 {
     public static function registerMethods(\PHPCompiler\VM\ClassEntry $entry, int $pub): void
@@ -21,15 +24,20 @@ final class SimpleXmlElementIterator
             'current' => SimpleXmlElementCurrent::class,
             'key' => SimpleXmlElementKey::class,
             'next' => SimpleXmlElementNext::class,
+            'haschildren' => SimpleXmlElementHasChildren::class,
+            'getchildren' => SimpleXmlElementGetChildren::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
+        $entry->methodNames['haschildren'] = 'hasChildren';
+        $entry->methodNames['getchildren'] = 'getChildren';
     }
 
     public static function registerInterfaces(\PHPCompiler\VM\ClassEntry $entry, Context $ctx): void
     {
-        foreach (['Iterator', 'Traversable'] as $iface) {
+        // RecursiveIterator extends Iterator (php-src register_class_SimpleXMLElement).
+        foreach (['Iterator', 'RecursiveIterator', 'Traversable'] as $iface) {
             if (isset($ctx->classes[strtolower($iface)])
                 && !\in_array($iface, $entry->interfaces, true)) {
                 $entry->interfaces[] = $iface;
@@ -49,7 +57,8 @@ final class SimpleXmlElementIterator
         if (!isset($children[$index])) {
             throw new \LogicException('SimpleXMLElement child index out of range');
         }
-        $class = $ctx->classes[VmSimpleXml::CLASS_LC] ?? $entry->class;
+        // Preserve receiver class (SimpleXMLIterator subclass; php-src uses sxe->zo.ce).
+        $class = $entry->class;
 
         return VmSimpleXml::wrapIteratorNode(
             $ctx,
@@ -57,6 +66,45 @@ final class SimpleXmlElementIterator
             $children[$index],
             SimpleXmlRegistry::documentKey($entry)
         );
+    }
+
+    /**
+     * Current iterator child has element children?
+     * (php-src PHP_METHOD(SimpleXMLElement, hasChildren); #21887).
+     */
+    public static function hasChildren(ObjectEntry $entry): bool
+    {
+        // php-src: UNDEF iter.data or SXE_ITER_ATTRLIST → false.
+        if (SimpleXmlRegistry::isAttributesView($entry)
+            || !SimpleXmlIteratorStorage::isInitialized($entry)) {
+            return false;
+        }
+        $index = SimpleXmlIteratorStorage::index($entry);
+        $children = self::iterableChildren($entry);
+        if ($index < 0 || $index >= \count($children)) {
+            return false;
+        }
+
+        return [] !== $children[$index]->children;
+    }
+
+    /**
+     * Current iterator element as recursive child iterator, or null.
+     * (php-src PHP_METHOD(SimpleXMLElement, getChildren); #21887).
+     */
+    public static function getChildren(Context $ctx, ObjectEntry $entry): ?ObjectEntry
+    {
+        if (SimpleXmlRegistry::isAttributesView($entry)
+            || !SimpleXmlIteratorStorage::isInitialized($entry)) {
+            return null;
+        }
+        $index = SimpleXmlIteratorStorage::index($entry);
+        $children = self::iterableChildren($entry);
+        if ($index < 0 || $index >= \count($children)) {
+            return null;
+        }
+
+        return self::wrapChild($ctx, $entry, $index);
     }
 }
 
@@ -176,5 +224,55 @@ final class SimpleXmlElementNext extends VmClassMethod
             'SimpleXMLElement::next()'
         );
         SimpleXmlIteratorStorage::setIndex($entry, SimpleXmlIteratorStorage::index($entry) + 1);
+    }
+}
+
+/** SimpleXMLElement::hasChildren() — RecursiveIterator (php-src simplexml.c; #21887). */
+final class SimpleXmlElementHasChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('hasChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $entry = VmSimpleXml::requireElement(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLElement::hasChildren()'
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(SimpleXmlElementIterator::hasChildren($entry));
+        }
+    }
+}
+
+/** SimpleXMLElement::getChildren() — RecursiveIterator (php-src simplexml.c; #21887). */
+final class SimpleXmlElementGetChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SimpleXMLElement::getChildren() requires VM context');
+        }
+        $entry = VmSimpleXml::requireElement(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLElement::getChildren()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $child = SimpleXmlElementIterator::getChildren($frame->vmContext, $entry);
+        if (null === $child) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->object($child);
     }
 }
