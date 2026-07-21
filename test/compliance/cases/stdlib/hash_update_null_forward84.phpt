@@ -1,20 +1,31 @@
 --TEST--
-stdlib hash_update() null $data TypeError on 8.4 forward (#20195, ext/hash/hash.c)
+stdlib hash_update() null $data DEP+coerce on 8.4 (#21557, reverts #20195)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-$c = hash_init('sha1');
+error_reporting(E_ALL);
+$seen = 0;
+set_error_handler(static function (int $no) use (&$seen): bool {
+    if (E_DEPRECATED === $no) {
+        $seen++;
+    }
+    return true;
+});
+$c = hash_init('md5');
 try {
     hash_update($c, null);
-    echo 'uncaught ', hash_final($c), "\n";
+    echo hash_final($c), "\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
-$c2 = hash_init('sha1');
+restore_error_handler();
+echo 'depr=', (int) ($seen >= 1), "\n";
+$c2 = hash_init('md5');
 hash_update($c2, '');
 echo hash_final($c2), "\n";
 ?>
 --EXPECT--
-hash_update(): Argument #2 ($data) must be of type string, null given
-da39a3ee5e6b4b0d3255bfef95601890afd80709
+d41d8cd98f00b204e9800998ecf8427e
+depr=1
+d41d8cd98f00b204e9800998ecf8427e

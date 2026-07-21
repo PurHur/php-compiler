@@ -1,5 +1,5 @@
 <?php
-/** Repro for #20195 — hash_update(null) TypeError under PROFILE=8.4. */
+/** Repro for #21557 — hash_update(null) soft-null under PROFILE=8.4 (reverts #20195 TypeError). */
 $c = hash_init('sha1');
 try {
     hash_update($c, null);

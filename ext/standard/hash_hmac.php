@@ -37,7 +37,7 @@ final class hash_hmac extends Internal
         // Z_PARAM_STR $algo — non-strict null is E_DEPRECATED + '' then ValueError (#21490, reverts #20304).
         $algo = self::vmAlgoArg($frame);
         $data = self::vmDataArg($frame);
-        // Z_PARAM_STR $key — null TypeError on 8.4 forward profile (#20175 / #21557).
+        // Z_PARAM_STR $key — non-strict null is E_DEPRECATED + '' on 8.4 (#21557, reverts #20175).
         $key = self::vmZparamStrArg($frame, 2, 'key');
         $raw = false;
         if (4 === $argc) {
@@ -144,7 +144,7 @@ final class hash_hmac extends Internal
     }
 
     /**
-     * Z_PARAM_STR $key — null TypeError on 8.4 forward profile (#20175, #21557, ext/hash/hash.c).
+     * Z_PARAM_STR $key — non-strict null is E_DEPRECATED + '' on 8.4 (#21557, reverts #20175).
      */
     private static function vmZparamStrArg(Frame $frame, int $argIndex, string $paramName): string
     {
@@ -154,7 +154,7 @@ final class hash_hmac extends Internal
             return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'hash_hmac',
             $argIndex,
@@ -178,7 +178,7 @@ final class hash_hmac extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'hash_hmac',
