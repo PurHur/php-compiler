@@ -73,6 +73,7 @@ class Module extends ModuleAbstract
             new ldap_exop_sync(),
             new ldap_parse_exop(),
             new ldap_exop_refresh(),
+            new ldap_exop_passwd(),
         ];
         if (LdapExtensionPolicy::advertisesWalletConnect()) {
             require_once __DIR__.'/ldap_connect_wallet.php';
