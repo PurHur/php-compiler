@@ -5100,6 +5100,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomNodeC14N.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeContains.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeGetRootNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeIsEqualNode.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomNodeIsSameNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeListItem.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodeNormalize.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomNodePrepend.php';
