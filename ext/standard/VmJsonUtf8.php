@@ -90,9 +90,27 @@ final class VmJsonUtf8
     }
 
     /**
+     * php-src ext/json/json_encoder.c — JSON_INVALID_UTF8_IGNORE strips malformed bytes (#21723).
+     */
+    public static function stripInvalidUtf8(string $string): string
+    {
+        return self::repairInvalidUtf8($string, false);
+    }
+
+    /**
      * php-src ext/standard/php_unicode.c — replacement character for malformed UTF-8 (#9964).
      */
     public static function substituteInvalidUtf8(string $string): string
+    {
+        return self::repairInvalidUtf8($string, true);
+    }
+
+    /**
+     * Walk bytes like php-src php_next_utf8_char / json encoder UTF-8 path:
+     * keep valid sequences; on malformed lead/continuation either drop the byte
+     * (IGNORE) or emit U+FFFD (SUBSTITUTE).
+     */
+    private static function repairInvalidUtf8(string $string, bool $substitute): string
     {
         $out = '';
         $len = \strlen($string);
@@ -137,7 +155,9 @@ final class VmJsonUtf8
                 $out .= \substr($string, $i, $need + 1);
                 $i += $need + 1;
             } else {
-                $out .= "\xEF\xBF\xBD";
+                if ($substitute) {
+                    $out .= "\xEF\xBF\xBD";
+                }
                 ++$i;
             }
         }
