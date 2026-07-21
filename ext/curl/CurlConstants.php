@@ -17,6 +17,8 @@ final class CurlConstants
     public const CURLINFO_CONTENT_LENGTH_DOWNLOAD = 3145743;
     public const CURLINFO_CONTENT_LENGTH_UPLOAD = 3145744;
     public const CURLINFO_CONTENT_TYPE = 1048594;
+    /** CURLINFO_EFFECTIVE_METHOD — libcurl ≥ 7.72 / php-src curl.stub.php (#21883). */
+    public const CURLINFO_EFFECTIVE_METHOD = 1048634;
     public const CURLINFO_EFFECTIVE_URL = 1048577;
     public const CURLINFO_FILETIME = 2097166;
     public const CURLINFO_HEADER_OUT = 2;
@@ -573,6 +575,7 @@ final class CurlConstants
             'CURLINFO_RESPONSE_CODE' => self::CURLINFO_RESPONSE_CODE,
             'CURLINFO_TOTAL_TIME' => self::CURLINFO_TOTAL_TIME,
             'CURLINFO_CONTENT_TYPE' => self::CURLINFO_CONTENT_TYPE,
+            'CURLINFO_EFFECTIVE_METHOD' => self::CURLINFO_EFFECTIVE_METHOD,
             'CURLINFO_SIZE_DOWNLOAD' => self::CURLINFO_SIZE_DOWNLOAD,
             'CURLINFO_PRIMARY_IP' => self::CURLINFO_PRIMARY_IP,
             'CURLINFO_PRIMARY_PORT' => self::CURLINFO_PRIMARY_PORT,
