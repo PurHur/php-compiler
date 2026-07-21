@@ -178,23 +178,32 @@ final class VmMysqli
         $entry->constructed = true;
     }
 
-    public static function state(ObjectEntry $entry): MysqliState
+    public static function state(ObjectEntry $entry, ?Context $ctx = null): MysqliState
     {
         if (!isset(self::$store[$entry->id])) {
+            if (null !== $ctx) {
+                self::throwUninitialized();
+            }
             throw new \LogicException('mysqli object has not been correctly initialized');
         }
 
         return self::$store[$entry->id];
     }
 
-    public static function requireNative(ObjectEntry $entry): \mysqli
+    public static function requireNative(ObjectEntry $entry, Context $ctx): \mysqli
     {
-        $state = self::state($entry);
+        $state = self::state($entry, $ctx);
         if (null === $state->native) {
             throw new \LogicException('mysqli connection is closed');
         }
 
         return $state->native;
+    }
+
+    /** @return never */
+    private static function throwUninitialized(): void
+    {
+        throw new \mysqli_sql_exception('mysqli object is not fully initialized', 0);
     }
 
     public static function destroyState(ObjectEntry $entry): void
@@ -349,14 +358,7 @@ final class MysqliConstruct extends MysqliClassMethod
             // php-src: new mysqli() with no args returns an unconnected object;
             // with args and no driver it would throw mysqli_sql_exception.
             if ($argc > 0) {
-                $ex = BuiltinExceptionSupport::materializeMysqliSqlException(
-                    $ctx,
-                    'mysqli extension not available on host PHP',
-                    '',
-                    0,
-                    2002
-                );
-                throw ExceptionSupport::vmThrowable($ex);
+                throw new \mysqli_sql_exception('mysqli extension not available on host PHP', 2002);
             }
             $receiver->constructed = true;
 
@@ -373,24 +375,10 @@ final class MysqliConstruct extends MysqliClassMethod
         try {
             $native = @new \mysqli($hostname, $username, $password, $database, $port, $socket);
         } catch (\mysqli_sql_exception $e) {
-            $ex = BuiltinExceptionSupport::materializeMysqliSqlException(
-                $ctx,
-                $e->getMessage(),
-                '',
-                0,
-                $e->getCode()
-            );
-            throw ExceptionSupport::vmThrowable($ex);
+            throw $e;
         }
         if ($native->connect_errno) {
-            $ex = BuiltinExceptionSupport::materializeMysqliSqlException(
-                $ctx,
-                $native->connect_error ?? 'Connection error',
-                '',
-                0,
-                $native->connect_errno
-            );
-            throw ExceptionSupport::vmThrowable($ex);
+            throw new \mysqli_sql_exception($native->connect_error ?? 'Connection error', $native->connect_errno);
         }
 
         $state = new MysqliState();
@@ -434,7 +422,8 @@ final class MysqliQuery extends MysqliClassMethod
             throw new \ArgumentCountError('mysqli::query() expects at least 1 argument, 0 given');
         }
         $sql = $this->stringArg($frame->calledArgs[1], 'mysqli::query', 0, 'query');
-        $native = VmMysqli::requireNative($receiver);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::query() requires VM context');
+        $native = VmMysqli::requireNative($receiver, $ctx);
         $result = $native->query($sql);
         if (null === $frame->returnVar) {
             return;
@@ -485,7 +474,8 @@ final class MysqliRealEscapeString extends MysqliClassMethod
             throw new \ArgumentCountError('mysqli::real_escape_string() expects exactly 1 argument, 0 given');
         }
         $str = $this->stringArg($frame->calledArgs[1], 'mysqli::real_escape_string', 0, 'string');
-        $native = VmMysqli::requireNative($receiver);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::real_escape_string() requires VM context');
+        $native = VmMysqli::requireNative($receiver, $ctx);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string($native->real_escape_string($str));
         }

@@ -29,7 +29,8 @@ final class mysqli_real_escape_string extends Internal
             throw new \TypeError('mysqli_real_escape_string(): Argument #1 ($mysql) must be of type mysqli');
         }
         $str = $frame->calledArgs[1]->resolveIndirect()->toString();
-        $native = VmMysqli::requireNative($link->toObject());
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli_real_escape_string() requires VM context');
+        $native = VmMysqli::requireNative($link->toObject(), $ctx);
         if (null !== $frame->returnVar) {
             $frame->returnVar->string($native->real_escape_string($str));
         }
