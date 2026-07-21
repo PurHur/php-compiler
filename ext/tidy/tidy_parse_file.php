@@ -26,7 +26,10 @@ final class tidy_parse_file extends Internal
         }
         $ctx = $frame->vmContext ?? throw new \LogicException('tidy_parse_file() requires VM context');
         $filename = VmTidy::htmlStringArg($frame->calledArgs[0], 'tidy_parse_file', 0);
-        $parsed = VmTidy::parseFile($ctx, $filename, $frame);
+        $config = VmTidy::optionalConfigArg($frame->calledArgs, 1, 'tidy_parse_file');
+        $encoding = VmTidy::optionalEncodingArg($frame->calledArgs, 2, 'tidy_parse_file');
+        $useIncludePath = VmTidy::optionalUseIncludePathArg($frame->calledArgs, 3);
+        $parsed = VmTidy::parseFile($ctx, $filename, $config, $encoding, $useIncludePath, $frame);
         if (false === $parsed) {
             $frame->returnVar->bool(false);
 

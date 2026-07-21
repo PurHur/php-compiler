@@ -27430,7 +27430,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/PackEngineEncode.php`
 
@@ -30658,8 +30658,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1826)
-- new Error (line 1837)
+- new Error (line 1819)
+- new Error (line 1830)
 - 218 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -33910,8 +33910,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/pathinfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 39)
-- new Variable (line 41)
+- new HashTable (line 35)
+- new Variable (line 37)
 - 2 class method(s)
 
 ### `ext/standard/pclose.php`
@@ -36176,26 +36176,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 240)
 - new ArgumentCountError (line 339)
 - new ArgumentCountError (line 344)
-- new ArgumentCountError (line 371)
-- new ArgumentCountError (line 376)
-- new ArgumentCountError (line 404)
-- new ArgumentCountError (line 407)
-- new ArgumentCountError (line 436)
-- new ArgumentCountError (line 439)
-- new ArgumentCountError (line 467)
-- new ArgumentCountError (line 472)
-- new ArgumentCountError (line 504)
-- new ArgumentCountError (line 509)
-- new ArgumentCountError (line 544)
-- new ArgumentCountError (line 573)
-- new ArgumentCountError (line 602)
-- new ArgumentCountError (line 627)
-- new ArgumentCountError (line 656)
-- new ArgumentCountError (line 685)
-- new ArgumentCountError (line 713)
-- new Error (line 798)
-- new ArgumentCountError (line 814)
-- new ArgumentCountError (line 953)
+- new ArgumentCountError (line 373)
+- new ArgumentCountError (line 378)
+- new ArgumentCountError (line 409)
+- new ArgumentCountError (line 412)
+- new ArgumentCountError (line 443)
+- new ArgumentCountError (line 446)
+- new ArgumentCountError (line 477)
+- new ArgumentCountError (line 482)
+- new ArgumentCountError (line 514)
+- new ArgumentCountError (line 519)
+- new ArgumentCountError (line 554)
+- new ArgumentCountError (line 583)
+- new ArgumentCountError (line 612)
+- new ArgumentCountError (line 637)
+- new ArgumentCountError (line 666)
+- new ArgumentCountError (line 695)
+- new ArgumentCountError (line 723)
+- new Error (line 808)
+- new ArgumentCountError (line 824)
+- new ArgumentCountError (line 963)
 - 41 class method(s)
 - 17 closure(s)
 
@@ -36242,18 +36242,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tidy/VmTidy.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 166)
-- new Variable (line 170)
-- new tidy (line 194)
-- new Error (line 210)
-- new ObjectEntry (line 305)
-- new Variable (line 309)
-- new HashTable (line 685)
-- new Variable (line 687)
-- new HashTable (line 1114)
-- new Variable (line 1116)
-- new HashTable (line 1141)
-- 51 class method(s)
+- new ObjectEntry (line 179)
+- new Variable (line 183)
+- new tidy (line 207)
+- new Error (line 223)
+- new ObjectEntry (line 318)
+- new Variable (line 322)
+- new HashTable (line 698)
+- new Variable (line 700)
+- new HashTable (line 1224)
+- new Variable (line 1226)
+- new HashTable (line 1251)
+- 55 class method(s)
 
 ### `ext/tidy/tidy_access_count.php`
 
@@ -36372,25 +36372,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/tidy/tidy_parse_file.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 40)
+- new Error (line 43)
 - 2 class method(s)
 
 ### `ext/tidy/tidy_parse_string.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 41)
+- new Error (line 43)
 - 2 class method(s)
 
 ### `ext/tidy/tidy_repair_file.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 39)
+- new Error (line 42)
 - 2 class method(s)
 
 ### `ext/tidy/tidy_repair_string.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 39)
+- new Error (line 41)
 - 2 class method(s)
 
 ### `ext/tidy/tidy_warning_count.php`

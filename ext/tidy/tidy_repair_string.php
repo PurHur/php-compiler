@@ -25,7 +25,9 @@ final class tidy_repair_string extends Internal
             return;
         }
         $html = VmTidy::htmlStringArg($frame->calledArgs[0], 'tidy_repair_string', 0);
-        $repaired = VmTidy::repairString($html, $frame);
+        $config = VmTidy::optionalConfigArg($frame->calledArgs, 1, 'tidy_repair_string');
+        $encoding = VmTidy::optionalEncodingArg($frame->calledArgs, 2, 'tidy_repair_string');
+        $repaired = VmTidy::repairString($html, $config, $encoding, $frame);
         if (false === $repaired) {
             $frame->returnVar->bool(false);
 

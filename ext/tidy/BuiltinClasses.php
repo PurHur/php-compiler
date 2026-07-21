@@ -350,7 +350,9 @@ final class TidyParseStringMethod extends VmClassMethod
             throw new \LogicException('tidy::parseString() called without $this');
         }
         $html = VmTidy::htmlStringArg($frame->calledArgs[1], 'tidy::parseString', 0);
-        $ok = VmTidy::parseStringInto($self->toObject(), $html, $frame);
+        $config = VmTidy::optionalConfigArg($frame->calledArgs, 2, 'tidy::parseString');
+        $encoding = VmTidy::optionalEncodingArg($frame->calledArgs, 3, 'tidy::parseString');
+        $ok = VmTidy::parseStringInto($self->toObject(), $html, $config, $encoding, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
         });
@@ -382,7 +384,10 @@ final class TidyParseFileMethod extends VmClassMethod
             throw new \LogicException('tidy::parseFile() called without $this');
         }
         $filename = VmTidy::htmlStringArg($frame->calledArgs[1], 'tidy::parseFile', 0);
-        $ok = VmTidy::parseFileInto($self->toObject(), $filename, $frame);
+        $config = VmTidy::optionalConfigArg($frame->calledArgs, 2, 'tidy::parseFile');
+        $encoding = VmTidy::optionalEncodingArg($frame->calledArgs, 3, 'tidy::parseFile');
+        $useIncludePath = VmTidy::optionalUseIncludePathArg($frame->calledArgs, 4);
+        $ok = VmTidy::parseFileInto($self->toObject(), $filename, $config, $encoding, $useIncludePath, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
         });
@@ -409,7 +414,9 @@ final class TidyRepairString extends VmClassMethod
             );
         }
         $html = VmTidy::htmlStringArg($frame->calledArgs[$offset], 'tidy::repairString', 0);
-        $repaired = VmTidy::repairString($html, $frame);
+        $config = VmTidy::optionalConfigArg($frame->calledArgs, $offset + 1, 'tidy::repairString');
+        $encoding = VmTidy::optionalEncodingArg($frame->calledArgs, $offset + 2, 'tidy::repairString');
+        $repaired = VmTidy::repairString($html, $config, $encoding, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($repaired): void {
             if (false === $repaired) {
                 $ret->bool(false);
@@ -441,7 +448,10 @@ final class TidyRepairFile extends VmClassMethod
             );
         }
         $filename = VmTidy::htmlStringArg($frame->calledArgs[$offset], 'tidy::repairFile', 0);
-        $repaired = VmTidy::repairFile($filename, $frame);
+        $config = VmTidy::optionalConfigArg($frame->calledArgs, $offset + 1, 'tidy::repairFile');
+        $encoding = VmTidy::optionalEncodingArg($frame->calledArgs, $offset + 2, 'tidy::repairFile');
+        $useIncludePath = VmTidy::optionalUseIncludePathArg($frame->calledArgs, $offset + 3);
+        $repaired = VmTidy::repairFile($filename, $config, $encoding, $useIncludePath, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($repaired): void {
             if (false === $repaired) {
                 $ret->bool(false);
