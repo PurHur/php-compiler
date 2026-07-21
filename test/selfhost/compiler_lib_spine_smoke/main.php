@@ -6270,6 +6270,8 @@ require_once __DIR__.'/../../../ext/dba/dba_sync.php';
 require_once __DIR__.'/../../../ext/tidy/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/tidy/Module.php';
 require_once __DIR__.'/../../../ext/tidy/TidyExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/tidy/TidyConstants.php';
+require_once __DIR__.'/../../../ext/tidy/tidy_get_opt_doc.php';
 require_once __DIR__.'/../../../ext/tidy/VmTidy.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_parse_string.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_parse_file.php';

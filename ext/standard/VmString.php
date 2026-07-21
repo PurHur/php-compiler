@@ -107,6 +107,7 @@ final class VmString
      * password_verify/password_needs_rehash/password_hash string operands soft-null (#21314/#21210; hash_equals stays TypeError).
      * hash()/hash_hmac()/hash_file()/hash_init() $algo soft-null (#21490/#21572, reverts #20304 TypeError).
      * version_compare($version1/$version2) soft-null (#21556, reverts #20254 TypeError; ext/standard/versioning.c).
+     * getimagesizefromstring($string) soft-null (#21492, reverts #20353 TypeError; ext/standard/image.c).
      * hash_pbkdf2($algo/$password/$salt) and hash_hkdf($algo/$key/$info/$salt) soft-null (#21319, reverts #20659/#21079).
      * str_rot13/crypt/uniqid/gzcompress soft-null (#21280).
      * hebrev($string) soft-null (#21421, ext/standard/string.c).
@@ -120,6 +121,7 @@ final class VmString
      * implode/join $separator soft-null (#21210, reverts #19894).
      * header($header), preg_quote($str), printf/fprintf($format) soft-null (#21234, reverts #19224/#20197).
      * xml_parse/xml_parse_into_struct $data soft-null (#21505, ext/xml/xml.c).
+     * simplexml_load_string($data) soft-null (#21502, reverts #20352 TypeError; ext/simplexml/simplexml.c).
      * token_get_all($source) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).
      * ini_get/ini_set $option and putenv $assignment soft-null (#21312, reverts #20361/#21004 TypeError).
      * parse_str $string / trigger_error|user_error $message soft-null (#21480).

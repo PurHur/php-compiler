@@ -32,7 +32,11 @@ class Module extends ModuleAbstract
         SoapExtensionPolicy::setUseSoapErrorHandler(false);
         foreach (SoapConstants::registeredConstants() as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
-            $var->int($value);
+            if (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int($value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
         BuiltinClasses::register($runtime->vmContext);

@@ -111,6 +111,7 @@ final class JitStringBuiltinArg
      * strlen/strtolower/strtoupper/strrev (#20007), md5/sha1/crc32/bin2hex/hash($data)/hash_hmac($data)/hash_hmac($key)/hash_update($data) (#21181, #21209, #21557),
      * hash()/hash_hmac()/hash_file()/hash_init() $algo soft-null (#21490/#21572, reverts #20304 TypeError),
      * version_compare($version1/$version2) soft-null (#21556, reverts #20254 TypeError; ext/standard/versioning.c),
+     * getimagesizefromstring($string) soft-null (#21492, reverts #20353 TypeError; ext/standard/image.c),
      * stripslashes/addcslashes/stripcslashes/quotemeta (+ decode siblings) (#21180), str_contains/str_starts_with/str_ends_with (#21187),
      * base64 encode/decode, url encode/decode, parse_url (#21188),
      * mb_strlen/mb_substr/mb_strpos + iconv/iconv_* string inputs (#21197),

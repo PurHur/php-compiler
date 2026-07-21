@@ -13,7 +13,8 @@ use PHPLLVM\Value;
 /**
  * getimagesizefromstring() — image metadata from bytes (ext/standard/image.c; #3271).
  *
- * Z_PARAM_STR: null coerces on default/8.2 profile; TypeError on PROFILE=8.4 (#20353, re-#19100).
+ * Z_PARAM_STR: null soft-coerces with E_DEPRECATED through PHP 8.4 (Zend 8.4.23), then empty
+ * bytes → E_NOTICE + false (#21492; reverts over-strict #20353 TypeError on PROFILE=8.4).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/image.c PHP_FUNCTION(getimagesizefromstring)
  * @see https://github.com/php/php-src/blob/master/ext/standard/image.stub.php
@@ -34,7 +35,7 @@ final class getimagesizefromstring extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'getimagesizefromstring', 0, 'string');
+        $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'getimagesizefromstring', 0, 'string');
         $imageinfo = null;
         if (2 === $argc) {
             $imageinfo = [];

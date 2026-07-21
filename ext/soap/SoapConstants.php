@@ -15,7 +15,8 @@ final class SoapConstants
     public const SOAP_LITERAL = 2;
     public const SOAP_ACTOR_NEXT = 1;
     public const SOAP_ACTOR_NONE = 2;
-    public const SOAP_ACTOR_UNLIMATED = 3;
+    /** php-src php_soap.h — intentional misspelling of "unlimited" (#21621). */
+    public const SOAP_ACTOR_UNLIMATERECEIVER = 3;
     public const SOAP_PERSISTENCE_SESSION = 1;
     public const SOAP_PERSISTENCE_REQUEST = 2;
     public const SOAP_FUNCTIONS_ALL = 999;
@@ -46,25 +47,58 @@ final class SoapConstants
     public const XSD_DECIMAL = 103;
     public const XSD_FLOAT = 104;
     public const XSD_DOUBLE = 105;
+    public const XSD_DURATION = 106;
     public const XSD_DATETIME = 107;
     public const XSD_TIME = 108;
     public const XSD_DATE = 109;
+    public const XSD_GYEARMONTH = 110;
+    public const XSD_GYEAR = 111;
+    public const XSD_GMONTHDAY = 112;
+    public const XSD_GDAY = 113;
+    public const XSD_GMONTH = 114;
     public const XSD_HEXBINARY = 115;
     public const XSD_BASE64BINARY = 116;
     public const XSD_ANYURI = 117;
     public const XSD_QNAME = 118;
+    public const XSD_NOTATION = 119;
+    public const XSD_NORMALIZEDSTRING = 120;
+    public const XSD_TOKEN = 121;
+    public const XSD_LANGUAGE = 122;
+    public const XSD_NMTOKEN = 123;
+    public const XSD_NAME = 124;
+    public const XSD_NCNAME = 125;
+    public const XSD_ID = 126;
+    public const XSD_IDREF = 127;
+    public const XSD_IDREFS = 128;
+    public const XSD_ENTITY = 129;
+    public const XSD_ENTITIES = 130;
     public const XSD_INTEGER = 131;
+    public const XSD_NONPOSITIVEINTEGER = 132;
+    public const XSD_NEGATIVEINTEGER = 133;
     public const XSD_LONG = 134;
     public const XSD_INT = 135;
     public const XSD_SHORT = 136;
     public const XSD_BYTE = 137;
+    public const XSD_NONNEGATIVEINTEGER = 138;
+    public const XSD_UNSIGNEDLONG = 139;
+    public const XSD_UNSIGNEDINT = 140;
+    public const XSD_UNSIGNEDSHORT = 141;
+    public const XSD_UNSIGNEDBYTE = 142;
+    public const XSD_POSITIVEINTEGER = 143;
+    public const XSD_NMTOKENS = 144;
     public const XSD_ANYTYPE = 145;
     public const XSD_ANYXML = 147;
+    public const APACHE_MAP = 200;
     public const SOAP_ENC_ARRAY = 300;
     public const SOAP_ENC_OBJECT = 301;
+    public const XSD_1999_TIMEINSTANT = 401;
     public const UNKNOWN_TYPE = 999998;
 
-    /** @return array<string, int> */
+    /** php-src php_encoding.h string namespaces (#21624). */
+    public const XSD_NAMESPACE = 'http://www.w3.org/2001/XMLSchema';
+    public const XSD_1999_NAMESPACE = 'http://www.w3.org/1999/XMLSchema';
+
+    /** @return array<string, int|string> */
     public static function registeredConstants(): array
     {
         return [
@@ -76,7 +110,7 @@ final class SoapConstants
             'SOAP_LITERAL' => self::SOAP_LITERAL,
             'SOAP_ACTOR_NEXT' => self::SOAP_ACTOR_NEXT,
             'SOAP_ACTOR_NONE' => self::SOAP_ACTOR_NONE,
-            'SOAP_ACTOR_UNLIMATED' => self::SOAP_ACTOR_UNLIMATED,
+            'SOAP_ACTOR_UNLIMATERECEIVER' => self::SOAP_ACTOR_UNLIMATERECEIVER,
             'SOAP_PERSISTENCE_SESSION' => self::SOAP_PERSISTENCE_SESSION,
             'SOAP_PERSISTENCE_REQUEST' => self::SOAP_PERSISTENCE_REQUEST,
             'SOAP_FUNCTIONS_ALL' => self::SOAP_FUNCTIONS_ALL,
@@ -101,23 +135,54 @@ final class SoapConstants
             'XSD_DECIMAL' => self::XSD_DECIMAL,
             'XSD_FLOAT' => self::XSD_FLOAT,
             'XSD_DOUBLE' => self::XSD_DOUBLE,
+            'XSD_DURATION' => self::XSD_DURATION,
             'XSD_DATETIME' => self::XSD_DATETIME,
             'XSD_TIME' => self::XSD_TIME,
             'XSD_DATE' => self::XSD_DATE,
+            'XSD_GYEARMONTH' => self::XSD_GYEARMONTH,
+            'XSD_GYEAR' => self::XSD_GYEAR,
+            'XSD_GMONTHDAY' => self::XSD_GMONTHDAY,
+            'XSD_GDAY' => self::XSD_GDAY,
+            'XSD_GMONTH' => self::XSD_GMONTH,
             'XSD_HEXBINARY' => self::XSD_HEXBINARY,
             'XSD_BASE64BINARY' => self::XSD_BASE64BINARY,
             'XSD_ANYURI' => self::XSD_ANYURI,
             'XSD_QNAME' => self::XSD_QNAME,
+            'XSD_NOTATION' => self::XSD_NOTATION,
+            'XSD_NORMALIZEDSTRING' => self::XSD_NORMALIZEDSTRING,
+            'XSD_TOKEN' => self::XSD_TOKEN,
+            'XSD_LANGUAGE' => self::XSD_LANGUAGE,
+            'XSD_NMTOKEN' => self::XSD_NMTOKEN,
+            'XSD_NAME' => self::XSD_NAME,
+            'XSD_NCNAME' => self::XSD_NCNAME,
+            'XSD_ID' => self::XSD_ID,
+            'XSD_IDREF' => self::XSD_IDREF,
+            'XSD_IDREFS' => self::XSD_IDREFS,
+            'XSD_ENTITY' => self::XSD_ENTITY,
+            'XSD_ENTITIES' => self::XSD_ENTITIES,
             'XSD_INTEGER' => self::XSD_INTEGER,
+            'XSD_NONPOSITIVEINTEGER' => self::XSD_NONPOSITIVEINTEGER,
+            'XSD_NEGATIVEINTEGER' => self::XSD_NEGATIVEINTEGER,
             'XSD_LONG' => self::XSD_LONG,
             'XSD_INT' => self::XSD_INT,
             'XSD_SHORT' => self::XSD_SHORT,
             'XSD_BYTE' => self::XSD_BYTE,
+            'XSD_NONNEGATIVEINTEGER' => self::XSD_NONNEGATIVEINTEGER,
+            'XSD_UNSIGNEDLONG' => self::XSD_UNSIGNEDLONG,
+            'XSD_UNSIGNEDINT' => self::XSD_UNSIGNEDINT,
+            'XSD_UNSIGNEDSHORT' => self::XSD_UNSIGNEDSHORT,
+            'XSD_UNSIGNEDBYTE' => self::XSD_UNSIGNEDBYTE,
+            'XSD_POSITIVEINTEGER' => self::XSD_POSITIVEINTEGER,
+            'XSD_NMTOKENS' => self::XSD_NMTOKENS,
             'XSD_ANYTYPE' => self::XSD_ANYTYPE,
             'XSD_ANYXML' => self::XSD_ANYXML,
+            'APACHE_MAP' => self::APACHE_MAP,
             'SOAP_ENC_ARRAY' => self::SOAP_ENC_ARRAY,
             'SOAP_ENC_OBJECT' => self::SOAP_ENC_OBJECT,
+            'XSD_1999_TIMEINSTANT' => self::XSD_1999_TIMEINSTANT,
             'UNKNOWN_TYPE' => self::UNKNOWN_TYPE,
+            'XSD_NAMESPACE' => self::XSD_NAMESPACE,
+            'XSD_1999_NAMESPACE' => self::XSD_1999_NAMESPACE,
         ];
     }
 }
