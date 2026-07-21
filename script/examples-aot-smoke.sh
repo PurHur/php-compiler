@@ -188,7 +188,7 @@ smoke_003_miniwebapp() {
 
 # 005-SessionsWeb project AOT + two-request session flash (#1891).
 smoke_005_sessionsweb() {
-  if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     echo "examples-aot-smoke: 005-SessionsWeb: skip (SESSIONS_WEB_AOT_SMOKE_GATE=0)"
     return 0
   fi
