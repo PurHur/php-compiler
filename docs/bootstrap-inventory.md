@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6322 |
-| Phase A inventory files (M2 ratio SSOT) | 6322 |
+| PHP files on vm.php path | 6326 |
+| Phase A inventory files (M2 ratio SSOT) | 6326 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20030 |
+| Source constructs flagged (warnings) | 20049 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1139,19 +1139,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
 | `ext/ldap/LdapExtensionPolicy.php` | 0 | 1 |
-| `ext/ldap/Module.php` | 0 | 26 |
+| `ext/ldap/Module.php` | 0 | 34 |
 | `ext/ldap/VmLdapArg.php` | 0 | 1 |
 | `ext/ldap/VmLdapConnection.php` | 0 | 4 |
 | `ext/ldap/VmLdapCore.php` | 0 | 4 |
 | `ext/ldap/VmLdapEscape.php` | 0 | 1 |
+| `ext/ldap/VmLdapModify.php` | 0 | 1 |
 | `ext/ldap/VmLdapNative.php` | 0 | 1 |
 | `ext/ldap/VmLdapResult.php` | 0 | 7 |
 | `ext/ldap/ldap_connect.php` | 0 | 2 |
 | `ext/ldap/ldap_connect_wallet.php` | 0 | 2 |
 | `ext/ldap/ldap_escape.php` | 0 | 2 |
 | `ext/ldap/ldap_exop_builtins.php` | 0 | 6 |
-| `ext/ldap/ldap_link_builtins.php` | 0 | 8 |
-| `ext/ldap/ldap_search_builtins.php` | 0 | 7 |
+| `ext/ldap/ldap_link_builtins.php` | 0 | 10 |
+| `ext/ldap/ldap_modify_builtins.php` | 0 | 4 |
+| `ext/ldap/ldap_search_builtins.php` | 0 | 8 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
 | `ext/libxml/LibxmlFunction.php` | 0 | 1 |
@@ -5343,12 +5345,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/HashTableAppend.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableCompareSpaceship.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableExportKeyValuePairs.php` | 0 | 6 |
+| `lib/JIT/Call/HashTableFind.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableFindIndex.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableGetNumElements.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableIsPackedList.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableIterate.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableKeysCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableKeysMatchingCopy.php` | 0 | 2 |
+| `lib/JIT/Call/HashTableMergeStringKeysFrom.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableNestedReceiver.php` | 0 | 1 |
 | `lib/JIT/Call/HashTablePadCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableUnshiftPrepend.php` | 0 | 2 |
@@ -15127,30 +15131,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 31)
-- new ldap_escape (line 55)
-- new ldap_connect (line 56)
-- new ldap_bind (line 57)
-- new ldap_unbind (line 58)
-- new ldap_close (line 59)
-- new ldap_errno (line 60)
-- new ldap_error (line 61)
-- new ldap_err2str (line 62)
-- new ldap_set_option (line 63)
-- new ldap_search (line 64)
-- new ldap_list (line 65)
-- new ldap_read (line 66)
-- new ldap_count_entries (line 67)
-- new ldap_get_entries (line 68)
-- new ldap_first_entry (line 69)
-- new ldap_next_entry (line 70)
-- new ldap_free_result (line 71)
-- new ldap_exop (line 72)
-- new ldap_exop_sync (line 73)
-- new ldap_parse_exop (line 74)
-- new ldap_exop_whoami (line 75)
-- new ldap_exop_refresh (line 76)
-- new ldap_exop_passwd (line 77)
-- new ldap_connect_wallet (line 81)
+- new ldap_escape (line 56)
+- new ldap_connect (line 57)
+- new ldap_bind (line 58)
+- new ldap_unbind (line 59)
+- new ldap_close (line 60)
+- new ldap_errno (line 61)
+- new ldap_error (line 62)
+- new ldap_err2str (line 63)
+- new ldap_set_option (line 64)
+- new ldap_get_option (line 65)
+- new ldap_start_tls (line 66)
+- new ldap_search (line 67)
+- new ldap_list (line 68)
+- new ldap_read (line 69)
+- new ldap_count_entries (line 70)
+- new ldap_get_entries (line 71)
+- new ldap_first_entry (line 72)
+- new ldap_next_entry (line 73)
+- new ldap_get_attributes (line 74)
+- new ldap_free_result (line 75)
+- new ldap_exop (line 76)
+- new ldap_exop_sync (line 77)
+- new ldap_parse_exop (line 78)
+- new ldap_exop_whoami (line 79)
+- new ldap_exop_refresh (line 80)
+- new ldap_exop_passwd (line 81)
+- new ldap_mod_add (line 82)
+- new ldap_mod_replace (line 83)
+- new ldap_mod_del (line 84)
+- new ldap_mod_batch (line 85)
+- new ldap_rename (line 86)
+- new ldap_connect_wallet (line 90)
 - 3 class method(s)
 
 ### `ext/ldap/VmLdapArg.php`
@@ -15169,20 +15181,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/VmLdapCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 126)
-- new Variable (line 138)
-- new Variable (line 149)
-- 7 class method(s)
+- new HashTable (line 150)
+- new Variable (line 162)
+- new Variable (line 173)
+- 8 class method(s)
 
 ### `ext/ldap/VmLdapEscape.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/ldap/VmLdapModify.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
 ### `ext/ldap/VmLdapNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 28 class method(s)
+- 31 class method(s)
 
 ### `ext/ldap/VmLdapResult.php`
 
@@ -15233,6 +15250,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 153)
 - new ArgumentCountError (line 181)
 - new ArgumentCountError (line 212)
+- new ArgumentCountError (line 262)
+- new ArgumentCountError (line 316)
+- 18 class method(s)
+
+### `ext/ldap/ldap_modify_builtins.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 122)
+- new ArgumentCountError (line 159)
 - 14 class method(s)
 
 ### `ext/ldap/ldap_search_builtins.php`
@@ -15244,7 +15271,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 230)
 - new ArgumentCountError (line 273)
 - new ArgumentCountError (line 318)
-- 20 class method(s)
+- new ArgumentCountError (line 354)
+- 22 class method(s)
 
 ### `ext/libxml/BuiltinClasses.php`
 
@@ -44537,6 +44565,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 203)
 - 9 class method(s)
 
+### `lib/JIT/Call/HashTableFind.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/HashTableFindIndex.php`
 
 **Warnings** (review for bootstrap subset):
@@ -44568,6 +44601,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 38)
 - 3 class method(s)
+
+### `lib/JIT/Call/HashTableMergeStringKeysFrom.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 35)
+- 2 class method(s)
 
 ### `lib/JIT/Call/HashTableNestedReceiver.php`
 
@@ -45737,7 +45776,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmHashTableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\HashTableWriteNested (line 54)
+- new Call\HashTableWriteNested (line 56)
 - 2 class method(s)
 
 ### `lib/JIT/NestedVmObjectMethodLlvm.php`
