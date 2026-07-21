@@ -9966,6 +9966,9 @@ class Compiler {
         if (null === $slot) {
             $slot = $this->findFuncCallExecReturnSlot($suppressCompiled);
         }
+        if (null === $slot) {
+            $slot = $this->findIncludeReturnSlot($suppressCompiled);
+        }
         if (null === $slot && $primary instanceof Op\Expr\ArrayDimFetch) {
             $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($suppressCompiled, 0);
         }
@@ -10067,7 +10070,8 @@ class Compiler {
                         continue;
                     }
                     if (
-                        $this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($endCompiled, $endChild, (int) $argIndex)
+                        $this->errorSuppressEndBlockCallArgHasTrailingIncludeProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingArrayDimFetchProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($endCompiled, $endChild, (int) $argIndex)
@@ -10192,7 +10196,7 @@ class Compiler {
 
     /**
      * php-cfg may leave include result usages empty when the value feeds a FuncCall arg
-     * in the {@see ErrorSuppressBlock} exit block (#12163, #10336).
+     * (distinct Temporary for the call arg) or an {@see ErrorSuppressBlock} exit (#12163, #10336, #21938).
      */
     private function includeNeedsReturnSlot(Operand $result, Block $block): bool
     {
@@ -10205,8 +10209,12 @@ class Compiler {
         if ($block->callResultFeedsErrorSuppressExit($result)) {
             return true;
         }
+        if (null !== $block->orig && $block->orig instanceof ErrorSuppressBlock) {
+            return true;
+        }
 
-        return null !== $block->orig && $block->orig instanceof ErrorSuppressBlock;
+        // var_export(require $f) / strlen(include $f): php-cfg usages stay empty (#21938).
+        return $this->callResultFeedsInlineCallArg($result, $block);
     }
 
     private function findFuncCallExecReturnSlot(Block $block): ?int
@@ -10215,6 +10223,19 @@ class Compiler {
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
                 $last = (int) $op->arg1;
+            }
+        }
+
+        return $last;
+    }
+
+    /** TYPE_INCLUDE result slot (arg2) — `@include` / `@require` expression value (#21938). */
+    private function findIncludeReturnSlot(Block $block): ?int
+    {
+        $last = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INCLUDE === $op->type && null !== $op->arg2) {
+                $last = (int) $op->arg2;
             }
         }
 
@@ -11627,13 +11648,10 @@ class Compiler {
 
     protected function compileIncludeOp(Op\Expr\Include_ $expr, Block $block): OpCode
     {
+        // Include expression value is independent of the enclosing function return type
+        // (void/never blocks must still materialize require/include results for call args) (#21938).
         $resultSlot = null;
-        if (
-            !$block->returnTypeVoid
-            && !$block->returnTypeNever
-            && isset($expr->result)
-            && $this->includeNeedsReturnSlot($expr->result, $block)
-        ) {
+        if (isset($expr->result) && $this->includeNeedsReturnSlot($expr->result, $block)) {
             $resultSlot = $this->compileOperand($expr->result, $block, false);
         }
 
@@ -24051,6 +24069,7 @@ class Compiler {
             || $op instanceof Op\Expr\BooleanNot
             || $op instanceof Op\Expr\Empty_
             || $op instanceof Op\Expr\Eval_
+            || $op instanceof Op\Expr\Include_
             || $op instanceof Op\Expr\Isset_
             || $op instanceof Op\Expr\InstanceOf_
             || $op instanceof Op\Expr\In_
@@ -39590,7 +39609,7 @@ class Compiler {
         return $this->operandsReferToSameVariable($callArg, $primary->result);
     }
 
-    /** FUNCCALL_EXEC_RETURN slot from the {@see ErrorSuppressBlock} parent (#15916). */
+    /** FUNCCALL_EXEC_RETURN / TYPE_INCLUDE slot from the {@see ErrorSuppressBlock} parent (#15916, #21938). */
     private function errorSuppressEndBlockInnerResultSlot(Block $block): ?int
     {
         if ($this->errorSuppressEndBlockDiscardsInnerResultForErrorGetLast($block)) {
@@ -39608,8 +39627,19 @@ class Compiler {
         if (!$parentCompiled instanceof Block) {
             return null;
         }
+        $primary = $this->findErrorSuppressPrimaryInnerExpr($parentCfg);
+        if (null !== $primary && isset($primary->result)) {
+            $bound = $parentCompiled->slotForOperand($primary->result);
+            if (null !== $bound) {
+                return (int) $bound;
+            }
+        }
+        $execReturn = $this->findFuncCallExecReturnSlot($parentCompiled);
+        if (null !== $execReturn) {
+            return $execReturn;
+        }
 
-        return $this->findFuncCallExecReturnSlot($parentCompiled);
+        return $this->findIncludeReturnSlot($parentCompiled);
     }
 
     private function isFirstNonEmbeddedDeadInlineCallArg(Op $cfgCallOp, int $argIndex): bool
@@ -39642,6 +39672,10 @@ class Compiler {
         if ($this->errorSuppressEndBlockDiscardsInnerResultForErrorGetLast($block)) {
             return null;
         }
+        // `@mkdir(...); var_export(require $f)` — include in the end block feeds the call, not @mkdir (#21938).
+        if ($this->errorSuppressEndBlockCallArgHasTrailingIncludeProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
         if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
@@ -39659,6 +39693,42 @@ class Compiler {
         }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
+    }
+
+    /**
+     * `var_export(require $f)` after `@mkdir` — Include_ in the post-silence block feeds arg #0 (#21938).
+     */
+    private function errorSuppressEndBlockCallArgHasTrailingIncludeProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        $producer = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$producer instanceof Op\Expr\Include_ && !$producer instanceof Op\Expr\Eval_) {
+            return false;
+        }
+        if (
+            null !== $producer->result
+            && $this->operandsReferToSameVariable($producer->result, $callArg)
+        ) {
+            return true;
+        }
+
+        return $this->isFirstNonEmbeddedDeadInlineCallArg($cfgCallOp, $argIndex);
     }
 
     /**
