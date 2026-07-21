@@ -1,5 +1,5 @@
 --TEST--
-ext/ftp ftp_connect()/ftp_ssl_connect(null) — soft coerce under 8.2 profile (#20484, ext/ftp/php_ftp.c)
+ext/ftp ftp_connect()/ftp_ssl_connect(null) — soft coerce (#21757 / #20484, ext/ftp/php_ftp.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.2
 --SKIPIF--
