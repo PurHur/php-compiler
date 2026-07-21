@@ -167,6 +167,41 @@ final class VmPhar
     }
 
     /**
+     * Phar::getSupportedCompression() — php-src zim_Phar_getSupportedCompression (#21650).
+     *
+     * @return list<string>
+     */
+    public static function getSupportedCompression(): array
+    {
+        $out = [];
+        if (self::canCompress(self::COMPRESSED_GZ)) {
+            $out[] = 'GZ';
+        }
+        if (self::canCompress(self::COMPRESSED_BZ2)) {
+            $out[] = 'BZ2';
+        }
+
+        return $out;
+    }
+
+    /**
+     * Phar::getSupportedSignatures() — php-src zim_Phar_getSupportedSignatures (#21650).
+     *
+     * @return list<string>
+     */
+    public static function getSupportedSignatures(): array
+    {
+        $out = ['MD5', 'SHA-1', 'SHA-256', 'SHA-512'];
+        if (\extension_loaded('openssl')) {
+            $out[] = 'OpenSSL';
+            $out[] = 'OpenSSL_SHA256';
+            $out[] = 'OpenSSL_SHA512';
+        }
+
+        return $out;
+    }
+
+    /**
      * Phar::isValidPharFilename() — phar_detect_phar_fname_ext(..., for_create=2).
      *
      * for_create=2 treats missing relative paths as valid when the extension rules pass
