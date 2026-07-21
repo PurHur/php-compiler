@@ -366,7 +366,7 @@ final class CiScriptsTest extends TestCase
         $body = (string) file_get_contents(dirname(__DIR__, 2).'/script/ci-common.sh');
         $this->assertStringContainsString('ci_run_fastcgi_smoke', $body);
         $this->assertStringContainsString('FASTCGI_SMOKE_GATE:-0', $body);
-        $this->assertStringContainsString("--filter 'FastCgiRecordTest|FastCgiTest'", $body);
+        $this->assertStringContainsString('fastcgi-smoke.sh', $body);
     }
 
     public function testCiLocalRunsFastcgiSmokeGate(): void

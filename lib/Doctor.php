@@ -1171,7 +1171,7 @@ final class Doctor
             $fcgiSmokeDefault,
             $fcgiSmokeOn,
             false,
-            'FASTCGI_SMOKE_GATE=1 ./script/ci-local.sh --filter FastCgiRecordTest|FastCgiTest (#173, #1899)',
+            'FASTCGI_SMOKE_GATE=1 ./script/fastcgi-smoke.sh · make fastcgi-smoke (#173, #1899)',
             '#173'
         );
         $aotStatus = $aotOn && $llvmReady ? '✅' : '📋';

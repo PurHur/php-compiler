@@ -1277,7 +1277,7 @@ ci_run_fastcgi_smoke() {
     return 0
   fi
   echo "PHPUnit: FastCGI adapter (FastCgi*; FASTCGI_SMOKE_GATE=1, #173, #1899)..."
-  ci_run_phpunit --filter 'FastCgiRecordTest|FastCgiTest' "$@"
+  FASTCGI_SMOKE_GATE=1 "$_CI_SCRIPT_DIR/fastcgi-smoke.sh" "$@"
 }
 
 # Shell curl harness for 009-FastCGIWeb health + PATH_INFO (issue #2351).
