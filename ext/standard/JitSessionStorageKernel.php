@@ -303,7 +303,6 @@ final class JitSessionStorageKernel
 
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
-        $strPtr = $context->getTypeFromString('__string__*');
         $idLen = $context->builder->load(SessionStorageGlobals::$idLenGlobal);
         $hasId = $context->builder->icmp(Builder::INT_SGT, $idLen, $i64->constInt(0, false));
         $bbDone = BasicBlockHelper::append($context, 'ss_setcookie_bridge_done');
@@ -318,16 +317,18 @@ final class JitSessionStorageKernel
         );
         $valueStr = self::bufferToString($context, SessionStorageGlobals::$idBufGlobal, $idLen);
         $pathStr = self::literalString($context, '/');
+        // NestedJIT PendingHeadersJitHelper::addSetcookie expects string, not null (#21892).
+        $emptyStr = self::literalString($context, '');
         $context->builder->call(
             $context->lookupFunction('__phpc_setcookie_add'),
             $nameStr,
             $valueStr,
             $i64->constInt(0, false),
             $pathStr,
-            $strPtr->constNull(),
+            $emptyStr,
             $i32->constInt(0, false),
             $i32->constInt(0, false),
-            $strPtr->constNull(),
+            $emptyStr,
             $i32->constInt(0, false)
         );
         $context->builder->branch($bbDone);

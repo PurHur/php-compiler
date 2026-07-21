@@ -26,21 +26,12 @@ final class SessionStart
 
     public static function emitWriteBool(Context $context, Value $outPtr, bool $value): void
     {
-        $valMap = $context->structFieldMap['__value__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $context->builder->store(
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false),
-            $context->builder->structGep($outPtr, $valMap['type'])
+        // Use the canonical value-box ABI (same as JitValueBox::writeBool) — #21892.
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $outPtr,
+            $context->getTypeFromString('int32')->constInt($value ? 1 : 0, false)
         );
-        $valueField = $context->builder->structGep($outPtr, $valMap['value']);
-        $firstByte = $context->builder->inBoundsGEP(
-            $valueField,
-            $i32->constInt(0, false),
-            $i64->constInt(0, false)
-        );
-        $context->builder->store($i8->constInt($value ? 1 : 0, false), $firstByte);
     }
 
     /**

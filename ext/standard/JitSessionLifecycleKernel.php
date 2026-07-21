@@ -111,7 +111,8 @@ final class JitSessionLifecycleKernel
         $context->builder->branchIf($isActive, $bbInactive, $bbCheckHeaders);
 
         $context->builder->positionAtEnd($bbInactive);
-        SessionStart::emitWriteBool($context, $outPtr, false);
+        // php-src: session already active → true (+ E_NOTICE); not false.
+        SessionStart::emitWriteBool($context, $outPtr, true);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbCheckHeaders);
