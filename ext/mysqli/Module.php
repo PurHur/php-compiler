@@ -61,6 +61,8 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_rollback.php';
         require_once __DIR__.'/mysqli_savepoint.php';
         require_once __DIR__.'/mysqli_release_savepoint.php';
+        require_once __DIR__.'/mysqli_refresh.php';
+        require_once __DIR__.'/mysqli_get_connection_stats.php';
         parent::init($runtime);
         if (!MysqliExtensionPolicy::advertisesExtension()) {
             return;
@@ -114,6 +116,8 @@ class Module extends ModuleAbstract
             new mysqli_rollback(),
             new mysqli_savepoint(),
             new mysqli_release_savepoint(),
+            new mysqli_refresh(),
+            new mysqli_get_connection_stats(),
         ];
     }
 }
