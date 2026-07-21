@@ -1565,9 +1565,9 @@ ci_run_fastcgi_web_aot_execute() {
   ci_run_phpunit --group fastcgiweb-aot-execute "$@"
 }
 
-# 005-SessionsWeb AOT binary CLI execute (issue #1891); opt-in SESSIONS_WEB_AOT_SMOKE_GATE=1.
+# 005-SessionsWeb AOT binary CLI execute (issue #1891); default SESSIONS_WEB_AOT_SMOKE_GATE=1 (#1923).
 ci_run_sessions_web_aot_execute() {
-  if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-0}" != "1" ]]; then
+  if [[ "${SESSIONS_WEB_AOT_SMOKE_GATE:-1}" != "1" ]]; then
     return 0
   fi
   if ! ci_llvm_ready; then

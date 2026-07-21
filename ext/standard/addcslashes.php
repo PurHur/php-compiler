@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\StringCslashes;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\InternalStrictArg;
@@ -21,9 +22,8 @@ final class addcslashes extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#21756).
+        $this->requireExactArgCount($frame, 'addcslashes', 2);
         // php-src basic_functions.stub.php: addcslashes(string $string, string $characters)
         $subject = self::vmStringArg($frame, 0, 'string');
         $charlist = self::vmStringArg($frame, 1, 'characters');
@@ -35,8 +35,10 @@ final class addcslashes extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, 'addcslashes', 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         $subjectLit = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
         $charlistLit = JitStringArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;

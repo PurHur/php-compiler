@@ -1703,7 +1703,7 @@ function sessionsWebNorthStarDefinitions(): array
             'aot' => 'yes',
             'issue' => 1881,
             'notes' => [
-                '#1881 VM serve + session smoke (#1887); AOT link #1946; execute #1891; ci-local gates opt-in (#1923, #1967)',
+                '#1881 VM serve + session smoke (#1887); AOT link #1946; execute #1891; ci-local AOT execute default-on (#1923)',
             ],
         ],
         [
@@ -1728,7 +1728,7 @@ function sessionsWebNorthStarDefinitions(): array
             'jit' => 'n/a',
             'aot' => 'yes',
             'issue' => 1891,
-            'notes' => ['SessionsWebAotExecuteTest; opt-in SESSIONS_WEB_AOT_SMOKE_GATE (#1923)'],
+            'notes' => ['SessionsWebAotExecuteTest; SESSIONS_WEB_AOT_SMOKE_GATE default-on (#1923)'],
         ],
     ];
 }
