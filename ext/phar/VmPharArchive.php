@@ -30,6 +30,9 @@ final class VmPharArchive
     /** Reserved ustar member for archive metadata (#21229). */
     private const META_ENTRY = '.phar/metadata';
 
+    /** Reserved ustar member for per-entry metadata map (#21651). */
+    private const ENTRY_META = '.phar/entrymeta';
+
     /**
      * @var array<int, array{
      *   path: string,
@@ -41,6 +44,7 @@ final class VmPharArchive
      *   alias: string,
      *   hasMetadata: bool,
      *   metadata: mixed,
+     *   fileMetadata: array<string, mixed>,
      *   wholeCompression: int
      *   sigFlags: int
      *   signature: string
@@ -69,7 +73,8 @@ final class VmPharArchive
         int $wholeCompression = VmPhar::COMPRESSED_NONE,
         int $sigFlags = 0,
         string $signature = '',
-        ?string $sigPrivateKey = null
+        ?string $sigPrivateKey = null,
+        array $fileMetadata = []
     ): void {
         if ('' === $stub) {
             $stub = self::createDefaultStub();
@@ -84,11 +89,13 @@ final class VmPharArchive
             'alias' => $alias,
             'hasMetadata' => $hasMetadata,
             'metadata' => $metadata,
+            'fileMetadata' => $fileMetadata,
             'wholeCompression' => $wholeCompression,
             'sigFlags' => $sigFlags,
             'signature' => $signature,
             'sigPrivateKey' => $sigPrivateKey,
         ];
+        self::$objectsByPath[$path] = $object;
     }
 
     public static function open(ObjectEntry $object, string $path): void
@@ -118,6 +125,13 @@ final class VmPharArchive
                 $metadata = '' === $raw ? null : \unserialize($raw);
                 unset($entries['files'][self::META_ENTRY]);
             }
+            $fileMetadata = [];
+            if (isset($entries['files'][self::ENTRY_META])) {
+                $raw = $entries['files'][self::ENTRY_META];
+                $decoded = '' === $raw ? [] : \unserialize($raw);
+                $fileMetadata = \is_array($decoded) ? $decoded : [];
+                unset($entries['files'][self::ENTRY_META]);
+            }
             self::bind(
                 $object,
                 $path,
@@ -129,7 +143,11 @@ final class VmPharArchive
                 false,
                 $hasMetadata,
                 $metadata,
-                $wholeCompression
+                $wholeCompression,
+                0,
+                '',
+                null,
+                $fileMetadata
             );
             self::registerFilenameMap($path);
 
@@ -368,6 +386,7 @@ final class VmPharArchive
             throw new \BadMethodCallException('Entry '.$localname.' does not exist and cannot be deleted');
         }
         unset(self::$state[$object->id]['files'][$localname], self::$state[$object->id]['dirs'][$localname]);
+        unset(self::$state[$object->id]['fileMetadata'][$localname]);
         self::markDirty($object);
 
         return true;
@@ -405,6 +424,71 @@ final class VmPharArchive
         self::$state[$object->id]['hasMetadata'] = false;
         self::$state[$object->id]['metadata'] = null;
         self::markDirty($object);
+
+        return true;
+    }
+
+    /** @var array<string, ObjectEntry> path → live Phar object (#21651). */
+    private static array $objectsByPath = [];
+
+    /**
+     * Look up live archive ObjectEntry by on-disk path (PharFileInfo entry metadata; #21651).
+     */
+    public static function objectByPath(string $archivePath): ?ObjectEntry
+    {
+        $archivePath = \str_replace('\\', '/', $archivePath);
+
+        return self::$objectsByPath[$archivePath] ?? null;
+    }
+
+    /** @return array{has: bool, value: mixed} */
+    public static function getEntryMetadata(string $archivePath, string $localname): array
+    {
+        $object = self::objectByPath($archivePath);
+        if (null === $object || !isset(self::$state[$object->id])) {
+            return ['has' => false, 'value' => null];
+        }
+        $map = self::$state[$object->id]['fileMetadata'] ?? [];
+        if (!\array_key_exists($localname, $map)) {
+            return ['has' => false, 'value' => null];
+        }
+
+        return ['has' => true, 'value' => $map[$localname]];
+    }
+
+    public static function setEntryMetadata(string $archivePath, string $localname, mixed $metadata): void
+    {
+        if (!VmPhar::canWrite()) {
+            throw new \BadMethodCallException(
+                'Write operations disabled by the php.ini setting phar.readonly'
+            );
+        }
+        $object = self::objectByPath($archivePath);
+        if (null === $object || !isset(self::$state[$object->id])) {
+            throw new \BadMethodCallException('Cannot set file metadata, phar archive is not open');
+        }
+        if (!isset(self::$state[$object->id]['fileMetadata'])) {
+            self::$state[$object->id]['fileMetadata'] = [];
+        }
+        self::$state[$object->id]['fileMetadata'][$localname] = $metadata;
+        self::markDirty($object);
+    }
+
+    public static function delEntryMetadata(string $archivePath, string $localname): bool
+    {
+        if (!VmPhar::canWrite()) {
+            throw new \BadMethodCallException(
+                'Write operations disabled by the php.ini setting phar.readonly'
+            );
+        }
+        $object = self::objectByPath($archivePath);
+        if (null === $object || !isset(self::$state[$object->id])) {
+            return true;
+        }
+        if (isset(self::$state[$object->id]['fileMetadata'][$localname])) {
+            unset(self::$state[$object->id]['fileMetadata'][$localname]);
+            self::markDirty($object);
+        }
 
         return true;
     }
@@ -498,7 +582,11 @@ final class VmPharArchive
             false,
             $st['hasMetadata'],
             $st['metadata'],
-            VmPhar::COMPRESSED_GZ
+            VmPhar::COMPRESSED_GZ,
+            0,
+            '',
+            null,
+            $st['fileMetadata'] ?? []
         );
 
         return $out;
@@ -543,7 +631,11 @@ final class VmPharArchive
             false,
             $st['hasMetadata'],
             $st['metadata'],
-            VmPhar::COMPRESSED_NONE
+            VmPhar::COMPRESSED_NONE,
+            0,
+            '',
+            null,
+            $st['fileMetadata'] ?? []
         );
 
         return $out;
@@ -624,7 +716,11 @@ final class VmPharArchive
             false,
             $st['hasMetadata'],
             $st['metadata'],
-            VmPhar::COMPRESSED_NONE
+            VmPhar::COMPRESSED_NONE,
+            0,
+            '',
+            null,
+            $st['fileMetadata'] ?? []
         );
 
         return $out;
@@ -862,6 +958,10 @@ final class VmPharArchive
         }
         $var = new Variable(Variable::TYPE_OBJECT);
         $info = VmPharFileInfo::createFromEntry($ctx, $st['path'], $localname, $st['files'][$localname]);
+        $entryMeta = self::getEntryMetadata($st['path'], $localname);
+        if ($entryMeta['has']) {
+            VmPharFileInfo::hydrateMetadata($info, $entryMeta['value']);
+        }
         $var->object($info);
 
         return $var;
@@ -873,6 +973,7 @@ final class VmPharArchive
         self::requireState($object);
         $localname = \rtrim(\ltrim(\str_replace('\\', '/', $localname), '/'), '/');
         unset(self::$state[$object->id]['files'][$localname], self::$state[$object->id]['dirs'][$localname]);
+        unset(self::$state[$object->id]['fileMetadata'][$localname]);
         self::markDirty($object);
     }
 
@@ -956,6 +1057,9 @@ final class VmPharArchive
         $files = $st['files'];
         if ($st['hasMetadata']) {
             $files[self::META_ENTRY] = \serialize($st['metadata']);
+        }
+        if ([] !== ($st['fileMetadata'] ?? [])) {
+            $files[self::ENTRY_META] = \serialize($st['fileMetadata']);
         }
 
         return $stub.VmPharTar::writeArchive($files, $st['dirs']);
