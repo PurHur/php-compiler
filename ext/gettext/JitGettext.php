@@ -34,12 +34,13 @@ final class JitGettext
             );
         }
 
+        // Soft-null msgid on 8.4 — Zend deprecate+coerce (#21581, reverts #20209 TypeError).
         return self::writeStringResult(
             $context,
             self::callStringFn(
                 $context,
                 '__compiler_gettext',
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], $function, 0, 'msgid')
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], $function, 0, 'msgid')
             )
         );
     }
@@ -57,8 +58,8 @@ final class JitGettext
             self::callStringFn(
                 $context,
                 '__compiler_dgettext',
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'dgettext', 0, 'domain'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'dgettext', 1, 'message')
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'dgettext', 0, 'domain'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'dgettext', 1, 'message')
             )
         );
     }
@@ -82,8 +83,8 @@ final class JitGettext
             self::callStringFn(
                 $context,
                 '__compiler_dcgettext',
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'dcgettext', 0, 'domain'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'dcgettext', 1, 'message'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'dcgettext', 0, 'domain'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'dcgettext', 1, 'message'),
                 $category
             )
         );
@@ -102,8 +103,8 @@ final class JitGettext
             self::callStringFn(
                 $context,
                 '__compiler_ngettext',
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'ngettext', 0, 'msgid1'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'ngettext', 1, 'msgid2'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'ngettext', 0, 'msgid1'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'ngettext', 1, 'msgid2'),
                 JitLongArg::lower($context, $args[2], 'ngettext() count')
             )
         );
@@ -122,9 +123,9 @@ final class JitGettext
             self::callStringFn(
                 $context,
                 '__compiler_dngettext',
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'dngettext', 0, 'domain'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'dngettext', 1, 'msgid1'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'dngettext', 2, 'msgid2'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'dngettext', 0, 'domain'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'dngettext', 1, 'msgid1'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[2], 'dngettext', 2, 'msgid2'),
                 JitLongArg::lower($context, $args[3], 'dngettext() count')
             )
         );
@@ -143,9 +144,9 @@ final class JitGettext
             self::callStringFn(
                 $context,
                 '__compiler_dcngettext',
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'dcngettext', 0, 'domain'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'dcngettext', 1, 'msgid1'),
-                JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'dcngettext', 2, 'msgid2'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'dcngettext', 0, 'domain'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'dcngettext', 1, 'msgid1'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[2], 'dcngettext', 2, 'msgid2'),
                 JitLongArg::lower($context, $args[3], 'dcngettext() count'),
                 JitLongArg::lower($context, $args[4], 'dcngettext() category')
             )
@@ -163,7 +164,8 @@ final class JitGettext
         }
 
         StringGettext::ensureLinked($context);
-        $domain = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'bindtextdomain', 0, 'domain');
+        // Soft-null domain → '' then empty-domain ValueError in Native (#21581).
+        $domain = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'bindtextdomain', 0, 'domain');
         $dir = 2 === $argc
             ? JitStringBuiltinArg::lowerNullableString($context, $args[1], 'bindtextdomain', 1, 'directory')
             : $context->getTypeFromString('__string__*')->constNull();
@@ -200,7 +202,7 @@ final class JitGettext
         }
 
         StringGettext::ensureLinked($context);
-        $domain = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'bind_textdomain_codeset', 0, 'domain');
+        $domain = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'bind_textdomain_codeset', 0, 'domain');
         $codeset = 2 === $argc
             ? JitStringBuiltinArg::lowerNullableString($context, $args[1], 'bind_textdomain_codeset', 1, 'codeset')
             : $context->getTypeFromString('__string__*')->constNull();

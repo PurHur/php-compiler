@@ -1,27 +1,55 @@
 --TEST--
-stdlib gettext/_/dgettext(null) TypeError on 8.4 forward profile (#20209, ext/gettext/gettext.c)
+stdlib gettext/_/dgettext/ngettext(null) soft-null DEP+'' on 8.4 (#21581, reverts #20209, ext/gettext/gettext.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL);
+$seenDep = 0;
+set_error_handler(static function (int $no, string $msg) use (&$seenDep): bool {
+    if (E_DEPRECATED === $no) {
+        $seenDep++;
+        return true;
+    }
+    return false;
+});
 foreach (['gettext', '_'] as $fn) {
     try {
         $r = $fn(null);
-        echo $fn, ': COERCED ', var_export($r, true), "\n";
-    } catch (TypeError $e) {
-        echo $fn, ': ', $e->getMessage(), "\n";
+        echo $fn, ': ', var_export($r, true), "\n";
+    } catch (Throwable $e) {
+        echo $fn, ': ', get_class($e), ' ', $e->getMessage(), "\n";
     }
 }
 try {
     $r = dgettext('messages', null);
-    echo 'dgettext: COERCED ', var_export($r, true), "\n";
-} catch (TypeError $e) {
-    echo 'dgettext: ', $e->getMessage(), "\n";
+    echo 'dgettext: ', var_export($r, true), "\n";
+} catch (Throwable $e) {
+    echo 'dgettext: ', get_class($e), ' ', $e->getMessage(), "\n";
 }
+try {
+    $r = ngettext(null, null, 1);
+    echo 'ngettext: ', var_export($r, true), "\n";
+} catch (Throwable $e) {
+    echo 'ngettext: ', get_class($e), ' ', $e->getMessage(), "\n";
+}
+try {
+    bindtextdomain(null, '/tmp');
+    echo "bindtextdomain: ok\n";
+} catch (ValueError $e) {
+    echo 'bindtextdomain: ValueError ', (str_contains($e->getMessage(), 'must not be empty') ? 'empty' : $e->getMessage()), "\n";
+} catch (Throwable $e) {
+    echo 'bindtextdomain: ', get_class($e), "\n";
+}
+restore_error_handler();
+echo 'depr=', (int) ($seenDep >= 4), "\n";
 echo 'ok_string=', gettext('hello'), "\n";
 ?>
 --EXPECT--
-gettext: gettext(): Argument #1 ($msgid) must be of type string, null given
-_: _(): Argument #1 ($msgid) must be of type string, null given
-dgettext: dgettext(): Argument #2 ($message) must be of type string, null given
+gettext: ''
+_: ''
+dgettext: ''
+ngettext: ''
+bindtextdomain: ValueError empty
+depr=1
 ok_string=hello

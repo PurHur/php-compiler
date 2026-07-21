@@ -39,11 +39,15 @@ final class VmGettextNative
 
     public static function dgettext(string $domain, string $msgid): string
     {
+        self::rejectEmptyDomain($domain, 'dgettext');
+
         return VmGettextPure::translate($domain, $msgid, self::LC_MESSAGES);
     }
 
     public static function dcgettext(string $domain, string $msgid, int $category): string
     {
+        self::rejectEmptyDomain($domain, 'dcgettext');
+
         return VmGettextPure::translate($domain, $msgid, $category);
     }
 
@@ -54,6 +58,8 @@ final class VmGettextNative
 
     public static function dngettext(string $domain, string $msgid1, string $msgid2, int $n): string
     {
+        self::rejectEmptyDomain($domain, 'dngettext');
+
         return VmGettextPure::translatePlural($domain, $msgid1, $msgid2, $n, self::LC_MESSAGES);
     }
 
@@ -64,11 +70,15 @@ final class VmGettextNative
         int $n,
         int $category
     ): string {
+        self::rejectEmptyDomain($domain, 'dcngettext');
+
         return VmGettextPure::translatePlural($domain, $msgid1, $msgid2, $n, $category);
     }
 
     public static function bindtextdomain(string $domain, ?string $directory): string|false
     {
+        // PHP_GETTEXT_DOMAIN_LENGTH_CHECK — empty domain ValueError after soft-null (#21581).
+        self::rejectEmptyDomain($domain, 'bindtextdomain');
         $previous = self::$domainPaths[$domain] ?? '';
         if (null === $directory) {
             return '' === $previous ? false : $previous;
@@ -85,6 +95,7 @@ final class VmGettextNative
         if (null === $domain) {
             return '' === $previous ? false : $previous;
         }
+        self::rejectEmptyDomain($domain, 'textdomain');
 
         self::$currentDomain = $domain;
 
@@ -93,6 +104,7 @@ final class VmGettextNative
 
     public static function bindTextdomainCodeset(string $domain, ?string $codeset): string|false
     {
+        self::rejectEmptyDomain($domain, 'bind_textdomain_codeset');
         $previous = self::$domainCodesets[$domain] ?? '';
         if (null === $codeset) {
             return '' === $previous ? false : $previous;
@@ -101,6 +113,21 @@ final class VmGettextNative
         self::$domainCodesets[$domain] = $codeset;
 
         return '' === $previous ? $codeset : $previous;
+    }
+
+    /**
+     * php-src PHP_GETTEXT_DOMAIN_LENGTH_CHECK — zend_argument_must_not_be_empty_error (#21581).
+     *
+     * @throws \ValueError when $domain is empty
+     */
+    private static function rejectEmptyDomain(string $domain, string $function): void
+    {
+        if ('' === $domain) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #1 ($domain) must not be empty',
+                $function
+            ));
+        }
     }
 
     public static function defaultCategory(): int

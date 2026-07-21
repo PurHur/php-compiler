@@ -149,6 +149,7 @@ final class JitStringBuiltinArg
      * implode/join $separator soft-null (#21210, reverts #19894).
      * header($header), preg_quote($str), printf/fprintf($format) soft-null (#21234, reverts #19224/#20197).
      * token_get_all($source) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).
+     * gettext/_/dgettext/ngettext msgid + domain soft-null (#21581, reverts #20209 TypeError; ext/gettext/gettext.c).
      */
     public static function lowerTrimFamilyString(
         Context $context,

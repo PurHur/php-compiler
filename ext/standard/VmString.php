@@ -125,6 +125,7 @@ final class VmString
      * token_get_all($source) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).
      * ini_get/ini_set $option and putenv $assignment soft-null (#21312, reverts #20361/#21004 TypeError).
      * parse_str $string / trigger_error|user_error $message soft-null (#21480).
+     * gettext/_/dgettext/ngettext msgid + domain soft-null (#21581, reverts #20209 TypeError; ext/gettext/gettext.c).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,
