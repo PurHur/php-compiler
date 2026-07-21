@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6237 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19684 |
+| Source constructs flagged (warnings) | 19688 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1480,7 +1480,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/PharDataBuiltin.php` | 0 | 17 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 4 |
-| `ext/phar/VmPharArchive.php` | 0 | 57 |
+| `ext/phar/VmPharArchive.php` | 0 | 60 |
 | `ext/phar/VmPharData.php` | 0 | 32 |
 | `ext/phar/VmPharFileInfo.php` | 0 | 17 |
 | `ext/phar/VmPharStream.php` | 0 | 10 |
@@ -5536,7 +5536,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
 | `lib/TryCatchElseSyntaxRejector.php` | 0 | 2 |
 | `lib/TypedFunctionStaticSyntaxRejector.php` | 0 | 2 |
-| `lib/VM.php` | 0 | 272 |
+| `lib/VM.php` | 0 | 273 |
 | `lib/VM/AbstractPropertyHookCheck.php` | 0 | 1 |
 | `lib/VM/ArrayAccessDimension.php` | 0 | 3 |
 | `lib/VM/ArraySpread.php` | 0 | 2 |
@@ -17917,36 +17917,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new UnexpectedValueException (line 675)
 - new ObjectEntry (line 677)
 - new BadMethodCallException (line 711)
-- new BadMethodCallException (line 714)
-- new UnexpectedValueException (line 725)
-- new ObjectEntry (line 730)
-- new UnexpectedValueException (line 781)
-- new ObjectEntry (line 786)
-- new BadMethodCallException (line 802)
-- new BadMethodCallException (line 805)
-- new UnexpectedValueException (line 820)
-- new ObjectEntry (line 823)
-- new UnexpectedValueException (line 892)
-- new UnexpectedValueException (line 897)
-- new UnexpectedValueException (line 902)
-- new UnexpectedValueException (line 950)
-- new PharException (line 1031)
-- new PharException (line 1043)
-- new UnexpectedValueException (line 1048)
-- new BadMethodCallException (line 1072)
-- new BadMethodCallException (line 1075)
-- new Variable (line 1077)
-- new Error (line 1131)
-- new UnexpectedValueException (line 1199)
-- new UnexpectedValueException (line 1208)
-- new UnexpectedValueException (line 1213)
-- new PharException (line 1230)
-- new PharException (line 1240)
-- new Error (line 1275)
-- new PharException (line 1294)
-- new PharException (line 1300)
-- new PharException (line 1307)
-- new PharException (line 1314)
+- new BadMethodCallException (line 715)
+- new BadMethodCallException (line 718)
+- new BadMethodCallException (line 721)
+- new UnexpectedValueException (line 736)
+- new UnexpectedValueException (line 741)
+- new ObjectEntry (line 746)
+- new UnexpectedValueException (line 797)
+- new ObjectEntry (line 802)
+- new BadMethodCallException (line 818)
+- new BadMethodCallException (line 821)
+- new UnexpectedValueException (line 836)
+- new ObjectEntry (line 839)
+- new UnexpectedValueException (line 908)
+- new UnexpectedValueException (line 913)
+- new UnexpectedValueException (line 918)
+- new UnexpectedValueException (line 966)
+- new PharException (line 1047)
+- new PharException (line 1059)
+- new UnexpectedValueException (line 1064)
+- new BadMethodCallException (line 1088)
+- new BadMethodCallException (line 1091)
+- new Variable (line 1093)
+- new Error (line 1147)
+- new UnexpectedValueException (line 1215)
+- new UnexpectedValueException (line 1224)
+- new UnexpectedValueException (line 1229)
+- new PharException (line 1246)
+- new PharException (line 1256)
+- new Error (line 1291)
+- new PharException (line 1310)
+- new PharException (line 1316)
+- new PharException (line 1323)
+- new PharException (line 1330)
 - 74 class method(s)
 
 ### `ext/phar/VmPharData.php`
@@ -39298,11 +39301,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/FinalClassExtensionCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 27)
-- new DeclarationFinder (line 35)
-- new Traverser (line 36)
-- new CompileError (line 71)
-- 7 class method(s)
+- new self (line 38)
+- new DeclarationFinder (line 46)
+- new Traverser (line 47)
+- new CompileError (line 83)
+- 8 class method(s)
 
 ### `lib/Compiler/FinalMethodOverrideCheck.php`
 
@@ -45945,44 +45948,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileError (line 15180)
 - new VM\ClassProperty (line 15345)
 - new Variable (line 15658)
-- new Variable (line 15857)
-- new Variable (line 15859)
-- new ClassEntry (line 15902)
-- new Func\PHP (line 15909)
-- new VM\ClassProperty (line 16037)
-- new Func\PHP (line 16184)
-- new Variable (line 16260)
-- new Variable (line 16267)
+- new CompileError (line 15676)
+- new Variable (line 15863)
+- new Variable (line 15865)
+- new ClassEntry (line 15908)
+- new Func\PHP (line 15915)
+- new VM\ClassProperty (line 16043)
+- new Func\PHP (line 16190)
+- new Variable (line 16266)
 - new Variable (line 16273)
-- new Variable (line 16310)
-- new Variable (line 16339)
-- new Variable (line 16524)
-- new Variable (line 16570)
-- new VM\ClassProperty (line 16635)
-- new Error (line 16681)
-- new Error (line 16716)
-- new Error (line 16719)
+- new Variable (line 16279)
+- new Variable (line 16316)
+- new Variable (line 16345)
+- new Variable (line 16530)
+- new Variable (line 16576)
+- new VM\ClassProperty (line 16641)
+- new Error (line 16687)
 - new Error (line 16722)
 - new Error (line 16725)
-- new ObjectEntry (line 16727)
-- new Error (line 16740)
-- new Error (line 16743)
+- new Error (line 16728)
+- new Error (line 16731)
+- new ObjectEntry (line 16733)
 - new Error (line 16746)
-- new Error (line 16765)
-- new ObjectEntry (line 16769)
-- new Variable (line 16771)
-- new Variable (line 16785)
-- new Variable (line 16812)
-- new Variable (line 16825)
-- new Error (line 16955)
-- new Error (line 16960)
-- new VM\ObjectEntry (line 16964)
-- new Variable (line 17108)
-- new Variable (line 17126)
-- new NoDiscardMetadata (line 17295)
-- new Variable (line 17464)
-- new Variable (line 17466)
-- new Variable (line 17566)
+- new Error (line 16749)
+- new Error (line 16752)
+- new Error (line 16771)
+- new ObjectEntry (line 16775)
+- new Variable (line 16777)
+- new Variable (line 16791)
+- new Variable (line 16818)
+- new Variable (line 16831)
+- new Error (line 16961)
+- new Error (line 16966)
+- new VM\ObjectEntry (line 16970)
+- new Variable (line 17114)
+- new Variable (line 17132)
+- new NoDiscardMetadata (line 17301)
+- new Variable (line 17470)
+- new Variable (line 17472)
+- new Variable (line 17572)
 - 495 class method(s)
 - 25 closure(s)
 
@@ -46019,10 +46023,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 119)
 - new ClassEntry (line 122)
-- new ClassProperty (line 123)
-- new AttributeConstruct (line 124)
-- new Variable (line 143)
-- new AttributeEntry (line 151)
+- new ClassProperty (line 125)
+- new AttributeConstruct (line 126)
+- new Variable (line 145)
+- new AttributeEntry (line 153)
 - 6 class method(s)
 
 ### `lib/VM/BackedEnum.php`
