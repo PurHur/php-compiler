@@ -1,9 +1,10 @@
 --TEST--
-stdlib password_get_info(null) — coerce+unknown on 8.2 profile; array TypeError (#18656, #20672, ext/standard/password.c)
+stdlib password_get_info(null) — coerce+unknown on 8.2 profile; array TypeError (#18656, #21537, ext/standard/password.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED);
 $info = password_get_info(null);
 echo $info['algoName'], "\n";
 echo null === $info['algo'] ? "algo_null\n" : "algo_set\n";

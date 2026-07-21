@@ -105,7 +105,7 @@ final class VmString
      * idate $format soft-null (#21491, reverts #20227 TypeError).
      * DateTime::format()/date_format() $format soft-null (#21536, reverts #20693 TypeError).
      * timezone_open/DateTimeZone/date_default_timezone_set timezone id soft-null (#21369, ext/date/php_date.stub.php).
-     * password_verify/password_needs_rehash/password_hash string operands soft-null (#21314/#21210; hash_equals stays TypeError).
+     * password_verify/password_needs_rehash/password_hash/password_get_info($hash) string operands soft-null (#21314/#21210/#21537; hash_equals stays TypeError).
      * hash()/hash_hmac()/hash_file()/hash_init() $algo soft-null (#21490/#21572, reverts #20304 TypeError).
      * version_compare($version1/$version2) soft-null (#21556, reverts #20254 TypeError; ext/standard/versioning.c).
      * getimagesizefromstring($string) soft-null (#21492, reverts #20353 TypeError; ext/standard/image.c).

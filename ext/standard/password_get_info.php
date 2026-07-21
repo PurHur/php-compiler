@@ -24,8 +24,8 @@ final class password_get_info extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('password_get_info() requires exactly one argument');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20672, ext/standard/password.c)
-        $hash = VmString::zparamStrBuiltinArgForFrame(
+        // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21537, reverts #20672; password.c).
+        $hash = VmString::trimFamilyStringArgForFrame(
             $frame,
             0,
             'password_get_info',
@@ -48,8 +48,8 @@ final class password_get_info extends Internal
 
         return JitPasswordGetInfo::invoke(
             $context,
-            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20672, ext/standard/password.c)
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'password_get_info', 0, 'hash')
+            // Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21537, reverts #20672; password.c).
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'password_get_info', 0, 'hash')
         );
     }
 }
