@@ -255,7 +255,7 @@ final class JitSessionStorageKernel
     }
 
     /**
-     * Load php session wire (key|s:N:"val";) via libc into Hashtable (#21900).
+     * Load php session wire (multi-key s/i/b/N) via libc into Hashtable (#21900 / #21922).
      */
     private static function emitSessionWireLoadFromPath(Context $context, Value $pathStr, Value $destHt): void
     {
@@ -288,7 +288,7 @@ final class JitSessionStorageKernel
         $fd = $context->builder->call(
             $context->lookupFunction('open'),
             $pathCPtr,
-            $i32->constInt(0, false), // O_RDONLY
+            $i32->constInt(0, false),
             $i32->constInt(0, false)
         );
         $okFd = $context->builder->icmp(Builder::INT_SGE, $fd, $i32->constInt(0, false));
@@ -311,18 +311,25 @@ final class JitSessionStorageKernel
         );
         $context->builder->call($context->lookupFunction('close'), $fd);
         $hasData = $context->builder->icmp(Builder::INT_SGT, $nread, $i64->constInt(0, false));
-        $bbParse = BasicBlockHelper::append($context, 'ss_wire_load_parse');
-        $context->builder->branchIf($hasData, $bbParse, $bbDone);
+        $bbLoopInit = BasicBlockHelper::append($context, 'ss_wire_load_loop_init');
+        $context->builder->branchIf($hasData, $bbLoopInit, $bbDone);
 
-        $context->builder->positionAtEnd($bbParse);
+        $context->builder->positionAtEnd($bbLoopInit);
         $context->builder->store(
             $i8->constInt(0, false),
             $context->builder->inBoundsGEP($bufPtr, $nread)
         );
+        $curSlot = $context->builder->alloca($i8p);
+        $context->builder->store($bufPtr, $curSlot);
+        $bbLoop = BasicBlockHelper::append($context, 'ss_wire_load_loop');
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbLoop);
+        $cur = $context->builder->load($curSlot);
         $pipe = $context->builder->call(
             $context->lookupFunction('strchr'),
-            $bufPtr,
-            $i32->constInt(0x7c, false) // '|'
+            $cur,
+            $i32->constInt(0x7c, false)
         );
         $hasPipe = $context->builder->icmp(Builder::INT_NE, $pipe, $i8p->constNull());
         $bbHavePipe = BasicBlockHelper::append($context, 'ss_wire_load_have_pipe');
@@ -331,19 +338,38 @@ final class JitSessionStorageKernel
         $context->builder->positionAtEnd($bbHavePipe);
         $keyLen = $context->builder->sub(
             $context->builder->ptrToInt($pipe, $i64),
-            $context->builder->ptrToInt($bufPtr, $i64)
+            $context->builder->ptrToInt($cur, $i64)
+        );
+        $keyOk = $context->builder->icmp(Builder::INT_SGT, $keyLen, $i64->constInt(0, false));
+        $bbKeyOk = BasicBlockHelper::append($context, 'ss_wire_load_key_ok');
+        $context->builder->branchIf($keyOk, $bbKeyOk, $bbDone);
+
+        $context->builder->positionAtEnd($bbKeyOk);
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $keyLen,
+            $cur
         );
         $afterPipe = $context->builder->inBoundsGEP($pipe, $i64->constInt(1, false));
-        // Expect s:
-        $c0 = $context->builder->load($afterPipe);
-        $c1 = $context->builder->load($context->builder->inBoundsGEP($afterPipe, $i64->constInt(1, false)));
-        $isS = $context->builder->icmp(Builder::INT_EQ, $c0, $i8->constInt(0x73, false));
-        $isColon = $context->builder->icmp(Builder::INT_EQ, $c1, $i8->constInt(0x3a, false));
-        $okPrefix = $context->builder->and($isS, $isColon);
-        $bbNum = BasicBlockHelper::append($context, 'ss_wire_load_num');
-        $context->builder->branchIf($okPrefix, $bbNum, $bbDone);
+        $tag = $context->builder->load($afterPipe);
+        $bbStr = BasicBlockHelper::append($context, 'ss_wire_load_str');
+        $bbInt = BasicBlockHelper::append($context, 'ss_wire_load_int');
+        $bbBool = BasicBlockHelper::append($context, 'ss_wire_load_bool');
+        $bbNull = BasicBlockHelper::append($context, 'ss_wire_load_null');
+        $bbAdvance = BasicBlockHelper::append($context, 'ss_wire_load_advance');
+        $bbAfterStrTag = BasicBlockHelper::append($context, 'ss_wire_load_after_s');
+        $bbAfterIntTag = BasicBlockHelper::append($context, 'ss_wire_load_after_i');
+        $bbAfterBoolTag = BasicBlockHelper::append($context, 'ss_wire_load_after_b');
+        $isS = $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(0x73, false));
+        $context->builder->branchIf($isS, $bbStr, $bbAfterStrTag);
 
-        $context->builder->positionAtEnd($bbNum);
+        // s:N:"val";
+        $context->builder->positionAtEnd($bbStr);
+        $c1 = $context->builder->load($context->builder->inBoundsGEP($afterPipe, $i64->constInt(1, false)));
+        $okSColon = $context->builder->icmp(Builder::INT_EQ, $c1, $i8->constInt(0x3a, false));
+        $bbSNum = BasicBlockHelper::append($context, 'ss_wire_load_s_num');
+        $context->builder->branchIf($okSColon, $bbSNum, $bbDone);
+        $context->builder->positionAtEnd($bbSNum);
         $numStart = $context->builder->inBoundsGEP($afterPipe, $i64->constInt(2, false));
         $endPtr = $context->builder->alloca($i8p);
         $valLen = $context->builder->call(
@@ -353,23 +379,16 @@ final class JitSessionStorageKernel
             $i32->constInt(10, false)
         );
         $afterNum = $context->builder->load($endPtr);
-        // Expect :"
         $colon2 = $context->builder->load($afterNum);
         $quote = $context->builder->load($context->builder->inBoundsGEP($afterNum, $i64->constInt(1, false)));
         $okMid = $context->builder->and(
             $context->builder->icmp(Builder::INT_EQ, $colon2, $i8->constInt(0x3a, false)),
             $context->builder->icmp(Builder::INT_EQ, $quote, $i8->constInt(0x22, false))
         );
-        $bbVal = BasicBlockHelper::append($context, 'ss_wire_load_val');
-        $context->builder->branchIf($okMid, $bbVal, $bbDone);
-
-        $context->builder->positionAtEnd($bbVal);
+        $bbSVal = BasicBlockHelper::append($context, 'ss_wire_load_s_val');
+        $context->builder->branchIf($okMid, $bbSVal, $bbDone);
+        $context->builder->positionAtEnd($bbSVal);
         $valStart = $context->builder->inBoundsGEP($afterNum, $i64->constInt(2, false));
-        $keyStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $keyLen,
-            $bufPtr
-        );
         $valStr = $context->builder->call(
             $context->lookupFunction('__string__init'),
             $valLen,
@@ -381,7 +400,104 @@ final class JitSessionStorageKernel
             $keyStr,
             $valStr
         );
-        $context->builder->branch($bbDone);
+        // advance past val + '"' + ';'
+        $nextS = $context->builder->inBoundsGEP(
+            $valStart,
+            $context->builder->add($valLen, $i64->constInt(2, false))
+        );
+        $context->builder->store($nextS, $curSlot);
+        $context->builder->branch($bbAdvance);
+
+        $context->builder->positionAtEnd($bbAfterStrTag);
+        $isI = $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(0x69, false));
+        $context->builder->branchIf($isI, $bbInt, $bbAfterIntTag);
+
+        // i:N;
+        $context->builder->positionAtEnd($bbInt);
+        $c1i = $context->builder->load($context->builder->inBoundsGEP($afterPipe, $i64->constInt(1, false)));
+        $okIColon = $context->builder->icmp(Builder::INT_EQ, $c1i, $i8->constInt(0x3a, false));
+        $bbINum = BasicBlockHelper::append($context, 'ss_wire_load_i_num');
+        $context->builder->branchIf($okIColon, $bbINum, $bbDone);
+        $context->builder->positionAtEnd($bbINum);
+        $iStart = $context->builder->inBoundsGEP($afterPipe, $i64->constInt(2, false));
+        $iEndPtr = $context->builder->alloca($i8p);
+        $iVal = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $iStart,
+            $iEndPtr,
+            $i32->constInt(10, false)
+        );
+        $afterI = $context->builder->load($iEndPtr);
+        $semiI = $context->builder->load($afterI);
+        $okSemiI = $context->builder->icmp(Builder::INT_EQ, $semiI, $i8->constInt(0x3b, false));
+        $bbISet = BasicBlockHelper::append($context, 'ss_wire_load_i_set');
+        $context->builder->branchIf($okSemiI, $bbISet, $bbDone);
+        $context->builder->positionAtEnd($bbISet);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $destHt,
+            $keyStr,
+            $iVal
+        );
+        $context->builder->store(
+            $context->builder->inBoundsGEP($afterI, $i64->constInt(1, false)),
+            $curSlot
+        );
+        $context->builder->branch($bbAdvance);
+
+        $context->builder->positionAtEnd($bbAfterIntTag);
+        $isB = $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(0x62, false));
+        $context->builder->branchIf($isB, $bbBool, $bbAfterBoolTag);
+
+        // b:0; / b:1;
+        $context->builder->positionAtEnd($bbBool);
+        $c1b = $context->builder->load($context->builder->inBoundsGEP($afterPipe, $i64->constInt(1, false)));
+        $digit = $context->builder->load($context->builder->inBoundsGEP($afterPipe, $i64->constInt(2, false)));
+        $semiB = $context->builder->load($context->builder->inBoundsGEP($afterPipe, $i64->constInt(3, false)));
+        $okB = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $c1b, $i8->constInt(0x3a, false)),
+            $context->builder->icmp(Builder::INT_EQ, $semiB, $i8->constInt(0x3b, false))
+        );
+        $bbBSet = BasicBlockHelper::append($context, 'ss_wire_load_b_set');
+        $context->builder->branchIf($okB, $bbBSet, $bbDone);
+        $context->builder->positionAtEnd($bbBSet);
+        $boolVal = $context->builder->icmp(Builder::INT_NE, $digit, $i8->constInt(0x30, false));
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyBool'),
+            $destHt,
+            $keyStr,
+            $boolVal
+        );
+        $context->builder->store(
+            $context->builder->inBoundsGEP($afterPipe, $i64->constInt(4, false)),
+            $curSlot
+        );
+        $context->builder->branch($bbAdvance);
+
+        $context->builder->positionAtEnd($bbAfterBoolTag);
+        $isN = $context->builder->icmp(Builder::INT_EQ, $tag, $i8->constInt(0x4e, false));
+        $context->builder->branchIf($isN, $bbNull, $bbDone);
+
+        // N;
+        $context->builder->positionAtEnd($bbNull);
+        $semiN = $context->builder->load($context->builder->inBoundsGEP($afterPipe, $i64->constInt(1, false)));
+        $okN = $context->builder->icmp(Builder::INT_EQ, $semiN, $i8->constInt(0x3b, false));
+        $bbNSet = BasicBlockHelper::append($context, 'ss_wire_load_n_set');
+        $context->builder->branchIf($okN, $bbNSet, $bbDone);
+        $context->builder->positionAtEnd($bbNSet);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyNull'),
+            $destHt,
+            $keyStr
+        );
+        $context->builder->store(
+            $context->builder->inBoundsGEP($afterPipe, $i64->constInt(2, false)),
+            $curSlot
+        );
+        $context->builder->branch($bbAdvance);
+
+        $context->builder->positionAtEnd($bbAdvance);
+        $context->builder->branch($bbLoop);
 
         $context->builder->positionAtEnd($bbDone);
     }
@@ -446,9 +562,9 @@ final class JitSessionStorageKernel
     }
 
     /**
-     * Write php session wire (key|s:N:"val";) via libc — NestedJIT encode broken (#21900).
+     * Write php session wire via libc (#21900 / #21922).
      *
-     * Walks {@see __hashtable__} strKeys; string values only (SessionsWeb flash).
+     * Walks {@see __hashtable__} strKeys; string/int/bool/null values (php-src mod_php.c).
      */
     private static function emitSessionWireSaveToPath(Context $context, Value $sessionHt, Value $pathStr): void
     {
@@ -485,8 +601,8 @@ final class JitSessionStorageKernel
 
         $context->builder->positionAtEnd($bbHead);
         $node = $context->builder->load($nodeSlot);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrTy->constNull());
-        $context->builder->branchIf($isNull, $bbDone, $bbBody);
+        $isNullNode = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrTy->constNull());
+        $context->builder->branchIf($isNullNode, $bbDone, $bbBody);
 
         $context->builder->positionAtEnd($bbBody);
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
@@ -495,14 +611,16 @@ final class JitSessionStorageKernel
         $valEntry = $context->builder->structGep($node, $nodeMap['value']);
         $typeByte = $context->builder->load($context->builder->structGep($valEntry, $valMap['type']));
         $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $kind,
-            $i8->constInt(4, false) // Type::TYPE_STRING / VM Variable::TYPE_STRING
-        );
         $bbStr = BasicBlockHelper::append($context, 'ss_wire_str');
+        $bbLong = BasicBlockHelper::append($context, 'ss_wire_long');
+        $bbBool = BasicBlockHelper::append($context, 'ss_wire_bool');
+        $bbNull = BasicBlockHelper::append($context, 'ss_wire_null');
         $bbNext = BasicBlockHelper::append($context, 'ss_wire_next');
-        $context->builder->branchIf($isString, $bbStr, $bbNext);
+        $bbAfterStr = BasicBlockHelper::append($context, 'ss_wire_after_str');
+        $bbAfterLong = BasicBlockHelper::append($context, 'ss_wire_after_long');
+        $bbAfterBool = BasicBlockHelper::append($context, 'ss_wire_after_bool');
+        $isString = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(4, false));
+        $context->builder->branchIf($isString, $bbStr, $bbAfterStr);
 
         $context->builder->positionAtEnd($bbStr);
         $valField = $context->builder->structGep($valEntry, $valMap['value']);
@@ -512,8 +630,7 @@ final class JitSessionStorageKernel
         $valBytes = $context->builder->structGep($valStr, $strMap['value']);
         $cur = $context->builder->load($wireLen);
         $dst = $context->builder->inBoundsGEP($wirePtr, $cur);
-        // "%.*s|s:%lld:\"%.*s\";"
-        $fmt = $context->builder->pointerCast(
+        $fmtStr = $context->builder->pointerCast(
             $context->constantFromString('%.*s|s:%lld:"%.*s";'),
             $i8p
         );
@@ -521,15 +638,111 @@ final class JitSessionStorageKernel
             $context->lookupFunction('snprintf'),
             $dst,
             $sizeT->constInt(512, false),
-            $fmt,
+            $fmtStr,
             $context->builder->trunc($keyLen, $i32),
             $keyBytes,
             $valLen,
             $context->builder->trunc($valLen, $i32),
             $valBytes
         );
-        $wrote64 = $context->builder->sext($wrote, $i64);
-        $context->builder->store($context->builder->add($cur, $wrote64), $wireLen);
+        $context->builder->store(
+            $context->builder->add($cur, $context->builder->sext($wrote, $i64)),
+            $wireLen
+        );
+        $context->builder->branch($bbNext);
+
+        $context->builder->positionAtEnd($bbAfterStr);
+        $isLong = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(1, false)); // NATIVE_LONG
+        $context->builder->branchIf($isLong, $bbLong, $bbAfterLong);
+
+        $context->builder->positionAtEnd($bbLong);
+        $longPtr = $context->builder->pointerCast(
+            $context->builder->structGep($valEntry, $valMap['value']),
+            $i64->pointerType(0)
+        );
+        $longVal = $context->builder->load($longPtr);
+        $curL = $context->builder->load($wireLen);
+        $dstL = $context->builder->inBoundsGEP($wirePtr, $curL);
+        $fmtLong = $context->builder->pointerCast(
+            $context->constantFromString('%.*s|i:%lld;'),
+            $i8p
+        );
+        $wroteL = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $dstL,
+            $sizeT->constInt(256, false),
+            $fmtLong,
+            $context->builder->trunc($keyLen, $i32),
+            $keyBytes,
+            $longVal
+        );
+        $context->builder->store(
+            $context->builder->add($curL, $context->builder->sext($wroteL, $i64)),
+            $wireLen
+        );
+        $context->builder->branch($bbNext);
+
+        $context->builder->positionAtEnd($bbAfterLong);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(2, false)); // NATIVE_BOOL
+        $context->builder->branchIf($isBool, $bbBool, $bbAfterBool);
+
+        $context->builder->positionAtEnd($bbBool);
+        $boolByte = $context->builder->load(
+            $context->builder->pointerCast(
+                $context->builder->structGep($valEntry, $valMap['value']),
+                $i8->pointerType(0)
+            )
+        );
+        $boolOne = $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false));
+        $boolDigit = $context->builder->select(
+            $boolOne,
+            $i32->constInt(1, false),
+            $i32->constInt(0, false)
+        );
+        $curB = $context->builder->load($wireLen);
+        $dstB = $context->builder->inBoundsGEP($wirePtr, $curB);
+        $fmtBool = $context->builder->pointerCast(
+            $context->constantFromString('%.*s|b:%d;'),
+            $i8p
+        );
+        $wroteB = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $dstB,
+            $sizeT->constInt(256, false),
+            $fmtBool,
+            $context->builder->trunc($keyLen, $i32),
+            $keyBytes,
+            $boolDigit
+        );
+        $context->builder->store(
+            $context->builder->add($curB, $context->builder->sext($wroteB, $i64)),
+            $wireLen
+        );
+        $context->builder->branch($bbNext);
+
+        $context->builder->positionAtEnd($bbAfterBool);
+        $isNullVal = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(0, false));
+        $context->builder->branchIf($isNullVal, $bbNull, $bbNext);
+
+        $context->builder->positionAtEnd($bbNull);
+        $curN = $context->builder->load($wireLen);
+        $dstN = $context->builder->inBoundsGEP($wirePtr, $curN);
+        $fmtNull = $context->builder->pointerCast(
+            $context->constantFromString('%.*s|N;'),
+            $i8p
+        );
+        $wroteN = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $dstN,
+            $sizeT->constInt(256, false),
+            $fmtNull,
+            $context->builder->trunc($keyLen, $i32),
+            $keyBytes
+        );
+        $context->builder->store(
+            $context->builder->add($curN, $context->builder->sext($wroteN, $i64)),
+            $wireLen
+        );
         $context->builder->branch($bbNext);
 
         $context->builder->positionAtEnd($bbNext);
@@ -542,7 +755,6 @@ final class JitSessionStorageKernel
         $pathMap = $strMap;
         $pathLen = $context->builder->load($context->builder->structGep($pathStr, $pathMap['length']));
         $pathBytes = $context->builder->structGep($pathStr, $pathMap['value']);
-        // Ensure NUL for open(2)
         $pathC = $context->builder->alloca($i8->arrayType(640));
         $pathCPtr = $context->builder->pointerCast(
             $context->builder->inBoundsGEP($pathC, $i32->constInt(0, false), $i64->constInt(0, false)),
@@ -558,7 +770,6 @@ final class JitSessionStorageKernel
             $i8->constInt(0, false),
             $context->builder->inBoundsGEP($pathCPtr, $pathLen)
         );
-        // O_WRONLY|O_CREAT|O_TRUNC = 577, mode 0600
         $fd = $context->builder->call(
             $context->lookupFunction('open'),
             $pathCPtr,
