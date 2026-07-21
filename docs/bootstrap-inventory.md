@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6293 |
-| Phase A inventory files (M2 ratio SSOT) | 6293 |
+| PHP files on vm.php path | 6292 |
+| Phase A inventory files (M2 ratio SSOT) | 6292 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 19907 |
@@ -1288,12 +1288,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
-| `ext/mysqli/BuiltinClasses.php` | 0 | 1 |
+| `ext/mysqli/BuiltinClasses.php` | 0 | 2 |
 | `ext/mysqli/Module.php` | 0 | 18 |
 | `ext/mysqli/MysqliClassMethod.php` | 0 | 1 |
 | `ext/mysqli/MysqliConstants.php` | 0 | 1 |
 | `ext/mysqli/MysqliExtensionPolicy.php` | 0 | 1 |
-| `ext/mysqli/VmMysqli.php` | 0 | 41 |
+| `ext/mysqli/VmMysqli.php` | 0 | 40 |
 | `ext/mysqli/mysqli_affected_rows.php` | 0 | 3 |
 | `ext/mysqli/mysqli_close.php` | 0 | 3 |
 | `ext/mysqli/mysqli_connect.php` | 0 | 3 |
@@ -16176,28 +16176,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
+- new ClassEntry (line 33)
 - 2 class method(s)
 
 ### `ext/mysqli/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 53)
-- new mysqli_connect (line 72)
-- new mysqli_init (line 73)
-- new mysqli_query (line 74)
-- new mysqli_fetch_assoc (line 75)
-- new mysqli_fetch_array (line 76)
-- new mysqli_fetch_row (line 77)
-- new mysqli_close (line 78)
-- new mysqli_connect_errno (line 79)
-- new mysqli_connect_error (line 80)
-- new mysqli_free_result (line 81)
-- new mysqli_real_escape_string (line 82)
-- new mysqli_real_escape_string (line 83)
-- new mysqli_num_rows (line 84)
-- new mysqli_affected_rows (line 85)
-- new mysqli_error (line 86)
-- new mysqli_errno (line 87)
+- new Variable (line 52)
+- new mysqli_connect (line 71)
+- new mysqli_query (line 72)
+- new mysqli_fetch_assoc (line 73)
+- new mysqli_fetch_array (line 74)
+- new mysqli_fetch_row (line 75)
+- new mysqli_close (line 76)
+- new mysqli_connect_errno (line 77)
+- new mysqli_connect_error (line 78)
+- new mysqli_free_result (line 79)
+- new mysqli_real_escape_string (line 80)
+- new mysqli_real_escape_string (line 81)
+- new mysqli_num_rows (line 82)
+- new mysqli_affected_rows (line 83)
+- new mysqli_error (line 84)
+- new mysqli_errno (line 85)
+- new mysqli_init (line 86)
 - 4 class method(s)
 
 ### `ext/mysqli/MysqliClassMethod.php`
@@ -16218,46 +16219,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/VmMysqli.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 41)
-- new MysqliConstruct (line 45)
-- new MysqliQuery (line 50)
-- new MysqliClose (line 51)
-- new MysqliRealEscapeString (line 52)
-- new MysqliPrepare (line 53)
-- new MysqliAutocommit (line 54)
-- new MysqliBeginTransaction (line 55)
-- new MysqliCommit (line 56)
-- new MysqliRollback (line 57)
-- new mysqli (line 94)
-- new ObjectEntry (line 131)
-- new MysqliState (line 132)
-- new ObjectEntry (line 147)
-- new MysqliState (line 155)
-- new HashTable (line 204)
-- new Variable (line 206)
-- new MysqliState (line 223)
-- new ClassEntry (line 250)
-- new MysqliResultFetchAssoc (line 255)
-- new MysqliResultFetchArray (line 256)
-- new MysqliResultFetchRow (line 257)
-- new MysqliResultFree (line 258)
-- new MysqliResultFree (line 259)
-- new MysqliResultFree (line 260)
-- new MysqliResultFetchAll (line 261)
-- new ObjectEntry (line 281)
-- new MysqliResultState (line 282)
-- new mysqli_sql_exception (line 349)
-- new mysqli (line 359)
-- new mysqli_sql_exception (line 361)
-- new ArgumentCountError (line 399)
-- new ArgumentCountError (line 450)
-- new Error (line 470)
-- new Error (line 484)
-- new Error (line 498)
-- new Error (line 512)
-- new Error (line 526)
-- new HashTable (line 631)
-- new Variable (line 633)
+- new ClassEntry (line 43)
+- new MysqliConstruct (line 47)
+- new MysqliQuery (line 52)
+- new MysqliClose (line 53)
+- new MysqliRealEscapeString (line 54)
+- new MysqliPrepare (line 55)
+- new MysqliAutocommit (line 56)
+- new MysqliBeginTransaction (line 57)
+- new MysqliCommit (line 58)
+- new MysqliRollback (line 59)
+- new mysqli (line 96)
+- new ObjectEntry (line 133)
+- new MysqliState (line 134)
+- new ObjectEntry (line 149)
+- new MysqliState (line 150)
+- new HashTable (line 207)
+- new Variable (line 209)
+- new MysqliState (line 226)
+- new ClassEntry (line 253)
+- new MysqliResultFetchAssoc (line 258)
+- new MysqliResultFetchArray (line 259)
+- new MysqliResultFetchRow (line 260)
+- new MysqliResultFree (line 261)
+- new MysqliResultFree (line 262)
+- new MysqliResultFree (line 263)
+- new MysqliResultFetchAll (line 264)
+- new ObjectEntry (line 284)
+- new MysqliResultState (line 285)
+- new mysqli (line 374)
+- new MysqliState (line 396)
+- new ArgumentCountError (line 434)
+- new ArgumentCountError (line 485)
+- new Error (line 505)
+- new Error (line 519)
+- new Error (line 533)
+- new Error (line 547)
+- new Error (line 561)
+- new HashTable (line 666)
+- new Variable (line 668)
 - 34 class method(s)
 
 ### `ext/mysqli/mysqli_affected_rows.php`
@@ -16338,8 +16338,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/mysqli_init.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 30)
-- new Error (line 37)
+- new ObjectEntry (line 39)
+- new Error (line 46)
 - 2 class method(s)
 
 ### `ext/mysqli/mysqli_num_rows.php`
@@ -49164,11 +49164,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/BuiltinExceptionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 626)
-- new Variable (line 630)
-- new ObjectEntry (line 646)
-- new Variable (line 650)
-- 41 class method(s)
+- new ObjectEntry (line 628)
+- new Variable (line 632)
+- new ObjectEntry (line 648)
+- new Variable (line 652)
+- 42 class method(s)
 
 ### `lib/VM/BuiltinExecute.php`
 

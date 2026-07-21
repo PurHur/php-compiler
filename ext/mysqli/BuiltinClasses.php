@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mysqli;
 
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ClassEntry;
 
 /** Register mysqli + mysqli_result VM builtin classes (php-src ext/mysqli; #3435). */
 final class BuiltinClasses
@@ -20,7 +21,7 @@ final class BuiltinClasses
     private static function registerAuxiliaryClasses(Context $ctx): void
     {
         if (!isset($ctx->classes['mysqli_sql_exception'])) {
-            $entry = new \PHPCompiler\VM\ClassEntry('mysqli_sql_exception');
+            $entry = new ClassEntry('mysqli_sql_exception');
             if (isset($ctx->classes['runtimeexception'])) {
                 $entry->parentLc = 'runtimeexception';
             } elseif (isset($ctx->classes['exception'])) {
@@ -31,7 +32,7 @@ final class BuiltinClasses
         }
 
         if (!isset($ctx->classes['mysqli_warning'])) {
-            $entry = new \PHPCompiler\VM\ClassEntry('mysqli_warning');
+            $entry = new ClassEntry('mysqli_warning');
             if (isset($ctx->classes['exception'])) {
                 $entry->parentLc = 'exception';
             }
@@ -40,7 +41,7 @@ final class BuiltinClasses
         }
 
         if (!isset($ctx->classes['mysqli_driver'])) {
-            $entry = new \PHPCompiler\VM\ClassEntry('mysqli_driver');
+            $entry = new ClassEntry('mysqli_driver');
             $entry->isInternal = true;
             $ctx->classes['mysqli_driver'] = $entry;
         }

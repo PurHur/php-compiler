@@ -49,6 +49,8 @@ final class BuiltinExceptionSupport
     public const CLASS_DATE_MALFORMED_INTERVAL_STRING_EXCEPTION = 'datemalformedintervalstringexception';
     public const CLASS_DATE_MALFORMED_STRING_EXCEPTION = 'datemalformedstringexception';
     public const CLASS_DATE_INVALID_OPERATION_EXCEPTION = 'dateinvalidoperationexception';
+    /** php-src ext/mysqli — mysqli_sql_exception (#21803). */
+    public const CLASS_MYSQLI_SQL_EXCEPTION = 'mysqli_sql_exception';
     public const CLASS_DATE_MALFORMED_PERIOD_STRING_EXCEPTION = 'datemalformedperiodstringexception';
     public const CLASS_DATE_ERROR = 'dateerror';
     public const CLASS_DATE_OBJECT_ERROR = 'dateobjecterror';
@@ -656,5 +658,21 @@ final class BuiltinExceptionSupport
     public static function materializeArithmeticError(Context $ctx, string $message): Variable
     {
         return self::materializeThrowable($ctx, self::CLASS_ARITHMETIC_ERROR, $message);
+    }
+
+    public static function materializeMysqliSqlException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0,
+        int $code = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_MYSQLI_SQL_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+        $var = self::materializeThrowable($ctx, self::CLASS_MYSQLI_SQL_EXCEPTION, $message, $file, $line);
+        $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+
+        return $var;
     }
 }

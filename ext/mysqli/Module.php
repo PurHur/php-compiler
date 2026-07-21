@@ -45,6 +45,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_affected_rows.php';
         require_once __DIR__.'/mysqli_error.php';
         require_once __DIR__.'/mysqli_errno.php';
+        require_once __DIR__.'/mysqli_init.php';
         parent::init($runtime);
         if (!MysqliExtensionPolicy::advertisesExtension()) {
             return;
@@ -85,6 +86,7 @@ class Module extends ModuleAbstract
             new mysqli_affected_rows(),
             new mysqli_error(),
             new mysqli_errno(),
+            new mysqli_init(),
         ];
     }
 }
