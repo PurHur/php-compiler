@@ -21,6 +21,11 @@ final class VmMemory
     public static function resolveUsageArg(Variable $var, string $fn): bool
     {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullNumberParamDeprecation::emit(null, $fn, 1, 'real_usage', 'bool');
+
+            return false;
+        }
         $fromEnum = self::tryMemoryUsageBool($var);
         if (null !== $fromEnum) {
             return $fromEnum;
