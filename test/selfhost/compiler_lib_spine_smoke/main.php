@@ -6354,4 +6354,5 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetFileName.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetNamespaceName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetShortName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantToString.php';
+require_once __DIR__.'/../../../ext/phar/VmPharManifest.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
