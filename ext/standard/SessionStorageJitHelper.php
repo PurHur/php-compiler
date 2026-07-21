@@ -70,6 +70,7 @@ final class SessionStorageJitHelper
         if ('' === $sessionName || null === $cookies) {
             return '';
         }
+        // HashTable::find() nested-JIT via HashTableFind + HashTableNestedReceiver (#21849, #1974).
         $val = $cookies->find($sessionName);
         if (null === $val) {
             return '';

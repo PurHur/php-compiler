@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\SessionLifecycleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
@@ -16,7 +17,9 @@ final class JitSessionRegenerateId
 {
     public static function invoke(Context $context, ?JITVariable $deleteOld = null): Value
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         SessionLifecycleRuntime::ensureLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $i8 = $context->getTypeFromString('int8');
