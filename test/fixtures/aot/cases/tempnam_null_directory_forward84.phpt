@@ -1,15 +1,29 @@
 --TEST--
-AOT: tempnam(null, 'x') — TypeError on 8.4 forward profile (#20960)
+AOT: tempnam(null, 'x') — DEP+system temp on 8.4 forward profile (#21595)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL);
+function tempnam_null_dir_dep_handler(int $no, string $msg): bool
+{
+    if (E_DEPRECATED === $no && str_contains($msg, 'Passing null to parameter #1 ($directory)')) {
+        echo "DEP\n";
+        return true;
+    }
+    return false;
+}
+set_error_handler('tempnam_null_dir_dep_handler');
 try {
-    tempnam(null, 'x');
-    echo "uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
+    $p = tempnam(null, 'x');
+    echo is_string($p) ? "path\n" : "fail\n";
+    if (is_string($p)) {
+        @unlink($p);
+    }
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
 }
 ?>
 --EXPECT--
-tempnam(): Argument #1 ($directory) must be of type string, null given
+DEP
+path

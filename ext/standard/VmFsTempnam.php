@@ -19,24 +19,24 @@ final class VmFsTempnam
     public const NOTICE_MESSAGE = "tempnam(): file created in the system's temporary directory";
 
     /**
-     * php-src ext/standard/file.c — null $directory selects system temp dir (#14672);
-     * caller strict_types rejects null (#18244, zend_verify_arg_type);
-     * forward profile 8.4+ rejects null $directory like stub `string $directory` (#20960).
+     * php-src ext/standard/file.c — Z_PARAM_PATH soft-null for $directory (#14672, #21595).
+     * caller strict_types rejects null (#18244, zend_verify_arg_type).
+     * PROFILE=8.4: E_DEPRECATED + coerce null→'' then empty-dir → system temp (reverts #20960 TypeError;
+     * Zend 8.4.23 still soft-deprecates — not TypeError until PHP 9).
      */
     public static function resolveDirectoryArg(Variable $var, Frame $frame): string
     {
         $resolved = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
-            if (
-                InternalStrictArg::isCallerStrict($frame)
-                || VmString::requiresTypedPathStringOnForwardProfile()
-            ) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(
                     'tempnam(): Argument #1 ($directory) must be of type string, null given'
                 );
             }
+            // Soft-null: DEP + '' — invoke() empty-dir path uses system temp (php-src php_tempnam).
+            VmNullStringParamDeprecation::emit($frame, 'tempnam', 0, 'directory');
 
-            return VmSysGetTempDirNative::resolve();
+            return '';
         }
 
         return VmString::coercePathBuiltinArg($var, 'tempnam', 0, 'directory');
