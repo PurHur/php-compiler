@@ -53,10 +53,16 @@ final class VmZlibArg
         );
     }
 
-    /** Z_PARAM_STR $filename with declare(strict_types=1) caller edge (#19119). */
+    /** Z_PARAM_PATH $filename — non-empty path guard (php-src ext/zlib/zlib.c php_zlib_path_arg, #21877). */
     public static function resolveFilenameString(Frame $frame, string $function, int $argIndex = 0): string
     {
-        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, $function, 'filename');
+        return VmStreamPath::coerceNonEmptyPathArgForFrame($frame, $argIndex, $function, 'filename');
+    }
+
+    /** JIT Z_PARAM_PATH $filename — match {@see resolveFilenameString()} (#21877). */
+    public static function jitFilenamePath(Context $context, JITVariable $arg, string $function, int $argIndex = 0): Value
+    {
+        return JitStreamPath::lowerNonEmptyPath($context, $arg, $function, $argIndex, 'filename');
     }
 
     /**
