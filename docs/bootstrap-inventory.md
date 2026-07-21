@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6326 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20050 |
+| Source constructs flagged (warnings) | 20051 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -167,7 +167,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_multi_strerror.php` | 0 | 2 |
 | `ext/curl/curl_pause.php` | 0 | 2 |
 | `ext/curl/curl_reset.php` | 0 | 2 |
-| `ext/curl/curl_setopt.php` | 0 | 2 |
+| `ext/curl/curl_setopt.php` | 0 | 3 |
 | `ext/curl/curl_setopt_array.php` | 0 | 2 |
 | `ext/curl/curl_share_close.php` | 0 | 2 |
 | `ext/curl/curl_share_errno.php` | 0 | 2 |
@@ -7230,8 +7230,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/curl_setopt.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
-- 2 class method(s)
+- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 56)
+- 3 class method(s)
 
 ### `ext/curl/curl_setopt_array.php`
 
