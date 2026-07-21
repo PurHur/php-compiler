@@ -22,10 +22,13 @@ try {
 } catch (TypeError $e) {
     echo "TypeError: ", $e->getMessage(), "\n";
 }
-$r = popen(null, 'r');
-echo 'popen: ', is_resource($r) ? 'resource' : 'other', "\n";
-if (is_resource($r)) {
-    pclose($r);
+try {
+    popen(null, 'r');
+    echo "popen: NO_ERROR\n";
+} catch (ValueError $e) {
+    echo $e->getMessage(), "\n";
+} catch (TypeError $e) {
+    echo "TypeError: ", $e->getMessage(), "\n";
 }
 ?>
 --EXPECT--
@@ -34,4 +37,4 @@ system(): Argument #1 ($command) cannot be empty
 passthru(): Argument #1 ($command) cannot be empty
 exec(): Argument #1 ($command) cannot be empty
 scandir(): Argument #1 ($directory) cannot be empty
-popen: resource
+popen(): Argument #1 ($command) cannot be empty
