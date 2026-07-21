@@ -1509,6 +1509,13 @@ final class VmSoapClient
             return '<'.$tag.' xsi:type="xsd:float">'.$value.'</'.$tag.'>';
         }
         if (\is_array($value)) {
+            if (
+                null !== $state
+                && SoapConstants::SOAP_ENCODED === $state->use
+                && \array_is_list($value)
+            ) {
+                return self::encodeSoapEncodedListArray($tag, $value, $state, $ctx);
+            }
             $inner = '';
             foreach ($value as $k => $v) {
                 $inner .= self::encodeParam(\is_int($k) ? 'item' : (string) $k, $v, $state, $ctx);
@@ -1521,6 +1528,74 @@ final class VmSoapClient
         }
 
         return '<'.$tag.' xsi:type="xsd:string">'.\htmlspecialchars((string) $value, \ENT_XML1).'</'.$tag.'>';
+    }
+
+    /**
+     * php-src ext/soap/php_encoding.c to_xml_array — SOAP_ENCODED list arrays (#21715).
+     *
+     * @param list<mixed> $value
+     */
+    private static function encodeSoapEncodedListArray(
+        string $tag,
+        array $value,
+        SoapClientState $state,
+        ?Context $ctx = null
+    ): string {
+        $inner = '';
+        foreach ($value as $v) {
+            $inner .= self::encodeParam('item', $v, $state, $ctx);
+        }
+        $count = \count($value);
+        $itemXsd = self::guessSoapEncodedArrayItemType($value);
+        $arrayType = $itemXsd.'['.$count.']';
+        $attrs = ' SOAP-ENC:arrayType="'.\htmlspecialchars($arrayType, \ENT_XML1).'"';
+        if (0 !== ($state->features & SoapConstants::SOAP_USE_XSI_ARRAY_TYPE)) {
+            $attrs .= ' xsi:type="SOAP-ENC:Array"';
+        }
+
+        return '<'.$tag.$attrs.'>'.$inner.'</'.$tag.'>';
+    }
+
+    /**
+     * @param list<mixed> $list
+     */
+    private static function guessSoapEncodedArrayItemType(array $list): string
+    {
+        if ([] === $list) {
+            return 'xsd:ur-type';
+        }
+        $prev = null;
+        foreach ($list as $el) {
+            $t = self::soapScalarValueToXsdType($el);
+            if (null === $prev) {
+                $prev = $t;
+            } elseif ($prev !== $t) {
+                return 'xsd:ur-type';
+            }
+        }
+
+        return 'xsd:anyType' === $prev ? 'xsd:ur-type' : ($prev ?? 'xsd:ur-type');
+    }
+
+    private static function soapScalarValueToXsdType(mixed $value): string
+    {
+        if (\is_bool($value)) {
+            return 'xsd:boolean';
+        }
+        if (\is_int($value)) {
+            return 'xsd:int';
+        }
+        if (\is_float($value)) {
+            return 'xsd:float';
+        }
+        if (\is_string($value)) {
+            return 'xsd:string';
+        }
+        if (\is_array($value)) {
+            return 'xsd:anyType';
+        }
+
+        return 'xsd:anyType';
     }
 
     /**
