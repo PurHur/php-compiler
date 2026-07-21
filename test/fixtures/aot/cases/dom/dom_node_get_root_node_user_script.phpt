@@ -1,5 +1,5 @@
 --TEST--
-AOT: DOMNode::getRootNode() under PHP 8.4 forward profile (#21377, #21687, ext/dom/node.c)
+AOT: DOMNode::getRootNode() under PHP 8.4 forward profile (#21377, #21687, #21766, ext/dom/node.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -8,15 +8,17 @@ $doc = new DOMDocument();
 $root = $doc->createElement('root');
 $child = $doc->createElement('child');
 $leaf = $doc->createElement('leaf');
-// Assign first: inline MethodCall temps mis-type === against $doc in AOT (#21687).
-// getRootNode returns ownerDocument (stored by createElement).
-$a = $leaf->getRootNode();
-$b = $root->getRootNode();
-$c = $child->getRootNode();
-echo ($a === $doc) ? "leaf_doc\n" : "leaf_other\n";
-echo ($b === $doc) ? "elem_doc\n" : "elem_other\n";
-echo ($c === $doc) ? "child_doc\n" : "child_other\n";
+// Detached nodes: root is self, not ownerDocument (#21766, php-src dom_get_root_node).
+echo (int) $leaf->isSameNode($leaf->getRootNode()), "\n";
+echo (int) $doc->isSameNode($leaf->getRootNode()), "\n";
+// In-tree: walk parentNode to document (use isSameNode — === vs $doc mis-boxes in AOT #21687).
+$doc->appendChild($root);
+$root->appendChild($child);
+$child->appendChild($leaf);
+echo (int) $doc->isSameNode($leaf->getRootNode()), "\n";
+echo (int) $doc->isSameNode($root->getRootNode()), "\n";
 --EXPECT--
-leaf_doc
-elem_doc
-child_doc
+1
+0
+1
+1

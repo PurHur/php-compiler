@@ -176,55 +176,89 @@ final class DomLivingApiRuntime
     }
 
     /**
-     * DOMNode::getRootNode (#21687).
-     * Return ownerDocument from the DOMElement TYPE_VALUE slot (createElement stores it).
-     * Same layout as JitDomCreateDocumentFragment; no NestedJIT / DomRegistry required.
+     * DOMNode::getRootNode (#21687, #21766).
+     * Walk parentNode until null; return topmost node (php-src ext/dom/node.c dom_get_root_node).
      */
     private static function getRootNodeViaParentSlots(Context $context, Variable $receiver): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_get_root_slots');
         $objPtr = $context->getTypeFromString('__object__*');
-        $start = self::loadObject($context, $receiver);
+        $current = self::loadObject($context, $receiver);
         $objectType = $context->type->object;
         $elementClassId = $objectType->lookup('DOMElement');
-        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT)) {
-            $objectType->defineProperty($elementClassId, VmDom::PROP_OWNER_DOCUMENT, Variable::TYPE_VALUE);
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, Variable::TYPE_VALUE);
         }
 
         $fn = $context->builder->getInsertBlock()->getParent();
         $done = $fn->appendBasicBlock('dom_root_done');
-        $useOwner = $fn->appendBasicBlock('dom_root_use');
-        $useSelf = $fn->appendBasicBlock('dom_root_self');
+        $objMap = $context->structFieldMap['__object__'];
+        $i64 = $context->getTypeFromString('int64');
+        $docClassId = $objectType->lookup('DOMDocument');
+        /** @var list<array{0: \PHPLLVM\BasicBlock, 1: Value}> */
+        $stopIncomings = [];
 
-        // Direct slot load — same IR shape as createElement's propertyStore of ownerDocument.
-        $slot = $objectType->propertySlotFor($start, 'DOMElement', VmDom::PROP_OWNER_DOCUMENT);
-        $valueType = $context->getTypeFromString('__value__');
-        $storage = BasicBlockHelper::entryAlloca($context, $valueType);
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_root_load_owner');
-        $valueMap = $context->structFieldMap['__value__'];
-        $context->builder->store(
-            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
-            $context->builder->structGep($storage, $valueMap['type'])
-        );
-        $context->builder->call(
-            $context->lookupFunction('__object__load_value_slot'),
-            $slot,
-            JitValueBox::pointer($context, $storage)
-        );
-        $ownerObj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            JitValueBox::pointer($context, $storage)
-        );
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $ownerObj, $objPtr->constNull());
-        $context->builder->branchIf($isNull, $useSelf, $useOwner);
-        $context->builder->positionAtEnd($useOwner);
+        for ($hop = 0; $hop < 8; ++$hop) {
+            $stopHere = $fn->appendBasicBlock('dom_root_stop'.$hop);
+            $cont = $fn->appendBasicBlock('dom_root_cont'.$hop);
+
+            $classIdVal = $context->builder->load(
+                $context->builder->structGep($current, $objMap['class_id'])
+            );
+            $isDoc = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classIdVal,
+                $i64->constInt($docClassId, false)
+            );
+            $afterDoc = $fn->appendBasicBlock('dom_root_d'.$hop);
+            $context->builder->branchIf($isDoc, $stopHere, $afterDoc);
+            $context->builder->positionAtEnd($afterDoc);
+
+            $parentVar = ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+                $objectType,
+                $current,
+                'DOMElement',
+                VmDom::PROP_PARENT_NODE,
+                $elementClassId
+            );
+            $parentRaw = JitValueBox::valuePtrFromVariable($context, $parentVar);
+            $parentIsNull = JitNestedHelperCoerce::isHelperResultNull($context, $parentRaw);
+            $afterNull = $fn->appendBasicBlock('dom_root_n'.$hop);
+            $context->builder->branchIf($parentIsNull, $stopHere, $afterNull);
+            $context->builder->positionAtEnd($afterNull);
+            $parentObj = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::normalizeValuePtr($context, $parentRaw)
+            );
+            $parentObjNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $parentObj,
+                $objPtr->constNull()
+            );
+            $afterObj = $fn->appendBasicBlock('dom_root_o'.$hop);
+            $context->builder->branchIf($parentObjNull, $stopHere, $afterObj);
+            $context->builder->positionAtEnd($afterObj);
+            $context->builder->branch($cont);
+
+            $context->builder->positionAtEnd($stopHere);
+            $context->builder->branch($done);
+            $stopIncomings[] = [$stopHere, $current];
+
+            $context->builder->positionAtEnd($cont);
+            $current = $parentObj;
+        }
+
+        $fallthrough = $fn->appendBasicBlock('dom_root_fall');
+        $context->builder->branch($fallthrough);
+        $context->builder->positionAtEnd($fallthrough);
         $context->builder->branch($done);
-        $context->builder->positionAtEnd($useSelf);
-        $context->builder->branch($done);
+        $stopIncomings[] = [$fallthrough, $current];
+
         $context->builder->positionAtEnd($done);
         $phi = $context->builder->phi($objPtr);
-        $phi->addIncoming($ownerObj, $useOwner);
-        $phi->addIncoming($start, $useSelf);
+        foreach ($stopIncomings as [$block, $value]) {
+            $phi->addIncoming($value, $block);
+        }
 
         return $phi;
     }
