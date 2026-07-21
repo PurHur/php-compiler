@@ -1488,6 +1488,12 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phar_unlink_load')) {
                 continue;
             }
+            // PharFileInfo metadata/chmod/compress: VM green (#21651/#21652/#21653); same Phar ctor MCJIT skip.
+            if (str_contains($name, 'pharfileinfo_metadata')
+                || str_contains($name, 'pharfileinfo_chmod_flags')
+                || str_contains($name, 'pharfileinfo_compress')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }
