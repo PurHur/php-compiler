@@ -441,9 +441,11 @@ function run(string $filename, string $code, array $options): void
             $_ENV['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = '1';
             $_SERVER['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = '1';
         }
+        $aotEmitOk = false;
         try {
             $runtime->standalone($block, $options['-o'], $code, $filename);
             \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput((string) $options['-o']);
+            $aotEmitOk = true;
         } catch (\LogicException $e) {
             fwrite(STDERR, $e->getMessage()."\n");
             exit(2);
@@ -477,6 +479,18 @@ function run(string $filename, string $code, array $options): void
                     $_ENV['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = $prevBootstrapAotLink;
                     $_SERVER['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = $prevBootstrapAotLink;
                 }
+            }
+        }
+        // Self-host bundle AOT: ExecutionEngine takes module ownership; PHP request
+        // shutdown then tears down LLVM builders/module in an order that aborts with
+        // `free(): invalid pointer` (exit 134) even after a successful link (#21925).
+        // Output is already on disk — skip PHP/LLVM destructors via _exit.
+        if ($aotEmitOk && '' !== $normalized && str_contains($normalized, 'test/selfhost/')) {
+            $noFastExit = getenv('PHP_COMPILER_AOT_NO_FAST_EXIT');
+            $skipFastExit = '1' === $noFastExit || 'true' === strtolower((string) $noFastExit);
+            if (!$skipFastExit && (\class_exists(\FFI::class, false) || \class_exists(\FFI::class))) {
+                $ffi = \FFI::cdef('void _exit(int status);');
+                $ffi->_exit(0);
             }
         }
     }
