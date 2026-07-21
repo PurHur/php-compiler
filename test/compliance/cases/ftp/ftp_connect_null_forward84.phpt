@@ -1,5 +1,5 @@
 --TEST--
-ext/ftp ftp_connect()/ftp_ssl_connect(null) — TypeError on 8.4 forward profile (#20484, ext/ftp/ftp.stub.php)
+ext/ftp ftp_connect()/ftp_ssl_connect(null) — DEP+false on 8.4 forward profile (#21757, ext/ftp/ftp.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
@@ -14,18 +14,18 @@ if (!PHPCompiler\CompilerVersion::supportsFtpConnection()) {
 --FILE--
 <?php
 try {
-    ftp_connect(null);
-    echo "ftp_connect_uncaught\n";
+    var_export(@ftp_connect(null));
+    echo " COERCED\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
 try {
-    ftp_ssl_connect(null);
-    echo "ftp_ssl_connect_uncaught\n";
+    var_export(@ftp_ssl_connect(null));
+    echo " COERCED\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
 ?>
 --EXPECT--
-ftp_connect(): Argument #1 ($hostname) must be of type string, null given
-ftp_ssl_connect(): Argument #1 ($hostname) must be of type string, null given
+false COERCED
+false COERCED

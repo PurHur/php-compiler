@@ -147,6 +147,7 @@ final class JitStringBuiltinArg
      * sodium_bin2hex($string) soft-null (#21517, reverts #20196; ext/sodium).
      * error_log($message), fsockopen/pfsockopen/stream_socket_client hostname/remote,
      * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
+     * ftp_connect/ftp_ssl_connect $hostname soft-null (#21757, ext/ftp/ftp.c).
      * implode/join $separator soft-null (#21210, reverts #19894).
      * header($header), preg_quote($str), printf/fprintf($format) soft-null (#21234, reverts #19224/#20197).
      * vprintf/vfprintf($format) soft-null (#21514).

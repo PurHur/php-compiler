@@ -1,10 +1,10 @@
 --TEST--
-AOT: ftp_connect(null) — TypeError on 8.4 forward profile (#20484, ext/ftp/ftp.stub.php)
+AOT: ftp_connect(null) — DEP+false on 8.4 forward profile (#21757, ext/ftp/ftp.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-ftp_connect(null);
+var_export(@ftp_connect(null));
+echo "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+false

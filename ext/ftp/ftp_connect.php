@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * ftp_connect() — TCP connect + FTP greeting (php-src ext/ftp/php_ftp.c; #3353).
  *
- * Z_PARAM_STR $hostname — null TypeError on 8.4 forward profile (#20484).
+ * $hostname — nullable internal string: DEP+coerce on 8.4 forward profile (#21757, ext/ftp/ftp.c).
  */
 final class ftp_connect extends Internal
 {
@@ -34,8 +34,14 @@ final class ftp_connect extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20484, ext/ftp/ftp.stub.php)
-        $hostname = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'ftp_connect', 0, 'hostname');
+        $hostname = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'ftp_connect',
+            0,
+            'hostname',
+            'string',
+            false
+        );
         if (null === $frame->returnVar) {
             return;
         }
@@ -68,24 +74,13 @@ final class ftp_connect extends Internal
                 $argc
             ));
         }
-        $hostnameArg = $args[0];
-        // Always run Z_PARAM_STR first so null TypeError IR is emitted before the
-        // VM-only LogicException (gethostbyname / curl_escape pattern; #20484).
-        $hostname = JitStringBuiltinArg::lowerZparamStr(
+        JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
-            $hostnameArg,
+            $args[0],
             'ftp_connect',
             0,
             'hostname'
         );
-        $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
-            || ($hostnameArg->isNullConstant ?? false);
-        if (
-            $nullOperand
-            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
-        ) {
-            return $hostname;
-        }
 
         throw new \LogicException('ftp_connect() is not implemented for JIT in this compiler build (issue #3353)');
     }
