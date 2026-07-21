@@ -8,13 +8,16 @@ use PHPCompiler\ext\standard\SessionCreateIdJitHelper;
 use PHPCompiler\ext\standard\VmSession;
 use PHPUnit\Framework\TestCase;
 
-/** session_create_id JIT routes through SessionCreateIdJitHelper PHP not LLVM entropy (#9500). */
+/** session_create_id JIT routes through SessionCreateIdJitHelper PHP not LLVM entropy (#9500, #21941). */
 final class SessionCreateIdRuntimeShrinkTest extends TestCase
 {
     public function testSessionCreateIdRuntimeUsesJitHelperNotLlvmEntropy(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionCreateIdRuntime.php');
         $this->assertStringContainsString('SessionCreateIdJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('HEX_TABLE', $source);
         $this->assertStringNotContainsString('emitRandomIdString', $source);
         $this->assertStringNotContainsString('hexTableGlobal', $source);
