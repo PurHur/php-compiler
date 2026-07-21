@@ -541,13 +541,18 @@ final class JitValueBox
         $context->builder->branchIf($isBool, $boolBlock, $afterBool);
 
         $context->builder->positionAtEnd($boolBlock);
-        $boolLong = $context->builder->call($context->lookupFunction('__value__readLong'), $srcPtr);
+        // __value__readLong has no TYPE_NATIVE_BOOL arm (returns 0) — #21892 / JitZendScalarCast.
+        $boolByte = self::readBoolByte($context, $srcPtr);
         $i32 = $context->getTypeFromString('int32');
         $context->builder->call(
             $context->lookupFunction('__value__writeBool'),
             $destPtr,
             $context->builder->zExt(
-                $context->builder->truncOrBitCast($boolLong, $context->getTypeFromString('int1')),
+                $context->builder->icmp(
+                    Builder::INT_NE,
+                    $boolByte,
+                    $context->getTypeFromString('int8')->constInt(0, false)
+                ),
                 $i32
             )
         );
@@ -574,6 +579,23 @@ final class JitValueBox
 
         $context->builder->positionAtEnd($done);
         BasicBlockHelper::branchToFreshContinue($context, 'after_value_copy_'.$tag);
+    }
+
+    /**
+     * Read boxed bool payload (writeBool stores int8 at value[0]).
+     * Do not use {@see __value__readLong} — no NATIVE_BOOL arm (#21892).
+     */
+    public static function readBoolByte(Context $context, Value $valuePtr): Value
+    {
+        $valuePtr = self::normalizeValuePtr($context, $valuePtr);
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $bytePtr = $context->builder->pointerCast(
+            $context->builder->structGep($valuePtr, $map['value']),
+            $i8->pointerType(0)
+        );
+
+        return $context->builder->load($bytePtr);
     }
 
     public static function writeBool(Context $context, Value $slot, Value $bool): void

@@ -24,8 +24,9 @@ final class SessionCreateIdRuntimeShrinkTest extends TestCase
     public function testSessionCreateIdJitHelperMatchesVmSession(): void
     {
         $id = SessionCreateIdJitHelper::randomIdString();
-        $this->assertSame(32, \strlen($id));
-        $this->assertMatchesRegularExpression('/^[0-9a-f]{32}$/', $id);
+        // php-src defaults: session.sid_length=26, sid_bits_per_character=5 (#10864).
+        $this->assertSame(26, \strlen($id));
+        $this->assertMatchesRegularExpression('/^[0-9a-zA-Z,-]{26}$/', $id);
 
         $prefixed = SessionCreateIdJitHelper::createIdNullable('app-');
         $this->assertIsString($prefixed);
@@ -33,7 +34,7 @@ final class SessionCreateIdRuntimeShrinkTest extends TestCase
 
         $vm = VmSession::createId('app-');
         $this->assertIsString($vm);
-        $this->assertSame(36, \strlen($vm));
+        $this->assertSame(30, \strlen($vm));
     }
 
     public function testSessionCreateIdJitHelperReturnsNullOnInvalidPrefix(): void
