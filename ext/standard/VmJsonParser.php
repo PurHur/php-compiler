@@ -222,7 +222,7 @@ final class VmJsonParser
         while ($this->pos < $this->len) {
             $c = $this->json[$this->pos++];
             if ('"' === $c) {
-                return $out;
+                return VmJsonUtf8::repairForJsonUtf8Flags($out, $this->flags);
             }
             if ('\\' !== $c) {
                 $out .= $c;
