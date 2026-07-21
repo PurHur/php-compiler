@@ -5083,6 +5083,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefNativeOpsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRegistryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefSetup.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ZendDoubleStringRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ZlibRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBindTo.php';
