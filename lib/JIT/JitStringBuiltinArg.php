@@ -129,7 +129,7 @@ final class JitStringBuiltinArg
      * parse_str $string soft-null (#21480, reverts #21380 TypeError).
      * trigger_error/user_error $message soft-null (#21480, reverts #21035 TypeError).
      * introspection name args (function_exists/class_exists/defined/…) (#21281).
-     * hex2bin/convert_uuencode/convert_uudecode/sscanf($string), pack($values) soft-null (#21209/#21420).
+     * hex2bin/convert_uuencode/convert_uudecode/sscanf($string/$format), pack($values) soft-null (#21209/#21420/#21521).
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
      * date/gmdate $format and strtotime $datetime soft-null (#21208, reverts #19651).

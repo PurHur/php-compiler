@@ -31,7 +31,7 @@ final class JitSscanf
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
-        // $string soft-null on 8.4; $format stays Z_PARAM_STR (#21209, ext/standard/sscanf.c).
+        // $string and $format soft-null on 8.4 (Zend DEP+coerce; #21209/#21521, ext/standard/sscanf.c).
         $strLit = $args[0]->compileTimeString ?? null;
         if (($args[0]->isNullConstant ?? false) && null === $strLit) {
             if ($context->callerStrictTypes) {
@@ -42,8 +42,7 @@ final class JitSscanf
         }
         $fmtLit = $args[1]->compileTimeString ?? null;
         if (($args[1]->isNullConstant ?? false) && null === $fmtLit) {
-            if (JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-                || $context->callerStrictTypes) {
+            if ($context->callerStrictTypes) {
                 $fmtLit = null;
             } else {
                 $fmtLit = '';
@@ -56,14 +55,13 @@ final class JitSscanf
         $str = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'sscanf', 0, 'string')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'sscanf', 0, 'string');
-        $fmt = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'sscanf', 1, 'format');
-        $nullRejected = (
-            $context->callerStrictTypes
-            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-        ) && (
-            JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
-        );
-        if ($nullRejected) {
+        $fmt = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'sscanf', 1, 'format')
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'sscanf', 1, 'format');
+        // declare(strict_types=1): null format rejects at runtime via lowerStrictOrCoercible.
+        if ($context->callerStrictTypes
+            && (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))
+        ) {
             return $context->getTypeFromString('__value__*')->constNull();
         }
 
