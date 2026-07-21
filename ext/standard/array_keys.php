@@ -15,10 +15,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayKeysRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitArrayElem;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -33,7 +31,9 @@ final class array_keys extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('array_keys() requires one to three arguments');
         }
-        $ht = VmArray::requireArrayForCaller($frame, $frame->calledArgs[0]->resolveIndirect(), 'array_keys');
+        // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (not soft-coerce).
+        // Zend 8.2 reference matches; do not gate on caller strict_types (#21915, re-#21771).
+        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_keys');
         if (null === $frame->returnVar) {
             return;
         }
@@ -59,12 +59,8 @@ final class array_keys extends Internal
             throw new \LogicException('array_keys() requires one to three arguments');
         }
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes) {
-                JitArrayElem::requireArrayArg($context, $args[0], 'array_keys');
-
-                return HashTableHelper::emptyVariable($context)->value;
-            }
-            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'array_keys', 0, 'array');
+            // php-src 8.0+: always TypeError on null (#21915).
+            JitArrayElem::requireArrayArg($context, $args[0], 'array_keys');
 
             return HashTableHelper::emptyVariable($context)->value;
         }
