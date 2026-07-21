@@ -124,7 +124,7 @@ final class VmString
      * vprintf/vfprintf($format) soft-null (#21514, reverts over-strict requireStringBuiltinArg).
      * xml_parse/xml_parse_into_struct $data soft-null (#21505, ext/xml/xml.c).
      * simplexml_load_string($data) soft-null (#21502, reverts #20352 TypeError; ext/simplexml/simplexml.c).
-     * token_get_all($source) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).
+     * token_get_all($code) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).
      * ini_get/ini_set $option and putenv $assignment soft-null (#21312, reverts #20361/#21004 TypeError).
      * parse_str $string / trigger_error|user_error $message soft-null (#21480).
      * gettext/_/dgettext/ngettext msgid + domain soft-null (#21581, reverts #20209 TypeError; ext/gettext/gettext.c).

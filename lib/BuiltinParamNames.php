@@ -206,7 +206,7 @@ final class BuiltinParamNames
             case 'touch':
                 return ['filename', 'mtime', 'atime'];
             case 'token_get_all':
-                return ['source', 'flags'];
+                return ['code', 'flags'];
             case 'getenv':
                 return ['name', 'local_only'];
             case 'ini_get':

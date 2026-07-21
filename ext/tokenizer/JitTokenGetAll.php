@@ -39,13 +39,13 @@ final class JitTokenGetAll
             (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
             && !$context->callerStrictTypes
         ) {
-            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'token_get_all', 0, 'source');
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'token_get_all', 0, 'code');
 
             return self::materializeEmptyTokens($context);
         }
 
         // php-src Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21503, reverts #19894 TypeError).
-        $source = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'token_get_all', 0, 'source');
+        $source = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'token_get_all', 0, 'code');
         $flags = self::lowerFlagsRuntime($context, $args, $argc);
         $ht = $context->builder->call(
             TokenGetAll::helperFunction($context),

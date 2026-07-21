@@ -30,7 +30,7 @@ final class token_get_all extends Internal
         }
 
         // php-src Z_PARAM_STR — soft-null DEP+coerce on PROFILE=8.4 (#21503, reverts #19894 TypeError).
-        $source = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'token_get_all', 0, 'source');
+        $source = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'token_get_all', 0, 'code');
         $flags = 0;
         if ($argc >= 2) {
             $flags = $frame->calledArgs[1]->toInt();
