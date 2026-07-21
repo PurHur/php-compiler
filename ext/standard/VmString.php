@@ -120,6 +120,7 @@ final class VmString
      * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
      * implode/join $separator soft-null (#21210, reverts #19894).
      * header($header), preg_quote($str), printf/fprintf($format) soft-null (#21234, reverts #19224/#20197).
+     * vprintf/vfprintf($format) soft-null (#21514, reverts over-strict requireStringBuiltinArg).
      * xml_parse/xml_parse_into_struct $data soft-null (#21505, ext/xml/xml.c).
      * simplexml_load_string($data) soft-null (#21502, reverts #20352 TypeError; ext/simplexml/simplexml.c).
      * token_get_all($source) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).

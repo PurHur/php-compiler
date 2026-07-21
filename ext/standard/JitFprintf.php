@@ -19,6 +19,10 @@ final class JitFprintf
 {
     public static function format(Context $context, JITVariable ...$args): Value
     {
+        // Link __compiler_sprintf body for user-standalone AOT (#15642 / #21514).
+        if ('1' !== getenv('PHP_COMPILER_HELPER_RUNTIME_EMITTING')) {
+            \PHPCompiler\JIT\Builtin\StringFormat::implementIfDeclared($context, true);
+        }
         $argc = \count($args);
         if ($argc < 2) {
             throw new \LogicException('fprintf() expects at least two arguments');

@@ -61,12 +61,8 @@ final class VmVprintf
     {
         $formatted = self::formatString($format, $argsVar, $frame, 'vprintf');
         OutputBuffer::append($formatted);
-        $written = VmString::byteLength($formatted);
-        if ($written <= 0) {
-            throw new \LogicException('vprintf() failed to write to stdout in this compiler build');
-        }
-
-        return $written;
+        // Empty format (incl. null→'' soft-null under PROFILE=8.4) returns 0 like Zend (#21514).
+        return VmString::byteLength($formatted);
     }
 
     public static function vfprintf(int $handle, string $format, Variable $argsVar, ?Frame $frame = null): int
