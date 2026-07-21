@@ -1067,7 +1067,15 @@ final class VmPregEngine
     }
 
     /**
+     * Quantifier + rest of concat — true NFA-style backtracking into nested greedy
+     * lengths (php-src/PCRE MATCHLIMIT; #21958 / #12289).
+     *
+     * Prior path rematched each repetition greedily once per count, so
+     * `(?:\D+|<\d+>)*[!?]` never explored partitions of `\D+` and left
+     * preg_last_error() at 0 instead of PREG_BACKTRACK_LIMIT_ERROR.
+     *
      * @param list<VmPregAstNode> $parts
+     * @param array<int, array{0: int, 1: int}> $captures
      */
     private function matchQuantWithContinuation(
         VmPregAstQuantNode $quant,
@@ -1081,57 +1089,21 @@ final class VmPregEngine
     ): bool {
         $start = $pos;
         $saved = $captures;
-        $maxCount = $this->countQuantMatches($quant->childNode(), $subject, $start, $len);
-        if ($maxCount > $quant->maxCount()) {
-            $maxCount = $quant->maxCount();
-        }
-        if ($maxCount < $quant->minCount()) {
-            $captures = $saved;
-            $pos = $start;
-
-            return false;
-        }
-        $tryOrder = [];
-        for ($c = $quant->minCount(); $c <= $maxCount; ++$c) {
-            $tryOrder[] = $c;
-        }
-        if ($quant->isGreedy()) {
-            $reversed = [];
-            for ($ri = \count($tryOrder) - 1; $ri >= 0; --$ri) {
-                $reversed[] = $tryOrder[$ri];
-            }
-            $tryOrder = $reversed;
-        }
-        foreach ($tryOrder as $count) {
-            $tryCaptures = $saved;
-            $p = $start;
-            $ok = true;
-            for ($i = 0; $i < $count; ++$i) {
-                if (!$this->matchNode($quant->childNode(), $subject, $p, $len, $tryCaptures)) {
-                    $ok = false;
-                    break;
-                }
-                $next = $tryCaptures[0][1] ?? $p;
-                if ($next <= $p) {
-                    $ok = false;
-                    break;
-                }
-                $p = $next;
-            }
-            if (!$ok) {
-                continue;
-            }
-            if ($wrapperPart instanceof VmPregAstGroupNode) {
-                $tryCaptures[$wrapperPart->groupIndex()] = [$start, $p];
-                $tryCaptures[0] = [$start, $p];
-            } else {
-                $tryCaptures[0] = [$start, $p];
-            }
-            $captures = $tryCaptures;
-            $pos = $p;
-            if ($this->matchConcatParts($parts, $idx + 1, $subject, $pos, $len, $captures)) {
-                return true;
-            }
+        if ($this->matchQuantContRecurse(
+            $quant,
+            $wrapperPart,
+            $parts,
+            $idx,
+            $subject,
+            $len,
+            $saved,
+            0,
+            $start,
+            $start,
+            $captures,
+            $pos
+        )) {
+            return true;
         }
         $captures = $saved;
         $pos = $start;
@@ -1139,24 +1111,391 @@ final class VmPregEngine
         return false;
     }
 
-    private function countQuantMatches(VmPregAstNode $child, string $subject, int $pos, int $len): int
-    {
-        $cur = $pos;
-        $count = 0;
-        while ($cur < $len) {
-            $sub = [];
-            if (!$this->matchNode($child, $subject, $cur, $len, $sub)) {
-                break;
-            }
-            $next = $sub[0][1] ?? $cur;
-            if ($next <= $cur) {
-                break;
-            }
-            $cur = $next;
-            ++$count;
+    /**
+     * @param list<VmPregAstNode> $parts
+     * @param array<int, array{0: int, 1: int}> $baseCaptures
+     * @param array<int, array{0: int, 1: int}> $captures
+     */
+    private function matchQuantContRecurse(
+        VmPregAstQuantNode $quant,
+        VmPregAstNode $wrapperPart,
+        array $parts,
+        int $idx,
+        string $subject,
+        int $len,
+        array $baseCaptures,
+        int $taken,
+        int $quantStart,
+        int $cur,
+        array &$captures,
+        int &$pos
+    ): bool {
+        if (0 !== $this->limitErrorCode) {
+            return false;
+        }
+        if ($this->backtrackLimit >= 0 && ++$this->backtrackCount > $this->backtrackLimit) {
+            $this->limitErrorCode = StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
+
+            return false;
         }
 
-        return $count;
+        $min = $quant->minCount();
+        $max = $quant->maxCount();
+        $greedy = $quant->isGreedy();
+        $capsHere = 0 === $taken ? $baseCaptures : $captures;
+
+        $applyWrapperAndRest = function (int $end, array $caps) use (
+            $wrapperPart,
+            $parts,
+            $idx,
+            $subject,
+            $len,
+            &$captures,
+            &$pos,
+            $quantStart
+        ): bool {
+            if ($wrapperPart instanceof VmPregAstGroupNode) {
+                $caps[$wrapperPart->groupIndex()] = [$quantStart, $end];
+            }
+            $caps[0] = [$quantStart, $end];
+            $captures = $caps;
+            $pos = $end;
+
+            return $this->matchConcatParts($parts, $idx + 1, $subject, $pos, $len, $captures);
+        };
+
+        $tryMore = function () use (
+            $quant,
+            $wrapperPart,
+            $parts,
+            $idx,
+            $subject,
+            $len,
+            $baseCaptures,
+            $taken,
+            $quantStart,
+            $cur,
+            $capsHere,
+            &$captures,
+            &$pos
+        ): bool {
+            return $this->matchNodeWithCont(
+                $quant->childNode(),
+                $subject,
+                $cur,
+                $len,
+                $capsHere,
+                function (int $newPos, array $newCaps) use (
+                    $quant,
+                    $wrapperPart,
+                    $parts,
+                    $idx,
+                    $subject,
+                    $len,
+                    $baseCaptures,
+                    $taken,
+                    $quantStart,
+                    $cur,
+                    &$captures,
+                    &$pos
+                ): bool {
+                    if ($newPos <= $cur) {
+                        return false;
+                    }
+                    $captures = $newCaps;
+
+                    return $this->matchQuantContRecurse(
+                        $quant,
+                        $wrapperPart,
+                        $parts,
+                        $idx,
+                        $subject,
+                        $len,
+                        $baseCaptures,
+                        $taken + 1,
+                        $quantStart,
+                        $newPos,
+                        $captures,
+                        $pos
+                    );
+                }
+            );
+        };
+
+        if ($greedy) {
+            if ($taken < $max) {
+                if ($tryMore()) {
+                    return true;
+                }
+                if (0 !== $this->limitErrorCode) {
+                    return false;
+                }
+            }
+            if ($taken >= $min) {
+                return $applyWrapperAndRest($cur, $capsHere);
+            }
+
+            return false;
+        }
+
+        if ($taken >= $min) {
+            if ($applyWrapperAndRest($cur, $capsHere)) {
+                return true;
+            }
+            if (0 !== $this->limitErrorCode) {
+                return false;
+            }
+        }
+        if ($taken < $max) {
+            return $tryMore();
+        }
+
+        return false;
+    }
+
+    /**
+     * Invoke $cont for each way $node can match at $pos (longest-first for greedy quants).
+     *
+     * @param array<int, array{0: int, 1: int}> $captures
+     * @param callable(int, array<int, array{0: int, 1: int}>): bool $cont
+     */
+    public function matchNodeWithCont(
+        VmPregAstNode $node,
+        string $subject,
+        int $pos,
+        int $len,
+        array $captures,
+        callable $cont
+    ): bool {
+        if (0 !== $this->limitErrorCode) {
+            return false;
+        }
+        if ($node instanceof VmPregAstQuantNode) {
+            return $this->matchQuantNodeWithCont($node, $subject, $pos, $len, $captures, $cont);
+        }
+        if ($node instanceof VmPregAstAltNode) {
+            foreach ($node->branches() as $branch) {
+                if ($this->matchNodeWithCont($branch, $subject, $pos, $len, $captures, $cont)) {
+                    return true;
+                }
+                if (0 !== $this->limitErrorCode) {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+        if ($node instanceof VmPregAstBranchResetAltNode) {
+            foreach ($node->branches() as $branch) {
+                if ($this->matchNodeWithCont($branch, $subject, $pos, $len, $captures, $cont)) {
+                    return true;
+                }
+                if (0 !== $this->limitErrorCode) {
+                    return false;
+                }
+            }
+
+            return false;
+        }
+        if ($node instanceof VmPregAstConcatNode) {
+            return $this->matchConcatPartsWithCont($node->parts(), 0, $subject, $pos, $len, $captures, $cont);
+        }
+        if ($node instanceof VmPregAstGroupNode) {
+            $start = $pos;
+
+            return $this->matchNodeWithCont(
+                $node->innerNode(),
+                $subject,
+                $pos,
+                $len,
+                $captures,
+                function (int $end, array $caps) use ($node, $start, $cont): bool {
+                    $caps[$node->groupIndex()] = [$start, $end];
+                    $caps[0] = [$this->matchStartPos(), $end];
+
+                    return $cont($end, $caps);
+                }
+            );
+        }
+
+        $caps = $captures;
+        if (!$this->matchNode($node, $subject, $pos, $len, $caps)) {
+            return false;
+        }
+        $end = $caps[0][1] ?? $pos;
+
+        return $cont($end, $caps);
+    }
+
+    /**
+     * @param array<int, array{0: int, 1: int}> $captures
+     * @param callable(int, array<int, array{0: int, 1: int}>): bool $cont
+     */
+    private function matchQuantNodeWithCont(
+        VmPregAstQuantNode $quant,
+        string $subject,
+        int $pos,
+        int $len,
+        array $captures,
+        callable $cont
+    ): bool {
+        return $this->matchQuantNodeContRecurseInner(
+            $quant,
+            $subject,
+            $len,
+            $captures,
+            0,
+            $pos,
+            $pos,
+            $cont
+        );
+    }
+
+    /**
+     * @param array<int, array{0: int, 1: int}> $captures
+     * @param callable(int, array<int, array{0: int, 1: int}>): bool $cont
+     */
+    private function matchQuantNodeContRecurseInner(
+        VmPregAstQuantNode $quant,
+        string $subject,
+        int $len,
+        array $captures,
+        int $taken,
+        int $quantStart,
+        int $cur,
+        callable $cont
+    ): bool {
+        if (0 !== $this->limitErrorCode) {
+            return false;
+        }
+        if ($this->backtrackLimit >= 0 && ++$this->backtrackCount > $this->backtrackLimit) {
+            $this->limitErrorCode = StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
+
+            return false;
+        }
+
+        $min = $quant->minCount();
+        $max = $quant->maxCount();
+        $greedy = $quant->isGreedy();
+
+        $finish = function () use ($cont, $quantStart, $cur, $captures): bool {
+            $caps = $captures;
+            $caps[0] = [$quantStart, $cur];
+
+            return $cont($cur, $caps);
+        };
+
+        $tryMore = function () use (
+            $quant,
+            $subject,
+            $len,
+            $captures,
+            $taken,
+            $quantStart,
+            $cur,
+            $cont
+        ): bool {
+            return $this->matchNodeWithCont(
+                $quant->childNode(),
+                $subject,
+                $cur,
+                $len,
+                $captures,
+                function (int $newPos, array $newCaps) use (
+                    $quant,
+                    $subject,
+                    $len,
+                    $taken,
+                    $quantStart,
+                    $cur,
+                    $cont
+                ): bool {
+                    if ($newPos <= $cur) {
+                        return false;
+                    }
+
+                    return $this->matchQuantNodeContRecurseInner(
+                        $quant,
+                        $subject,
+                        $len,
+                        $newCaps,
+                        $taken + 1,
+                        $quantStart,
+                        $newPos,
+                        $cont
+                    );
+                }
+            );
+        };
+
+        if ($greedy) {
+            if ($taken < $max) {
+                if ($tryMore()) {
+                    return true;
+                }
+                if (0 !== $this->limitErrorCode) {
+                    return false;
+                }
+            }
+            if ($taken >= $min) {
+                return $finish();
+            }
+
+            return false;
+        }
+
+        if ($taken >= $min) {
+            if ($finish()) {
+                return true;
+            }
+            if (0 !== $this->limitErrorCode) {
+                return false;
+            }
+        }
+        if ($taken < $max) {
+            return $tryMore();
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<VmPregAstNode> $parts
+     * @param array<int, array{0: int, 1: int}> $captures
+     * @param callable(int, array<int, array{0: int, 1: int}>): bool $cont
+     */
+    private function matchConcatPartsWithCont(
+        array $parts,
+        int $idx,
+        string $subject,
+        int $pos,
+        int $len,
+        array $captures,
+        callable $cont
+    ): bool {
+        if ($idx >= \count($parts)) {
+            return $cont($pos, $captures);
+        }
+        $part = $parts[$idx];
+
+        return $this->matchNodeWithCont(
+            $part,
+            $subject,
+            $pos,
+            $len,
+            $captures,
+            function (int $newPos, array $newCaps) use ($parts, $idx, $subject, $len, $cont): bool {
+                return $this->matchConcatPartsWithCont(
+                    $parts,
+                    $idx + 1,
+                    $subject,
+                    $newPos,
+                    $len,
+                    $newCaps,
+                    $cont
+                );
+            }
+        );
     }
 
     /**
@@ -1376,6 +1715,12 @@ final class VmPregAstConcatNode implements VmPregAstNode
     {
     }
 
+    /** @return list<VmPregAstNode> */
+    public function parts(): array
+    {
+        return $this->parts;
+    }
+
     public function match(
         VmPregEngine $engine,
         string $subject,
@@ -1401,6 +1746,12 @@ final class VmPregAstAltNode implements VmPregAstNode
     /** @param list<VmPregAstNode> $branches */
     public function __construct(private readonly array $branches)
     {
+    }
+
+    /** @return list<VmPregAstNode> */
+    public function branches(): array
+    {
+        return $this->branches;
     }
 
     public function match(
@@ -1429,6 +1780,12 @@ final class VmPregAstBranchResetAltNode implements VmPregAstNode
     /** @param list<VmPregAstNode> $branches */
     public function __construct(private readonly array $branches)
     {
+    }
+
+    /** @return list<VmPregAstNode> */
+    public function branches(): array
+    {
+        return $this->branches;
     }
 
     public function match(
