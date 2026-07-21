@@ -19916,7 +19916,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlElementIterator.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 13 class method(s)
 
 ### `ext/simplexml/SimpleXmlElementOffsetExists.php`
 
@@ -19968,7 +19968,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlIteratorStorage.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/simplexml/SimpleXmlJsonExport.php`
 
@@ -20068,8 +20068,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 27)
 - new SimpleXmlIteratorConstruct (line 35)
-- new ArgumentCountError (line 106)
-- 14 class method(s)
+- new ArgumentCountError (line 102)
+- 12 class method(s)
 
 ### `ext/simplexml/simplexml_import_dom.php`
 

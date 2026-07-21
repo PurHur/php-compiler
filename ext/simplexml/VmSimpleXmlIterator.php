@@ -42,15 +42,11 @@ final class VmSimpleXmlIterator
             'rewind' => SimpleXmlIteratorRewind::class,
             'valid' => SimpleXmlIteratorValid::class,
             'count' => SimpleXmlIteratorCount::class,
-            'haschildren' => SimpleXmlIteratorHasChildren::class,
-            'getchildren' => SimpleXmlIteratorGetChildren::class,
+            // hasChildren/getChildren inherited from SimpleXMLElement (php-src empty subclass; #21887).
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
-        $entry->methodNames['haschildren'] = 'hasChildren';
-        $entry->methodNames['getchildren'] = 'getChildren';
-
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -266,71 +262,5 @@ final class SimpleXmlIteratorCount extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(\count(VmSimpleXmlIterator::iterableChildren($iterator)));
         }
-    }
-}
-
-final class SimpleXmlIteratorHasChildren extends VmClassMethod
-{
-    public function __construct()
-    {
-        parent::__construct('hasChildren');
-    }
-
-    public function execute(Frame $frame): void
-    {
-        if (null === $frame->vmContext) {
-            throw new \LogicException('SimpleXMLIterator::hasChildren() requires VM context');
-        }
-        $iterator = VmSimpleXmlIterator::requireIterator(
-            $frame->calledArgs[0]->resolveIndirect()->toObject(),
-            'SimpleXMLIterator::hasChildren()'
-        );
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $index = SimpleXmlIteratorStorage::index($iterator);
-        $children = VmSimpleXmlIterator::iterableChildren($iterator);
-        if ($index < 0 || $index >= \count($children)) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-        $frame->returnVar->bool([] !== $children[$index]->children);
-    }
-}
-
-final class SimpleXmlIteratorGetChildren extends VmClassMethod
-{
-    public function __construct()
-    {
-        parent::__construct('getChildren');
-    }
-
-    public function execute(Frame $frame): void
-    {
-        if (null === $frame->vmContext) {
-            throw new \LogicException('SimpleXMLIterator::getChildren() requires VM context');
-        }
-        $iterator = VmSimpleXmlIterator::requireIterator(
-            $frame->calledArgs[0]->resolveIndirect()->toObject(),
-            'SimpleXMLIterator::getChildren()'
-        );
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $index = SimpleXmlIteratorStorage::index($iterator);
-        $children = VmSimpleXmlIterator::iterableChildren($iterator);
-        if ($index < 0 || $index >= \count($children)) {
-            throw new \LogicException('SimpleXMLIterator has no current element');
-        }
-        $class = $frame->vmContext->classes[VmSimpleXmlIterator::CLASS_LC] ?? $iterator->class;
-        $child = VmSimpleXml::wrapIteratorNode(
-            $frame->vmContext,
-            $class,
-            $children[$index],
-            SimpleXmlRegistry::documentKey($iterator)
-        );
-        SimpleXmlIteratorStorage::init($child);
-        $frame->returnVar->object($child);
     }
 }
