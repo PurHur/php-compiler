@@ -72,6 +72,7 @@ class Module extends ModuleAbstract
             new ldap_exop(),
             new ldap_exop_sync(),
             new ldap_parse_exop(),
+            new ldap_exop_whoami(),
             new ldap_exop_refresh(),
             new ldap_exop_passwd(),
         ];

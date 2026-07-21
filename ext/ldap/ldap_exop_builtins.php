@@ -241,6 +241,50 @@ final class ldap_exop_passwd extends Internal
     }
 }
 
+final class ldap_exop_whoami extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_exop_whoami');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $name = $this->getName();
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects exactly 1 argument, %d given',
+                $name,
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], $name, 1);
+        $ld = VmLdapConnection::native($conn);
+        $parsed = VmLdapNative::extendedOperationSync($ld, LdapConstants::LDAP_EXOP_WHO_AM_I, null);
+        VmLdapConnection::setErrno($conn, $parsed['errno']);
+        if (!$parsed['ok']) {
+            @\trigger_error(
+                \sprintf('%s(): Whoami extended operation failed: %s (%d)', $name, VmLdapNative::err2string($parsed['errno']), $parsed['errno']),
+                \E_USER_WARNING
+            );
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string($parsed['data']);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_exop_whoami() is not implemented for JIT in this compiler build (issue #8688)');
+    }
+}
+
 final class ldap_exop_refresh extends Internal
 {
     public function __construct()
