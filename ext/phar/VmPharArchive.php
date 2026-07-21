@@ -19,14 +19,26 @@ use PHPCompiler\ext\zip\ZipEngine;
 /**
  * Phar executable archive state — php-src ext/phar/phar_object.c (#20628).
  *
- * On-disk layout for this build: stub ending in `__HALT_COMPILER(); ?>` + ustar payload
- * (same tar writer as PharData). Round-trips inside this VM; respects phar.readonly.
+ * On-disk layout for this build:
+ * - TAR/PHAR: stub ending in `__HALT_COMPILER(); ?>` + ustar payload (same tar writer as PharData)
+ * - ZIP (#21678): stored ZIP with `.phar/stub.php` entry (php-src zip-based phar)
+ *
+ * Round-trips inside this VM; respects phar.readonly.
  */
 final class VmPharArchive
 {
     public const CLASS_LC = 'phar';
 
     private const HALT = "__HALT_COMPILER(); ?>";
+
+    /** php-src zip-based phar default stub (ext/phar/zip.c). */
+    private const ZIP_STUB = "<?php // zip-based phar archive stub file\n__HALT_COMPILER();";
+
+    /** Reserved ZIP member holding the executable stub (#21678). */
+    private const STUB_ENTRY = '.phar/stub.php';
+
+    /** Reserved ZIP member for signature bytes (skipped on open). */
+    private const SIGNATURE_ENTRY = '.phar/signature.bin';
 
     /** Reserved ustar member for archive metadata (#21229). */
     private const META_ENTRY = '.phar/metadata';
@@ -50,10 +62,11 @@ final class VmPharArchive
      *   metadata: mixed,
      *   fileMetadata: array<string, mixed>,
      *   fileAttrs: array<string, array{perms: int, flags: int}>,
-     *   wholeCompression: int
-     *   sigFlags: int
-     *   signature: string
-     *   sigPrivateKey: ?string
+     *   wholeCompression: int,
+     *   sigFlags: int,
+     *   signature: string,
+     *   sigPrivateKey: ?string,
+     *   format: int
      * }>
      */
     private static array $state = [];
@@ -80,10 +93,11 @@ final class VmPharArchive
         string $signature = '',
         ?string $sigPrivateKey = null,
         array $fileMetadata = [],
-        array $fileAttrs = []
+        array $fileAttrs = [],
+        int $format = VmPhar::FORMAT_TAR
     ): void {
         if ('' === $stub) {
-            $stub = self::createDefaultStub();
+            $stub = VmPhar::FORMAT_ZIP === $format ? self::ZIP_STUB : self::createDefaultStub();
         }
         self::$state[$object->id] = [
             'path' => $path,
@@ -101,6 +115,7 @@ final class VmPharArchive
             'sigFlags' => $sigFlags,
             'signature' => $signature,
             'sigPrivateKey' => $sigPrivateKey,
+            'format' => $format,
         ];
         self::$objectsByPath[$path] = $object;
     }
@@ -121,6 +136,12 @@ final class VmPharArchive
                 }
                 $binary = $decoded;
                 $wholeCompression = VmPhar::COMPRESSED_GZ;
+            }
+            if (self::looksLikeZip($binary)) {
+                self::openZipBytes($object, $path, $binary, $wholeCompression);
+                self::registerFilenameMap($path);
+
+                return;
             }
             [$stub, $payload] = self::splitStub($binary);
             $entries = VmPharTar::readArchiveEntries($payload);
@@ -162,7 +183,8 @@ final class VmPharArchive
                 '',
                 null,
                 $fileMetadata,
-                $fileAttrs
+                $fileAttrs,
+                VmPhar::FORMAT_TAR
             );
             self::registerFilenameMap($path);
 
@@ -807,21 +829,28 @@ final class VmPharArchive
     }
 
     /**
-     * php-src zim_Phar_convertToExecutable — already executable tar-backed Phar (#21328).
+     * php-src zim_Phar_convertToExecutable — tar/phar re-emit or ZIP executable (#21328, #21678).
      */
     public static function convertToExecutable(ObjectEntry $object, Context $ctx, ?int $format = null, ?int $compression = null, ?string $extension = null): ObjectEntry
     {
         self::requireWritable('Phar::convertToExecutable');
         $st = self::requireState($object);
         self::ensureFlushed($object);
-        if (null !== $format && VmPhar::FORMAT_TAR !== $format && VmPhar::FORMAT_PHAR !== $format && 0 !== $format) {
-            throw new \BadMethodCallException('Only tar/phar format is supported for Phar::convertToExecutable() in this build');
+        $fmt = null === $format || 0 === $format ? ($st['format'] ?? VmPhar::FORMAT_TAR) : $format;
+        if (VmPhar::FORMAT_TAR !== $fmt && VmPhar::FORMAT_PHAR !== $fmt && VmPhar::FORMAT_ZIP !== $fmt) {
+            throw new \BadMethodCallException('Only tar/phar/zip format is supported for Phar::convertToExecutable() in this build');
         }
-        if (null !== $compression && VmPhar::COMPRESSED_NONE !== $compression && VmPhar::COMPRESSED_GZ !== $compression && 0 !== $compression) {
+        $comp = null === $compression || 0 === $compression ? VmPhar::COMPRESSED_NONE : $compression;
+        if (VmPhar::COMPRESSED_NONE !== $comp && VmPhar::COMPRESSED_GZ !== $comp) {
             throw new \BadMethodCallException('Only NONE/GZ compression is supported for Phar::convertToExecutable() in this build');
         }
-        $wantGz = null !== $compression && VmPhar::COMPRESSED_GZ === $compression;
-        if ($wantGz) {
+        if (VmPhar::FORMAT_ZIP === $fmt && VmPhar::COMPRESSED_GZ === $comp) {
+            throw new \BadMethodCallException('Cannot compress entire archive with gzip, zip archives do not support whole-archive compression');
+        }
+        if (VmPhar::FORMAT_ZIP === $fmt) {
+            return self::convertToExecutableZip($ctx, $st, $extension);
+        }
+        if (VmPhar::COMPRESSED_GZ === $comp) {
             return self::compress($object, $ctx, VmPhar::COMPRESSED_GZ, $extension);
         }
         $path = $st['path'];
@@ -854,8 +883,62 @@ final class VmPharArchive
             '',
             null,
             $st['fileMetadata'] ?? [],
-            $st['fileAttrs'] ?? []
+            $st['fileAttrs'] ?? [],
+            VmPhar::FORMAT_TAR
         );
+
+        return $out;
+    }
+
+    /**
+     * Emit executable ZIP phar (stub entry + stored members; #21678).
+     *
+     * @param array{
+     *   path: string,
+     *   files: array<string, string>,
+     *   dirs: array<string, true>,
+     *   stub: string,
+     *   alias: string,
+     *   hasMetadata: bool,
+     *   metadata: mixed,
+     *   fileMetadata?: array<string, mixed>,
+     *   fileAttrs?: array<string, array{perms: int, flags: int}>
+     * } $st
+     */
+    private static function convertToExecutableZip(Context $ctx, array $st, ?string $extension): ObjectEntry
+    {
+        $path = $st['path'];
+        $base = \preg_replace('/\.phar(\.(zip|tar|gz|bz2))?$/i', '', $path) ?? $path;
+        $base = \preg_replace('/\.(zip|tar|gz|bz2)$/i', '', $base) ?? $base;
+        $ext = null !== $extension && '' !== $extension ? \ltrim($extension, '.') : 'phar.zip';
+        $outPath = $base.'.'.$ext;
+        $stub = self::ZIP_STUB;
+        $binary = self::buildZipBinary($st['files'], $st['dirs'], $stub, $st['hasMetadata'], $st['metadata'], $st['fileMetadata'] ?? [], $st['fileAttrs'] ?? []);
+        if (false === VmFs::filePutContents($outPath, $binary)) {
+            throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
+        }
+        $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        $out->constructed = true;
+        self::bind(
+            $out,
+            $outPath,
+            $st['files'],
+            false,
+            $st['dirs'],
+            $stub,
+            $st['alias'],
+            false,
+            $st['hasMetadata'],
+            $st['metadata'],
+            VmPhar::COMPRESSED_NONE,
+            0,
+            '',
+            null,
+            $st['fileMetadata'] ?? [],
+            $st['fileAttrs'] ?? [],
+            VmPhar::FORMAT_ZIP
+        );
+        self::registerFilenameMap($outPath);
 
         return $out;
     }
@@ -877,13 +960,14 @@ final class VmPharArchive
     }
 
     /**
-     * php-src zim_Phar_isFileFormat — this build is always tar-backed (#21328).
+     * php-src zim_Phar_isFileFormat — tar or zip-backed executable (#21328, #21678).
      */
     public static function isFileFormat(ObjectEntry $object, int $format): bool
     {
-        self::requireState($object);
+        $st = self::requireState($object);
+        $current = $st['format'] ?? VmPhar::FORMAT_TAR;
 
-        return VmPhar::FORMAT_TAR === $format;
+        return $current === $format;
     }
 
     /** php-src zim_Phar_setDefaultStub — createDefaultStub + setStub (#21231). */
@@ -1179,10 +1263,21 @@ final class VmPharArchive
         }
     }
 
-    /** Build on-disk stub+tar bytes (uncompressed). */
+    /** Build on-disk bytes (stub+tar or stored ZIP). */
     private static function buildBinary(ObjectEntry $object): string
     {
         $st = self::requireState($object);
+        if (VmPhar::FORMAT_ZIP === ($st['format'] ?? VmPhar::FORMAT_TAR)) {
+            return self::buildZipBinary(
+                $st['files'],
+                $st['dirs'],
+                $st['stub'],
+                $st['hasMetadata'],
+                $st['metadata'],
+                $st['fileMetadata'] ?? [],
+                $st['fileAttrs'] ?? []
+            );
+        }
         $stub = $st['stub'];
         if (!\str_contains($stub, self::HALT)) {
             if (!\str_ends_with(\rtrim($stub), '?>')) {
@@ -1203,6 +1298,174 @@ final class VmPharArchive
         }
 
         return $stub.VmPharTar::writeArchive($files, $st['dirs']);
+    }
+
+    /**
+     * @param array<string, string>                              $files
+     * @param array<string, true>                                $dirs
+     * @param array<string, mixed>                               $fileMetadata
+     * @param array<string, array{perms: int, flags: int}>       $fileAttrs
+     */
+    private static function buildZipBinary(
+        array $files,
+        array $dirs,
+        string $stub,
+        bool $hasMetadata,
+        mixed $metadata,
+        array $fileMetadata,
+        array $fileAttrs
+    ): string {
+        if (!\class_exists(ZipEngine::class, false)) {
+            require_once __DIR__.'/../zip/ZipEngine.php';
+        }
+        if ('' === $stub) {
+            $stub = self::ZIP_STUB;
+        }
+        $entries = [];
+        foreach ($dirs as $name => $_) {
+            $name = \rtrim(\str_replace('\\', '/', (string) $name), '/');
+            if ('' === $name) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $name.'/',
+                'data' => '',
+                'crc' => 0,
+                'size' => 0,
+            ];
+        }
+        foreach ($files as $name => $contents) {
+            $name = \ltrim(\str_replace('\\', '/', (string) $name), '/');
+            if ('' === $name || self::isReservedPharEntry($name)) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $name,
+                'data' => $contents,
+                'crc' => 0,
+                'size' => \strlen($contents),
+            ];
+        }
+        if ($hasMetadata) {
+            $raw = \serialize($metadata);
+            $entries[] = [
+                'name' => self::META_ENTRY,
+                'data' => $raw,
+                'crc' => 0,
+                'size' => \strlen($raw),
+            ];
+        }
+        if ([] !== $fileMetadata) {
+            $raw = \serialize($fileMetadata);
+            $entries[] = [
+                'name' => self::ENTRY_META,
+                'data' => $raw,
+                'crc' => 0,
+                'size' => \strlen($raw),
+            ];
+        }
+        if ([] !== $fileAttrs) {
+            $raw = \serialize($fileAttrs);
+            $entries[] = [
+                'name' => self::ENTRY_ATTRS,
+                'data' => $raw,
+                'crc' => 0,
+                'size' => \strlen($raw),
+            ];
+        }
+        $entries[] = [
+            'name' => self::STUB_ENTRY,
+            'data' => $stub,
+            'crc' => 0,
+            'size' => \strlen($stub),
+        ];
+
+        return ZipEngine::buildArchive($entries);
+    }
+
+    private static function isReservedPharEntry(string $name): bool
+    {
+        return self::STUB_ENTRY === $name
+            || self::SIGNATURE_ENTRY === $name
+            || self::META_ENTRY === $name
+            || self::ENTRY_META === $name
+            || self::ENTRY_ATTRS === $name;
+    }
+
+    private static function looksLikeZip(string $binary): bool
+    {
+        return \strlen($binary) >= 4 && 'PK' === \substr($binary, 0, 2);
+    }
+
+    private static function openZipBytes(ObjectEntry $object, string $path, string $binary, int $wholeCompression = VmPhar::COMPRESSED_NONE): void
+    {
+        if (!\class_exists(ZipEngine::class, false)) {
+            require_once __DIR__.'/../zip/ZipEngine.php';
+        }
+        $parsed = ZipEngine::readArchiveBytes($binary);
+        if (!($parsed['ok'] ?? false)) {
+            throw new \UnexpectedValueException('phar error: unable to open phar "'.$path.'"');
+        }
+        $files = [];
+        $dirs = [];
+        $stub = self::ZIP_STUB;
+        $hasMetadata = false;
+        $metadata = null;
+        $fileMetadata = [];
+        $fileAttrs = [];
+        foreach ($parsed['entries'] as $entry) {
+            $name = \str_replace('\\', '/', (string) ($entry['name'] ?? ''));
+            if ('' === $name) {
+                continue;
+            }
+            if (\str_ends_with($name, '/')) {
+                $dirs[\rtrim($name, '/')] = true;
+                continue;
+            }
+            $data = (string) ($entry['data'] ?? '');
+            if (self::STUB_ENTRY === $name) {
+                $stub = $data;
+                continue;
+            }
+            if (self::SIGNATURE_ENTRY === $name) {
+                continue;
+            }
+            if (self::META_ENTRY === $name) {
+                $hasMetadata = true;
+                $metadata = '' === $data ? null : \unserialize($data);
+                continue;
+            }
+            if (self::ENTRY_META === $name) {
+                $decoded = '' === $data ? [] : \unserialize($data);
+                $fileMetadata = \is_array($decoded) ? $decoded : [];
+                continue;
+            }
+            if (self::ENTRY_ATTRS === $name) {
+                $decoded = '' === $data ? [] : \unserialize($data);
+                $fileAttrs = \is_array($decoded) ? $decoded : [];
+                continue;
+            }
+            $files[$name] = $data;
+        }
+        self::bind(
+            $object,
+            $path,
+            $files,
+            false,
+            $dirs,
+            $stub,
+            '',
+            false,
+            $hasMetadata,
+            $metadata,
+            $wholeCompression,
+            0,
+            '',
+            null,
+            $fileMetadata,
+            $fileAttrs,
+            VmPhar::FORMAT_ZIP
+        );
     }
 
     private static function flush(ObjectEntry $object): void
@@ -1325,6 +1588,32 @@ final class VmPharArchive
                 );
             }
             $binary = $decoded;
+        }
+        if (self::looksLikeZip($binary)) {
+            if (!\class_exists(ZipEngine::class, false)) {
+                require_once __DIR__.'/../zip/ZipEngine.php';
+            }
+            $parsed = ZipEngine::readArchiveBytes($binary);
+            if (!($parsed['ok'] ?? false)) {
+                throw new \PharException(
+                    'Unknown phar archive "'.$path.'": unable to open phar for reading "'.$path.'"'
+                );
+            }
+            $hasStub = false;
+            foreach ($parsed['entries'] as $entry) {
+                $name = \str_replace('\\', '/', (string) ($entry['name'] ?? ''));
+                if (self::STUB_ENTRY === $name) {
+                    $hasStub = \str_contains((string) ($entry['data'] ?? ''), '__HALT_COMPILER()');
+                    break;
+                }
+            }
+            if (!$hasStub && !\str_contains($binary, '__HALT_COMPILER()')) {
+                throw new \PharException(
+                    'internal corruption of phar "'.$path.'" (__HALT_COMPILER(); not found)'
+                );
+            }
+
+            return;
         }
         if (!\str_contains($binary, '__HALT_COMPILER()')) {
             throw new \PharException(
