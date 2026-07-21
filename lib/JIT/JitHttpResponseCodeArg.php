@@ -29,7 +29,7 @@ final class JitHttpResponseCodeArg
                 \PHPCompiler\ext\standard\JitIntdiv::emitNullIntDeprecation(
                     $context,
                     'http_response_code',
-                    0,
+                    1,
                     'response_code'
                 );
             } else {

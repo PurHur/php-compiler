@@ -35,7 +35,7 @@ final class http_response_code extends Internal
             }
             if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
                 // Soft-null DEP+coerce on 8.4 (php-src head.c Z_PARAM_LONG; #21480, reverts #20962 TypeError).
-                VmNullNumberParamDeprecation::emit($frame, 'http_response_code', 0, 'response_code', 'int');
+                VmNullNumberParamDeprecation::emit($frame, 'http_response_code', 1, 'response_code', 'int');
 
                 return;
             }
@@ -57,7 +57,7 @@ final class http_response_code extends Internal
         }
         if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
             // Soft-null DEP+coerce on 8.4 (php-src head.c Z_PARAM_LONG; #21480, reverts #20962 TypeError).
-            VmNullNumberParamDeprecation::emit($frame, 'http_response_code', 0, 'response_code', 'int');
+            VmNullNumberParamDeprecation::emit($frame, 'http_response_code', 1, 'response_code', 'int');
             VmHttpResponse::assignReadResult(
                 $frame->returnVar,
                 VmHttpResponse::readHttpResponseCode($ctx),

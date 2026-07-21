@@ -92,7 +92,7 @@ final class JitHttpResponseCode
                 );
                 $context->builder->call($context->lookupFunction('abort'));
             } else {
-                JitIntdiv::emitNullIntDeprecation($context, 'http_response_code', 0, 'response_code');
+                JitIntdiv::emitNullIntDeprecation($context, 'http_response_code', 1, 'response_code');
             }
             $context->builder->call(
                 $context->lookupFunction('__phpc_http_response_code_apply'),
