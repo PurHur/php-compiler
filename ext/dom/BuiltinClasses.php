@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\ext\standard\ThrowableManifest;
 
 /** Register dom extension builtin classes (php-src ext/dom/php_dom.c; issue #6140). */
@@ -49,6 +51,15 @@ final class BuiltinClasses
         $entry = $ctx->classes[ThrowableManifest::LC_DOM_EXCEPTION] ?? null;
         if (null !== $entry) {
             DomExceptionConstants::registerOnClass($entry);
+            // php-src ext/dom/php_dom.c: DOMException redeclares $code as public
+            // (Exception declares it protected; DOMException widens it).
+            foreach ($entry->properties as $prop) {
+                if (ExceptionSupport::PROP_CODE === $prop->name) {
+                    $prop->visibility = CfgFunc::FLAG_PUBLIC;
+                    $prop->declaringClassLc = ThrowableManifest::LC_DOM_EXCEPTION;
+                    break;
+                }
+            }
         }
     }
 }
