@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -384,57 +382,12 @@ final class ProcessRuntime
 
     private static function ensurePhpcRunCommandHelperCompiled(Context $context): void
     {
-        if (self::helpersPresent($context, [self::PHPC_RUN_COMMAND])) {
-            return;
-        }
-
-        self::compileHelperFile(
+        JitVmHelperLink::ensureCompiled(
             $context,
             self::PHPC_RUN_COMMAND_HELPER_PATH,
-            'ProcessPhpcRunCommandJitHelper.php',
-            [self::PHPC_RUN_COMMAND]
+            [self::PHPC_RUN_COMMAND],
+            '#21857'
         );
-    }
-
-    /**
-     * @param list<string> $expectedHelpers
-     */
-    private static function helpersPresent(Context $context, array $expectedHelpers): bool
-    {
-        foreach ($expectedHelpers as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    /**
-     * @param list<string> $expectedHelpers
-     */
-    private static function compileHelperFile(
-        Context $context,
-        string $relativePath,
-        string $basename,
-        array $expectedHelpers
-    ): void {
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).$relativePath;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
-            if (null === $block) {
-                throw new \LogicException($basename.' parseAndCompile failed (#9337)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach ($expectedHelpers as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT process helpers (#9337)');
-            }
-        }
     }
 
     private static function registerShellRuntime(Context $context): void

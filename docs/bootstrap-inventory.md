@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6322 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20030 |
+| Source constructs flagged (warnings) | 20032 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1139,7 +1139,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
 | `ext/ldap/LdapExtensionPolicy.php` | 0 | 1 |
-| `ext/ldap/Module.php` | 0 | 24 |
+| `ext/ldap/Module.php` | 0 | 26 |
 | `ext/ldap/VmLdapArg.php` | 0 | 1 |
 | `ext/ldap/VmLdapConnection.php` | 0 | 4 |
 | `ext/ldap/VmLdapCore.php` | 0 | 4 |
@@ -1149,7 +1149,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/ldap_connect.php` | 0 | 2 |
 | `ext/ldap/ldap_connect_wallet.php` | 0 | 2 |
 | `ext/ldap/ldap_escape.php` | 0 | 2 |
-| `ext/ldap/ldap_exop_builtins.php` | 0 | 4 |
+| `ext/ldap/ldap_exop_builtins.php` | 0 | 6 |
 | `ext/ldap/ldap_link_builtins.php` | 0 | 8 |
 | `ext/ldap/ldap_search_builtins.php` | 0 | 7 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
@@ -5195,7 +5195,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringStrtokJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrtotime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringStrtr.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrtr.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSubstrCompare.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSubstrCount.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSuperglobalName.php` | 0 | 1 |
@@ -15147,8 +15147,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ldap_exop (line 72)
 - new ldap_exop_sync (line 73)
 - new ldap_parse_exop (line 74)
-- new ldap_exop_refresh (line 75)
-- new ldap_connect_wallet (line 79)
+- new ldap_exop_whoami (line 75)
+- new ldap_exop_refresh (line 76)
+- new ldap_exop_passwd (line 77)
+- new ldap_connect_wallet (line 81)
 - 3 class method(s)
 
 ### `ext/ldap/VmLdapArg.php`
@@ -15180,7 +15182,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/VmLdapNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 26 class method(s)
+- 28 class method(s)
 
 ### `ext/ldap/VmLdapResult.php`
 
@@ -15216,8 +15218,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - new ArgumentCountError (line 139)
-- new ArgumentCountError (line 190)
-- 9 class method(s)
+- new ArgumentCountError (line 191)
+- new ArgumentCountError (line 256)
+- new ArgumentCountError (line 299)
+- 13 class method(s)
 
 ### `ext/ldap/ldap_link_builtins.php`
 
@@ -43701,9 +43705,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrtr.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 189)
-- 10 class method(s)
-- 1 closure(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/StringSubstrCompare.php`
 
