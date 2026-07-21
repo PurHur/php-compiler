@@ -250,7 +250,13 @@ function run(string $filename, string $code, array $options): void
             fwrite(STDERR, 'phpc lint: OK (bundle cache hit '.basename($bundleLintCacheFile).", #16508)\n");
             exit(0);
         }
-        // The mega-bundle compile needs ~2-4G; the 1536M default OOMs (#16508).
+    }
+
+    // Self-host bundles need ~2-4G whether we are LINTING or COMPILING them; the
+    // 1536M default OOMs deep inside php-cfg Traverser with no hint that the cap is
+    // the cause (#16508). The bump used to sit inside the `-l` branch above, so
+    // `bin/compile.php -o OUT test/selfhost/.../main.php` still died at 1536M.
+    if ('' !== $normalized && str_contains($normalized, 'test/selfhost/')) {
         $bundleLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
         if (false === $bundleLimit || '' === $bundleLimit || '1536M' === $bundleLimit || '2G' === $bundleLimit) {
             ini_set('memory_limit', '6G');
