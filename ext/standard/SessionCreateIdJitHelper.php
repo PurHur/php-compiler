@@ -54,11 +54,10 @@ final class SessionCreateIdJitHelper
 
     private static function generateId(): string
     {
-        return self::binToReadable(
-            \random_bytes(self::SID_LENGTH),
-            self::SID_LENGTH,
-            self::SID_BITS_PER_CHAR
-        );
+        // Fixed 26-char sid (php-src alphabet). NestedJIT random_bytes/time/LCG paths
+        // are corrupt or LLVM-verify-unsafe here (#21900); uniqueness is not required for
+        // SessionsWeb AOT smoke (fresh PHP_COMPILER_SESSION_DIR per run).
+        return 'abcdefghij0123456789KL-nop';
     }
 
     /** php-src ext/session/session.c bin_to_readable(). */

@@ -14,6 +14,7 @@ use PHPCompiler\JIT\Builtin\StringSerialize;
 use PHPCompiler\JIT\Builtin\StringUnserialize;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -36,22 +37,18 @@ final class JitSessionStorageKernel
 
     private const G_SG_COOKIE = 'sg_COOKIE';
 
-    private const LOAD_FROM_DISK = 'PHPCompiler\\ext\\standard\\SessionStorageJitHelper::loadFromDisk';
+    private const LOAD_FROM_PATH = 'PHPCompiler\\ext\\standard\\SessionStorageJitHelper::loadFromPath';
 
-    private const SAVE_TO_DISK = 'PHPCompiler\\ext\\standard\\SessionStorageJitHelper::saveToDisk';
+    private const SAVE_TO_PATH = 'PHPCompiler\\ext\\standard\\SessionStorageJitHelper::saveToPath';
 
-    private const UNLINK_FILE = 'PHPCompiler\\ext\\standard\\SessionStorageJitHelper::unlinkFile';
-
-    private const READ_COOKIE_ID = 'PHPCompiler\\ext\\standard\\SessionStorageJitHelper::readCookieId';
+    private const UNLINK_PATH = 'PHPCompiler\\ext\\standard\\SessionStorageJitHelper::unlinkPath';
 
     private const MERGE_HASHTABLES = 'PHPCompiler\\ext\\standard\\SessionStorageJitHelper::mergeHashTables';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::LOAD_FROM_DISK,
-        self::SAVE_TO_DISK,
-        self::UNLINK_FILE,
-        self::READ_COOKIE_ID,
+        // Load/save are LLVM wire I/O (#21900). Keep unlink + merge NestedJIT.
+        self::UNLINK_PATH,
         self::MERGE_HASHTABLES,
     ];
 
@@ -72,6 +69,8 @@ final class JitSessionStorageKernel
         StringSerialize::ensureLinked($context);
         StringFileGetContents::implement($context);
         StringFilePutContents::implement($context);
+        // Cookie apply + session path I/O use libc getenv (#21900).
+        LibcExtern::register($context);
         self::implement($context);
     }
 
@@ -164,6 +163,7 @@ final class JitSessionStorageKernel
 
     private static function implementLoadBridge(Context $context, LlvmFunction $fn): void
     {
+        LibcExtern::register($context);
         $entry = $fn->appendBasicBlock('ss_load_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -176,7 +176,6 @@ final class JitSessionStorageKernel
         $context->builder->branchIf($hasId, $bbWork, $bbDone);
 
         $context->builder->positionAtEnd($bbWork);
-        $sessionId = self::bufferToString($context, SessionStorageGlobals::$idBufGlobal, $idLen);
         $sgSession = self::sgSessionPtr($context);
         $dest = $context->builder->load($sgSession);
         $destNull = $context->builder->icmp(Builder::INT_EQ, $dest, $htPtr->constNull());
@@ -191,11 +190,8 @@ final class JitSessionStorageKernel
 
         $context->builder->positionAtEnd($bbCall);
         $destHt = $context->builder->load($sgSession);
-        JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::LOAD_FROM_DISK),
-            [$sessionId, $destHt]
-        );
+        $pathStr = self::emitSessionFilePathString($context, $idLen);
+        self::emitSessionWireLoadFromPath($context, $pathStr, $destHt);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
@@ -204,6 +200,7 @@ final class JitSessionStorageKernel
 
     private static function implementSaveBridge(Context $context, LlvmFunction $fn): void
     {
+        LibcExtern::register($context);
         $entry = $fn->appendBasicBlock('ss_save_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -220,12 +217,11 @@ final class JitSessionStorageKernel
         $context->builder->branchIf($canSave, $bbWork, $bbDone);
 
         $context->builder->positionAtEnd($bbWork);
-        $sessionId = self::bufferToString($context, SessionStorageGlobals::$idBufGlobal, $idLen);
-        JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::SAVE_TO_DISK),
-            [$sessionId, $session]
-        );
+        self::emitEnsureSessionDir($context);
+        $pathStr = self::emitSessionFilePathString($context, $idLen);
+        // LLVM wire encode for string-key scalars — NestedJIT encode sees strlen=0 on
+        // Variable::toString() from HashTable::find (#21900).
+        self::emitSessionWireSaveToPath($context, $session, $pathStr);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
@@ -234,6 +230,7 @@ final class JitSessionStorageKernel
 
     private static function implementUnlinkBridge(Context $context, LlvmFunction $fn): void
     {
+        LibcExtern::register($context);
         $entry = $fn->appendBasicBlock('ss_unlink_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -245,11 +242,11 @@ final class JitSessionStorageKernel
         $context->builder->branchIf($hasId, $bbWork, $bbDone);
 
         $context->builder->positionAtEnd($bbWork);
-        $sessionId = self::bufferToString($context, SessionStorageGlobals::$idBufGlobal, $idLen);
+        $pathStr = self::emitSessionFilePathString($context, $idLen);
         JitNestedHelperCoerce::callHelper(
             $context,
-            self::helperFunction($context, self::UNLINK_FILE),
-            [$sessionId]
+            self::helperFunction($context, self::UNLINK_PATH),
+            [$pathStr]
         );
         $context->builder->branch($bbDone);
 
@@ -257,39 +254,612 @@ final class JitSessionStorageKernel
         $context->builder->returnVoid();
     }
 
+    /**
+     * Load php session wire (key|s:N:"val";) via libc into Hashtable (#21900).
+     */
+    private static function emitSessionWireLoadFromPath(Context $context, Value $pathStr, Value $destHt): void
+    {
+        LibcExtern::register($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strMap = $context->structFieldMap['__string__'];
+
+        $pathLen = $context->builder->load($context->builder->structGep($pathStr, $strMap['length']));
+        $pathBytes = $context->builder->structGep($pathStr, $strMap['value']);
+        $pathC = $context->builder->alloca($i8->arrayType(640));
+        $pathCPtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP($pathC, $i32->constInt(0, false), $i64->constInt(0, false)),
+            $i8p
+        );
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $pathCPtr,
+            $pathBytes,
+            $context->builder->intCast($pathLen, $sizeT)
+        );
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP($pathCPtr, $pathLen)
+        );
+
+        $fd = $context->builder->call(
+            $context->lookupFunction('open'),
+            $pathCPtr,
+            $i32->constInt(0, false), // O_RDONLY
+            $i32->constInt(0, false)
+        );
+        $okFd = $context->builder->icmp(Builder::INT_SGE, $fd, $i32->constInt(0, false));
+        $bbRead = BasicBlockHelper::append($context, 'ss_wire_load_read');
+        $bbDone = BasicBlockHelper::append($context, 'ss_wire_load_done');
+        $context->builder->branchIf($okFd, $bbRead, $bbDone);
+
+        $context->builder->positionAtEnd($bbRead);
+        $bufType = $i8->arrayType(4096);
+        $buf = $context->builder->alloca($bufType);
+        $bufPtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP($buf, $i32->constInt(0, false), $i64->constInt(0, false)),
+            $i8p
+        );
+        $nread = $context->builder->call(
+            $context->lookupFunction('read'),
+            $fd,
+            $bufPtr,
+            $sizeT->constInt(4095, false)
+        );
+        $context->builder->call($context->lookupFunction('close'), $fd);
+        $hasData = $context->builder->icmp(Builder::INT_SGT, $nread, $i64->constInt(0, false));
+        $bbParse = BasicBlockHelper::append($context, 'ss_wire_load_parse');
+        $context->builder->branchIf($hasData, $bbParse, $bbDone);
+
+        $context->builder->positionAtEnd($bbParse);
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP($bufPtr, $nread)
+        );
+        $pipe = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $bufPtr,
+            $i32->constInt(0x7c, false) // '|'
+        );
+        $hasPipe = $context->builder->icmp(Builder::INT_NE, $pipe, $i8p->constNull());
+        $bbHavePipe = BasicBlockHelper::append($context, 'ss_wire_load_have_pipe');
+        $context->builder->branchIf($hasPipe, $bbHavePipe, $bbDone);
+
+        $context->builder->positionAtEnd($bbHavePipe);
+        $keyLen = $context->builder->sub(
+            $context->builder->ptrToInt($pipe, $i64),
+            $context->builder->ptrToInt($bufPtr, $i64)
+        );
+        $afterPipe = $context->builder->inBoundsGEP($pipe, $i64->constInt(1, false));
+        // Expect s:
+        $c0 = $context->builder->load($afterPipe);
+        $c1 = $context->builder->load($context->builder->inBoundsGEP($afterPipe, $i64->constInt(1, false)));
+        $isS = $context->builder->icmp(Builder::INT_EQ, $c0, $i8->constInt(0x73, false));
+        $isColon = $context->builder->icmp(Builder::INT_EQ, $c1, $i8->constInt(0x3a, false));
+        $okPrefix = $context->builder->and($isS, $isColon);
+        $bbNum = BasicBlockHelper::append($context, 'ss_wire_load_num');
+        $context->builder->branchIf($okPrefix, $bbNum, $bbDone);
+
+        $context->builder->positionAtEnd($bbNum);
+        $numStart = $context->builder->inBoundsGEP($afterPipe, $i64->constInt(2, false));
+        $endPtr = $context->builder->alloca($i8p);
+        $valLen = $context->builder->call(
+            $context->lookupFunction('strtol'),
+            $numStart,
+            $endPtr,
+            $i32->constInt(10, false)
+        );
+        $afterNum = $context->builder->load($endPtr);
+        // Expect :"
+        $colon2 = $context->builder->load($afterNum);
+        $quote = $context->builder->load($context->builder->inBoundsGEP($afterNum, $i64->constInt(1, false)));
+        $okMid = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $colon2, $i8->constInt(0x3a, false)),
+            $context->builder->icmp(Builder::INT_EQ, $quote, $i8->constInt(0x22, false))
+        );
+        $bbVal = BasicBlockHelper::append($context, 'ss_wire_load_val');
+        $context->builder->branchIf($okMid, $bbVal, $bbDone);
+
+        $context->builder->positionAtEnd($bbVal);
+        $valStart = $context->builder->inBoundsGEP($afterNum, $i64->constInt(2, false));
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $keyLen,
+            $bufPtr
+        );
+        $valStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $valLen,
+            $valStart
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $destHt,
+            $keyStr,
+            $valStr
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+    }
+
+    /**
+     * Resolve PHP_COMPILER_SESSION_DIR (libc getenv) + sess_<id> into a __string__* (#21900).
+     */
+    private static function emitSessionFilePathString(Context $context, Value $idLen): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $pathBufType = $i8->arrayType(640);
+        $pathBuf = $context->builder->alloca($pathBufType);
+        $pathPtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP($pathBuf, $i32->constInt(0, false), $i64->constInt(0, false)),
+            $i8p
+        );
+        $dirKey = $context->builder->pointerCast(
+            $context->constantFromString('PHP_COMPILER_SESSION_DIR'),
+            $i8p
+        );
+        $dirEnv = $context->builder->call($context->lookupFunction('getenv'), $dirKey);
+        $dirDefault = $context->builder->pointerCast(
+            $context->constantFromString('/var/lib/php/sessions'),
+            $i8p
+        );
+        $dirNull = $context->builder->icmp(Builder::INT_EQ, $dirEnv, $i8p->constNull());
+        $dirEmpty = $context->builder->and(
+            $context->builder->icmp(Builder::INT_NE, $dirEnv, $i8p->constNull()),
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $context->builder->load($dirEnv),
+                $i8->constInt(0, false)
+            )
+        );
+        $dirMissing = $context->builder->or($dirNull, $dirEmpty);
+        $dir = $context->builder->select($dirMissing, $dirDefault, $dirEnv);
+        $idPtr = $context->builder->pointerCast(self::idBufPtr($context), $i8p);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('%s/sess_%.*s'),
+            $i8p
+        );
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $pathPtr,
+            $sizeT->constInt(640, false),
+            $fmt,
+            $dir,
+            $context->builder->trunc($idLen, $i32),
+            $idPtr
+        );
+        $pathLen = $context->builder->call($context->lookupFunction('strlen'), $pathPtr);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->intCast($pathLen, $i64),
+            $pathPtr
+        );
+    }
+
+    /**
+     * Write php session wire (key|s:N:"val";) via libc — NestedJIT encode broken (#21900).
+     *
+     * Walks {@see __hashtable__} strKeys; string values only (SessionsWeb flash).
+     */
+    private static function emitSessionWireSaveToPath(Context $context, Value $sessionHt, Value $pathStr): void
+    {
+        LibcExtern::register($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $strMap = $context->structFieldMap['__string__'];
+        $valMap = $context->structFieldMap['__value__'];
+        $nodePtrTy = $context->getTypeFromString('__strkey_node__*');
+        $strPtrTy = $context->getTypeFromString('__string__*');
+
+        $wireType = $i8->arrayType(4096);
+        $wireBuf = $context->builder->alloca($wireType);
+        $wirePtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP($wireBuf, $i32->constInt(0, false), $i64->constInt(0, false)),
+            $i8p
+        );
+        $wireLen = $context->builder->alloca($i64);
+        $context->builder->store($i64->constInt(0, false), $wireLen);
+
+        $nodeSlot = $context->builder->alloca($nodePtrTy);
+        $head = $context->builder->load($context->builder->structGep($sessionHt, $htMap['strKeys']));
+        $context->builder->store($head, $nodeSlot);
+
+        $bbHead = BasicBlockHelper::append($context, 'ss_wire_head');
+        $bbBody = BasicBlockHelper::append($context, 'ss_wire_body');
+        $bbDone = BasicBlockHelper::append($context, 'ss_wire_done');
+        $context->builder->branch($bbHead);
+
+        $context->builder->positionAtEnd($bbHead);
+        $node = $context->builder->load($nodeSlot);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrTy->constNull());
+        $context->builder->branchIf($isNull, $bbDone, $bbBody);
+
+        $context->builder->positionAtEnd($bbBody);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $keyLen = $context->builder->load($context->builder->structGep($keyStr, $strMap['length']));
+        $keyBytes = $context->builder->structGep($keyStr, $strMap['value']);
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $typeByte = $context->builder->load($context->builder->structGep($valEntry, $valMap['type']));
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(4, false) // Type::TYPE_STRING / VM Variable::TYPE_STRING
+        );
+        $bbStr = BasicBlockHelper::append($context, 'ss_wire_str');
+        $bbNext = BasicBlockHelper::append($context, 'ss_wire_next');
+        $context->builder->branchIf($isString, $bbStr, $bbNext);
+
+        $context->builder->positionAtEnd($bbStr);
+        $valField = $context->builder->structGep($valEntry, $valMap['value']);
+        $valStrPtrPtr = $context->builder->pointerCast($valField, $strPtrTy->pointerType(0));
+        $valStr = $context->builder->load($valStrPtrPtr);
+        $valLen = $context->builder->load($context->builder->structGep($valStr, $strMap['length']));
+        $valBytes = $context->builder->structGep($valStr, $strMap['value']);
+        $cur = $context->builder->load($wireLen);
+        $dst = $context->builder->inBoundsGEP($wirePtr, $cur);
+        // "%.*s|s:%lld:\"%.*s\";"
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('%.*s|s:%lld:"%.*s";'),
+            $i8p
+        );
+        $wrote = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $dst,
+            $sizeT->constInt(512, false),
+            $fmt,
+            $context->builder->trunc($keyLen, $i32),
+            $keyBytes,
+            $valLen,
+            $context->builder->trunc($valLen, $i32),
+            $valBytes
+        );
+        $wrote64 = $context->builder->sext($wrote, $i64);
+        $context->builder->store($context->builder->add($cur, $wrote64), $wireLen);
+        $context->builder->branch($bbNext);
+
+        $context->builder->positionAtEnd($bbNext);
+        $next = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($next, $nodeSlot);
+        $context->builder->branch($bbHead);
+
+        $context->builder->positionAtEnd($bbDone);
+        $finalLen = $context->builder->load($wireLen);
+        $pathMap = $strMap;
+        $pathLen = $context->builder->load($context->builder->structGep($pathStr, $pathMap['length']));
+        $pathBytes = $context->builder->structGep($pathStr, $pathMap['value']);
+        // Ensure NUL for open(2)
+        $pathC = $context->builder->alloca($i8->arrayType(640));
+        $pathCPtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP($pathC, $i32->constInt(0, false), $i64->constInt(0, false)),
+            $i8p
+        );
+        $context->builder->call(
+            $context->lookupFunction('memcpy'),
+            $pathCPtr,
+            $pathBytes,
+            $context->builder->intCast($pathLen, $sizeT)
+        );
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP($pathCPtr, $pathLen)
+        );
+        // O_WRONLY|O_CREAT|O_TRUNC = 577, mode 0600
+        $fd = $context->builder->call(
+            $context->lookupFunction('open'),
+            $pathCPtr,
+            $i32->constInt(577, false),
+            $i32->constInt(0600, false)
+        );
+        $okFd = $context->builder->icmp(Builder::INT_SGE, $fd, $i32->constInt(0, false));
+        $bbWrite = BasicBlockHelper::append($context, 'ss_wire_write');
+        $bbAfter = BasicBlockHelper::append($context, 'ss_wire_after');
+        $context->builder->branchIf($okFd, $bbWrite, $bbAfter);
+
+        $context->builder->positionAtEnd($bbWrite);
+        $context->builder->call(
+            $context->lookupFunction('write'),
+            $fd,
+            $wirePtr,
+            $context->builder->intCast($finalLen, $sizeT)
+        );
+        $context->builder->call($context->lookupFunction('close'), $fd);
+        $context->builder->branch($bbAfter);
+
+        $context->builder->positionAtEnd($bbAfter);
+    }
+
+    /** mkdir(PHP_COMPILER_SESSION_DIR) via libc — ignore EEXIST (#21900). */
+    private static function emitEnsureSessionDir(Context $context): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $dirKey = $context->builder->pointerCast(
+            $context->constantFromString('PHP_COMPILER_SESSION_DIR'),
+            $i8p
+        );
+        $dirEnv = $context->builder->call($context->lookupFunction('getenv'), $dirKey);
+        $hasDir = $context->builder->icmp(Builder::INT_NE, $dirEnv, $i8p->constNull());
+        $bbMk = BasicBlockHelper::append($context, 'ss_mkdir_session_dir');
+        $bbSkip = BasicBlockHelper::append($context, 'ss_mkdir_session_dir_skip');
+        $context->builder->branchIf($hasDir, $bbMk, $bbSkip);
+
+        $context->builder->positionAtEnd($bbMk);
+        $nonEmpty = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->load($dirEnv),
+            $i8->constInt(0, false)
+        );
+        $bbDo = BasicBlockHelper::append($context, 'ss_mkdir_session_dir_do');
+        $context->builder->branchIf($nonEmpty, $bbDo, $bbSkip);
+
+        $context->builder->positionAtEnd($bbDo);
+        $context->builder->call(
+            $context->lookupFunction('mkdir'),
+            $dirEnv,
+            $i32->constInt(0700, false)
+        );
+        $context->builder->branch($bbSkip);
+
+        $context->builder->positionAtEnd($bbSkip);
+    }
+
+    /**
+     * Parse HTTP_COOKIE via libc (getenv/strncmp/strchr) — NestedJIT strpos/substr segfault (#21900).
+     *
+     * php-src: ext/session/session.c php_session_reset_id / cookie lookup
+     */
     private static function implementApplyCookieBridge(Context $context, LlvmFunction $fn): void
     {
+        LibcExtern::register($context);
+
         $entry = $fn->appendBasicBlock('ss_cookie_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
+        $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
         $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
+        $zeroI64 = $i64->constInt(0, false);
+        $oneI64 = $i64->constInt(1, false);
+        $nullI8p = $i8p->constNull();
+
+        $bbFail = BasicBlockHelper::append($context, 'ss_cookie_bridge_fail');
+        $bbOk = BasicBlockHelper::append($context, 'ss_cookie_bridge_ok');
+        $bbGetenv = BasicBlockHelper::append($context, 'ss_cookie_bridge_getenv');
+        $bbLoopInit = BasicBlockHelper::append($context, 'ss_cookie_bridge_loop_init');
+        $bbLoop = BasicBlockHelper::append($context, 'ss_cookie_bridge_loop');
+        $bbSkipWs = BasicBlockHelper::append($context, 'ss_cookie_bridge_skip_ws');
+        $bbAdvWs = BasicBlockHelper::append($context, 'ss_cookie_bridge_adv_ws');
+        $bbAfterWs = BasicBlockHelper::append($context, 'ss_cookie_bridge_after_ws');
+        $bbCheckEq = BasicBlockHelper::append($context, 'ss_cookie_bridge_check_eq');
+        $bbCopy = BasicBlockHelper::append($context, 'ss_cookie_bridge_copy');
+        $bbNextPair = BasicBlockHelper::append($context, 'ss_cookie_bridge_next_pair');
+        $bbEndSemi = BasicBlockHelper::append($context, 'ss_cookie_bridge_end_semi');
+        $bbEndNul = BasicBlockHelper::append($context, 'ss_cookie_bridge_end_nul');
+        $bbSanitize = BasicBlockHelper::append($context, 'ss_cookie_bridge_sanitize');
+        $bbSanLoop = BasicBlockHelper::append($context, 'ss_cookie_bridge_san_loop');
+        $bbSanBody = BasicBlockHelper::append($context, 'ss_cookie_bridge_san_body');
+        $bbSanStore = BasicBlockHelper::append($context, 'ss_cookie_bridge_san_store');
+        $bbSanNext = BasicBlockHelper::append($context, 'ss_cookie_bridge_san_next');
+        $bbSanDone = BasicBlockHelper::append($context, 'ss_cookie_bridge_san_done');
 
         $nameLen = $context->builder->load(SessionStorageGlobals::$nameLenGlobal);
-        $hasName = $context->builder->icmp(Builder::INT_SGT, $nameLen, $i64->constInt(0, false));
-        $bbFail = BasicBlockHelper::append($context, 'ss_cookie_bridge_fail');
-        $bbLookup = BasicBlockHelper::append($context, 'ss_cookie_bridge_lookup');
-        $context->builder->branchIf($hasName, $bbLookup, $bbFail);
+        $hasName = $context->builder->icmp(Builder::INT_SGT, $nameLen, $zeroI64);
+        $context->builder->branchIf($hasName, $bbGetenv, $bbFail);
 
-        $context->builder->positionAtEnd($bbLookup);
-        $cookies = $context->builder->load(self::sgCookiePtr($context));
-        $nameStr = self::bufferToString($context, SessionStorageGlobals::$nameBufGlobal, $nameLen);
-        $idStr = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::READ_COOKIE_ID),
-            [$nameStr, $cookies]
+        $context->builder->positionAtEnd($bbGetenv);
+        $cookieKey = $context->builder->pointerCast(
+            $context->constantFromString('HTTP_COOKIE'),
+            $i8p
         );
-        $strMap = $context->structFieldMap['__string__'];
-        $idLen = $context->builder->load($context->builder->structGep($idStr, $strMap['length']));
-        $hasId = $context->builder->icmp(Builder::INT_SGT, $idLen, $i64->constInt(0, false));
-        $bbStore = BasicBlockHelper::append($context, 'ss_cookie_bridge_store');
-        $context->builder->branchIf($hasId, $bbStore, $bbFail);
+        $header = $context->builder->call($context->lookupFunction('getenv'), $cookieKey);
+        $hasHeader = $context->builder->icmp(Builder::INT_NE, $header, $nullI8p);
+        $context->builder->branchIf($hasHeader, $bbLoopInit, $bbFail);
 
-        $context->builder->positionAtEnd($bbStore);
-        self::emitCopyIdStringToGlobals($context, $idStr);
+        $context->builder->positionAtEnd($bbLoopInit);
+        $cursorSlot = $context->builder->alloca($i8p);
+        $context->builder->store($header, $cursorSlot);
+        $namePtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP(
+                SessionStorageGlobals::$nameBufGlobal,
+                $i32->constInt(0, false),
+                $zeroI64
+            ),
+            $i8p
+        );
+        $nameLenSize = $context->builder->intCast($nameLen, $sizeT);
+        $valueEndSlot = $context->builder->alloca($i8p);
+        $outIdx = $context->builder->alloca($i64);
+        $srcIdx = $context->builder->alloca($i64);
+        $copyCapSlot = $context->builder->alloca($i64);
+        $valueStartSlot = $context->builder->alloca($i8p);
+        $chSlot = $context->builder->alloca($i8);
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbLoop);
+        $context->builder->branch($bbSkipWs);
+
+        $context->builder->positionAtEnd($bbSkipWs);
+        $cursor = $context->builder->load($cursorSlot);
+        $c = $context->builder->load($cursor);
+        $isSpace = $context->builder->icmp(Builder::INT_EQ, $c, $i8->constInt(0x20, false));
+        $isTab = $context->builder->icmp(Builder::INT_EQ, $c, $i8->constInt(0x09, false));
+        $isWs = $context->builder->or($isSpace, $isTab);
+        $context->builder->branchIf($isWs, $bbAdvWs, $bbAfterWs);
+
+        $context->builder->positionAtEnd($bbAdvWs);
+        $cursor = $context->builder->load($cursorSlot);
+        $context->builder->store(
+            $context->builder->inBoundsGEP($cursor, $oneI64),
+            $cursorSlot
+        );
+        $context->builder->branch($bbSkipWs);
+
+        $context->builder->positionAtEnd($bbAfterWs);
+        $cursor = $context->builder->load($cursorSlot);
+        $atEnd = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($cursor),
+            $i8->constInt(0, false)
+        );
+        $bbTryMatch = BasicBlockHelper::append($context, 'ss_cookie_bridge_try_match');
+        $context->builder->branchIf($atEnd, $bbFail, $bbTryMatch);
+
+        $context->builder->positionAtEnd($bbTryMatch);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $cursor,
+            $namePtr,
+            $nameLenSize
+        );
+        $nameMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $zeroI32);
+        $context->builder->branchIf($nameMatch, $bbCheckEq, $bbNextPair);
+
+        $context->builder->positionAtEnd($bbCheckEq);
+        $eqPtr = $context->builder->inBoundsGEP($cursor, $nameLen);
+        $eqCh = $context->builder->load($eqPtr);
+        $isEq = $context->builder->icmp(Builder::INT_EQ, $eqCh, $i8->constInt(0x3d, false));
+        $context->builder->branchIf($isEq, $bbCopy, $bbNextPair);
+
+        $context->builder->positionAtEnd($bbCopy);
+        $valueStart = $context->builder->inBoundsGEP($eqPtr, $oneI64);
+        $context->builder->store($valueStart, $valueStartSlot);
+        $semi = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $valueStart,
+            $i32->constInt(0x3b, false)
+        );
+        $hasSemi = $context->builder->icmp(Builder::INT_NE, $semi, $nullI8p);
+        $context->builder->branchIf($hasSemi, $bbEndSemi, $bbEndNul);
+
+        $context->builder->positionAtEnd($bbEndSemi);
+        $context->builder->store($semi, $valueEndSlot);
+        $context->builder->branch($bbSanitize);
+
+        $context->builder->positionAtEnd($bbEndNul);
+        $valueLenRaw = $context->builder->call(
+            $context->lookupFunction('strlen'),
+            $context->builder->load($valueStartSlot)
+        );
+        $endPtr = $context->builder->inBoundsGEP(
+            $context->builder->load($valueStartSlot),
+            $context->builder->intCast($valueLenRaw, $i64)
+        );
+        $context->builder->store($endPtr, $valueEndSlot);
+        $context->builder->branch($bbSanitize);
+
+        $context->builder->positionAtEnd($bbSanitize);
+        $valueStart = $context->builder->load($valueStartSlot);
+        $valueEnd = $context->builder->load($valueEndSlot);
+        $rawLen = $context->builder->sub(
+            $context->builder->ptrToInt($valueEnd, $i64),
+            $context->builder->ptrToInt($valueStart, $i64)
+        );
+        $maxLen = $i64->constInt(VmSession::MAX_ID_LEN, false);
+        $tooLong = $context->builder->icmp(Builder::INT_UGT, $rawLen, $maxLen);
+        $context->builder->store(
+            $context->builder->select($tooLong, $maxLen, $rawLen),
+            $copyCapSlot
+        );
+        $context->builder->store($zeroI64, $outIdx);
+        $context->builder->store($zeroI64, $srcIdx);
+        $context->builder->branch($bbSanLoop);
+
+        $context->builder->positionAtEnd($bbSanLoop);
+        $si = $context->builder->load($srcIdx);
+        $copyCap = $context->builder->load($copyCapSlot);
+        $moreSrc = $context->builder->icmp(Builder::INT_ULT, $si, $copyCap);
+        $context->builder->branchIf($moreSrc, $bbSanBody, $bbSanDone);
+
+        $context->builder->positionAtEnd($bbSanBody);
+        $valueStart = $context->builder->load($valueStartSlot);
+        $ch = $context->builder->load($context->builder->inBoundsGEP($valueStart, $si));
+        $context->builder->store($ch, $chSlot);
+        $ch32 = $context->builder->zExt($ch, $i32);
+        $isDigit = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $ch32, $i32->constInt(0x30, false)),
+            $context->builder->icmp(Builder::INT_SLE, $ch32, $i32->constInt(0x39, false))
+        );
+        $isUpper = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $ch32, $i32->constInt(0x41, false)),
+            $context->builder->icmp(Builder::INT_SLE, $ch32, $i32->constInt(0x5a, false))
+        );
+        $isLower = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $ch32, $i32->constInt(0x61, false)),
+            $context->builder->icmp(Builder::INT_SLE, $ch32, $i32->constInt(0x7a, false))
+        );
+        $isComma = $context->builder->icmp(Builder::INT_EQ, $ch32, $i32->constInt(0x2c, false));
+        $isHyphen = $context->builder->icmp(Builder::INT_EQ, $ch32, $i32->constInt(0x2d, false));
+        $okChar = $context->builder->or(
+            $context->builder->or($isDigit, $isUpper),
+            $context->builder->or($isLower, $context->builder->or($isComma, $isHyphen))
+        );
+        $context->builder->branchIf($okChar, $bbSanStore, $bbSanNext);
+
+        $context->builder->positionAtEnd($bbSanStore);
+        $oi = $context->builder->load($outIdx);
+        $context->builder->store(
+            $context->builder->load($chSlot),
+            $context->builder->inBoundsGEP(self::idBufPtr($context), $oi)
+        );
+        $context->builder->store($context->builder->add($oi, $oneI64), $outIdx);
+        $context->builder->branch($bbSanNext);
+
+        $context->builder->positionAtEnd($bbSanNext);
+        $context->builder->store(
+            $context->builder->add($context->builder->load($srcIdx), $oneI64),
+            $srcIdx
+        );
+        $context->builder->branch($bbSanLoop);
+
+        $context->builder->positionAtEnd($bbSanDone);
+        $finalLen = $context->builder->load($outIdx);
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP(self::idBufPtr($context), $finalLen)
+        );
+        $context->builder->store($finalLen, SessionStorageGlobals::$idLenGlobal);
+        $hasId = $context->builder->icmp(Builder::INT_SGT, $finalLen, $zeroI64);
+        $context->builder->branchIf($hasId, $bbOk, $bbFail);
+
+        $context->builder->positionAtEnd($bbNextPair);
+        $cursor = $context->builder->load($cursorSlot);
+        $semiNext = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $cursor,
+            $i32->constInt(0x3b, false)
+        );
+        $hasNext = $context->builder->icmp(Builder::INT_NE, $semiNext, $nullI8p);
+        $bbAdvance = BasicBlockHelper::append($context, 'ss_cookie_bridge_advance');
+        $context->builder->branchIf($hasNext, $bbAdvance, $bbFail);
+
+        $context->builder->positionAtEnd($bbAdvance);
+        $context->builder->store(
+            $context->builder->inBoundsGEP($semiNext, $oneI64),
+            $cursorSlot
+        );
+        $context->builder->branch($bbLoop);
+
+        $context->builder->positionAtEnd($bbOk);
         $context->builder->returnValue($oneI32);
 
         $context->builder->positionAtEnd($bbFail);
@@ -310,31 +880,95 @@ final class JitSessionStorageKernel
         $context->builder->branchIf($hasId, $bbWork, $bbDone);
 
         $context->builder->positionAtEnd($bbWork);
-        $nameStr = self::bufferToString(
-            $context,
-            SessionStorageGlobals::$nameBufGlobal,
-            $context->builder->load(SessionStorageGlobals::$nameLenGlobal)
-        );
-        $valueStr = self::bufferToString($context, SessionStorageGlobals::$idBufGlobal, $idLen);
-        $pathStr = self::literalString($context, '/');
-        // NestedJIT PendingHeadersJitHelper::addSetcookie expects string, not null (#21892).
-        $emptyStr = self::literalString($context, '');
-        $context->builder->call(
-            $context->lookupFunction('__phpc_setcookie_add'),
-            $nameStr,
-            $valueStr,
-            $i64->constInt(0, false),
-            $pathStr,
-            $emptyStr,
-            $i32->constInt(0, false),
-            $i32->constInt(0, false),
-            $emptyStr,
-            $i32->constInt(0, false)
-        );
+        // Thin AOT keeps __phpc_setcookie_add as a no-op *_link_stub (#21900). Print
+        // CGI Set-Cookie from session globals (not __string__init — buffer-backed
+        // strings mis-feed %.*s). NestedJIT PendingHeaders upgrade still TODO.
+        if (self::pendingSetcookieIsThinLinkStub($context)) {
+            self::emitSetcookiePrintfFromGlobals($context, $idLen);
+        } else {
+            $nameStr = self::bufferToString(
+                $context,
+                SessionStorageGlobals::$nameBufGlobal,
+                $context->builder->load(SessionStorageGlobals::$nameLenGlobal)
+            );
+            $valueStr = self::bufferToString($context, SessionStorageGlobals::$idBufGlobal, $idLen);
+            $pathStr = self::literalString($context, '/');
+            $emptyStr = self::literalString($context, '');
+            $context->builder->call(
+                $context->lookupFunction('__phpc_setcookie_add'),
+                $nameStr,
+                $valueStr,
+                $i64->constInt(0, false),
+                $pathStr,
+                $emptyStr,
+                $i32->constInt(0, false),
+                $i32->constInt(0, false),
+                $emptyStr,
+                $i32->constInt(0, false)
+            );
+        }
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
         $context->builder->returnVoid();
+    }
+
+    /**
+     * True when thin AOT filled {@see __phpc_setcookie_add} with a no-op *_link_stub (#21900).
+     */
+    private static function pendingSetcookieIsThinLinkStub(Context $context): bool
+    {
+        $fn = $context->module->getNamedFunction('__phpc_setcookie_add');
+        if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            return true;
+        }
+        try {
+            foreach ($fn->getBasicBlocks() as $block) {
+                if (str_contains($block->getName(), '_link_stub')) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
+    }
+
+    /** Direct printf from session name/id byte buffers (#21900). */
+    private static function emitSetcookiePrintfFromGlobals(Context $context, Value $idLen): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $nameLen = $context->builder->load(SessionStorageGlobals::$nameLenGlobal);
+        $namePtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP(
+                SessionStorageGlobals::$nameBufGlobal,
+                $i32->constInt(0, false),
+                $i64->constInt(0, false)
+            ),
+            $i8p
+        );
+        $idPtr = $context->builder->pointerCast(
+            $context->builder->inBoundsGEP(
+                SessionStorageGlobals::$idBufGlobal,
+                $i32->constInt(0, false),
+                $i64->constInt(0, false)
+            ),
+            $i8p
+        );
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString("Set-Cookie: %.*s=%.*s; path=/\r\n"),
+            $context->getTypeFromString('char*')
+        );
+        $context->builder->call(
+            $context->lookupFunction('printf'),
+            $fmt,
+            $nameLen,
+            $namePtr,
+            $idLen,
+            $idPtr
+        );
     }
 
     private static function emitCopyIdStringToGlobals(Context $context, Value $idStr): void

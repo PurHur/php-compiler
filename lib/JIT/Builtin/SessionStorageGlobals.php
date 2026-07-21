@@ -145,11 +145,20 @@ final class SessionStorageGlobals
         $defaultModuleLen = $i64->constInt(\strlen(VmSession::DEFAULT_MODULE), false);
 
         $curLen = $context->builder->load(self::$nameLenGlobal);
-        $needsSeed = $context->builder->icmp(
-            \PHPLLVM\Builder::INT_EQ,
-            $curLen,
+        $nameBufPtr = $context->builder->inBoundsGEP(
+            self::$nameBufGlobal,
+            $i32->constInt(0, false),
             $zero
         );
+        $firstByte = $context->builder->load($nameBufPtr);
+        // name_len is initialized to strlen(PHPSESSID) but the buffer starts zeroed (#21900).
+        $lenIsZero = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $curLen, $zero);
+        $bufIsEmpty = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $firstByte,
+            $i8->constInt(0, false)
+        );
+        $needsSeed = $context->builder->or($lenIsZero, $bufIsEmpty);
         $context->builder->branchIf($needsSeed, $bbSeed, $bbDone);
 
         $context->builder->positionAtEnd($bbSeed);

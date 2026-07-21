@@ -61,6 +61,8 @@ final class SessionCreateIdRuntime
     public static function ensureRandomIdStringLinked(Context $context): void
     {
         SessionStorageGlobals::ensureGlobals($context);
+        // NestedJIT SessionCreateIdJitHelper calls random_bytes() (#21900).
+        StringRandomBytes::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, 'phpc_session_random_id_string', self::implementRandomIdString(...));
     }
