@@ -10713,12 +10713,17 @@ class JIT {
                             $forWrite
                             && !$this->context->type->object->hasProperty($classId, $name->value)
                         ) {
+                            $deprecationLine = null !== $op->sourceLocation && $op->sourceLocation->startLine > 0
+                                ? $op->sourceLocation->startLine
+                                : 0;
                             JIT\DynamicPropertyDeprecationGuard::emitBeforeUndeclaredWrite(
                                 $this->context,
                                 $this->context->type->object,
                                 $classId,
                                 $declaringClass,
-                                $name->value
+                                $name->value,
+                                $block->scriptPath(),
+                                $deprecationLine
                             );
                         }
                         if (!$forWrite) {

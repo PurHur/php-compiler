@@ -10803,13 +10803,16 @@ class Compiler {
                 if (null !== $propertyFetch) {
                     $fetchSlot = $this->compileOperand($propertyFetch->result, $block, false);
                     $rhsSlot = $this->compileOperand($expr->expr, $block, true);
+                    $fetchOp = new OpCode(
+                        OpCode::TYPE_PROPERTY_FETCH,
+                        $fetchSlot,
+                        $this->compileOperand($propertyFetch->var, $block, true),
+                        $this->compileOperand($propertyFetch->name, $block, true)
+                    );
+                    // Assign-lowered property writes skip compileExpr(PropertyFetch); stamp line here (#21953).
+                    $this->assignSourceMetadata($fetchOp, $propertyFetch);
                     $ops = [
-                        new OpCode(
-                            OpCode::TYPE_PROPERTY_FETCH,
-                            $fetchSlot,
-                            $this->compileOperand($propertyFetch->var, $block, true),
-                            $this->compileOperand($propertyFetch->name, $block, true)
-                        ),
+                        $fetchOp,
                         new OpCode(
                             OpCode::TYPE_ASSIGN,
                             $fetchSlot,
@@ -11232,12 +11235,16 @@ class Compiler {
                     ? OpCode::TYPE_PROPERTY_FETCH_WRITE
                     : OpCode::TYPE_PROPERTY_FETCH;
 
-                return [new OpCode(
+                $fetchOp = new OpCode(
                     $fetchType,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->var, $block, true),
                     $this->compileOperand($expr->name, $block, true)
-                )];
+                );
+                // Zend attributes dynamic-property E_DEPRECATED to the fetch/write site (#21953).
+                $this->assignSourceMetadata($fetchOp, $expr);
+
+                return [$fetchOp];
             case Op\Expr\Array_::class:
                 return $this->compileArrayLiteral($expr, $block);
             case Op\Expr\MagicScriptConst::class:
@@ -49025,12 +49032,14 @@ class Compiler {
                 );
                 if (null !== $propFetch) {
                     ++$this->forcePropertyFetchForWrite;
-                    $return[] = new OpCode(
+                    $propWrite = new OpCode(
                         OpCode::TYPE_PROPERTY_FETCH_WRITE,
                         $valueSlot,
                         $this->compileOperand($propFetch->var, $block, true),
                         $this->compileOperand($propFetch->name, $block, true)
                     );
+                    $this->assignSourceMetadata($propWrite, $propFetch);
+                    $return[] = $propWrite;
                     --$this->forcePropertyFetchForWrite;
                 }
                 $return[] = new OpCode(
