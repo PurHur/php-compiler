@@ -32,6 +32,8 @@ final class Variable {
     public const STRING_OFFSET_INCDEC_ERROR = 'Cannot increment/decrement string offsets';
     /** @see Zend/zend_execute.c zend_assign_to_string_offset() — empty/null RHS */
     public const STRING_OFFSET_EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
+    /** @see Zend/zend_execute.c zend_fetch_dimension_address() — BP_VAR_W/RW string dim by-ref (#21910) */
+    public const STRING_OFFSET_REF_ERROR = 'Cannot create references to/from string offsets';
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
     const TYPE_ENUM_CASE = 9;
     /** Writable ArrayAccess dimension ($obj[$key] assignment, #3331). */

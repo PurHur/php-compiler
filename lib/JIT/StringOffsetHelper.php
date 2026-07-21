@@ -32,6 +32,11 @@ final class StringOffsetHelper
         StringOffsetRuntime::emitIncDecError($context);
     }
 
+    public static function emitRefError(Context $context): void
+    {
+        StringOffsetRuntime::emitRefError($context);
+    }
+
     public static function dimFetch(Context $context, PHPLLVM\Value $str, Variable $dim): PHPLLVM\Value
     {
         return StringOffsetRuntime::dimFetch($context, $str, $dim);

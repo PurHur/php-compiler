@@ -2956,6 +2956,7 @@ class Compiler {
             $this->compileOp($ops[$j], $block);
         }
         $checkOp->listUnpackNullInitSlots = $this->collectListDestructAssignTargetSlots($block, $checkOp);
+        $checkOp->listUnpackHasByRef = $this->listDestructGroupHasAssignRef($ops, $start, $block);
 
         $mergeBlock = new Block($block->orig);
         $mergeBlock->inheritUndefinedLocals = true;
@@ -14830,6 +14831,13 @@ class Compiler {
             ) {
                 continue;
             }
+            // `[&$s[$i]]` — by-ref array element must FETCH_DIM_W so string offsets raise (#21910).
+            if (
+                $usage instanceof Op\Expr\Array_
+                && $this->arrayLiteralHasByRefElementOperand($usage, $fetch->result)
+            ) {
+                continue;
+            }
             if ($usage instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($usage, $fetch->result)) {
                 continue;
             }
@@ -14869,6 +14877,13 @@ class Compiler {
             if (
                 $next instanceof Op\Expr\AssignRef
                 && ($next->var === $fetch->result || $next->expr === $fetch->result)
+            ) {
+                return true;
+            }
+            // php-cfg: ArrayDimFetch then Expr_Array with byRef element (#21910).
+            if (
+                $next instanceof Op\Expr\Array_
+                && $this->arrayLiteralHasByRefElementOperand($next, $fetch->result)
             ) {
                 return true;
             }

@@ -3566,6 +3566,18 @@ restart:
                     // ArrayDimFetch / property fetch temps are indirect to live storage; write the
                     // reference into that cell instead of redirecting the temp (#5349).
                     $lhsPeel = $lhs->isIndirect() ? $lhs->directIndirectTarget() : $lhs;
+                    // Zend: cannot create references to/from string offsets (#21910).
+                    if (
+                        Variable::TYPE_STRING_OFFSET === $rhs->type
+                        || Variable::TYPE_STRING_OFFSET === $lhsPeel->resolveIndirect()->type
+                    ) {
+                        $catchFrame = $this->dispatchVmError(Variable::STRING_OFFSET_REF_ERROR, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     if (null !== $lhsPeel->objectPropertyOwner) {
                         // $obj->prop =& $v — bind into declared property storage (#5370).
                         $writeTarget = $lhsPeel;
@@ -3787,6 +3799,11 @@ restart:
                     $unpack = $unpackSlot->resolveIndirect();
                     if (null !== $op->block1) {
                         if (!$this->variableIsListDestructUnpackable($unpack)) {
+                            // By-ref list / `$r =& $s[$i]`: do not skip — FETCH_DIM_W + ASSIGN_REF
+                            // raise Zend string-offset or scalar-as-array Errors (#21910).
+                            if ($op->listUnpackHasByRef) {
+                                break;
+                            }
                             foreach ($op->listUnpackNullInitSlots as $destSlot) {
                                 $dest = $frame->scope[(int) $destSlot];
                                 $dest->resolveIndirect()->null();

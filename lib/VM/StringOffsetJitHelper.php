@@ -16,6 +16,9 @@ final class StringOffsetJitHelper
 
     public const EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
 
+    /** @see Variable::STRING_OFFSET_REF_ERROR (#21910) */
+    public const REF_ERROR = 'Cannot create references to/from string offsets';
+
     /**
      * Zend-style byte index: negative offsets count from the end (PHP 7.1+).
      *
@@ -38,6 +41,11 @@ final class StringOffsetJitHelper
     public static function emptyAssignErrorMessage(): string
     {
         return self::EMPTY_ASSIGN_ERROR;
+    }
+
+    public static function refErrorMessage(): string
+    {
+        return self::REF_ERROR;
     }
 
     public static function byteFromLong(int $value): int

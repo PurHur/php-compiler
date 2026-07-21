@@ -100,6 +100,13 @@ final class StringOffsetRuntime
         ErrorRaise::emitRaise($context, StringOffsetJitHelper::emptyAssignErrorMessage());
     }
 
+    public static function emitRefError(Context $context): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, StringOffsetJitHelper::refErrorMessage());
+    }
+
     public static function dimFetch(Context $context, Value $str, JitVariable $dim): Value
     {
         self::ensureLinked($context);
