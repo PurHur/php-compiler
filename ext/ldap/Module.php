@@ -50,6 +50,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/ldap_link_builtins.php';
         require_once __DIR__.'/ldap_search_builtins.php';
         require_once __DIR__.'/ldap_exop_builtins.php';
+        require_once __DIR__.'/ldap_modify_builtins.php';
 
         $fns = [
             new ldap_escape(),
@@ -62,6 +63,7 @@ class Module extends ModuleAbstract
             new ldap_err2str(),
             new ldap_set_option(),
             new ldap_get_option(),
+            new ldap_start_tls(),
             new ldap_search(),
             new ldap_list(),
             new ldap_read(),
@@ -77,6 +79,11 @@ class Module extends ModuleAbstract
             new ldap_exop_whoami(),
             new ldap_exop_refresh(),
             new ldap_exop_passwd(),
+            new ldap_mod_add(),
+            new ldap_mod_replace(),
+            new ldap_mod_del(),
+            new ldap_mod_batch(),
+            new ldap_rename(),
         ];
         if (LdapExtensionPolicy::advertisesWalletConnect()) {
             require_once __DIR__.'/ldap_connect_wallet.php';

@@ -35,6 +35,8 @@ final class VmLdapNative
 
     public const LDAP_DEREF_NEVER = 0x00;
 
+    public const LDAP_MOD_BVALUES = 0x80;
+
     /** @var \FFI|null */
     private static $ffi = null;
 
@@ -104,6 +106,81 @@ final class VmLdapNative
         }
 
         return $ld;
+    }
+
+    public static function startTlsSync(\FFI\CData $ld): int
+    {
+        $proto = 3;
+        $rc = self::setOptionInt($ld, self::LDAP_OPT_PROTOCOL_VERSION, $proto);
+        if (self::LDAP_SUCCESS !== $rc) {
+            return $rc;
+        }
+
+        return (int) self::requireFfi()->ldap_start_tls_s($ld, null, null);
+    }
+
+    /**
+     * @param list<array{op: int, attr: string, values: list<string>|null}> $mods
+     */
+    public static function modifyExtSync(\FFI\CData $ld, string $dn, array $mods): int
+    {
+        if ([] === $mods) {
+            return self::LDAP_SUCCESS;
+        }
+        $ffi = self::requireFfi();
+        $n = \count($mods);
+        $modPtrs = $ffi->new('LDAPMod*['.($n + 1).']');
+        $allocated = [];
+        try {
+            for ($i = 0; $i < $n; ++$i) {
+                $spec = $mods[$i];
+                $mod = $ffi->new('LDAPMod');
+                $mod->mod_op = $spec['op'] | self::LDAP_MOD_BVALUES;
+                $mod->mod_type = $spec['attr'];
+                $values = $spec['values'];
+                if (null === $values) {
+                    $mod->mod_bvalues = null;
+                } else {
+                    $vc = \count($values);
+                    $bvs = $ffi->new('BerValue*['.($vc + 1).']');
+                    for ($vi = 0; $vi < $vc; ++$vi) {
+                        $bvs[$vi] = \FFI::addr(self::newBerValue($values[$vi]));
+                    }
+                    $bvs[$vc] = null;
+                    $mod->mod_bvalues = $bvs;
+                }
+                $modPtrs[$i] = \FFI::addr($mod);
+                $allocated[] = $mod;
+            }
+            $modPtrs[$n] = null;
+
+            return (int) $ffi->ldap_modify_ext_s($ld, $dn, $modPtrs, null, null);
+        } catch (\Throwable) {
+            return -1;
+        }
+    }
+
+    public static function renameSync(
+        \FFI\CData $ld,
+        string $dn,
+        string $newRdn,
+        ?string $newParent,
+        bool $deleteOldRdn
+    ): int {
+        $parent = $newParent;
+        if (null === $parent || '' === $parent) {
+            $parent = null;
+        }
+
+        return (int) self::requireFfi()->ldap_rename_s(
+            $ld,
+            $dn,
+            $newRdn,
+            $parent,
+            $deleteOldRdn ? 1 : 0,
+            null,
+            null
+        );
     }
 
     public static function setOptionInt(?\FFI\CData $ld, int $option, int $value): int
@@ -592,6 +669,14 @@ int ldap_unbind_ext_s(LDAP *ld, void *serverctrls, void *clientctrls);
 char *ldap_err2string(int err);
 int ldap_set_option(LDAP *ld, int option, const void *invalue);
 int ldap_get_option(LDAP *ld, int option, void *outvalue);
+int ldap_start_tls_s(LDAP *ld, void *serverctrls, void *clientctrls);
+typedef struct ldapmod {
+    int mod_op;
+    char *mod_type;
+    BerValue **mod_bvalues;
+} LDAPMod;
+int ldap_modify_ext_s(LDAP *ld, const char *dn, LDAPMod *mods[], void *serverctrls, void *clientctrls);
+int ldap_rename_s(LDAP *ld, const char *dn, const char *newrdn, const char *newparent, int deleteoldrdn, void *serverctrls, void *clientctrls);
 int ldap_simple_bind_s(LDAP *ld, const char *who, const char *passwd);
 int ldap_search_ext_s(LDAP *ld, const char *base, int scope, const char *filter, char **attrs, int attrsonly, void *serverctrls, void *clientctrls, timeval *timeout, int sizelimit, LDAPMessage **res);
 int ldap_count_entries(LDAP *ld, LDAPMessage *res);

@@ -301,3 +301,45 @@ final class ldap_get_option extends Internal
         throw new \LogicException('ldap_get_option() is not implemented for JIT in this compiler build (issue #21851)');
     }
 }
+
+final class ldap_start_tls extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_start_tls');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_start_tls() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_start_tls', 1);
+        $ld = VmLdapConnection::native($conn);
+        $rc = VmLdapNative::startTlsSync($ld);
+        VmLdapConnection::setErrno($conn, $rc);
+        if (VmLdapNative::LDAP_SUCCESS !== $rc) {
+            @\trigger_error(
+                'ldap_start_tls(): Unable to start TLS: '.VmLdapNative::err2string($rc),
+                \E_USER_WARNING
+            );
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_start_tls() is not implemented for JIT in this compiler build (issue #21852)');
+    }
+}
