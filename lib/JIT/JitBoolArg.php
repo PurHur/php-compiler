@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -29,7 +30,7 @@ final class JitBoolArg
         );
     }
 
-    /** Z_PARAM_BOOL coercion — null → false (php-src ext/standard/info.c get_loaded_extensions; #18971). */
+    /** Z_PARAM_BOOL coercion — null → false + E_DEPRECATED (php-src zend_API.h; #18971, #21702). */
     public static function lowerCoerceZParamBool(
         Context $context,
         Variable $arg,
@@ -39,6 +40,11 @@ final class JitBoolArg
     ): Value {
         if ($context->callerStrictTypes) {
             InternalStrictArg::requireBool($context, $arg, $function, $paramName, $argNumber);
+        }
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::emitNullBoolParamDeprecation($context, $function, $argNumber, $paramName);
+
+            return $context->constantFromBool(false);
         }
 
         return self::lowerCoerce(
@@ -360,6 +366,35 @@ final class JitBoolArg
     {
         // php-src convert_to_boolean / zend_is_true for strings (Z_PARAM_BOOL; #4293).
         return '' !== $literal && '0' !== $literal;
+    }
+
+    /** Compile-time null → E_DEPRECATED for Z_PARAM_BOOL (php-src zend_API.h; #21702). */
+    private static function emitNullBoolParamDeprecation(
+        Context $context,
+        string $function,
+        int $argNumber,
+        string $paramName
+    ): void {
+        $message = sprintf(
+            '%s(): Passing null to parameter #%d ($%s) of type bool is deprecated',
+            $function,
+            $argNumber,
+            $paramName
+        );
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_DEPRECATED, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     private static function emitTypeErrorAndAbort(

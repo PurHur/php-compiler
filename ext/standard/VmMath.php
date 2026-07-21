@@ -143,6 +143,9 @@ final class VmMath
             case Variable::TYPE_FLOAT:
                 return 0.0 !== $var->toFloat();
             case Variable::TYPE_NULL:
+                // Z_PARAM_BOOL — null→false with E_DEPRECATED (php-src zend_API.h; #21702).
+                VmNullNumberParamDeprecation::emit(null, $function, $argIndex, $paramName, 'bool');
+
                 return false;
             case Variable::TYPE_STRING:
                 return self::coerceBoolStringLiteral($var->toString(), $function, $argIndex, $paramName);

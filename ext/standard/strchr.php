@@ -7,9 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** strchr() is a PHP alias of strstr() (not libc strchr). */
@@ -25,11 +25,8 @@ final class strchr extends Internal
         $needleStr = VmString::coerceTrimFamilyStringArg($frame->calledArgs[1], 'strchr', 1, 'needle');
         $beforeNeedle = false;
         if (3 === $argc) {
-            $flag = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $flag->type) {
-                throw new \LogicException('strchr() before_needle must be a boolean in this compiler build');
-            }
-            $beforeNeedle = $flag->toBool();
+            // Z_PARAM_BOOL — null→false + E_DEPRECATED (php-src string.c; #21702).
+            $beforeNeedle = VmMath::parseBoolBuiltinArgForFrame($frame, 2, 'strchr', 3, 'before_needle');
         }
         if (null === $frame->returnVar) {
             return;
@@ -50,7 +47,11 @@ final class strchr extends Internal
         }
         $before = null;
         if (3 === $argc) {
-            $before = $this->jitBool($context, $args[2], 'strchr() before_needle');
+            $i8 = $context->getTypeFromString('int8');
+            $before = $context->builder->zExt(
+                JitBoolArg::lowerCoerceZParamBool($context, $args[2], 'strchr', 'before_needle', 3),
+                $i8
+            );
         }
 
         return JitStrstr::find(
