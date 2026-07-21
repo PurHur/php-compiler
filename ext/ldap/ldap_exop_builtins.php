@@ -176,6 +176,71 @@ final class ldap_parse_exop extends Internal
     }
 }
 
+final class ldap_exop_passwd extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_exop_passwd');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $name = $this->getName();
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects between 1 and 5 arguments, %d given',
+                $name,
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], $name, 1);
+        $user = '';
+        if ($argc >= 2) {
+            $user = VmString::coerceStringBuiltinArg($frame->calledArgs[1], $name, 1, 'user');
+        }
+        $oldPw = '';
+        if ($argc >= 3) {
+            $oldPw = VmString::coerceStringBuiltinArg($frame->calledArgs[2], $name, 2, 'old_password');
+        }
+        $newPw = '';
+        if ($argc >= 4) {
+            $newPw = VmString::coerceStringBuiltinArg($frame->calledArgs[3], $name, 3, 'new_password');
+        }
+        // arg 5 ($controls by ref) accepted; population deferred (#8688 controls pattern).
+        $ld = VmLdapConnection::native($conn);
+        $parsed = VmLdapNative::passwdModifySync($ld, $user, $oldPw, $newPw);
+        if (!$parsed['ok']) {
+            $errno = $parsed['errno'];
+            VmLdapConnection::setErrno($conn, $errno);
+            $msg = $parsed['errmsg'] ?? VmLdapNative::err2string($errno);
+            @\trigger_error(
+                \sprintf('%s(): Passwd modify extended operation failed: %s (%d)', $name, $msg, $errno),
+                \E_USER_WARNING
+            );
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        VmLdapConnection::setErrno($conn, VmLdapNative::LDAP_SUCCESS);
+        if (null !== $frame->returnVar) {
+            $val = $parsed['value'];
+            if (\is_bool($val)) {
+                $frame->returnVar->bool($val);
+            } else {
+                $frame->returnVar->string($val);
+            }
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_exop_passwd() is not implemented for JIT in this compiler build (issue #8688)');
+    }
+}
+
 final class ldap_exop_refresh extends Internal
 {
     public function __construct()

@@ -418,11 +418,7 @@ final class VmLdapNative
     public static function refreshSync(\FFI\CData $ld, string $dn, int $ttl): array
     {
         $ffi = self::requireFfi();
-        $bv = $ffi->new('BerValue');
-        $bv->bv_len = \strlen($dn);
-        $buf = $ffi->new('char['.\strlen($dn).']', false);
-        \FFI::memcpy($buf, $dn, \strlen($dn));
-        $bv->bv_val = $buf;
+        $bv = self::newBerValue($dn);
         $newttl = $ffi->new('int');
         $rc = (int) $ffi->ldap_refresh_s($ld, \FFI::addr($bv), $ttl, \FFI::addr($newttl), null, null);
         if (self::LDAP_SUCCESS !== $rc) {
@@ -430,6 +426,101 @@ final class VmLdapNative
         }
 
         return ['ok' => true, 'errno' => self::LDAP_SUCCESS, 'ttl' => (int) $newttl->cdata];
+    }
+
+    /**
+     * RFC 3062 password modify EXOP (php-src ldap_exop_passwd / ldap_passwd).
+     *
+     * @return array{ok: bool, errno: int, value: bool|string}
+     */
+    public static function passwdModifySync(\FFI\CData $ld, string $user, string $oldPw, string $newPw): array
+    {
+        $ffi = self::requireFfi();
+        $luser = self::newBerValue($user);
+        $lold = '' !== $oldPw ? self::newBerValue($oldPw) : null;
+        $lnew = '' !== $newPw ? self::newBerValue($newPw) : null;
+        $msgid = $ffi->new('int');
+        $rc = (int) $ffi->ldap_passwd(
+            $ld,
+            \FFI::addr($luser),
+            null !== $lold ? \FFI::addr($lold) : null,
+            null !== $lnew ? \FFI::addr($lnew) : null,
+            null,
+            null,
+            \FFI::addr($msgid)
+        );
+        if (self::LDAP_SUCCESS !== $rc) {
+            return ['ok' => false, 'errno' => $rc, 'value' => false];
+        }
+        $res = $ffi->new('LDAPMessage*[1]');
+        $res[0] = null;
+        $rrc = (int) $ffi->ldap_result($ld, (int) $msgid->cdata, 1, null, $res);
+        if (-1 === $rrc || null === $res[0]) {
+            return ['ok' => false, 'errno' => self::getOptionInt($ld, self::LDAP_OPT_ERROR_NUMBER), 'value' => false];
+        }
+        $ldapRes = $res[0];
+        $genPass = $ffi->new('BerValue*[1]');
+        $genPass[0] = null;
+        $prc = (int) $ffi->ldap_parse_passwd($ld, $ldapRes, $genPass);
+        if (self::LDAP_SUCCESS !== $prc) {
+            $ffi->ldap_msgfree($ldapRes);
+
+            return ['ok' => false, 'errno' => $prc, 'value' => false];
+        }
+        $genStr = '';
+        if (null !== $genPass[0]) {
+            $bv = $genPass[0];
+            $len = (int) $bv->bv_len;
+            if ($len > 0 && null !== $bv->bv_val) {
+                try {
+                    $genStr = \FFI::string($bv->bv_val, $len);
+                } catch (\Throwable) {
+                    $genStr = '';
+                }
+            }
+            $ffi->ldap_memfree($bv->bv_val);
+            $ffi->ldap_memfree($bv);
+        }
+        $err = $ffi->new('int');
+        $errmsg = $ffi->new('char*[1]');
+        $errmsg[0] = null;
+        $parseRc = (int) $ffi->ldap_parse_result($ld, $ldapRes, \FFI::addr($err), null, $errmsg, null, null, 0);
+        $errVal = (int) $err->cdata;
+        $errMsgStr = null !== $errmsg[0] ? self::ffiString($errmsg[0]) : '';
+        if (null !== $errmsg[0]) {
+            $ffi->ldap_memfree($errmsg[0]);
+        }
+        $ffi->ldap_msgfree($ldapRes);
+        if (self::LDAP_SUCCESS !== $parseRc) {
+            return ['ok' => false, 'errno' => $parseRc, 'value' => false];
+        }
+        if ('' === $newPw) {
+            return ['ok' => true, 'errno' => self::LDAP_SUCCESS, 'value' => '' === $genStr ? '' : $genStr];
+        }
+        if (self::LDAP_SUCCESS === $errVal) {
+            return ['ok' => true, 'errno' => self::LDAP_SUCCESS, 'value' => true];
+        }
+
+        return ['ok' => false, 'errno' => $errVal, 'value' => false, 'errmsg' => $errMsgStr];
+    }
+
+    /** @return \FFI\CData BerValue struct */
+    private static function newBerValue(string $data): \FFI\CData
+    {
+        $ffi = self::requireFfi();
+        $bv = $ffi->new('BerValue');
+        $len = \strlen($data);
+        $bv->bv_len = $len;
+        if (0 === $len) {
+            $bv->bv_val = null;
+
+            return $bv;
+        }
+        $buf = $ffi->new('char['.$len.']', false);
+        \FFI::memcpy($buf, $data, $len);
+        $bv->bv_val = $buf;
+
+        return $bv;
     }
 
     public static function err2string(int $errno): string
@@ -518,6 +609,9 @@ int ldap_extended_operation(LDAP *ld, const char *reqoid, BerValue *reqdata, voi
 int ldap_result(LDAP *ld, int msgid, int all, timeval *timeout, LDAPMessage **result);
 int ldap_parse_extended_result(LDAP *ld, LDAPMessage *res, char **retoidp, BerValue **retdatap, int freeit);
 int ldap_refresh_s(LDAP *ld, BerValue *dn, int ttl, int *newttl, void *serverctrls, void *clientctrls);
+int ldap_passwd(LDAP *ld, BerValue *user, BerValue *oldpw, BerValue *newpw, void *serverctrls, void *clientctrls, int *msgidp);
+int ldap_parse_passwd(LDAP *ld, LDAPMessage *res, BerValue **newpasswd);
+int ldap_parse_result(LDAP *ld, LDAPMessage *res, int *errcodep, char **matcheddnp, char **errmsgp, char ***referralsp, void **serverctrls, int freeit);
 CDEF;
 
         foreach (['libldap-2.5.so.0', 'libldap.so.2', 'libldap.so'] as $lib) {
