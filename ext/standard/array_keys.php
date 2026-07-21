@@ -16,7 +16,9 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayKeysRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitArrayElem;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -31,7 +33,7 @@ final class array_keys extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('array_keys() requires one to three arguments');
         }
-        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_keys');
+        $ht = VmArray::requireArrayForCaller($frame, $frame->calledArgs[0]->resolveIndirect(), 'array_keys');
         if (null === $frame->returnVar) {
             return;
         }
@@ -55,6 +57,16 @@ final class array_keys extends Internal
         $argc = \count($args);
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('array_keys() requires one to three arguments');
+        }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitArrayElem::requireArrayArg($context, $args[0], 'array_keys');
+
+                return HashTableHelper::emptyVariable($context)->value;
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'array_keys', 0, 'array');
+
+            return HashTableHelper::emptyVariable($context)->value;
         }
         if ($argc > 1) {
             $strict = $context->constantFromBool(false);

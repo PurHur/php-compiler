@@ -19,8 +19,10 @@ use PHPCompiler\JIT\Builtin\ArrayCountRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -43,6 +45,19 @@ final class array_count extends Internal
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->vmContext) {
             throw new \LogicException('count() requires VM context in this compiler build');
+        }
+        if (Variable::TYPE_NULL === $v->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    $this->name.'(): Argument #1 ($value) must be of type Countable|array, null given'
+                );
+            }
+            VmNullStringParamDeprecation::emit($frame, $this->name, 0, 'value', 'Countable|array');
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->int(0);
+            }
+
+            return;
         }
         $mode = VmArray::COUNT_NORMAL;
         if (2 === $argc) {
@@ -82,6 +97,19 @@ final class array_count extends Internal
                 $context,
                 'count() expects at least 1 argument, '.$argc.' given'
             );
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                TypeErrorRaise::emitRaise(
+                    $context,
+                    $this->name.'(): Argument #1 ($value) must be of type Countable|array, null given'
+                );
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, $this->name, 0, 'value', 'Countable|array');
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }

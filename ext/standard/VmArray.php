@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
@@ -756,7 +757,10 @@ final class VmArray
         string $expectedType = 'array'
     ): HashTable {
         $v = $value->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $v->type) {
+        if (Variable::TYPE_ARRAY === $v->type) {
+            return $v->toArray();
+        }
+        if (Variable::TYPE_NULL === $v->type) {
             throw new \TypeError(
                 \sprintf(
                     '%s(): Argument #%d ($%s) must be of type %s, %s given',
@@ -769,7 +773,111 @@ final class VmArray
             );
         }
 
-        return $v->toArray();
+        throw new \TypeError(
+            \sprintf(
+                '%s(): Argument #%d ($%s) must be of type %s, %s given',
+                $fn,
+                $argNum,
+                $paramName,
+                $expectedType,
+                self::valueTypeLabel($v)
+            )
+        );
+    }
+
+    /**
+     * Z_PARAM_ARRAY at internal call sites — null TypeError only under declare(strict_types=1)
+     * on the caller; otherwise E_DEPRECATED + empty array (php-src zend_API.c / array.c; #21771).
+     *
+     * @throws \TypeError when {@param $value} is not an array and cannot be coerced
+     */
+    public static function requireArrayParamForCaller(
+        Frame $frame,
+        Variable $value,
+        string $fn,
+        int $argNum,
+        string $paramName,
+        string $expectedType = 'array'
+    ): HashTable {
+        $v = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $v->type) {
+            return $v->toArray();
+        }
+        if (Variable::TYPE_NULL === $v->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    \sprintf(
+                        '%s(): Argument #%d ($%s) must be of type %s, null given',
+                        $fn,
+                        $argNum,
+                        $paramName,
+                        $expectedType
+                    )
+                );
+            }
+            VmNullStringParamDeprecation::emit($frame, $fn, $argNum - 1, $paramName, $expectedType);
+
+            return new HashTable();
+        }
+
+        throw new \TypeError(
+            \sprintf(
+                '%s(): Argument #%d ($%s) must be of type %s, %s given',
+                $fn,
+                $argNum,
+                $paramName,
+                $expectedType,
+                self::valueTypeLabel($v)
+            )
+        );
+    }
+
+    /**
+     * @throws \TypeError when {@param $value} is not an array
+     */
+    public static function requireArrayForCaller(Frame $frame, Variable $value, string $fn): HashTable
+    {
+        return self::requireArrayParamForCaller($frame, $value, $fn, 1, 'array');
+    }
+
+    /**
+     * Variadic array builtins — null soft-coerce like {@see requireArrayParamForCaller} (#21771).
+     *
+     * @throws \TypeError when {@param $value} is not an array
+     */
+    public static function requireArrayArgNumForCaller(
+        Frame $frame,
+        Variable $value,
+        string $fn,
+        int $argNum
+    ): HashTable {
+        $v = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $v->type) {
+            return $v->toArray();
+        }
+        if (Variable::TYPE_NULL === $v->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    \sprintf(
+                        '%s(): Argument #%d must be of type array, null given',
+                        $fn,
+                        $argNum
+                    )
+                );
+            }
+            VmNullStringParamDeprecation::emit($frame, $fn, $argNum - 1, 'array', 'array');
+
+            return new HashTable();
+        }
+
+        throw new \TypeError(
+            \sprintf(
+                '%s(): Argument #%d must be of type array, %s given',
+                $fn,
+                $argNum,
+                self::valueTypeLabel($v)
+            )
+        );
     }
 
     /**
