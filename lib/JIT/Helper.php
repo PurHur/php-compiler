@@ -1061,6 +1061,20 @@ restart:
                 );
                 goto return_bool;
             }
+            if (Variable::TYPE_OBJECT === $rightType) {
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalValueBoxToObject($this->context, $left, $right);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalValueBoxToObject($this->context, $left, $right);
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                    goto return_bool;
+                }
+            }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = JitValueCompare::identicalToNative($this->context, $left, $right);
                 goto return_bool;
@@ -1200,6 +1214,20 @@ restart:
                     $right
                 );
                 goto return_bool;
+            }
+            if (Variable::TYPE_OBJECT === $leftType) {
+                if (OpCode::TYPE_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalValueBoxToObject($this->context, $right, $left);
+                    goto return_bool;
+                }
+                if (OpCode::TYPE_NOT_IDENTICAL === $opcode->type) {
+                    $result = JitValueCompare::identicalValueBoxToObject($this->context, $right, $left);
+                    $result = $this->context->builder->xor(
+                        $result,
+                        $this->context->getTypeFromString('int1')->constInt(1, false)
+                    );
+                    goto return_bool;
+                }
             }
             if (OpCode::TYPE_IDENTICAL === $opcode->type) {
                 $result = JitValueCompare::identicalNativeToValue($this->context, $left, $right);
