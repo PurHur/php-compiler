@@ -5159,6 +5159,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/HashTableIsPackedList.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableIterate.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableKeysCopy.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableKeysMatchingCopy.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableMergeStringKeysFrom.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableNestedReceiver.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTablePadCopy.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableUnshiftPrepend.php';
