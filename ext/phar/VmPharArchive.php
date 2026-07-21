@@ -14,6 +14,7 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStatPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\standard\VmZlib;
+use PHPCompiler\ext\zip\ZipEngine;
 
 /**
  * Phar executable archive state — php-src ext/phar/phar_object.c (#20628).
@@ -698,21 +699,25 @@ final class VmPharArchive
     }
 
     /**
-     * php-src zim_Phar_convertToData — emit PharData tar archive (#21328).
+     * php-src zim_Phar_convertToData — emit PharData tar/zip archive (#21328, #21675).
      */
     public static function convertToData(ObjectEntry $object, Context $ctx, ?int $format = null, ?int $compression = null, ?string $extension = null): ObjectEntry
     {
         self::requireWritable('Phar::convertToData');
         $st = self::requireState($object);
         self::ensureFlushed($object);
-        if (null !== $format && VmPhar::FORMAT_TAR !== $format && 0 !== $format) {
-            throw new \BadMethodCallException('Only tar format is supported for Phar::convertToData() in this build');
+        $fmt = null === $format || 0 === $format ? VmPhar::FORMAT_TAR : $format;
+        if (VmPhar::FORMAT_TAR !== $fmt && VmPhar::FORMAT_ZIP !== $fmt) {
+            throw new \BadMethodCallException('Only tar/zip format is supported for Phar::convertToData() in this build');
         }
         if (null !== $compression && VmPhar::COMPRESSED_NONE !== $compression && 0 !== $compression) {
-            throw new \BadMethodCallException('Only uncompressed tar is supported for Phar::convertToData() in this build');
+            throw new \BadMethodCallException('Only uncompressed archives are supported for Phar::convertToData() in this build');
         }
         $path = $st['path'];
         $base = \preg_replace('/\.phar(\.(gz|bz2))?$/i', '', $path) ?? $path;
+        if (VmPhar::FORMAT_ZIP === $fmt) {
+            return self::convertToDataZip($ctx, $base, $st['files'], $st['dirs'], $extension);
+        }
         $ext = null !== $extension && '' !== $extension ? \ltrim($extension, '.') : 'tar';
         $outPath = $base.'.'.$ext;
         $binary = VmPharTar::writeArchive($st['files'], $st['dirs']);
@@ -725,6 +730,62 @@ final class VmPharArchive
         $out = new ObjectEntry($ctx->classes[VmPharData::CLASS_LC]);
         $out->constructed = true;
         VmPharData::bind($out, $outPath, $st['files'], false, $st['dirs']);
+
+        return $out;
+    }
+
+    /**
+     * Emit stored ZIP PharData via ZipEngine (php-src convertToData FORMAT_ZIP; #21675).
+     *
+     * @param array<string, string> $files
+     * @param array<string, true>   $dirs
+     */
+    private static function convertToDataZip(
+        Context $ctx,
+        string $base,
+        array $files,
+        array $dirs,
+        ?string $extension
+    ): ObjectEntry {
+        if (!\class_exists(ZipEngine::class, false)) {
+            require_once __DIR__.'/../zip/ZipEngine.php';
+        }
+        $ext = null !== $extension && '' !== $extension ? \ltrim($extension, '.') : 'zip';
+        $outPath = $base.'.'.$ext;
+        $entries = [];
+        foreach ($dirs as $name => $_) {
+            $name = \rtrim(\str_replace('\\', '/', (string) $name), '/');
+            if ('' === $name) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $name.'/',
+                'data' => '',
+                'crc' => 0,
+                'size' => 0,
+            ];
+        }
+        foreach ($files as $name => $contents) {
+            $name = \ltrim(\str_replace('\\', '/', (string) $name), '/');
+            if ('' === $name) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $name,
+                'data' => $contents,
+                'crc' => 0,
+                'size' => \strlen($contents),
+            ];
+        }
+        if (!ZipEngine::writeArchive($outPath, $entries)) {
+            throw new \UnexpectedValueException('phar error: unable to write phar "'.$outPath.'"');
+        }
+        if (!isset($ctx->classes[VmPharData::CLASS_LC])) {
+            PharDataBuiltin::register($ctx);
+        }
+        $out = new ObjectEntry($ctx->classes[VmPharData::CLASS_LC]);
+        $out->constructed = true;
+        VmPharData::bind($out, $outPath, $files, false, $dirs);
 
         return $out;
     }

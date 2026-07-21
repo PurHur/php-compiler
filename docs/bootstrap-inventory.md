@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6237 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19680 |
+| Source constructs flagged (warnings) | 19682 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1480,7 +1480,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/PharDataBuiltin.php` | 0 | 16 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 4 |
-| `ext/phar/VmPharArchive.php` | 0 | 55 |
+| `ext/phar/VmPharArchive.php` | 0 | 57 |
 | `ext/phar/VmPharData.php` | 0 | 31 |
 | `ext/phar/VmPharFileInfo.php` | 0 | 17 |
 | `ext/phar/VmPharStream.php` | 0 | 10 |
@@ -17890,61 +17890,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharArchive.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 113)
-- new UnexpectedValueException (line 119)
-- new UnexpectedValueException (line 172)
-- new UnexpectedValueException (line 185)
-- new UnexpectedValueException (line 197)
-- new UnexpectedValueException (line 209)
-- new UnexpectedValueException (line 222)
-- new UnexpectedValueException (line 226)
-- new UnexpectedValueException (line 240)
-- new RecursiveIteratorIterator (line 243)
-- new RecursiveDirectoryIterator (line 244)
-- new UnexpectedValueException (line 327)
-- new BadMethodCallException (line 400)
-- new BadMethodCallException (line 477)
-- new BadMethodCallException (line 483)
-- new BadMethodCallException (line 495)
-- new BadMethodCallException (line 532)
-- new BadMethodCallException (line 538)
-- new BadMethodCallException (line 587)
-- new BadMethodCallException (line 613)
-- new BadMethodCallException (line 616)
-- new UnexpectedValueException (line 624)
-- new ObjectEntry (line 626)
-- new UnexpectedValueException (line 674)
-- new ObjectEntry (line 676)
-- new BadMethodCallException (line 709)
-- new BadMethodCallException (line 712)
-- new UnexpectedValueException (line 720)
-- new ObjectEntry (line 725)
-- new BadMethodCallException (line 741)
-- new BadMethodCallException (line 744)
-- new UnexpectedValueException (line 759)
-- new ObjectEntry (line 762)
-- new UnexpectedValueException (line 831)
-- new UnexpectedValueException (line 836)
-- new UnexpectedValueException (line 841)
-- new UnexpectedValueException (line 889)
-- new PharException (line 970)
-- new PharException (line 982)
-- new UnexpectedValueException (line 987)
-- new BadMethodCallException (line 1011)
-- new BadMethodCallException (line 1014)
-- new Variable (line 1016)
-- new Error (line 1070)
-- new UnexpectedValueException (line 1138)
-- new UnexpectedValueException (line 1147)
-- new UnexpectedValueException (line 1152)
-- new PharException (line 1169)
-- new PharException (line 1179)
-- new Error (line 1214)
-- new PharException (line 1233)
-- new PharException (line 1239)
-- new PharException (line 1246)
-- new PharException (line 1253)
-- 73 class method(s)
+- new UnexpectedValueException (line 114)
+- new UnexpectedValueException (line 120)
+- new UnexpectedValueException (line 173)
+- new UnexpectedValueException (line 186)
+- new UnexpectedValueException (line 198)
+- new UnexpectedValueException (line 210)
+- new UnexpectedValueException (line 223)
+- new UnexpectedValueException (line 227)
+- new UnexpectedValueException (line 241)
+- new RecursiveIteratorIterator (line 244)
+- new RecursiveDirectoryIterator (line 245)
+- new UnexpectedValueException (line 328)
+- new BadMethodCallException (line 401)
+- new BadMethodCallException (line 478)
+- new BadMethodCallException (line 484)
+- new BadMethodCallException (line 496)
+- new BadMethodCallException (line 533)
+- new BadMethodCallException (line 539)
+- new BadMethodCallException (line 588)
+- new BadMethodCallException (line 614)
+- new BadMethodCallException (line 617)
+- new UnexpectedValueException (line 625)
+- new ObjectEntry (line 627)
+- new UnexpectedValueException (line 675)
+- new ObjectEntry (line 677)
+- new BadMethodCallException (line 711)
+- new BadMethodCallException (line 714)
+- new UnexpectedValueException (line 725)
+- new ObjectEntry (line 730)
+- new UnexpectedValueException (line 781)
+- new ObjectEntry (line 786)
+- new BadMethodCallException (line 802)
+- new BadMethodCallException (line 805)
+- new UnexpectedValueException (line 820)
+- new ObjectEntry (line 823)
+- new UnexpectedValueException (line 892)
+- new UnexpectedValueException (line 897)
+- new UnexpectedValueException (line 902)
+- new UnexpectedValueException (line 950)
+- new PharException (line 1031)
+- new PharException (line 1043)
+- new UnexpectedValueException (line 1048)
+- new BadMethodCallException (line 1072)
+- new BadMethodCallException (line 1075)
+- new Variable (line 1077)
+- new Error (line 1131)
+- new UnexpectedValueException (line 1199)
+- new UnexpectedValueException (line 1208)
+- new UnexpectedValueException (line 1213)
+- new PharException (line 1230)
+- new PharException (line 1240)
+- new Error (line 1275)
+- new PharException (line 1294)
+- new PharException (line 1300)
+- new PharException (line 1307)
+- new PharException (line 1314)
+- 74 class method(s)
 
 ### `ext/phar/VmPharData.php`
 
@@ -33697,10 +33699,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_filter.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 97)
-- new Variable (line 99)
-- new Variable (line 105)
-- new JITVariable (line 138)
+- new HashTable (line 98)
+- new Variable (line 100)
+- new Variable (line 106)
+- new JITVariable (line 139)
 - 4 class method(s)
 
 ### `ext/standard/preg_grep.php`
@@ -33738,9 +33740,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 132)
-- new Variable (line 134)
-- new Variable (line 140)
+- new HashTable (line 133)
+- new Variable (line 135)
+- new Variable (line 141)
 - 6 class method(s)
 
 ### `ext/standard/preg_replace_callback.php`

@@ -1494,6 +1494,10 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'pharfileinfo_compress')) {
                 continue;
             }
+            // Phar::convertToData(ZIP): VM green (#21675); same Phar ctor MCJIT harness skip as #20628.
+            if (str_contains($name, 'phar_convert_to_data_zip')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }
