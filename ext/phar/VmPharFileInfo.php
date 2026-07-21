@@ -29,6 +29,9 @@ final class VmPharFileInfo
     /** Default entry mode matching Zend fresh PharFileInfo (100644). */
     private const DEFAULT_PERMS = self::S_IFREG | 0644;
 
+    /** php-src PHAR_ENT_COMPRESSION_MASK (GZ|BZ2). */
+    private const COMPRESSION_MASK = VmPhar::COMPRESSED_GZ | VmPhar::COMPRESSED_BZ2;
+
     /** @var array<int, array{content: string, name: string, archive: string, crcChecked: bool, compressed: bool, hasMetadata: bool, metadata: mixed, perms: int, flags: int}> */
     private static array $store = [];
 
@@ -38,7 +41,9 @@ final class VmPharFileInfo
             && isset($ctx->classes[self::CLASS_LC]->methods['iscrcchecked'])
             && isset($ctx->classes[self::CLASS_LC]->methods['hasmetadata'])
             && isset($ctx->classes[self::CLASS_LC]->methods['chmod'])
-            && isset($ctx->classes[self::CLASS_LC]->methods['getpharflags'])) {
+            && isset($ctx->classes[self::CLASS_LC]->methods['getpharflags'])
+            && isset($ctx->classes[self::CLASS_LC]->methods['compress'])
+            && isset($ctx->classes[self::CLASS_LC]->methods['decompress'])) {
             return;
         }
 
@@ -66,6 +71,8 @@ final class VmPharFileInfo
             'getperms' => PharFileInfoGetPerms::class,
             'chmod' => PharFileInfoChmod::class,
             'getpharflags' => PharFileInfoGetPharFlags::class,
+            'compress' => PharFileInfoCompress::class,
+            'decompress' => PharFileInfoDecompress::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -82,6 +89,8 @@ final class VmPharFileInfo
         $entry->methodNames['getperms'] = 'getPerms';
         $entry->methodNames['chmod'] = 'chmod';
         $entry->methodNames['getpharflags'] = 'getPharFlags';
+        $entry->methodNames['compress'] = 'compress';
+        $entry->methodNames['decompress'] = 'decompress';
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -144,6 +153,7 @@ final class VmPharFileInfo
         self::state($object);
         self::$store[$object->id]['perms'] = $perms;
         self::$store[$object->id]['flags'] = $flags;
+        self::$store[$object->id]['compressed'] = (0 !== ($flags & self::COMPRESSION_MASK));
     }
 
     /** @return array{content: string, name: string, archive: string, crcChecked: bool, compressed: bool, hasMetadata: bool, metadata: mixed, perms: int, flags: int} */
@@ -197,7 +207,26 @@ final class VmPharFileInfo
 
     public static function getPharFlags(ObjectEntry $object): int
     {
-        return self::state($object)['flags'];
+        // php-src zim_PharFileInfo_getPharFlags — strip compression bits.
+        return self::state($object)['flags'] & ~self::COMPRESSION_MASK;
+    }
+
+    public static function isCompressed(ObjectEntry $object, ?int $method): bool
+    {
+        $flags = self::state($object)['flags'];
+        if (null === $method) {
+            return 0 !== ($flags & self::COMPRESSION_MASK);
+        }
+        switch ($method) {
+            case 9021976: // Retained for BC (php-src)
+                return 0 !== ($flags & self::COMPRESSION_MASK);
+            case VmPhar::COMPRESSED_GZ:
+                return 0 !== ($flags & VmPhar::COMPRESSED_GZ);
+            case VmPhar::COMPRESSED_BZ2:
+                return 0 !== ($flags & VmPhar::COMPRESSED_BZ2);
+            default:
+                throw new \BadMethodCallException('Unknown compression type specified');
+        }
     }
 
     public static function chmod(ObjectEntry $object, int $perms): void
@@ -214,6 +243,80 @@ final class VmPharFileInfo
                 self::$store[$object->id]['flags']
             );
         }
+    }
+
+    /**
+     * php-src zim_PharFileInfo_compress — mark entry compressed (#21653).
+     * Tar-backed storage keeps payloads uncompressed; flags persist via entryattrs.
+     */
+    public static function compress(ObjectEntry $object, int $method): bool
+    {
+        $st = self::state($object);
+        if (!VmPhar::canWrite()) {
+            throw new \BadMethodCallException('Phar is readonly, cannot change compression');
+        }
+        switch ($method) {
+            case VmPhar::COMPRESSED_GZ:
+                if (0 !== ($st['flags'] & VmPhar::COMPRESSED_GZ)) {
+                    return true;
+                }
+                if (!VmPhar::canCompress(VmPhar::COMPRESSED_GZ)) {
+                    throw new \BadMethodCallException(
+                        'Cannot compress with gzip compression, zlib extension is not enabled'
+                    );
+                }
+                break;
+            case VmPhar::COMPRESSED_BZ2:
+                if (0 !== ($st['flags'] & VmPhar::COMPRESSED_BZ2)) {
+                    return true;
+                }
+                if (!VmPhar::canCompress(VmPhar::COMPRESSED_BZ2)) {
+                    throw new \BadMethodCallException(
+                        'Cannot compress with bzip2 compression, bz2 extension is not enabled'
+                    );
+                }
+                break;
+            default:
+                throw new \BadMethodCallException('Unknown compression type specified');
+        }
+        $flags = ($st['flags'] & ~self::COMPRESSION_MASK) | $method;
+        self::$store[$object->id]['flags'] = $flags;
+        self::$store[$object->id]['compressed'] = true;
+        if ('' !== $st['archive']) {
+            VmPharArchive::setEntryAttrs($st['archive'], $st['name'], $st['perms'], $flags);
+        }
+
+        return true;
+    }
+
+    /** php-src zim_PharFileInfo_decompress (#21653). */
+    public static function decompress(ObjectEntry $object): bool
+    {
+        $st = self::state($object);
+        if (0 === ($st['flags'] & self::COMPRESSION_MASK)) {
+            return true;
+        }
+        if (!VmPhar::canWrite()) {
+            throw new \BadMethodCallException('Phar is readonly, cannot decompress');
+        }
+        if (0 !== ($st['flags'] & VmPhar::COMPRESSED_GZ) && !VmPhar::canCompress(VmPhar::COMPRESSED_GZ)) {
+            throw new \BadMethodCallException(
+                'Cannot decompress Gzip-compressed file, zlib extension is not enabled'
+            );
+        }
+        if (0 !== ($st['flags'] & VmPhar::COMPRESSED_BZ2) && !VmPhar::canCompress(VmPhar::COMPRESSED_BZ2)) {
+            throw new \BadMethodCallException(
+                'Cannot decompress Bzip2-compressed file, bz2 extension is not enabled'
+            );
+        }
+        $flags = $st['flags'] & ~self::COMPRESSION_MASK;
+        self::$store[$object->id]['flags'] = $flags;
+        self::$store[$object->id]['compressed'] = false;
+        if ('' !== $st['archive']) {
+            VmPharArchive::setEntryAttrs($st['archive'], $st['name'], $st['perms'], $flags);
+        }
+
+        return true;
     }
 
     public static function requireReceiver(Frame $frame, string $label): ObjectEntry
@@ -322,7 +425,7 @@ final class PharFileInfoGetCompressedSize extends VmClassMethod
     }
 }
 
-/** PharFileInfo::isCompressed(?int $compression = null): bool (#19892). */
+/** PharFileInfo::isCompressed(?int $compression = null): bool (#19892, #21653). */
 final class PharFileInfoIsCompressed extends VmClassMethod
 {
     public function __construct()
@@ -333,8 +436,15 @@ final class PharFileInfoIsCompressed extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = VmPharFileInfo::requireReceiver($frame, 'PharFileInfo::isCompressed()');
+        $method = null;
+        if (\count($frame->calledArgs) >= 2) {
+            $arg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $arg->type) {
+                $method = $arg->toInt();
+            }
+        }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(VmPharFileInfo::state($object)['compressed']);
+            $frame->returnVar->bool(VmPharFileInfo::isCompressed($object, $method));
         }
     }
 }
@@ -469,6 +579,50 @@ final class PharFileInfoGetPharFlags extends VmClassMethod
         $object = VmPharFileInfo::requireReceiver($frame, 'PharFileInfo::getPharFlags()');
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(VmPharFileInfo::getPharFlags($object));
+        }
+    }
+}
+
+/** PharFileInfo::compress() — php-src zim_PharFileInfo_compress (#21653). */
+final class PharFileInfoCompress extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('compress');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharFileInfo::requireReceiver($frame, 'PharFileInfo::compress()');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'PharFileInfo::compress() expects exactly 1 argument, %d given',
+                \max(0, $argc - 1)
+            ));
+        }
+        $method = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $ok = VmPharFileInfo::compress($object, $method);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/** PharFileInfo::decompress() — php-src zim_PharFileInfo_decompress (#21653). */
+final class PharFileInfoDecompress extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('decompress');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharFileInfo::requireReceiver($frame, 'PharFileInfo::decompress()');
+        $ok = VmPharFileInfo::decompress($object);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
         }
     }
 }
