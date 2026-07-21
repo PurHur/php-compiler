@@ -28,7 +28,8 @@ final class ord extends Internal
     {
         $this->requireExactArgCount($frame, 'ord', 1);
         // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21222; php-src string.c ord).
-        $s = VmString::trimFamilyStringArgForFrame($frame, 0, 'ord', 1, 'character');
+        // $userArgIndex is 0-based display index (#21668; peers strlen/chr pass 0 → parameter #1).
+        $s = VmString::trimFamilyStringArgForFrame($frame, 0, 'ord', 0, 'character');
         if (null === $frame->returnVar) {
             return;
         }
