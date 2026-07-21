@@ -101,6 +101,9 @@ After Tier 0 setup, use the **inventory argv driver** for compile work (gen-2 in
 | `prelinked/bootstrap-gen0/bin-compile-aot` | Committed gen-0 seed (no Zend when `build/` empty) |
 | `build/bin-compile-aot-inventory` | **Preferred** argv driver for spine / full revision |
 | `build/bin-compile-aot` | Legacy gen-0 alias; spine probes may refresh this |
+| `prelinked/bootstrap-gen0/.bootstrap_lowering_source.sha` | Lowering-source fingerprint for committed gen-0 reuse ([#21855](https://github.com/PurHur/php-compiler/issues/21855)) |
+
+**Lowering freshness (Tier 1 trust):** `script/bootstrap-resolve-compile-invoke.sh` refuses to reuse committed or `build/` compiled drivers and M3 sidecars when `lib/`, `ext/`, or `patches/` drift from the stamped fingerprint. After editing lowering sources, either rebuild the inventory argv driver (Zend or honest native emit) or set `BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER=1` for a deliberate bisect. Fingerprint: `php script/bootstrap-lowering-source-fingerprint.php`.
 
 **Preferred argv shape** ([#2866](https://github.com/PurHur/php-compiler/issues/2866)):
 

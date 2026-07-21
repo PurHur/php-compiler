@@ -26,6 +26,9 @@
 #   BOOTSTRAP_ALLOW_SIDECAR_EMIT_FALLBACK=1 — opt-in when native driver SIGSEGV (exit 139) and only sidecar copy succeeds
 set -euo pipefail
 
+# shellcheck source=bootstrap-lowering-freshness.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-lowering-freshness.sh"
+
 BOOTSTRAP_COMPILE_DRIVER_MODE=""
 BOOTSTRAP_COMPILE_DRIVER=""
 
@@ -110,8 +113,16 @@ bootstrap_gen0_sidecar_blob_for_entry() {
     */bin/compile.php) rel='build/.m3_bin_compile_aot_blob' ;;
     *) return 1 ;;
   esac
+  local lowering_stamp=""
+  lowering_stamp="$(bootstrap_lowering_source_prelinked_stamp)"
   local build_blob="${root}/${rel}"
   if [[ -f "${build_blob}" && -s "${build_blob}" ]]; then
+    if [[ -f "$(bootstrap_lowering_source_build_stamp)" ]]; then
+      lowering_stamp="$(bootstrap_lowering_source_build_stamp)"
+    fi
+    if ! bootstrap_lowering_source_refuse_stale_reuse "${lowering_stamp}" "build sidecar ${rel}"; then
+      return 1
+    fi
     if [[ "${rel}" == "build/.m3_compiler_lib_aot_blob" ]] \
       && declare -F bootstrap_compiler_lib_spine_entry_sha >/dev/null 2>&1; then
       local want_sha have_sha stamp="${root}/build/.m3_compiler_lib_sidecar.sha"
@@ -146,6 +157,9 @@ bootstrap_gen0_sidecar_blob_for_entry() {
       ;;
   esac
   if [[ -n "${prelinked}" && -f "${prelinked}" && -s "${prelinked}" ]]; then
+    if ! bootstrap_lowering_source_refuse_stale_reuse "$(bootstrap_lowering_source_prelinked_stamp)" "prelinked sidecar ${rel}"; then
+      return 1
+    fi
     if [[ "${rel}" == "build/.m3_compiler_lib_aot_blob" ]] \
       && declare -F bootstrap_compiler_lib_spine_entry_sha >/dev/null 2>&1; then
       local want_sha have_sha stamp="${root}/build/.m3_compiler_lib_sidecar.sha"
@@ -595,6 +609,7 @@ bootstrap_inventory_argv_link() {
     if [[ -x "${out}" && -s "${out}" ]]; then
       cp -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
       chmod +x "${root}/build/.m3_bin_compile_aot_blob"
+      bootstrap_lowering_source_write_build_stamp 2>/dev/null || true
     fi
     echo "bootstrap-inventory-argv-link: OK ${out} (gen-0 compiled; emit_path=${BOOTSTRAP_COMPILE_DRIVER_MODE:-native})" >&2
     return 0
@@ -629,6 +644,7 @@ bootstrap_inventory_argv_link() {
       && bootstrap_inventory_argv_emit_output_ok "${out}"; then
       cp -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
       chmod +x "${root}/build/.m3_bin_compile_aot_blob"
+      bootstrap_lowering_source_write_build_stamp 2>/dev/null || true
       echo "bootstrap-inventory-argv-link: OK ${out} (Zend helloworld inventory argv; sidecar refreshed)" >&2
       return 0
     fi
@@ -776,7 +792,7 @@ bootstrap_resolve_compile_driver() {
 
   local candidate
   while IFS= read -r candidate; do
-    if [[ -x "${candidate}" ]]; then
+    if [[ -x "${candidate}" ]] && bootstrap_native_compile_driver_lowering_fresh "${candidate}"; then
       BOOTSTRAP_COMPILE_DRIVER_MODE=native
       BOOTSTRAP_COMPILE_DRIVER="${candidate}"
       return 0
@@ -857,6 +873,10 @@ bootstrap_compile_invoke() {
   local attempted_native=0
   while IFS= read -r native_candidate; do
     if [[ ! -x "${native_candidate}" ]]; then
+      continue
+    fi
+    if ! bootstrap_native_compile_driver_lowering_fresh "${native_candidate}"; then
+      echo "bootstrap-compile-invoke: skipping stale native driver ${native_candidate} (#21855)" >&2
       continue
     fi
     attempted_native=1
