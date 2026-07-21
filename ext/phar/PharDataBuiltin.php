@@ -11,8 +11,9 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\spl\SplArrayStorage;
+use PHPCompiler\ext\standard\VmJson;
 
-/** PharData — .tar archives (php-src ext/phar/phar_object.c; #6490, #19893). */
+/** PharData — .tar archives (php-src ext/phar/phar_object.c; #6490, #19893, #21691). */
 final class PharDataBuiltin
 {
     public static function register(Context $ctx): void
@@ -23,7 +24,9 @@ final class PharDataBuiltin
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['getmodified'])
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['count'])
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['iswritable'])
-            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['iscompressed'])) {
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['iscompressed'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['hasmetadata'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['setmetadata'])) {
             return;
         }
 
@@ -62,6 +65,10 @@ final class PharDataBuiltin
             'count' => [PharDataCount::class, 'count'],
             'iswritable' => [PharDataIsWritable::class, 'isWritable'],
             'iscompressed' => [PharDataIsCompressed::class, 'isCompressed'],
+            'hasmetadata' => [PharDataHasMetadata::class, 'hasMetadata'],
+            'getmetadata' => [PharDataGetMetadata::class, 'getMetadata'],
+            'setmetadata' => [PharDataSetMetadata::class, 'setMetadata'],
+            'delmetadata' => [PharDataDelMetadata::class, 'delMetadata'],
             'offsetset' => [PharDataOffsetSet::class, 'offsetSet'],
             'offsetget' => [PharDataOffsetGet::class, 'offsetGet'],
             'offsetexists' => [PharDataOffsetExists::class, 'offsetExists'],
@@ -441,6 +448,63 @@ final class PharDataIsCompressed extends VmClassMethod
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($result);
+        }
+    }
+}
+
+/** PharData::hasMetadata() — php-src zim_Phar_hasMetadata (#21691). */
+final class PharDataHasMetadata extends VmClassMethod
+{
+    public function __construct() { parent::__construct('hasMetadata'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPharData::hasMetadata(
+                VmPharData::requireReceiver($frame, 'PharData::hasMetadata')
+            ));
+        }
+    }
+}
+
+/** PharData::getMetadata() — php-src zim_Phar_getMetadata (#21691). */
+final class PharDataGetMetadata extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getMetadata'); }
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $value = VmPharData::getMetadata(VmPharData::requireReceiver($frame, 'PharData::getMetadata'));
+        $imported = VmJson::import($value);
+        $frame->returnVar->copyFrom($imported);
+    }
+}
+
+/** PharData::setMetadata() — php-src zim_Phar_setMetadata (#21691). */
+final class PharDataSetMetadata extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setMetadata'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf('PharData::setMetadata() expects exactly 1 argument, %d given', \max(0, $argc - 1)));
+        }
+        $meta = VmJson::export($frame->calledArgs[1]->resolveIndirect(), $frame->vmContext, null, $frame);
+        VmPharData::setMetadata(VmPharData::requireReceiver($frame, 'PharData::setMetadata'), $meta);
+    }
+}
+
+/** PharData::delMetadata() — php-src zim_Phar_delMetadata (#21691). */
+final class PharDataDelMetadata extends VmClassMethod
+{
+    public function __construct() { parent::__construct('delMetadata'); }
+    public function execute(Frame $frame): void
+    {
+        $ok = VmPharData::delMetadata(VmPharData::requireReceiver($frame, 'PharData::delMetadata'));
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
         }
     }
 }
