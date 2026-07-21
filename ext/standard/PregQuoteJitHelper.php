@@ -16,8 +16,8 @@ final class PregQuoteJitHelper
      * NestedJIT types nullable string as __value__*; ABI bridge passes __string__*.
      * Use empty string for "no delimiter" so both sides stay __string__* (#21109).
      */
-    public static function pregQuoteArgv(string $string, string $delimiter = ''): string
+    public static function pregQuoteArgv(string $string, ?string $delimiter = null): string
     {
-        return VmString::pregQuote($string, '' === $delimiter ? null : $delimiter);
+        return VmString::pregQuote($string, null === $delimiter || '' === $delimiter ? null : $delimiter);
     }
 }

@@ -8,13 +8,19 @@ use PHPCompiler\ext\standard\PregQuoteJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** preg_quote() JIT routes through PregQuoteJitHelper PHP not inline LLVM (#14743). */
+/** preg_quote() JIT routes through PregQuoteJitHelper + JitVmHelperLink (#14743, #21751). */
 final class PregQuoteRuntimeShrinkTest extends TestCase
 {
     public function testStringPregQuoteUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPregQuote.php');
         $this->assertStringContainsString('PregQuoteJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $source);
         $this->assertStringNotContainsString('preg_quote_count_head', $source);
         $this->assertStringNotContainsString('shouldEscape', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitPregQuote.php');
