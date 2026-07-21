@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6249 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19732 |
+| Source constructs flagged (warnings) | 19728 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5106,7 +5106,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrcoll.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStreamCsv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrftime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringStripTags.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStripTags.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStripcslashesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStripslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcasecmp.php` | 0 | 1 |
@@ -5137,7 +5137,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringTriggerErrorJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTrimMask.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTrimModeJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringUcwords.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringUcwords.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUmask.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUniqid.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUnitEnumExists.php` | 0 | 1 |
@@ -42946,9 +42946,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStripTags.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 113)
-- 6 class method(s)
-- 1 closure(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringStripcslashesRuntime.php`
 
@@ -43118,9 +43116,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUcwords.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 142)
-- 7 class method(s)
-- 1 closure(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringUmask.php`
 
