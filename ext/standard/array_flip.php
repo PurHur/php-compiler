@@ -17,8 +17,6 @@ use PHPCompiler\JIT\Builtin\ArrayFlipRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitArrayElem;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -49,13 +47,9 @@ final class array_flip extends Internal
             throw new \LogicException('array_flip() requires exactly one argument');
         }
         TypeErrorRaise::ensureLinked($context);
+        // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916, re-#21771).
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes) {
-                JitArrayElem::requireArrayParam($context, $args[0], 'array_flip', 1, 'array');
-
-                return HashTableHelper::emptyVariable($context)->value;
-            }
-            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'array_flip', 0, 'array');
+            JitArrayElem::requireArrayParam($context, $args[0], 'array_flip', 1, 'array');
 
             return HashTableHelper::emptyVariable($context)->value;
         }

@@ -16,8 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayMergeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitArrayElem;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -64,34 +62,21 @@ final class array_merge extends Internal
             return HashTableHelper::emptyVariable($context)->value;
         }
 
-        $coerced = [];
+        // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916, re-#21771).
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
-                if ($context->callerStrictTypes) {
-                    JitArrayElem::requireArrayArgNum($context, $arg, 'array_merge', $i + 1);
+                JitArrayElem::requireArrayArgNum($context, $arg, 'array_merge', $i + 1);
 
-                    return HashTableHelper::emptyVariable($context)->value;
-                }
-                JitStringBuiltinArg::emitNullStringParamDeprecation(
-                    $context,
-                    'array_merge',
-                    $i,
-                    'array',
-                    'array'
-                );
-                $coerced[] = HashTableHelper::emptyVariable($context);
-
-                continue;
+                return HashTableHelper::emptyVariable($context)->value;
             }
-            $coerced[] = $arg;
         }
 
-        foreach ($coerced as $i => $arg) {
+        foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_merge() argument #'.((int) $i + 1));
             }
         }
 
-        return ArrayMergeRuntime::merge($context, ...$coerced);
+        return ArrayMergeRuntime::merge($context, ...$args);
     }
 }

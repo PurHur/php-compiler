@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
@@ -786,10 +785,12 @@ final class VmArray
     }
 
     /**
-     * Z_PARAM_ARRAY at internal call sites — null TypeError only under declare(strict_types=1)
-     * on the caller; otherwise E_DEPRECATED + empty array (php-src zend_API.c / array.c; #21771).
+     * Z_PARAM_ARRAY at internal call sites — always TypeError on null (php-src 8.0+;
+     * Zend 8.2 reference). Soft-null/DEP was an inverted #21771 claim (#21916).
      *
-     * @throws \TypeError when {@param $value} is not an array and cannot be coerced
+     * {@param $frame} retained for call-site API stability; unused for the type check.
+     *
+     * @throws \TypeError when {@param $value} is not an array
      */
     public static function requireArrayParamForCaller(
         Frame $frame,
@@ -799,37 +800,9 @@ final class VmArray
         string $paramName,
         string $expectedType = 'array'
     ): HashTable {
-        $v = $value->resolveIndirect();
-        if (Variable::TYPE_ARRAY === $v->type) {
-            return $v->toArray();
-        }
-        if (Variable::TYPE_NULL === $v->type) {
-            if (InternalStrictArg::isCallerStrict($frame)) {
-                throw new \TypeError(
-                    \sprintf(
-                        '%s(): Argument #%d ($%s) must be of type %s, null given',
-                        $fn,
-                        $argNum,
-                        $paramName,
-                        $expectedType
-                    )
-                );
-            }
-            VmNullStringParamDeprecation::emit($frame, $fn, $argNum - 1, $paramName, $expectedType);
+        unset($frame);
 
-            return new HashTable();
-        }
-
-        throw new \TypeError(
-            \sprintf(
-                '%s(): Argument #%d ($%s) must be of type %s, %s given',
-                $fn,
-                $argNum,
-                $paramName,
-                $expectedType,
-                self::valueTypeLabel($v)
-            )
-        );
+        return self::requireArrayParam($value, $fn, $argNum, $paramName, $expectedType);
     }
 
     /**
@@ -841,7 +814,9 @@ final class VmArray
     }
 
     /**
-     * Variadic array builtins — null soft-coerce like {@see requireArrayParamForCaller} (#21771).
+     * Variadic array builtins (Zend messages omit ($param)) — always TypeError on null (#21916).
+     *
+     * {@param $frame} retained for call-site API stability; unused for the type check.
      *
      * @throws \TypeError when {@param $value} is not an array
      */
@@ -851,33 +826,9 @@ final class VmArray
         string $fn,
         int $argNum
     ): HashTable {
-        $v = $value->resolveIndirect();
-        if (Variable::TYPE_ARRAY === $v->type) {
-            return $v->toArray();
-        }
-        if (Variable::TYPE_NULL === $v->type) {
-            if (InternalStrictArg::isCallerStrict($frame)) {
-                throw new \TypeError(
-                    \sprintf(
-                        '%s(): Argument #%d must be of type array, null given',
-                        $fn,
-                        $argNum
-                    )
-                );
-            }
-            VmNullStringParamDeprecation::emit($frame, $fn, $argNum - 1, 'array', 'array');
+        unset($frame);
 
-            return new HashTable();
-        }
-
-        throw new \TypeError(
-            \sprintf(
-                '%s(): Argument #%d must be of type array, %s given',
-                $fn,
-                $argNum,
-                self::valueTypeLabel($v)
-            )
-        );
+        return self::requireArrayArgNum($value, $fn, $argNum);
     }
 
     /**
