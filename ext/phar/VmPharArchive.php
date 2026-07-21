@@ -20,7 +20,8 @@ use PHPCompiler\ext\zip\ZipEngine;
  * Phar executable archive state — php-src ext/phar/phar_object.c (#20628).
  *
  * On-disk layout for this build:
- * - TAR/PHAR: stub ending in `__HALT_COMPILER(); ?>` + ustar payload (same tar writer as PharData)
+ * - Classic FORMAT_PHAR (#21712): stub + manifest + file data + digest + GBMB (php-src phar_flush)
+ * - TAR: stub ending in `__HALT_COMPILER(); ?>` + ustar payload (same tar writer as PharData)
  * - ZIP (#21678): stored ZIP with `.phar/stub.php` entry (php-src zip-based phar)
  *
  * Round-trips inside this VM; respects phar.readonly.
@@ -94,10 +95,13 @@ final class VmPharArchive
         ?string $sigPrivateKey = null,
         array $fileMetadata = [],
         array $fileAttrs = [],
-        int $format = VmPhar::FORMAT_TAR
+        int $format = VmPhar::FORMAT_PHAR
     ): void {
         if ('' === $stub) {
             $stub = VmPhar::FORMAT_ZIP === $format ? self::ZIP_STUB : self::createDefaultStub();
+        }
+        if (VmPhar::FORMAT_PHAR === $format && 0 === $sigFlags) {
+            $sigFlags = VmPhar::SIG_SHA256;
         }
         self::$state[$object->id] = [
             'path' => $path,
@@ -139,6 +143,31 @@ final class VmPharArchive
             }
             if (self::looksLikeZip($binary)) {
                 self::openZipBytes($object, $path, $binary, $wholeCompression);
+                self::registerFilenameMap($path);
+
+                return;
+            }
+            $classic = VmPharManifest::tryParse($binary);
+            if (null !== $classic) {
+                self::bind(
+                    $object,
+                    $path,
+                    $classic['files'],
+                    false,
+                    $classic['dirs'],
+                    $classic['stub'],
+                    $classic['alias'],
+                    false,
+                    $classic['hasMetadata'],
+                    $classic['metadata'],
+                    $wholeCompression,
+                    $classic['sigFlags'],
+                    $classic['signatureHex'],
+                    null,
+                    [],
+                    [],
+                    VmPhar::FORMAT_PHAR
+                );
                 self::registerFilenameMap($path);
 
                 return;
@@ -348,6 +377,10 @@ final class VmPharArchive
         self::requireState($object);
         if (!\str_contains($stub, self::HALT) && !\str_contains($stub, '__HALT_COMPILER()')) {
             throw new \UnexpectedValueException('illegal stub for an executable phar archive');
+        }
+        $format = self::$state[$object->id]['format'] ?? VmPhar::FORMAT_PHAR;
+        if (VmPhar::FORMAT_PHAR === $format) {
+            $stub = VmPharManifest::normalizeStub($stub);
         }
         self::$state[$object->id]['stub'] = $stub;
         self::markDirty($object);
@@ -960,12 +993,12 @@ final class VmPharArchive
     }
 
     /**
-     * php-src zim_Phar_isFileFormat — tar or zip-backed executable (#21328, #21678).
+     * php-src zim_Phar_isFileFormat — classic / tar / zip executable (#21328, #21678, #21712).
      */
     public static function isFileFormat(ObjectEntry $object, int $format): bool
     {
         $st = self::requireState($object);
-        $current = $st['format'] ?? VmPhar::FORMAT_TAR;
+        $current = $st['format'] ?? VmPhar::FORMAT_PHAR;
 
         return $current === $format;
     }
@@ -1263,11 +1296,12 @@ final class VmPharArchive
         }
     }
 
-    /** Build on-disk bytes (stub+tar or stored ZIP). */
+    /** Build on-disk bytes (classic / stub+tar / stored ZIP). */
     private static function buildBinary(ObjectEntry $object): string
     {
         $st = self::requireState($object);
-        if (VmPhar::FORMAT_ZIP === ($st['format'] ?? VmPhar::FORMAT_TAR)) {
+        $format = $st['format'] ?? VmPhar::FORMAT_PHAR;
+        if (VmPhar::FORMAT_ZIP === $format) {
             return self::buildZipBinary(
                 $st['files'],
                 $st['dirs'],
@@ -1277,6 +1311,9 @@ final class VmPharArchive
                 $st['fileMetadata'] ?? [],
                 $st['fileAttrs'] ?? []
             );
+        }
+        if (VmPhar::FORMAT_PHAR === $format) {
+            return self::buildClassicBinary($object);
         }
         $stub = $st['stub'];
         if (!\str_contains($stub, self::HALT)) {
@@ -1298,6 +1335,28 @@ final class VmPharArchive
         }
 
         return $stub.VmPharTar::writeArchive($files, $st['dirs']);
+    }
+
+    private static function buildClassicBinary(ObjectEntry $object): string
+    {
+        $st = self::requireState($object);
+        $built = VmPharManifest::build(
+            $st['stub'],
+            $st['files'],
+            $st['dirs'],
+            $st['alias'] ?? '',
+            (bool) $st['hasMetadata'],
+            $st['metadata'],
+            (int) ($st['sigFlags'] ?? VmPhar::SIG_SHA256),
+            $st['sigPrivateKey'] ?? null,
+            $st['fileAttrs'] ?? [],
+            0
+        );
+        self::$state[$object->id]['sigFlags'] = $built['sigFlags'];
+        self::$state[$object->id]['signature'] = $built['signatureHex'];
+        self::$state[$object->id]['stub'] = VmPharManifest::normalizeStub($st['stub']);
+
+        return $built['binary'];
     }
 
     /**
@@ -1479,6 +1538,13 @@ final class VmPharArchive
                 'Cannot write to archive - write operations disabled by the php.ini setting phar.readonly'
             );
         }
+        $format = $st['format'] ?? VmPhar::FORMAT_PHAR;
+        // php-src phar_flush returns EOF for empty classic manifests — leave path unwritten.
+        if (VmPhar::FORMAT_PHAR === $format && [] === $st['files'] && [] === $st['dirs']) {
+            self::$state[$object->id]['dirty'] = false;
+
+            return;
+        }
         $path = $st['path'];
         $binary = self::buildBinary($object);
         if (VmPhar::COMPRESSED_GZ === $st['wholeCompression']) {
@@ -1491,7 +1557,10 @@ final class VmPharArchive
         if (false === VmFs::filePutContents($path, $binary)) {
             throw new \UnexpectedValueException('phar error: unable to write phar "'.$path.'"');
         }
-        self::refreshSignature($object, $binary);
+        // Classic FORMAT_PHAR embeds GBMB inside buildClassicBinary already.
+        if (VmPhar::FORMAT_PHAR !== $format) {
+            self::refreshSignature($object, $binary);
+        }
         self::$state[$object->id]['dirty'] = false;
     }
 
