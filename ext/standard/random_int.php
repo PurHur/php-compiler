@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -29,8 +28,8 @@ final class random_int extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('random_int() requires exactly two arguments');
         }
-        $min = self::parseBound($frame->calledArgs[0]->resolveIndirect(), 1, 'min');
-        $max = self::parseBound($frame->calledArgs[1]->resolveIndirect(), 2, 'max');
+        $min = self::parseBound($frame, 0, 1, 'min');
+        $max = self::parseBound($frame, 1, 2, 'max');
         $result = VmRandom::randomInt($min, $max);
         if (null === $frame->returnVar) {
             return;
@@ -52,12 +51,14 @@ final class random_int extends Internal
     }
 
     /**
-     * Z_PARAM_LONG bound — reject enum cases before int-only check (#5795, ext/standard/random.c).
+     * Z_PARAM_LONG bound — coerce like php-src ext/random/random.c
+     * (null→0 with E_DEPRECATED, enum→TypeError; #5795, #21754).
      *
-     * @throws \TypeError when an enum case operand is passed (php-src-strict)
+     * @throws \TypeError when an enum case or non-coercible operand is passed
      */
-    private static function parseBound(Variable $var, int $argIndex, string $paramName): int
+    private static function parseBound(Frame $frame, int $argArrayIndex, int $argIndex, string $paramName): int
     {
+        $var = $frame->calledArgs[$argArrayIndex]->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
             $given = null !== $enumClass ? $enumClass->name : 'object';
@@ -68,10 +69,13 @@ final class random_int extends Internal
                 $given
             ));
         }
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \LogicException('random_int() only supports integers in this compiler build');
-        }
 
-        return $var->toInt();
+        return VmMath::parseZParamLongBuiltinArg(
+            $var,
+            'random_int',
+            $argIndex,
+            $paramName,
+            $frame
+        );
     }
 }
