@@ -36,8 +36,8 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Bootstrap driver** | Prelinked gen-0 refreshed via honest inventory argv emit; native `build/bin-compile-aot-inventory` for M4/M5 | Compiled `bin/compile.php` only |
 | **Bundle size** | **6319/6319** literal Phase A inventory in spine smoke | Full vm.php closure |
 | **Inventory coverage** | **6319** / **6319** ✅ | Full closure |
-| **HelloWorld** | Strict probe **emit_path=native** ✅ | Native compile for arbitrary PHP |
-| **Bootstrap loop (M4)** | `make bootstrap-loop-probe` counts **native** gen-1→gen-2 only — prelinked sidecar recovery is **not** M4 green ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | Native full revision rebuild |
+| **HelloWorld** | 🚧 probe reports `emit_path=native-prelinked-sidecar` — a committed blob **COPY**, not a native emit ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | Native compile for arbitrary PHP |
+| **Bootstrap loop (M4)** | `make bootstrap-loop-probe` full ladder ✅ — gen-1→gen-2, gen-2→gen-3 full spine, full-revision argv | Native full revision rebuild |
 | **Vendor** | **3/3** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `make north-star5-verify-fast` daily ✅; `--strict` ❌ **red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) | No Zend `vendor/autoload.php` at bootstrap |
 
 ### Gates (run after `script/apply-patches.sh`)
@@ -50,12 +50,12 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M3 Runtime compile smoke strict | ✅ `make bootstrap-selfhost-runtime-compile-smoke-strict` → `emit_path=native` (#2610) |
 | M3 compiler-unit strict | ✅ `make bootstrap-selfhost-compiler-unit-probe-strict` → `emit_path=native` (#2618) |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
-| M3 `make bootstrap-selfhost-helloworld` | ✅ strict default — HelloWorld `emit_path=native` (verified 27 May 2026) |
+| M3 `make bootstrap-selfhost-helloworld` | 🚧 **DEGRADED** — native emit fails; output is a prelinked blob COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)). The old `emit_path=native` line was a hardcoded string, not a measurement. Require a real emit: `BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT=1` |
 | M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (`BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1`, #2611); **`BOOTSTRAP_M4_GEN2_STRICT=1` default-on** ([#8711](https://github.com/PurHur/php-compiler/issues/8711)); opt-in Zend bisect: `BOOTSTRAP_M4_GEN2_ZEND_FALLBACK=1`; presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
 | M4 `make bootstrap-loop-gen1-full-spine-emit` | 🚧 gen-1→gen-2 full spine — heavy opt-in |
 | M4 `make bootstrap-selfhost-full-revision-probe` | ✅ gen-2 inventory argv → gen-3 + fixture smoke ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) |
 | M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 full spine native argv |
-| M4 `make bootstrap-loop-probe` | ✅ when gen-1→gen-2 **`emit_path=native`** only — sidecar path exits 2 ([#21860](https://github.com/PurHur/php-compiler/issues/21860); [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 `make bootstrap-loop-probe` | 🚧 **DEGRADED** — gen-1→gen-2 is a prelinked sidecar COPY, not a native compile ([#21860](https://github.com/PurHur/php-compiler/issues/21860)); gen-2→gen-3 + full-revision then run on that copy, so byte-comparing gen-0/gen-2/gen-3 proves nothing. Require a real emit: `BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1` ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **6319/6319** |
 | `make bootstrap-inventory-check` | ✅ **6319/6319** Phase A files, **0** source blockers |
 | `make north-star5-verify-fast` | ✅ daily M5 PR gate (~1–2 min) |
@@ -70,11 +70,11 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
 | **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **6319** / **6319** | **100%** |
-| **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | ✅ strict **native** + inventory argv | **~85%** |
-| **M4** | Self-host binary **rebuilds** the next compiler tree | ✅ full `bootstrap-loop-probe` ladder | **~90%** |
+| **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 probe output is a blob COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | **~60%** |
+| **M4** | Self-host binary **rebuilds** the next compiler tree | 🚧 ladder runs but gen-1→gen-2 is a COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | **~60%** |
 | **M5** | Full self-host; Zend retired from loop | 🚧 `north-star5-verify-fast` daily ✅; **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)); `BOOTSTRAP_M5_NO_ZEND=1` empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) | **~75%** |
 
-**Indicative north star composite:** **~85%** (weighted across M0–M5; see formula below). M5 is gated on `--strict` ([#21417](https://github.com/PurHur/php-compiler/issues/21417)), not on spine coverage.
+**Indicative north star composite:** **~65%** (weighted across M0–M5; see formula below). M5 is gated on `--strict` ([#21417](https://github.com/PurHur/php-compiler/issues/21417)), not on spine coverage.
 
 ### North star % (single formula)
 
@@ -83,7 +83,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **6319** / **6319** (`php script/bootstrap-spine-count.php`) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~97%** |
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **3 / 3** (cfg, types, llvm) |
-| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~85%** |
+| **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~65%** |
 
 Regenerate inventory: `make bootstrap-inventory-regenerate` (or `php script/bootstrap-inventory.php`) · spine count: `php script/bootstrap-spine-count.php` (or `grep -c '^require_once' test/selfhost/compiler_lib_spine_smoke/main.php`)
 

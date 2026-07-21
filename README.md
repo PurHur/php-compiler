@@ -11,7 +11,7 @@
 
 > **Stable line (2026)** — First maintained **stable** release **[v1.0.0](https://github.com/PurHur/php-compiler/releases/tag/v1.0.0)**; **v1.1.0** prep adds M5 fast-path stability, enum/property-hook parity, `preg_match` JIT, `spl_autoload*`, and php-in-PHP JIT helpers. Demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path. Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
-**Snapshot (Jul 2026, `master` — v1.1.0 prep):** VM + AOT for shipped examples ✅ · examples web smoke ✅ · self-host spine **6319** / **6319** · **1555** builtins · M5 fast ✅ / strict 🚧 ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) · VM probe ~**20ms**
+**Snapshot (Jul 2026, `master` — v1.1.0 prep):** VM + AOT for shipped examples ✅ · examples web smoke ✅ · self-host spine **6319** / **6319** · **1555** builtins · M5 fast ✅ / strict 🚧 · M3/M4 emit = blob copy ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) · VM probe ~**20ms**
 
 ---
 
@@ -23,7 +23,7 @@
 | **AOT (`phpc build`)** | ✅ For curated subset | Standalone binaries for examples **000–009** and small CGI apps; not arbitrary Composer stacks |
 | **JIT (`bin/jit.php`)** | 🚧 Partial | LLVM IR for many constructs; **MCJIT execute** still flaky ([#98](https://github.com/PurHur/php-compiler/issues/98)); EH scripts VM-fallback ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
 | **Language wave 3** | ✅ Closed batch | **12/12** language + **13/13** stdlib tracker items ([#1380](https://github.com/PurHur/php-compiler/issues/1380)); closures, try/catch, generators (VM), `parent::class`, backed enums (VM), intersection AOT checks |
-| **Self-host north star** | 🚧 ~85% | M5 fast gate green, `--strict` red ([#21417](https://github.com/PurHur/php-compiler/issues/21417)); spine **6319** / **6319**; vendor prelink **3/3** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| **Self-host north star** | 🚧 ~65% | M3/M4 emit paths are blob copies ([#21860](https://github.com/PurHur/php-compiler/issues/21860)); `--strict` red; spine **6319** / **6319**; vendor prelink **3/3** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 
 ### What you can rely on today
 
@@ -41,8 +41,8 @@ Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `c
 |-----------|--------|----------------|
 | **M0–M1** | ✅ | `compiler_minimal` + compile-smoke bundles link and run natively |
 | **M2** | ✅ **6319** / **6319** | Full Phase A inventory in spine smoke; native link + lint ✅ |
-| **M3** | ✅ | HelloWorld strict native ✅; inventory argv `bin/compile.php` ✅ |
-| **M4** | ✅ | `make bootstrap-loop-probe` full ladder ✅ (gen-1→gen-2→gen-3 + full-revision) |
+| **M3** | 🚧 | HelloWorld probe output is a prelinked blob **COPY**, not a native emit ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) |
+| **M4** | 🚧 | ladder runs, but gen-1→gen-2 is a sidecar **COPY** ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) — gen-0/gen-2/gen-3 being byte-identical follows from that, and is not fixpoint evidence |
 | **M5** | 🚧 | `make north-star5-verify-fast` (daily) ✅; vendor **3/3** ✅; gen-0 sidecars refreshed; **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) |
 
 **Reproduce M0 smoke on a clean clone (verified Jul 2026):**
