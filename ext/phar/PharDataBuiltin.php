@@ -19,7 +19,11 @@ final class PharDataBuiltin
     {
         if (isset($ctx->classes[VmPharData::CLASS_LC])
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['addemptydir'])
-            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['isfileformat'])) {
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['isfileformat'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['getmodified'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['count'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['iswritable'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['iscompressed'])) {
             return;
         }
 
@@ -54,6 +58,10 @@ final class PharDataBuiltin
             'extractto' => [PharDataExtractTo::class, 'extractTo'],
             'getpath' => [PharDataGetPath::class, 'getPath'],
             'isfileformat' => [PharDataIsFileFormat::class, 'isFileFormat'],
+            'getmodified' => [PharDataGetModified::class, 'getModified'],
+            'count' => [PharDataCount::class, 'count'],
+            'iswritable' => [PharDataIsWritable::class, 'isWritable'],
+            'iscompressed' => [PharDataIsCompressed::class, 'isCompressed'],
             'offsetset' => [PharDataOffsetSet::class, 'offsetSet'],
             'offsetget' => [PharDataOffsetGet::class, 'offsetGet'],
             'offsetexists' => [PharDataOffsetExists::class, 'offsetExists'],
@@ -371,6 +379,68 @@ final class PharDataIsFileFormat extends VmClassMethod
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/** PharData::getModified() — php-src zim_Phar_getModified on PharData (#21692). */
+final class PharDataGetModified extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getModified'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPharData::getModified(
+                VmPharData::requireReceiver($frame, 'PharData::getModified')
+            ));
+        }
+    }
+}
+
+/** PharData::count() — php-src zim_Phar_count / Countable (#21692). */
+final class PharDataCount extends VmClassMethod
+{
+    public function __construct() { parent::__construct('count'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmPharData::count(
+                VmPharData::requireReceiver($frame, 'PharData::count')
+            ));
+        }
+    }
+}
+
+/** PharData::isWritable() — php-src zim_Phar_isWritable; ignores phar.readonly (#21692). */
+final class PharDataIsWritable extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isWritable'); }
+    public function execute(Frame $frame): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPharData::isWritable(
+                VmPharData::requireReceiver($frame, 'PharData::isWritable')
+            ));
+        }
+    }
+}
+
+/** PharData::isCompressed() — whole-archive compression or false (#21692). */
+final class PharDataIsCompressed extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isCompressed'); }
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPharData::isCompressed(
+            VmPharData::requireReceiver($frame, 'PharData::isCompressed')
+        );
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->int($result);
         }
     }
 }
