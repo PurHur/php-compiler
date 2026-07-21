@@ -70,15 +70,20 @@ final class SessionStorageJitHelper
         if ('' === $sessionName || null === $cookies) {
             return '';
         }
-        $val = $cookies->find($sessionName);
-        if (null === $val) {
-            return '';
-        }
-        $val = $val->resolveIndirect();
-        if (Variable::TYPE_STRING !== $val->type) {
-            return '';
+        // Nested-JIT: HashTable::find() LLVM verify on standalone 005 (#21849); exportKeyValuePairs is registered.
+        foreach ($cookies->exportKeyValuePairs() as [$keyVar, $valVar]) {
+            $keyVar = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $keyVar->type || $sessionName !== $keyVar->toString()) {
+                continue;
+            }
+            $val = $valVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $val->type) {
+                return '';
+            }
+
+            return SessionFileStorage::sanitizeId($val->toString());
         }
 
-        return SessionFileStorage::sanitizeId($val->toString());
+        return '';
     }
 }
