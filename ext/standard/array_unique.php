@@ -46,12 +46,10 @@ final class array_unique extends Internal
         if (1 === $argc) {
             return StdlibConstants::SORT_STRING;
         }
-        $flagsArg = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $flagsArg->type) {
-            throw new \LogicException('array_unique() flags must be an integer in this compiler build');
-        }
 
-        return ArrayUniqueJitHelper::normalizeFlagsForCall($flagsArg->toInt());
+        return ArrayUniqueJitHelper::normalizeFlagsForCall(
+            VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_unique', 2, 'flags')
+        );
     }
 
     public Context $context;
