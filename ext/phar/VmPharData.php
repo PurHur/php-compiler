@@ -86,6 +86,50 @@ final class VmPharData
         return ($st['format'] ?? VmPhar::FORMAT_TAR) === $format;
     }
 
+    /**
+     * php-src zim_Phar_count / Countable — file + directory entries (#21692).
+     */
+    public static function count(ObjectEntry $object): int
+    {
+        $st = self::requireState($object);
+
+        return \count($st['files']) + \count($st['dirs']);
+    }
+
+    /**
+     * php-src zim_Phar_getModified — archive has unflushed changes (#21692).
+     */
+    public static function getModified(ObjectEntry $object): bool
+    {
+        return self::requireState($object)['dirty'];
+    }
+
+    /**
+     * php-src zim_Phar_isWritable — PharData ignores phar.readonly (#21692).
+     *
+     * Zend keeps data archives writeable even when Phar::canWrite() is false.
+     */
+    public static function isWritable(ObjectEntry $object): bool
+    {
+        self::requireState($object);
+
+        return true;
+    }
+
+    /**
+     * php-src zim_Phar_isCompressed — whole-archive compression or false (#21692).
+     *
+     * Tar/zip PharData subset stores uncompressed payloads today.
+     *
+     * @return int|false
+     */
+    public static function isCompressed(ObjectEntry $object): int|false
+    {
+        self::requireState($object);
+
+        return false;
+    }
+
     public static function addFromString(ObjectEntry $object, string $localname, string $contents): void
     {
         self::requireState($object);
