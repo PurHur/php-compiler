@@ -240,6 +240,34 @@ final class VmPharData
         return true;
     }
 
+    /**
+     * php-src zim_Phar_compressFiles on PharData (#21693).
+     *
+     * Tar archives cannot compress individual files — Zend throws BadMethodCallException
+     * directing callers to whole-archive {@see compress()}.
+     */
+    public static function compressFiles(ObjectEntry $object, int $compression): void
+    {
+        $st = self::requireState($object);
+        if (VmPhar::COMPRESSED_GZ !== $compression && VmPhar::COMPRESSED_BZ2 !== $compression) {
+            throw new \BadMethodCallException('Unknown compression specified, please pass one of Phar::GZ or Phar::BZ2');
+        }
+        if (VmPhar::COMPRESSED_BZ2 === $compression && !VmPhar::canCompress(VmPhar::COMPRESSED_BZ2)) {
+            throw new \BadMethodCallException('Cannot compress files within archive with bz2, enable ext/bz2 in php.ini');
+        }
+        if (VmPhar::COMPRESSED_GZ === $compression && !VmPhar::canCompress(VmPhar::COMPRESSED_GZ)) {
+            throw new \BadMethodCallException('Cannot compress files within archive with gzip, enable ext/zlib in php.ini');
+        }
+        $format = $st['format'] ?? VmPhar::FORMAT_TAR;
+        if (VmPhar::FORMAT_TAR === $format) {
+            $label = VmPhar::COMPRESSED_GZ === $compression ? 'Gzip' : 'Bzip2';
+            throw new \BadMethodCallException(
+                'Cannot compress with '.$label.' compression, tar archives cannot compress individual files, use compress() to compress the whole archive'
+            );
+        }
+        // ZIP PharData: per-file compression accepted by Zend; stored ZipEngine subset is a no-op.
+    }
+
     public static function addFromString(ObjectEntry $object, string $localname, string $contents): void
     {
         self::requireState($object);
