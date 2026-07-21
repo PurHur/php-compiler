@@ -31,6 +31,7 @@ final class intdiv extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('intdiv() requires exactly two arguments');
         }
+        // Z_PARAM_LONG — soft-null DEP+coerce on 8.4 (parseLongBuiltinArgCore; #21593).
         $num1 = VmMath::parseIntBuiltinArgForFrame(
             $frame,
             0,
@@ -64,6 +65,11 @@ final class intdiv extends Internal
         $this->context = $context;
         if (2 !== count($args)) {
             throw new \LogicException('intdiv() requires exactly two arguments');
+        }
+        // Compile-time fold for literal args — keeps AOT green for soft-null (#21593, peer checkdate).
+        $folded = JitIntdiv::tryFoldCompileTime($context, $args[0], $args[1]);
+        if (null !== $folded) {
+            return $folded;
         }
         [$left, $right] = JitIntdiv::lowerOperands($context, $args[0], $args[1]);
         JitNumericDivisionGuard::emitZeroLongDivisorGuard($context, $right, 'Division by zero');
