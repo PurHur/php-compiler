@@ -56,9 +56,11 @@ final class VmTidy
     }
 
     /**
+     * @param array<string, mixed>|string|null $config
+     *
      * @return Variable|false tidy object variable, or false when host tidy missing/parse fails
      */
-    public static function parseString(Context $ctx, string $html, ?Frame $frame)
+    public static function parseString(Context $ctx, string $html, array|string|null $config = null, ?string $encoding = null, ?Frame $frame = null)
     {
         if (!self::hostAvailable()) {
             self::emitWarning($frame, 'tidy_parse_string(): host ext/tidy is not available');
@@ -67,7 +69,7 @@ final class VmTidy
         }
 
         try {
-            $host = \tidy_parse_string($html);
+            $host = \tidy_parse_string($html, $config, $encoding);
         } catch (\Throwable $e) {
             self::emitWarning($frame, 'tidy_parse_string(): '.$e->getMessage());
 
@@ -85,7 +87,12 @@ final class VmTidy
      *
      * @return Variable|false
      */
-    public static function parseFile(Context $ctx, string $filename, ?Frame $frame)
+    /**
+     * @param array<string, mixed>|string|null $config
+     *
+     * @return Variable|false
+     */
+    public static function parseFile(Context $ctx, string $filename, array|string|null $config = null, ?string $encoding = null, bool $useIncludePath = false, ?Frame $frame = null)
     {
         if (!self::hostAvailable() || !\function_exists('tidy_parse_file')) {
             self::emitWarning($frame, 'tidy_parse_file(): host ext/tidy is not available');
@@ -94,7 +101,7 @@ final class VmTidy
         }
 
         try {
-            $host = \tidy_parse_file($filename);
+            $host = \tidy_parse_file($filename, $config, $encoding, $useIncludePath);
         } catch (\Throwable $e) {
             self::emitWarning($frame, 'tidy_parse_file(): '.$e->getMessage());
 
@@ -110,7 +117,10 @@ final class VmTidy
     /**
      * tidy::parseString() — reload host document into existing object (#21501).
      */
-    public static function parseStringInto(ObjectEntry $object, string $html, ?Frame $frame): bool
+    /**
+     * @param array<string, mixed>|string|null $config
+     */
+    public static function parseStringInto(ObjectEntry $object, string $html, array|string|null $config = null, ?string $encoding = null, ?Frame $frame = null): bool
     {
         if (!self::hostAvailable()) {
             self::emitWarning($frame, 'tidy::parseString(): host ext/tidy is not available');
@@ -119,7 +129,7 @@ final class VmTidy
         }
 
         try {
-            $host = \tidy_parse_string($html);
+            $host = \tidy_parse_string($html, $config, $encoding);
         } catch (\Throwable $e) {
             self::emitWarning($frame, 'tidy::parseString(): '.$e->getMessage());
 
@@ -137,7 +147,10 @@ final class VmTidy
     /**
      * tidy::parseFile() — reload host document into existing object (#21501).
      */
-    public static function parseFileInto(ObjectEntry $object, string $filename, ?Frame $frame): bool
+    /**
+     * @param array<string, mixed>|string|null $config
+     */
+    public static function parseFileInto(ObjectEntry $object, string $filename, array|string|null $config = null, ?string $encoding = null, bool $useIncludePath = false, ?Frame $frame = null): bool
     {
         if (!self::hostAvailable() || !\function_exists('tidy_parse_file')) {
             self::emitWarning($frame, 'tidy::parseFile(): host ext/tidy is not available');
@@ -146,7 +159,7 @@ final class VmTidy
         }
 
         try {
-            $host = \tidy_parse_file($filename);
+            $host = \tidy_parse_file($filename, $config, $encoding, $useIncludePath);
         } catch (\Throwable $e) {
             self::emitWarning($frame, 'tidy::parseFile(): '.$e->getMessage());
 
@@ -840,7 +853,12 @@ final class VmTidy
      *
      * @return string|false
      */
-    public static function repairString(string $html, ?Frame $frame)
+    /**
+     * @param array<string, mixed>|string|null $config
+     *
+     * @return string|false
+     */
+    public static function repairString(string $html, array|string|null $config = null, ?string $encoding = null, ?Frame $frame = null)
     {
         if (!self::hostAvailable() || !\function_exists('tidy_repair_string')) {
             self::emitWarning($frame, 'tidy_repair_string(): host ext/tidy is not available');
@@ -849,7 +867,7 @@ final class VmTidy
         }
 
         try {
-            $out = \tidy_repair_string($html);
+            $out = \tidy_repair_string($html, $config, $encoding);
         } catch (\Throwable $e) {
             self::emitWarning($frame, 'tidy_repair_string(): '.$e->getMessage());
 
@@ -867,7 +885,12 @@ final class VmTidy
      *
      * @return string|false
      */
-    public static function repairFile(string $filename, ?Frame $frame)
+    /**
+     * @param array<string, mixed>|string|null $config
+     *
+     * @return string|false
+     */
+    public static function repairFile(string $filename, array|string|null $config = null, ?string $encoding = null, bool $useIncludePath = false, ?Frame $frame = null)
     {
         if (!self::hostAvailable() || !\function_exists('tidy_repair_file')) {
             self::emitWarning($frame, 'tidy_repair_file(): host ext/tidy is not available');
@@ -876,7 +899,7 @@ final class VmTidy
         }
 
         try {
-            $out = \tidy_repair_file($filename);
+            $out = \tidy_repair_file($filename, $config, $encoding, $useIncludePath);
         } catch (\Throwable $e) {
             self::emitWarning($frame, 'tidy_repair_file(): '.$e->getMessage());
 
@@ -892,6 +915,93 @@ final class VmTidy
     public static function htmlStringArg(Variable $arg, string $func, int $argNum): string
     {
         return VmString::coerceStringBuiltinArg($arg, $func, $argNum, 'string');
+    }
+
+    /**
+     * Extract optional $config argument (array or string) from calledArgs at $index.
+     *
+     * php-src tidy_parse_string/tidy_repair_string accept array|string|null for $config.
+     *
+     * @param Variable[] $args
+     *
+     * @return array<string, mixed>|string|null
+     */
+    public static function optionalConfigArg(array $args, int $index, string $func): array|string|null
+    {
+        if (!isset($args[$index])) {
+            return null;
+        }
+        $v = $args[$index]->resolveIndirect();
+        if (Variable::TYPE_NULL === $v->type) {
+            return null;
+        }
+        if (Variable::TYPE_STRING === $v->type) {
+            return $v->toString();
+        }
+        $ht = $v->toArray();
+        if (null !== $ht) {
+            $out = [];
+            foreach ($ht->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                $key = Variable::TYPE_INTEGER === $keyVar->type ? $keyVar->toInt() : $keyVar->toString();
+                $out[$key] = self::variableToNative($valueVar);
+            }
+
+            return $out;
+        }
+
+        return null;
+    }
+
+    /**
+     * Shallow conversion of a Variable to a native PHP scalar/array for host delegation.
+     *
+     * @return mixed
+     */
+    private static function variableToNative(Variable $v)
+    {
+        $v = $v->resolveIndirect();
+
+        return match ($v->type) {
+            Variable::TYPE_NULL => null,
+            Variable::TYPE_INTEGER => $v->toInt(),
+            Variable::TYPE_FLOAT => $v->toFloat(),
+            Variable::TYPE_BOOLEAN => $v->toBool(),
+            Variable::TYPE_STRING => $v->toString(),
+            default => $v->toString(),
+        };
+    }
+
+    /**
+     * Extract optional $encoding argument (string) from calledArgs at $index.
+     *
+     * @param Variable[] $args
+     */
+    public static function optionalEncodingArg(array $args, int $index, string $func): ?string
+    {
+        if (!isset($args[$index])) {
+            return null;
+        }
+        $v = $args[$index]->resolveIndirect();
+        if (Variable::TYPE_NULL === $v->type) {
+            return null;
+        }
+
+        return VmString::coerceStringBuiltinArg($args[$index], $func, $index, 'encoding');
+    }
+
+    /**
+     * Extract optional $use_include_path argument (bool) from calledArgs at $index.
+     *
+     * @param Variable[] $args
+     */
+    public static function optionalUseIncludePathArg(array $args, int $index): bool
+    {
+        if (!isset($args[$index])) {
+            return false;
+        }
+        $v = $args[$index]->resolveIndirect();
+
+        return (bool) $v->toBool();
     }
 
     /**

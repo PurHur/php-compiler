@@ -21,13 +21,15 @@ final class tidy_parse_string extends Internal
 
     public function execute(Frame $frame): void
     {
-        $this->requireExactArgCount($frame, 'tidy_parse_string', 1);
+        $this->requireArgCountRange($frame, 'tidy_parse_string', 1, 3);
         if (null === $frame->returnVar) {
             return;
         }
         $ctx = $frame->vmContext ?? throw new \LogicException('tidy_parse_string() requires VM context');
         $html = VmTidy::htmlStringArg($frame->calledArgs[0], 'tidy_parse_string', 0);
-        $parsed = VmTidy::parseString($ctx, $html, $frame);
+        $config = VmTidy::optionalConfigArg($frame->calledArgs, 1, 'tidy_parse_string');
+        $encoding = VmTidy::optionalEncodingArg($frame->calledArgs, 2, 'tidy_parse_string');
+        $parsed = VmTidy::parseString($ctx, $html, $config, $encoding, $frame);
         if (false === $parsed) {
             $frame->returnVar->bool(false);
 

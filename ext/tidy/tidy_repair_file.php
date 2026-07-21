@@ -25,7 +25,10 @@ final class tidy_repair_file extends Internal
             return;
         }
         $filename = VmTidy::htmlStringArg($frame->calledArgs[0], 'tidy_repair_file', 0);
-        $repaired = VmTidy::repairFile($filename, $frame);
+        $config = VmTidy::optionalConfigArg($frame->calledArgs, 1, 'tidy_repair_file');
+        $encoding = VmTidy::optionalEncodingArg($frame->calledArgs, 2, 'tidy_repair_file');
+        $useIncludePath = VmTidy::optionalUseIncludePathArg($frame->calledArgs, 3);
+        $repaired = VmTidy::repairFile($filename, $config, $encoding, $useIncludePath, $frame);
         if (false === $repaired) {
             $frame->returnVar->bool(false);
 
