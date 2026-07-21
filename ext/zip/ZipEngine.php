@@ -32,6 +32,17 @@ final class ZipEngine
         if (false === $data) {
             return ['ok' => false, 'code' => ZipArchiveConstants::ER_READ];
         }
+
+        return self::readArchiveBytes($data);
+    }
+
+    /**
+     * Parse a stored ZIP from bytes (no path/is_file probe) — PharData ZIP open (#21676).
+     *
+     * @return array{ok: true, entries: list<array{name: string, data: string, crc: int, size: int, comp_size: int, comp_method: int, comment?: string}>, comment: string}|array{ok: false, code: int}
+     */
+    public static function readArchiveBytes(string $data): array
+    {
         if ('' === $data) {
             return ['ok' => true, 'entries' => [], 'comment' => ''];
         }

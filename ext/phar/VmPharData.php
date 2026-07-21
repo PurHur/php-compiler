@@ -13,17 +13,27 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStatPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\standard\VmZlib;
+use PHPCompiler\ext\zip\ZipEngine;
 
-/** PharData archive state — php-src ext/phar/phar_object.c (#6490, #19893). */
+/** PharData archive state — php-src ext/phar/phar_object.c (#6490, #19893, #21676). */
 final class VmPharData
 {
     public const CLASS_LC = 'phardata';
 
-    /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, sigFlags: int, signature: string, sigPrivateKey: ?string}> */
+    /** @var array<int, array{path: string, files: array<string, string>, dirs: array<string, true>, dirty: bool, sigFlags: int, signature: string, sigPrivateKey: ?string, format: int}> */
     private static array $state = [];
 
-    public static function bind(ObjectEntry $object, string $path, array $files, bool $dirty, array $dirs = [], int $sigFlags = 0, string $signature = '', ?string $sigPrivateKey = null): void
-    {
+    public static function bind(
+        ObjectEntry $object,
+        string $path,
+        array $files,
+        bool $dirty,
+        array $dirs = [],
+        int $sigFlags = 0,
+        string $signature = '',
+        ?string $sigPrivateKey = null,
+        int $format = VmPhar::FORMAT_TAR
+    ): void {
         self::$state[$object->id] = [
             'path' => $path,
             'files' => $files,
@@ -32,16 +42,21 @@ final class VmPharData
             'sigFlags' => $sigFlags,
             'signature' => $signature,
             'sigPrivateKey' => $sigPrivateKey,
+            'format' => $format,
         ];
     }
 
     public static function open(ObjectEntry $object, string $path): void
     {
         $path = \str_replace('\\', '/', $path);
-        if (VmStatPath::isFile($path)) {
-            $binary = VmFs::fileGetContents($path);
-            if (false === $binary) {
-                throw new \UnexpectedValueException('phar error: unable to open phar "'.$path.'"');
+        // Prefer content probe over isFile — ZipEngine/VmFsWriteNative paths can be
+        // readable via fileGetContents while VmStatPath::isFile is false (#21676).
+        $binary = VmFs::fileGetContents($path);
+        if (false !== $binary) {
+            if (self::looksLikeZip($binary)) {
+                self::openZipBytes($object, $path, $binary);
+
+                return;
             }
             if (\strlen($binary) >= 2 && "\x1f" === $binary[0] && "\x8b" === $binary[1]) {
                 $decoded = VmZlib::gzdecode($binary);
@@ -51,7 +66,7 @@ final class VmPharData
                 $binary = $decoded;
             }
             $entries = VmPharTar::readArchiveEntries($binary);
-            self::bind($object, $path, $entries['files'], false, $entries['dirs']);
+            self::bind($object, $path, $entries['files'], false, $entries['dirs'], 0, '', null, VmPhar::FORMAT_TAR);
 
             return;
         }
@@ -59,7 +74,16 @@ final class VmPharData
         if ('.' !== $dir && !VmStatPath::isDir($dir) && !VmStatPath::isFile($dir)) {
             throw new \UnexpectedValueException('phar error: unable to create phar "'.$path.'"');
         }
-        self::bind($object, $path, [], true, []);
+        $format = self::formatFromPath($path);
+        self::bind($object, $path, [], true, [], 0, '', null, $format);
+    }
+
+    /** php-src zim_Phar_isFileFormat for PharData (#21676). */
+    public static function isFileFormat(ObjectEntry $object, int $format): bool
+    {
+        $st = self::requireState($object);
+
+        return ($st['format'] ?? VmPhar::FORMAT_TAR) === $format;
     }
 
     public static function addFromString(ObjectEntry $object, string $localname, string $contents): void
@@ -183,7 +207,7 @@ final class VmPharData
         }
         $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $out->constructed = true;
-        self::bind($out, $outPath, $st['files'], false, $st['dirs']);
+        self::bind($out, $outPath, $st['files'], false, $st['dirs'], 0, '', null, $st['format'] ?? VmPhar::FORMAT_TAR);
 
         return $out;
     }
@@ -212,7 +236,7 @@ final class VmPharData
         }
         $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $out->constructed = true;
-        self::bind($out, $outPath, $st['files'], false, $st['dirs']);
+        self::bind($out, $outPath, $st['files'], false, $st['dirs'], 0, '', null, $st['format'] ?? VmPhar::FORMAT_TAR);
 
         return $out;
     }
@@ -223,7 +247,7 @@ final class VmPharData
         self::flush($object);
         $out = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $out->constructed = true;
-        self::bind($out, $st['path'], $st['files'], false, $st['dirs']);
+        self::bind($out, $st['path'], $st['files'], false, $st['dirs'], 0, '', null, $st['format'] ?? VmPhar::FORMAT_TAR);
 
         return $out;
     }
@@ -366,6 +390,13 @@ final class VmPharData
             return;
         }
         $path = $st['path'];
+        $format = $st['format'] ?? VmPhar::FORMAT_TAR;
+        if (VmPhar::FORMAT_ZIP === $format) {
+            self::flushZip($object, $path, $st['files'], $st['dirs']);
+            self::$state[$object->id]['dirty'] = false;
+
+            return;
+        }
         $binary = VmPharTar::writeArchive($st['files'], $st['dirs']);
         $lower = \strtolower($path);
         if (\str_ends_with($lower, '.gz') || \str_ends_with($lower, '.tgz')) {
@@ -380,6 +411,90 @@ final class VmPharData
         }
         self::refreshSignature($object, $binary);
         self::$state[$object->id]['dirty'] = false;
+    }
+
+    private static function looksLikeZip(string $binary): bool
+    {
+        if (\strlen($binary) < 4) {
+            return false;
+        }
+
+        return 'PK' === \substr($binary, 0, 2);
+    }
+
+    private static function formatFromPath(string $path): int
+    {
+        $lower = \strtolower($path);
+        if (\str_ends_with($lower, '.zip')) {
+            return VmPhar::FORMAT_ZIP;
+        }
+
+        return VmPhar::FORMAT_TAR;
+    }
+
+    private static function openZipBytes(ObjectEntry $object, string $path, string $binary): void
+    {
+        if (!\class_exists(ZipEngine::class, false)) {
+            require_once __DIR__.'/../zip/ZipEngine.php';
+        }
+        $parsed = ZipEngine::readArchiveBytes($binary);
+        if (!($parsed['ok'] ?? false)) {
+            throw new \UnexpectedValueException('phar error: unable to open phar "'.$path.'"');
+        }
+        $files = [];
+        $dirs = [];
+        foreach ($parsed['entries'] as $entry) {
+            $name = \str_replace('\\', '/', (string) ($entry['name'] ?? ''));
+            if ('' === $name) {
+                continue;
+            }
+            if (\str_ends_with($name, '/')) {
+                $dirs[\rtrim($name, '/')] = true;
+                continue;
+            }
+            $files[$name] = (string) ($entry['data'] ?? '');
+        }
+        self::bind($object, $path, $files, false, $dirs, 0, '', null, VmPhar::FORMAT_ZIP);
+    }
+
+    /**
+     * @param array<string, string> $files
+     * @param array<string, true>   $dirs
+     */
+    private static function flushZip(ObjectEntry $object, string $path, array $files, array $dirs): void
+    {
+        if (!\class_exists(ZipEngine::class, false)) {
+            require_once __DIR__.'/../zip/ZipEngine.php';
+        }
+        $entries = [];
+        foreach ($dirs as $name => $_) {
+            $name = \rtrim(\str_replace('\\', '/', (string) $name), '/');
+            if ('' === $name) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $name.'/',
+                'data' => '',
+                'crc' => 0,
+                'size' => 0,
+            ];
+        }
+        foreach ($files as $name => $contents) {
+            $name = \ltrim(\str_replace('\\', '/', (string) $name), '/');
+            if ('' === $name) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $name,
+                'data' => $contents,
+                'crc' => 0,
+                'size' => \strlen($contents),
+            ];
+        }
+        if (!ZipEngine::writeArchive($path, $entries)) {
+            throw new \UnexpectedValueException('phar error: unable to write phar "'.$path.'"');
+        }
+        self::refreshSignature($object, (string) VmFs::fileGetContents($path));
     }
 
     private static function refreshSignature(ObjectEntry $object, string $binary): void

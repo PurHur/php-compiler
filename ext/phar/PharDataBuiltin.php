@@ -18,7 +18,8 @@ final class PharDataBuiltin
     public static function register(Context $ctx): void
     {
         if (isset($ctx->classes[VmPharData::CLASS_LC])
-            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['addemptydir'])) {
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['addemptydir'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['isfileformat'])) {
             return;
         }
 
@@ -52,6 +53,7 @@ final class PharDataBuiltin
             'converttoexecutable' => [PharDataConvertToExecutable::class, 'convertToExecutable'],
             'extractto' => [PharDataExtractTo::class, 'extractTo'],
             'getpath' => [PharDataGetPath::class, 'getPath'],
+            'isfileformat' => [PharDataIsFileFormat::class, 'isFileFormat'],
             'offsetset' => [PharDataOffsetSet::class, 'offsetSet'],
             'offsetget' => [PharDataOffsetGet::class, 'offsetGet'],
             'offsetexists' => [PharDataOffsetExists::class, 'offsetExists'],
@@ -347,5 +349,28 @@ final class PharDataGetSignature extends VmClassMethod
             return;
         }
         $frame->returnVar->array(VmPharData::mapToHashTable($sig));
+    }
+}
+
+/** PharData::isFileFormat() — format tracking after convertToData(ZIP) (#21676). */
+final class PharDataIsFileFormat extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isFileFormat'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'PharData::isFileFormat() expects exactly 1 argument, %d given',
+                \max(0, $argc - 1)
+            ));
+        }
+        $ok = VmPharData::isFileFormat(
+            VmPharData::requireReceiver($frame, 'PharData::isFileFormat'),
+            $frame->calledArgs[1]->resolveIndirect()->toInt()
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
     }
 }

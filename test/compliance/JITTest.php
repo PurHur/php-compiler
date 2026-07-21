@@ -1498,6 +1498,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'phar_convert_to_data_zip')) {
                 continue;
             }
+            // PharData ZIP open/isFileFormat: VM green (#21676); same Phar ctor MCJIT harness skip.
+            if (str_contains($name, 'phar_data_zip_open')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }

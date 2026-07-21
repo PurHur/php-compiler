@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6237 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19682 |
+| Source constructs flagged (warnings) | 19684 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1477,11 +1477,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/BuiltinClasses.php` | 0 | 28 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharBuiltin.php` | 0 | 23 |
-| `ext/phar/PharDataBuiltin.php` | 0 | 16 |
+| `ext/phar/PharDataBuiltin.php` | 0 | 17 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 4 |
 | `ext/phar/VmPharArchive.php` | 0 | 57 |
-| `ext/phar/VmPharData.php` | 0 | 31 |
+| `ext/phar/VmPharData.php` | 0 | 32 |
 | `ext/phar/VmPharFileInfo.php` | 0 | 17 |
 | `ext/phar/VmPharStream.php` | 0 | 10 |
 | `ext/phar/VmPharTar.php` | 0 | 1 |
@@ -17857,22 +17857,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/PharDataBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 30)
-- new PharDataConstruct (line 39)
-- new ArgumentCountError (line 78)
-- new ArgumentCountError (line 94)
-- new ArgumentCountError (line 113)
-- new ArgumentCountError (line 128)
-- new ArgumentCountError (line 145)
-- new ArgumentCountError (line 162)
-- new UnexpectedValueException (line 178)
-- new ArgumentCountError (line 192)
-- new ArgumentCountError (line 252)
-- new ArgumentCountError (line 266)
-- new ArgumentCountError (line 283)
-- new ArgumentCountError (line 298)
-- new ArgumentCountError (line 320)
-- 19 class method(s)
+- new ClassEntry (line 31)
+- new PharDataConstruct (line 40)
+- new ArgumentCountError (line 80)
+- new ArgumentCountError (line 96)
+- new ArgumentCountError (line 115)
+- new ArgumentCountError (line 130)
+- new ArgumentCountError (line 147)
+- new ArgumentCountError (line 164)
+- new UnexpectedValueException (line 180)
+- new ArgumentCountError (line 194)
+- new ArgumentCountError (line 254)
+- new ArgumentCountError (line 268)
+- new ArgumentCountError (line 285)
+- new ArgumentCountError (line 300)
+- new ArgumentCountError (line 322)
+- new ArgumentCountError (line 363)
+- 20 class method(s)
 
 ### `ext/phar/PharExtensionPolicy.php`
 
@@ -17951,37 +17952,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharData.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 44)
-- new UnexpectedValueException (line 49)
-- new UnexpectedValueException (line 60)
-- new UnexpectedValueException (line 70)
-- new UnexpectedValueException (line 82)
-- new UnexpectedValueException (line 95)
-- new UnexpectedValueException (line 99)
-- new UnexpectedValueException (line 112)
-- new RecursiveIteratorIterator (line 115)
-- new RecursiveDirectoryIterator (line 116)
-- new BadMethodCallException (line 171)
-- new BadMethodCallException (line 174)
-- new UnexpectedValueException (line 182)
-- new ObjectEntry (line 184)
-- new UnexpectedValueException (line 211)
-- new ObjectEntry (line 213)
-- new ObjectEntry (line 224)
-- new BadMethodCallException (line 234)
-- new BadMethodCallException (line 236)
-- new BadMethodCallException (line 284)
-- new BadMethodCallException (line 287)
-- new Variable (line 289)
-- new HashTable (line 330)
-- new Variable (line 332)
-- new Error (line 343)
-- new UnexpectedValueException (line 374)
-- new UnexpectedValueException (line 379)
-- new PharException (line 396)
-- new PharException (line 406)
-- new Error (line 419)
-- 24 class method(s)
+- new UnexpectedValueException (line 64)
+- new UnexpectedValueException (line 75)
+- new UnexpectedValueException (line 94)
+- new UnexpectedValueException (line 106)
+- new UnexpectedValueException (line 119)
+- new UnexpectedValueException (line 123)
+- new UnexpectedValueException (line 136)
+- new RecursiveIteratorIterator (line 139)
+- new RecursiveDirectoryIterator (line 140)
+- new BadMethodCallException (line 195)
+- new BadMethodCallException (line 198)
+- new UnexpectedValueException (line 206)
+- new ObjectEntry (line 208)
+- new UnexpectedValueException (line 235)
+- new ObjectEntry (line 237)
+- new ObjectEntry (line 248)
+- new BadMethodCallException (line 258)
+- new BadMethodCallException (line 260)
+- new BadMethodCallException (line 308)
+- new BadMethodCallException (line 311)
+- new Variable (line 313)
+- new HashTable (line 354)
+- new Variable (line 356)
+- new Error (line 367)
+- new UnexpectedValueException (line 405)
+- new UnexpectedValueException (line 410)
+- new UnexpectedValueException (line 442)
+- new UnexpectedValueException (line 495)
+- new PharException (line 511)
+- new PharException (line 521)
+- new Error (line 534)
+- 29 class method(s)
 
 ### `ext/phar/VmPharFileInfo.php`
 
@@ -38113,7 +38115,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/ZipEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/zip/ZipExtensionPolicy.php`
 
