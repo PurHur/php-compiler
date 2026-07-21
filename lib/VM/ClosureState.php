@@ -139,6 +139,11 @@ final class ClosureState
             ];
         }
         $clone = new self($this->func, $captures);
+        $clone->wrappedFunc = $this->wrappedFunc;
+        $clone->methodName = $this->methodName;
+        $clone->methodReceiver = null !== $this->methodReceiver
+            ? $this->copyVar($this->methodReceiver)
+            : null;
         $clone->boundThis = null !== $this->boundThis ? $this->copyVar($this->boundThis) : null;
         $clone->boundScopeClass = $this->boundScopeClass;
         foreach ($this->staticVars as $name => $var) {

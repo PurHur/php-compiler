@@ -305,7 +305,7 @@ final class ClosureSupport
     }
 
     /**
-     * Invoke a bound closure with a temporary $this (Closure::call; issue #4927).
+     * Invoke a bound closure with a temporary $this (Closure::call; issues #4927, #21927).
      *
      * @param list<Variable> $invokeArgs
      */
@@ -324,7 +324,10 @@ final class ClosureSupport
                 .self::valueTypeName($newThis).' given'
             );
         }
-        if (!$state->isUserClosure()) {
+        // User closures and instance-method wrappers (fromCallable / ReflectionMethod::getClosure)
+        // rebind via Closure::call; free-function / static wrappers do not (#4927, #21927).
+        $isInstanceMethodClosure = null !== $state->methodName && null !== $state->methodReceiver;
+        if (!$state->isUserClosure() && !$isInstanceMethodClosure) {
             throw new \Error(
                 'Cannot call non-static '.$state->func->getName().'() statically'
             );
@@ -346,6 +349,10 @@ final class ClosureSupport
         $boundThis->copyFrom($newThis);
         $invokeState->boundThis = $boundThis;
         $invokeState->boundScopeClass = $scopeClass;
+        if ($isInstanceMethodClosure) {
+            // initClosureCall dispatches via methodReceiver — point it at the temporary $this.
+            $invokeState->methodReceiver = $boundThis;
+        }
 
         $copies = [];
         foreach ($invokeArgs as $arg) {
