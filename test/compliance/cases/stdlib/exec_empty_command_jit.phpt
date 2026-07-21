@@ -5,9 +5,13 @@ stdlib exec family empty command throws ValueError — JIT (#12031)
 <?php
 declare(strict_types=1);
 
-foreach (['shell_exec', 'exec', 'system', 'passthru'] as $fn) {
+foreach (['shell_exec', 'exec', 'system', 'passthru', 'popen'] as $fn) {
     try {
-        $fn('');
+        if ('popen' === $fn) {
+            $fn('', 'r');
+        } else {
+            $fn('');
+        }
         echo "$fn: no_exception\n";
     } catch (ValueError $e) {
         echo "$fn: ValueError\n";
@@ -18,3 +22,4 @@ shell_exec: ValueError
 exec: ValueError
 system: ValueError
 passthru: ValueError
+popen: ValueError
