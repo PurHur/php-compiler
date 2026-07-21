@@ -149,14 +149,24 @@ final class CurlyBraceOffsetRejector
             return true;
         }
 
-        // `new class(...)` / `new readonly class(...)` anonymous class ctor args — `{` opens class body (#6881, #17467).
+        // `new class(...)` / `new readonly class(...)` anonymous class ctor args — `{` opens class body
+        // (#6881, #17467, #21885). Walk significant tokens — fixed `$openParenIndex - N` breaks when
+        // whitespace sits between `class` and `(` (Zend accepts both forms).
         if (T_CLASS === $beforeOpen[0]) {
-            $beforeClass = self::previousSignificantToken($tokens, $openParenIndex - 2);
+            $classIndex = self::previousSignificantIndex($tokens, $openParenIndex - 1);
+            if (null === $classIndex) {
+                return false;
+            }
+            $beforeClass = self::previousSignificantToken($tokens, $classIndex - 1);
             if (\is_array($beforeClass) && T_NEW === $beforeClass[0]) {
                 return true;
             }
             if (\is_array($beforeClass) && \defined('T_READONLY') && T_READONLY === $beforeClass[0]) {
-                $beforeReadonly = self::previousSignificantToken($tokens, $openParenIndex - 4);
+                $readonlyIndex = self::previousSignificantIndex($tokens, $classIndex - 1);
+                if (null === $readonlyIndex) {
+                    return false;
+                }
+                $beforeReadonly = self::previousSignificantToken($tokens, $readonlyIndex - 1);
                 if (\is_array($beforeReadonly) && T_NEW === $beforeReadonly[0]) {
                     return true;
                 }
@@ -164,7 +174,11 @@ final class CurlyBraceOffsetRejector
         }
 
         if (T_STRING === $beforeOpen[0]) {
-            $beforeString = self::previousSignificantToken($tokens, $openParenIndex - 2);
+            $stringIndex = self::previousSignificantIndex($tokens, $openParenIndex - 1);
+            if (null === $stringIndex) {
+                return false;
+            }
+            $beforeString = self::previousSignificantToken($tokens, $stringIndex - 1);
             if (\is_array($beforeString) && T_FUNCTION === $beforeString[0]) {
                 return true;
             }
@@ -231,6 +245,18 @@ final class CurlyBraceOffsetRejector
      */
     private static function previousSignificantToken(array $tokens, int $index)
     {
+        $found = self::previousSignificantIndex($tokens, $index);
+
+        return null === $found ? null : $tokens[$found];
+    }
+
+    /**
+     * Index of the nearest significant token at or before `$index` (#21885).
+     *
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function previousSignificantIndex(array $tokens, int $index): ?int
+    {
         for ($i = $index; $i >= 0; --$i) {
             $token = $tokens[$i];
             if (\is_array($token)) {
@@ -238,13 +264,13 @@ final class CurlyBraceOffsetRejector
                     continue;
                 }
 
-                return $token;
+                return $i;
             }
             if (' ' === $token || "\t" === $token || "\n" === $token || "\r" === $token) {
                 continue;
             }
 
-            return $token;
+            return $i;
         }
 
         return null;

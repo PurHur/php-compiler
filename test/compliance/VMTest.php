@@ -1146,6 +1146,10 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsReadonlyAnonymousClass()
+                && str_contains($name, 'readonly_anonymous_ctor_args')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReadonlyAnonymousClass()
                 && str_contains($name, 'anonymous_readonly_class_forward_84')) {
                 continue;
             }
