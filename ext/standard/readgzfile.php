@@ -62,7 +62,7 @@ final class readgzfile extends Internal
 
         return JitReadgzfile::invoke(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'readgzfile', 0, 'filename'),
+            VmZlibArg::jitFilenamePath($context, $args[0], 'readgzfile', 0),
             $useIncludePath
         );
     }
