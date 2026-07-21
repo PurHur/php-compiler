@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\curl;
 
+use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -47,12 +48,25 @@ final class VmCurlEasy
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['reset'])) {
             return;
         }
 
-        $entry = new ClassEntry('CurlHandle');
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('CurlHandle');
         $entry->isInternal = true;
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        foreach ([
+            'reset' => new CurlHandleReset(),
+            'pause' => new CurlHandlePause(),
+        ] as $name => $method) {
+            $entry->methods[$name] = $method;
+            $entry->methodVisibility[$name] = $pub;
+            $entry->methodNames[$name] = $name;
+        }
+
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 

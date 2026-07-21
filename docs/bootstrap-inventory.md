@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6319 |
-| Phase A inventory files (M2 ratio SSOT) | 6319 |
+| PHP files on vm.php path | 6322 |
+| Phase A inventory files (M2 ratio SSOT) | 6322 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20024 |
+| Source constructs flagged (warnings) | 20030 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -128,15 +128,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ctype/Module.php` | 0 | 12 |
 | `ext/ctype/VmCtype.php` | 0 | 1 |
 | `ext/curl/BuiltinClasses.php` | 0 | 1 |
+| `ext/curl/CurlClassMethod.php` | 0 | 1 |
 | `ext/curl/CurlConstants.php` | 0 | 1 |
 | `ext/curl/CurlExtensionPolicy.php` | 0 | 1 |
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
+| `ext/curl/CurlHandlePause.php` | 0 | 2 |
+| `ext/curl/CurlHandleReset.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
 | `ext/curl/Module.php` | 0 | 37 |
 | `ext/curl/VmCurlArg.php` | 0 | 1 |
 | `ext/curl/VmCurlCore.php` | 0 | 5 |
-| `ext/curl/VmCurlEasy.php` | 0 | 6 |
+| `ext/curl/VmCurlEasy.php` | 0 | 8 |
 | `ext/curl/VmCurlEscape.php` | 0 | 1 |
 | `ext/curl/VmCurlMulti.php` | 0 | 4 |
 | `ext/curl/VmCurlNative.php` | 0 | 2 |
@@ -6910,6 +6913,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/curl/CurlClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/curl/CurlConstants.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6940,6 +6948,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/curl/CurlHandlePause.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/curl/CurlHandleReset.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/curl/CurlStringFileBuiltin.php`
 
@@ -7010,11 +7029,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlEasy.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 54)
-- new Variable (line 66)
-- new ObjectEntry (line 67)
-- new Variable (line 452)
-- new ObjectEntry (line 453)
+- new ClassEntry (line 57)
+- new CurlHandleReset (line 62)
+- new CurlHandlePause (line 63)
+- new Variable (line 80)
+- new ObjectEntry (line 81)
+- new Variable (line 466)
+- new ObjectEntry (line 467)
 - 32 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
