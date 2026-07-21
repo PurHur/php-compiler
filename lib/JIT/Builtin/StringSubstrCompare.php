@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for substr_compare via SubstrCompareJitHelper PHP (#13536).
+ * JIT/AOT link for substr_compare via SubstrCompareJitHelper PHP (#13536, #21816).
  *
  * Replaces ~289 LOC LLVM in StringSubstrCompareJit.php. Keeps i8* ABI for callers.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringSubstrCount #21773).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}
  */
 final class StringSubstrCompare
@@ -29,6 +30,8 @@ final class StringSubstrCompare
         self::SUBSTR_COMPARE_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'substr_compare_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -41,8 +44,12 @@ final class StringSubstrCompare
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('substr_compare');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction('substr_compare', $probe);
 
             return;
@@ -52,7 +59,7 @@ final class StringSubstrCompare
         // clearInsertionPosition left the user-script builder detached
         // ("Current basic block has no parent function").
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        self::ensureJitHelperCompiled($context);
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#21816');
         self::implementBridge($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
@@ -65,7 +72,7 @@ final class StringSubstrCompare
     {
         $abiName = 'substr_compare';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -79,7 +86,7 @@ final class StringSubstrCompare
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('substr_compare_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
 
         $hayStr = self::stringFromCstr($context, $fn->getParam(0));
@@ -130,43 +137,6 @@ final class StringSubstrCompare
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SubstrCompareJitHelper compile (#13536)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SubstrCompareJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('SubstrCompareJitHelper.php parseAndCompile failed (#13536)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#13536)');
-            }
-        }
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#21816');
     }
 }
