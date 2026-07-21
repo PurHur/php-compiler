@@ -451,6 +451,10 @@ patch_already_applied() {
     php-cfg-is-resource-no-assertion.patch)
       ! grep -q "'is_resource' => 'resource'" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-assertion-fn-arity.patch)
+      grep -q 'isset($assertionFunctions\[$lname\]) && isset($args\[0\])' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        || grep -q 'isset($assertionFunctions[$lname]) && isset($args[0])' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-simplifier-use-chain.patch)
       grep -q 'replaceVariablesByCfgWalk' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php" 2>/dev/null
       ;;
@@ -6344,6 +6348,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_trait_use_overlay
   apply_patch "$PATCH_DIR/php-cfg-throw-expr.patch"
   apply_patch "$PATCH_DIR/php-cfg-is-resource-no-assertion.patch"
+  apply_patch "$PATCH_DIR/php-cfg-assertion-fn-arity.patch"
   # Perf patches last: their hunks are diffed against the fully-patched files (#16077).
   apply_patch "$PATCH_DIR/php-cfg-simplifier-use-chain.patch"
   apply_patch "$PATCH_DIR/php-cfg-operand-usage-dedup.patch"

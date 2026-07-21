@@ -26,8 +26,18 @@ final class is_callable extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('is_callable() expects 1 to 3 arguments');
+        if ($argc < 1) {
+            // Zend ZEND_ARG_VARIADIC_TYPE_INFO / min 1: "expects at least 1 argument, N given" (#21961)
+            throw new \ArgumentCountError(\sprintf(
+                'is_callable() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'is_callable() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;

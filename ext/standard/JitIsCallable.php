@@ -18,8 +18,23 @@ final class JitIsCallable
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('is_callable() expects at least one argument');
+        $argc = \count($args);
+        if ($argc < 1) {
+            // Zend-shaped arity (#21961); emit at runtime so try/catch sees ArgumentCountError
+            \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountError(
+                $context,
+                \sprintf('is_callable() expects at least 1 argument, %d given', $argc)
+            );
+
+            return $context->constantFromInteger(0, 'int1');
+        }
+        if ($argc > 3) {
+            \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountError(
+                $context,
+                \sprintf('is_callable() expects at most 3 arguments, %d given', $argc)
+            );
+
+            return $context->constantFromInteger(0, 'int1');
         }
         $callback = $args[0];
         $syntaxOnly = false;
