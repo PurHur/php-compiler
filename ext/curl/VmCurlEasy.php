@@ -295,8 +295,10 @@ final class VmCurlEasy
         self::ensureLive($easy, 'curl_getinfo');
         $st = self::$state[$easy->id];
         if (null === $option) {
+            // Key order matches php-src ext/curl/interface.c PHP_FUNCTION(curl_getinfo) (#21883).
             return [
                 'url' => $st['effective_url'] !== '' ? $st['effective_url'] : (string) ($st['url'] ?? ''),
+                'content_type' => self::contentTypeForAllInfo($st),
                 'http_code' => $st['http_code'],
                 'header_size' => 0,
                 'request_size' => 0,
@@ -332,6 +334,7 @@ final class VmCurlEasy
                 'redirect_time_us' => 0,
                 'starttransfer_time_us' => 0,
                 'total_time_us' => 0,
+                'effective_method' => self::effectiveMethod($st),
             ];
         }
         if (CurlConstants::CURLINFO_HTTP_CODE === $option) {
@@ -340,8 +343,59 @@ final class VmCurlEasy
         if (CurlConstants::CURLINFO_EFFECTIVE_URL === $option) {
             return $st['effective_url'] !== '' ? $st['effective_url'] : (string) ($st['url'] ?? '');
         }
+        if (CurlConstants::CURLINFO_CONTENT_TYPE === $option) {
+            // CURLINFO_STRING: false when libcurl returns NULL (php-src interface.c).
+            $native = $st['native'];
+            if (null === $native) {
+                return false;
+            }
+            [$ok, $value] = VmCurlNative::easyGetinfoStringResult($native, CurlConstants::CURLINFO_CONTENT_TYPE);
+
+            return ($ok && null !== $value) ? $value : false;
+        }
+        if (CurlConstants::CURLINFO_EFFECTIVE_METHOD === $option) {
+            return self::effectiveMethod($st);
+        }
 
         return false;
+    }
+
+    /**
+     * All-info content_type: string or null when OK+NULL (php-src interface.c; #21883).
+     *
+     * @param array<string, mixed> $st
+     */
+    private static function contentTypeForAllInfo(array $st): ?string
+    {
+        $native = $st['native'] ?? null;
+        if (null === $native) {
+            return null;
+        }
+        [$ok, $value] = VmCurlNative::easyGetinfoStringResult($native, CurlConstants::CURLINFO_CONTENT_TYPE);
+        if (!$ok) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Effective HTTP method — libcurl CURLINFO_EFFECTIVE_METHOD (pre-perform: "GET"; #21883).
+     *
+     * @param array<string, mixed> $st
+     */
+    private static function effectiveMethod(array $st): string
+    {
+        $native = $st['native'] ?? null;
+        if (null === $native) {
+            return 'GET';
+        }
+        [$ok, $value] = VmCurlNative::easyGetinfoStringResult($native, CurlConstants::CURLINFO_EFFECTIVE_METHOD);
+        if ($ok && null !== $value && '' !== $value) {
+            return $value;
+        }
+
+        return 'GET';
     }
 
     public static function error(ObjectEntry $easy): string

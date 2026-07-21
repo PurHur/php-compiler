@@ -161,17 +161,45 @@ final class VmCurlNative
      */
     public static function easyGetinfoString(\FFI\CData $ch, int $info): string
     {
+        $value = self::easyGetinfoStringOrNull($ch, $info);
+
+        return null === $value ? '' : $value;
+    }
+
+    /**
+     * CURLINFO_STRING getinfo — distinguish OK+NULL (null) from failure (null) vs non-null string.
+     * php-src interface.c: content_type all-info uses NULL; option path returns false when s_code is NULL.
+     *
+     * @param \FFI\CData $ch CURL*
+     *
+     * @return array{0: bool, 1: ?string} [CURLE_OK, string|null]
+     */
+    public static function easyGetinfoStringResult(\FFI\CData $ch, int $info): array
+    {
         $ffi = self::requireCurl();
         $out = $ffi->new('char*');
         $rc = (int) $ffi->curl_easy_getinfo($ch, $info, \FFI::addr($out));
-        if (0 !== $rc || null === $out) {
-            return '';
+        if (0 !== $rc) {
+            return [false, null];
         }
         if (\is_string($out)) {
-            return $out;
+            return [true, $out];
+        }
+        if (\FFI::isNull($out)) {
+            return [true, null];
         }
 
-        return (string) \FFI::string($out);
+        return [true, (string) \FFI::string($out)];
+    }
+
+    /**
+     * @param \FFI\CData $ch CURL*
+     */
+    public static function easyGetinfoStringOrNull(\FFI\CData $ch, int $info): ?string
+    {
+        [$ok, $value] = self::easyGetinfoStringResult($ch, $info);
+
+        return $ok ? $value : null;
     }
 
     public static function easyStrerror(int $code): string
