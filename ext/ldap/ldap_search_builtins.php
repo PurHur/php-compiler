@@ -304,6 +304,42 @@ final class ldap_next_entry extends Internal
     }
 }
 
+final class ldap_get_attributes extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_get_attributes');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_get_attributes() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_get_attributes', 1);
+        $entry = VmLdapArg::requireEntry($frame->calledArgs[1], 'ldap_get_attributes', 2);
+        $attrs = VmLdapCore::getAttributesMap($conn, $entry);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $attrs) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->copyFrom($attrs);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_get_attributes() is not implemented for JIT in this compiler build (issue #21850)');
+    }
+}
+
 final class ldap_free_result extends Internal
 {
     public function __construct()
