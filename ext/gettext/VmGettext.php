@@ -15,19 +15,21 @@ use PHPCompiler\VM\Variable;
 final class VmGettext
 {
     /**
-     * Z_PARAM_STR $message / $msgid* — null TypeError on PROFILE=8.4 (#20209, gettext.stub.php).
+     * Z_PARAM_STR $message / $msgid* — soft-null DEP+coerce on PROFILE=8.4 (#21581, reverts #20209 TypeError;
+     * php-src ext/gettext/gettext.c — Zend 8.4.23 still deprecates null → '').
      */
     public static function coerceMsgidArg(Variable $var, string $function, int $argIndex, string $param): string
     {
-        return VmString::coerceZparamStrBuiltinArg($var, $function, $argIndex, $param);
+        return VmString::coerceTrimFamilyStringArg($var, $function, $argIndex, $param);
     }
 
     /**
-     * Z_PARAM_STR $domain — null TypeError on PROFILE=8.4 (#20209, gettext.stub.php).
+     * Z_PARAM_STR / Z_PARAM_PATH_STR $domain — soft-null DEP+coerce on PROFILE=8.4 (#21581;
+     * empty domain → ValueError after coerce via {@see VmGettextNative}).
      */
     public static function coerceDomainArg(Variable $var, string $function, int $argIndex, string $param): string
     {
-        return VmString::coerceZparamStrBuiltinArg($var, $function, $argIndex, $param);
+        return VmString::coerceTrimFamilyStringArg($var, $function, $argIndex, $param);
     }
 
     public static function msgidArgForFrame(
@@ -37,7 +39,7 @@ final class VmGettext
         int $userArgIndex,
         string $param
     ): string {
-        return VmString::zparamStrBuiltinArgForFrame($frame, $argIndex, $function, $userArgIndex, $param);
+        return VmString::trimFamilyStringArgForFrame($frame, $argIndex, $function, $userArgIndex, $param);
     }
 
     public static function domainArgForFrame(
@@ -47,7 +49,7 @@ final class VmGettext
         int $userArgIndex,
         string $param
     ): string {
-        return VmString::zparamStrBuiltinArgForFrame($frame, $argIndex, $function, $userArgIndex, $param);
+        return VmString::trimFamilyStringArgForFrame($frame, $argIndex, $function, $userArgIndex, $param);
     }
 
     public static function coerceNullableDirectoryArg(

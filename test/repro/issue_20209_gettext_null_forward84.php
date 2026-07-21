@@ -1,16 +1,6 @@
 <?php
-/** Repro for #20209 — gettext/_/dgettext(null msgid) TypeError under PROFILE=8.4. */
-foreach (['gettext', '_'] as $f) {
-    try {
-        $r = $f(null);
-        echo "$f COERCED ", var_export($r, true), "\n";
-    } catch (Throwable $e) {
-        echo "$f ", get_class($e), "\n";
-    }
-}
-try {
-    $r = dgettext('messages', null);
-    echo 'dgettext COERCED ', var_export($r, true), "\n";
-} catch (Throwable $e) {
-    echo 'dgettext ', get_class($e), "\n";
-}
+/**
+ * Historical #20209 TypeError polarity superseded by #21581 (Zend soft-null DEP+'').
+ * Prefer test/repro/issue_21581_gettext_null_soft84.php.
+ */
+require __DIR__ . '/issue_21581_gettext_null_soft84.php';
