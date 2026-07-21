@@ -65,7 +65,7 @@ permalink: /development-status.html
 - **Self-host M2** — spine **6319/6319** ✅; native link + lint ✅
 - **Self-host M3** — HelloWorld strict `emit_path=native` ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493)); inventory argv `bin/compile.php` ✅ ([#3024](https://github.com/PurHur/php-compiler/issues/3024) closed); compile-smoke strict native ✅ ([#1937](https://github.com/PurHur/php-compiler/issues/1937))
 - **Self-host M4** — `make bootstrap-loop-probe` full ladder ✅; gen-2→gen-3 full-spine recompile ✅
-- **Self-host M5** — vendor prelink **3/3** ✅; **`make north-star5-verify-fast`** daily ✅; gen-0 refreshed; VM probe ~**20ms**; **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417))
+- **Self-host M3–M5** — vendor prelink **3/3** ✅; **`make north-star5-verify-fast`** daily ✅; VM probe ~**20ms**. **`--strict` red** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) and **M3/M4 emit paths are prelinked blob COPIES, not native compiles** ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) — the byte-identical gen-0/gen-2/gen-3 result follows from copying and is not fixpoint evidence
 
 **Not claimed:** full Zend PHP compatibility (subset compiler only).
 

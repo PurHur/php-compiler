@@ -162,6 +162,10 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         M4_BLOCK_REASON="gen-1 native emit failed; gen-2 recovered via prelinked sidecar (#21860)"
         echo "bootstrap-loop-gen1-link: gen-1 native emit failed — gen-2 recovered via prelinked sidecar (${GEN2_OUT}, #21860)" >&2
         printf '%s\n' "${compile_out}" >&2
+        if [[ "${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-0}" == "1" ]]; then
+          echo "bootstrap-loop-gen1-link: BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=1 — refusing prelinked sidecar COPY in place of a native emit (#21860)" >&2
+          exit 1
+        fi
       else
         if grep -q 'native emit failed at phase=' <<< "${compile_out}"; then
           M4_BLOCK_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed 's/^[^:]*: //')"

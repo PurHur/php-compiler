@@ -161,6 +161,10 @@ GEN1_ENV=(
 )
 if [[ "${STRICT_M4}" -eq 1 ]]; then
   GEN1_ENV+=(BOOTSTRAP_M4_GEN2_STRICT=1)
+  # Strict M4 must mean a genuine gen-1 native emit — not a prelinked sidecar blob
+  # COPY standing in for one (#21860). Opt out with BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT=0.
+  GEN1_ENV+=(BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT="${BOOTSTRAP_M4_REQUIRE_NATIVE_EMIT:-1}")
+  export BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT="${BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT:-1}"
 fi
 
 PROBE_PARTIAL=0
