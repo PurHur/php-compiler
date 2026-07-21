@@ -292,13 +292,18 @@ final class JitDate
             throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
         }
         VmEngineBuiltinDeprecation::emitJitFunction($context, $function);
-        // Pre-8.4 soft-null → false; PROFILE=8.4 / strict_types → TypeError (#20227).
+        // Soft-null $format → DEP + false (Zend 8.4.23; #21582, reverts #20227 TypeError).
+        // Keep false (not '') for #18945 — do not lower through Z_PARAM_STR → php_strftime("").
+        // Compile-time null folds to native bool like checkdate AOT (#21594) — value-box false
+        // segfaults under AOT assign/var_export.
+        // strict_types still TypeError via lowerZparamStr below.
         if (
             (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
             && !$context->callerStrictTypes
-            && !JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
         ) {
-            return self::boxStrftimeFailure($context);
+            JitStringBuiltinArg::emitNullStringParamDeprecation($context, $function, 0, 'format');
+
+            return $context->constantFromBool(false);
         }
         $format = JitStringBuiltinArg::lowerZparamStr($context, $args[0], $function, 0, 'format');
         $timestamp = $argc >= 2
@@ -319,14 +324,6 @@ final class JitDate
             $timestamp,
             $gmtI8
         );
-    }
-
-    private static function boxStrftimeFailure(Context $context): Value
-    {
-        $slot = JitValueBox::alloc($context);
-        JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(0, false));
-
-        return JitValueBox::pointer($context, $slot);
     }
 
 }
