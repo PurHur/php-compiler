@@ -18,6 +18,8 @@ INVENTORY_EMIT_DRIVER="${ROOT}/test/selfhost/compiler_helloworld_smoke/compile_d
 source "$(dirname "$0")/bootstrap-inventory-emit-default.sh"
 bootstrap_resolve_inventory_emit_driver "${INVENTORY_EMIT_DRIVER}"
 M3_NATIVE_COMPILE=0
+M3_SIDECAR_FALLBACK=0
+M3_SIDECAR_REASON=""
 M3_EMIT_PATH="none"
 M3_EMIT_HELPER_LINKED=0
 M3_BLOCK_REASON="native emit helper not linked (set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1)"
@@ -190,10 +192,26 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         echo "bootstrap-selfhost-helloworld-probe: native emit via selfhost emit helper OK"
       elif [[ "${m3_emit_helper_from_prelinked}" -eq 1 ]] \
         && bootstrap_gen0_sidecar_emit_fallback "${AOT_OUT}" "${SOURCE}"; then
+        # The genuine native emit FAILED; this only COPIES a committed prelinked blob.
+        # It is not a native emit and must not be reported as one (#21860).
+        if grep -q 'native emit failed at phase=' <<< "${compile_out}"; then
+          M3_SIDECAR_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed 's/^compile_smoke_m3_emit: //')"
+        elif [[ "${native_compile_code}" -eq 0 ]]; then
+          M3_SIDECAR_REASON="emit helper exited 0 but printed no 'compile OK' marker"
+        else
+          M3_SIDECAR_REASON="emit helper $(m3_exit_label "${native_compile_code}")"
+        fi
         M3_NATIVE_COMPILE=1
+        M3_SIDECAR_FALLBACK=1
         M3_EMIT_PATH="native-prelinked-sidecar"
         M3_BLOCK_REASON=""
-        echo "bootstrap-selfhost-helloworld-probe: native emit via prelinked HelloWorld sidecar (${AOT_OUT}, #9704)"
+        echo "bootstrap-selfhost-helloworld-probe: native emit FAILED — ${M3_SIDECAR_REASON}" >&2
+        printf '%s\n' "${compile_out}" >&2
+        if [[ "${BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT:-0}" == "1" ]]; then
+          echo "bootstrap-selfhost-helloworld-probe: BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT=1 — refusing prelinked sidecar COPY as a native emit (#21860)" >&2
+          exit 1
+        fi
+        echo "bootstrap-selfhost-helloworld-probe: HelloWorld produced by prelinked sidecar COPY, not a native emit (${AOT_OUT}, #9704, #21860)" >&2
       else
         if grep -q 'native emit failed at phase=' <<< "${compile_out}"; then
           M3_BLOCK_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed 's/^compile_smoke_m3_emit: //')"
@@ -255,8 +273,12 @@ if ! grep -q 'Hello World' <<< "${run_out}"; then
   exit 1
 fi
 
-if [[ "${M3_NATIVE_COMPILE}" -eq 1 ]]; then
-  echo "bootstrap-selfhost-helloworld-probe: OK emit_path=native ${EMIT_HELPER} -> ${AOT_OUT}"
+if [[ "${M3_NATIVE_COMPILE}" -eq 1 && "${M3_SIDECAR_FALLBACK}" -eq 1 ]]; then
+  echo "bootstrap-selfhost-helloworld-probe: DEGRADED emit_path=${M3_EMIT_PATH} ${EMIT_HELPER} -> ${AOT_OUT}"
+  echo "bootstrap-selfhost-helloworld-probe:   native emit failed (${M3_SIDECAR_REASON}); output is a prelinked blob COPY (#21860)"
+  echo "bootstrap-selfhost-helloworld-probe:   require a genuine native emit with BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT=1"
+elif [[ "${M3_NATIVE_COMPILE}" -eq 1 ]]; then
+  echo "bootstrap-selfhost-helloworld-probe: OK emit_path=${M3_EMIT_PATH} ${EMIT_HELPER} -> ${AOT_OUT}"
 else
   echo "bootstrap-selfhost-helloworld-probe: OK emit_path=zend partial ${PROBE} -> ${AOT_OUT} (native run)"
 fi
