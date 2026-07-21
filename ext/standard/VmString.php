@@ -474,9 +474,13 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            // Z_PARAM_PATH: soft-null DEP+coerce on 8.4 (php-src filestat.c / file.c; #20362, #19146).
-            // TypeError for null→string is PHP 9 (deprecate_null_to_scalar_internal_arg), not 8.4.
-            // $softNullPath retained for call-site API compatibility.
+            // basename/dirname/pathinfo stubs: Z_PARAM_STR null TypeError on 8.4 (#20099, re-#19997).
+            if (!$softNullPath && self::requiresZparamStrStrictNullOnForwardProfile()) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null')
+                );
+            }
+            // Other Z_PARAM_PATH: soft-null DEP+coerce on 8.4 (php-src filestat.c / file.c; #20362, #19146).
             VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';

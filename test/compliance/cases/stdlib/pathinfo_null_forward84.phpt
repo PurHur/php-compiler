@@ -1,10 +1,9 @@
 --TEST--
-stdlib basename()/dirname()/pathinfo() null — coerce on 8.4 forward profile (#19997, ext/standard/filestat.c)
+stdlib basename()/dirname()/pathinfo() null — TypeError on 8.4 forward profile (#20099, ext/standard/filestat.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-error_reporting(E_ALL & ~E_DEPRECATED);
 foreach ([
     'basename' => static fn () => basename(null),
     'dirname' => static fn () => dirname(null),
@@ -17,10 +16,8 @@ foreach ([
         echo $e->getMessage(), "\n";
     }
 }
-echo var_export(basename(''), true), "\n";
 ?>
 --EXPECT--
-basename: uncaught
-dirname: uncaught
-pathinfo: uncaught
-''
+basename(): Argument #1 ($path) must be of type string, null given
+dirname(): Argument #1 ($path) must be of type string, null given
+pathinfo(): Argument #1 ($path) must be of type string, null given

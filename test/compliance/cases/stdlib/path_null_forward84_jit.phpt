@@ -1,5 +1,5 @@
 --TEST--
-stdlib basename()/dirname()/pathinfo() null — coerce on 8.4 forward profile JIT (#19997, ext/standard/basename.c)
+stdlib basename()/dirname()/pathinfo() null — TypeError on 8.4 forward profile JIT (#20099, ext/standard/basename.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -13,14 +13,8 @@ foreach (['basename', 'dirname', 'pathinfo'] as $fn) {
         echo $e->getMessage(), "\n";
     }
 }
-echo var_export(basename(null), true), "\n";
-echo var_export(dirname(null), true), "\n";
-echo is_array(pathinfo(null)) ? "pathinfo: array\n" : "pathinfo: not-array\n";
 ?>
 --EXPECT--
-basename: uncaught
-dirname: uncaught
-pathinfo: uncaught
-''
-''
-pathinfo: array
+basename(): Argument #1 ($path) must be of type string, null given
+dirname(): Argument #1 ($path) must be of type string, null given
+pathinfo(): Argument #1 ($path) must be of type string, null given

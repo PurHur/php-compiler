@@ -290,13 +290,13 @@ final class JitStringBuiltinArg
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
-            if ($context->callerStrictTypes) {
+            if ($context->callerStrictTypes
+                || (!$softNullPath && self::requiresZparamStrStrictNullOnForwardProfile())) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
             }
 
-            // $softNullPath retained for call-site API compatibility.
             self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName, $expectedType);
 
             return $context->builder->load($context->constantStringFromString(''));
