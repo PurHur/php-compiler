@@ -6,6 +6,8 @@ if (!method_exists('DOMXPath', 'quote')) {
     die('skip DOMXPath::quote() not advertised on PHP 8.2 reference profile (#18650, ext/dom/xpath.c)');
 }
 ?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo DOMXPath::quote("'quoted' name"), "\n";
