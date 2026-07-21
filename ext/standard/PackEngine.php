@@ -616,7 +616,6 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
-            self::rejectNullForwardProfileValue($resolved, $valueArgIndex);
             $enumLong = EnumCaseSupport::packCoerceToLong($resolved, $frame?->vmContext, $frame);
             if (null !== $enumLong) {
                 return $enumLong;
@@ -649,8 +648,6 @@ final class PackEngine
             return $value ? 1 : 0;
         }
         if (null === $value) {
-            self::rejectNativeNullForwardProfileValue($valueArgIndex);
-
             return 0;
         }
         if (\is_string($value) && is_numeric($value)) {
@@ -664,7 +661,6 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
-            self::rejectNullForwardProfileValue($resolved, $valueArgIndex);
             $enumDouble = EnumCaseSupport::packCoerceToDouble($resolved, $frame?->vmContext, $frame);
             if (null !== $enumDouble) {
                 return $enumDouble;
@@ -694,8 +690,6 @@ final class PackEngine
             return $value ? 1.0 : 0.0;
         }
         if (null === $value) {
-            self::rejectNativeNullForwardProfileValue($valueArgIndex);
-
             return 0.0;
         }
         if (\is_string($value) && is_numeric($value)) {
@@ -705,27 +699,5 @@ final class PackEngine
         return 0.0;
     }
 
-    /**
-     * php-src ext/standard/pack.c — typed value operands reject null on 8.4 forward profile (#18992, #19388).
-     *
-     * Uses {@see VmString::requiresZparamStrStrictNullOnForwardProfile} (not the retired
-     * {@see VmString::requiresForwardProfileStrictStringNull} global switch).
-     */
-    private static function rejectNullForwardProfileValue(Variable $resolved, int $valueArgIndex): void
-    {
-        if (Variable::TYPE_NULL === $resolved->type) {
-            self::rejectNativeNullForwardProfileValue($valueArgIndex);
-        }
-    }
-
-    private static function rejectNativeNullForwardProfileValue(int $valueArgIndex): void
-    {
-        if (VmString::requiresZparamStrStrictNullOnForwardProfile()) {
-            throw new \TypeError(\sprintf(
-                'pack(): Argument #%d ($values) must be of type string, null given',
-                $valueArgIndex + 2
-            ));
-        }
-    }
 
 }
