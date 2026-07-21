@@ -33,6 +33,9 @@ final class VmPharArchive
     /** Reserved ustar member for per-entry metadata map (#21651). */
     private const ENTRY_META = '.phar/entrymeta';
 
+    /** Reserved ustar member for per-entry perms/flags (#21652). */
+    private const ENTRY_ATTRS = '.phar/entryattrs';
+
     /**
      * @var array<int, array{
      *   path: string,
@@ -45,6 +48,7 @@ final class VmPharArchive
      *   hasMetadata: bool,
      *   metadata: mixed,
      *   fileMetadata: array<string, mixed>,
+     *   fileAttrs: array<string, array{perms: int, flags: int}>,
      *   wholeCompression: int
      *   sigFlags: int
      *   signature: string
@@ -74,7 +78,8 @@ final class VmPharArchive
         int $sigFlags = 0,
         string $signature = '',
         ?string $sigPrivateKey = null,
-        array $fileMetadata = []
+        array $fileMetadata = [],
+        array $fileAttrs = []
     ): void {
         if ('' === $stub) {
             $stub = self::createDefaultStub();
@@ -90,6 +95,7 @@ final class VmPharArchive
             'hasMetadata' => $hasMetadata,
             'metadata' => $metadata,
             'fileMetadata' => $fileMetadata,
+            'fileAttrs' => $fileAttrs,
             'wholeCompression' => $wholeCompression,
             'sigFlags' => $sigFlags,
             'signature' => $signature,
@@ -132,6 +138,13 @@ final class VmPharArchive
                 $fileMetadata = \is_array($decoded) ? $decoded : [];
                 unset($entries['files'][self::ENTRY_META]);
             }
+            $fileAttrs = [];
+            if (isset($entries['files'][self::ENTRY_ATTRS])) {
+                $raw = $entries['files'][self::ENTRY_ATTRS];
+                $decoded = '' === $raw ? [] : \unserialize($raw);
+                $fileAttrs = \is_array($decoded) ? $decoded : [];
+                unset($entries['files'][self::ENTRY_ATTRS]);
+            }
             self::bind(
                 $object,
                 $path,
@@ -147,7 +160,8 @@ final class VmPharArchive
                 0,
                 '',
                 null,
-                $fileMetadata
+                $fileMetadata,
+                $fileAttrs
             );
             self::registerFilenameMap($path);
 
@@ -387,6 +401,7 @@ final class VmPharArchive
         }
         unset(self::$state[$object->id]['files'][$localname], self::$state[$object->id]['dirs'][$localname]);
         unset(self::$state[$object->id]['fileMetadata'][$localname]);
+        unset(self::$state[$object->id]['fileAttrs'][$localname]);
         self::markDirty($object);
 
         return true;
@@ -493,6 +508,45 @@ final class VmPharArchive
         return true;
     }
 
+    /** @return array{perms: int, flags: int} */
+    public static function getEntryAttrs(string $archivePath, string $localname): array
+    {
+        $object = self::objectByPath($archivePath);
+        if (null === $object || !isset(self::$state[$object->id])) {
+            return ['perms' => 0644, 'flags' => 0];
+        }
+        $attrs = self::$state[$object->id]['fileAttrs'][$localname] ?? null;
+        if (!\is_array($attrs)) {
+            return ['perms' => 0100644, 'flags' => 0];
+        }
+
+        return [
+            'perms' => (int) ($attrs['perms'] ?? 0100644),
+            'flags' => (int) ($attrs['flags'] ?? 0),
+        ];
+    }
+
+    public static function setEntryAttrs(string $archivePath, string $localname, int $perms, int $flags): void
+    {
+        if (!VmPhar::canWrite()) {
+            throw new \BadMethodCallException(
+                'Write operations disabled by the php.ini setting phar.readonly'
+            );
+        }
+        $object = self::objectByPath($archivePath);
+        if (null === $object || !isset(self::$state[$object->id])) {
+            throw new \BadMethodCallException('Cannot set file attributes, phar archive is not open');
+        }
+        if (!isset(self::$state[$object->id]['fileAttrs'])) {
+            self::$state[$object->id]['fileAttrs'] = [];
+        }
+        self::$state[$object->id]['fileAttrs'][$localname] = [
+            'perms' => $perms,
+            'flags' => $flags,
+        ];
+        self::markDirty($object);
+    }
+
     /** php-src zim_Phar_getVersion — archive API version string (#21230). */
     public static function getVersion(ObjectEntry $object): string
     {
@@ -586,7 +640,8 @@ final class VmPharArchive
             0,
             '',
             null,
-            $st['fileMetadata'] ?? []
+            $st['fileMetadata'] ?? [],
+            $st['fileAttrs'] ?? []
         );
 
         return $out;
@@ -635,7 +690,8 @@ final class VmPharArchive
             0,
             '',
             null,
-            $st['fileMetadata'] ?? []
+            $st['fileMetadata'] ?? [],
+            $st['fileAttrs'] ?? []
         );
 
         return $out;
@@ -720,7 +776,8 @@ final class VmPharArchive
             0,
             '',
             null,
-            $st['fileMetadata'] ?? []
+            $st['fileMetadata'] ?? [],
+            $st['fileAttrs'] ?? []
         );
 
         return $out;
@@ -962,6 +1019,8 @@ final class VmPharArchive
         if ($entryMeta['has']) {
             VmPharFileInfo::hydrateMetadata($info, $entryMeta['value']);
         }
+        $attrs = self::getEntryAttrs($st['path'], $localname);
+        VmPharFileInfo::hydrateAttrs($info, $attrs['perms'], $attrs['flags']);
         $var->object($info);
 
         return $var;
@@ -974,6 +1033,7 @@ final class VmPharArchive
         $localname = \rtrim(\ltrim(\str_replace('\\', '/', $localname), '/'), '/');
         unset(self::$state[$object->id]['files'][$localname], self::$state[$object->id]['dirs'][$localname]);
         unset(self::$state[$object->id]['fileMetadata'][$localname]);
+        unset(self::$state[$object->id]['fileAttrs'][$localname]);
         self::markDirty($object);
     }
 
@@ -1060,6 +1120,9 @@ final class VmPharArchive
         }
         if ([] !== ($st['fileMetadata'] ?? [])) {
             $files[self::ENTRY_META] = \serialize($st['fileMetadata']);
+        }
+        if ([] !== ($st['fileAttrs'] ?? [])) {
+            $files[self::ENTRY_ATTRS] = \serialize($st['fileAttrs']);
         }
 
         return $stub.VmPharTar::writeArchive($files, $st['dirs']);
