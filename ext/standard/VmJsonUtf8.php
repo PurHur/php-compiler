@@ -90,6 +90,25 @@ final class VmJsonUtf8
     }
 
     /**
+     * php-src ext/json/json_encoder.c + json_scanner.c — JSON_INVALID_UTF8_* on string payloads (#21723, #21724).
+     * IGNORE strips malformed bytes; SUBSTITUTE emits U+FFFD; IGNORE wins when both are set (Zend).
+     */
+    public static function repairForJsonUtf8Flags(string $string, int $flags): string
+    {
+        if (self::isValidUtf8($string)) {
+            return $string;
+        }
+        if (0 !== ($flags & VmJsonFlags::INVALID_UTF8_IGNORE)) {
+            return self::stripInvalidUtf8($string);
+        }
+        if (VmJsonFlags::substitutesInvalidUtf8($flags)) {
+            return self::substituteInvalidUtf8($string);
+        }
+
+        return $string;
+    }
+
+    /**
      * php-src ext/json/json_encoder.c — JSON_INVALID_UTF8_IGNORE strips malformed bytes (#21723).
      */
     public static function stripInvalidUtf8(string $string): string

@@ -298,11 +298,8 @@ final class VmJsonFormat
         if (VmJsonUtf8::isValidUtf8($value)) {
             return $value;
         }
-        if (0 !== ($flags & VmJsonFlags::INVALID_UTF8_IGNORE)) {
-            return VmJsonUtf8::stripInvalidUtf8($value);
-        }
-        if (VmJsonFlags::substitutesInvalidUtf8($flags)) {
-            return VmJsonUtf8::substituteInvalidUtf8($value);
+        if (VmJsonFlags::ignoreInvalidUtf8($flags)) {
+            return VmJsonUtf8::repairForJsonUtf8Flags($value, $flags);
         }
 
         throw new VmJsonExportException(5);
