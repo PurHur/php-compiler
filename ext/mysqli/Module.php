@@ -46,6 +46,8 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_error.php';
         require_once __DIR__.'/mysqli_errno.php';
         require_once __DIR__.'/mysqli_init.php';
+        require_once __DIR__.'/MysqliReportMode.php';
+        require_once __DIR__.'/mysqli_report.php';
         parent::init($runtime);
         if (!MysqliExtensionPolicy::advertisesExtension()) {
             return;
@@ -87,6 +89,7 @@ class Module extends ModuleAbstract
             new mysqli_error(),
             new mysqli_errno(),
             new mysqli_init(),
+            new mysqli_report(),
         ];
     }
 }

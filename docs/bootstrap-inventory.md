@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6292 |
-| Phase A inventory files (M2 ratio SSOT) | 6292 |
+| PHP files on vm.php path | 6295 |
+| Phase A inventory files (M2 ratio SSOT) | 6295 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19907 |
+| Source constructs flagged (warnings) | 19914 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1288,11 +1288,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
-| `ext/mysqli/BuiltinClasses.php` | 0 | 2 |
-| `ext/mysqli/Module.php` | 0 | 18 |
+| `ext/mysqli/BuiltinClasses.php` | 0 | 4 |
+| `ext/mysqli/Module.php` | 0 | 20 |
 | `ext/mysqli/MysqliClassMethod.php` | 0 | 1 |
 | `ext/mysqli/MysqliConstants.php` | 0 | 1 |
 | `ext/mysqli/MysqliExtensionPolicy.php` | 0 | 1 |
+| `ext/mysqli/MysqliReportMode.php` | 0 | 1 |
 | `ext/mysqli/VmMysqli.php` | 0 | 40 |
 | `ext/mysqli/mysqli_affected_rows.php` | 0 | 3 |
 | `ext/mysqli/mysqli_close.php` | 0 | 3 |
@@ -1309,6 +1310,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mysqli/mysqli_num_rows.php` | 0 | 3 |
 | `ext/mysqli/mysqli_query.php` | 0 | 3 |
 | `ext/mysqli/mysqli_real_escape_string.php` | 0 | 3 |
+| `ext/mysqli/mysqli_report.php` | 0 | 2 |
 | `ext/odbc/BuiltinClasses.php` | 0 | 1 |
 | `ext/odbc/Module.php` | 0 | 50 |
 | `ext/odbc/OdbcConstants.php` | 0 | 1 |
@@ -16176,29 +16178,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 33)
+- new ClassEntry (line 24)
+- new ClassEntry (line 35)
+- new ClassEntry (line 44)
 - 2 class method(s)
 
 ### `ext/mysqli/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 52)
-- new mysqli_connect (line 71)
-- new mysqli_query (line 72)
-- new mysqli_fetch_assoc (line 73)
-- new mysqli_fetch_array (line 74)
-- new mysqli_fetch_row (line 75)
-- new mysqli_close (line 76)
-- new mysqli_connect_errno (line 77)
-- new mysqli_connect_error (line 78)
-- new mysqli_free_result (line 79)
-- new mysqli_real_escape_string (line 80)
-- new mysqli_real_escape_string (line 81)
-- new mysqli_num_rows (line 82)
-- new mysqli_affected_rows (line 83)
-- new mysqli_error (line 84)
-- new mysqli_errno (line 85)
-- new mysqli_init (line 86)
+- new Variable (line 56)
+- new mysqli_connect (line 75)
+- new mysqli_init (line 76)
+- new mysqli_query (line 77)
+- new mysqli_fetch_assoc (line 78)
+- new mysqli_fetch_array (line 79)
+- new mysqli_fetch_row (line 80)
+- new mysqli_close (line 81)
+- new mysqli_connect_errno (line 82)
+- new mysqli_connect_error (line 83)
+- new mysqli_free_result (line 84)
+- new mysqli_real_escape_string (line 85)
+- new mysqli_real_escape_string (line 86)
+- new mysqli_num_rows (line 87)
+- new mysqli_affected_rows (line 88)
+- new mysqli_error (line 89)
+- new mysqli_errno (line 90)
+- new mysqli_init (line 91)
+- new mysqli_report (line 92)
 - 4 class method(s)
 
 ### `ext/mysqli/MysqliClassMethod.php`
@@ -16212,6 +16218,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/mysqli/MysqliExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/mysqli/MysqliReportMode.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
@@ -16361,6 +16372,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - new Error (line 40)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_report.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 42)
 - 2 class method(s)
 
 ### `ext/odbc/BuiltinClasses.php`
