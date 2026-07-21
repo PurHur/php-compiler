@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
@@ -102,6 +103,8 @@ final class RewriteVarsRuntime
             return;
         }
 
+        // Restore caller insert after NestedJIT (#21965) — peer GethostbynamelRuntime (#20555).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $runtime = $context->runtime;
         $root = \dirname(__DIR__, 3);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
@@ -117,6 +120,11 @@ final class RewriteVarsRuntime
                 $context->markJitIncludedFileCompiled($realPath);
             }
         });
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
