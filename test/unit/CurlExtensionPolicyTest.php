@@ -115,6 +115,10 @@ PHP;
         ] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
+        self::assertFalse(
+            VmReflection::functionExists($ctx, 'curl_multi_poll'),
+            'curl_multi_poll is libcurl-only; php-src has no PHP wrapper (#21826, #21834)'
+        );
         self::assertSame(
             \PHPCompiler\CompilerVersion::advertisesCurlMultiGetHandles(),
             VmReflection::functionExists($ctx, 'curl_multi_get_handles'),
