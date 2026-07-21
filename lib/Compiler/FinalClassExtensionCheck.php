@@ -12,13 +12,24 @@ use PHPCfg\Visitor\DeclarationFinder;
 use PhpParser\Node\Stmt\Class_;
 
 /**
- * Compile-time check: non-final classes cannot extend a final parent (#3406).
+ * Compile-time check: non-final classes cannot extend a final parent (#3406, #21669).
  *
  * php-src: Zend/zend_compile.c — zend_compile_class_decl;
  * Zend/zend_inheritance.c — do_inheritance_on_class
  */
 final class FinalClassExtensionCheck
 {
+    /**
+     * Builtin final classes not present in the script AST (ZEND_ACC_FINAL).
+     *
+     * @var array<string, string> lowercase name => display name
+     */
+    private const INTERNAL_FINAL = [
+        'attribute' => 'Attribute',
+        'closure' => 'Closure',
+        'generator' => 'Generator',
+    ];
+
     /** @var array<string, array{display: string, final: bool, extends: ?string}> */
     private array $classes = [];
 
@@ -62,16 +73,28 @@ final class FinalClassExtensionCheck
     {
         foreach ($this->classes as $class) {
             $parentLc = $class['extends'];
-            if (null === $parentLc || !isset($this->classes[$parentLc])) {
+            if (null === $parentLc) {
                 continue;
             }
-            if (!$this->classes[$parentLc]['final']) {
+            $parentDisplay = $this->finalParentDisplay($parentLc);
+            if (null === $parentDisplay) {
                 continue;
             }
             throw new \CompileError(
-                "Class {$class['display']} cannot extend final class {$this->classes[$parentLc]['display']}"
+                "Class {$class['display']} cannot extend final class {$parentDisplay}"
             );
         }
+    }
+
+    private function finalParentDisplay(string $parentLc): ?string
+    {
+        if (isset($this->classes[$parentLc])) {
+            return $this->classes[$parentLc]['final']
+                ? $this->classes[$parentLc]['display']
+                : null;
+        }
+
+        return self::INTERNAL_FINAL[$parentLc] ?? null;
     }
 
     private function operandLcName(Operand $op): ?string

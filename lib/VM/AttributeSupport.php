@@ -120,6 +120,8 @@ final class AttributeSupport
         $pub = CfgFunc::FLAG_PUBLIC;
 
         $entry = new ClassEntry('Attribute');
+        // php-src Zend/zend_attributes.c — ZEND_ACC_FINAL; stub: final class Attribute (#21669).
+        $entry->isFinal = true;
         $entry->properties[] = new ClassProperty('flags', null, $intProto);
         $entry->constructor = new AttributeConstruct();
         $entry->methods['__construct'] = $entry->constructor;
