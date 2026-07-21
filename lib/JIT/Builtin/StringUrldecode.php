@@ -4,21 +4,26 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __string__urldecode / __string__rawurldecode via UrldecodeJitHelper PHP (#14726).
+ * JIT/AOT link for __string__urldecode / __string__rawurldecode via UrldecodeJitHelper PHP (#14726, #21686).
  *
- * Replaces ~344 LOC inline LLVM in StringUrldecode.php.
+ * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringUrlencode #21670 / StringStrrev #21648 /
+ * StringNl2br #21630.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/url.c — PHP_FUNCTION(urldecode), PHP_FUNCTION(rawurldecode)
  */
 final class StringUrldecode
 {
     private const HELPER_PATH = '/ext/standard/UrldecodeJitHelper.php';
+
+    private const URLDECODE_ABI = '__string__urldecode';
+
+    private const RAWURLDECODE_ABI = '__string__rawurldecode';
 
     private const URLDECODE_HELPER = 'PHPCompiler\\ext\\standard\\UrldecodeJitHelper::urldecodeArgv';
 
@@ -30,11 +35,9 @@ final class StringUrldecode
         self::RAWURLDECODE_HELPER,
     ];
 
-    /** @var list<string> */
-    private const ABI_FUNCTIONS = [
-        '__string__urldecode',
-        '__string__rawurldecode',
-    ];
+    private const URLDECODE_BRIDGE_ENTRY = 'urldecode_bridge_entry';
+
+    private const RAWURLDECODE_BRIDGE_ENTRY = 'rawurldecode_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -48,106 +51,61 @@ final class StringUrldecode
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__string__urldecode');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
+        self::implementUrldecode($context);
+        self::implementRawurldecode($context);
+    }
 
+    private static function implementUrldecode(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementBridge($context, '__string__urldecode', self::URLDECODE_HELPER);
-        self::implementBridge($context, '__string__rawurldecode', self::RAWURLDECODE_HELPER);
-        self::registerLinkedRuntime($context);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function implementBridge(Context $context, string $abiName, string $helperLogical): void
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
+        $probe = $context->module->getNamedFunction(self::URLDECODE_ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::URLDECODE_BRIDGE_ENTRY)) {
+            $context->registerFunction(self::URLDECODE_ABI, $probe);
 
             return;
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('urldecode_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, $helperLogical),
-            $fn->getParam(0)
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::URLDECODE_ABI,
+            self::URLDECODE_BRIDGE_ENTRY,
+            [$strPtr],
+            $strPtr,
+            self::URLDECODE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21686'
         );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function implementRawurldecode(Context $context): void
     {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after UrldecodeJitHelper compile (#14726)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'UrldecodeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('UrldecodeJitHelper.php parseAndCompile failed (#14726)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#14726)');
-            }
-        }
-    }
+        $probe = $context->module->getNamedFunction(self::RAWURLDECODE_ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::RAWURLDECODE_BRIDGE_ENTRY)) {
+            $context->registerFunction(self::RAWURLDECODE_ABI, $probe);
 
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach (self::ABI_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after StringUrldecode bridge (#14726)');
-            }
-            $context->registerFunction($name, $fn);
+            return;
         }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::RAWURLDECODE_ABI,
+            self::RAWURLDECODE_BRIDGE_ENTRY,
+            [$strPtr],
+            $strPtr,
+            self::RAWURLDECODE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21686'
+        );
     }
 }
