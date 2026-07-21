@@ -44,7 +44,8 @@ final class VmSessionSerializer
     public static function encodeWireHashTable(HashTable $session): string|false
     {
         $out = '';
-        foreach ($session->iterateKeyed(true) as [$keyVar, $valueVar]) {
+        // NestedJIT lowers exportKeyValuePairs, not iterateKeyed (#12908 / #21900).
+        foreach ($session->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
             $keyVar = $keyVar->resolveIndirect();
             if (Variable::TYPE_STRING !== $keyVar->type) {
                 continue;
@@ -64,18 +65,37 @@ final class VmSessionSerializer
     }
 
     /**
-     * JIT session wire encode for one value — NestedJIT-safe (no iterateKeyed in SerializeJitHelper, #20773).
+     * JIT session wire encode for one value — NestedJIT-safe scalar path (#21900).
+     *
+     * Avoids {@see VmSerializeFormat}/{@see VmJson} which throw under NestedJIT and
+     * made {@see encodeWireHashTable} return false (no session file written).
      */
     public static function serializeSessionWireValue(Variable $value): ?string
     {
         $value = $value->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $value->type) {
-            return null;
-        }
-        try {
-            return VmSerializeFormat::encodeExported(self::exportJitSessionValue($value));
-        } catch (\Throwable) {
-            return null;
+        switch ($value->type) {
+            case Variable::TYPE_NULL:
+                return 'N;';
+            case Variable::TYPE_BOOLEAN:
+                return $value->toBool() ? 'b:1;' : 'b:0;';
+            case Variable::TYPE_INTEGER:
+                return 'i:'.$value->toInt().';';
+            case Variable::TYPE_FLOAT:
+                return 'd:'.$value->toFloat().';';
+            case Variable::TYPE_STRING:
+                $s = $value->toString();
+
+                return 's:'.\strlen($s).':"'.$s.'";';
+            case Variable::TYPE_OBJECT:
+                return null;
+            case Variable::TYPE_ARRAY:
+                try {
+                    return VmSerializeFormat::encodeExported(self::exportJitSessionValue($value));
+                } catch (\Throwable) {
+                    return null;
+                }
+            default:
+                return null;
         }
     }
 
