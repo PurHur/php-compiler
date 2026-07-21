@@ -34,10 +34,9 @@ final class substr_compare extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#21769).
+        $this->requireArgCountRange($frame, 'substr_compare', 3, 5);
         $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 5) {
-            throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
-        }
         $haystack = self::vmStringArg($frame, 0, 'haystack');
         $needle = self::vmStringArg($frame, 1, 'needle');
         $offsetInt = self::requireIntArg($frame->calledArgs[2], 'substr_compare', 3, 'offset');
@@ -70,10 +69,10 @@ final class substr_compare extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
-        if ($argc < 3 || $argc > 5) {
-            throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'substr_compare', 3, 5)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
 
