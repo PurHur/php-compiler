@@ -11,9 +11,9 @@ use PhpParser\Node\Scalar;
 use PHPCompiler\VM\AttributeSupport;
 
 /**
- * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340).
+ * Evaluate attribute constructor arguments that must be compile-time constants (#3206, #3340, #21725).
  *
- * php-src: zend_compile_attribute / constant expression rules (subset).
+ * php-src: zend_compile_attribute / zend_ast_evaluate constant expression rules (subset).
  */
 final class AttributeConstantEvaluator
 {
@@ -51,11 +51,25 @@ final class AttributeConstantEvaluator
                 return false;
             }
         }
-        if ($expr instanceof Expr\UnaryMinus && $expr->expr instanceof Scalar\LNumber) {
-            return -(int) $expr->expr->value;
+        if ($expr instanceof Expr\UnaryMinus) {
+            $v = self::evalExpr($expr->expr);
+            if (!\is_int($v) && !\is_float($v)) {
+                throw new \LogicException(
+                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+                );
+            }
+
+            return -$v;
         }
-        if ($expr instanceof Expr\UnaryPlus && $expr->expr instanceof Scalar\LNumber) {
-            return (int) $expr->expr->value;
+        if ($expr instanceof Expr\UnaryPlus) {
+            $v = self::evalExpr($expr->expr);
+            if (!\is_int($v) && !\is_float($v)) {
+                throw new \LogicException(
+                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+                );
+            }
+
+            return +$v;
         }
         if ($expr instanceof Expr\New_) {
             return self::evalNew($expr);
@@ -71,6 +85,25 @@ final class AttributeConstantEvaluator
         }
         if ($expr instanceof BinaryOp\BitwiseXor) {
             return self::evalIntBinary($expr, '^');
+        }
+        // php-src zend_compile_attribute / zend_ast_evaluate — arithmetic const exprs (#21725).
+        if ($expr instanceof BinaryOp\Plus) {
+            return self::evalNumericBinary($expr, '+');
+        }
+        if ($expr instanceof BinaryOp\Minus) {
+            return self::evalNumericBinary($expr, '-');
+        }
+        if ($expr instanceof BinaryOp\Mul) {
+            return self::evalNumericBinary($expr, '*');
+        }
+        if ($expr instanceof BinaryOp\Div) {
+            return self::evalNumericBinary($expr, '/');
+        }
+        if ($expr instanceof BinaryOp\Mod) {
+            return self::evalNumericBinary($expr, '%');
+        }
+        if ($expr instanceof BinaryOp\Pow) {
+            return self::evalNumericBinary($expr, '**');
         }
 
         throw new \LogicException(
@@ -134,6 +167,34 @@ final class AttributeConstantEvaluator
             '|' => $left | $right,
             '&' => $left & $right,
             '^' => $left ^ $right,
+            default => throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            ),
+        };
+    }
+
+    /**
+     * Arithmetic const exprs for attribute args (php-src zend_ast_evaluate subset).
+     *
+     * @return int|float
+     */
+    private static function evalNumericBinary(BinaryOp $expr, string $op): int|float
+    {
+        $left = self::evalExpr($expr->left);
+        $right = self::evalExpr($expr->right);
+        if ((!(\is_int($left) || \is_float($left))) || (!(\is_int($right) || \is_float($right)))) {
+            throw new \LogicException(
+                'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+            );
+        }
+
+        return match ($op) {
+            '+' => $left + $right,
+            '-' => $left - $right,
+            '*' => $left * $right,
+            '/' => $left / $right,
+            '%' => $left % $right,
+            '**' => $left ** $right,
             default => throw new \LogicException(
                 'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
             ),
