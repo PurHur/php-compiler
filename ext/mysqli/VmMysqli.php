@@ -57,6 +57,8 @@ final class VmMysqli
             'begin_transaction' => new MysqliBeginTransaction(),
             'commit' => new MysqliCommit(),
             'rollback' => new MysqliRollback(),
+            'savepoint' => new MysqliSavepoint(),
+            'release_savepoint' => new MysqliReleaseSavepoint(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -235,6 +237,64 @@ final class VmMysqli
         $sentinel = new MysqliState();
         $sentinel->ctx = $ctx;
         self::$store[-1] = $sentinel;
+    }
+
+    public static function autocommitOnLink(ObjectEntry $entry, Context $ctx, bool $mode): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->autocommit($mode);
+    }
+
+    public static function beginTransactionOnLink(ObjectEntry $entry, Context $ctx, int $flags = 0, ?string $name = null): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->begin_transaction($flags, $name);
+    }
+
+    public static function commitOnLink(ObjectEntry $entry, Context $ctx, int $flags = 0, ?string $name = null): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->commit($flags, $name);
+    }
+
+    public static function rollbackOnLink(ObjectEntry $entry, Context $ctx, int $flags = 0, ?string $name = null): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->rollback($flags, $name);
+    }
+
+    public static function savepointOnLink(ObjectEntry $entry, Context $ctx, string $name): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+        if (method_exists($native, 'savepoint')) {
+            return $native->savepoint($name);
+        }
+
+        return true === $native->query(self::savepointSql($name));
+    }
+
+    public static function releaseSavepointOnLink(ObjectEntry $entry, Context $ctx, string $name): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+        if (method_exists($native, 'release_savepoint')) {
+            return $native->release_savepoint($name);
+        }
+
+        return true === $native->query(self::releaseSavepointSql($name));
+    }
+
+    private static function savepointSql(string $name): string
+    {
+        return 'SAVEPOINT `'.str_replace('`', '``', $name).'`';
+    }
+
+    private static function releaseSavepointSql(string $name): string
+    {
+        return 'RELEASE SAVEPOINT `'.str_replace('`', '``', $name).'`';
     }
 }
 
@@ -517,8 +577,31 @@ final class MysqliAutocommit extends MysqliClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, 'mysqli::autocommit()');
-        throw new \Error('mysqli::autocommit() is not yet implemented in this compiler build (issue #3435)');
+        $receiver = $this->receiver($frame, 'mysqli::autocommit()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::autocommit() expects exactly 1 argument, 0 given');
+        }
+        $mode = $this->boolArg($frame->calledArgs[1], 'mysqli::autocommit', 0, 'mode');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::autocommit() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::autocommitOnLink($receiver, $ctx, $mode));
+        }
+    }
+
+    private function boolArg(Variable $var, string $label, int $index, string $paramName): bool
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            return $resolved->toBool();
+        }
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return 0 !== $resolved->toInt();
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return false;
+        }
+
+        return (bool) $resolved->toString();
     }
 }
 
@@ -531,8 +614,27 @@ final class MysqliBeginTransaction extends MysqliClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, 'mysqli::begin_transaction()');
-        throw new \Error('mysqli::begin_transaction() is not yet implemented in this compiler build (issue #3435)');
+        $receiver = $this->receiver($frame, 'mysqli::begin_transaction()');
+        $flags = \count($frame->calledArgs) >= 2
+            ? $this->intArg($frame->calledArgs[1], 'mysqli::begin_transaction', 0, 'flags', 0)
+            : 0;
+        $name = \count($frame->calledArgs) >= 3
+            ? $this->optionalStringArg($frame->calledArgs[2])
+            : null;
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::begin_transaction() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::beginTransactionOnLink($receiver, $ctx, $flags, $name));
+        }
+    }
+
+    private function optionalStringArg(Variable $var): ?string
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toString();
     }
 }
 
@@ -545,8 +647,27 @@ final class MysqliCommit extends MysqliClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, 'mysqli::commit()');
-        throw new \Error('mysqli::commit() is not yet implemented in this compiler build (issue #3435)');
+        $receiver = $this->receiver($frame, 'mysqli::commit()');
+        $flags = \count($frame->calledArgs) >= 2
+            ? $this->intArg($frame->calledArgs[1], 'mysqli::commit', 0, 'flags', 0)
+            : 0;
+        $name = \count($frame->calledArgs) >= 3
+            ? $this->optionalStringArg($frame->calledArgs[2])
+            : null;
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::commit() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::commitOnLink($receiver, $ctx, $flags, $name));
+        }
+    }
+
+    private function optionalStringArg(Variable $var): ?string
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toString();
     }
 }
 
@@ -559,8 +680,69 @@ final class MysqliRollback extends MysqliClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, 'mysqli::rollback()');
-        throw new \Error('mysqli::rollback() is not yet implemented in this compiler build (issue #3435)');
+        $receiver = $this->receiver($frame, 'mysqli::rollback()');
+        $flags = \count($frame->calledArgs) >= 2
+            ? $this->intArg($frame->calledArgs[1], 'mysqli::rollback', 0, 'flags', 0)
+            : 0;
+        $name = \count($frame->calledArgs) >= 3
+            ? $this->optionalStringArg($frame->calledArgs[2])
+            : null;
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::rollback() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::rollbackOnLink($receiver, $ctx, $flags, $name));
+        }
+    }
+
+    private function optionalStringArg(Variable $var): ?string
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toString();
+    }
+}
+
+final class MysqliSavepoint extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('savepoint');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::savepoint()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::savepoint() expects exactly 1 argument, 0 given');
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'mysqli::savepoint', 0, 'name');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::savepoint() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::savepointOnLink($receiver, $ctx, $name));
+        }
+    }
+}
+
+final class MysqliReleaseSavepoint extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('release_savepoint');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::release_savepoint()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::release_savepoint() expects exactly 1 argument, 0 given');
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'mysqli::release_savepoint', 0, 'name');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::release_savepoint() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::releaseSavepointOnLink($receiver, $ctx, $name));
+        }
     }
 }
 

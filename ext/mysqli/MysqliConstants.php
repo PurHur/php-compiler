@@ -28,6 +28,10 @@ final class MysqliConstants
     public const MYSQLI_CLIENT_SSL = 2048;
     public const MYSQLI_CLIENT_INTERACTIVE = 1024;
 
+    public const MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT = 1;
+    public const MYSQLI_TRANS_START_READ_WRITE = 2;
+    public const MYSQLI_TRANS_START_READ_ONLY = 4;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -45,6 +49,9 @@ final class MysqliConstants
             'MYSQLI_CLIENT_COMPRESS' => self::MYSQLI_CLIENT_COMPRESS,
             'MYSQLI_CLIENT_SSL' => self::MYSQLI_CLIENT_SSL,
             'MYSQLI_CLIENT_INTERACTIVE' => self::MYSQLI_CLIENT_INTERACTIVE,
+            'MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT' => self::MYSQLI_TRANS_START_WITH_CONSISTENT_SNAPSHOT,
+            'MYSQLI_TRANS_START_READ_WRITE' => self::MYSQLI_TRANS_START_READ_WRITE,
+            'MYSQLI_TRANS_START_READ_ONLY' => self::MYSQLI_TRANS_START_READ_ONLY,
         ];
     }
 
