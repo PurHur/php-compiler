@@ -608,9 +608,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::advertisesPhp85ArrayFirstLast());
     }
 
-    public function testDateTimeMicrosecondWithheldOnReferenceProfile(): void
+    public function testDateTimeMicrosecondAdvertisedOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDateTimeMicrosecond());
+        $this->assertTrue(CompilerVersion::supportsDateTimeMicrosecond());
     }
 
     public function testDateTimeMicrosecondTrueWhenProfile84(): void
@@ -1021,13 +1021,17 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmDoesNotRegisterDateTimeMicrosecondOnReferenceProfile(): void
+    public function testVmRegistersDateTimeMicrosecondOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $dt = $runtime->vmContext->classes['datetime'] ?? null;
         $this->assertNotNull($dt);
-        $this->assertFalse(isset($dt->methods['getmicrosecond']));
-        $this->assertFalse(isset($dt->methods['setmicrosecond']));
+        $this->assertTrue(isset($dt->methods['getmicrosecond']));
+        $this->assertTrue(isset($dt->methods['setmicrosecond']));
+        $dti = $runtime->vmContext->classes['datetimeimmutable'] ?? null;
+        $this->assertNotNull($dti);
+        $this->assertTrue(isset($dti->methods['getmicrosecond']));
+        $this->assertTrue(isset($dti->methods['setmicrosecond']));
     }
 
     public function testVmDoesNotRegisterConvertCyrStringOnReferenceProfile(): void
