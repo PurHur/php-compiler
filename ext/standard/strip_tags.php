@@ -48,9 +48,17 @@ final class strip_tags extends Internal
 
         $subjectArg = $args[0];
         $subjectLiteral = $subjectArg->compileTimeString ?? null;
-        if (null !== $subjectLiteral && (null === $allowed || self::isAllowedTagsArrayArg($allowed))) {
+        // Fold compile-time subject + allowed_tags (string or array). Prior guard only
+        // admitted null/array allowed, so AOT strip_tags(..., '<b>') always hit NestedJIT
+        // after ensureBridge fixed the insert-block compile error (#21711).
+        if (null !== $subjectLiteral) {
+            if (null === $allowed) {
+                return $context->builder->load(
+                    $context->constantStringFromString(VmString::stripTags($subjectLiteral, null))
+                );
+            }
             $allowedValue = self::resolveAllowedTagsJit($allowed);
-            if (null !== $allowedValue || null === $allowed) {
+            if (null !== $allowedValue) {
                 return $context->builder->load(
                     $context->constantStringFromString(VmString::stripTags($subjectLiteral, $allowedValue))
                 );
@@ -124,8 +132,12 @@ final class strip_tags extends Internal
         if (null === $allowed) {
             return null;
         }
-        if (JITVariable::TYPE_STRING === $allowed->type) {
+        // TYPE_VALUE string temps may still carry compileTimeString (#21711).
+        if (null !== ($allowed->compileTimeString ?? null)) {
             return $allowed->compileTimeString;
+        }
+        if (JITVariable::TYPE_STRING === $allowed->type) {
+            return null;
         }
         if (!self::isAllowedTagsArrayArg($allowed)) {
             return null;
@@ -146,8 +158,8 @@ final class strip_tags extends Internal
         if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
             return true;
         }
-
-        return JITVariable::TYPE_VALUE === $arg->type;
+        // TYPE_VALUE string temps must not take the hashtable markup path (#21711).
+        return JITVariable::TYPE_VALUE === $arg->type && $arg->valueBoxHashtable;
     }
 
     /**
