@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
+// Bare/parenthesized asymmetric visibility on PROFILE=8.4 (#18820).
+// Property defaults with `new` compile-reject like Zend (#21493, #21869) — see
+// test/compliance/cases/language/bare_public_private_set_property_new_reject_84.phpt.
+
 class PrivateSetBare {
     public private(set) string $x = 'hi';
 }
 
 class PrivateSetParen {
     public (private(set)) int $n = 1;
-}
-
-class PrivateSetNewDefault {
-    public private(set) stdClass $obj = new stdClass();
 }
 
 $bare = new PrivateSetBare();
@@ -26,5 +26,4 @@ try {
 $p = new PrivateSetParen();
 echo $p->n, "\n";
 
-$o = new PrivateSetNewDefault();
-echo $o->obj instanceof stdClass ? "new default ok\n" : "new default fail\n";
+echo "asymmetric ok\n";
