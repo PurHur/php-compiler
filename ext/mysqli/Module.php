@@ -54,6 +54,13 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_stmt_fetch.php';
         require_once __DIR__.'/MysqliReportMode.php';
         require_once __DIR__.'/mysqli_report.php';
+        require_once __DIR__.'/MysqliProceduralLink.php';
+        require_once __DIR__.'/mysqli_autocommit.php';
+        require_once __DIR__.'/mysqli_begin_transaction.php';
+        require_once __DIR__.'/mysqli_commit.php';
+        require_once __DIR__.'/mysqli_rollback.php';
+        require_once __DIR__.'/mysqli_savepoint.php';
+        require_once __DIR__.'/mysqli_release_savepoint.php';
         parent::init($runtime);
         if (!MysqliExtensionPolicy::advertisesExtension()) {
             return;
@@ -101,6 +108,12 @@ class Module extends ModuleAbstract
             new mysqli_stmt_close(),
             new mysqli_stmt_execute(),
             new mysqli_stmt_fetch(),
+            new mysqli_autocommit(),
+            new mysqli_begin_transaction(),
+            new mysqli_commit(),
+            new mysqli_rollback(),
+            new mysqli_savepoint(),
+            new mysqli_release_savepoint(),
         ];
     }
 }
