@@ -33,6 +33,10 @@ final class SubstrCompareRuntimeShrinkTest extends TestCase
 
         $bridge = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringSubstrCompare.php');
         $this->assertStringContainsString('SubstrCompareJitHelper', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
+        $this->assertStringNotContainsString('parseAndCompile', $bridge);
+        $this->assertStringNotContainsString('new JIT(', $bridge);
         $this->assertStringNotContainsString('final class StringSubstrCompareJit', $bridge);
 
         $builtin = (string) file_get_contents($this->repoRoot.'/ext/standard/substr_compare.php');
