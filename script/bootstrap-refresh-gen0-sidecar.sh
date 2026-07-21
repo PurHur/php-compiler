@@ -29,9 +29,13 @@ After test/selfhost/compiler_lib_spine_smoke/main.php changes:
   4. Run check-bootstrap-gen0-manifest-sync.php
 
 Options:
-  --skip-link  Copy sidecars + refresh manifest only (build/ already linked)
+  --skip-link  Copy sidecars + refresh manifest only (build/ already linked).
+               Refuses when build/.bootstrap_lowering_source.sha is stale (#21905).
 
-See docs/bootstrap-m5-fast-path.md and GETTING-STARTED §7b (#8704).
+After a verified-fresh copy, stamps lowering_source_fingerprint into
+prelinked/bootstrap-gen0/manifest.json (never via size/sha-only refresh).
+
+See docs/bootstrap-m5-fast-path.md and GETTING-STARTED §7b (#8704, #21905).
 EOF
       exit 0
       ;;
@@ -48,6 +52,8 @@ source "$(dirname "$0")/php-env.sh"
 source "$(dirname "$0")/selfhost-preflight.sh"
 # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
 source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
+# shellcheck source=bootstrap-lowering-freshness.sh
+source "$(dirname "$0")/bootstrap-lowering-freshness.sh"
 
 ci_apply_llvm_memory_env
 
@@ -59,6 +65,17 @@ if [[ "${SKIP_LINK}" -eq 0 ]]; then
   echo "==> M2 full spine link (BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1)"
   BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 \
     bash "${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
+  # Honest build stamp: spine link just ran against current lib/ext/patches (#21905).
+  bootstrap_lowering_source_write_build_stamp
+else
+  # --skip-link: refuse to copy/stamp from a stale build/ artifact (#21905 / #21855).
+  bootstrap_lowering_source_refuse_stale_reuse \
+    "$(bootstrap_lowering_source_build_stamp)" \
+    "build/ artifact for gen-0 sidecar refresh" \
+    || {
+      echo "bootstrap-refresh-gen0-sidecar: refusing refresh from stale build/ (rebuild first, or omit --skip-link)" >&2
+      exit 1
+    }
 fi
 
 SPINE_OUT="${ROOT}/build/selfhost-lib-spine-smoke"
@@ -121,10 +138,18 @@ fi
 
 echo "bootstrap-refresh-gen0-sidecar: copied ${copied} build/.m3_* blobs + compiler_lib sidecar"
 
-echo "==> refresh prelinked/bootstrap-gen0/manifest.json"
+echo "==> refresh prelinked/bootstrap-gen0/manifest.json (size/sha only — no provenance stamp)"
 php "${ROOT}/script/bootstrap-gen0-manifest-refresh.php"
+
+echo "==> stamp lowering_source_fingerprint (verified-fresh copy only — #21905)"
+php -r '
+require $argv[1]."/script/bootstrap-gen0-manifest-lib.php";
+$m = bootstrap_gen0_manifest_stamp_lowering_fingerprint($argv[1]);
+fwrite(STDOUT, "bootstrap-refresh-gen0-sidecar: stamped lowering_source_fingerprint="
+    .substr((string) ($m["lowering_source_fingerprint"] ?? ""), 0, 16)."…\n");
+' "${ROOT}"
 
 echo "==> verify gen-0 manifest sync"
 php "${ROOT}/script/check-bootstrap-gen0-manifest-sync.php"
 
-echo "bootstrap-refresh-gen0-sidecar: OK — commit prelinked/bootstrap-gen0/ when intentional (#8704)"
+echo "bootstrap-refresh-gen0-sidecar: OK — commit prelinked/bootstrap-gen0/ when intentional (#8704, #21905)"

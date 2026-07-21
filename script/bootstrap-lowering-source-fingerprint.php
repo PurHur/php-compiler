@@ -68,28 +68,32 @@ function bootstrap_lowering_source_fingerprint(string $root): string
     return hash_final($ctx);
 }
 
-$fp = bootstrap_lowering_source_fingerprint($root);
+// Library-safe include (#21905 / a7858871d): CLI only when executed as main script.
+if (isset($_SERVER['SCRIPT_FILENAME'])
+    && realpath((string) $_SERVER['SCRIPT_FILENAME']) === realpath(__FILE__)) {
+    $fp = bootstrap_lowering_source_fingerprint($root);
 
-if (in_array('--check', $argv ?? [], true)) {
-    $idx = array_search('--check', $argv, true);
-    $stampPath = $argv[$idx + 1] ?? '';
-    if ('' === $stampPath || !is_readable($stampPath)) {
-        fwrite(STDERR, "bootstrap-lowering-source-fingerprint: --check requires readable stamp path\n");
+    if (in_array('--check', $argv ?? [], true)) {
+        $idx = array_search('--check', $argv, true);
+        $stampPath = $argv[$idx + 1] ?? '';
+        if ('' === $stampPath || !is_readable($stampPath)) {
+            fwrite(STDERR, "bootstrap-lowering-source-fingerprint: --check requires readable stamp path\n");
+            exit(1);
+        }
+        $have = trim((string) file_get_contents($stampPath));
+        if ($fp === $have) {
+            fwrite(STDOUT, "bootstrap-lowering-source-fingerprint: OK ({$fp})\n");
+            exit(0);
+        }
+        if ('1' === getenv('BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER')
+            || '1' === getenv('BOOTSTRAP_ALLOW_STALE_SIDECAR')) {
+            fwrite(STDOUT, "bootstrap-lowering-source-fingerprint: WAIVED stale stamp (have {$have}, want {$fp})\n");
+            exit(0);
+        }
+        fwrite(STDERR, "bootstrap-lowering-source-fingerprint: FAILED — stamp {$have} ≠ lowering source {$fp}\n");
         exit(1);
     }
-    $have = trim((string) file_get_contents($stampPath));
-    if ($fp === $have) {
-        fwrite(STDOUT, "bootstrap-lowering-source-fingerprint: OK ({$fp})\n");
-        exit(0);
-    }
-    if ('1' === getenv('BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER')
-        || '1' === getenv('BOOTSTRAP_ALLOW_STALE_SIDECAR')) {
-        fwrite(STDOUT, "bootstrap-lowering-source-fingerprint: WAIVED stale stamp (have {$have}, want {$fp})\n");
-        exit(0);
-    }
-    fwrite(STDERR, "bootstrap-lowering-source-fingerprint: FAILED — stamp {$have} ≠ lowering source {$fp}\n");
-    exit(1);
-}
 
-fwrite(STDOUT, $fp."\n");
-exit(0);
+    fwrite(STDOUT, $fp."\n");
+    exit(0);
+}

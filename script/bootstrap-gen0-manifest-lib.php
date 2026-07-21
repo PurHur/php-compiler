@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Gen-0 prelinked argv driver manifest helpers (issues #8713, #3053, #3046).
+ * Gen-0 prelinked argv driver manifest helpers (issues #8713, #3053, #3046, #21905).
  *
  * @return array<string, mixed>|null
  */
@@ -21,6 +21,95 @@ function bootstrap_gen0_manifest_read(string $root): ?array
 function bootstrap_gen0_manifest_path(string $root): string
 {
     return rtrim($root, '/').'/prelinked/bootstrap-gen0/manifest.json';
+}
+
+/**
+ * Live lowering-source fingerprint for committed gen-0 provenance (#21905).
+ *
+ * Requires script/bootstrap-lowering-source-fingerprint.php (safe to include).
+ */
+function bootstrap_gen0_manifest_live_lowering_fingerprint(string $root): string
+{
+    static $cached = null;
+    if (is_string($cached)) {
+        return $cached;
+    }
+    $script = rtrim($root, '/').'/script/bootstrap-lowering-source-fingerprint.php';
+    if (!is_readable($script)) {
+        throw new \RuntimeException('missing '.$script);
+    }
+    require_once $script;
+    $cached = bootstrap_lowering_source_fingerprint($root);
+
+    return $cached;
+}
+
+/**
+ * Hard errors when manifest carries a lowering fingerprint that disagrees with live source.
+ *
+ * Missing fingerprint is a warning only (see bootstrap_gen0_manifest_sync_warnings) until
+ * the next verified-fresh refresh stamps it (#21905; rebuild blocked on #21886).
+ *
+ * @return list<string>
+ */
+function bootstrap_gen0_manifest_lowering_fingerprint_errors(string $root, ?array $manifest = null): array
+{
+    if (null === $manifest) {
+        $manifest = bootstrap_gen0_manifest_read($root);
+    }
+    if (null === $manifest) {
+        return [];
+    }
+    $have = strtolower(trim((string) ($manifest['lowering_source_fingerprint'] ?? '')));
+    if ('' === $have) {
+        return [];
+    }
+    if ('1' === getenv('BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER')
+        || '1' === getenv('BOOTSTRAP_ALLOW_STALE_SIDECAR')) {
+        return [];
+    }
+    try {
+        $want = strtolower(bootstrap_gen0_manifest_live_lowering_fingerprint($root));
+    } catch (\Throwable $e) {
+        return ['lowering_source_fingerprint: cannot compute live fingerprint ('.$e->getMessage().')'];
+    }
+    if ($have !== $want) {
+        return [
+            "lowering_source_fingerprint mismatch (manifest {$have}, live {$want}) — refresh via script/bootstrap-refresh-gen0-sidecar.sh from a verified-fresh build/ (#21905)",
+        ];
+    }
+
+    return [];
+}
+
+/**
+ * Soft provenance gaps (missing stamp) — loud warn, not a hard sync failure (#21905).
+ *
+ * @return list<string>
+ */
+function bootstrap_gen0_manifest_sync_warnings(string $root, ?array $manifest = null): array
+{
+    if (null === $manifest) {
+        $manifest = bootstrap_gen0_manifest_read($root);
+    }
+    if (null === $manifest) {
+        return [];
+    }
+    $warnings = [];
+    $have = trim((string) ($manifest['lowering_source_fingerprint'] ?? ''));
+    if ('' === $have) {
+        $warnings[] = 'manifest missing lowering_source_fingerprint — committed gen-0 blobs have no lowering provenance until the next verified-fresh refresh (#21905)';
+    }
+    $stampRel = 'prelinked/bootstrap-gen0/.bootstrap_lowering_source.sha';
+    $stampAbs = rtrim($root, '/').'/'.$stampRel;
+    if ('' !== $have && is_readable($stampAbs)) {
+        $stamp = strtolower(trim((string) file_get_contents($stampAbs)));
+        if ('' !== $stamp && $stamp !== strtolower($have)) {
+            $warnings[] = ".bootstrap_lowering_source.sha ({$stamp}) disagrees with manifest lowering_source_fingerprint ({$have})";
+        }
+    }
+
+    return $warnings;
 }
 
 /**
@@ -86,6 +175,10 @@ function bootstrap_gen0_manifest_sync_errors(string $root): array
         }
     }
 
+    foreach (bootstrap_gen0_manifest_lowering_fingerprint_errors($root, $manifest) as $fpError) {
+        $errors[] = $fpError;
+    }
+
     return $errors;
 }
 
@@ -126,6 +219,11 @@ function bootstrap_gen0_manifest_tracked_assets(): array
 /**
  * Rewrite manifest size/sha fields from on-disk prelinked gen-0 blobs (#8704, #8713).
  *
+ * Does **not** set or refresh `lowering_source_fingerprint` — that would stamp today's
+ * source onto possibly-ancient blobs (false provenance). Use
+ * {@see bootstrap_gen0_manifest_stamp_lowering_fingerprint()} only from a verified-fresh
+ * copy path in script/bootstrap-refresh-gen0-sidecar.sh (#21905).
+ *
  * @return array<string, mixed>
  */
 function bootstrap_gen0_manifest_refresh_from_disk(string $root): array
@@ -133,6 +231,12 @@ function bootstrap_gen0_manifest_refresh_from_disk(string $root): array
     $manifest = bootstrap_gen0_manifest_read($root);
     if (null === $manifest) {
         throw new \RuntimeException('missing or invalid '.bootstrap_gen0_manifest_path($root));
+    }
+
+    // Preserve any existing provenance claim; never invent one from live source here.
+    $preservedFingerprint = null;
+    if (array_key_exists('lowering_source_fingerprint', $manifest)) {
+        $preservedFingerprint = $manifest['lowering_source_fingerprint'];
     }
 
     $base = bootstrap_gen0_manifest_tracked_assets();
@@ -158,10 +262,50 @@ function bootstrap_gen0_manifest_refresh_from_disk(string $root): array
     }
 
     $manifest['generated_at'] = gmdate('c');
+    if (null === $preservedFingerprint) {
+        unset($manifest['lowering_source_fingerprint']);
+    } else {
+        $manifest['lowering_source_fingerprint'] = $preservedFingerprint;
+    }
 
     $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
     if (false === file_put_contents(bootstrap_gen0_manifest_path($root), $encoded)) {
         throw new \RuntimeException('failed writing '.bootstrap_gen0_manifest_path($root));
+    }
+
+    return $manifest;
+}
+
+/**
+ * Record lowering provenance after a verified-fresh copy into prelinked/bootstrap-gen0/ (#21905).
+ *
+ * @return array<string, mixed>
+ */
+function bootstrap_gen0_manifest_stamp_lowering_fingerprint(string $root, ?string $fingerprint = null): array
+{
+    $manifest = bootstrap_gen0_manifest_read($root);
+    if (null === $manifest) {
+        throw new \RuntimeException('missing or invalid '.bootstrap_gen0_manifest_path($root));
+    }
+    $fp = $fingerprint;
+    if (null === $fp || '' === $fp) {
+        $fp = bootstrap_gen0_manifest_live_lowering_fingerprint($root);
+    }
+    $fp = strtolower(trim($fp));
+    if (!preg_match('/^[a-f0-9]{64}$/', $fp)) {
+        throw new \RuntimeException('invalid lowering_source_fingerprint (want 64 hex chars)');
+    }
+    $manifest['lowering_source_fingerprint'] = $fp;
+    $manifest['generated_at'] = gmdate('c');
+
+    $encoded = json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+    if (false === file_put_contents(bootstrap_gen0_manifest_path($root), $encoded)) {
+        throw new \RuntimeException('failed writing '.bootstrap_gen0_manifest_path($root));
+    }
+
+    $stampAbs = rtrim($root, '/').'/prelinked/bootstrap-gen0/.bootstrap_lowering_source.sha';
+    if (false === file_put_contents($stampAbs, $fp)) {
+        throw new \RuntimeException('failed writing '.$stampAbs);
     }
 
     return $manifest;
