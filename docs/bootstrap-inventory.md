@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6322 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20032 |
+| Source constructs flagged (warnings) | 20030 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4938,7 +4938,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ProcessOpenEmbedBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessOpenJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpenRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProgressNoteRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Rand.php` | 0 | 2 |
 | `lib/JIT/Builtin/RangeIntRuntime.php` | 0 | 1 |
@@ -42278,9 +42278,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ProcessRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 429)
-- 17 class method(s)
-- 1 closure(s)
+- 15 class method(s)
 
 ### `lib/JIT/Builtin/ProgressNoteRuntime.php`
 
