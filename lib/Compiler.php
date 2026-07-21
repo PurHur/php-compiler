@@ -49698,6 +49698,75 @@ class Compiler {
     }
 
     /**
+     * count($ref->getAttributes(EnumCases::class)) — hoisted ClassConstFetch feeds the MethodCall, not the outer callee (#21867).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $pendingNestedProducerOps
+     */
+    private function rewireNestedMethodCallHoistedClassConstOuterCallArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        ?Op $cfgCallOp,
+        array $pendingNestedProducerOps = []
+    ): void {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return;
+        }
+        if (!\is_array($cfgCallOp->args ?? null) || 1 !== \count($cfgCallOp->args)) {
+            return;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
+        if (!\is_int($callIndex) || $callIndex < 2) {
+            return;
+        }
+        $producer = $block->orig->children[$callIndex - 1] ?? null;
+        if (
+            !$producer instanceof Op\Expr\MethodCall
+            && !$producer instanceof Op\Expr\StaticCall
+        ) {
+            return;
+        }
+        $prelude = $block->orig->children[$callIndex - 2] ?? null;
+        if (!$prelude instanceof Op\Expr\ClassConstFetch) {
+            return;
+        }
+        if (
+            $callArg instanceof Operand
+            && $this->operandsReferToSameVariable($prelude->result, $callArg)
+        ) {
+            return;
+        }
+        $execSlot = $this->slotForMethodOrStaticCallInitFollowingExecReturn(
+            $block,
+            $producer,
+            $pendingNestedProducerOps
+        );
+        if (null === $execSlot) {
+            $execSlot = $this->slotForSiblingMethodCallProducerExecReturn(
+                $block,
+                $producer,
+                $cfgCallOp,
+                $block->orig->children
+            );
+        }
+        if (null === $execSlot) {
+            return;
+        }
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            $send->arg1 = (string) $execSlot;
+
+            return;
+        }
+    }
+
+    /**
      * var_dump(f(), g()) after an earlier sibling chain — map ARG_SEND to chain EXEC_RETURN slots (#16254).
      *
      * @param list<OpCode> $outerArgSends
@@ -51166,6 +51235,12 @@ class Compiler {
         );
         $this->rewireInlineArithmeticBranchCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
         $this->rewireSiblingMultiArgInlineCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
+        $this->rewireNestedMethodCallHoistedClassConstOuterCallArgSendSlots(
+            $outerArgSends,
+            $block,
+            $cfgCallOp,
+            $nestedProducerOps
+        );
         $this->rewireHoistedClassConstPreludeCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
         $this->rewireRegisterShutdownFunctionClosureEnumCallArgSendSlots(
             $outerArgSends,
