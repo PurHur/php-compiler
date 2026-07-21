@@ -26,7 +26,9 @@ final class PharDataBuiltin
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['iswritable'])
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['iscompressed'])
             && isset($ctx->classes[VmPharData::CLASS_LC]->methods['hasmetadata'])
-            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['setmetadata'])) {
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['setmetadata'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['copy'])
+            && isset($ctx->classes[VmPharData::CLASS_LC]->methods['delete'])) {
             return;
         }
 
@@ -69,6 +71,8 @@ final class PharDataBuiltin
             'getmetadata' => [PharDataGetMetadata::class, 'getMetadata'],
             'setmetadata' => [PharDataSetMetadata::class, 'setMetadata'],
             'delmetadata' => [PharDataDelMetadata::class, 'delMetadata'],
+            'copy' => [PharDataCopy::class, 'copy'],
+            'delete' => [PharDataDelete::class, 'delete'],
             'offsetset' => [PharDataOffsetSet::class, 'offsetSet'],
             'offsetget' => [PharDataOffsetGet::class, 'offsetGet'],
             'offsetexists' => [PharDataOffsetExists::class, 'offsetExists'],
@@ -503,6 +507,47 @@ final class PharDataDelMetadata extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $ok = VmPharData::delMetadata(VmPharData::requireReceiver($frame, 'PharData::delMetadata'));
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/** PharData::copy() — php-src zim_Phar_copy on PharData (#21690). */
+final class PharDataCopy extends VmClassMethod
+{
+    public function __construct() { parent::__construct('copy'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(\sprintf('PharData::copy() expects at least 2 arguments, %d given', \max(0, $argc - 1)));
+        }
+        $ok = VmPharData::copy(
+            VmPharData::requireReceiver($frame, 'PharData::copy'),
+            VmPharData::coercePathArg($frame->calledArgs[1], 'PharData::copy', 0, 'from'),
+            VmPharData::coercePathArg($frame->calledArgs[2], 'PharData::copy', 1, 'to')
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/** PharData::delete() — php-src zim_Phar_delete on PharData (#21690). */
+final class PharDataDelete extends VmClassMethod
+{
+    public function __construct() { parent::__construct('delete'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf('PharData::delete() expects exactly 1 argument, %d given', \max(0, $argc - 1)));
+        }
+        $ok = VmPharData::delete(
+            VmPharData::requireReceiver($frame, 'PharData::delete'),
+            VmPharData::coercePathArg($frame->calledArgs[1], 'PharData::delete', 0, 'localname')
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
