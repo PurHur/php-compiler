@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6233 |
-| Phase A inventory files (M2 ratio SSOT) | 6233 |
+| PHP files on vm.php path | 6237 |
+| Phase A inventory files (M2 ratio SSOT) | 6237 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19645 |
+| Source constructs flagged (warnings) | 19652 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1706,7 +1706,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_strerror.php` | 0 | 3 |
 | `ext/sockets/socket_write.php` | 0 | 3 |
 | `ext/sodium/JitSodium.php` | 0 | 1 |
-| `ext/sodium/Module.php` | 0 | 109 |
+| `ext/sodium/Module.php` | 0 | 112 |
 | `ext/sodium/SodiumAeadDecryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAeadEncryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAuthFunction.php` | 0 | 4 |
@@ -1731,6 +1731,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/SodiumOneStringFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPadFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPwhashFunction.php` | 0 | 2 |
+| `ext/sodium/SodiumPwhashScryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumPwhashStrFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumPwhashStrNeedsRehashFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumPwhashStrVerifyFunction.php` | 0 | 3 |
@@ -1811,6 +1812,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_crypto_kx_seed_keypair.php` | 0 | 2 |
 | `ext/sodium/sodium_crypto_kx_server_session_keys.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_pwhash.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256_str.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256_str_verify.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_pwhash_str.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_pwhash_str_needs_rehash.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_pwhash_str_verify.php` | 0 | 1 |
@@ -5101,7 +5105,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrpos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrrchr.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringStrrev.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrrev.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrrpos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrspn.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrstr.php` | 0 | 1 |
@@ -9108,157 +9112,157 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 1005)
 - new Variable (line 1006)
 - new HashTable (line 1018)
-- new Variable (line 1025)
-- new DomNodeState (line 1051)
-- new DomNodeState (line 1109)
-- new ObjectEntry (line 1141)
-- new DomNodeState (line 1146)
-- new Variable (line 1169)
-- new ObjectEntry (line 1188)
-- new DomNodeState (line 1193)
-- new Variable (line 1216)
-- new Variable (line 1237)
-- new ObjectEntry (line 1264)
-- new DomNodeState (line 1273)
-- new Variable (line 1285)
-- new ObjectEntry (line 1322)
-- new DomNodeState (line 1338)
-- new DOMException (line 1385)
-- new Variable (line 1389)
-- new Variable (line 1395)
-- new DOMException (line 1404)
-- new Variable (line 1442)
-- new DOMException (line 1462)
-- new Variable (line 1465)
-- new DOMException (line 1484)
-- new Variable (line 1516)
-- new DOMException (line 1528)
-- new DOMException (line 1541)
-- new Variable (line 1550)
-- new DOMException (line 1716)
-- new DOMException (line 1768)
-- new DOMException (line 1781)
-- new DOMException (line 1804)
-- new DOMException (line 1817)
-- new DOMException (line 1821)
-- new DOMException (line 1836)
-- new DOMException (line 1848)
-- new DOMException (line 1855)
-- new DOMException (line 1870)
-- new DOMException (line 1883)
-- new DOMException (line 2072)
-- new DOMException (line 2137)
-- new DOMException (line 2190)
-- new DOMException (line 2246)
-- new DOMException (line 2250)
-- new DOMException (line 2263)
-- new DOMException (line 2267)
-- new DOMException (line 2279)
-- new DOMException (line 2292)
-- new DOMException (line 2302)
-- new DOMException (line 3212)
-- new DOMException (line 3228)
-- new ObjectEntry (line 3426)
-- new DomNodeState (line 3431)
-- new ObjectEntry (line 3447)
-- new DomNodeState (line 3452)
-- new ObjectEntry (line 3468)
-- new DomNodeState (line 3473)
-- new DOMException (line 3512)
-- new DOMException (line 3522)
-- new DOMException (line 3535)
-- new DOMException (line 3554)
-- new ObjectEntry (line 3642)
-- new DomNodeState (line 3647)
-- new Variable (line 3656)
-- new ObjectEntry (line 3666)
-- new DomNodeState (line 3671)
-- new Variable (line 3681)
-- new ObjectEntry (line 4541)
-- new DomNodeState (line 4543)
-- new ObjectEntry (line 5048)
-- new DomNodeState (line 5050)
-- new ObjectEntry (line 5078)
-- new DomNodeState (line 5080)
-- new ObjectEntry (line 5313)
-- new DomNodeState (line 5318)
-- new DOMException (line 5717)
-- new DOMException (line 5733)
-- new Variable (line 5751)
-- new DOMException (line 5765)
-- new DOMException (line 5768)
-- new DOMException (line 5778)
-- new Error (line 5808)
-- new DOMException (line 5814)
-- new DOMException (line 5828)
-- new DOMException (line 6033)
-- new DOMException (line 6230)
-- new DOMException (line 6234)
-- new DOMException (line 6323)
-- new DOMException (line 6327)
-- new DOMException (line 6385)
-- new DOMException (line 6402)
-- new DOMException (line 6434)
-- new DOMException (line 6476)
-- new DOMException (line 6503)
-- new DOMException (line 7400)
-- new Variable (line 7455)
-- new DOMException (line 7742)
-- new DOMException (line 7881)
-- new DOMException (line 7926)
-- new HashTable (line 8011)
-- new Variable (line 8015)
-- new ObjectEntry (line 8037)
-- new DomNodeState (line 8041)
-- new Variable (line 8048)
-- new ObjectEntry (line 8066)
-- new DomNodeState (line 8070)
-- new Variable (line 8077)
-- new ObjectEntry (line 8095)
-- new DomNodeState (line 8099)
-- new Variable (line 8106)
-- new DOMException (line 8189)
-- new HashTable (line 8465)
-- new Variable (line 8478)
-- new ObjectEntry (line 8520)
-- new DomNodeState (line 8524)
-- new Variable (line 8533)
-- new ObjectEntry (line 8583)
-- new DomNodeState (line 8586)
-- new Variable (line 8594)
-- new Variable (line 8799)
-- new DOMException (line 8936)
-- new DOMException (line 8943)
-- new DOMException (line 8950)
-- new DOMException (line 8954)
-- new DOMException (line 8957)
-- new DOMException (line 8966)
-- new DOMException (line 8978)
-- new Variable (line 9088)
-- new DOMException (line 10183)
-- new Variable (line 10242)
-- new Variable (line 10265)
-- new Variable (line 10294)
-- new Variable (line 10332)
-- new DOMException (line 10343)
-- new Variable (line 10345)
-- new DOMException (line 10519)
-- new DOMException (line 10546)
-- new DOMException (line 10582)
-- new DOMException (line 10678)
-- new DOMException (line 10686)
-- new DOMException (line 10699)
-- new DOMException (line 10710)
-- new DOMException (line 10715)
-- new DOMException (line 10741)
-- new DOMException (line 10762)
-- new DOMException (line 10820)
-- new DOMException (line 10825)
-- new DOMException (line 10828)
-- new DOMException (line 10831)
-- new DOMException (line 10860)
-- new Error (line 11902)
-- new Error (line 11906)
+- new Variable (line 1026)
+- new DomNodeState (line 1052)
+- new DomNodeState (line 1110)
+- new ObjectEntry (line 1142)
+- new DomNodeState (line 1147)
+- new Variable (line 1170)
+- new ObjectEntry (line 1189)
+- new DomNodeState (line 1194)
+- new Variable (line 1217)
+- new Variable (line 1238)
+- new ObjectEntry (line 1265)
+- new DomNodeState (line 1274)
+- new Variable (line 1286)
+- new ObjectEntry (line 1323)
+- new DomNodeState (line 1339)
+- new DOMException (line 1386)
+- new Variable (line 1390)
+- new Variable (line 1396)
+- new DOMException (line 1405)
+- new Variable (line 1443)
+- new DOMException (line 1463)
+- new Variable (line 1466)
+- new DOMException (line 1485)
+- new Variable (line 1517)
+- new DOMException (line 1529)
+- new DOMException (line 1542)
+- new Variable (line 1551)
+- new DOMException (line 1717)
+- new DOMException (line 1769)
+- new DOMException (line 1782)
+- new DOMException (line 1805)
+- new DOMException (line 1818)
+- new DOMException (line 1822)
+- new DOMException (line 1837)
+- new DOMException (line 1849)
+- new DOMException (line 1856)
+- new DOMException (line 1871)
+- new DOMException (line 1884)
+- new DOMException (line 2073)
+- new DOMException (line 2138)
+- new DOMException (line 2191)
+- new DOMException (line 2247)
+- new DOMException (line 2251)
+- new DOMException (line 2264)
+- new DOMException (line 2268)
+- new DOMException (line 2280)
+- new DOMException (line 2293)
+- new DOMException (line 2303)
+- new DOMException (line 3213)
+- new DOMException (line 3229)
+- new ObjectEntry (line 3427)
+- new DomNodeState (line 3432)
+- new ObjectEntry (line 3448)
+- new DomNodeState (line 3453)
+- new ObjectEntry (line 3469)
+- new DomNodeState (line 3474)
+- new DOMException (line 3513)
+- new DOMException (line 3523)
+- new DOMException (line 3536)
+- new DOMException (line 3555)
+- new ObjectEntry (line 3643)
+- new DomNodeState (line 3648)
+- new Variable (line 3657)
+- new ObjectEntry (line 3667)
+- new DomNodeState (line 3672)
+- new Variable (line 3682)
+- new ObjectEntry (line 4542)
+- new DomNodeState (line 4544)
+- new ObjectEntry (line 5049)
+- new DomNodeState (line 5051)
+- new ObjectEntry (line 5079)
+- new DomNodeState (line 5081)
+- new ObjectEntry (line 5314)
+- new DomNodeState (line 5319)
+- new DOMException (line 5718)
+- new DOMException (line 5734)
+- new Variable (line 5752)
+- new DOMException (line 5766)
+- new DOMException (line 5769)
+- new DOMException (line 5779)
+- new Error (line 5809)
+- new DOMException (line 5815)
+- new DOMException (line 5829)
+- new DOMException (line 6034)
+- new DOMException (line 6231)
+- new DOMException (line 6235)
+- new DOMException (line 6324)
+- new DOMException (line 6328)
+- new DOMException (line 6386)
+- new DOMException (line 6403)
+- new DOMException (line 6435)
+- new DOMException (line 6477)
+- new DOMException (line 6504)
+- new DOMException (line 7401)
+- new Variable (line 7456)
+- new DOMException (line 7743)
+- new DOMException (line 7882)
+- new DOMException (line 7927)
+- new HashTable (line 8012)
+- new Variable (line 8016)
+- new ObjectEntry (line 8038)
+- new DomNodeState (line 8042)
+- new Variable (line 8049)
+- new ObjectEntry (line 8067)
+- new DomNodeState (line 8071)
+- new Variable (line 8078)
+- new ObjectEntry (line 8096)
+- new DomNodeState (line 8100)
+- new Variable (line 8107)
+- new DOMException (line 8190)
+- new HashTable (line 8466)
+- new Variable (line 8479)
+- new ObjectEntry (line 8521)
+- new DomNodeState (line 8525)
+- new Variable (line 8534)
+- new ObjectEntry (line 8584)
+- new DomNodeState (line 8587)
+- new Variable (line 8595)
+- new Variable (line 8800)
+- new DOMException (line 8937)
+- new DOMException (line 8944)
+- new DOMException (line 8951)
+- new DOMException (line 8955)
+- new DOMException (line 8958)
+- new DOMException (line 8967)
+- new DOMException (line 8979)
+- new Variable (line 9089)
+- new DOMException (line 10184)
+- new Variable (line 10243)
+- new Variable (line 10266)
+- new Variable (line 10295)
+- new Variable (line 10333)
+- new DOMException (line 10344)
+- new Variable (line 10346)
+- new DOMException (line 10520)
+- new DOMException (line 10547)
+- new DOMException (line 10583)
+- new DOMException (line 10679)
+- new DOMException (line 10687)
+- new DOMException (line 10700)
+- new DOMException (line 10711)
+- new DOMException (line 10716)
+- new DOMException (line 10742)
+- new DOMException (line 10763)
+- new DOMException (line 10821)
+- new DOMException (line 10826)
+- new DOMException (line 10829)
+- new DOMException (line 10832)
+- new DOMException (line 10861)
+- new Error (line 11903)
+- new Error (line 11907)
 - 465 class method(s)
 - 3 closure(s)
 
@@ -11095,14 +11099,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 32)
-- new ArgumentCountError (line 50)
-- new ArgumentCountError (line 70)
-- new ArgumentCountError (line 95)
-- new ArgumentCountError (line 115)
-- new ArgumentCountError (line 136)
-- new ArgumentCountError (line 159)
-- new ArgumentCountError (line 178)
-- new ArgumentCountError (line 196)
+- new ArgumentCountError (line 51)
+- new ArgumentCountError (line 71)
+- new ArgumentCountError (line 96)
+- new ArgumentCountError (line 116)
+- new ArgumentCountError (line 137)
+- new ArgumentCountError (line 160)
+- new ArgumentCountError (line 180)
+- new ArgumentCountError (line 198)
 - 14 class method(s)
 
 ### `ext/gettext/Module.php`
@@ -11128,7 +11132,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gettext/VmGettextNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/gettext/VmGettextPure.php`
 
@@ -20094,12 +20098,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new sodium_crypto_pwhash_str (line 142)
 - new sodium_crypto_pwhash_str_verify (line 143)
 - new sodium_crypto_pwhash_str_needs_rehash (line 144)
-- new sodium_crypto_aead_aegis128l_encrypt (line 157)
-- new sodium_crypto_aead_aegis128l_decrypt (line 158)
-- new sodium_crypto_aead_aegis128l_keygen (line 159)
-- new sodium_crypto_aead_aegis256_encrypt (line 162)
-- new sodium_crypto_aead_aegis256_decrypt (line 163)
-- new sodium_crypto_aead_aegis256_keygen (line 164)
+- new sodium_crypto_pwhash_scryptsalsa208sha256 (line 145)
+- new sodium_crypto_pwhash_scryptsalsa208sha256_str (line 146)
+- new sodium_crypto_pwhash_scryptsalsa208sha256_str_verify (line 147)
+- new sodium_crypto_aead_aegis128l_encrypt (line 160)
+- new sodium_crypto_aead_aegis128l_decrypt (line 161)
+- new sodium_crypto_aead_aegis128l_keygen (line 162)
+- new sodium_crypto_aead_aegis256_encrypt (line 165)
+- new sodium_crypto_aead_aegis256_decrypt (line 166)
+- new sodium_crypto_aead_aegis256_keygen (line 167)
 - 3 class method(s)
 
 ### `ext/sodium/SodiumAeadDecryptFunction.php`
@@ -20257,6 +20264,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 - 1 closure(s)
 
+### `ext/sodium/SodiumPwhashScryptFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 3 class method(s)
+- 1 closure(s)
+
 ### `ext/sodium/SodiumPwhashStrFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -20352,26 +20366,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/VmSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 1870)
-- new Exception (line 1882)
-- new Exception (line 1891)
-- new Exception (line 1907)
-- new Exception (line 2841)
-- new Exception (line 2858)
-- new Exception (line 2873)
-- new Exception (line 2890)
-- new Exception (line 2907)
-- new Exception (line 2943)
-- new Exception (line 3021)
-- new Exception (line 3099)
-- new Exception (line 3177)
-- new Exception (line 3254)
-- new Exception (line 3330)
-- new Exception (line 3923)
-- new Exception (line 3926)
-- new SodiumException (line 4036)
-- new Exception (line 4038)
-- 238 class method(s)
+- new Exception (line 1933)
+- new Exception (line 1945)
+- new Exception (line 1954)
+- new Exception (line 1970)
+- new Exception (line 3035)
+- new Exception (line 3052)
+- new Exception (line 3067)
+- new Exception (line 3084)
+- new Exception (line 3101)
+- new Exception (line 3137)
+- new Exception (line 3215)
+- new Exception (line 3293)
+- new Exception (line 3371)
+- new Exception (line 3448)
+- new Exception (line 3524)
+- new Exception (line 4117)
+- new Exception (line 4120)
+- new SodiumException (line 4230)
+- new Exception (line 4232)
+- 246 class method(s)
 
 ### `ext/sodium/VmSodiumSecretstream.php`
 
@@ -20708,6 +20722,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `ext/sodium/sodium_crypto_pwhash.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256_str.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_pwhash_scryptsalsa208sha256_str_verify.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -25731,10 +25760,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitVfprintf.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 23)
-- new JITVariable (line 51)
-- new JITVariable (line 53)
-- new JITVariable (line 151)
+- new JITVariable (line 28)
+- new JITVariable (line 56)
+- new JITVariable (line 58)
+- new JITVariable (line 156)
 - 5 class method(s)
 
 ### `ext/standard/JitVfscanf.php`
@@ -30107,8 +30136,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1819)
-- new Error (line 1830)
+- new Error (line 1821)
+- new Error (line 1832)
 - 218 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -35216,8 +35245,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/vprintf_.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
-- new ArgumentCountError (line 47)
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 49)
 - 2 class method(s)
 
 ### `ext/standard/vsprintf.php`
@@ -42833,9 +42862,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrrev.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 118)
-- 7 class method(s)
-- 1 closure(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringStrrpos.php`
 
@@ -44780,7 +44807,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 496)
+- new Variable (line 498)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
