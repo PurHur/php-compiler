@@ -11,11 +11,11 @@
 
 > **Stable line (2026)** — First maintained **stable** release **[v1.0.0](https://github.com/PurHur/php-compiler/releases/tag/v1.0.0)**; **v1.1.0** prep adds M5 fast-path stability, enum/property-hook parity, `preg_match` JIT, `spl_autoload*`, and php-in-PHP JIT helpers. Demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path. Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
-**Snapshot (Jul 2026, `master` — v1.1.0 prep):** VM + AOT for shipped examples ✅ · examples web smoke ✅ · self-host spine **6271** / **6271** · **852** builtins · M5 fast + strict ✅ · VM probe ~**20ms**
+**Snapshot (Jul 2026, `master` — v1.1.0 prep):** VM + AOT for shipped examples ✅ · examples web smoke ✅ · self-host spine **6302** / **6302** · **1555** builtins · M5 fast ✅ / strict 🚧 ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) · VM probe ~**20ms**
 
 ---
 
-## Current implementation status (June 2026)
+## Current implementation status (July 2026)
 
 | Area | State | Notes |
 |------|--------|--------|
@@ -23,7 +23,7 @@
 | **AOT (`phpc build`)** | ✅ For curated subset | Standalone binaries for examples **000–009** and small CGI apps; not arbitrary Composer stacks |
 | **JIT (`bin/jit.php`)** | 🚧 Partial | LLVM IR for many constructs; **MCJIT execute** still flaky ([#98](https://github.com/PurHur/php-compiler/issues/98)); EH scripts VM-fallback ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
 | **Language wave 3** | ✅ Closed batch | **12/12** language + **13/13** stdlib tracker items ([#1380](https://github.com/PurHur/php-compiler/issues/1380)); closures, try/catch, generators (VM), `parent::class`, backed enums (VM), intersection AOT checks |
-| **Self-host north star** | ✅ ~90% | M5 fast gate green; spine **6271** / **6271**; vendor prelink **3/3** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| **Self-host north star** | 🚧 ~85% | M5 fast gate green, `--strict` red ([#21417](https://github.com/PurHur/php-compiler/issues/21417)); spine **6302** / **6302**; vendor prelink **3/3** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 
 ### What you can rely on today
 
@@ -40,12 +40,12 @@ Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `c
 | Milestone | Status | What it means |
 |-----------|--------|----------------|
 | **M0–M1** | ✅ | `compiler_minimal` + compile-smoke bundles link and run natively |
-| **M2** | ✅ **6271** / **6271** | Full Phase A inventory in spine smoke; native link + lint ✅ |
+| **M2** | ✅ **6302** / **6302** | Full Phase A inventory in spine smoke; native link + lint ✅ |
 | **M3** | ✅ | HelloWorld strict native ✅; inventory argv `bin/compile.php` ✅ |
 | **M4** | ✅ | `make bootstrap-loop-probe` full ladder ✅ (gen-1→gen-2→gen-3 + full-revision) |
-| **M5** | ✅ | `make north-star5-verify-fast` (daily); `--strict` pre-merge ✅; vendor **3/3** ✅; gen-0 sidecars refreshed |
+| **M5** | 🚧 | `make north-star5-verify-fast` (daily) ✅; vendor **3/3** ✅; gen-0 sidecars refreshed; **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) |
 
-**Reproduce M0 smoke on a clean clone (verified Jun 2026):**
+**Reproduce M0 smoke on a clean clone (verified Jul 2026):**
 
 ```bash
 make docker-build-22   # once
@@ -130,7 +130,7 @@ composer install
 |------|---------|----------------|
 | **Hello, native** | `./phpc build -o /tmp/hello examples/000-HelloWorld/example.php && /tmp/hello` | Standalone executable, no `php` at runtime |
 | **Web app (VM)** | `./phpc serve examples/003-MiniWebApp` → open `http://127.0.0.1:8080/` | Router, templates, JSON API |
-| **Self-host smoke (M0)** | Docker: see [Current implementation status](#current-implementation-status-june-2026) | `compiler_minimal bundle OK` (needs LLVM 9 + patches) |
+| **Self-host smoke (M0)** | Docker: see [Current implementation status](#current-implementation-status-july-2026) | `compiler_minimal bundle OK` (needs LLVM 9 + patches) |
 
 Presenter walkthrough: [`docs/GETTING-STARTED.md`](docs/GETTING-STARTED.md) · public overview: [status site](https://purhur.github.io/php-compiler/docs/pages/index.html).
 
@@ -220,9 +220,9 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 - `phpc build`, `phpc deploy`, `phpc.json` project manifests — see [deploy-production.md](docs/deploy-production.md)
 - Reference **003-MiniWebApp**: router, templates, forms, native AOT execute on supported routes
 
-**Standard library (v1.1.0 prep — Jun 2026)**
+**Standard library (v1.1.0 prep — Jul 2026)**
 
-- **852** builtins in the auto-generated matrix — strings, arrays, JSON, `preg_*`, filesystem, streams, bcmath, mbstring
+- **1555** builtins in the auto-generated matrix — strings, arrays, JSON, `preg_*`, filesystem, streams, bcmath, mbstring
 - v1.1.0 batch: **`preg_match` / `preg_match_all` JIT**, **`spl_autoload*`** stack, enum-aware strict builtins, php-in-PHP `proc_open` paths
 - Core VM additions: `class_uses`, `class_alias`, `get_debug_type`, `iterator_to_array`, `array_chunk` (preserve keys), `settype`, `array_replace_recursive`, `json_validate`, `preg_last_error_msg`, `fdiv`, **DateTime** / **DateTimeZone** OOP ([#3104](https://github.com/PurHur/php-compiler/pull/3104))
 - **`array_map` / `array_filter` / `usort`** accept **closure** callbacks on VM ([#3086](https://github.com/PurHur/php-compiler/pull/3086))
@@ -259,7 +259,7 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 
 **Self-host (experimental, not “stable app” scope)**
 
-See [Current implementation status](#current-implementation-status-june-2026) for the full M0–M5 ladder. Summary: M0–M5 bootstrap gates ✅; spine **6271** / **6271**; M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 **`north-star5-verify-fast`** (daily) + **`--strict`** pre-merge ✅ ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). Recent: native spine bundle probe, fast VM execute smoke ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), `GeneratorYieldSourceMarker` spine unit ([#10356](https://github.com/PurHur/php-compiler/pull/10356)).
+See [Current implementation status](#current-implementation-status-july-2026) for the full M0–M5 ladder. Summary: M0–M5 bootstrap gates ✅; spine **6302** / **6302**; M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 **`north-star5-verify-fast`** (daily) ✅ — **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). Recent: native spine bundle probe, fast VM execute smoke ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), `GeneratorYieldSourceMarker` spine unit ([#10356](https://github.com/PurHur/php-compiler/pull/10356)).
 
 **What we do not target in v1.x**
 
