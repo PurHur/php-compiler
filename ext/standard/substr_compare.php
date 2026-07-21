@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\StringSubstrCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitOperandTypeLabel;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -76,15 +77,21 @@ final class substr_compare extends Internal
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
 
-        // Null Z_PARAM_STR before ensureLinked — helper link clears insert block (#20164 / #20007).
+        // Compile-time soft-null fold (#21515) — DEP + host-evaluate when operands are literals.
+        $folded = self::tryFoldCompileTimeSoftNull($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
+        // Soft-null before ensureLinked — helper link clears insert block (#21515 / peer #20007).
         if (self::isCompileTimeNull($args[0])) {
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr_compare', 0, 'haystack');
-            if ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr_compare', 0, 'haystack');
+            if ($context->callerStrictTypes) {
                 return $i64->constInt(0, false);
             }
         } elseif (self::isCompileTimeNull($args[1])) {
-            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'substr_compare', 1, 'needle');
-            if ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'substr_compare', 1, 'needle');
+            if ($context->callerStrictTypes) {
                 return $i64->constInt(0, false);
             }
         }
@@ -108,14 +115,67 @@ final class substr_compare extends Internal
                 $i32
             );
         }
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20164; same as strncmp/substr).
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr_compare', 0, 'haystack'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'substr_compare', 1, 'needle'));
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21515, reverts #20164 TypeError).
+        $p0 = $this->stringDataPtr($context, self::jitStringArg($context, $args[0], 0, 'haystack'));
+        $p1 = $this->stringDataPtr($context, self::jitStringArg($context, $args[1], 1, 'needle'));
         $offset = self::lowerStrictIntArg($context, $args[2], 'substr_compare', 3, 'offset');
         $fn = $context->lookupFunction('substr_compare');
         $raw = $context->builder->call($fn, $p0, $p1, $offset, $lengthVal, $ci);
 
         return $context->builder->sExt($raw, $i64);
+    }
+
+    /**
+     * Compile-time soft-null fold — emit DEP then host-evaluate when all operands are literals (#21515).
+     */
+    private static function tryFoldCompileTimeSoftNull(Context $context, array $args): ?Value
+    {
+        if ($context->callerStrictTypes) {
+            return null;
+        }
+        $hayNull = self::isCompileTimeNull($args[0]);
+        $needleNull = self::isCompileTimeNull($args[1]);
+        if (!$hayNull && !$needleNull) {
+            return null;
+        }
+        $hayLit = $hayNull ? '' : JitStringArg::compileTimeLiteral($args[0]);
+        $needleLit = $needleNull ? '' : JitStringArg::compileTimeLiteral($args[1]);
+        if (null === $hayLit || null === $needleLit) {
+            return null;
+        }
+        if (null === $args[2]->compileTimeLong) {
+            return null;
+        }
+        $offset = $args[2]->compileTimeLong;
+        $argc = \count($args);
+        $length = null;
+        if ($argc >= 4) {
+            if (JITVariable::TYPE_VALUE === $args[3]->type && ($args[3]->isNullConstant ?? false)) {
+                $length = null;
+            } elseif (null !== $args[3]->compileTimeLong) {
+                $length = $args[3]->compileTimeLong;
+            } else {
+                return null;
+            }
+        }
+        $caseInsensitive = false;
+        if (5 === $argc) {
+            if (null === $args[4]->compileTimeLong) {
+                return null;
+            }
+            $caseInsensitive = 0 !== $args[4]->compileTimeLong;
+        }
+        if ($hayNull) {
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr_compare', 0, 'haystack');
+        }
+        if ($needleNull) {
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[1], 'substr_compare', 1, 'needle');
+        }
+
+        return $context->getTypeFromString('int64')->constInt(
+            VmString::substr_compare($hayLit, $needleLit, $offset, $length, $caseInsensitive),
+            true
+        );
     }
 
     private static function isCompileTimeNull(JITVariable $arg): bool
@@ -148,9 +208,34 @@ final class substr_compare extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'substr_compare', $paramName)->toString();
         }
 
-        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20164; same as strncmp/substr).
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21515, peers strncmp #21317).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
+            'substr_compare',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'substr_compare',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString(
+            $context,
+            $arg,
             'substr_compare',
             $argIndex,
             $paramName

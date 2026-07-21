@@ -34,7 +34,7 @@ final class VmString
      * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222, #19254, #19318).
      *
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
-     * wordwrap/str_pad, substr_compare, str_increment/str_decrement,
+     * wordwrap/str_pad, str_increment/str_decrement,
      * and other typed string builtins use this guard (php-src ext/standard/string.c).
      * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords are Z_PARAM_STR TypeError on 8.4 (#20080).
      * strlen/strtolower/strtoupper/strrev, trim/ltrim/rtrim/chop (#21404, reverts #21350),
@@ -53,7 +53,7 @@ final class VmString
      * htmlspecialchars/htmlentities/nl2br/addslashes soft-null on 8.4 (#21405/#21406; reverts #21351 TypeError).
      * convert_uudecode soft-null on 8.4 (#21420; empty decode → warning+false like Zend).
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
-     * substr_compare is Z_PARAM_STR TypeError on 8.4 (#20164), not soft-null.
+     * substr_compare soft-null on 8.4 (#21515, reverts #20164 TypeError; peers strncmp #21317).
      * glob()/fnmatch() pattern soft-null on 8.4 (#21366, ext/standard/file.c, fnmatch.c).
      * error_log($message), fsockopen/pfsockopen/stream_socket_client hostname/remote,
      * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
@@ -93,6 +93,7 @@ final class VmString
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
+     * substr_compare haystack/needle (#21515, reverts #20164 TypeError),
      * json_decode/json_validate $json, unserialize $data (#21223).
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
      * hex2bin/convert_uuencode/convert_uudecode/sscanf($string), pack($values) soft-null (#21209/#21420).
