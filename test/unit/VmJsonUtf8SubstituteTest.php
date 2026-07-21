@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmJsonFlags;
 use PHPCompiler\ext\standard\VmJsonFormat;
 use PHPUnit\Framework\TestCase;
 
-/** json_encode() JSON_INVALID_UTF8_SUBSTITUTE (#9964). */
+/** json_encode() JSON_INVALID_UTF8_SUBSTITUTE / IGNORE (#9964, #21723). */
 final class VmJsonUtf8SubstituteTest extends TestCase
 {
     public function testSubstituteFlagEncodesReplacementCharacter(): void
@@ -28,5 +28,23 @@ final class VmJsonUtf8SubstituteTest extends TestCase
             VmJsonFlags::INVALID_UTF8_SUBSTITUTE | VmJsonFlags::THROW_ON_ERROR
         );
         $this->assertSame('"\ufffd1"', $encoded);
+    }
+
+    public function testIgnoreFlagStripsMalformedBytes(): void
+    {
+        $encoded = VmJsonFormat::encodeExported(
+            'a'."\x80".'b',
+            VmJsonFlags::INVALID_UTF8_IGNORE
+        );
+        $this->assertSame('"ab"', $encoded);
+    }
+
+    public function testIgnoreWinsOverSubstitute(): void
+    {
+        $encoded = VmJsonFormat::encodeExported(
+            'a'."\x80".'b',
+            VmJsonFlags::INVALID_UTF8_IGNORE | VmJsonFlags::INVALID_UTF8_SUBSTITUTE
+        );
+        $this->assertSame('"ab"', $encoded);
     }
 }

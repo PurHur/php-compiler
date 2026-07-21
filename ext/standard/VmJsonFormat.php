@@ -290,12 +290,16 @@ final class VmJsonFormat
     }
 
     /**
-     * php-src ext/json/php_json_encoder.c — reject malformed UTF-8 unless JSON_INVALID_UTF8_* (#9205).
+     * php-src ext/json/php_json_encoder.c — reject malformed UTF-8 unless JSON_INVALID_UTF8_* (#9205, #21723).
+     * IGNORE strips bad bytes; SUBSTITUTE emits U+FFFD; IGNORE wins when both are set (Zend).
      */
     private static function prepareUtf8StringForEncode(string $value, int $flags): string
     {
         if (VmJsonUtf8::isValidUtf8($value)) {
             return $value;
+        }
+        if (0 !== ($flags & VmJsonFlags::INVALID_UTF8_IGNORE)) {
+            return VmJsonUtf8::stripInvalidUtf8($value);
         }
         if (VmJsonFlags::substitutesInvalidUtf8($flags)) {
             return VmJsonUtf8::substituteInvalidUtf8($value);

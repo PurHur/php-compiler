@@ -80,14 +80,16 @@ final class json_encode extends Internal
             throw new \LogicException('json_encode() accepts at most three arguments');
         }
 
-        $flagsVal = self::lowerFlagsJitValue($context, $args);
+        // Resolve compile-time flags before lowerIntBuiltinArg mutates the arg shape.
         $knownFlags = self::tryCompileTimeFlags($context, $args);
+        $flagsVal = self::lowerFlagsJitValue($context, $args);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
-        if (null !== $literal) {
-            $encoded = \json_encode($literal, $knownFlags ?? 0);
+        if (null !== $literal && null !== $knownFlags) {
+            // PHP-in-PHP fold — same encoder as VM/runtime (#21723); avoid host ext/json skew.
+            $encoded = VmJsonFormat::encodeExported($literal, $knownFlags);
             if (false === $encoded) {
-                if (VmJsonFlags::throwsOnError($knownFlags ?? 0)) {
-                    throw new \JsonException(\json_last_error_msg(), \json_last_error());
+                if (VmJsonFlags::throwsOnError($knownFlags)) {
+                    throw new \JsonException(VmJson::lastErrorMsg(), VmJson::lastError());
                 }
                 throw new \LogicException('json_encode() failed');
             }
@@ -168,10 +170,27 @@ final class json_encode extends Internal
             return null;
         }
         $lib = $context->llvm->lib;
-        if (null === $lib->LLVMIsAConstantInt($flagsArg->value->value)) {
+        if (null !== $lib->LLVMIsAConstantInt($flagsArg->value->value)) {
+            return (int) $lib->LLVMConstIntGetZExtValue($flagsArg->value->value);
+        }
+        // JSON_* constants lower as loads from registered globals (define_.php peer).
+        // Avoid Value::isALoadInst() — php-llvm fromBool TypeError on LLVMIsALoadInst (#21723).
+        if (null === $flagsArg->value || null === $lib->LLVMIsALoadInst($flagsArg->value->value)) {
+            return null;
+        }
+        $ptr = $flagsArg->value->getOperand(0);
+        $name = $lib->LLVMGetValueName($ptr->value)?->toString() ?? '';
+        if ('' === $name || !isset($context->constants[$name])) {
+            return null;
+        }
+        if ($context->constants[$name][0] !== $flagsArg->type) {
+            return null;
+        }
+        $phpVar = $context->runtime->vmContext->constantFetch($name);
+        if (null === $phpVar || Variable::TYPE_INTEGER !== $phpVar->type) {
             return null;
         }
 
-        return (int) $lib->LLVMConstIntGetZExtValue($flagsArg->value->value);
+        return $phpVar->toInt();
     }
 }
