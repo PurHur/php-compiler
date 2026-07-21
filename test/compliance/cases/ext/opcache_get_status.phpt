@@ -1,5 +1,5 @@
 --TEST--
-ext opcache probe API returns Zend-shaped disabled status (issue #4421)
+ext opcache probe API — get_status false when disabled (#4421, #21755)
 --FILE--
 <?php
 var_export(function_exists('opcache_get_status'));
@@ -9,11 +9,9 @@ echo "\n";
 var_export(function_exists('opcache_reset'));
 echo "\n";
 $st = opcache_get_status(false);
+var_export($st);
+echo "\n";
 var_export(is_array($st));
-echo "\n";
-var_export($st['opcache_enabled']);
-echo "\n";
-var_export(isset($st['cache_full'], $st['memory_usage'], $st['opcache_statistics']));
 echo "\n";
 $cfg = opcache_get_configuration();
 var_export(is_array($cfg));
@@ -29,9 +27,8 @@ echo "\n";
 true
 true
 true
-true
 false
-true
+false
 true
 true
 false

@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\opcache;
 
 use PHPCompiler\Frame;
 
-/** opcache_get_status() — Zend-shaped disabled probe (php-src ext/opcache; issue #4421). */
+/** opcache_get_status() — returns false when OPcache is not active (php-src ZendAccelerator.c; #21755). */
 final class opcache_get_status extends OpcacheFunction
 {
     public function __construct()
@@ -25,7 +25,9 @@ final class opcache_get_status extends OpcacheFunction
         if (null === $frame->returnVar) {
             return;
         }
-        $includeScripts = $this->optionalBoolArg($frame, 0, true);
-        $frame->returnVar->array(VmOpcache::disabledStatus($includeScripts));
+        if ($argc > 0) {
+            $this->optionalBoolArg($frame, 0, true);
+        }
+        $frame->returnVar->bool(false);
     }
 }
