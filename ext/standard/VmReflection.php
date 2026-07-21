@@ -1963,6 +1963,12 @@ final class VmReflection
     public static function resolveClassFromArg(Context $ctx, Variable $arg): ClassEntry
     {
         $arg = $arg->resolveIndirect();
+        // php-src ext/reflection/php_reflection.c — null class/object name → "" (#21770).
+        if (Variable::TYPE_NULL === $arg->type) {
+            ReflectionSupport::throwReflectionException(
+                ReflectionSupport::classNotFoundMessage('')
+            );
+        }
         if (Variable::TYPE_STRING === $arg->type) {
             $entry = self::resolveClassEntry($ctx, $arg->toString());
             if (null === $entry) {
