@@ -23,7 +23,8 @@ final class SpaceshipCompareJitHelperTest extends TestCase
         $this->assertStringContainsString('CompareJitHelperScalars', $source);
         $this->assertStringNotContainsString('OBJECT_HELPER', $source);
         $this->assertStringNotContainsString('HASHTABLE_HELPER', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
     }
 
     public function testSpaceshipCompareKernelRoutesScalarsThroughHelper(): void

@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\JitSpaceshipCompareKernel;
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for spaceship (<=>) — CompareJitHelperScalars NestedJIT + LLVM object/ht (#9381, #21109).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SessionCreateIdRuntime #21941).
  * php-src: Zend/zend_operators.c; VM SSOT {@see \PHPCompiler\VM\Variable}.
  */
 final class SpaceshipRuntime
@@ -114,23 +114,13 @@ final class SpaceshipRuntime
             return;
         }
 
+        // ABI decls before NestedJIT so CompareJitHelperScalars can resolve externs (#9381/#21109).
         JitSpaceshipCompareKernel::declareAbiFunctions($context);
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CompareJitHelperScalars.php');
-            if (null === $block) {
-                throw new \LogicException('CompareJitHelperScalars.php parseAndCompile failed (#9381/#21109)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9381/#21109)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21949'
+        );
     }
 }
