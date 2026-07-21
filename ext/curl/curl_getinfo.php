@@ -38,9 +38,11 @@ final class curl_getinfo extends Internal
             return;
         }
         $easy = VmCurlArg::requireEasyObject($frame->calledArgs[0], 'curl_getinfo', 1);
+        // php-src curl.stub.php: ?int $option = null — explicit null keeps all-info array
+        // (ext/curl/interface.c PHP_FUNCTION(curl_getinfo); #21882). Do not soft-int coerce.
         $option = null;
         if ($argc >= 2) {
-            $option = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'curl_getinfo', 2, 'option');
+            $option = VmMath::parseNullableIntBuiltinArgForFrame($frame, 1, 'curl_getinfo', 2, 'option');
         }
         $info = VmCurlEasy::getinfo($easy, $option);
         self::assignReturn($frame->returnVar, $info);
