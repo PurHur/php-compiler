@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6250 |
-| Phase A inventory files (M2 ratio SSOT) | 6250 |
+| PHP files on vm.php path | 6271 |
+| Phase A inventory files (M2 ratio SSOT) | 6271 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19735 |
+| Source constructs flagged (warnings) | 19800 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -775,6 +775,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gmp/gmp_sub.php` | 0 | 2 |
 | `ext/gmp/gmp_testbit.php` | 0 | 2 |
 | `ext/gmp/gmp_xor.php` | 0 | 2 |
+| `ext/gnupg/BuiltinClasses.php` | 0 | 1 |
+| `ext/gnupg/GnupgExtensionPolicy.php` | 0 | 1 |
+| `ext/gnupg/GnupgFunction.php` | 0 | 1 |
+| `ext/gnupg/Module.php` | 0 | 14 |
+| `ext/gnupg/VmGnupgArg.php` | 0 | 1 |
+| `ext/gnupg/VmGnupgCore.php` | 0 | 4 |
+| `ext/gnupg/VmGnupgNative.php` | 0 | 2 |
+| `ext/gnupg/VmGnupgObject.php` | 0 | 5 |
+| `ext/gnupg/gnupg_adddecryptkey.php` | 0 | 2 |
+| `ext/gnupg/gnupg_addencryptkey.php` | 0 | 2 |
+| `ext/gnupg/gnupg_addsignkey.php` | 0 | 2 |
+| `ext/gnupg/gnupg_cleardecryptkeys.php` | 0 | 2 |
+| `ext/gnupg/gnupg_clearencryptkeys.php` | 0 | 2 |
+| `ext/gnupg/gnupg_clearsignkeys.php` | 0 | 2 |
+| `ext/gnupg/gnupg_decrypt.php` | 0 | 2 |
+| `ext/gnupg/gnupg_encrypt.php` | 0 | 2 |
+| `ext/gnupg/gnupg_geterror.php` | 0 | 2 |
+| `ext/gnupg/gnupg_init.php` | 0 | 2 |
+| `ext/gnupg/gnupg_keyinfo.php` | 0 | 7 |
+| `ext/gnupg/gnupg_sign.php` | 0 | 2 |
+| `ext/gnupg/gnupg_verify.php` | 0 | 6 |
 | `ext/hash/BuiltinClasses.php` | 0 | 1 |
 | `ext/hash/HashAlgosJitHelper.php` | 0 | 1 |
 | `ext/hash/HashContextDebugInfo.php` | 0 | 3 |
@@ -5541,7 +5562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 109 |
+| `lib/Runtime.php` | 0 | 110 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -11600,6 +11621,154 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/gnupg/GnupgExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/gnupg/GnupgFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/gnupg/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new gnupg_init (line 38)
+- new gnupg_addencryptkey (line 39)
+- new gnupg_adddecryptkey (line 40)
+- new gnupg_addsignkey (line 41)
+- new gnupg_encrypt (line 42)
+- new gnupg_decrypt (line 43)
+- new gnupg_sign (line 44)
+- new gnupg_verify (line 45)
+- new gnupg_cleardecryptkeys (line 46)
+- new gnupg_clearencryptkeys (line 47)
+- new gnupg_clearsignkeys (line 48)
+- new gnupg_geterror (line 49)
+- new gnupg_keyinfo (line 50)
+- 3 class method(s)
+
+### `ext/gnupg/VmGnupgArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/gnupg/VmGnupgCore.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 57)
+- new Variable (line 353)
+- 16 class method(s)
+- 2 closure(s)
+
+### `ext/gnupg/VmGnupgNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 37 class method(s)
+- 2 closure(s)
+
+### `ext/gnupg/VmGnupgObject.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 41)
+- new ObjectEntry (line 49)
+- new Variable (line 62)
+- new Exception (line 106)
+- 11 class method(s)
+
+### `ext/gnupg/gnupg_adddecryptkey.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_addencryptkey.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_addsignkey.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_cleardecryptkeys.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_clearencryptkeys.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_clearsignkeys.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_decrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_encrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_geterror.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_keyinfo.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- new HashTable (line 43)
+- new Variable (line 45)
+- new HashTable (line 57)
+- new Variable (line 60)
+- new Variable (line 76)
+- 2 class method(s)
+
+### `ext/gnupg/gnupg_sign.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gnupg/gnupg_verify.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- new HashTable (line 40)
+- new HashTable (line 42)
+- new Variable (line 44)
+- new Variable (line 52)
 - 1 class method(s)
 
 ### `ext/hash/BuiltinClasses.php`
@@ -25769,7 +25938,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTempnam.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/JitTimezoneAbbreviationsList.php`
 
@@ -45756,29 +45925,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\dba\Module (line 280)
 - new ext\mailparse\Module (line 281)
 - new ext\enchant\Module (line 282)
-- new ext\pspell\Module (line 283)
-- new ext\tidy\Module (line 284)
-- new ext\pdo\Module (line 285)
-- new ext\phar\Module (line 286)
-- new ext\uri\Module (line 287)
-- new ext\uuid\Module (line 288)
-- new ext\uploadprogress\Module (line 289)
-- new ext\apcu\Module (line 290)
-- new ext\sysvshm\Module (line 291)
-- new ext\sysvsem\Module (line 292)
-- new ext\sysvmsg\Module (line 293)
-- new ext\reflection\Module (line 294)
-- new ext\standard\Module (line 295)
-- new JIT (line 371)
-- new JITContext (line 385)
-- new SealedClassPreprocessor (line 451)
-- new StaticClassPreprocessor (line 454)
-- new SourcePreprocessor\PropertyHooks (line 457)
-- new State (line 598)
-- new ReflectionProperty (line 625)
-- new ReflectionProperty (line 628)
-- new LintCompiler (line 1039)
-- new Variable (line 1169)
+- new ext\gnupg\Module (line 283)
+- new ext\pspell\Module (line 284)
+- new ext\tidy\Module (line 285)
+- new ext\pdo\Module (line 286)
+- new ext\phar\Module (line 287)
+- new ext\uri\Module (line 288)
+- new ext\uuid\Module (line 289)
+- new ext\uploadprogress\Module (line 290)
+- new ext\apcu\Module (line 291)
+- new ext\sysvshm\Module (line 292)
+- new ext\sysvsem\Module (line 293)
+- new ext\sysvmsg\Module (line 294)
+- new ext\reflection\Module (line 295)
+- new ext\standard\Module (line 296)
+- new JIT (line 372)
+- new JITContext (line 386)
+- new SealedClassPreprocessor (line 452)
+- new StaticClassPreprocessor (line 455)
+- new SourcePreprocessor\PropertyHooks (line 458)
+- new State (line 599)
+- new ReflectionProperty (line 626)
+- new ReflectionProperty (line 629)
+- new LintCompiler (line 1040)
+- new Variable (line 1170)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
