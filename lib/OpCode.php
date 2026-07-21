@@ -231,6 +231,12 @@ class OpCode {
     /** Guarded list destruct: scope slots to null when RHS is not unpackable (#4325, #10486). */
     public array $listUnpackNullInitSlots = [];
 
+    /**
+     * Guarded list destruct includes by-ref slots (`[&$r] = …` / `$r =& $rhs[$i]`).
+     * Non-array RHS must not skip ASSIGN_REF — Zend raises string-offset / scalar-as-array (#21910).
+     */
+    public bool $listUnpackHasByRef = false;
+
     public int $type;
     public ?int $arg1;
     public ?int $arg2;

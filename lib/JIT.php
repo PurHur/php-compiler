@@ -7548,6 +7548,25 @@ class JIT {
                     }
                     $destOp = $block->getOperand($op->arg1);
                     $srcOp = $block->getOperand($op->arg2);
+                    // Zend: cannot create references to/from string offsets (#21910).
+                    if ($this->context->hasVariableOp($destOp)) {
+                        $destProbe = $this->context->getVariableFromOp($destOp);
+                        if (JIT\StringOffsetHelper::isWritableCharOffsetLvalue($destProbe, $this->context)) {
+                            JIT\StringOffsetHelper::emitRefError($this->context);
+                            $this->context->builder->call($this->context->lookupFunction('abort'));
+                            $this->context->builder->clearInsertionPosition();
+                            break;
+                        }
+                    }
+                    if ($this->context->hasVariableOp($srcOp)) {
+                        $srcProbe = $this->context->getVariableFromOp($srcOp);
+                        if (JIT\StringOffsetHelper::isWritableCharOffsetLvalue($srcProbe, $this->context)) {
+                            JIT\StringOffsetHelper::emitRefError($this->context);
+                            $this->context->builder->call($this->context->lookupFunction('abort'));
+                            $this->context->builder->clearInsertionPosition();
+                            break;
+                        }
+                    }
                     $destName = JIT\OperandName::resolve($destOp);
                     $srcName = JIT\OperandName::resolve($srcOp);
                     if (null === $destName) {
@@ -7935,7 +7954,8 @@ class JIT {
                             $array,
                             $branchBlock,
                             $mergeBody,
-                            $block->getOperand($op->arg2)
+                            $block->getOperand($op->arg2),
+                            $op->listUnpackHasByRef
                         );
                         break;
                     }

@@ -44,6 +44,9 @@ final class ListUnpackHelper
     /**
      * Guarded `[]` / list() destructuring: skip assign path when RHS is not an array at run time (#4325, #4308, #10486).
      *
+     * When {@see $hasByRef} is true, non-array RHS must still run FETCH_DIM_W + ASSIGN_REF so Zend
+     * string-offset / scalar-as-array Errors surface (#21910).
+     *
      * @return bool true when assign-path opcodes should compile as unreachable stubs (compile-time non-array RHS)
      */
     public static function emitGuardedListUnpackCheck(
@@ -51,9 +54,16 @@ final class ListUnpackHelper
         Variable $array,
         \PHPLLVM\BasicBlock $branchBlock,
         \PHPLLVM\BasicBlock $mergeEntry,
-        ?Operand $arrayOp = null
+        ?Operand $arrayOp = null,
+        bool $hasByRef = false
     ): bool {
         if (self::isDefinitelyNonArrayAtCompileTime($context, $array, $arrayOp)) {
+            if ($hasByRef) {
+                // Fall through to dim fetch + ASSIGN_REF (#21910).
+                $context->builder->positionAtEnd($branchBlock);
+
+                return false;
+            }
             $context->builder->positionAtEnd($branchBlock);
             $context->builder->branch($mergeEntry);
             $deadBb = BasicBlockHelper::append($context, 'list_unpack_skip_assign');
@@ -67,7 +77,11 @@ final class ListUnpackHelper
         $context->builder->positionAtEnd($branchBlock);
         $context->builder->branchIf($isUnpackable, $assignBb, $nonUnpackableBb);
         $context->builder->positionAtEnd($nonUnpackableBb);
-        $context->builder->branch($mergeEntry);
+        if ($hasByRef) {
+            $context->builder->branch($assignBb);
+        } else {
+            $context->builder->branch($mergeEntry);
+        }
         // Numeric list slots warn per-key at dim fetch; spread tail keeps isList in TYPE_LIST_SPREAD_ASSIGN (#4841).
         $context->builder->positionAtEnd($assignBb);
 
