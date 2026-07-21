@@ -18,8 +18,8 @@ set_error_handler(static function (int $n, string $m): bool {
 
 $checks = [
     // count(null)/sizeof(null) always TypeError (Countable|array) — #21914 (re-#21771)
+    // array_keys(null) always TypeError (typed array) — #21915 (re-#21771)
     'array_merge' => static fn () => array_merge(null) === [],
-    'array_keys' => static fn () => array_keys(null) === [],
     'in_array' => static fn () => in_array('a', null) === false,
     'array_flip' => static fn () => array_flip(null) === [],
     'array_sum' => static fn () => array_sum(null) === 0,
