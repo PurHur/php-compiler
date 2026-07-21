@@ -78,11 +78,16 @@ final class setcookie extends Internal
         }
         $expiresI64 = $i64->constInt(0, false);
         if ($argc >= 3) {
-            JitLongArg::lower($context, $args[2], 'setcookie() expires');
-            if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-                throw new \LogicException('setcookie() expires must be an integer in this compiler build');
+            if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
+                if ($context->callerStrictTypes) {
+                    throw new \LogicException(
+                        'setcookie(): Argument #3 ($expires_or_options) must be of type array|int, null given'
+                    );
+                }
+                JitIntdiv::emitNullIntDeprecation($context, 'setcookie', 3, 'expires_or_options', 'array|int');
+            } else {
+                $expiresI64 = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'setcookie', 3, 'expires_or_options');
             }
-            $expiresI64 = $context->builder->sext($args[2]->value, $i64);
         }
         $pathPtr = $context->builder->load($context->constantStringFromString(''));
         if ($argc >= 4) {

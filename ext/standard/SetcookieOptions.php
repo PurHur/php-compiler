@@ -104,7 +104,19 @@ final class SetcookieOptions
         }
         $expires = 0;
         if ($argc >= 3) {
-            $expires = VmMath::parseIntBuiltinArg($args[2], $function, 2, 'expires');
+            $third = $args[2]->resolveIndirect();
+            if (Variable::TYPE_NULL === $third->type) {
+                if (VmMath::requiresForwardProfileStrictLongNull()) {
+                    throw new \TypeError(sprintf(
+                        '%s(): Argument #3 ($expires_or_options) must be of type array|int, null given',
+                        $function
+                    ));
+                }
+                VmNullNumberParamDeprecation::emit($frame, $function, 3, 'expires_or_options', 'array|int');
+                $expires = 0;
+            } else {
+                $expires = VmMath::parseIntBuiltinArg($args[2], $function, 3, 'expires_or_options', $frame);
+            }
         }
         $path = '';
         if ($argc >= 4) {
