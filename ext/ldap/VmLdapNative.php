@@ -115,16 +115,16 @@ final class VmLdapNative
         return (int) $ffi->ldap_set_option($ld, $option, \FFI::addr($box));
     }
 
-    public static function getOptionInt(\FFI\CData $ld, int $option): int
+    public static function getOptionInt(?\FFI\CData $ld, int $option): array
     {
         $ffi = self::requireFfi();
         $box = $ffi->new('int');
         $rc = (int) $ffi->ldap_get_option($ld, $option, \FFI::addr($box));
         if (self::LDAP_SUCCESS !== $rc) {
-            return 0;
+            return ['ok' => false, 'value' => 0];
         }
 
-        return (int) $box->cdata;
+        return ['ok' => true, 'value' => (int) $box->cdata];
     }
 
     public static function simpleBind(\FFI\CData $ld, ?string $dn, ?string $password): int
@@ -456,7 +456,7 @@ final class VmLdapNative
         $res[0] = null;
         $rrc = (int) $ffi->ldap_result($ld, (int) $msgid->cdata, 1, null, $res);
         if (-1 === $rrc || null === $res[0]) {
-            return ['ok' => false, 'errno' => self::getOptionInt($ld, self::LDAP_OPT_ERROR_NUMBER), 'value' => false];
+            return ['ok' => false, 'errno' => self::getOptionInt($ld, self::LDAP_OPT_ERROR_NUMBER)['value'], 'value' => false];
         }
         $ldapRes = $res[0];
         $genPass = $ffi->new('BerValue*[1]');

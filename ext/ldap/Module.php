@@ -61,6 +61,7 @@ class Module extends ModuleAbstract
             new ldap_error(),
             new ldap_err2str(),
             new ldap_set_option(),
+            new ldap_get_option(),
             new ldap_search(),
             new ldap_list(),
             new ldap_read(),

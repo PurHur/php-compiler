@@ -247,3 +247,57 @@ final class ldap_set_option extends Internal
         throw new \LogicException('ldap_set_option() is not implemented for JIT in this compiler build (issue #3369)');
     }
 }
+
+final class ldap_get_option extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_get_option');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_get_option() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $ldapVar = $frame->calledArgs[0]->resolveIndirect();
+        $ld = null;
+        $connObj = null;
+        if (Variable::TYPE_NULL !== $ldapVar->type) {
+            $connObj = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_get_option', 1);
+            $ld = VmLdapConnection::native($connObj);
+        }
+        $optVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $optVar->type) {
+            throw new \TypeError('ldap_get_option(): Argument #2 ($option) must be of type int');
+        }
+        $option = $optVar->toInt();
+        $got = VmLdapNative::getOptionInt($ld, $option);
+        if (!$got['ok']) {
+            if (null !== $connObj) {
+                VmLdapConnection::setErrno($connObj, VmLdapNative::LDAP_OPT_ERROR_NUMBER);
+            }
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $frame->calledArgs[2]->byRefTarget()->int($got['value']);
+        if (null !== $connObj) {
+            VmLdapConnection::setErrno($connObj, VmLdapNative::LDAP_SUCCESS);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_get_option() is not implemented for JIT in this compiler build (issue #21851)');
+    }
+}
