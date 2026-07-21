@@ -32,6 +32,55 @@ final class JitIntdiv
     }
 
     /**
+     * Fold literal intdiv operands at compile time (AOT soft-null #21593).
+     */
+    public static function tryFoldCompileTime(Context $context, JITVariable $num1, JITVariable $num2): ?Value
+    {
+        $left = self::compileTimeLongArg($context, $num1, 'intdiv', 1, 'num1');
+        if (null === $left) {
+            return null;
+        }
+        $right = self::compileTimeLongArg($context, $num2, 'intdiv', 2, 'num2');
+        if (null === $right) {
+            return null;
+        }
+        if (0 === $right) {
+            return null;
+        }
+        if (\PHP_INT_MIN === $left && -1 === $right) {
+            return null;
+        }
+
+        return $context->getTypeFromString('int64')->constInt(\intdiv($left, $right), true);
+    }
+
+    private static function compileTimeLongArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): ?int {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                return null;
+            }
+            // Fold soft-null: coerce to 0. Emit DEP on JIT; skip DEP IR on user-script AOT
+            // (thin standalone trigger_error mid-fold crashes — #21593).
+            if (!$context->isUserScriptAot()) {
+                self::emitNullIntDeprecation($context, $function, $userArgIndex, $paramName);
+            }
+
+            return 0;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return $arg->compileTimeLong;
+        }
+
+        return null;
+    }
+
+    /**
      * Z_PARAM_LONG with caller strict_types parity (#12275 intdiv, #12273 dechex/decoct/decbin).
      */
     public static function lowerIntBuiltinArgForCaller(

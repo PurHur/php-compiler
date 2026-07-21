@@ -18,14 +18,15 @@ final class VmMath
     private const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 
     /**
-     * PHP 8.4+ forward profile: Z_PARAM_LONG null is TypeError (ext/standard/math.c / string.c; #18850, #19318).
+     * Historically gated Z_PARAM_LONG null→TypeError on PROFILE=8.4 (#18850), but Zend 8.4 still
+     * deprecates and coerces null→0 for Z_PARAM_LONG (php-src zend_API.h / math.c). Keep false until
+     * a real PHP 9 gate exists (#21593 intdiv, #21594 checkdate peers).
      *
-     * PHP 8.2 reference profile keeps coerce to 0. Call sites that must still coerce on 8.4
-     * (sleep/usleep, etc.) use {@see parseZParamLongBuiltinArg} which short-circuits null.
+     * Call sites that always soft-null use {@see parseChrCodepoint} / {@see parseZParamLongBuiltinArg}.
      */
     public static function requiresForwardProfileStrictLongNull(): bool
     {
-        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
