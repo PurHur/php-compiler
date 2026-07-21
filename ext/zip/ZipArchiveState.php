@@ -34,6 +34,15 @@ final class ZipArchiveState
     /** Archive AFL_RDONLY / setReadOnly (#20412). */
     public bool $readOnly = false;
 
+    /**
+     * Current archive-flag bitmask (libzip zip_set/get_archive_flag; #21831).
+     * Bits: AFL_RDONLY / AFL_IS_TORRENTZIP / AFL_WANT_TORRENTZIP / AFL_CREATE_OR_KEEP_FILE_FOR_EMPTY_ARCHIVE.
+     */
+    public int $archiveFlags = 0;
+
+    /** Archive flags at open — restored view for getArchiveFlag(..., FL_UNCHANGED) (#21831). */
+    public int $openSnapshotArchiveFlags = 0;
+
     /** Default archive password for setEncryptionName / decrypt (#19873). */
     public string $password = '';
 

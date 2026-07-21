@@ -1568,3 +1568,72 @@ final class ZipArchiveSetReadOnly extends ZipClassMethod
         }
     }
 }
+
+/**
+ * ZipArchive::setArchiveFlag(int $flag, int $value) — (#21831).
+ */
+final class ZipArchiveSetArchiveFlag extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setArchiveFlag');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setArchiveFlag()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setArchiveFlag() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setArchiveFlag() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $flag = $this->intArg($frame->calledArgs[1], 'ZipArchive::setArchiveFlag', 1, 'flag');
+        $value = $this->intArg($frame->calledArgs[2], 'ZipArchive::setArchiveFlag', 2, 'value');
+        $ok = VmZipArchive::setArchiveFlag($receiver, $flag, $value);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::getArchiveFlag(int $flag, int $flags = 0) — (#21831).
+ */
+final class ZipArchiveGetArchiveFlag extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getArchiveFlag');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getArchiveFlag()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 1) {
+            throw new \ArgumentCountError('ZipArchive::getArchiveFlag() expects at least 1 argument, 0 given');
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::getArchiveFlag() expects at most 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $flag = $this->intArg($frame->calledArgs[1], 'ZipArchive::getArchiveFlag', 1, 'flag');
+        $flags = $argc >= 2
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::getArchiveFlag', 2, 'flags')
+            : 0;
+        $n = VmZipArchive::getArchiveFlag($receiver, $flag, $flags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($n);
+        }
+    }
+}

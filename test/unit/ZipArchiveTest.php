@@ -81,6 +81,9 @@ final class ZipArchiveTest extends TestCase
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'replacefile'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'addglob'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'addpattern'));
+        // archive flags (#21831)
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setarchiveflag'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getarchiveflag'));
 
         $entry = $ctx->classes['ziparchive'];
         self::assertContains('countable', $entry->interfaces);
@@ -92,6 +95,12 @@ final class ZipArchiveTest extends TestCase
         self::assertSame(ZipArchiveConstants::LENGTH_UNCHECKED, $entry->constants['length_unchecked']->toInt());
         self::assertArrayHasKey('fl_open_file_now', $entry->constants);
         self::assertSame(ZipArchiveConstants::FL_OPEN_FILE_NOW, $entry->constants['fl_open_file_now']->toInt());
+        self::assertArrayHasKey('fl_unchanged', $entry->constants);
+        self::assertSame(ZipArchiveConstants::FL_UNCHANGED, $entry->constants['fl_unchanged']->toInt());
+        self::assertArrayHasKey('afl_rdonly', $entry->constants);
+        self::assertSame(ZipArchiveConstants::AFL_RDONLY, $entry->constants['afl_rdonly']->toInt());
+        self::assertArrayHasKey('afl_want_torrentzip', $entry->constants);
+        self::assertSame(ZipArchiveConstants::AFL_WANT_TORRENTZIP, $entry->constants['afl_want_torrentzip']->toInt());
         self::assertArrayHasKey('er_data_length', $entry->constants);
         self::assertSame(ZipArchiveConstants::ER_DATA_LENGTH, $entry->constants['er_data_length']->toInt());
         self::assertArrayHasKey('er_truncated_zip', $entry->constants);

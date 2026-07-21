@@ -142,6 +142,9 @@ final class VmZipArchive
             // read-only archive flag — php-src php_zip.c (#20412)
             'iswritable' => new ZipArchiveIsWritable(),
             'setreadonly' => new ZipArchiveSetReadOnly(),
+            // archive flags — php-src php_zip.c (#21831)
+            'setarchiveflag' => new ZipArchiveSetArchiveFlag(),
+            'getarchiveflag' => new ZipArchiveGetArchiveFlag(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -294,6 +297,8 @@ final class VmZipArchive
         }
         $state->openSnapshot = self::cloneEntries($state->entries);
         $state->openSnapshotComment = $state->archiveComment;
+        $state->archiveFlags = 0;
+        $state->openSnapshotArchiveFlags = 0;
 
         $state->filename = $filename;
         $state->open = true;
@@ -328,6 +333,8 @@ final class VmZipArchive
         $state->open = false;
         $state->dirty = false;
         $state->readOnly = false;
+        $state->archiveFlags = 0;
+        $state->openSnapshotArchiveFlags = 0;
         $state->archiveComment = '';
         $state->openSnapshot = [];
         $state->openSnapshotComment = '';
@@ -1668,9 +1675,77 @@ final class VmZipArchive
     {
         $state = self::requireOpen($entry);
         $state->readOnly = $readonly;
+        if ($readonly) {
+            $state->archiveFlags |= ZipArchiveConstants::AFL_RDONLY;
+        } else {
+            $state->archiveFlags &= ~ZipArchiveConstants::AFL_RDONLY;
+        }
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
         return true;
+    }
+
+    /**
+     * Known libzip archive-flag bits we advertise (php-src ZipArchive::AFL_*; #21831).
+     */
+    private static function isKnownArchiveFlag(int $flag): bool
+    {
+        return match ($flag) {
+            ZipArchiveConstants::AFL_RDONLY,
+            ZipArchiveConstants::AFL_IS_TORRENTZIP,
+            ZipArchiveConstants::AFL_WANT_TORRENTZIP,
+            ZipArchiveConstants::AFL_CREATE_OR_KEEP_FILE_FOR_EMPTY_ARCHIVE => true,
+            default => false,
+        };
+    }
+
+    /**
+     * ZipArchive::setArchiveFlag — libzip zip_set_archive_flag (php-src php_zip.c; #21831).
+     *
+     * AFL_RDONLY once set cannot be cleared (libzip).
+     */
+    public static function setArchiveFlag(ObjectEntry $entry, int $flag, int $value): bool
+    {
+        $state = self::requireOpen($entry);
+        if (!self::isKnownArchiveFlag($flag)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        $enable = 0 !== $value;
+        if (ZipArchiveConstants::AFL_RDONLY === $flag) {
+            if (!$enable && ($state->archiveFlags & ZipArchiveConstants::AFL_RDONLY)) {
+                // libzip: ZIP_AFL_RDONLY — read only -- cannot be cleared
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+                return false;
+            }
+            $state->readOnly = $enable;
+        }
+        if ($enable) {
+            $state->archiveFlags |= $flag;
+        } else {
+            $state->archiveFlags &= ~$flag;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::getArchiveFlag — libzip zip_get_archive_flag (php-src php_zip.c; #21831).
+     *
+     * Returns 1 when the flag bit is set, else 0. With FL_UNCHANGED, uses open-time flags.
+     */
+    public static function getArchiveFlag(ObjectEntry $entry, int $flag, int $flags = 0): int
+    {
+        $state = self::requireOpen($entry);
+        $bits = (0 !== ($flags & ZipArchiveConstants::FL_UNCHANGED))
+            ? $state->openSnapshotArchiveFlags
+            : $state->archiveFlags;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return (0 !== ($bits & $flag)) ? 1 : 0;
     }
 
     /**
@@ -1866,6 +1941,8 @@ final class VmZipArchive
             'addpattern' => 'addPattern',
             'iswritable' => 'isWritable',
             'setreadonly' => 'setReadOnly',
+            'setarchiveflag' => 'setArchiveFlag',
+            'getarchiveflag' => 'getArchiveFlag',
             default => $lc,
         };
     }

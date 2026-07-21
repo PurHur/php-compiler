@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6302 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19949 |
+| Source constructs flagged (warnings) | 19951 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4439,7 +4439,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 11 |
-| `ext/zip/VmZipArchive.php` | 0 | 69 |
+| `ext/zip/VmZipArchive.php` | 0 | 71 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
@@ -4449,7 +4449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipArchiveConstruct.php` | 0 | 1 |
 | `ext/zip/ZipArchiveExtractTo.php` | 0 | 2 |
 | `ext/zip/ZipArchiveGetFromName.php` | 0 | 2 |
-| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 49 |
+| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 53 |
 | `ext/zip/ZipArchiveOpen.php` | 0 | 2 |
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
@@ -4781,8 +4781,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/HashContextRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/HashTableDuplicateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/HashtableValueOutJitBridge.php` | 0 | 1 |
-| `lib/JIT/Builtin/Hebrev.php` | 0 | 3 |
-| `lib/JIT/Builtin/Hebrevc.php` | 0 | 3 |
+| `lib/JIT/Builtin/Hebrev.php` | 0 | 1 |
+| `lib/JIT/Builtin/Hebrevc.php` | 0 | 1 |
 | `lib/JIT/Builtin/Highlight.php` | 0 | 3 |
 | `lib/JIT/Builtin/HtmlEntitiesJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/HtmlEntityDecodeJit.php` | 0 | 2 |
@@ -38580,11 +38580,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ZipArchiveAddPattern (line 141)
 - new ZipArchiveIsWritable (line 143)
 - new ZipArchiveSetReadOnly (line 144)
-- new ZipArchiveState (line 160)
-- new Variable (line 876)
-- new Variable (line 891)
-- new Variable (line 906)
-- 78 class method(s)
+- new ZipArchiveSetArchiveFlag (line 146)
+- new ZipArchiveGetArchiveFlag (line 147)
+- new ZipArchiveState (line 163)
+- new Variable (line 883)
+- new Variable (line 898)
+- new Variable (line 913)
+- 81 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
 
@@ -38686,7 +38688,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 1508)
 - new ArgumentCountError (line 1536)
 - new ArgumentCountError (line 1562)
-- 51 class method(s)
+- new ArgumentCountError (line 1587)
+- new ArgumentCountError (line 1593)
+- new ArgumentCountError (line 1622)
+- new ArgumentCountError (line 1625)
+- 53 class method(s)
 
 ### `ext/zip/ZipArchiveOpen.php`
 
@@ -41320,16 +41326,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Hebrev.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 52)
 - 4 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/Hebrevc.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 52)
 - 4 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/Highlight.php`
 
