@@ -31,6 +31,7 @@ final class NestedVmHashTableMethodLlvm
         'iterate' => Call\HashTableIterate::class,
         'mergestringkeysfrom' => Call\HashTableMergeStringKeysFrom::class,
         'unshiftprepend' => Call\HashTableUnshiftPrepend::class,
+        'find' => Call\HashTableFind::class,
         'findindex' => Call\HashTableFindIndex::class,
         'add' => Call\HashTableWriteNested::class,
         'updateindex' => Call\HashTableWriteNested::class,

@@ -5153,6 +5153,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/HashTableAdd.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableAppend.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableCompareSpaceship.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableExportKeyValuePairs.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableFind.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableFindIndex.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableGetNumElements.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableIsPackedList.php';

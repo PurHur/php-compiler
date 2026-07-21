@@ -43,4 +43,9 @@ final class SessionLifecycleRuntimeStandaloneTest extends TestCase
     {
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('mergestringkeysfrom'));
     }
+
+    public function testNestedHashTableFindRegistered(): void
+    {
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('find'));
+    }
 }
