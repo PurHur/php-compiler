@@ -538,20 +538,10 @@ final class HashTableReadLlvm
         $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
         $context->builder->branch($done);
 
+        // Typed copy — $_SESSION (and other supers) may hold i:/b:/N; scalars (#21948).
+        // Always-string readString/separate segfaulted on TYPE_NATIVE_LONG / BOOL.
         $context->builder->positionAtEnd($hasValue);
-        $str = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $valPtr
-        );
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $destPtr,
-            $owned
-        );
+        JitValueBox::copyFromPointer($context, $slot, $valPtr);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);

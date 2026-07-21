@@ -57,4 +57,19 @@ final class SessionWireMultiKeyTest extends TestCase
         $this->assertStringContainsString('__hashtable__setStringKeyNull', $source);
         $this->assertStringContainsString('#21922', $source);
     }
+
+    public function testSuperglobalStringKeyReadUsesTypedValueCopy(): void
+    {
+        $source = (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/HashTableReadLlvm.php'
+        );
+        $this->assertStringContainsString('#21948', $source);
+        $fnStart = strpos($source, 'function readSuperglobalStringKeyToValueBox');
+        $this->assertNotFalse($fnStart);
+        $fnEnd = strpos($source, 'function offsetIsSetDim', $fnStart);
+        $this->assertNotFalse($fnEnd);
+        $fnBody = substr($source, (int) $fnStart, (int) $fnEnd - (int) $fnStart);
+        $this->assertStringContainsString('JitValueBox::copyFromPointer', $fnBody);
+        $this->assertStringNotContainsString("__value__readString',\n            \$valPtr", $fnBody);
+    }
 }

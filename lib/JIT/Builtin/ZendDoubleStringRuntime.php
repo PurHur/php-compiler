@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -109,17 +110,10 @@ final class ZendDoubleStringRuntime
         $doneBb = $fn->appendBasicBlock('zds_done_'.$s);
 
         $nanLit = $context->builder->load($context->constantStringFromString('nan'));
-        $isNan = $context->builder->call(
-            $context->lookupFunction('__string__compare'),
-            $raw,
-            $nanLit
-        );
+        // Use JitStringCompare SSOT — bare __string__compare was never implemented (#21948 AOT link).
+        $isNan = JitStringCompare::identical($context, $raw, $nanLit);
         $afterNan = $fn->appendBasicBlock('zds_after_nan_'.$s);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $isNan, $i32->constInt(0, false)),
-            $nanBb,
-            $afterNan
-        );
+        $context->builder->branchIf($isNan, $nanBb, $afterNan);
 
         $context->builder->positionAtEnd($nanBb);
         $nanStr = $context->builder->load($context->constantStringFromString('NAN'));
@@ -128,17 +122,9 @@ final class ZendDoubleStringRuntime
 
         $context->builder->positionAtEnd($afterNan);
         $infLit = $context->builder->load($context->constantStringFromString('inf'));
-        $isInf = $context->builder->call(
-            $context->lookupFunction('__string__compare'),
-            $raw,
-            $infLit
-        );
+        $isInf = JitStringCompare::identical($context, $raw, $infLit);
         $afterInf = $fn->appendBasicBlock('zds_after_inf_'.$s);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $isInf, $i32->constInt(0, false)),
-            $infBb,
-            $afterInf
-        );
+        $context->builder->branchIf($isInf, $infBb, $afterInf);
 
         $context->builder->positionAtEnd($infBb);
         $infStr = $context->builder->load($context->constantStringFromString('INF'));
@@ -147,16 +133,8 @@ final class ZendDoubleStringRuntime
 
         $context->builder->positionAtEnd($afterInf);
         $ninfLit = $context->builder->load($context->constantStringFromString('-inf'));
-        $isNinf = $context->builder->call(
-            $context->lookupFunction('__string__compare'),
-            $raw,
-            $ninfLit
-        );
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $isNinf, $i32->constInt(0, false)),
-            $ninfBb,
-            $okBb
-        );
+        $isNinf = JitStringCompare::identical($context, $raw, $ninfLit);
+        $context->builder->branchIf($isNinf, $ninfBb, $okBb);
 
         $context->builder->positionAtEnd($ninfBb);
         $ninfStr = $context->builder->load($context->constantStringFromString('-INF'));
@@ -263,7 +241,7 @@ final class ZendDoubleStringRuntime
                 '__mm__malloc' => [$i8p, false, [$sizeT]],
                 '__mm__free' => [$voidTy, false, [$i8p]],
                 '__string__init' => [$strPtr, false, [$i64, $charPtr]],
-                '__string__compare' => [$i32, false, [$strPtr, $strPtr]],
+                'memcmp' => [$i32, false, [$i8p, $i8p, $sizeT]],
             ] as $name => [$ret, $vararg, $params]
         ) {
             try {
