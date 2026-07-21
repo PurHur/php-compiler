@@ -10542,6 +10542,33 @@ class JIT {
                     $obj = $block->getOperand($op->arg2);
                     $name = $block->getOperand($op->arg3);
                     $propName = $name instanceof Operand\Literal ? $name->value : null;
+                    // NestedJIT VM\Variable is a __value__* box (#16565) — `$v->type` must
+                    // read the value-box type byte (masked), not an object property (#21921).
+                    if (
+                        JIT\NestedJitCompileScope::isActive()
+                        && 'type' === $propName
+                        && $this->context->hasVariableOp($obj)
+                    ) {
+                        $recv = $this->context->getVariableFromOp($obj);
+                        if (Variable::TYPE_VALUE === $recv->type) {
+                            $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $recv);
+                            $map = $this->context->structFieldMap['__value__'];
+                            $i8 = $this->context->getTypeFromString('int8');
+                            $i64 = $this->context->getTypeFromString('int64');
+                            $typeByte = $this->context->builder->load(
+                                $this->context->builder->structGep($valuePtr, $map['type'])
+                            );
+                            $kind = $this->context->builder->and(
+                                $typeByte,
+                                $i8->constInt(0x7f, false)
+                            );
+                            $this->assignOperandValue(
+                                $result,
+                                $this->context->builder->zExt($kind, $i64)
+                            );
+                            break;
+                        }
+                    }
                     $nonObjectLabel = Variable::propertyFetchNonObjectTypeLabel(
                         Variable::getTypeFromType($obj->type)
                     );

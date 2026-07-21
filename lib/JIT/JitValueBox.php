@@ -426,6 +426,9 @@ final class JitValueBox
             $context->builder->structGep($srcPtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED — HT slots may store VM TYPE_STRING (4) or JIT (4|0x80).
+        // Unmasked compare missed VM tags → empty copy → NestedJIT toString strlen=0 (#21921).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
 
         $tag = 'v'.(string) self::$copySeq++;
         $stringBlock = BasicBlockHelper::append($context, 'value_copy_string_'.$tag);
@@ -439,37 +442,37 @@ final class JitValueBox
 
         $isString = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
         );
         $isHashtable = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
         );
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
         );
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
         );
         $isBool = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
         );
         $isDouble = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
         );
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
+            $kind,
             $i8->constInt(Variable::TYPE_NULL, false)
         );
 

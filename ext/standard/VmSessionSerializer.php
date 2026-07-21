@@ -23,7 +23,7 @@ final class VmSessionSerializer
         $out = '';
         foreach ($session->iterateKeyed(true) as [$keyVar, $valueVar]) {
             $keyVar = $keyVar->resolveIndirect();
-            if (Variable::TYPE_STRING !== $keyVar->type) {
+            if (Variable::TYPE_STRING !== ($keyVar->type & 0x7f)) {
                 continue;
             }
             $key = $keyVar->toString();
@@ -47,7 +47,7 @@ final class VmSessionSerializer
         // NestedJIT lowers exportKeyValuePairs, not iterateKeyed (#12908 / #21900).
         foreach ($session->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
             $keyVar = $keyVar->resolveIndirect();
-            if (Variable::TYPE_STRING !== $keyVar->type) {
+            if (Variable::TYPE_STRING !== ($keyVar->type & 0x7f)) {
                 continue;
             }
             $key = $keyVar->toString();
@@ -73,7 +73,8 @@ final class VmSessionSerializer
     public static function serializeSessionWireValue(Variable $value): ?string
     {
         $value = $value->resolveIndirect();
-        switch ($value->type) {
+        // Mask IS_REFCOUNTED — NestedJIT value-box type bytes may be JIT tags (4|0x80) (#21921).
+        switch ($value->type & 0x7f) {
             case Variable::TYPE_NULL:
                 return 'N;';
             case Variable::TYPE_BOOLEAN:
