@@ -259,6 +259,9 @@ final class BuiltinByRefParams
             case 'apcu_fetch':
                 // PECL apcu apcu.stub.php — &$success (#6574)
                 return [1];
+            case 'ldap_get_option':
+                // php-src ext/ldap/ldap.c — &$retval (#21851)
+                return [2];
         }
 
         return [];

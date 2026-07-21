@@ -68,7 +68,7 @@ final class VmLdapCore
         $attrs = [] === $attributes ? null : $attributes;
         $res = VmLdapNative::search($ld, $base, $scope, $filter, $attrs, $attrsonly, $sizelimit, $timelimit);
         if (null === $res) {
-            $errno = VmLdapNative::getOptionInt($ld, VmLdapNative::LDAP_OPT_ERROR_NUMBER);
+            $errno = VmLdapNative::getOptionInt($ld, VmLdapNative::LDAP_OPT_ERROR_NUMBER)['value'];
             VmLdapConnection::setErrno($connection, $errno);
             @\trigger_error('ldap_search(): Search: '.VmLdapNative::err2string($errno), \E_USER_WARNING);
 

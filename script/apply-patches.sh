@@ -175,6 +175,9 @@ patch_already_applied() {
       grep -qF "'IntlTimeZone::getIanaID' => ['string|false', 'zoneId' => 'string']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null \
         && grep -qF "'intltz_get_iana_id' => ['string|false', 'zoneId' => 'string']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-ldap-get-option-byref.patch)
+      grep -qF "'ldap_get_option' => ['bool', 'link' => '', 'option' => 'int', '&retval' => '']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-llvm-builder-xor.patch)
       grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
@@ -6371,6 +6374,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-sem-get-auto-release-bool.patch"
   apply_patch "$PATCH_DIR/php-types-openssl-encrypt-aead-args.patch"
   apply_patch "$PATCH_DIR/php-types-intltz-get-iana-id-arginfo.patch"
+  apply_patch "$PATCH_DIR/php-types-ldap-get-option-byref.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-types-missing-parent-no-echo.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"
