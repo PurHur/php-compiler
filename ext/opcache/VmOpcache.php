@@ -11,8 +11,8 @@ use PHPCompiler\VM\Variable;
 /**
  * Zend-shaped opcache probe payloads for VM-only stubs (php-src ext/opcache; issue #4421).
  *
- * This compiler does not embed Zend OPcache; probes return disabled placeholders so
- * deploy health checks do not fatal on undefined functions.
+ * This compiler does not embed Zend OPcache. {@see opcache_get_status} returns `false`
+ * when inactive (#21755); configuration/reset stubs remain for deploy probes.
  */
 final class VmOpcache
 {
