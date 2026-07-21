@@ -17,6 +17,8 @@ final class ProcessRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessRuntime.php');
         $this->assertStringContainsString('ProcessJitHelper', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('compileHelperFile', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         $this->assertStringContainsString('ProcessExecCaptureNativeJitHelper', $runtime);
         $this->assertStringNotContainsString('ProcessExecCaptureLlvm', $runtime);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ProcessExecCaptureLlvm.php');
