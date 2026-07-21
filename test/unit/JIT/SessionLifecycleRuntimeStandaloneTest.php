@@ -24,7 +24,8 @@ final class SessionLifecycleRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('implementStandaloneRuntime', $kernel);
         $this->assertStringContainsString('implementStandaloneWriteClose', $kernel);
 
-        $start = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/SessionStart.php');
+        $start = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitSessionStart.php');
+        $this->assertStringContainsString('SessionLifecycleRuntime::ensureLinked', $start);
         $this->assertStringNotContainsString('implementStandaloneForwarder', $start);
         $this->assertStringNotContainsString('registerRuntimeDeclaration', $start);
         $this->assertStringNotContainsString('RUNTIME_C_SYMBOL', $start);
@@ -36,5 +37,10 @@ final class SessionLifecycleRuntimeStandaloneTest extends TestCase
         $linker = file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertIsString($linker);
         $this->assertStringNotContainsString('phpc_session_lifecycle.c', $linker);
+    }
+
+    public function testNestedHashTableMergeStringKeysFromRegistered(): void
+    {
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('mergestringkeysfrom'));
     }
 }

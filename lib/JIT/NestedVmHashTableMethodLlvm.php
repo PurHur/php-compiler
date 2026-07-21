@@ -29,6 +29,7 @@ final class NestedVmHashTableMethodLlvm
         'ispackedlist' => Call\HashTableIsPackedList::class,
         'comparespaceship' => Call\HashTableCompareSpaceship::class,
         'iterate' => Call\HashTableIterate::class,
+        'mergestringkeysfrom' => Call\HashTableMergeStringKeysFrom::class,
         'unshiftprepend' => Call\HashTableUnshiftPrepend::class,
         'findindex' => Call\HashTableFindIndex::class,
         'add' => Call\HashTableWriteNested::class,
