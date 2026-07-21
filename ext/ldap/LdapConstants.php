@@ -35,6 +35,28 @@ final class LdapConstants
     public const LDAP_EXOP_WHO_AM_I = '1.3.6.1.4.1.4203.1.11.3';
     public const LDAP_EXOP_TURN = '1.3.6.1.1.19';
 
+    public const LDAP_MOD_ADD = 0x00;
+
+    public const LDAP_MOD_DELETE = 0x01;
+
+    public const LDAP_MOD_REPLACE = 0x02;
+
+    public const LDAP_MOD_BVALUES = 0x80;
+
+    public const LDAP_MODIFY_BATCH_ADD = 0x01;
+
+    public const LDAP_MODIFY_BATCH_REMOVE = 0x02;
+
+    public const LDAP_MODIFY_BATCH_REPLACE = 0x03;
+
+    public const LDAP_MODIFY_BATCH_REMOVE_ALL = 0x12;
+
+    public const LDAP_MODIFY_BATCH_ATTRIB = 'attrib';
+
+    public const LDAP_MODIFY_BATCH_MODTYPE = 'modtype';
+
+    public const LDAP_MODIFY_BATCH_VALUES = 'values';
+
     /** Oracle wallet SSL auth modes (php-src HAVE_ORALDAP; #20638). */
     public const GSLC_SSL_NO_AUTH = 1;
     public const GSLC_SSL_ONEWAY_AUTH = 2;
@@ -65,6 +87,10 @@ final class LdapConstants
             'LDAP_EXOP_REFRESH' => self::LDAP_EXOP_REFRESH,
             'LDAP_EXOP_WHO_AM_I' => self::LDAP_EXOP_WHO_AM_I,
             'LDAP_EXOP_TURN' => self::LDAP_EXOP_TURN,
+            'LDAP_MODIFY_BATCH_ADD' => self::LDAP_MODIFY_BATCH_ADD,
+            'LDAP_MODIFY_BATCH_REMOVE' => self::LDAP_MODIFY_BATCH_REMOVE,
+            'LDAP_MODIFY_BATCH_REPLACE' => self::LDAP_MODIFY_BATCH_REPLACE,
+            'LDAP_MODIFY_BATCH_REMOVE_ALL' => self::LDAP_MODIFY_BATCH_REMOVE_ALL,
         ];
         if (LdapExtensionPolicy::advertisesWalletConnect()) {
             $constants['GSLC_SSL_NO_AUTH'] = self::GSLC_SSL_NO_AUTH;
