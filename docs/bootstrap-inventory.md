@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6271 |
-| Phase A inventory files (M2 ratio SSOT) | 6271 |
+| PHP files on vm.php path | 6291 |
+| Phase A inventory files (M2 ratio SSOT) | 6291 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19796 |
+| Source constructs flagged (warnings) | 19904 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1288,6 +1288,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
+| `ext/mysqli/BuiltinClasses.php` | 0 | 1 |
+| `ext/mysqli/Module.php` | 0 | 17 |
+| `ext/mysqli/MysqliClassMethod.php` | 0 | 1 |
+| `ext/mysqli/MysqliConstants.php` | 0 | 1 |
+| `ext/mysqli/MysqliExtensionPolicy.php` | 0 | 1 |
+| `ext/mysqli/VmMysqli.php` | 0 | 42 |
+| `ext/mysqli/mysqli_affected_rows.php` | 0 | 3 |
+| `ext/mysqli/mysqli_close.php` | 0 | 3 |
+| `ext/mysqli/mysqli_connect.php` | 0 | 3 |
+| `ext/mysqli/mysqli_connect_errno.php` | 0 | 2 |
+| `ext/mysqli/mysqli_connect_error.php` | 0 | 2 |
+| `ext/mysqli/mysqli_errno.php` | 0 | 3 |
+| `ext/mysqli/mysqli_error.php` | 0 | 3 |
+| `ext/mysqli/mysqli_fetch_array.php` | 0 | 3 |
+| `ext/mysqli/mysqli_fetch_assoc.php` | 0 | 3 |
+| `ext/mysqli/mysqli_fetch_row.php` | 0 | 3 |
+| `ext/mysqli/mysqli_free_result.php` | 0 | 3 |
+| `ext/mysqli/mysqli_num_rows.php` | 0 | 3 |
+| `ext/mysqli/mysqli_query.php` | 0 | 3 |
+| `ext/mysqli/mysqli_real_escape_string.php` | 0 | 3 |
 | `ext/odbc/BuiltinClasses.php` | 0 | 1 |
 | `ext/odbc/Module.php` | 0 | 50 |
 | `ext/odbc/OdbcConstants.php` | 0 | 1 |
@@ -2891,7 +2911,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VersionCompareJitHelper.php` | 0 | 1 |
 | `ext/standard/VfscanfJitHelper.php` | 0 | 2 |
 | `ext/standard/VmApache.php` | 0 | 1 |
-| `ext/standard/VmArray.php` | 0 | 56 |
+| `ext/standard/VmArray.php` | 0 | 58 |
 | `ext/standard/VmArrayAssocSetOps.php` | 0 | 1 |
 | `ext/standard/VmArrayColumnArg.php` | 0 | 1 |
 | `ext/standard/VmArrayFilterCallback.php` | 0 | 3 |
@@ -3281,7 +3301,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_keys.php` | 0 | 1 |
 | `ext/standard/array_last.php` | 0 | 1 |
 | `ext/standard/array_last_key.php` | 0 | 3 |
-| `ext/standard/array_map.php` | 0 | 11 |
+| `ext/standard/array_map.php` | 0 | 12 |
 | `ext/standard/array_merge.php` | 0 | 2 |
 | `ext/standard/array_merge_recursive.php` | 0 | 3 |
 | `ext/standard/array_multisort.php` | 0 | 9 |
@@ -3667,7 +3687,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/is_writable.php` | 0 | 1 |
 | `ext/standard/iterator_apply.php` | 0 | 3 |
 | `ext/standard/iterator_count.php` | 0 | 1 |
-| `ext/standard/iterator_to_array.php` | 0 | 1 |
+| `ext/standard/iterator_to_array.php` | 0 | 2 |
 | `ext/standard/json_decode.php` | 0 | 2 |
 | `ext/standard/json_encode.php` | 0 | 4 |
 | `ext/standard/json_last_error_.php` | 0 | 1 |
@@ -5562,7 +5582,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 110 |
+| `lib/Runtime.php` | 0 | 111 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -16150,6 +16170,189 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 58)
+- 2 class method(s)
+
+### `ext/mysqli/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mysqli/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 51)
+- new mysqli_connect (line 70)
+- new mysqli_query (line 71)
+- new mysqli_fetch_assoc (line 72)
+- new mysqli_fetch_array (line 73)
+- new mysqli_fetch_row (line 74)
+- new mysqli_close (line 75)
+- new mysqli_connect_errno (line 76)
+- new mysqli_connect_error (line 77)
+- new mysqli_free_result (line 78)
+- new mysqli_real_escape_string (line 79)
+- new mysqli_real_escape_string (line 80)
+- new mysqli_num_rows (line 81)
+- new mysqli_affected_rows (line 82)
+- new mysqli_error (line 83)
+- new mysqli_errno (line 84)
+- 4 class method(s)
+
+### `ext/mysqli/MysqliClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/mysqli/MysqliConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mysqli/MysqliExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/mysqli/VmMysqli.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 41)
+- new MysqliConstruct (line 45)
+- new MysqliQuery (line 50)
+- new MysqliClose (line 51)
+- new MysqliRealEscapeString (line 52)
+- new MysqliPrepare (line 53)
+- new MysqliAutocommit (line 54)
+- new MysqliBeginTransaction (line 55)
+- new MysqliCommit (line 56)
+- new MysqliRollback (line 57)
+- new mysqli (line 94)
+- new ObjectEntry (line 131)
+- new MysqliState (line 132)
+- new ObjectEntry (line 147)
+- new MysqliState (line 148)
+- new HashTable (line 199)
+- new Variable (line 201)
+- new MysqliState (line 218)
+- new ClassEntry (line 245)
+- new MysqliResultFetchAssoc (line 250)
+- new MysqliResultFetchArray (line 251)
+- new MysqliResultFetchRow (line 252)
+- new MysqliResultFree (line 253)
+- new MysqliResultFree (line 254)
+- new MysqliResultFree (line 255)
+- new MysqliResultFetchAll (line 256)
+- new ObjectEntry (line 276)
+- new MysqliResultState (line 277)
+- new mysqli_sql_exception (line 338)
+- new mysqli (line 348)
+- new mysqli_sql_exception (line 350)
+- new MysqliState (line 354)
+- new ArgumentCountError (line 392)
+- new ArgumentCountError (line 443)
+- new Error (line 463)
+- new Error (line 477)
+- new Error (line 491)
+- new Error (line 505)
+- new Error (line 519)
+- new HashTable (line 624)
+- new Variable (line 626)
+- 33 class method(s)
+
+### `ext/mysqli/mysqli_affected_rows.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_close.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 44)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_connect.php`
+
+**Warnings** (review for bootstrap subset):
+- new mysqli (line 52)
+- new Error (line 70)
+- 4 class method(s)
+
+### `ext/mysqli/mysqli_connect_errno.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 30)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_connect_error.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 36)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_errno.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_error.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_fetch_array.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_fetch_assoc.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 45)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_fetch_row.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 45)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_free_result.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 41)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_num_rows.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_query.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 50)
+- 3 class method(s)
+
+### `ext/mysqli/mysqli_real_escape_string.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 40)
 - 2 class method(s)
 
 ### `ext/odbc/BuiltinClasses.php`
@@ -27619,11 +27822,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 44)
 - new ArgumentCountError (line 50)
 - new ArgumentCountError (line 67)
-- new Variable (line 214)
-- new Variable (line 216)
-- new HashTable (line 218)
-- new Variable (line 219)
-- new Variable (line 222)
+- new Variable (line 226)
+- new Variable (line 228)
+- new HashTable (line 230)
+- new Variable (line 231)
+- new Variable (line 234)
 - 6 class method(s)
 
 ### `ext/standard/SettypeJitHelper.php`
@@ -28182,61 +28385,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmArray.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 118)
-- new Error (line 130)
-- new Error (line 143)
-- new Error (line 200)
-- new Error (line 205)
-- new Error (line 218)
-- new Error (line 223)
-- new HashTable (line 359)
-- new Variable (line 362)
-- new Variable (line 378)
-- new HashTable (line 417)
-- new Variable (line 419)
-- new HashTable (line 451)
-- new Variable (line 456)
-- new HashTable (line 508)
-- new Variable (line 513)
-- new HashTable (line 538)
-- new Variable (line 543)
-- new HashTable (line 568)
-- new Variable (line 573)
-- new HashTable (line 598)
-- new Variable (line 603)
-- new HashTable (line 628)
-- new Variable (line 633)
-- new Variable (line 877)
-- new Variable (line 883)
-- new Variable (line 921)
-- new Variable (line 927)
-- new HashTable (line 949)
-- new HashTable (line 954)
-- new Variable (line 957)
-- new HashTable (line 970)
-- new Variable (line 972)
-- new Variable (line 1109)
-- new Variable (line 1177)
-- new Variable (line 1184)
-- new HashTable (line 1189)
-- new Variable (line 1191)
-- new Random\BrokenRandomEngineError (line 1212)
-- new Variable (line 1223)
-- new HashTable (line 1224)
-- new Variable (line 1228)
-- new HashTable (line 1358)
-- new Variable (line 1369)
-- new HashTable (line 1409)
-- new Variable (line 1420)
-- new Variable (line 1433)
-- new HashTable (line 1473)
-- new Variable (line 1482)
-- new Variable (line 1563)
-- new Variable (line 1664)
-- new Variable (line 1666)
-- new HashTable (line 1679)
-- new Variable (line 1682)
-- 87 class method(s)
+- new Error (line 119)
+- new Error (line 131)
+- new Error (line 144)
+- new Error (line 201)
+- new Error (line 206)
+- new Error (line 219)
+- new Error (line 224)
+- new HashTable (line 360)
+- new Variable (line 363)
+- new Variable (line 379)
+- new HashTable (line 418)
+- new Variable (line 420)
+- new HashTable (line 452)
+- new Variable (line 457)
+- new HashTable (line 509)
+- new Variable (line 514)
+- new HashTable (line 539)
+- new Variable (line 544)
+- new HashTable (line 569)
+- new Variable (line 574)
+- new HashTable (line 599)
+- new Variable (line 604)
+- new HashTable (line 629)
+- new Variable (line 634)
+- new HashTable (line 820)
+- new HashTable (line 870)
+- new Variable (line 985)
+- new Variable (line 991)
+- new Variable (line 1029)
+- new Variable (line 1035)
+- new HashTable (line 1057)
+- new HashTable (line 1062)
+- new Variable (line 1065)
+- new HashTable (line 1078)
+- new Variable (line 1080)
+- new Variable (line 1217)
+- new Variable (line 1285)
+- new Variable (line 1292)
+- new HashTable (line 1297)
+- new Variable (line 1299)
+- new Random\BrokenRandomEngineError (line 1320)
+- new Variable (line 1331)
+- new HashTable (line 1332)
+- new Variable (line 1336)
+- new HashTable (line 1466)
+- new Variable (line 1477)
+- new HashTable (line 1517)
+- new Variable (line 1528)
+- new Variable (line 1541)
+- new HashTable (line 1581)
+- new Variable (line 1590)
+- new Variable (line 1671)
+- new Variable (line 1772)
+- new Variable (line 1774)
+- new HashTable (line 1787)
+- new Variable (line 1790)
+- 90 class method(s)
 - 6 closure(s)
 
 ### `ext/standard/VmArrayAssocSetOps.php`
@@ -30977,16 +31182,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_map.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 40)
-- new self (line 102)
-- new HashTable (line 110)
-- new HashTable (line 145)
-- new Variable (line 155)
-- new HashTable (line 191)
-- new Variable (line 194)
-- new Variable (line 210)
-- new Variable (line 243)
-- new Variable (line 251)
+- new ArgumentCountError (line 43)
+- new HashTable (line 62)
+- new self (line 129)
+- new HashTable (line 137)
+- new HashTable (line 172)
+- new Variable (line 182)
+- new HashTable (line 218)
+- new Variable (line 221)
+- new Variable (line 237)
+- new Variable (line 270)
+- new Variable (line 278)
 - 12 class method(s)
 
 ### `ext/standard/array_merge.php`
@@ -32999,10 +33205,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/in_array.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
-- new ArgumentCountError (line 38)
-- new ArgumentCountError (line 71)
-- new ArgumentCountError (line 77)
+- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 40)
+- new ArgumentCountError (line 74)
+- new ArgumentCountError (line 80)
 - 3 class method(s)
 
 ### `ext/standard/inet_ntop.php`
@@ -33231,6 +33437,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/iterator_to_array.php`
 
 **Warnings** (review for bootstrap subset):
+- new HashTable (line 67)
 - 2 class method(s)
 
 ### `ext/standard/json_decode.php`
@@ -45923,28 +46130,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\enchant\Module (line 282)
 - new ext\gnupg\Module (line 283)
 - new ext\pspell\Module (line 284)
-- new ext\tidy\Module (line 285)
-- new ext\pdo\Module (line 286)
-- new ext\phar\Module (line 287)
-- new ext\uri\Module (line 288)
-- new ext\uuid\Module (line 289)
-- new ext\uploadprogress\Module (line 290)
-- new ext\apcu\Module (line 291)
-- new ext\sysvshm\Module (line 292)
-- new ext\sysvsem\Module (line 293)
-- new ext\sysvmsg\Module (line 294)
-- new ext\reflection\Module (line 295)
-- new ext\standard\Module (line 296)
-- new JIT (line 372)
-- new JITContext (line 386)
-- new SealedClassPreprocessor (line 452)
-- new StaticClassPreprocessor (line 455)
-- new SourcePreprocessor\PropertyHooks (line 458)
-- new State (line 599)
-- new ReflectionProperty (line 626)
-- new ReflectionProperty (line 629)
-- new LintCompiler (line 1040)
-- new Variable (line 1170)
+- new ext\mysqli\Module (line 285)
+- new ext\tidy\Module (line 286)
+- new ext\pdo\Module (line 287)
+- new ext\phar\Module (line 288)
+- new ext\uri\Module (line 289)
+- new ext\uuid\Module (line 290)
+- new ext\uploadprogress\Module (line 291)
+- new ext\apcu\Module (line 292)
+- new ext\sysvshm\Module (line 293)
+- new ext\sysvsem\Module (line 294)
+- new ext\sysvmsg\Module (line 295)
+- new ext\reflection\Module (line 296)
+- new ext\standard\Module (line 297)
+- new JIT (line 373)
+- new JITContext (line 387)
+- new SealedClassPreprocessor (line 453)
+- new StaticClassPreprocessor (line 456)
+- new SourcePreprocessor\PropertyHooks (line 459)
+- new State (line 600)
+- new ReflectionProperty (line 627)
+- new ReflectionProperty (line 630)
+- new LintCompiler (line 1041)
+- new Variable (line 1171)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
