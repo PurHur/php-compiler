@@ -39293,9 +39293,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/AttributeConstantEvaluator.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileTimeEnumCase (line 114)
-- new CompileTimeNew (line 155)
-- 6 class method(s)
+- new CompileTimeEnumCase (line 147)
+- new CompileTimeNew (line 216)
+- 7 class method(s)
 
 ### `lib/Compiler/AttributeEntry.php`
 
