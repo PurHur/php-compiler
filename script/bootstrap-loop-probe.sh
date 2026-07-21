@@ -85,6 +85,15 @@ m4_probe_tail() {
   fi
 }
 
+# emit_path=native must not match native-prelinked-sidecar (#21860).
+m4_gen1_log_emit_path_native() {
+  grep -qE 'bootstrap-loop-gen1-link: OK emit_path=native gen-1=' "$1"
+}
+
+m4_gen1_log_emit_path_sidecar() {
+  grep -qE 'bootstrap-loop-gen1-link: OK emit_path=native-prelinked-sidecar' "$1"
+}
+
 m4_run_subprobe() {
   local label=$1
   shift
@@ -224,7 +233,11 @@ if [[ "${GEN1_CODE}" -ne 0 ]]; then
 fi
 
 grep -E 'bootstrap-loop-gen1-link: OK' "${GEN1_LOG}" || tail -n 5 "${GEN1_LOG}"
-if grep -q 'emit_path=native' "${GEN1_LOG}"; then
+if m4_gen1_log_emit_path_sidecar "${GEN1_LOG}"; then
+  echo "bootstrap-loop-probe: gen-2 emit_path=native-prelinked-sidecar (native emit failed — not M4 green; #21860)" >&2
+  m4_probe_tail "${GEN1_LOG}" 20
+  exit 2
+elif m4_gen1_log_emit_path_native "${GEN1_LOG}"; then
   echo "bootstrap-loop-probe: gen-2 native emit OK (incremental M4 slice)"
 elif grep -q 'emit_path=zend partial' "${GEN1_LOG}"; then
   if grep -q 'gen-1 native emit blocked —' "${GEN1_LOG}"; then
@@ -261,7 +274,7 @@ if [[ "${DRY_RUN}" -eq 1 ]]; then
 fi
 
 echo "==> M4 exit status (M3 HelloWorld strict already verified above)"
-if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
+if m4_gen1_log_emit_path_native "${GEN1_LOG}"; then
   echo "bootstrap-loop-probe: M4 gen-1→gen-2 native slice OK"
   if [[ "${BOOTSTRAP_M4_GEN1_COMPILE_FULL_SPINE:-0}" == "1" ]]; then
     echo ""
@@ -288,7 +301,7 @@ if grep -q 'emit_path=native' "${GEN1_LOG}" 2>/dev/null; then
 fi
 
 echo "bootstrap-loop-probe: M3 HelloWorld strict OK; M4 gen-2 native emit still blocked (exit 2)" >&2
-echo "bootstrap-loop-probe: gen-1 link log lacked emit_path=native — check gen-1 native emit output" >&2
+echo "bootstrap-loop-probe: gen-1 link log lacked emit_path=native (sidecar recovery does not count — #21860)" >&2
 echo "bootstrap-loop-probe: NEXT: make bootstrap-loop-gen1-link" >&2
 m4_probe_tail "${GEN1_LOG}" 5
 exit 2

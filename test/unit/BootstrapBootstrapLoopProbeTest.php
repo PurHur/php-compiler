@@ -118,6 +118,18 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertLessThan($gen1Pos, $emitPos, 'emit helper should link before gen-1 bundle (M3 probe order)');
     }
 
+    public function testBootstrapLoopProbeRejectsSidecarAsNativeEmit(): void
+    {
+        $probe = (string) file_get_contents(self::$root.'/script/bootstrap-loop-probe.sh');
+        $this->assertStringContainsString('m4_gen1_log_emit_path_native', $probe);
+        $this->assertStringContainsString('m4_gen1_log_emit_path_sidecar', $probe);
+        $this->assertStringContainsString('#21860', $probe);
+        $this->assertStringContainsString('native-prelinked-sidecar (native emit failed', $probe);
+        $gen1 = (string) file_get_contents(self::$root.'/script/bootstrap-loop-gen1-link.sh');
+        $this->assertStringContainsString('M4_GEN2_SIDECAR', $gen1);
+        $this->assertStringContainsString('native emit failed — gen-2 recovered via prelinked sidecar', $gen1);
+    }
+
     public function testSelfHostTargetDocMentionsBootstrapLoopProbe(): void
     {
         $doc = (string) file_get_contents(self::$root.'/docs/self-host-target.md');

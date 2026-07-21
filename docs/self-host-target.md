@@ -37,7 +37,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Bundle size** | **6319/6319** literal Phase A inventory in spine smoke | Full vm.php closure |
 | **Inventory coverage** | **6319** / **6319** ✅ | Full closure |
 | **HelloWorld** | Strict probe **emit_path=native** ✅ | Native compile for arbitrary PHP |
-| **Bootstrap loop (M4)** | `make bootstrap-loop-probe` full ladder ✅ — gen-1→gen-2, gen-2→gen-3 full spine, full-revision argv | Native full revision rebuild |
+| **Bootstrap loop (M4)** | `make bootstrap-loop-probe` counts **native** gen-1→gen-2 only — prelinked sidecar recovery is **not** M4 green ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | Native full revision rebuild |
 | **Vendor** | **3/3** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `make north-star5-verify-fast` daily ✅; `--strict` ❌ **red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) | No Zend `vendor/autoload.php` at bootstrap |
 
 ### Gates (run after `script/apply-patches.sh`)
@@ -55,7 +55,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M4 `make bootstrap-loop-gen1-full-spine-emit` | 🚧 gen-1→gen-2 full spine — heavy opt-in |
 | M4 `make bootstrap-selfhost-full-revision-probe` | ✅ gen-2 inventory argv → gen-3 + fixture smoke ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) |
 | M4 `make bootstrap-loop-gen2-recompile-spine` | ✅ gen-2→gen-3 full spine native argv |
-| M4 `make bootstrap-loop-probe` | ✅ full ladder ([#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
+| M4 `make bootstrap-loop-probe` | ✅ when gen-1→gen-2 **`emit_path=native`** only — sidecar path exits 2 ([#21860](https://github.com/PurHur/php-compiler/issues/21860); [#1498](https://github.com/PurHur/php-compiler/issues/1498)) |
 | `make bootstrap-aot-link` | ✅ **6319/6319** |
 | `make bootstrap-inventory-check` | ✅ **6319/6319** Phase A files, **0** source blockers |
 | `make north-star5-verify-fast` | ✅ daily M5 PR gate (~1–2 min) |

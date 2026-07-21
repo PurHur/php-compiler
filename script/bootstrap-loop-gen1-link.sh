@@ -15,6 +15,7 @@ GEN2_SOURCE="test/bootstrap-aot/compiler_smoke_standalone.php"
 GEN2_OUT="build/bootstrap-loop-gen2"
 GEN2_EXPECT_STDOUT_RE="compiler smoke"
 M4_NATIVE_COMPILE=0
+M4_GEN2_SIDECAR=0
 M4_EMIT_PATH="none"
 M4_BLOCK_REASON="native compile driver not linked (set BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1)"
 # shellcheck source=php-env.sh
@@ -156,10 +157,11 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         echo "bootstrap-loop-gen1-link: gen-1 native emit OK (${ROOT}/${EMIT_HELPER} -> ${ROOT}/${GEN2_OUT})"
       elif [[ "${m4_emit_helper_from_prelinked}" -eq 1 ]] \
         && bootstrap_gen0_sidecar_emit_fallback "${GEN2_OUT}" "${ROOT}/${GEN2_SOURCE}"; then
-        M4_NATIVE_COMPILE=1
+        M4_GEN2_SIDECAR=1
         M4_EMIT_PATH="native-prelinked-sidecar"
-        M4_BLOCK_REASON=""
-        echo "bootstrap-loop-gen1-link: gen-2 native emit via prelinked sidecar (${GEN2_OUT}, #9704)"
+        M4_BLOCK_REASON="gen-1 native emit failed; gen-2 recovered via prelinked sidecar (#21860)"
+        echo "bootstrap-loop-gen1-link: gen-1 native emit failed — gen-2 recovered via prelinked sidecar (${GEN2_OUT}, #21860)" >&2
+        printf '%s\n' "${compile_out}" >&2
       else
         if grep -q 'native emit failed at phase=' <<< "${compile_out}"; then
           M4_BLOCK_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed 's/^[^:]*: //')"
@@ -194,7 +196,7 @@ if ! grep -q 'bootstrap_loop_smoke bundle OK' <<< "${gen1_out}"; then
 fi
 echo "bootstrap-loop-gen1-link: gen-1 link OK (${ROOT}/${GEN1})"
 
-if [[ "${M4_NATIVE_COMPILE}" -eq 0 ]]; then
+if [[ "${M4_NATIVE_COMPILE}" -eq 0 && "${M4_GEN2_SIDECAR}" -eq 0 ]]; then
   if [[ "${BOOTSTRAP_M4_GEN2_STRICT}" == "1" && "${BOOTSTRAP_M4_GEN2_ZEND_FALLBACK:-0}" != "1" ]]; then
     echo "bootstrap-loop-gen1-link: BOOTSTRAP_M4_GEN2_STRICT=1 — require native gen-2 emit; refusing Zend fallback (opt-in: BOOTSTRAP_M4_GEN2_ZEND_FALLBACK=1)" >&2
     echo "bootstrap-loop-gen1-link: emit_path=zend_fallback_would_be_used block_reason=${M4_BLOCK_REASON}" >&2
@@ -222,7 +224,9 @@ if ! grep -qE "${GEN2_EXPECT_STDOUT_RE}" <<< "${gen2_out}"; then
 fi
 
 if [[ "${M4_NATIVE_COMPILE}" -eq 1 ]]; then
-  echo "bootstrap-loop-gen1-link: OK emit_path=${M4_EMIT_PATH} gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT}"
+  echo "bootstrap-loop-gen1-link: OK emit_path=native gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT}"
+elif [[ "${M4_GEN2_SIDECAR}" -eq 1 ]]; then
+  echo "bootstrap-loop-gen1-link: OK emit_path=native-prelinked-sidecar gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT} (native emit failed — #21860)"
 else
   echo "bootstrap-loop-gen1-link: OK emit_path=zend partial gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT} (gen-1 native compile blocked)"
 fi
