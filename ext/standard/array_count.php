@@ -19,10 +19,8 @@ use PHPCompiler\JIT\Builtin\ArrayCountRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -47,17 +45,11 @@ final class array_count extends Internal
             throw new \LogicException('count() requires VM context in this compiler build');
         }
         if (Variable::TYPE_NULL === $v->type) {
-            if (InternalStrictArg::isCallerStrict($frame)) {
-                throw new \TypeError(
-                    $this->name.'(): Argument #1 ($value) must be of type Countable|array, null given'
-                );
-            }
-            VmNullStringParamDeprecation::emit($frame, $this->name, 0, 'value', 'Countable|array');
-            if (null !== $frame->returnVar) {
-                $frame->returnVar->int(0);
-            }
-
-            return;
+            // php-src 8.0+: count()/sizeof() always TypeError on null (not soft-coerce).
+            // Zend 8.2 reference matches; do not gate on caller strict_types (#21914, re-#21771).
+            throw new \TypeError(
+                $this->name.'(): Argument #1 ($value) must be of type Countable|array, null given'
+            );
         }
         $mode = VmArray::COUNT_NORMAL;
         if (2 === $argc) {
@@ -101,15 +93,11 @@ final class array_count extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes) {
-                TypeErrorRaise::emitRaise(
-                    $context,
-                    $this->name.'(): Argument #1 ($value) must be of type Countable|array, null given'
-                );
-
-                return $context->getTypeFromString('int64')->constInt(0, false);
-            }
-            JitStringBuiltinArg::emitNullStringParamDeprecation($context, $this->name, 0, 'value', 'Countable|array');
+            // php-src 8.0+: always TypeError on null (#21914).
+            TypeErrorRaise::emitRaise(
+                $context,
+                $this->name.'(): Argument #1 ($value) must be of type Countable|array, null given'
+            );
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
