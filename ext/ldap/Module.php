@@ -68,6 +68,7 @@ class Module extends ModuleAbstract
             new ldap_get_entries(),
             new ldap_first_entry(),
             new ldap_next_entry(),
+            new ldap_get_attributes(),
             new ldap_free_result(),
             new ldap_exop(),
             new ldap_exop_sync(),

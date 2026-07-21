@@ -119,6 +119,30 @@ final class VmLdapCore
     }
 
     /**
+     * php-src ldap_get_attributes() shape (no dn key; ext/ldap/ldap.c).
+     *
+     * @return Variable|false
+     */
+    public static function getAttributesMap(ObjectEntry $connection, ObjectEntry $entry): Variable|false
+    {
+        $ld = VmLdapConnection::native($connection);
+        $entryNative = VmLdapResult::entryNative($entry);
+        $attrNames = VmLdapNative::getAttributes($ld, $entryNative);
+        $out = ['count' => \count($attrNames)];
+        foreach ($attrNames as $attrIndex => $attrName) {
+            $values = VmLdapNative::getValuesLen($ld, $entryNative, $attrName);
+            $attrRow = ['count' => \count($values)];
+            foreach ($values as $vi => $val) {
+                $attrRow[$vi] = $val;
+            }
+            $out[$attrName] = $attrRow;
+            $out[$attrIndex] = $attrName;
+        }
+
+        return self::importPhpArray($out);
+    }
+
+    /**
      * @param array<int|string, mixed> $value
      */
     private static function importPhpArray(array $value): Variable
