@@ -445,6 +445,9 @@ final class PendingHeadersJitBridge
             return;
         }
 
+        // PendingHeadersJitHelper uses phpc_getenv_kernel (not raw getenv) under NestedJIT (#21888).
+        StringGetenv::ensureNativeHtInternalProxies($context);
+
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {

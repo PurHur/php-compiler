@@ -83,8 +83,9 @@ final class PendingHeadersJitHelper
     /** @return HashTable|null null when header_list() should return [] (no CGI gateway) */
     public static function listHeadersTable(): ?HashTable
     {
-        $gateway = getenv('GATEWAY_INTERFACE');
-        if (false === $gateway || '' === $gateway) {
+        // NestedJIT AOT: raw getenv() SEGVs — use phpc_getenv_kernel (#21888 / #20644).
+        $gateway = self::environGet('GATEWAY_INTERFACE');
+        if ('' === $gateway) {
             return null;
         }
 
@@ -177,12 +178,24 @@ final class PendingHeadersJitHelper
     private static function isWebResponseEnvPresent(): bool
     {
         foreach (['REQUEST_METHOD', 'GATEWAY_INTERFACE', 'QUERY_STRING'] as $key) {
-            $value = getenv($key);
-            if (false !== $value && '' !== $value) {
+            if ('' !== self::environGet($key)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Process environ lookup safe under NestedJIT AOT (#21888, #20644).
+     *
+     * Builtin environ lookup SEGVs when this helper is NestedJIT'd; use the
+     * Rename-shaped {@see phpc_getenv_kernel} libc leaf instead.
+     */
+    private static function environGet(string $key): string
+    {
+        $value = \phpc_getenv_kernel($key);
+
+        return null === $value ? '' : (string) $value;
     }
 }

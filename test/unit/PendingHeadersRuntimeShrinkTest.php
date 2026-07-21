@@ -44,4 +44,15 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PendingHeadersJitBridge.php', $spine);
         $this->assertStringContainsString('PendingHeadersRuntime.php', $spine);
     }
+
+    public function testHelperUsesGetenvKernelNotRawGetenv(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/PendingHeadersJitHelper.php');
+        $this->assertStringContainsString('phpc_getenv_kernel', $helper);
+        $this->assertStringContainsString('environGet', $helper);
+        $this->assertStringNotContainsString('getenv($', $helper);
+        $this->assertStringNotContainsString('= getenv(', $helper);
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersJitBridge.php');
+        $this->assertStringContainsString('StringGetenv::ensureNativeHtInternalProxies', $bridge);
+    }
 }
