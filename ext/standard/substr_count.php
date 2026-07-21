@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringSubstrCount;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\JitValueBox;
@@ -35,7 +36,8 @@ final class substr_count extends Internal
         $needle = self::vmNeedleArg($frame);
         $offset = 0;
         if ($argc >= 3) {
-            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'substr_count', 3, 'offset');
+            // Z_PARAM_LONG $offset — soft-null DEP+coerce on 8.4 (#21657; peer chr/mktime).
+            $offset = VmMath::parseChrCodepointForFrame($frame, 2, 'substr_count', 3, 'offset');
         }
         $length = null;
         if (4 === $argc) {
@@ -56,14 +58,21 @@ final class substr_count extends Internal
             throw new \LogicException('substr_count() requires two to four arguments in this compiler build');
         }
 
+        // Compile-time fold (#21657) — host-evaluate when operands are literals (AOT verify).
+        $folded = self::tryFoldCompileTime($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         StringSubstrCount::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $fn = $context->lookupFunction('phpc_substr_count');
         $hay = self::jitHaystackArg($context, $args[0]);
         $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'substr_count', 1, 'needle');
+        // Z_PARAM_LONG $offset — soft-null DEP+coerce on 8.4 (#21657; peer chr/mktime).
         $offset = $argc >= 3
-            ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'substr_count', 3, 'offset')
+            ? JitChr::lowerZParamLongArg($context, $args[2], 'substr_count', 3, 'offset')
             : $i64->constInt(0, false);
 
         if (4 !== $argc) {
@@ -153,6 +162,66 @@ final class substr_count extends Internal
         $phi->addIncoming($lenResult, $lenEnd);
 
         return $phi;
+    }
+
+    /**
+     * Compile-time fold for literal operands — emit soft-null DEP then host-evaluate (#21657).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function tryFoldCompileTime(Context $context, array $args): ?Value
+    {
+        $argc = \count($args);
+        $hayNull = self::isCompileTimeNull($args[0]);
+        $hayLit = $hayNull ? '' : JitStringArg::compileTimeLiteral($args[0]);
+        if (null === $hayLit) {
+            return null;
+        }
+        $needleNull = self::isCompileTimeNull($args[1]);
+        $needleLit = $needleNull ? '' : JitStringArg::compileTimeLiteral($args[1]);
+        if (null === $needleLit) {
+            return null;
+        }
+        $offset = 0;
+        $offsetNull = false;
+        if ($argc >= 3) {
+            $offsetNull = self::isCompileTimeNull($args[2]);
+            if ($offsetNull) {
+                if ($context->callerStrictTypes) {
+                    return null;
+                }
+            } elseif (null === $args[2]->compileTimeLong) {
+                return null;
+            } else {
+                $offset = $args[2]->compileTimeLong;
+            }
+        }
+        $length = null;
+        if (4 === $argc) {
+            if (self::isCompileTimeNull($args[3])) {
+                $length = null;
+            } elseif (null !== $args[3]->compileTimeLong) {
+                $length = $args[3]->compileTimeLong;
+            } else {
+                return null;
+            }
+        }
+        if ($hayNull && !$context->callerStrictTypes) {
+            JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr_count', 0, 'haystack');
+        }
+        if ($offsetNull) {
+            JitIntdiv::emitNullIntDeprecation($context, 'substr_count', 3, 'offset');
+        }
+
+        return $context->getTypeFromString('int64')->constInt(
+            VmString::substr_count($hayLit, $needleLit, $offset, $length),
+            true
+        );
+    }
+
+    private static function isCompileTimeNull(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
     }
 
     /**
