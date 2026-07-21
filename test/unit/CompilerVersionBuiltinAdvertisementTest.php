@@ -75,9 +75,26 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testMbStrPadWithheldOnReferenceProfileUntilStable84(): void
+    public function testMbStrPadEnabledOnDefault84Dev(): void
     {
-        $this->assertFalse(CompilerVersion::supportsMbStrPad());
+        $this->assertTrue(CompilerVersion::supportsMbStrPad());
+        $this->assertTrue(CompilerVersion::advertisesMbStrPad());
+    }
+
+    public function testMbStrPadWithheldOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsMbStrPad());
+            $this->assertFalse(CompilerVersion::advertisesMbStrPad());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testMbUcfirstLcfirstWithheldOnReferenceProfileUntilStable84(): void
@@ -1158,10 +1175,26 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmDoesNotRegisterMbStrPadOnReferenceProfile(): void
+    public function testVmRegistersMbStrPadOnDefault84Dev(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
+        $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
+    }
+
+    public function testVmDoesNotRegisterMbStrPadOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterClosureGetCurrentOnReferenceProfile(): void

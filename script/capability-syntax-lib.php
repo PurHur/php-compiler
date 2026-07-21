@@ -1362,7 +1362,7 @@ function withheldBuiltinGateDefinitions(): array
         [
             'names' => ['mb_str_pad'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbStrPad'],
-            'since' => '8.4.0',
+            'since' => '8.3.0',
             'module' => 'mbstring',
             'relPath' => 'ext/mbstring/mb_str_pad.php',
         ],
