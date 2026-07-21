@@ -29,9 +29,9 @@ final class sscanf extends Internal
                 $argc
             ));
         }
-        // $string soft-null on 8.4; $format stays Z_PARAM_STR (#21209, ext/standard/sscanf.c).
+        // $string and $format soft-null on 8.4 (Zend DEP+coerce; #21209/#21521, ext/standard/sscanf.c).
         $input = VmString::trimFamilyStringArgForFrame($frame, 0, 'sscanf', 0, 'string');
-        $format = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'sscanf', 1, 'format');
+        $format = VmString::trimFamilyStringArgForFrame($frame, 1, 'sscanf', 1, 'format');
         $outVars = [];
         for ($i = 2; $i < $argc; ++$i) {
             $outVars[] = $frame->calledArgs[$i];

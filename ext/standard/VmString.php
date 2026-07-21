@@ -96,7 +96,7 @@ final class VmString
      * substr_compare haystack/needle (#21515, reverts #20164 TypeError),
      * json_decode/json_validate $json, unserialize $data (#21223).
      * parse_ini_string $ini_string soft-null (#21431, reverts #18658).
-     * hex2bin/convert_uuencode/convert_uudecode/sscanf($string), pack($values) soft-null (#21209/#21420).
+     * hex2bin/convert_uuencode/convert_uudecode/sscanf($string/$format), pack($values) soft-null (#21209/#21420/#21521).
      * pack()/unpack() $format soft-null (#21478, reverts #20241 TypeError).
      * unpack($string) soft-null (#21246).
      * escapeshellarg/escapeshellcmd soft-null (#21221, re-#19333).
