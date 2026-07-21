@@ -8,13 +8,17 @@ use PHPCompiler\ext\standard\SubstrCountJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** substr_count() JIT routes through SubstrCountJitHelper PHP not inline LLVM (#14691). */
+/** substr_count() JIT routes through SubstrCountJitHelper PHP not inline LLVM (#14691, #21773). */
 final class SubstrCountRuntimeShrinkTest extends TestCase
 {
     public function testStringSubstrCountUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSubstrCount.php');
         $this->assertStringContainsString('SubstrCountJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitSubstrCount.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/substr_count.php');
