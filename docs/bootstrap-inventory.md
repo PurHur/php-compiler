@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6248 |
-| Phase A inventory files (M2 ratio SSOT) | 6248 |
+| PHP files on vm.php path | 6249 |
+| Phase A inventory files (M2 ratio SSOT) | 6249 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19728 |
+| Source constructs flagged (warnings) | 19732 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1483,6 +1483,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/VmPharArchive.php` | 0 | 66 |
 | `ext/phar/VmPharData.php` | 0 | 40 |
 | `ext/phar/VmPharFileInfo.php` | 0 | 17 |
+| `ext/phar/VmPharManifest.php` | 0 | 4 |
 | `ext/phar/VmPharStream.php` | 0 | 10 |
 | `ext/phar/VmPharTar.php` | 0 | 1 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
@@ -17906,72 +17907,72 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharArchive.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 129)
-- new UnexpectedValueException (line 135)
-- new UnexpectedValueException (line 195)
-- new UnexpectedValueException (line 208)
-- new UnexpectedValueException (line 220)
-- new UnexpectedValueException (line 232)
-- new UnexpectedValueException (line 245)
+- new UnexpectedValueException (line 133)
+- new UnexpectedValueException (line 139)
+- new UnexpectedValueException (line 224)
+- new UnexpectedValueException (line 237)
 - new UnexpectedValueException (line 249)
-- new UnexpectedValueException (line 263)
-- new RecursiveIteratorIterator (line 266)
-- new RecursiveDirectoryIterator (line 267)
-- new UnexpectedValueException (line 350)
-- new BadMethodCallException (line 423)
-- new BadMethodCallException (line 500)
-- new BadMethodCallException (line 506)
-- new BadMethodCallException (line 518)
-- new BadMethodCallException (line 555)
-- new BadMethodCallException (line 561)
-- new BadMethodCallException (line 610)
-- new BadMethodCallException (line 636)
-- new BadMethodCallException (line 639)
-- new UnexpectedValueException (line 647)
-- new ObjectEntry (line 649)
-- new UnexpectedValueException (line 697)
-- new ObjectEntry (line 699)
-- new BadMethodCallException (line 733)
-- new BadMethodCallException (line 737)
-- new BadMethodCallException (line 740)
-- new BadMethodCallException (line 743)
-- new UnexpectedValueException (line 758)
-- new UnexpectedValueException (line 763)
-- new ObjectEntry (line 768)
-- new UnexpectedValueException (line 819)
-- new ObjectEntry (line 824)
-- new BadMethodCallException (line 841)
-- new BadMethodCallException (line 845)
-- new BadMethodCallException (line 848)
-- new UnexpectedValueException (line 865)
-- new ObjectEntry (line 868)
-- new UnexpectedValueException (line 918)
-- new ObjectEntry (line 920)
-- new UnexpectedValueException (line 992)
-- new UnexpectedValueException (line 997)
-- new UnexpectedValueException (line 1002)
-- new UnexpectedValueException (line 1050)
-- new PharException (line 1131)
-- new PharException (line 1143)
-- new UnexpectedValueException (line 1148)
-- new BadMethodCallException (line 1172)
-- new BadMethodCallException (line 1175)
-- new Variable (line 1177)
-- new Error (line 1231)
-- new UnexpectedValueException (line 1407)
-- new UnexpectedValueException (line 1478)
-- new UnexpectedValueException (line 1487)
-- new UnexpectedValueException (line 1492)
-- new PharException (line 1509)
-- new PharException (line 1519)
-- new Error (line 1554)
-- new PharException (line 1573)
-- new PharException (line 1579)
-- new PharException (line 1586)
-- new PharException (line 1598)
-- new PharException (line 1611)
-- new PharException (line 1619)
-- 79 class method(s)
+- new UnexpectedValueException (line 261)
+- new UnexpectedValueException (line 274)
+- new UnexpectedValueException (line 278)
+- new UnexpectedValueException (line 292)
+- new RecursiveIteratorIterator (line 295)
+- new RecursiveDirectoryIterator (line 296)
+- new UnexpectedValueException (line 379)
+- new BadMethodCallException (line 456)
+- new BadMethodCallException (line 533)
+- new BadMethodCallException (line 539)
+- new BadMethodCallException (line 551)
+- new BadMethodCallException (line 588)
+- new BadMethodCallException (line 594)
+- new BadMethodCallException (line 643)
+- new BadMethodCallException (line 669)
+- new BadMethodCallException (line 672)
+- new UnexpectedValueException (line 680)
+- new ObjectEntry (line 682)
+- new UnexpectedValueException (line 730)
+- new ObjectEntry (line 732)
+- new BadMethodCallException (line 766)
+- new BadMethodCallException (line 770)
+- new BadMethodCallException (line 773)
+- new BadMethodCallException (line 776)
+- new UnexpectedValueException (line 791)
+- new UnexpectedValueException (line 796)
+- new ObjectEntry (line 801)
+- new UnexpectedValueException (line 852)
+- new ObjectEntry (line 857)
+- new BadMethodCallException (line 874)
+- new BadMethodCallException (line 878)
+- new BadMethodCallException (line 881)
+- new UnexpectedValueException (line 898)
+- new ObjectEntry (line 901)
+- new UnexpectedValueException (line 951)
+- new ObjectEntry (line 953)
+- new UnexpectedValueException (line 1025)
+- new UnexpectedValueException (line 1030)
+- new UnexpectedValueException (line 1035)
+- new UnexpectedValueException (line 1083)
+- new PharException (line 1164)
+- new PharException (line 1176)
+- new UnexpectedValueException (line 1181)
+- new BadMethodCallException (line 1205)
+- new BadMethodCallException (line 1208)
+- new Variable (line 1210)
+- new Error (line 1264)
+- new UnexpectedValueException (line 1466)
+- new UnexpectedValueException (line 1537)
+- new UnexpectedValueException (line 1553)
+- new UnexpectedValueException (line 1558)
+- new PharException (line 1578)
+- new PharException (line 1588)
+- new Error (line 1623)
+- new PharException (line 1642)
+- new PharException (line 1648)
+- new PharException (line 1655)
+- new PharException (line 1667)
+- new PharException (line 1680)
+- new PharException (line 1688)
+- 80 class method(s)
 
 ### `ext/phar/VmPharData.php`
 
@@ -18037,6 +18038,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 559)
 - new ArgumentCountError (line 599)
 - 32 class method(s)
+
+### `ext/phar/VmPharManifest.php`
+
+**Warnings** (review for bootstrap subset):
+- new UnexpectedValueException (line 76)
+- new PharException (line 331)
+- new PharException (line 340)
+- 12 class method(s)
 
 ### `ext/phar/VmPharStream.php`
 
@@ -44830,7 +44839,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitBoolArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `lib/JIT/JitClockGettimeArg.php`
 
