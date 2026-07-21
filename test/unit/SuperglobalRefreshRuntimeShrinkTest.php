@@ -6,13 +6,17 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Superglobal refresh JIT routes through SuperglobalRefreshJitHelper PHP not standalone LLVM (#9907, #13031). */
+/** Superglobal refresh JIT routes through JitSuperglobalRefreshKernel (not NestedJIT HashTable helper) (#9907, #21888). */
 final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
 {
-    public function testSuperglobalRefreshRuntimeUsesJitHelperBridge(): void
+    public function testSuperglobalRefreshRuntimeUsesKernelNotNestedJitHelperBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshRuntime.php');
-        $this->assertStringContainsString('SuperglobalRefreshJitHelper::buildGetTable', $source);
+        $this->assertStringContainsString('JitSuperglobalRefreshKernel::implement', $source);
+        $this->assertStringContainsString('#21888', $source);
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $source);
+        $this->assertStringNotContainsString('implementRefreshBridge', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString('SuperglobalRefreshStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitRefreshMain', $source);
         $this->assertStringNotContainsString('__phpc_sg_parse_form_encoded', $source);

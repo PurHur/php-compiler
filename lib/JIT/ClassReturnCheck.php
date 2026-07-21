@@ -12,6 +12,11 @@ use PHPLLVM\Builder;
 
 /**
  * Class/enum return type checks at JIT/AOT return sites (#17222, zend_type_hold.c).
+ *
+ * {@see \PHPCompiler\VM\HashTable} is special: NestedJIT lowers `: HashTable` to the
+ * `__hashtable__*` ABI (#21109), so return operands are native hashtables / i64 pointers —
+ * not `__object__*`. Treating them as ordinary class returns TypeErrors
+ * `HashTable, int returned` (#20652, #21888 / SuperglobalRefreshJitHelper).
  */
 final class ClassReturnCheck
 {
@@ -35,6 +40,11 @@ final class ClassReturnCheck
         }
         $expected = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
         $callableName = self::callableName($block->func);
+        if (self::isVmHashTableClass($expected)
+            || self::isVmHashTableClass($block->returnClassConstraint)
+        ) {
+            return self::enforceVmHashTableReturn($context, $return, $callableName, $expected);
+        }
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $objectType = $context->type->object;
@@ -52,6 +62,53 @@ final class ClassReturnCheck
         $ok = $objectType->emitInstanceOf($return, $classLc);
 
         return self::branchOnBoolOrRaise($context, $ok, $callableName, $expected, $return, $objectType);
+    }
+
+    /** NestedJIT / param ABI name for {@see \PHPCompiler\VM\HashTable} (#21109). */
+    public static function isVmHashTableClass(string $name): bool
+    {
+        $lc = strtolower(ltrim($name, '\\'));
+
+        return 'phpcompiler\\vm\\hashtable' === $lc
+            || str_ends_with($lc, '\\vm\\hashtable')
+            || 'hashtable' === $lc;
+    }
+
+    /**
+     * Accept native hashtable ABI returns for `: HashTable` (#21888, #20652).
+     *
+     * @return bool false when a TypeError path was emitted
+     */
+    private static function enforceVmHashTableReturn(
+        Context $context,
+        Variable $return,
+        ?string $callableName,
+        string $expected
+    ): bool {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        // __hashtable__* / NestedJIT i64 pointer / HashTable object / value-box hashtable
+        if (Variable::TYPE_HASHTABLE === $return->type
+            || Variable::TYPE_NATIVE_LONG === $return->type
+            || Variable::TYPE_OBJECT === $return->type
+            || Variable::TYPE_VALUE === $return->type
+            || 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)
+        ) {
+            return true;
+        }
+        if (Variable::TYPE_NULL === $return->type) {
+            self::raiseReturnTypeError($context, $callableName, $expected, 'null');
+
+            return false;
+        }
+        $scalarGiven = self::scalarGivenLabel($return);
+        if (null !== $scalarGiven) {
+            self::raiseReturnTypeError($context, $callableName, $expected, $scalarGiven);
+
+            return false;
+        }
+
+        return true;
     }
 
     private static function enforceValueBox(
