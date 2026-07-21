@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -15,6 +13,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for output_add_rewrite_var / output_reset_rewrite_vars via OutputRewriteVarsJitHelper PHP (#9477, #9753).
  *
  * JIT embed and AOT standalone compile {@see OutputRewriteVarsJitHelper} static storage.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SpaceshipRuntime #21949 / SessionCreateIdRuntime #21941).
  * php-src: ext/standard/url.c — PHP_FUNCTION(output_add_rewrite_var), output_reset_rewrite_vars.
  * VM SSOT: {@see \PHPCompiler\Web\ResponseContext}.
  */
@@ -33,17 +32,15 @@ final class RewriteVarsRuntime
     private const RESET_URL_REWRITER = 'PHPCompiler\\ext\\standard\\VmUrlRewriterOb::resetState';
 
     /** @var list<string> */
-    private const COMPILED_HELPERS = [
+    private const URL_REWRITER_HELPERS = [
         self::ENSURE_URL_REWRITER,
         self::RESET_URL_REWRITER,
-        self::ADD_HELPER,
-        self::RESET_HELPER,
     ];
 
     /** @var list<string> */
-    private const COMPILE_PATHS = [
-        self::URL_REWRITER_PATH,
-        self::HELPER_PATH,
+    private const OUTPUT_REWRITE_HELPERS = [
+        self::ADD_HELPER,
+        self::RESET_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -92,44 +89,18 @@ final class RewriteVarsRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        // Restore caller insert after NestedJIT (#21965) — peer GethostbynamelRuntime (#20555).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            foreach (self::COMPILE_PATHS as $relPath) {
-                $path = $root.$relPath;
-                $realPath = \realpath($path) ?: $path;
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), \basename($path));
-                if (null === $block) {
-                    throw new \LogicException(\basename($path).' parseAndCompile failed (#9477)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($realPath);
-            }
-        });
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9477)');
-            }
-        }
+        // VmUrlRewriterOb first — OutputRewriteVarsJitHelper::add calls ensureRegistered (#21965/#21968).
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::URL_REWRITER_PATH,
+            self::URL_REWRITER_HELPERS,
+            '#21968'
+        );
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::OUTPUT_REWRITE_HELPERS,
+            '#21968'
+        );
     }
 }

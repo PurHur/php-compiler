@@ -6,13 +6,17 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** RewriteVarsRuntime must route through OutputRewriteVarsJitHelper PHP, not LLVM globals (#9753). */
+/** RewriteVarsRuntime must route through OutputRewriteVarsJitHelper PHP, not LLVM globals (#9753, #21968). */
 final class RewriteVarsRuntimeShrinkTest extends TestCase
 {
     public function testRewriteVarsRuntimeUsesOutputRewriteVarsJitHelperNotLlvmGlobals(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/RewriteVarsRuntime.php');
         $this->assertStringContainsString('OutputRewriteVarsJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('VmUrlRewriterOb', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString("addGlobal(\$htPtrTy, 'phpc_rewrite_vars')", $source);
         $this->assertStringNotContainsString('HashTableHelper', $source);
         $this->assertStringNotContainsString('__hashtable__setStringKeyString', $source);
