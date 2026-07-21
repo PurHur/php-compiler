@@ -75,12 +75,12 @@
               </tr>
               <tr>
                 <td><strong>M4</strong> bootstrap loop</td>
-                <td>Gen-2→gen-3 full spine recompile ✅ (<code>make bootstrap-loop-gen2-recompile-spine</code>, **6302/6302**). Full revision: inventory argv driver compiles <code>bin/compile.php</code> → gen-3 ✅ (<code>make bootstrap-selfhost-full-revision-probe</code>, [#2880](https://github.com/PurHur/php-compiler/issues/2880))</td>
+                <td>Gen-2→gen-3 full spine recompile ✅ (<code>make bootstrap-loop-gen2-recompile-spine</code>, **6319/6319**). Full revision: inventory argv driver compiles <code>bin/compile.php</code> → gen-3 ✅ (<code>make bootstrap-selfhost-full-revision-probe</code>, [#2880](https://github.com/PurHur/php-compiler/issues/2880))</td>
                 <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></td>
               </tr>
               <tr>
                 <td><strong>M5</strong> full self-host</td>
-                <td><code>north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; spine <strong>6302/6302</strong>; vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅; committed <code>.o</code> cold boot without <code>vendor/</code> ✅; gen-0 sidecars refreshed ([#8559](https://github.com/PurHur/php-compiler/issues/8559)). Remaining: MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)); honest full-spine PHP <code>main()</code> at runtime (native bundle-OK probe covers bootstrap smoke)</td>
+                <td><code>north-star5-verify-fast</code> ✅ daily; <code>--strict</code> pre-merge; spine <strong>6319/6319</strong>; vendor prelink <strong>3/3</strong> <code>object_ok</code> ✅; committed <code>.o</code> cold boot without <code>vendor/</code> ✅; gen-0 sidecars refreshed ([#8559](https://github.com/PurHur/php-compiler/issues/8559)). Remaining: MCJIT execute ([#98](https://github.com/PurHur/php-compiler/issues/98)); honest full-spine PHP <code>main()</code> at runtime (native bundle-OK probe covers bootstrap smoke)</td>
                 <td><a href="https://github.com/PurHur/php-compiler/issues/1492">#1492</a></td>
               </tr>
             </tbody>
@@ -168,7 +168,7 @@
 
       <section>
         <h2>M2 spine — shim / native-floor notes</h2>
-        <p>SSOT: <code>script/bootstrap-spine-count.php</code> — <strong>6302/6302</strong> Phase&nbsp;A files in <code>compiler_lib_spine_smoke</code> ([#8559](https://github.com/PurHur/php-compiler/issues/8559), [#2543](https://github.com/PurHur/php-compiler/issues/2543)). <code>bin/vm.php</code> is in the spine ([#2134](https://github.com/PurHur/php-compiler/issues/2134)); VM driver execute probe ~<strong>20ms</strong> ([#2201](https://github.com/PurHur/php-compiler/issues/2201)). Native bundle-OK probe at standalone main entry (bootstrap smoke; honest PHP <code>main()</code> still open).</p>
+        <p>SSOT: <code>script/bootstrap-spine-count.php</code> — <strong>6319/6319</strong> Phase&nbsp;A files in <code>compiler_lib_spine_smoke</code> ([#8559](https://github.com/PurHur/php-compiler/issues/8559), [#2543](https://github.com/PurHur/php-compiler/issues/2543)). <code>bin/vm.php</code> is in the spine ([#2134](https://github.com/PurHur/php-compiler/issues/2134)); VM driver execute probe ~<strong>20ms</strong> ([#2201](https://github.com/PurHur/php-compiler/issues/2201)). Native bundle-OK probe at standalone main entry (bootstrap smoke; honest PHP <code>main()</code> still open).</p>
         <div class="table-wrap">
           <table>
             <thead>

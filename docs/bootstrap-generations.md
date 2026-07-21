@@ -13,8 +13,8 @@ This document is the **canonical reference** for generation numbering, artifacts
 | **0** | Committed `prelinked/bootstrap-gen0/bin-compile-aot` or Zend `php bin/compile.php` | `build/bin-compile-aot`, `build/selfhost-helloworld-compile`, emit helpers | M3 emit TU links; `BOOTSTRAP_M5_NO_ZEND=1` installs prelinked argv driver + `compiler_minimal` sidecar without Zend ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) |
 | **1** | Gen-0 emit helper | `build/bootstrap-loop-gen1-compile` | Native compile driver (M3 bridge) is linkable |
 | **2 (smoke)** | Gen-1 emit helper | `build/bootstrap-loop-gen2` | Gen-1 **native-emits** a smoke fixture (`compiler smoke`) |
-| **2 (spine)** | Gen-1 full-spine emit | `build/bootstrap-loop-gen2-full-spine` | Gen-1 **native-emits** the **6302/6302** spine bundle |
-| **3** | Gen-2 native driver | `build/bootstrap-loop-gen3-full-spine` | Gen-2 **recompiles** the **6302/6302** spine via argv `-o` (no `PHP_COMPILER_M3_*` on compile; [#2866](https://github.com/PurHur/php-compiler/issues/2866)) |
+| **2 (spine)** | Gen-1 full-spine emit | `build/bootstrap-loop-gen2-full-spine` | Gen-1 **native-emits** the **6319/6319** spine bundle |
+| **3** | Gen-2 native driver | `build/bootstrap-loop-gen3-full-spine` | Gen-2 **recompiles** the **6319/6319** spine via argv `-o` (no `PHP_COMPILER_M3_*` on compile; [#2866](https://github.com/PurHur/php-compiler/issues/2866)) |
 
 **Gen-2 compiles itself** in the M4 sense: `build/bin-compile-aot` (M3 native compile driver, linked via `./script/bootstrap-loop-gen1-link.sh` or `bootstrap-selfhost-helloworld-compile-bin.sh` for `bin/compile.php`) emits the next native binary via **argv** `-o OUT SOURCE.php` (preferred; [#2866](https://github.com/PurHur/php-compiler/issues/2866)) or legacy `PHP_COMPILER_M3_SOURCE` / `PHP_COMPILER_M3_OUT`. **`BOOTSTRAP_M4_GEN2_STRICT=1` default-on** ([#8711](https://github.com/PurHur/php-compiler/issues/8711)); opt-in Zend bisect: `BOOTSTRAP_M4_GEN2_ZEND_FALLBACK=1` (`emit_path=zend partial`). Inventory-scale spine uses link-time sidecar fast paths inside the emit bridge; full `php_compiler_cli_dispatch` lowering for arbitrary PHP remains ([#1937](https://github.com/PurHur/php-compiler/issues/1937), [#2866](https://github.com/PurHur/php-compiler/issues/2866)).
 
@@ -28,8 +28,8 @@ This document is the **canonical reference** for generation numbering, artifacts
 | `build/bootstrap-loop-gen1` | Gen-1 smoke bundle (runs before emit) |
 | `build/bootstrap-loop-gen1-compile` | Gen-1 emit helper |
 | `build/bootstrap-loop-gen2` | Gen-2 smoke binary |
-| `build/bootstrap-loop-gen2-full-spine` | Gen-2 full spine (6302/6302) |
-| `build/bootstrap-loop-gen3-full-spine` | Gen-3 full spine (6302/6302) — **gen-2 output** |
+| `build/bootstrap-loop-gen2-full-spine` | Gen-2 full spine (6319/6319) |
+| `build/bootstrap-loop-gen3-full-spine` | Gen-3 full spine (6319/6319) — **gen-2 output** |
 
 ### Gen-0 compile invoker (`bootstrap-resolve-compile-invoke.sh`, #2894)
 
@@ -53,8 +53,8 @@ This document is the **canonical reference** for generation numbering, artifacts
 ```bash
 script/apply-patches.sh
 make bootstrap-loop-gen1-link                    # gen-1 → gen-2 smoke (native)
-make bootstrap-loop-gen1-full-spine-emit       # gen-1 → gen-2 spine (6302/6302)
-make bootstrap-loop-gen2-recompile-spine       # gen-2 → gen-3 spine (6302/6302, argv -o)
+make bootstrap-loop-gen1-full-spine-emit       # gen-1 → gen-2 spine (6319/6319)
+make bootstrap-loop-gen2-recompile-spine       # gen-2 → gen-3 spine (6319/6319, argv -o)
 ```
 
 **One-shot probes:**
