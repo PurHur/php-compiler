@@ -23,14 +23,22 @@ final class VmPharFileInfo
 {
     public const CLASS_LC = 'pharfileinfo';
 
-    /** @var array<int, array{content: string, name: string, archive: string, crcChecked: bool, compressed: bool, hasMetadata: bool, metadata: mixed}> */
+    /** Regular-file type bit (stat st_mode S_IFREG) — Zend PharFileInfo::getPerms (#21652). */
+    private const S_IFREG = 0100000;
+
+    /** Default entry mode matching Zend fresh PharFileInfo (100644). */
+    private const DEFAULT_PERMS = self::S_IFREG | 0644;
+
+    /** @var array<int, array{content: string, name: string, archive: string, crcChecked: bool, compressed: bool, hasMetadata: bool, metadata: mixed, perms: int, flags: int}> */
     private static array $store = [];
 
     public static function register(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC])
             && isset($ctx->classes[self::CLASS_LC]->methods['iscrcchecked'])
-            && isset($ctx->classes[self::CLASS_LC]->methods['hasmetadata'])) {
+            && isset($ctx->classes[self::CLASS_LC]->methods['hasmetadata'])
+            && isset($ctx->classes[self::CLASS_LC]->methods['chmod'])
+            && isset($ctx->classes[self::CLASS_LC]->methods['getpharflags'])) {
             return;
         }
 
@@ -55,6 +63,9 @@ final class VmPharFileInfo
             'getmetadata' => PharFileInfoGetMetadata::class,
             'setmetadata' => PharFileInfoSetMetadata::class,
             'delmetadata' => PharFileInfoDelMetadata::class,
+            'getperms' => PharFileInfoGetPerms::class,
+            'chmod' => PharFileInfoChmod::class,
+            'getpharflags' => PharFileInfoGetPharFlags::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -68,6 +79,9 @@ final class VmPharFileInfo
         $entry->methodNames['getmetadata'] = 'getMetadata';
         $entry->methodNames['setmetadata'] = 'setMetadata';
         $entry->methodNames['delmetadata'] = 'delMetadata';
+        $entry->methodNames['getperms'] = 'getPerms';
+        $entry->methodNames['chmod'] = 'chmod';
+        $entry->methodNames['getpharflags'] = 'getPharFlags';
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -93,6 +107,8 @@ final class VmPharFileInfo
             'compressed' => false,
             'hasMetadata' => false,
             'metadata' => null,
+            'perms' => self::DEFAULT_PERMS,
+            'flags' => 0,
         ];
 
         return $info;
@@ -110,6 +126,8 @@ final class VmPharFileInfo
             'compressed' => false,
             'hasMetadata' => false,
             'metadata' => null,
+            'perms' => self::DEFAULT_PERMS,
+            'flags' => 0,
         ];
         $object->constructed = true;
     }
@@ -121,7 +139,14 @@ final class VmPharFileInfo
         self::$store[$object->id]['metadata'] = $metadata;
     }
 
-    /** @return array{content: string, name: string, archive: string, crcChecked: bool, compressed: bool, hasMetadata: bool, metadata: mixed} */
+    public static function hydrateAttrs(ObjectEntry $object, int $perms, int $flags): void
+    {
+        self::state($object);
+        self::$store[$object->id]['perms'] = $perms;
+        self::$store[$object->id]['flags'] = $flags;
+    }
+
+    /** @return array{content: string, name: string, archive: string, crcChecked: bool, compressed: bool, hasMetadata: bool, metadata: mixed, perms: int, flags: int} */
     public static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -163,6 +188,32 @@ final class VmPharFileInfo
         }
 
         return true;
+    }
+
+    public static function getPerms(ObjectEntry $object): int
+    {
+        return self::state($object)['perms'];
+    }
+
+    public static function getPharFlags(ObjectEntry $object): int
+    {
+        return self::state($object)['flags'];
+    }
+
+    public static function chmod(ObjectEntry $object, int $perms): void
+    {
+        $st = self::state($object);
+        // php-src keeps permission bits and reports as regular-file mode (100xxx).
+        $mode = self::S_IFREG | ($perms & 07777);
+        self::$store[$object->id]['perms'] = $mode;
+        if ('' !== $st['archive']) {
+            VmPharArchive::setEntryAttrs(
+                $st['archive'],
+                $st['name'],
+                $mode,
+                self::$store[$object->id]['flags']
+            );
+        }
     }
 
     public static function requireReceiver(Frame $frame, string $label): ObjectEntry
@@ -361,6 +412,63 @@ final class PharFileInfoDelMetadata extends VmClassMethod
         $ok = VmPharFileInfo::delMetadata($object);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/** PharFileInfo::getPerms() — override SplFileInfo for phar:// entries (#21652). */
+final class PharFileInfoGetPerms extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPerms');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharFileInfo::requireReceiver($frame, 'PharFileInfo::getPerms()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmPharFileInfo::getPerms($object));
+        }
+    }
+}
+
+/** PharFileInfo::chmod() — php-src zim_PharFileInfo_chmod (#21652). */
+final class PharFileInfoChmod extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('chmod');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharFileInfo::requireReceiver($frame, 'PharFileInfo::chmod()');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'PharFileInfo::chmod() expects exactly 1 argument, %d given',
+                \max(0, $argc - 1)
+            ));
+        }
+        $perms = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        VmPharFileInfo::chmod($object, $perms);
+    }
+}
+
+/** PharFileInfo::getPharFlags() — php-src zim_PharFileInfo_getPharFlags (#21652). */
+final class PharFileInfoGetPharFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPharFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharFileInfo::requireReceiver($frame, 'PharFileInfo::getPharFlags()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmPharFileInfo::getPharFlags($object));
         }
     }
 }
