@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6311 |
-| Phase A inventory files (M2 ratio SSOT) | 6311 |
+| PHP files on vm.php path | 6319 |
+| Phase A inventory files (M2 ratio SSOT) | 6319 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19985 |
+| Source constructs flagged (warnings) | 20024 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1289,13 +1289,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
 | `ext/mysqli/BuiltinClasses.php` | 0 | 4 |
-| `ext/mysqli/Module.php` | 0 | 33 |
+| `ext/mysqli/Module.php` | 0 | 41 |
 | `ext/mysqli/MysqliClassMethod.php` | 0 | 1 |
 | `ext/mysqli/MysqliConstants.php` | 0 | 1 |
 | `ext/mysqli/MysqliExtensionPolicy.php` | 0 | 1 |
 | `ext/mysqli/MysqliProceduralLink.php` | 0 | 3 |
 | `ext/mysqli/MysqliReportMode.php` | 0 | 1 |
-| `ext/mysqli/VmMysqli.php` | 0 | 47 |
+| `ext/mysqli/VmMysqli.php` | 0 | 57 |
 | `ext/mysqli/VmMysqliStmt.php` | 0 | 11 |
 | `ext/mysqli/mysqli_affected_rows.php` | 0 | 3 |
 | `ext/mysqli/mysqli_autocommit.php` | 0 | 2 |
@@ -1312,21 +1312,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mysqli/mysqli_fetch_row.php` | 0 | 3 |
 | `ext/mysqli/mysqli_free_result.php` | 0 | 3 |
 | `ext/mysqli/mysqli_get_connection_stats.php` | 0 | 2 |
-| `ext/mysqli/mysqli_init.php` | 0 | 3 |
+| `ext/mysqli/mysqli_info.php` | 0 | 2 |
+| `ext/mysqli/mysqli_init.php` | 0 | 5 |
+| `ext/mysqli/mysqli_multi_query.php` | 0 | 3 |
+| `ext/mysqli/mysqli_next_result.php` | 0 | 2 |
 | `ext/mysqli/mysqli_num_rows.php` | 0 | 3 |
+| `ext/mysqli/mysqli_options.php` | 0 | 3 |
 | `ext/mysqli/mysqli_prepare.php` | 0 | 3 |
 | `ext/mysqli/mysqli_query.php` | 0 | 3 |
+| `ext/mysqli/mysqli_real_connect.php` | 0 | 2 |
 | `ext/mysqli/mysqli_real_escape_string.php` | 0 | 3 |
 | `ext/mysqli/mysqli_refresh.php` | 0 | 3 |
 | `ext/mysqli/mysqli_release_savepoint.php` | 0 | 3 |
 | `ext/mysqli/mysqli_report.php` | 0 | 2 |
 | `ext/mysqli/mysqli_rollback.php` | 0 | 2 |
 | `ext/mysqli/mysqli_savepoint.php` | 0 | 3 |
+| `ext/mysqli/mysqli_set_charset.php` | 0 | 3 |
+| `ext/mysqli/mysqli_stat.php` | 0 | 2 |
 | `ext/mysqli/mysqli_stmt_bind_param.php` | 0 | 3 |
 | `ext/mysqli/mysqli_stmt_bind_result.php` | 0 | 3 |
 | `ext/mysqli/mysqli_stmt_close.php` | 0 | 3 |
 | `ext/mysqli/mysqli_stmt_execute.php` | 0 | 3 |
 | `ext/mysqli/mysqli_stmt_fetch.php` | 0 | 3 |
+| `ext/mysqli/mysqli_store_result.php` | 0 | 2 |
 | `ext/odbc/BuiltinClasses.php` | 0 | 1 |
 | `ext/odbc/Module.php` | 0 | 50 |
 | `ext/odbc/OdbcConstants.php` | 0 | 1 |
@@ -16202,38 +16210,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 71)
-- new mysqli_connect (line 90)
-- new mysqli_init (line 91)
-- new mysqli_query (line 92)
-- new mysqli_fetch_assoc (line 93)
-- new mysqli_fetch_array (line 94)
-- new mysqli_fetch_row (line 95)
-- new mysqli_close (line 96)
-- new mysqli_connect_errno (line 97)
-- new mysqli_connect_error (line 98)
-- new mysqli_free_result (line 99)
-- new mysqli_real_escape_string (line 100)
-- new mysqli_real_escape_string (line 101)
-- new mysqli_num_rows (line 102)
-- new mysqli_affected_rows (line 103)
-- new mysqli_error (line 104)
-- new mysqli_errno (line 105)
-- new mysqli_report (line 106)
-- new mysqli_prepare (line 107)
-- new mysqli_stmt_bind_param (line 108)
-- new mysqli_stmt_bind_result (line 109)
-- new mysqli_stmt_close (line 110)
-- new mysqli_stmt_execute (line 111)
-- new mysqli_stmt_fetch (line 112)
-- new mysqli_autocommit (line 113)
-- new mysqli_begin_transaction (line 114)
-- new mysqli_commit (line 115)
-- new mysqli_rollback (line 116)
-- new mysqli_savepoint (line 117)
-- new mysqli_release_savepoint (line 118)
-- new mysqli_refresh (line 119)
-- new mysqli_get_connection_stats (line 120)
+- new Variable (line 79)
+- new mysqli_connect (line 98)
+- new mysqli_init (line 99)
+- new mysqli_query (line 100)
+- new mysqli_fetch_assoc (line 101)
+- new mysqli_fetch_array (line 102)
+- new mysqli_fetch_row (line 103)
+- new mysqli_close (line 104)
+- new mysqli_connect_errno (line 105)
+- new mysqli_connect_error (line 106)
+- new mysqli_free_result (line 107)
+- new mysqli_real_escape_string (line 108)
+- new mysqli_real_escape_string (line 109)
+- new mysqli_num_rows (line 110)
+- new mysqli_affected_rows (line 111)
+- new mysqli_error (line 112)
+- new mysqli_errno (line 113)
+- new mysqli_report (line 114)
+- new mysqli_prepare (line 115)
+- new mysqli_stmt_bind_param (line 116)
+- new mysqli_stmt_bind_result (line 117)
+- new mysqli_stmt_close (line 118)
+- new mysqli_stmt_execute (line 119)
+- new mysqli_stmt_fetch (line 120)
+- new mysqli_autocommit (line 121)
+- new mysqli_begin_transaction (line 122)
+- new mysqli_commit (line 123)
+- new mysqli_rollback (line 124)
+- new mysqli_savepoint (line 125)
+- new mysqli_release_savepoint (line 126)
+- new mysqli_refresh (line 127)
+- new mysqli_get_connection_stats (line 128)
+- new mysqli_real_connect (line 129)
+- new mysqli_options (line 130)
+- new mysqli_set_charset (line 131)
+- new mysqli_multi_query (line 132)
+- new mysqli_next_result (line 133)
+- new mysqli_store_result (line 134)
+- new mysqli_info (line 135)
+- new mysqli_stat (line 136)
 - 4 class method(s)
 
 ### `ext/mysqli/MysqliClassMethod.php`
@@ -16256,7 +16272,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 17)
 - new ArgumentCountError (line 78)
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/mysqli/MysqliReportMode.php`
 
@@ -16280,39 +16296,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new MysqliReleaseSavepoint (line 61)
 - new MysqliRefresh (line 62)
 - new MysqliGetConnectionStats (line 63)
-- new mysqli (line 100)
-- new ObjectEntry (line 137)
-- new MysqliState (line 138)
-- new ObjectEntry (line 153)
-- new MysqliState (line 154)
-- new mysqli_sql_exception (line 210)
-- new HashTable (line 220)
-- new Variable (line 222)
-- new MysqliState (line 239)
-- new ClassEntry (line 346)
-- new MysqliResultFetchAssoc (line 351)
-- new MysqliResultFetchArray (line 352)
-- new MysqliResultFetchRow (line 353)
-- new MysqliResultFree (line 354)
-- new MysqliResultFree (line 355)
-- new MysqliResultFree (line 356)
-- new MysqliResultFetchAll (line 357)
-- new ObjectEntry (line 377)
-- new MysqliResultState (line 378)
-- new mysqli_sql_exception (line 445)
-- new mysqli (line 460)
-- new mysqli_sql_exception (line 465)
-- new MysqliState (line 468)
-- new ArgumentCountError (line 506)
-- new ArgumentCountError (line 558)
-- new ArgumentCountError (line 580)
-- new ArgumentCountError (line 606)
-- new ArgumentCountError (line 742)
-- new ArgumentCountError (line 763)
-- new ArgumentCountError (line 784)
-- new HashTable (line 913)
-- new Variable (line 915)
-- 53 class method(s)
+- new MysqliRealConnect (line 64)
+- new MysqliOptions (line 65)
+- new MysqliSetCharset (line 66)
+- new MysqliMultiQuery (line 67)
+- new MysqliNextResult (line 68)
+- new MysqliStoreResult (line 69)
+- new mysqli (line 106)
+- new ObjectEntry (line 143)
+- new MysqliState (line 144)
+- new ObjectEntry (line 159)
+- new MysqliState (line 160)
+- new mysqli_sql_exception (line 216)
+- new HashTable (line 226)
+- new Variable (line 228)
+- new MysqliState (line 245)
+- new mysqli (line 420)
+- new ClassEntry (line 448)
+- new MysqliResultFetchAssoc (line 453)
+- new MysqliResultFetchArray (line 454)
+- new MysqliResultFetchRow (line 455)
+- new MysqliResultFree (line 456)
+- new MysqliResultFree (line 457)
+- new MysqliResultFree (line 458)
+- new MysqliResultFetchAll (line 459)
+- new ObjectEntry (line 479)
+- new MysqliResultState (line 480)
+- new mysqli_sql_exception (line 547)
+- new mysqli (line 562)
+- new mysqli_sql_exception (line 567)
+- new MysqliState (line 570)
+- new ArgumentCountError (line 608)
+- new ArgumentCountError (line 660)
+- new ArgumentCountError (line 682)
+- new ArgumentCountError (line 708)
+- new ArgumentCountError (line 844)
+- new ArgumentCountError (line 865)
+- new ArgumentCountError (line 886)
+- new ArgumentCountError (line 970)
+- new ArgumentCountError (line 992)
+- new ArgumentCountError (line 1013)
+- new HashTable (line 1167)
+- new Variable (line 1169)
+- 69 class method(s)
 
 ### `ext/mysqli/VmMysqliStmt.php`
 
@@ -16428,11 +16454,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 33)
 - 2 class method(s)
 
+### `ext/mysqli/mysqli_info.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 38)
+- 2 class method(s)
+
 ### `ext/mysqli/mysqli_init.php`
 
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 39)
-- new Error (line 46)
+- new MysqliState (line 40)
+- new mysqli (line 43)
+- new Error (line 51)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_multi_query.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new Error (line 34)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_next_result.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 30)
 - 2 class method(s)
 
 ### `ext/mysqli/mysqli_num_rows.php`
@@ -16440,6 +16487,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - new Error (line 39)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_options.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new Error (line 35)
 - 2 class method(s)
 
 ### `ext/mysqli/mysqli_prepare.php`
@@ -16455,6 +16509,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 25)
 - new Error (line 51)
 - 3 class method(s)
+
+### `ext/mysqli/mysqli_real_connect.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 49)
+- 2 class method(s)
 
 ### `ext/mysqli/mysqli_real_escape_string.php`
 
@@ -16496,6 +16556,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 35)
 - 2 class method(s)
 
+### `ext/mysqli/mysqli_set_charset.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 35)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_stat.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 38)
+- 2 class method(s)
+
 ### `ext/mysqli/mysqli_stmt_bind_param.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16528,6 +16601,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/mysqli/mysqli_store_result.php`
+
+**Warnings** (review for bootstrap subset):
 - new Error (line 39)
 - 2 class method(s)
 

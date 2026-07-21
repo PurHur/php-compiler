@@ -42,6 +42,17 @@ final class MysqliConstants
     public const MYSQLI_REFRESH_MASTER = 128;
     public const MYSQLI_REFRESH_BACKUP_LOG = 2097152;
 
+    public const MYSQLI_OPT_CONNECT_TIMEOUT = 0;
+    public const MYSQLI_INIT_COMMAND = 3;
+    public const MYSQLI_READ_DEFAULT_FILE = 4;
+    public const MYSQLI_READ_DEFAULT_GROUP = 5;
+    public const MYSQLI_OPT_LOCAL_INFILE = 8;
+    public const MYSQLI_OPT_READ_TIMEOUT = 11;
+    public const MYSQLI_OPT_NET_CMD_BUFFER_SIZE = 12;
+    public const MYSQLI_OPT_NET_READ_BUFFER_SIZE = 13;
+    public const MYSQLI_OPT_INT_AND_FLOAT_NATIVE = 17;
+    public const MYSQLI_OPT_SSL_VERIFY_SERVER_CERT = 21;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -71,6 +82,16 @@ final class MysqliConstants
             'MYSQLI_REFRESH_SLAVE' => self::MYSQLI_REFRESH_SLAVE,
             'MYSQLI_REFRESH_MASTER' => self::MYSQLI_REFRESH_MASTER,
             'MYSQLI_REFRESH_BACKUP_LOG' => self::MYSQLI_REFRESH_BACKUP_LOG,
+            'MYSQLI_OPT_CONNECT_TIMEOUT' => self::MYSQLI_OPT_CONNECT_TIMEOUT,
+            'MYSQLI_INIT_COMMAND' => self::MYSQLI_INIT_COMMAND,
+            'MYSQLI_READ_DEFAULT_FILE' => self::MYSQLI_READ_DEFAULT_FILE,
+            'MYSQLI_READ_DEFAULT_GROUP' => self::MYSQLI_READ_DEFAULT_GROUP,
+            'MYSQLI_OPT_LOCAL_INFILE' => self::MYSQLI_OPT_LOCAL_INFILE,
+            'MYSQLI_OPT_READ_TIMEOUT' => self::MYSQLI_OPT_READ_TIMEOUT,
+            'MYSQLI_OPT_NET_CMD_BUFFER_SIZE' => self::MYSQLI_OPT_NET_CMD_BUFFER_SIZE,
+            'MYSQLI_OPT_NET_READ_BUFFER_SIZE' => self::MYSQLI_OPT_NET_READ_BUFFER_SIZE,
+            'MYSQLI_OPT_INT_AND_FLOAT_NATIVE' => self::MYSQLI_OPT_INT_AND_FLOAT_NATIVE,
+            'MYSQLI_OPT_SSL_VERIFY_SERVER_CERT' => self::MYSQLI_OPT_SSL_VERIFY_SERVER_CERT,
         ];
     }
 

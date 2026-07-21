@@ -97,4 +97,18 @@ final class MysqliProceduralLink
             $frame->returnVar->bool($value);
         }
     }
+
+    public static function optionValue(Variable $var): mixed
+    {
+        $resolved = $var->resolveIndirect();
+
+        return match ($resolved->type) {
+            Variable::TYPE_INTEGER => $resolved->toInt(),
+            Variable::TYPE_FLOAT => $resolved->toFloat(),
+            Variable::TYPE_BOOLEAN => $resolved->toBool(),
+            Variable::TYPE_NULL => null,
+            Variable::TYPE_STRING => $resolved->toString(),
+            default => $resolved->toString(),
+        };
+    }
 }

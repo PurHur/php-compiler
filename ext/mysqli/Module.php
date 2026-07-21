@@ -63,6 +63,14 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_release_savepoint.php';
         require_once __DIR__.'/mysqli_refresh.php';
         require_once __DIR__.'/mysqli_get_connection_stats.php';
+        require_once __DIR__.'/mysqli_real_connect.php';
+        require_once __DIR__.'/mysqli_options.php';
+        require_once __DIR__.'/mysqli_set_charset.php';
+        require_once __DIR__.'/mysqli_multi_query.php';
+        require_once __DIR__.'/mysqli_next_result.php';
+        require_once __DIR__.'/mysqli_store_result.php';
+        require_once __DIR__.'/mysqli_info.php';
+        require_once __DIR__.'/mysqli_stat.php';
         parent::init($runtime);
         if (!MysqliExtensionPolicy::advertisesExtension()) {
             return;
@@ -118,6 +126,14 @@ class Module extends ModuleAbstract
             new mysqli_release_savepoint(),
             new mysqli_refresh(),
             new mysqli_get_connection_stats(),
+            new mysqli_real_connect(),
+            new mysqli_options(),
+            new mysqli_set_charset(),
+            new mysqli_multi_query(),
+            new mysqli_next_result(),
+            new mysqli_store_result(),
+            new mysqli_info(),
+            new mysqli_stat(),
         ];
     }
 }

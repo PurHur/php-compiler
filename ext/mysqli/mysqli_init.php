@@ -37,7 +37,12 @@ final class mysqli_init extends Internal
             throw new \LogicException('mysqli class not registered');
         }
         $entry = new ObjectEntry($class);
-        $entry->constructed = true;
+        $state = new MysqliState();
+        $state->ctx = $ctx;
+        if (MysqliExtensionPolicy::hasNativeDriver()) {
+            $state->native = new \mysqli();
+        }
+        VmMysqli::attachState($entry, $state);
         $frame->returnVar->object($entry);
     }
 

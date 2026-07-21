@@ -61,6 +61,12 @@ final class VmMysqli
             'release_savepoint' => new MysqliReleaseSavepoint(),
             'refresh' => new MysqliRefresh(),
             'get_connection_stats' => new MysqliGetConnectionStats(),
+            'real_connect' => new MysqliRealConnect(),
+            'options' => new MysqliOptions(),
+            'set_charset' => new MysqliSetCharset(),
+            'multi_query' => new MysqliMultiQuery(),
+            'next_result' => new MysqliNextResult(),
+            'store_result' => new MysqliStoreResult(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -319,6 +325,102 @@ final class VmMysqli
         }
 
         return $stats;
+    }
+
+    public static function realConnectOnLink(
+        ObjectEntry $entry,
+        Context $ctx,
+        ?string $hostname,
+        ?string $username,
+        ?string $password,
+        ?string $database,
+        ?int $port,
+        ?string $socket,
+        int $flags = 0
+    ): bool {
+        $native = self::requireNativeOrInit($entry, $ctx);
+        $hostname = $hostname ?? ini_get('mysqli.default_host') ?: null;
+        $username = $username ?? ini_get('mysqli.default_user') ?: null;
+        $password = $password ?? ini_get('mysqli.default_pw') ?: null;
+        $database = $database ?? null;
+        $port = $port ?? (int) (ini_get('mysqli.default_port') ?: 3306);
+        $socket = $socket ?? ini_get('mysqli.default_socket') ?: null;
+
+        return $native->real_connect($hostname, $username, $password, $database, $port, $socket, $flags);
+    }
+
+    public static function optionsOnLink(ObjectEntry $entry, Context $ctx, int $option, mixed $value): bool
+    {
+        $native = self::requireNativeOrInit($entry, $ctx);
+
+        return $native->options($option, $value);
+    }
+
+    public static function setCharsetOnLink(ObjectEntry $entry, Context $ctx, string $charset): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->set_charset($charset);
+    }
+
+    public static function multiQueryOnLink(ObjectEntry $entry, Context $ctx, string $query): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->multi_query($query);
+    }
+
+    public static function nextResultOnLink(ObjectEntry $entry, Context $ctx): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->next_result();
+    }
+
+    public static function storeResultOnLink(ObjectEntry $entry, Context $ctx, int $flags = 0): ObjectEntry|bool
+    {
+        $native = self::requireNative($entry, $ctx);
+        $result = $native->store_result($flags);
+        if (false === $result) {
+            return false;
+        }
+
+        return VmMysqliResult::wrap($ctx, $result);
+    }
+
+    public static function infoOnLink(ObjectEntry $entry, Context $ctx): ?string
+    {
+        $native = self::requireNative($entry, $ctx);
+        $info = $native->info;
+
+        return false === $info || null === $info ? null : (string) $info;
+    }
+
+    public static function statOnLink(ObjectEntry $entry, Context $ctx): ?string
+    {
+        $native = self::requireNative($entry, $ctx);
+        $stat = $native->stat();
+        if (false === $stat) {
+            return null;
+        }
+
+        return (string) $stat;
+    }
+
+    public static function requireNativeOrInit(ObjectEntry $entry, Context $ctx): \mysqli
+    {
+        if (!isset(self::$store[$entry->id])) {
+            throw new \LogicException('mysqli object has not been correctly initialized');
+        }
+        $state = self::$store[$entry->id];
+        if (null === $state->native) {
+            if (!MysqliExtensionPolicy::hasNativeDriver()) {
+                throw new \LogicException('mysqli extension not available on host PHP');
+            }
+            $state->native = new \mysqli();
+        }
+
+        return $state->native;
     }
 }
 
@@ -806,6 +908,158 @@ final class MysqliGetConnectionStats extends MysqliClassMethod
             return;
         }
         VmMysqli::assignRow($frame->returnVar, VmMysqli::connectionStatsOnLink($receiver, $ctx));
+    }
+}
+
+final class MysqliRealConnect extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('real_connect');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::real_connect()');
+        $argc = \count($frame->calledArgs) - 1;
+        $hostname = $argc >= 1 ? $this->optionalStringArg($frame->calledArgs[1]) : null;
+        $username = $argc >= 2 ? $this->optionalStringArg($frame->calledArgs[2]) : null;
+        $password = $argc >= 3 ? $this->optionalStringArg($frame->calledArgs[3]) : null;
+        $database = $argc >= 4 ? $this->optionalStringArg($frame->calledArgs[4]) : null;
+        $port = $argc >= 5 ? $this->intArg($frame->calledArgs[5], 'mysqli::real_connect', 4, 'port', 0) : null;
+        $socket = $argc >= 6 ? $this->optionalStringArg($frame->calledArgs[6]) : null;
+        $flags = $argc >= 7 ? $this->intArg($frame->calledArgs[7], 'mysqli::real_connect', 6, 'flags', 0) : 0;
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::real_connect() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::realConnectOnLink(
+                $receiver,
+                $ctx,
+                $hostname,
+                $username,
+                $password,
+                $database,
+                $port,
+                $socket,
+                $flags
+            ));
+        }
+    }
+
+    private function optionalStringArg(Variable $var): ?string
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toString();
+    }
+}
+
+final class MysqliOptions extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('options');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::options()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError('mysqli::options() expects exactly 2 arguments, '.(\count($frame->calledArgs) - 1).' given');
+        }
+        $option = $this->intArg($frame->calledArgs[1], 'mysqli::options', 0, 'option');
+        $value = MysqliProceduralLink::optionValue($frame->calledArgs[2]);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::options() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::optionsOnLink($receiver, $ctx, $option, $value));
+        }
+    }
+}
+
+final class MysqliSetCharset extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('set_charset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::set_charset()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::set_charset() expects exactly 1 argument, 0 given');
+        }
+        $charset = $this->stringArg($frame->calledArgs[1], 'mysqli::set_charset', 0, 'charset');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::set_charset() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::setCharsetOnLink($receiver, $ctx, $charset));
+        }
+    }
+}
+
+final class MysqliMultiQuery extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('multi_query');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::multi_query()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::multi_query() expects exactly 1 argument, 0 given');
+        }
+        $query = $this->stringArg($frame->calledArgs[1], 'mysqli::multi_query', 0, 'query');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::multi_query() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::multiQueryOnLink($receiver, $ctx, $query));
+        }
+    }
+}
+
+final class MysqliNextResult extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::next_result()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::next_result() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::nextResultOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliStoreResult extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('store_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::store_result()');
+        $flags = \count($frame->calledArgs) >= 2
+            ? $this->intArg($frame->calledArgs[1], 'mysqli::store_result', 0, 'flags', 0)
+            : 0;
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::store_result() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmMysqli::storeResultOnLink($receiver, $ctx, $flags);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($result);
+        }
     }
 }
 
