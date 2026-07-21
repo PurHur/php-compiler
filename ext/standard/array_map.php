@@ -19,12 +19,10 @@ use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -50,27 +48,13 @@ final class array_map extends Internal
         $callback = $frame->calledArgs[0]->resolveIndirect();
         $arrays = [];
         for ($i = 1; $i < $argc; ++$i) {
-            $arg = $frame->calledArgs[$i]->resolveIndirect();
-            if (Variable::TYPE_NULL === $arg->type) {
-                if (InternalStrictArg::isCallerStrict($frame)) {
-                    throw new \TypeError(\sprintf(
-                        'array_map(): Argument #%d ($array) must be of type array, null given',
-                        $i + 1
-                    ));
-                }
-                VmNullStringParamDeprecation::emit($frame, 'array_map', $i, 'array');
-                $arrays[] = new HashTable();
-
-                continue;
-            }
-            if (Variable::TYPE_ARRAY !== $arg->type) {
-                throw new \TypeError(\sprintf(
-                    'array_map(): Argument #%d ($array) must be of type array, %s given',
-                    $i + 1,
-                    self::typeLabel($arg)
-                ));
-            }
-            $arrays[] = $arg->toArray();
+            // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916, re-#21771).
+            $arrays[] = VmArray::requireArrayParam(
+                $frame->calledArgs[$i]->resolveIndirect(),
+                'array_map',
+                $i + 1,
+                'array'
+            );
         }
         if (1 === \count($arrays)) {
             $frame->returnVar->array(self::mapSingleArray($frame, $callback, $arrays[0]));
@@ -89,16 +73,12 @@ final class array_map extends Internal
         }
         $callback = $args[0];
         $arrays = \array_slice($args, 1);
+        // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916, re-#21771).
         foreach ($arrays as $i => $array) {
             if (JITVariable::TYPE_NULL === $array->type || ($array->isNullConstant ?? false)) {
-                if ($context->callerStrictTypes) {
-                    throw new \TypeError(\sprintf(
-                        'array_map(): Argument #%d ($array) must be of type array, null given',
-                        $i + 2
-                    ));
-                }
-                JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'array_map', $i + 1, 'array');
-                $arrays[$i] = HashTableHelper::emptyVariable($context);
+                JitArrayElem::requireArrayParam($context, $array, 'array_map', $i + 2, 'array');
+
+                return HashTableHelper::emptyVariable($context)->value;
             }
         }
         foreach ($arrays as $i => $array) {

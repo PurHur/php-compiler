@@ -16,8 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArraySumRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitArrayElem;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -48,16 +46,9 @@ final class array_sum extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('array_sum() requires exactly one argument');
         }
+        // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916/#21926, re-#4504).
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes) {
-                TypeErrorRaise::emitRaise(
-                    $context,
-                    'array_sum(): Argument #1 ($array) must be of type array, null given'
-                );
-
-                return $context->getTypeFromString('int64')->constInt(0, false);
-            }
-            JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'array_sum', 0, 'array');
+            JitArrayElem::requireArrayArg($context, $args[0], 'array_sum');
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
