@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1535,7 +1535,7 @@
+                 'is_string' => 'string',
+             ];
+             $lname = strtolower($name->value);
+-            if (isset($assertionFunctions[$lname])) {
++            if (isset($assertionFunctions[$lname]) && isset($args[0])) {
+                 $op->result->addAssertion(
+                     $args[0],
+                     new Assertion\TypeAssertion(new Operand\Literal($assertionFunctions[$lname]))
