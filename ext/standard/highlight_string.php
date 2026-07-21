@@ -24,8 +24,7 @@ final class highlight_string extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('highlight_string() expects 1 or 2 arguments in this compiler build');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20262, re-#18779)
-        $code = VmString::zparamStrBuiltinArgForFrame(
+        $code = VmString::stringBuiltinArgForFrame(
             $frame,
             0,
             $this->getName(),

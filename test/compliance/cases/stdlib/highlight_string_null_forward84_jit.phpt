@@ -1,16 +1,24 @@
 --TEST--
-stdlib highlight_string(null) — TypeError on 8.4 forward profile JIT (#20262, ext/standard/basic_functions.c)
+stdlib highlight_string(null) — DEP+coerce on 8.4 forward profile JIT (#21504, ext/standard/basic_functions.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
+set_error_handler(function ($n, $m) {
+    if ($n === E_DEPRECATED) {
+        echo "DEP\n";
+        return true;
+    }
+    return false;
+});
 try {
-    highlight_string(null, true);
-    echo "uncaught\n";
+    $r = highlight_string(null, true);
+    echo "ok len=" . strlen($r) . "\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
 ?>
 --EXPECT--
-highlight_string(): Argument #1 ($string) must be of type string, null given
+DEP
+ok len=51
