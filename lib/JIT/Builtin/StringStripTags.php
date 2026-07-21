@@ -4,20 +4,24 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_strip_tags via StripTagsJitHelper PHP (#9196).
+ * JIT/AOT link for __compiler_strip_tags via StripTagsJitHelper PHP (#9196, #21711).
  *
- * JIT embed and AOT standalone compile {@see StripTagsJitHelper} into the module; thin LLVM bridge
- * forwards the __compiler_strip_tags ABI. php-src: ext/standard/string.c
+ * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringVersionCompare #21706 /
+ * StringUrldecode #21686 / StringCslashes #21617.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * php-src: ext/standard/string.c — PHP_FUNCTION(strip_tags)
  */
 final class StringStripTags
 {
     private const HELPER_PATH = '/ext/standard/StripTagsJitHelper.php';
+
+    private const ABI = '__compiler_strip_tags';
 
     private const STRIP_TAGS_HELPER = 'PHPCompiler\\ext\\standard\\StripTagsJitHelper::stripTags';
 
@@ -25,6 +29,8 @@ final class StringStripTags
     private const COMPILED_HELPERS = [
         self::STRIP_TAGS_HELPER,
     ];
+
+    private const BRIDGE_ENTRY = 'strip_tags_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -38,85 +44,28 @@ final class StringStripTags
 
     public static function implement(Context $context): void
     {
-        self::implementBridge($context, '__compiler_strip_tags', self::STRIP_TAGS_HELPER, 2);
-    }
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
 
-    private static function implementBridge(
-        Context $context,
-        string $abiName,
-        string $helperLogical,
-        int $paramCount
-    ): void {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $params = \array_fill(0, $paramCount, $strPtr);
-        $ft = $context->context->functionType($strPtr, false, ...$params);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        self::ensureJitHelperCompiled($context);
-
-        $entry = $fn->appendBasicBlock('strip_tags_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $callArgs = [];
-        for ($i = 0; $i < $paramCount; ++$i) {
-            $callArgs[] = $fn->getParam($i);
-        }
-        $result = $context->builder->call(
-            self::helperFunction($context, $helperLogical),
-            ...$callArgs
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr, $strPtr],
+            $strPtr,
+            self::STRIP_TAGS_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21711'
         );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after StripTagsJitHelper compile (#9196)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StripTagsJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StripTagsJitHelper.php parseAndCompile failed (#9196)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9196)');
-            }
-        }
     }
 }
