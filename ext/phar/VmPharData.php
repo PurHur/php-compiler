@@ -187,6 +187,59 @@ final class VmPharData
         return false;
     }
 
+    /**
+     * php-src zim_Phar_copy on PharData — duplicate in-archive entry (#21690).
+     */
+    public static function copy(ObjectEntry $object, string $from, string $to): bool
+    {
+        $st = self::requireState($object);
+        $path = $st['path'];
+        $from = \rtrim(\ltrim(\str_replace('\\', '/', $from), '/'), '/');
+        $to = \rtrim(\ltrim(\str_replace('\\', '/', $to), '/'), '/');
+        if ('' === $from || '' === $to) {
+            throw new \UnexpectedValueException('Entry name cannot be empty');
+        }
+        $fromIsDir = isset($st['dirs'][$from]);
+        $fromIsFile = isset($st['files'][$from]);
+        if (!$fromIsDir && !$fromIsFile) {
+            throw new \UnexpectedValueException(
+                'file "'.$from.'" cannot be copied to file "'.$to.'", file does not exist in '.$path
+            );
+        }
+        if (isset($st['files'][$to]) || isset($st['dirs'][$to])) {
+            throw new \UnexpectedValueException(
+                'file "'.$from.'" cannot be copied to file "'.$to.'", file must not already exist in phar '.$path
+            );
+        }
+        if ($fromIsDir) {
+            self::$state[$object->id]['dirs'][$to] = true;
+        } else {
+            self::$state[$object->id]['files'][$to] = $st['files'][$from];
+        }
+        self::$state[$object->id]['dirty'] = true;
+        self::flush($object);
+
+        return true;
+    }
+
+    /**
+     * php-src zim_Phar_delete on PharData — remove entry (#21690).
+     */
+    public static function delete(ObjectEntry $object, string $localname): bool
+    {
+        self::requireState($object);
+        $localname = \rtrim(\ltrim(\str_replace('\\', '/', $localname), '/'), '/');
+        if (!isset(self::$state[$object->id]['files'][$localname])
+            && !isset(self::$state[$object->id]['dirs'][$localname])) {
+            throw new \BadMethodCallException('Entry '.$localname.' does not exist and cannot be deleted');
+        }
+        unset(self::$state[$object->id]['files'][$localname], self::$state[$object->id]['dirs'][$localname]);
+        self::$state[$object->id]['dirty'] = true;
+        self::flush($object);
+
+        return true;
+    }
+
     public static function addFromString(ObjectEntry $object, string $localname, string $contents): void
     {
         self::requireState($object);
