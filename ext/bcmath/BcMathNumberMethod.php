@@ -26,7 +26,7 @@ abstract class BcMathNumberMethod extends VmClassMethod
             return null;
         }
 
-        return VmBcMathNumber::optionalScaleArg($frame->calledArgs[$index], $method, $index);
+        return VmBcMathNumber::optionalScaleArg($frame->calledArgs[$index], $method, $index, $frame);
     }
 
     protected function returnNumber(Frame $frame, string $value, ?int $scale): void

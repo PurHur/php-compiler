@@ -369,6 +369,12 @@ final class JitBcmath
         if (!isset($args[$index])) {
             return [$i64->constInt(0, true), $i64->constInt(-1, true)];
         }
+        if (self::isNullScaleArg($args[$index])) {
+            return [$i64->constInt(0, true), $i64->constInt(-1, true)];
+        }
+        if (JITVariable::TYPE_VALUE === $args[$index]->type) {
+            return self::lowerBcscaleNullableArg($context, $args[$index]);
+        }
 
         return [
             self::lowerScaleArg($context, $args[$index], $function, $index, 'scale'),
