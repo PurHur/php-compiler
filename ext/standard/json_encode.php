@@ -117,14 +117,14 @@ final class json_encode extends Internal
         if (!isset($frame->calledArgs[1])) {
             return 0;
         }
-        $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-            throw new \TypeError(
-                'json_encode(): Argument #2 ($flags) must be of type int'
-            );
-        }
 
-        return $flagsVar->toInt();
+        return VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            1,
+            'json_encode',
+            2,
+            'flags'
+        );
     }
 
     private static function resolveDepthVm(Frame $frame): int

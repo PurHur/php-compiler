@@ -371,10 +371,13 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): int {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            VmNullNumberParamDeprecation::emit($frame, $function, $argIndex, $paramName, 'int');
+
             return 0;
         }
 
@@ -401,7 +404,7 @@ final class VmMath
             self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
         }
 
-        return self::parseZParamLongBuiltinArg($var, $function, $userArgIndex, $paramName);
+        return self::parseZParamLongBuiltinArg($var, $function, $userArgIndex, $paramName, $frame);
     }
 
     /**
