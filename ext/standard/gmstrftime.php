@@ -54,12 +54,16 @@ final class gmstrftime extends Internal
     /** @return string|false */
     private static function vmFormatArg(Frame $frame): string|false
     {
-        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20227, ext/date/php_date.c).
+        // Soft-null $format → DEP + false (Zend 8.4.23; #21582, reverts #20227 TypeError).
+        // Keep false (not '') for #18945 — do not coerce through Z_PARAM_STR → php_strftime("").
+        // php-src: ext/standard/datetime.c — PHP_FUNCTION(gmstrftime)
         $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_NULL === $arg->type
-            && !InternalStrictArg::isCallerStrict($frame)
-            && !VmString::requiresZparamStrStrictNullOnForwardProfile()
-        ) {
+        if (Variable::TYPE_NULL === $arg->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                InternalStrictArg::requireString($frame, 0, 'gmstrftime', 'format');
+            }
+            VmNullStringParamDeprecation::emit($frame, 'gmstrftime', 0, 'format');
+
             return false;
         }
 
