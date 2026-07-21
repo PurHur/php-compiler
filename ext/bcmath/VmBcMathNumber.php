@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\bcmath;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
+use PHPCompiler\ext\standard\VmNullNumberParamDeprecation;
 use PHPCompiler\ext\standard\VmStreamArg;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\ClassEntry;
@@ -206,10 +209,19 @@ final class VmBcMathNumber
         return VmString::coerceStringBuiltinArg($var, $method, $argNum, $paramName);
     }
 
-    public static function optionalScaleArg(Variable $var, string $method, int $argNum): ?int
-    {
+    public static function optionalScaleArg(
+        Variable $var,
+        string $method,
+        int $argNum,
+        ?Frame $frame = null,
+        string $paramName = 'scale'
+    ): ?int {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+                VmNullNumberParamDeprecation::emit($frame, $method, $argNum, $paramName, '?int');
+            }
+
             return null;
         }
         if (Variable::TYPE_INTEGER !== $var->type) {

@@ -33,7 +33,11 @@ final class bcdivmod extends Internal
 
         $left = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'bcdivmod', 0, 'num1');
         $right = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'bcdivmod', 1, 'num2');
-        [$quotient, $remainder] = VmBcmath::divmod($left, $right, $this->optionalScale($frame, 2));
+        $scale = null;
+        if (\count($frame->calledArgs) > 2) {
+            $scale = VmBcMathNumber::optionalScaleArg($frame->calledArgs[2], 'bcdivmod', 3, $frame);
+        }
+        [$quotient, $remainder] = VmBcmath::divmod($left, $right, $scale);
 
         $ht = new HashTable();
         $qVar = new Variable();
@@ -48,18 +52,5 @@ final class bcdivmod extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         return JitBcmath::divmod($context, ...$args);
-    }
-
-    private function optionalScale(Frame $frame, int $index): ?int
-    {
-        if (\count($frame->calledArgs) <= $index) {
-            return null;
-        }
-        $var = $frame->calledArgs[$index]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \LogicException('bcdivmod() scale must be an integer in this compiler build');
-        }
-
-        return $var->toInt();
     }
 }

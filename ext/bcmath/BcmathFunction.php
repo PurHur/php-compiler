@@ -67,12 +67,13 @@ abstract class BcmathFunction extends Internal
         if (!isset($frame->calledArgs[$index])) {
             return null;
         }
-        $var = $frame->calledArgs[$index]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \LogicException($this->getName().'() scale must be an integer in this compiler build');
-        }
 
-        return $var->toInt();
+        return VmBcMathNumber::optionalScaleArg(
+            $frame->calledArgs[$index],
+            $this->getName(),
+            $index + 1,
+            $frame
+        );
     }
 
     protected function maxArgCount(): int
