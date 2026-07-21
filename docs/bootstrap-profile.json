@@ -5310,6 +5310,7 @@
         "lib/JIT/Call/DomNodeContains.php",
         "lib/JIT/Call/DomNodeGetRootNode.php",
         "lib/JIT/Call/DomNodeIsEqualNode.php",
+        "lib/JIT/Call/DomNodeIsSameNode.php",
         "lib/JIT/Call/DomNodeListItem.php",
         "lib/JIT/Call/DomNodeNormalize.php",
         "lib/JIT/Call/DomNodePrepend.php",
@@ -6483,9 +6484,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6249,
+        "inventory_files": 6250,
         "excluded": 0,
-        "eligible": 6249,
+        "eligible": 6250,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
