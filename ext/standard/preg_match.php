@@ -30,11 +30,7 @@ final class preg_match extends Internal
         $offset = 0;
         $hasMatches = isset($frame->calledArgs[2]);
         if (isset($frame->calledArgs[3])) {
-            $flagsVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException('preg_match() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_match', 4, 'flags');
         }
         if (isset($frame->calledArgs[4])) {
             $offset = VmMath::parseIntBuiltinArgForFrame(

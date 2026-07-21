@@ -24,11 +24,7 @@ final class pathinfo extends Internal
         $path = VmFilestatArg::pathComponentFilenameArgForFrame($frame, 0, 'pathinfo', 'path');
         $flags = 15;
         if (2 === $argc) {
-            $flagVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagVar->type) {
-                throw new \LogicException('pathinfo() flags must be an integer in this compiler build');
-            }
-            $flags = $flagVar->toInt();
+            $flags = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'pathinfo', 2, 'flags');
         }
         if (null === $frame->returnVar) {
             return;
