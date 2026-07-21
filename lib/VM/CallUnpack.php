@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
@@ -86,28 +85,26 @@ final class CallUnpack
     private static function fromArray(Variable $array, array $paramNames, ?int $variadicParamIndex, ?string $functionName = null): array
     {
         $ht = $array->toArray();
-        $variadicByRefFrom = null !== $functionName
-            ? BuiltinByRefParams::variadicByRefFromIndex($functionName)
-            : null;
+        // ZEND_SEND_UNPACK (zend_vm_def.h): send the array element cell, not a resolved
+        // copy. By-ref formals then write back through the bucket — including through
+        // [&$x] to the outer CV (#21913). Same cell-ref path as array_multisort (#15787).
+        $pairs = [];
+        foreach ($ht->iterateKeyed(false) as [$key, $_element]) {
+            $bucket = $ht->findVariable($key, true);
+            $ref = new Variable();
+            $ref->indirect($bucket);
+            $pairs[] = [$key, $ref];
+        }
         if (VmArray::isList($ht)) {
             $out = [];
-            if (null !== $variadicByRefFrom) {
-                foreach ($ht->iterateKeyed(true) as [$key, $element]) {
-                    $ref = new Variable();
-                    $ref->indirect($ht->findVariable($key, true));
-                    $out[] = ['p', $ref];
-                }
-
-                return $out;
-            }
-            foreach ($ht->iterate(true) as $element) {
-                $out[] = ['p', $element];
+            foreach ($pairs as [, $ref]) {
+                $out[] = ['p', $ref];
             }
 
             return $out;
         }
 
-        return self::entriesFromKeyedPairs($ht->iterateKeyed(true), $paramNames, $variadicParamIndex, $functionName);
+        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName);
     }
 
     /**
