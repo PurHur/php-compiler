@@ -17,7 +17,7 @@ set_error_handler(static function (int $n, string $m): bool {
 });
 
 $checks = [
-    'count' => static fn () => count(null) === 0,
+    // count(null)/sizeof(null) always TypeError (Countable|array) — #21914 (re-#21771)
     'array_merge' => static fn () => array_merge(null) === [],
     'array_keys' => static fn () => array_keys(null) === [],
     'in_array' => static fn () => in_array('a', null) === false,
