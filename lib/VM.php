@@ -15671,6 +15671,12 @@ restart:
             return;
         }
         $parent = $this->context->classes[$entry->parentLc];
+        // php-src zend_inheritance.c — cannot extend ZEND_ACC_FINAL (#21669, #3406).
+        if ($parent->isFinal) {
+            throw new \CompileError(
+                "Class {$entry->name} cannot extend final class {$parent->name}"
+            );
+        }
         foreach ($parent->interfaces as $iface) {
             if (!in_array($iface, $entry->interfaces, true)) {
                 $entry->interfaces[] = $iface;

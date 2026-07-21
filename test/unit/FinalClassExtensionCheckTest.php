@@ -87,4 +87,36 @@ PHP;
         $this->expectExceptionMessage('Class D cannot extend final class C');
         $runtime->parseAndCompile($code, 'final_after_runtime.php');
     }
+
+    /** @covers issue #21669 */
+    public function testExtendBuiltinAttributeFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class BadAttr extends Attribute {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class BadAttr cannot extend final class Attribute');
+        $runtime->parseAndCompile($code, 'extend_attribute.php');
+    }
+
+    /** @covers issue #21669 */
+    public function testAttributeReflectionIsFinal(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export((new ReflectionClass(Attribute::class))->isFinal());
+echo "\n";
+#[Attribute]
+class MyAttr {}
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'attribute_isfinal.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("true\nok\n", ob_get_clean());
+    }
 }
