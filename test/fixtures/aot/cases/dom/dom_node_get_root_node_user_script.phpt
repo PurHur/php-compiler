@@ -8,10 +8,14 @@ $doc = new DOMDocument();
 $root = $doc->createElement('root');
 $child = $doc->createElement('child');
 $leaf = $doc->createElement('leaf');
-// Thin AOT: getRootNode returns ownerDocument (set by createElement).
-echo ($leaf->getRootNode() === $doc) ? "leaf_doc\n" : "leaf_other\n";
-echo ($root->getRootNode() === $doc) ? "elem_doc\n" : "elem_other\n";
-echo ($child->getRootNode() === $doc) ? "child_doc\n" : "child_other\n";
+// Assign first: inline MethodCall temps mis-type === against $doc in AOT (#21687).
+// getRootNode returns ownerDocument (stored by createElement).
+$a = $leaf->getRootNode();
+$b = $root->getRootNode();
+$c = $child->getRootNode();
+echo ($a === $doc) ? "leaf_doc\n" : "leaf_other\n";
+echo ($b === $doc) ? "elem_doc\n" : "elem_other\n";
+echo ($c === $doc) ? "child_doc\n" : "child_other\n";
 --EXPECT--
 leaf_doc
 elem_doc
