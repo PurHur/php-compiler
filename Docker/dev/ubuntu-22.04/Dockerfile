@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libenchant-2-2 \
     enchant-2 \
     hunspell-en-us \
+    libaspell15 \
+    aspell \
+    aspell-en \
 
     && rm -rf /var/lib/apt/lists/* \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
