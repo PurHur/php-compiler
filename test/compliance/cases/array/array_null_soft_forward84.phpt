@@ -18,6 +18,4 @@ array_flip OK
 DEP
 array_sum OK
 DEP
-iterator_to_array OK
-DEP
 array_map OK
