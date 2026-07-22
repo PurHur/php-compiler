@@ -32,6 +32,8 @@ final class Variable {
     public const STRING_OFFSET_INCDEC_ERROR = 'Cannot increment/decrement string offsets';
     /** @see Zend/zend_execute.c zend_assign_to_string_offset() — empty/null RHS */
     public const STRING_OFFSET_EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
+    /** @see Zend/zend_execute.c zend_assign_to_string_offset() — multi-byte RHS (#22380) */
+    public const STRING_OFFSET_FIRST_BYTE_WARNING = 'Only the first byte will be assigned to the string offset';
     /** @see Zend/zend_execute.c zend_fetch_dimension_address() — BP_VAR_W/RW string dim by-ref (#21910) */
     public const STRING_OFFSET_REF_ERROR = 'Cannot create references to/from string offsets';
     /** Zend enum case object for E::Case fetches (#3420, #3554). */
@@ -2872,7 +2874,7 @@ restart:
 
             return;
         }
-        $byte = self::byteFromAssignValue($value);
+        $byte = $this->byteFromAssignValue($value);
         if ($index > $len) {
             $str .= str_repeat(' ', $index - $len);
         }
@@ -2888,7 +2890,7 @@ restart:
         $parent->string($str);
     }
 
-    private static function byteFromAssignValue(self $value): string
+    private function byteFromAssignValue(self $value): string
     {
         $value = $value->resolveIndirect();
         if (self::TYPE_NULL === $value->type) {
@@ -2900,6 +2902,7 @@ restart:
                 if ('' === $s) {
                     throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
                 }
+                $this->warnIfMultiByteStringOffsetAssign($s);
 
                 return $s[0];
             case self::TYPE_INTEGER:
@@ -2909,9 +2912,25 @@ restart:
                 if ('' === $s) {
                     throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
                 }
+                $this->warnIfMultiByteStringOffsetAssign($s);
 
                 return $s[0];
         }
+    }
+
+    /**
+     * Zend/zend_execute.c zend_assign_to_string_offset() — E_WARNING when RHS string length > 1 (#22380).
+     */
+    private function warnIfMultiByteStringOffsetAssign(string $s): void
+    {
+        if (\strlen($s) <= 1 || null === $this->stringOffsetReporter) {
+            return;
+        }
+        $this->stringOffsetReporter->onlyFirstByteAssignedToStringOffset(
+            $this->stringOffsetContext,
+            $this->stringOffsetFrame,
+            $this->stringOffsetFile
+        );
     }
 }
 

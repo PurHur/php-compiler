@@ -16,6 +16,9 @@ final class StringOffsetJitHelper
 
     public const EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
 
+    /** @see Variable::STRING_OFFSET_FIRST_BYTE_WARNING (#22380) */
+    public const FIRST_BYTE_WARNING = 'Only the first byte will be assigned to the string offset';
+
     /** @see Variable::STRING_OFFSET_REF_ERROR (#21910) */
     public const REF_ERROR = 'Cannot create references to/from string offsets';
 
