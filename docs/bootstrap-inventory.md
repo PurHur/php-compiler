@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6412 |
-| Phase A inventory files (M2 ratio SSOT) | 6412 |
+| PHP files on vm.php path | 6413 |
+| Phase A inventory files (M2 ratio SSOT) | 6413 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20428 |
+| Source constructs flagged (warnings) | 20431 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1562,6 +1562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharBuiltin.php` | 0 | 23 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 21 |
+| `ext/phar/PharDefaultStubTemplate.php` | 0 | 3 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 4 |
 | `ext/phar/VmPharArchive.php` | 0 | 66 |
@@ -18870,6 +18871,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 567)
 - 31 class method(s)
 
+### `ext/phar/PharDefaultStubTemplate.php`
+
+**Warnings** (review for bootstrap subset):
+- new PharException (line 58)
+- new PharException (line 64)
+- 2 class method(s)
+
 ### `ext/phar/PharExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18937,20 +18945,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new BadMethodCallException (line 1205)
 - new BadMethodCallException (line 1208)
 - new Variable (line 1210)
-- new Error (line 1264)
-- new UnexpectedValueException (line 1466)
-- new UnexpectedValueException (line 1537)
-- new UnexpectedValueException (line 1553)
-- new UnexpectedValueException (line 1558)
-- new PharException (line 1578)
-- new PharException (line 1588)
-- new Error (line 1623)
+- new Error (line 1258)
+- new UnexpectedValueException (line 1460)
+- new UnexpectedValueException (line 1531)
+- new UnexpectedValueException (line 1547)
+- new UnexpectedValueException (line 1552)
+- new PharException (line 1572)
+- new PharException (line 1582)
+- new Error (line 1617)
+- new PharException (line 1636)
 - new PharException (line 1642)
-- new PharException (line 1648)
-- new PharException (line 1655)
-- new PharException (line 1667)
-- new PharException (line 1680)
-- new PharException (line 1688)
+- new PharException (line 1649)
+- new PharException (line 1661)
+- new PharException (line 1674)
+- new PharException (line 1682)
 - 80 class method(s)
 
 ### `ext/phar/VmPharData.php`
@@ -22696,45 +22704,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 134)
 - new Variable (line 155)
 - new Variable (line 168)
-- new HashTable (line 243)
-- new Variable (line 245)
-- new Variable (line 249)
-- new Variable (line 255)
-- new Variable (line 259)
-- new HashTable (line 260)
-- new ClassEntry (line 372)
-- new SplMinHeapConstruct (line 376)
-- new SplMinHeapCompare (line 379)
-- new ClassEntry (line 402)
-- new SplMaxHeapConstruct (line 406)
-- new SplMaxHeapCompare (line 409)
-- new ClassEntry (line 442)
-- new SplPriorityQueueConstruct (line 448)
-- new SplPriorityQueueDebugInfo (line 477)
-- new Variable (line 525)
-- new Variable (line 527)
-- new HashTable (line 618)
-- new Variable (line 620)
-- new Variable (line 624)
-- new HashTable (line 630)
-- new Variable (line 631)
-- new Variable (line 634)
+- new HashTable (line 246)
+- new Variable (line 248)
+- new Variable (line 252)
+- new Variable (line 258)
+- new Variable (line 262)
+- new HashTable (line 263)
+- new ClassEntry (line 375)
+- new SplMinHeapConstruct (line 379)
+- new SplMinHeapCompare (line 382)
+- new ClassEntry (line 405)
+- new SplMaxHeapConstruct (line 409)
+- new SplMaxHeapCompare (line 412)
+- new ClassEntry (line 445)
+- new SplPriorityQueueConstruct (line 451)
+- new SplPriorityQueueDebugInfo (line 480)
+- new Variable (line 528)
+- new Variable (line 530)
+- new HashTable (line 624)
+- new Variable (line 626)
+- new Variable (line 630)
+- new HashTable (line 636)
 - new Variable (line 637)
-- new Variable (line 641)
-- new HashTable (line 642)
-- new Variable (line 657)
-- new HashTable (line 663)
-- new Variable (line 664)
-- new Variable (line 666)
+- new Variable (line 640)
+- new Variable (line 643)
+- new Variable (line 647)
+- new HashTable (line 648)
+- new Variable (line 663)
+- new HashTable (line 669)
 - new Variable (line 670)
-- new Variable (line 675)
-- new Error (line 802)
-- new ArgumentCountError (line 852)
-- new ArgumentCountError (line 872)
-- new ArgumentCountError (line 892)
-- new ArgumentCountError (line 1097)
-- new ArgumentCountError (line 1218)
-- new ArgumentCountError (line 1378)
+- new Variable (line 672)
+- new Variable (line 676)
+- new Variable (line 681)
+- new Error (line 808)
+- new ArgumentCountError (line 858)
+- new ArgumentCountError (line 878)
+- new ArgumentCountError (line 898)
+- new ArgumentCountError (line 1103)
+- new ArgumentCountError (line 1224)
+- new ArgumentCountError (line 1384)
 - 85 class method(s)
 
 ### `ext/spl/SplIteratorSupport.php`
@@ -29417,10 +29425,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 105)
-- new RecursiveIteratorIterator (line 3105)
-- new RecursiveDirectoryIterator (line 3106)
-- new RecursiveIteratorIterator (line 3207)
-- new RecursiveDirectoryIterator (line 3208)
+- new RecursiveIteratorIterator (line 3117)
+- new RecursiveDirectoryIterator (line 3118)
+- new RecursiveIteratorIterator (line 3219)
+- new RecursiveDirectoryIterator (line 3220)
 - 112 class method(s)
 - 13 closure(s)
 

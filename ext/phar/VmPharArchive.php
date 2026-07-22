@@ -1236,21 +1236,15 @@ final class VmPharArchive
         return self::requireState($object)['path'];
     }
 
+    /**
+     * php-src zim_Phar_createDefaultStub / phar_create_default_stub (#22292).
+     *
+     * Emits the full shortarc stub (interceptFileFuncs + include_path + webPhar +
+     * Extract_Phar fallback), not a minimal mapPhar CLI/web shim.
+     */
     public static function createDefaultStub(?string $index = null, ?string $webIndex = null): string
     {
-        $index = null === $index || '' === $index ? 'index.php' : $index;
-        $webIndex = null === $webIndex || '' === $webIndex ? $index : $webIndex;
-
-        return "#!/usr/bin/env php\n<?php\n"
-            ."Phar::mapPhar();\n"
-            ."\$web = '".$webIndex."';\n"
-            ."\$cli = '".$index."';\n"
-            ."if (PHP_SAPI === 'cli') {\n"
-            ."    include 'phar://'.__FILE__.'/'.\$cli;\n"
-            ."} else {\n"
-            ."    include 'phar://'.__FILE__.'/'.\$web;\n"
-            ."}\n"
-            ."__HALT_COMPILER(); ?>";
+        return PharDefaultStubTemplate::build($index, $webIndex);
     }
 
     public static function mapToHashTable(array $map): HashTable
