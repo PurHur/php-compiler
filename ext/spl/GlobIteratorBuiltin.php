@@ -11,6 +11,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
@@ -50,11 +51,15 @@ final class GlobIteratorBuiltin
             'key' => GlobIteratorKey::class,
             'next' => GlobIteratorNext::class,
             'count' => GlobIteratorCount::class,
+            'getflags' => GlobIteratorGetFlags::class,
+            'setflags' => GlobIteratorSetFlags::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
         $entry->methodNames['count'] = 'count';
+        $entry->methodNames['getflags'] = 'getFlags';
+        $entry->methodNames['setflags'] = 'setFlags';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -65,7 +70,9 @@ final class GlobIteratorBuiltin
         return isset(
             $entry->methods['__construct'],
             $entry->methods['rewind'],
-            $entry->methods['count']
+            $entry->methods['count'],
+            $entry->methods['getflags'],
+            $entry->methods['setflags']
         );
     }
 }
@@ -111,14 +118,70 @@ final class GlobIteratorStorage
         return isset($state['paths'][$state['index']]);
     }
 
-    public static function key(ObjectEntry $object): int
+    public static function key(ObjectEntry $object): int|string
     {
-        return self::state($object)['index'];
+        $state = self::state($object);
+        $pathname = self::pathname($object);
+        if (0 !== ($state['flags'] & FilesystemIteratorBuiltin::KEY_AS_FILENAME)) {
+            return basename($pathname);
+        }
+
+        // Default KEY_AS_PATHNAME (0) — php-src GlobIterator keys are path strings (#22306).
+        return $pathname;
     }
 
     public static function count(ObjectEntry $object): int
     {
         return \count(self::state($object)['paths']);
+    }
+
+    /** php-src GlobIterator inherits FilesystemIterator::getFlags (#22306). */
+    public static function getFlags(ObjectEntry $object): int
+    {
+        return self::state($object)['flags'];
+    }
+
+    /**
+     * php-src GlobIterator::setFlags — update flags without re-globbing; rewind cursor
+     * like FilesystemIterator::setFlags (#22306).
+     */
+    public static function setFlags(ObjectEntry $object, int $flags): void
+    {
+        $state = &self::state($object);
+        $state['flags'] = $flags;
+        self::rewind($object);
+    }
+
+    /**
+     * php-src GlobIterator::current — FilesystemIterator current-mode flags (#22306).
+     */
+    public static function current(Frame $frame, ObjectEntry $object): Variable
+    {
+        $flags = self::getFlags($object);
+        $result = new Variable();
+        if (0 !== ($flags & FilesystemIteratorBuiltin::CURRENT_AS_SELF)) {
+            $result->object($object);
+
+            return $result;
+        }
+        if (0 !== ($flags & FilesystemIteratorBuiltin::CURRENT_AS_PATHNAME)) {
+            $result->string(self::pathname($object));
+
+            return $result;
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('GlobIterator::current() requires VM context');
+        }
+        $class = $frame->vmContext->classes[SplFileInfoBuiltin::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('SplFileInfo is not registered in this compiler build');
+        }
+        $info = new ObjectEntry($class);
+        $info->constructed = true;
+        SplFileInfoStorage::init($info, self::pathname($object));
+        $result->object($info);
+
+        return $result;
     }
 
     public static function pathname(ObjectEntry $object): string
@@ -240,7 +303,10 @@ final class GlobIteratorCurrent extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->object($object);
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            GlobIteratorStorage::current($frame, $object)
+        );
     }
 }
 
@@ -261,7 +327,12 @@ final class GlobIteratorKey extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(GlobIteratorStorage::key($object));
+        $key = GlobIteratorStorage::key($object);
+        if (\is_int($key)) {
+            $frame->returnVar->int($key);
+        } else {
+            $frame->returnVar->string($key);
+        }
     }
 }
 
@@ -301,5 +372,58 @@ final class GlobIteratorCount extends VmClassMethod
             return;
         }
         $frame->returnVar->int(GlobIteratorStorage::count($object));
+    }
+}
+
+/** php-src GlobIterator::getFlags via FilesystemIterator (#22306). */
+final class GlobIteratorGetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            GlobIteratorBuiltin::CLASS_LC,
+            'GlobIterator::getFlags()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(GlobIteratorStorage::getFlags($object));
+    }
+}
+
+/** php-src GlobIterator::setFlags via FilesystemIterator (#22306). */
+final class GlobIteratorSetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            GlobIteratorBuiltin::CLASS_LC,
+            'GlobIterator::setFlags()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'GlobIterator::setFlags() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $flags = SplFilesystemArg::requireIntArg(
+            $frame->calledArgs[1],
+            'GlobIterator::setFlags',
+            1,
+            'flags'
+        );
+        GlobIteratorStorage::setFlags($object, $flags);
     }
 }
