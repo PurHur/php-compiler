@@ -5615,6 +5615,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassInNamespace.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassInitializeLazyObject.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsAbstract.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsAnonymous.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsCloneable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsEnum.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsFinal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstance.php';
