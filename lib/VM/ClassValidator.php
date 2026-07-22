@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Frame;
+
 /**
  * Zend-style class/interface/trait validation (issue #144).
  *
@@ -11,16 +13,61 @@ namespace PHPCompiler\VM;
  */
 final class ClassValidator
 {
-    public static function finalizeClassDefinition(ClassEntry $entry, Context $context): void
-    {
+    public static function finalizeClassDefinition(
+        ClassEntry $entry,
+        Context $context,
+        ?Frame $frame = null
+    ): void {
         if ($entry->isInterface || $entry->isTrait) {
             return;
         }
+
+        // Before abstract-method fatals — zend_implement_serializable (Zend/zend_interfaces.c; #22000).
+        self::maybeDeprecateLegacySerializable($entry, $context, $frame);
 
         self::rebuildAbstractMethods($entry, $context);
         self::validateInterfaceImplementation($entry, $context);
         self::validateAbstractMethodsResolved($entry);
         self::validateAbstractPropertyHooksResolved($entry, $context);
+    }
+
+    /**
+     * Zend zend_implement_serializable — E_DEPRECATED unless both __serialize and __unserialize exist.
+     *
+     * php-src: Zend/zend_interfaces.c (PHP 8.1+). Skips explicit abstract / internal classes.
+     */
+    private static function maybeDeprecateLegacySerializable(
+        ClassEntry $entry,
+        Context $context,
+        ?Frame $frame = null
+    ): void {
+        if ($entry->isAbstract || $entry->isInternal) {
+            return;
+        }
+        if (!\in_array('serializable', $entry->interfaces, true)) {
+            return;
+        }
+        if (isset($entry->methods['__serialize'], $entry->methods['__unserialize'])) {
+            return;
+        }
+
+        $file = null;
+        $line = 0;
+        if (null !== $entry->sourceLocation) {
+            if ('' !== $entry->sourceLocation->filename) {
+                $file = $entry->sourceLocation->filename;
+            }
+            $line = $entry->sourceLocation->startLine > 0 ? $entry->sourceLocation->startLine : 0;
+        }
+
+        $context->errors->internalDeprecated(
+            $entry->name.' implements the Serializable interface, which is deprecated. '
+            .'Implement __serialize() and __unserialize() instead (or in addition, if support for old PHP versions is necessary)',
+            $context,
+            $frame,
+            $file,
+            $line
+        );
     }
 
     public static function assertInstantiable(ClassEntry $entry): void

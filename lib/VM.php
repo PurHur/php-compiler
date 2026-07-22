@@ -6558,7 +6558,7 @@ restart:
                         VM\LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($classEntry);
                     }
                     if (!$parentPending) {
-                        VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context);
+                        VM\ClassValidator::finalizeClassDefinition($classEntry, $this->context, $frame);
                     }
                     $this->context->classes[$lcname] = $classEntry;
                     if ($parentPending) {
