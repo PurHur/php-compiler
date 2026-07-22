@@ -2876,6 +2876,72 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionMethod::__toString() — php-src _function_string for methods (#22173).
+     *
+     * Covers user/internal header, visibility/static/abstract/final, by-ref name, file/line,
+     * and a simplified parameters section (names only).
+     */
+    public static function methodReflectionToString(Context $ctx, ObjectEntry $reflection): string
+    {
+        [$declaring, $methodLc] = self::resolveReflectedMethodDeclaring($ctx, $reflection);
+        $flags = self::reflectedMethodCfgFlags($ctx, $reflection);
+        $name = self::methodNameFromReflection($reflection);
+        $isInternal = $declaring->isInternal;
+        $tag = $isInternal ? '<internal' : '<user';
+        if ($isInternal) {
+            $ext = VmReflection::extensionNameForInternalClass($declaring->name);
+            if ('' !== $ext) {
+                $tag .= ':'.$ext;
+            }
+        }
+        $tag .= '>';
+
+        $mods = '';
+        if (($flags & \PHPCfg\Func::FLAG_ABSTRACT) !== 0) {
+            $mods .= 'abstract ';
+        }
+        if (($flags & \PHPCfg\Func::FLAG_FINAL) !== 0) {
+            $mods .= 'final ';
+        }
+        if (($flags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            $mods .= 'static ';
+        }
+        if (($flags & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $mods .= 'private ';
+        } elseif (($flags & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            $mods .= 'protected ';
+        } else {
+            $mods .= 'public ';
+        }
+
+        $amp = self::methodReturnsReference($ctx, $reflection) ? '&' : '';
+        $out = "Method [ {$tag} {$mods}method {$amp}{$name} ] {\n";
+
+        $loc = self::methodSourceLocation($declaring, $methodLc);
+        if (null !== $loc && '' !== $loc->filename && $loc->startLine > 0) {
+            $end = $loc->endLine > 0 ? $loc->endLine : $loc->startLine;
+            $out .= "  @@ {$loc->filename} {$loc->startLine} - {$end}\n";
+        }
+
+        $className = self::classNameFromReflection($reflection);
+        $paramNames = self::reflectedMethodParameterNames($ctx, $className, $name);
+        $paramCount = \count($paramNames);
+        if ($paramCount > 0) {
+            $out .= "\n  - Parameters [{$paramCount}] {\n";
+            $required = self::reflectedMethodRequiredParameterCount($ctx, $className, $name);
+            for ($i = 0; $i < $paramCount; ++$i) {
+                $kind = $i < $required ? 'required' : 'optional';
+                $out .= "    Parameter #{$i} [ <{$kind}> \${$paramNames[$i]} ]\n";
+            }
+            $out .= "  }\n";
+        }
+
+        $out .= "}\n";
+
+        return $out;
+    }
+
+    /**
      * ReflectionFunction::{getFileName,getStartLine,getEndLine} — false for internals / missing (#22144).
      */
     public static function returnFunctionFileName(?Variable $returnVar, ?SourceLocation $location, bool $isInternal): void
