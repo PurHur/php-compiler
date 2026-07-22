@@ -151,6 +151,24 @@ final class ReflectionSetup
         );
     }
 
+    /** Store a native long into an object property slot (#22044 ReflectionAttribute::$target). */
+    public static function emitSetIntegerProperty(
+        Context $context,
+        Value $obj,
+        string $className,
+        string $propName,
+        int $value
+    ): void {
+        $longVar = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->constantFromInteger($value)
+        );
+        $slot = $context->type->object->propertySlotFor($obj, $className, $propName);
+        $context->type->object->propertyStore($slot, $longVar, Variable::TYPE_NATIVE_LONG);
+    }
+
     /**
      * @return array{0: Value, 1: Value} cstr pointer and byte length (size_t)
      */

@@ -12,6 +12,8 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\AttributeSupport;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -72,6 +74,13 @@ final class ReflectionMethodGetAttributes implements Call
             'name',
             $context->builder->pointerCast($namePtr, $i8p),
             $nameLen
+        );
+        ReflectionSetup::emitSetIntegerProperty(
+            $context,
+            $attrObj,
+            'ReflectionAttribute',
+            ReflectionSupport::PROP_ATTR_TARGET,
+            AttributeSupport::TARGET_METHOD
         );
         HashTableHelper::setAtIndex(
             $context,

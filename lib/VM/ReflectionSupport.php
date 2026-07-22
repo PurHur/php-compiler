@@ -114,6 +114,9 @@ final class ReflectionSupport
     /** Whether this attribute name is duplicated on the target (#6912). */
     public const PROP_ATTR_IS_REPEATED = 'isRepeated';
 
+    /** Attribute::TARGET_* bitmask for the declaration site (#22044). */
+    public const PROP_ATTR_TARGET = 'target';
+
     public const PROP_EXTENSION_NAME = 'extension';
 
     /** Internal enum class name on ReflectionEnumUnitCase / ReflectionEnumBackedCase (#10000). */
@@ -209,20 +212,21 @@ final class ReflectionSupport
     /**
      * @param list<string> $names
      */
-    public static function attributesArray(Frame $frame, array $names): Variable
+    public static function attributesArray(Frame $frame, array $names, int $target = 0): Variable
     {
         $entries = [];
         foreach ($names as $name) {
             $entries[] = new AttributeEntry($name);
         }
 
-        return self::attributesArrayFromEntries($frame, $entries);
+        return self::attributesArrayFromEntries($frame, $entries, $target);
     }
 
     /**
      * @param list<AttributeEntry> $entries
+     * @param int                  $target  Attribute::TARGET_* for the declaration site (#22044)
      */
-    public static function attributesArrayFromEntries(Frame $frame, array $entries): Variable
+    public static function attributesArrayFromEntries(Frame $frame, array $entries, int $target = 0): Variable
     {
         $ctx = $frame->vmContext;
         if (null === $ctx) {
@@ -244,6 +248,7 @@ final class ReflectionSupport
             $obj->getProperty(self::PROP_ATTR_NAME)->string($entry->name);
             $obj->getProperty(self::PROP_ATTR_ARGS)->copyFrom(self::argsToVariable($entry->args, $ctx));
             $obj->getProperty(self::PROP_ATTR_IS_REPEATED)->bool($entry->isRepeated);
+            $obj->getProperty(self::PROP_ATTR_TARGET)->int($target);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);

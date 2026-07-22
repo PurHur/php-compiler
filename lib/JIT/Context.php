@@ -952,6 +952,7 @@ class Context {
             $this->functionProxies['reflectionmethod::getnamedarguments'] = new Call\ReflectionMethodGetNamedArguments();
         }
         $this->functionProxies['reflectionattribute::getname'] = new Call\ReflectionAttributeGetName();
+        $this->functionProxies['reflectionattribute::gettarget'] = new Call\ReflectionAttributeGetTarget();
         $this->functionProxies['reflectionattribute::newinstance'] = new Call\ReflectionAttributeNewInstance();
         $this->functionProxies['reflectionenum::__construct'] = new Call\ReflectionEnumConstruct();
         $this->functionProxies['reflectionenum::getname'] = new Call\ReflectionEnumGetName();
