@@ -1,5 +1,5 @@
 --TEST--
-Language: final plain property `final public string $x` (#22241, Zend/zend_compile.c)
+Language: final plain property `final public string $x` (#22241, #22308, Zend/zend_compile.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
