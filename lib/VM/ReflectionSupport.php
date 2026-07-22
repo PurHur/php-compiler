@@ -2787,7 +2787,7 @@ final class ReflectionSupport
 
             return;
         }
-        $returnVar->string('Core');
+        $returnVar->string(VmReflection::extensionNameForInternalClass($entry->name));
     }
 
     public static function returnExtension(?Variable $returnVar, ClassEntry $entry, Context $ctx): void
@@ -2800,7 +2800,10 @@ final class ReflectionSupport
 
             return;
         }
-        $returnVar->object(self::newReflectionExtensionObject($ctx, 'Core'));
+        $returnVar->object(self::newReflectionExtensionObject(
+            $ctx,
+            VmReflection::extensionNameForInternalClass($entry->name)
+        ));
     }
 
     public static function newReflectionExtensionObject(Context $ctx, string $name): ObjectEntry
