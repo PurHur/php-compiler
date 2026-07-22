@@ -49,6 +49,8 @@ class Module extends ModuleAbstract
             new enchant_dict_check(),
             new enchant_dict_suggest(),
             new enchant_dict_add(),
+            // php-src @alias enchant_dict_add + #[\Deprecated(since: '8.0')] (#22270)
+            new enchant_dict_add('enchant_dict_add_to_personal'),
             new enchant_dict_remove(),
             new enchant_dict_add_to_session(),
             new enchant_dict_remove_from_session(),

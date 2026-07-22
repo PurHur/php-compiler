@@ -30,6 +30,8 @@ final class EnchantModuleTest extends TestCase
         self::assertTrue(VmReflection::functionExists($ctx, 'enchant_broker_list_dicts'));
         self::assertTrue(VmReflection::functionExists($ctx, 'enchant_broker_describe'));
         self::assertTrue(VmReflection::functionExists($ctx, 'enchant_dict_add_to_session'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'enchant_dict_add'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'enchant_dict_add_to_personal'));
         self::assertTrue(ModuleRegistry::extensionLoaded('enchant'));
         self::assertTrue(isset($ctx->classes['enchantbroker']));
         self::assertTrue(isset($ctx->classes['enchantdictionary']));

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6415 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20438 |
+| Source constructs flagged (warnings) | 20439 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -475,7 +475,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ns_import_simplexml.php` | 0 | 2 |
 | `ext/enchant/BuiltinClasses.php` | 0 | 1 |
 | `ext/enchant/EnchantExtensionPolicy.php` | 0 | 1 |
-| `ext/enchant/Module.php` | 0 | 22 |
+| `ext/enchant/Module.php` | 0 | 23 |
 | `ext/enchant/VmEnchantArg.php` | 0 | 1 |
 | `ext/enchant/VmEnchantBroker.php` | 0 | 5 |
 | `ext/enchant/VmEnchantCore.php` | 0 | 13 |
@@ -9756,13 +9756,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new enchant_dict_check (line 49)
 - new enchant_dict_suggest (line 50)
 - new enchant_dict_add (line 51)
-- new enchant_dict_remove (line 52)
-- new enchant_dict_add_to_session (line 53)
-- new enchant_dict_remove_from_session (line 54)
-- new enchant_dict_is_added (line 55)
-- new enchant_dict_store_replacement (line 56)
-- new enchant_dict_get_error (line 57)
-- new enchant_dict_describe (line 58)
+- new enchant_dict_add (line 53)
+- new enchant_dict_remove (line 54)
+- new enchant_dict_add_to_session (line 55)
+- new enchant_dict_remove_from_session (line 56)
+- new enchant_dict_is_added (line 57)
+- new enchant_dict_store_replacement (line 58)
+- new enchant_dict_get_error (line 59)
+- new enchant_dict_describe (line 60)
 - 3 class method(s)
 
 ### `ext/enchant/VmEnchantArg.php`
@@ -9873,7 +9874,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/enchant/enchant_dict_add.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/enchant/enchant_dict_add_to_session.php`
