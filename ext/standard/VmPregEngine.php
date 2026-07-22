@@ -523,6 +523,36 @@ final class VmPregEngine
             if (':' === $flag) {
                 $capture = false;
                 $this->advance(1);
+            } elseif ('=' === $flag || '!' === $flag) {
+                // Positive/negative lookahead (?=…) / (?!…) — PCRE2, php_pcre.c (#22002).
+                $this->advance(1);
+                $inner = $this->parseAlternation();
+                if ($this->compileAborted) {
+                    return new VmPregAstEmptyNode();
+                }
+                if ($this->peek() !== ')') {
+                    $this->abortCompile('missing closing parenthesis', $openPos);
+
+                    return new VmPregAstEmptyNode();
+                }
+                $this->advance(1);
+
+                return new VmPregAstLookaheadNode($inner, '=' === $flag);
+            } elseif ('>' === $flag) {
+                // Atomic / possessive group (? > …) — no backtrack into inner (#22002).
+                $this->advance(1);
+                $inner = $this->parseAlternation();
+                if ($this->compileAborted) {
+                    return new VmPregAstEmptyNode();
+                }
+                if ($this->peek() !== ')') {
+                    $this->abortCompile('missing closing parenthesis', $openPos);
+
+                    return new VmPregAstEmptyNode();
+                }
+                $this->advance(1);
+
+                return new VmPregAstAtomicNode($inner);
             } elseif ('#' === $flag) {
                 $this->advance(1);
                 while (!$this->atEnd() && ')' !== $this->peek()) {
@@ -538,14 +568,37 @@ final class VmPregEngine
                 $this->advance(1);
 
                 return $this->parseBranchResetAlternation();
-            } elseif ('P' === $flag || '<' === $flag) {
+            } elseif ('<' === $flag) {
                 $this->advance(1);
-                if ('P' === $flag) {
-                    if ($this->peek() !== '<') {
-                        $this->abortCompile(); return new VmPregAstEmptyNode();
+                $behind = $this->peek();
+                if ('=' === $behind || '!' === $behind) {
+                    // Positive/negative lookbehind (?<=…) / (?<!…) (#22002).
+                    $this->advance(1);
+                    $inner = $this->parseAlternation();
+                    if ($this->compileAborted) {
+                        return new VmPregAstEmptyNode();
+                    }
+                    if ($this->peek() !== ')') {
+                        $this->abortCompile('missing closing parenthesis', $openPos);
+
+                        return new VmPregAstEmptyNode();
                     }
                     $this->advance(1);
+
+                    return new VmPregAstLookbehindNode($inner, '=' === $behind);
                 }
+                $name = $this->parseGroupName();
+                if ($this->peek() !== '>') {
+                    $this->abortCompile(); return new VmPregAstEmptyNode();
+                }
+                $nameCloseOffset = $this->pos;
+                $this->advance(1);
+            } elseif ('P' === $flag) {
+                $this->advance(1);
+                if ($this->peek() !== '<') {
+                    $this->abortCompile(); return new VmPregAstEmptyNode();
+                }
+                $this->advance(1);
                 $name = $this->parseGroupName();
                 if ($this->peek() !== '>') {
                     $this->abortCompile(); return new VmPregAstEmptyNode();
@@ -694,7 +747,9 @@ final class VmPregEngine
     {
         $ch = $this->peek();
         if ('' === $ch || !self::isNameStart($ch)) {
-            $this->abortCompile(); return new VmPregAstEmptyNode();
+            $this->abortCompile();
+
+            return '';
         }
         $start = $this->pos;
         $this->advance(1);
@@ -869,6 +924,112 @@ final class VmPregEngine
     private function advance(int $n): void
     {
         $this->pos += $n;
+    }
+
+    /**
+     * PCRE `(?=…)` / `(?!…)` — zero-width lookahead; captures from a successful positive
+     * assertion are kept (php-src/PCRE2, #22002).
+     *
+     * @param array<int, array{0: int, 1: int}> $captures
+     */
+    public function matchLookahead(
+        VmPregAstNode $inner,
+        bool $positive,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        $saved = $captures;
+        $ok = $this->matchNode($inner, $subject, $pos, $len, $captures);
+        if ($positive) {
+            if (!$ok) {
+                $captures = $saved;
+
+                return false;
+            }
+            $captures[0] = [$this->matchStartPos(), $pos];
+
+            return true;
+        }
+        $captures = $saved;
+        if ($ok) {
+            return false;
+        }
+        $captures[0] = [$this->matchStartPos(), $pos];
+
+        return true;
+    }
+
+    /**
+     * PCRE `(?<=…)` / `(?<!…)` — zero-width lookbehind ending at $pos (#22002).
+     *
+     * @param array<int, array{0: int, 1: int}> $captures
+     */
+    public function matchLookbehind(
+        VmPregAstNode $inner,
+        bool $positive,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        $saved = $captures;
+        $found = false;
+        $bestCaps = $saved;
+        // Try every start offset that could end at $pos (variable-length lookbehind).
+        for ($start = $pos; $start >= 0; --$start) {
+            $try = $saved;
+            if (!$this->matchNode($inner, $subject, $start, $len, $try)) {
+                continue;
+            }
+            $end = $try[0][1] ?? $start;
+            if ($end === $pos) {
+                $found = true;
+                $bestCaps = $try;
+                break;
+            }
+        }
+        if ($positive) {
+            if (!$found) {
+                $captures = $saved;
+
+                return false;
+            }
+            $captures = $bestCaps;
+            $captures[0] = [$this->matchStartPos(), $pos];
+
+            return true;
+        }
+        $captures = $saved;
+        if ($found) {
+            return false;
+        }
+        $captures[0] = [$this->matchStartPos(), $pos];
+
+        return true;
+    }
+
+    /**
+     * PCRE atomic grouping (no backtrack into inner alternatives) (#22002).
+     *
+     * @param array<int, array{0: int, 1: int}> $captures
+     */
+    public function matchAtomic(
+        VmPregAstNode $inner,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        $saved = $captures;
+        if (!$this->matchNode($inner, $subject, $pos, $len, $captures)) {
+            $captures = $saved;
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -1316,6 +1477,32 @@ final class VmPregEngine
                     return $cont($end, $caps);
                 }
             );
+        }
+        if ($node instanceof VmPregAstAtomicNode) {
+            // Atomic: commit to the first (greedy) inner match; do not re-enter on cont failure.
+            $caps = $captures;
+            if (!$this->matchNode($node->innerNode(), $subject, $pos, $len, $caps)) {
+                return false;
+            }
+            $end = $caps[0][1] ?? $pos;
+
+            return $cont($end, $caps);
+        }
+        if ($node instanceof VmPregAstLookaheadNode) {
+            $caps = $captures;
+            if (!$this->matchLookahead($node->innerNode(), $node->isPositive(), $subject, $pos, $len, $caps)) {
+                return false;
+            }
+
+            return $cont($pos, $caps);
+        }
+        if ($node instanceof VmPregAstLookbehindNode) {
+            $caps = $captures;
+            if (!$this->matchLookbehind($node->innerNode(), $node->isPositive(), $subject, $pos, $len, $caps)) {
+                return false;
+            }
+
+            return $cont($pos, $caps);
         }
 
         $caps = $captures;
@@ -1895,6 +2082,89 @@ final class VmPregAstGroupNode implements VmPregAstNode
         $captures[0] = [$engine->matchStartPos(), $end];
 
         return true;
+    }
+}
+
+/** PCRE `(?=…)` / `(?!…)` zero-width lookahead (#22002). */
+final class VmPregAstLookaheadNode implements VmPregAstNode
+{
+    public function __construct(
+        private readonly VmPregAstNode $inner,
+        private readonly bool $positive
+    ) {
+    }
+
+    public function innerNode(): VmPregAstNode
+    {
+        return $this->inner;
+    }
+
+    public function isPositive(): bool
+    {
+        return $this->positive;
+    }
+
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        return $engine->matchLookahead($this->inner, $this->positive, $subject, $pos, $len, $captures);
+    }
+}
+
+/** PCRE `(?<=…)` / `(?<!…)` zero-width lookbehind (#22002). */
+final class VmPregAstLookbehindNode implements VmPregAstNode
+{
+    public function __construct(
+        private readonly VmPregAstNode $inner,
+        private readonly bool $positive
+    ) {
+    }
+
+    public function innerNode(): VmPregAstNode
+    {
+        return $this->inner;
+    }
+
+    public function isPositive(): bool
+    {
+        return $this->positive;
+    }
+
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        return $engine->matchLookbehind($this->inner, $this->positive, $subject, $pos, $len, $captures);
+    }
+}
+
+/** PCRE atomic grouping — no backtrack into inner (#22002). */
+final class VmPregAstAtomicNode implements VmPregAstNode
+{
+    public function __construct(private readonly VmPregAstNode $inner)
+    {
+    }
+
+    public function innerNode(): VmPregAstNode
+    {
+        return $this->inner;
+    }
+
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        return $engine->matchAtomic($this->inner, $subject, $pos, $len, $captures);
     }
 }
 
