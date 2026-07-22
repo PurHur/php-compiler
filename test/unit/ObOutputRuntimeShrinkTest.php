@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\ObOutputJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ObOutputRuntime: always NestedJIT ObOutputJitHelper (#9268, #12951, #19422, #20169, #20443, #21066, #21469). */
+/** ObOutputRuntime: JitVmHelperLink + ObOutputJitHelper (#9268, #12951, #19422, #20169, #20443, #21066, #21469, #22049). */
 final class ObOutputRuntimeShrinkTest extends TestCase
 {
     public function testObOutputRuntimeUsesHelperNotLlvmStack(): void
@@ -28,8 +28,12 @@ final class ObOutputRuntimeShrinkTest extends TestCase
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputJitBridge.php');
         $this->assertStringContainsString('ObOutputJitHelper', $bridge);
-        $this->assertStringContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringContainsString('ensureEchoAbiDeclared', $bridge);
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
+        $this->assertStringNotContainsString('parseAndCompile', $bridge);
+        $this->assertStringNotContainsString('new JIT(', $bridge);
         $this->assertStringNotContainsString('JitObOutputKernel', $bridge);
         $this->assertStringNotContainsString('implementDeferredInventoryStubs', $bridge);
         $this->assertStringNotContainsString('implementMissingUserScriptAbiPads', $bridge);
@@ -42,7 +46,6 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('GLOBAL_STORAGE', $bridge);
         $this->assertStringNotContainsString('implementPopBuffer', $bridge);
         $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $bridge);
-        $this->assertStringContainsString('ensureEchoAbiDeclared', $bridge);
         $bridgeLines = \substr_count($bridge, "\n") + 1;
         $this->assertLessThan(820, $bridgeLines, 'ObOutputJitBridge LOC (#12999 echo ABI forward declare)');
         $this->assertDoesNotMatchRegularExpression(

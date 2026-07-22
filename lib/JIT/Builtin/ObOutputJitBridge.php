@@ -8,10 +8,9 @@ use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\ext\standard\ob_end_flush;
 use PHPCompiler\ext\standard\ob_flush;
 use PHPCompiler\ext\standard\ob_get_flush;
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -20,6 +19,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951, #19422, #20443, #21066, #21469).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer PendingHeadersJitBridge #22034 / FunctionExistsRuntime #22016).
  * Always NestedJIT {@see ObOutputJitHelper} bridges — no user-script ExecCapture/AbiPads fork (#21469).
  * SSOT: {@see \PHPCompiler\ext\standard\ObOutputJitHelper}.
  * php-src: ext/standard/output.c
@@ -553,35 +553,14 @@ final class ObOutputJitBridge
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
+        // Echo ABI must exist before NestedJIT ObOutputJitHelper compile (#12999).
         ObOutputEchoJitEmit::ensureEchoAbiDeclared($context);
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObOutputJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ObOutputJitHelper.php parseAndCompile failed (#9268)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9268)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22049'
+        );
     }
 
     /**
