@@ -9904,6 +9904,10 @@ class Compiler {
         if (AttributeNames::isSensitiveParameter(AttributeNames::fromOp($param))) {
             $block->paramSensitive[$paramIdx] = true;
         }
+        $defaultConstantName = $this->paramDefaultConstantName($param);
+        if (null !== $defaultConstantName) {
+            $block->paramDefaultConstantNames[$paramIdx] = $defaultConstantName;
+        }
         $this->applyParamDeclaredType($param, $block, $slot, $param->variadic);
         $this->assertParamDefaultMatchesDeclaredType($param, $defaultConst, $block);
         if ($this->paramIsImplicitNullable($param, $defaultConst, $block)) {
@@ -9917,6 +9921,66 @@ class Compiler {
             $paramIdx,
             $defaultConst
         );
+    }
+
+    /**
+     * Constant-fetch default name for ReflectionParameter (#22026, zim_reflection_parameter_*).
+     * true/false/null and ::class are not constant defaults (php-src).
+     */
+    protected function paramDefaultConstantName(Op\Expr\Param $param): ?string
+    {
+        $expr = $this->paramDefaultConstFetchExpr($param);
+        if ($expr instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($expr->name);
+            if (null === $name || '' === $name) {
+                return null;
+            }
+            $name = ltrim($name, '\\');
+            $lc = strtolower($name);
+            if ('true' === $lc || 'false' === $lc || 'null' === $lc) {
+                return null;
+            }
+
+            return $name;
+        }
+        if ($expr instanceof Op\Expr\ClassConstFetch) {
+            $constName = $this->staticNameFromOperand($expr->name);
+            $className = $this->staticNameFromOperand($expr->class);
+            if (null === $constName || null === $className || '' === $constName || '' === $className) {
+                return null;
+            }
+            if ('class' === strtolower($constName)) {
+                return null;
+            }
+
+            return ltrim($className, '\\').'::'.$constName;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return Op\Expr\ConstFetch|Op\Expr\ClassConstFetch|null
+     */
+    protected function paramDefaultConstFetchExpr(Op\Expr\Param $param): ?Op\Expr
+    {
+        if (null !== $param->defaultBlock && [] !== $param->defaultBlock->children) {
+            $last = $param->defaultBlock->children[\count($param->defaultBlock->children) - 1];
+            if ($last instanceof Op\Expr\ConstFetch || $last instanceof Op\Expr\ClassConstFetch) {
+                return $last;
+            }
+            if ($last instanceof Op\Expr\Assign
+                && ($last->expr instanceof Op\Expr\ConstFetch || $last->expr instanceof Op\Expr\ClassConstFetch)
+            ) {
+                return $last->expr;
+            }
+        }
+        $unwrapped = null !== $param->defaultVar ? $this->unwrapOperandChain($param->defaultVar) : null;
+        if ($unwrapped instanceof Op\Expr\ConstFetch || $unwrapped instanceof Op\Expr\ClassConstFetch) {
+            return $unwrapped;
+        }
+
+        return null;
     }
 
     protected function compileFunction(Op\Stmt\Function_ $function, Block $block): OpCode {
