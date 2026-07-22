@@ -31,6 +31,9 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\CycleCollector;
+use PHPCompiler\VM\DateIntervalSupport;
+use PHPCompiler\VM\DatePeriodSupport;
+use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -2043,6 +2046,20 @@ class VM {
      */
     public function collectVarExportPropertiesForBuiltin(ObjectEntry $object, Frame $frame): array
     {
+        $lc = strtolower($object->class->name);
+        if (DateTimeSupport::CLASS_DATETIME === $lc || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lc) {
+            return DateTimeSupport::varExportPropertyMap($object);
+        }
+        if (DateTimeSupport::CLASS_DATETIMEZONE === $lc) {
+            return DateTimeSupport::varExportTimezonePropertyMap($object);
+        }
+        if (DateIntervalSupport::CLASS_DATEINTERVAL === $lc) {
+            return DateIntervalSupport::varExportPropertyMap($object);
+        }
+        if (DatePeriodSupport::CLASS_DATEPERIOD === $lc) {
+            return DatePeriodSupport::varExportPropertyMap($object);
+        }
+
         return $this->collectObjectPropertiesForBuiltin($object, $frame, true);
     }
 

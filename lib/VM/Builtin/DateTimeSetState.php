@@ -1,0 +1,61 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\VM\Builtin;
+
+use PHPCompiler\ext\standard\VmJson;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\DateTimeSupport;
+use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\Variable;
+
+/**
+ * DateTime::__set_state / DateTimeImmutable::__set_state — php-src ext/date/php_date.c (#22407).
+ */
+final class DateTimeSetState extends VmClassMethod
+{
+    public function __construct(
+        private readonly string $classKey,
+        private readonly string $classLabel,
+    ) {
+        parent::__construct('__set_state');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException($this->classLabel.'::__set_state() requires VM context');
+        }
+        if (1 !== \count($frame->calledArgs)) {
+            throw new \ArgumentCountError(
+                $this->classLabel.'::__set_state() expects exactly 1 argument, '
+                .\count($frame->calledArgs).' given'
+            );
+        }
+        $arg = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(
+                $this->classLabel.'::__set_state(): Argument #1 ($array) must be of type array, '
+                .EnumCaseSupport::typeNameForVariable($arg).' given'
+            );
+        }
+        $data = VmJson::export($arg);
+        if (!\is_array($data)) {
+            throw new \Error('Invalid serialization data for '.$this->classLabel.' object');
+        }
+        try {
+            $restored = DateTimeSupport::restoreFromZendSerialize(
+                $frame->vmContext,
+                $this->classKey,
+                $data
+            );
+        } catch (\Error) {
+            throw new \Error('Invalid serialization data for '.$this->classLabel.' object');
+        }
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($restored): void {
+            $ret->object($restored);
+        });
+    }
+}

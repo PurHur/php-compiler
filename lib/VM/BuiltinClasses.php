@@ -17,10 +17,12 @@ use PHPCompiler\VM\Builtin\DatePeriodGetStartDate;
 use PHPCompiler\VM\Builtin\DatePeriodKey;
 use PHPCompiler\VM\Builtin\DatePeriodNext;
 use PHPCompiler\VM\Builtin\DatePeriodRewind;
+use PHPCompiler\VM\Builtin\DatePeriodSetState;
 use PHPCompiler\VM\Builtin\DatePeriodValid;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
+use PHPCompiler\VM\Builtin\DateIntervalSetState;
 use PHPCompiler\VM\Builtin\DateTimeAdd;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeDiff;
@@ -43,6 +45,7 @@ use PHPCompiler\VM\Builtin\DateTimeModify;
 use PHPCompiler\VM\Builtin\DateTimeSetDate;
 use PHPCompiler\VM\Builtin\DateTimeSetISODate;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
+use PHPCompiler\VM\Builtin\DateTimeSetState;
 use PHPCompiler\VM\Builtin\DateTimeSetTime;
 use PHPCompiler\VM\Builtin\DateTimeSetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
@@ -54,6 +57,7 @@ use PHPCompiler\VM\Builtin\DateTimeZoneGetOffset;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetTransitions;
 use PHPCompiler\VM\Builtin\DateTimeZoneListAbbreviations;
 use PHPCompiler\VM\Builtin\DateTimeZoneListIdentifiers;
+use PHPCompiler\VM\Builtin\DateTimeZoneSetState;
 use PHPCompiler\VM\Builtin\ExceptionConstruct;
 use PHPCompiler\VM\Builtin\ErrorExceptionConstruct;
 use PHPCompiler\VM\Builtin\ErrorExceptionGetSeverity;
@@ -1598,6 +1602,9 @@ final class BuiltinClasses
         $tz->methodVisibility['listabbreviations'] = $pubStatic;
         $tz->methods['listidentifiers'] = new DateTimeZoneListIdentifiers();
         $tz->methodVisibility['listidentifiers'] = $pubStatic;
+        $tz->methods['__set_state'] = new DateTimeZoneSetState();
+        $tz->methodVisibility['__set_state'] = $pubStatic;
+        $tz->methodNames['__set_state'] = '__set_state';
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEZONE] = $tz;
 
         $dateTimeMethods = [
@@ -1647,6 +1654,12 @@ final class BuiltinClasses
         }
         $dt->methods['getlasterrors'] = new DateTimeGetLastErrors();
         $dt->methodVisibility['getlasterrors'] = $pubStatic;
+        $dt->methods['__set_state'] = new DateTimeSetState(
+            DateTimeSupport::CLASS_DATETIME,
+            'DateTime'
+        );
+        $dt->methodVisibility['__set_state'] = $pubStatic;
+        $dt->methodNames['__set_state'] = '__set_state';
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
 
         $dti = new ClassEntry('DateTimeImmutable');
@@ -1674,6 +1687,12 @@ final class BuiltinClasses
         }
         $dti->methods['getlasterrors'] = new DateTimeGetLastErrors();
         $dti->methodVisibility['getlasterrors'] = $pubStatic;
+        $dti->methods['__set_state'] = new DateTimeSetState(
+            DateTimeSupport::CLASS_DATETIMEIMMUTABLE,
+            'DateTimeImmutable'
+        );
+        $dti->methodVisibility['__set_state'] = $pubStatic;
+        $dti->methodNames['__set_state'] = '__set_state';
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
 
         $floatProto = new Variable(Variable::TYPE_FLOAT);
@@ -1697,6 +1716,9 @@ final class BuiltinClasses
         $di->methodVisibility['format'] = $pub;
         $di->methods['createfromdatestring'] = new DateIntervalCreateFromDateString();
         $di->methodVisibility['createfromdatestring'] = $pubStatic;
+        $di->methods['__set_state'] = new DateIntervalSetState();
+        $di->methodVisibility['__set_state'] = $pubStatic;
+        $di->methodNames['__set_state'] = '__set_state';
         $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] = $di;
 
         $objProto = new Variable(Variable::TYPE_OBJECT);
@@ -1746,6 +1768,9 @@ final class BuiltinClasses
             $dp->methods['createfromiso8601string'] = new DatePeriodCreateFromISO8601String();
             $dp->methodVisibility['createfromiso8601string'] = $pubStatic;
         }
+        $dp->methods['__set_state'] = new DatePeriodSetState();
+        $dp->methodVisibility['__set_state'] = $pubStatic;
+        $dp->methodNames['__set_state'] = '__set_state';
         $ctx->classes[DatePeriodSupport::CLASS_DATEPERIOD] = $dp;
     }
 

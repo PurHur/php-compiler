@@ -536,6 +536,153 @@ final class DatePeriodSupport
     }
 
     /**
+     * php-src zend_get_properties_for(ZEND_PROP_PURPOSE_VAR_EXPORT) — DatePeriod bag (#22407).
+     *
+     * @return array<string, Variable>
+     */
+    public static function varExportPropertyMap(ObjectEntry $period): array
+    {
+        self::requireConstructedPeriod($period);
+        $out = [];
+        foreach (['start', 'current', 'end', 'interval'] as $name) {
+            $prop = self::requireProperty($period, $name)->resolveIndirect();
+            $copy = new Variable();
+            $copy->copyFrom($prop);
+            $out[$name] = $copy;
+        }
+        $rec = new Variable(Variable::TYPE_INTEGER);
+        $rec->int(self::requireIntProperty($period, 'recurrences')->toInt());
+        $out['recurrences'] = $rec;
+        $includeStart = new Variable(Variable::TYPE_BOOLEAN);
+        $includeStart->bool(self::requireBoolProperty($period, 'include_start_date')->toBool());
+        $out['include_start_date'] = $includeStart;
+        $includeEnd = new Variable(Variable::TYPE_BOOLEAN);
+        $includeEnd->bool(self::requireBoolProperty($period, 'include_end_date')->toBool());
+        $out['include_end_date'] = $includeEnd;
+
+        return $out;
+    }
+
+    /**
+     * php-src php_date_period_initialize_from_hash — DatePeriod::__set_state (#22407).
+     */
+    public static function restoreFromSetStateHash(Context $ctx, Variable $bag): ObjectEntry
+    {
+        $bag = $bag->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $bag->type) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        $ht = $bag->toArray();
+        $start = self::hashEntryObject($ht, 'start');
+        if (null === $start
+            || !InterfaceCheck::entryIsInstanceOf($start->class, DateTimeSupport::CLASS_DATETIMEINTERFACE, $ctx)) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        $end = self::hashEntryObjectOrNull($ht, 'end');
+        if (false === $end) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        if (null !== $end
+            && !InterfaceCheck::entryIsInstanceOf($end->class, DateTimeSupport::CLASS_DATETIMEINTERFACE, $ctx)) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        $current = self::hashEntryObjectOrNull($ht, 'current');
+        if (false === $current) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        if (null !== $current
+            && !InterfaceCheck::entryIsInstanceOf($current->class, DateTimeSupport::CLASS_DATETIMEINTERFACE, $ctx)) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        $interval = self::hashEntryObject($ht, 'interval');
+        if (null === $interval
+            || DateIntervalSupport::CLASS_DATEINTERVAL !== strtolower($interval->class->name)) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        $recurrencesVar = self::hashEntryScalar($ht, 'recurrences');
+        if (null === $recurrencesVar || Variable::TYPE_INTEGER !== $recurrencesVar->type) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        $recurrences = $recurrencesVar->toInt();
+        if ($recurrences < 0) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        $includeStart = self::hashEntryScalar($ht, 'include_start_date');
+        if (null === $includeStart || Variable::TYPE_BOOLEAN !== $includeStart->type) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+        $includeEnd = self::hashEntryScalar($ht, 'include_end_date');
+        if (null === $includeEnd || Variable::TYPE_BOOLEAN !== $includeEnd->type) {
+            throw new \Error('Invalid serialization data for DatePeriod object');
+        }
+
+        $class = $ctx->classes[self::CLASS_DATEPERIOD] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DatePeriod is not registered in this compiler build');
+        }
+        $period = new ObjectEntry($class);
+        self::setObjectProperty($period, 'start', self::cloneDateTimeForStorage($start, $ctx));
+        if (null === $current) {
+            self::setNullProperty($period, 'current');
+        } else {
+            self::setObjectProperty($period, 'current', self::cloneDateTimeForStorage($current, $ctx));
+        }
+        if (null === $end) {
+            self::setNullProperty($period, 'end');
+        } else {
+            self::setObjectProperty($period, 'end', self::cloneDateTimeForStorage($end, $ctx));
+        }
+        self::setObjectProperty($period, 'interval', self::cloneIntervalForStorage($interval, $ctx));
+        self::requireIntProperty($period, 'recurrences')->int($recurrences);
+        self::requireBoolProperty($period, 'include_start_date')->bool($includeStart->toBool());
+        self::requireBoolProperty($period, 'include_end_date')->bool($includeEnd->toBool());
+        $period->constructed = true;
+        $period->datePeriodIterator = null;
+
+        return $period;
+    }
+
+    private static function hashEntryScalar(HashTable $ht, string $key): ?Variable
+    {
+        $found = $ht->find($key);
+        if (null === $found) {
+            return null;
+        }
+
+        return $found->resolveIndirect();
+    }
+
+    private static function hashEntryObject(HashTable $ht, string $key): ?ObjectEntry
+    {
+        $var = self::hashEntryScalar($ht, $key);
+        if (null === $var || Variable::TYPE_OBJECT !== $var->type) {
+            return null;
+        }
+
+        return $var->toObject();
+    }
+
+    /**
+     * @return ObjectEntry|null|false null = present NULL; false = missing key or invalid type
+     */
+    private static function hashEntryObjectOrNull(HashTable $ht, string $key): ObjectEntry|null|false
+    {
+        $found = $ht->find($key);
+        if (null === $found) {
+            return false;
+        }
+        $var = $found->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return false;
+        }
+
+        return $var->toObject();
+    }
+
+    /**
      * php-src ext/json/php_json.c — DatePeriod json encode wire (#14144).
      *
      * @return array<string, mixed>

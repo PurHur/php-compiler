@@ -255,6 +255,52 @@ final class DateIntervalSupport
         ];
     }
 
+    /**
+     * php-src zend_get_properties_for(ZEND_PROP_PURPOSE_VAR_EXPORT) — DateInterval bag (#22407).
+     *
+     * @return array<string, Variable>
+     */
+    public static function varExportPropertyMap(ObjectEntry $interval): array
+    {
+        if (self::isFromDateString($interval)) {
+            $dateString = self::readDateString($interval) ?? '';
+            $from = new Variable(Variable::TYPE_BOOLEAN);
+            $from->bool(true);
+            $ds = new Variable(Variable::TYPE_STRING);
+            $ds->string($dateString);
+
+            return [
+                'from_string' => $from,
+                'date_string' => $ds,
+            ];
+        }
+        $wire = self::exportZendJsonWireDateInterval($interval);
+        $out = [];
+        foreach (['y', 'm', 'd', 'h', 'i', 's'] as $key) {
+            $v = new Variable(Variable::TYPE_INTEGER);
+            $v->int((int) $wire[$key]);
+            $out[$key] = $v;
+        }
+        $f = new Variable(Variable::TYPE_FLOAT);
+        $f->float((float) $wire['f']);
+        $out['f'] = $f;
+        $invert = new Variable(Variable::TYPE_INTEGER);
+        $invert->int((int) $wire['invert']);
+        $out['invert'] = $invert;
+        $days = new Variable();
+        if (\is_int($wire['days'])) {
+            $days->int($wire['days']);
+        } else {
+            $days->bool((bool) $wire['days']);
+        }
+        $out['days'] = $days;
+        $from = new Variable(Variable::TYPE_BOOLEAN);
+        $from->bool((bool) $wire['from_string']);
+        $out['from_string'] = $from;
+
+        return $out;
+    }
+
     /** php-src php_date_serialize — Zend DateInterval member order (#10692). */
     public static function encodeZendSerializeWire(ObjectEntry $interval): string
     {
