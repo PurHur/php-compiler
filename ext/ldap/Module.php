@@ -51,9 +51,12 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/ldap_search_builtins.php';
         require_once __DIR__.'/ldap_exop_builtins.php';
         require_once __DIR__.'/ldap_modify_builtins.php';
+        require_once __DIR__.'/ldap_dn_builtins.php';
 
         $fns = [
             new ldap_escape(),
+            new ldap_dn2ufn(),
+            new ldap_explode_dn(),
             new ldap_connect(),
             new ldap_bind(),
             new ldap_unbind(),

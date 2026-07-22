@@ -188,6 +188,8 @@ final class BuiltinIntrospectionPolicy
         }
         if (\in_array($lc, [
             'ldap_escape',
+            'ldap_dn2ufn',
+            'ldap_explode_dn',
             'ldap_connect',
             'ldap_bind',
             'ldap_unbind',

@@ -48,6 +48,55 @@ final class VmLdapNative
     }
 
     /**
+     * OpenLDAP ldap_explode_dn() — RDN component strings or null when invalid (#22212).
+     *
+     * @return list<string>|null
+     */
+    public static function explodeDn(string $dn, int $notypes): ?array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $values = $ffi->ldap_explode_dn($dn, $notypes);
+        if (null === $values) {
+            return null;
+        }
+        $parts = [];
+        for ($i = 0; ; ++$i) {
+            $ptr = $values[$i];
+            if (null === $ptr) {
+                break;
+            }
+            $parts[] = \FFI::string($ptr);
+        }
+        $ffi->ldap_memvfree($values);
+
+        return $parts;
+    }
+
+    /**
+     * OpenLDAP ldap_dn2ufn() — user-friendly name or null when invalid (#22212).
+     *
+     * Empty DN yields "" (not null), matching php-src RETVAL_STRING on non-NULL.
+     */
+    public static function dn2ufn(string $dn): ?string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $ufn = $ffi->ldap_dn2ufn($dn);
+        if (null === $ufn) {
+            return null;
+        }
+        $out = \FFI::string($ufn);
+        $ffi->ldap_memfree($ufn);
+
+        return $out;
+    }
+
+    /**
      * Oracle wallet TLS connect (php-src HAVE_ORALDAP / ldap_connect_wallet; #20638).
      *
      * True only when an Oracle LDAP library exports ldap_init_SSL — OpenLDAP
@@ -687,6 +736,9 @@ char *ldap_first_attribute(LDAP *ld, LDAPMessage *entry, void **ber);
 char *ldap_next_attribute(LDAP *ld, LDAPMessage *entry, void *ber);
 BerValue **ldap_get_values_len(LDAP *ld, LDAPMessage *entry, const char *attr);
 void ldap_value_free_len(BerValue **vals);
+char **ldap_explode_dn(const char *dn, int notypes);
+char *ldap_dn2ufn(const char *dn);
+void ldap_memvfree(void **v);
 void ldap_memfree(void *p);
 int ldap_msgfree(LDAPMessage *msg);
 int ldap_extended_operation_s(LDAP *ld, const char *reqoid, BerValue *reqdata, void *serverctrls, void *clientctrls, char **retoidp, BerValue **retdatap);
