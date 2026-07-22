@@ -283,6 +283,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_namednodemap_foreach_keys.phpt',
             'dom_namednodemap_foreach_keys.phpt'
         );
+        yield 'dom_namednodemap_live_foreach_remove.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_namednodemap_live_foreach_remove.phpt',
+            'dom_namednodemap_live_foreach_remove.phpt'
+        );
         yield 'dom_element_xmlns_attributes_namednodemap.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_element_xmlns_attributes_namednodemap.phpt',
             'dom_element_xmlns_attributes_namednodemap.phpt'

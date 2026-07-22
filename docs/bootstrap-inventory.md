@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6330 |
-| Phase A inventory files (M2 ratio SSOT) | 6330 |
+| PHP files on vm.php path | 6331 |
+| Phase A inventory files (M2 ratio SSOT) | 6331 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20073 |
+| Source constructs flagged (warnings) | 20074 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -264,6 +264,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 3 |
 | `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
+| `ext/dom/DomLiveNamedNodeMapIterator.php` | 0 | 3 |
 | `ext/dom/DomLiveNodeListIterator.php` | 0 | 3 |
 | `ext/dom/DomLivingBuiltinClasses.php` | 0 | 137 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
@@ -450,7 +451,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
 | `ext/dom/TokenListValues.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 408 |
+| `ext/dom/VmDom.php` | 0 | 406 |
 | `ext/dom/VmDomCollectionDimension.php` | 0 | 1 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 44 |
@@ -7810,6 +7811,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/DomLiveNamedNodeMapIterator.php`
+
+**Warnings** (review for bootstrap subset):
+- new self (line 31)
+- new Variable (line 73)
+- 6 class method(s)
+
 ### `ext/dom/DomLiveNodeListIterator.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9342,47 +9350,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DomNodeState (line 8093)
 - new Variable (line 8100)
 - new DOMException (line 8183)
-- new HashTable (line 8459)
-- new Variable (line 8472)
-- new ObjectEntry (line 8514)
-- new DomNodeState (line 8518)
-- new Variable (line 8527)
-- new ObjectEntry (line 8577)
-- new DomNodeState (line 8580)
-- new Variable (line 8588)
-- new Variable (line 8793)
-- new DOMException (line 8930)
-- new DOMException (line 8937)
-- new DOMException (line 8944)
-- new DOMException (line 8948)
-- new DOMException (line 8951)
-- new DOMException (line 8960)
-- new DOMException (line 8972)
-- new Variable (line 9082)
-- new DOMException (line 10177)
-- new Variable (line 10236)
-- new Variable (line 10259)
-- new Variable (line 10288)
+- new ObjectEntry (line 8501)
+- new DomNodeState (line 8505)
+- new Variable (line 8514)
+- new ObjectEntry (line 8564)
+- new DomNodeState (line 8567)
+- new Variable (line 8575)
+- new Variable (line 8780)
+- new DOMException (line 8917)
+- new DOMException (line 8924)
+- new DOMException (line 8931)
+- new DOMException (line 8935)
+- new DOMException (line 8938)
+- new DOMException (line 8947)
+- new DOMException (line 8959)
+- new Variable (line 9069)
+- new DOMException (line 10164)
+- new Variable (line 10223)
+- new Variable (line 10246)
+- new Variable (line 10275)
+- new Variable (line 10313)
+- new DOMException (line 10324)
 - new Variable (line 10326)
-- new DOMException (line 10337)
-- new Variable (line 10339)
-- new DOMException (line 10513)
-- new DOMException (line 10540)
-- new DOMException (line 10576)
-- new DOMException (line 10672)
+- new DOMException (line 10500)
+- new DOMException (line 10527)
+- new DOMException (line 10563)
+- new DOMException (line 10659)
+- new DOMException (line 10667)
 - new DOMException (line 10680)
-- new DOMException (line 10693)
-- new DOMException (line 10704)
-- new DOMException (line 10709)
-- new DOMException (line 10735)
-- new DOMException (line 10756)
-- new DOMException (line 10814)
-- new DOMException (line 10819)
-- new DOMException (line 10822)
-- new DOMException (line 10825)
-- new DOMException (line 10854)
-- new Error (line 11931)
-- new Error (line 11935)
+- new DOMException (line 10691)
+- new DOMException (line 10696)
+- new DOMException (line 10722)
+- new DOMException (line 10743)
+- new DOMException (line 10801)
+- new DOMException (line 10806)
+- new DOMException (line 10809)
+- new DOMException (line 10812)
+- new DOMException (line 10841)
+- new Error (line 11918)
+- new Error (line 11922)
 - 467 class method(s)
 - 3 closure(s)
 
@@ -28212,7 +28218,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/SprintfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 15 class method(s)
 
 ### `ext/standard/SqrtJitHelper.php`
 
@@ -30709,7 +30715,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 243)
-- new Error (line 353)
+- new Error (line 359)
 - 30 class method(s)
 
 ### `ext/standard/VmSscanf.php`

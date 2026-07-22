@@ -298,6 +298,7 @@ require_once __DIR__.'/../../../ext/dom/DomHtmlElementPropertySupport.php';
 require_once __DIR__.'/../../../ext/dom/DomImportNodeJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomIsConnectedJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomIsEqualNodeJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomLiveNamedNodeMapIterator.php';
 require_once __DIR__.'/../../../ext/dom/DomLiveNodeListIterator.php';
 require_once __DIR__.'/../../../ext/dom/DomLivingBuiltinClasses.php';
 require_once __DIR__.'/../../../ext/dom/DomLivingConstants.php';
