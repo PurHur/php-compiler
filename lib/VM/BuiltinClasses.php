@@ -308,6 +308,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsAbstract;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsConstructor;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsDestructor;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsInternal;
@@ -333,6 +334,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsUserDefined;
+use PHPCompiler\VM\Builtin\ReflectionMethodToString;
 use PHPCompiler\VM\Builtin\ReflectionCompositeTypeGetTypes;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
@@ -815,6 +817,10 @@ final class BuiltinClasses
         $rm->methodVisibility['isfinal'] = $pub;
         $rm->methods['isgenerator'] = new ReflectionMethodIsGenerator();
         $rm->methodVisibility['isgenerator'] = $pub;
+        $rm->methods['isclosure'] = new ReflectionMethodIsClosure();
+        $rm->methodVisibility['isclosure'] = $pub;
+        $rm->methods['__tostring'] = new ReflectionMethodToString();
+        $rm->methodVisibility['__tostring'] = $pub;
         $rm->methods['getmodifiers'] = new ReflectionMethodGetModifiers();
         $rm->methodVisibility['getmodifiers'] = $pub;
         foreach (

@@ -1698,6 +1698,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_function_tentative_return')) {
                 continue;
             }
+            // ReflectionMethod isClosure/__toString are VM-only (#22173).
+            if (str_contains($name, 'reflection_method_isclosure_tostring')) {
+                continue;
+            }
             // ReflectionClass::getExtension() / ReflectionExtension are VM-only (#11462).
             if (str_contains($name, 'reflection_extension_class')) {
                 continue;
