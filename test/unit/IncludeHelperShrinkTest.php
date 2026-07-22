@@ -22,6 +22,9 @@ final class IncludeHelperShrinkTest extends TestCase
         $this->assertStringNotContainsString('function resolveLiteralPath', $source);
         $this->assertStringNotContainsString('function collectCalleeLocalBindings', $source);
         $this->assertStringNotContainsString('function prepareCallerBinding', $source);
+        // Private JIT::assignOperand is unusable from IncludeHelper — public Forced API (#21905).
+        $this->assertStringContainsString('assignOperandForced(', $source);
+        $this->assertStringNotContainsString('$jit->assignOperand(', $source);
     }
 
     public function testIncludeHelperShrunkAtLeastFiftyPercent(): void
