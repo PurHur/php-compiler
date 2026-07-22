@@ -360,6 +360,7 @@ use PHPCompiler\VM\Builtin\ReflectionParameterGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetDefaultValueConstantName;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetName;
+use PHPCompiler\VM\Builtin\ReflectionParameterGetPosition;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
 use PHPCompiler\VM\Builtin\ReflectionParameterHasType;
@@ -731,6 +732,8 @@ final class BuiltinClasses
         $rparam->methodVisibility['getattributes'] = $pub;
         $rparam->methods['getname'] = new ReflectionParameterGetName();
         $rparam->methodVisibility['getname'] = $pub;
+        $rparam->methods['getposition'] = new ReflectionParameterGetPosition();
+        $rparam->methodVisibility['getposition'] = $pub;
         $rparam->methods['gettype'] = new ReflectionParameterGetType();
         $rparam->methodVisibility['gettype'] = $pub;
         $rparam->methods['hastype'] = new ReflectionParameterHasType();
