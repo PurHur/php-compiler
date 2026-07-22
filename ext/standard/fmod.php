@@ -25,9 +25,8 @@ final class fmod extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('fmod() requires exactly two arguments');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#21982).
+        $this->requireExactArgCount($frame, 'fmod', 2);
         $num1 = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'fmod',
@@ -51,8 +50,8 @@ final class fmod extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== count($args)) {
-            throw new \LogicException('fmod() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'fmod', 2)) {
+            return $context->getTypeFromString('double')->constReal(0.0);
         }
         [$left, $right] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'fmod', 'num1', 'num2', 'float');
 

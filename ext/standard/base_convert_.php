@@ -35,9 +35,8 @@ final class base_convert_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('base_convert() requires exactly three arguments in this compiler build');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#21982).
+        $this->requireExactArgCount($frame, 'base_convert', 3);
         if (null === $frame->returnVar) {
             return;
         }
@@ -57,8 +56,8 @@ final class base_convert_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (3 !== \count($args)) {
-            throw new \LogicException('base_convert() requires exactly three arguments in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, 'base_convert', 3)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
         $num = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base_convert', 0, 'num')

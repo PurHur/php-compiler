@@ -28,9 +28,8 @@ final class intdiv extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('intdiv() requires exactly two arguments');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#21982).
+        $this->requireExactArgCount($frame, self::FUNCTION, 2);
         // Z_PARAM_LONG — soft-null DEP+coerce on 8.4 (parseLongBuiltinArgCore; #21593).
         $num1 = VmMath::parseIntBuiltinArgForFrame(
             $frame,
@@ -63,8 +62,8 @@ final class intdiv extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== count($args)) {
-            throw new \LogicException('intdiv() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, self::FUNCTION, 2)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         // Compile-time fold for literal args — keeps AOT green for soft-null (#21593, peer checkdate).
         $folded = JitIntdiv::tryFoldCompileTime($context, $args[0], $args[1]);
