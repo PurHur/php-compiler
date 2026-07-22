@@ -3118,7 +3118,8 @@ class Object_ extends Type {
         }
         if ('dateperiod' === $lcname) {
             $this->ensureTraversableBuiltinInterfaces();
-            $this->setClassInterfaces($displayName, ['Iterator']);
+            // php-src date.stub.php — IteratorAggregate (#22263); Iterator methods retained for helpers.
+            $this->setClassInterfaces($displayName, ['IteratorAggregate']);
             // php-src REGISTER_DATEPERIOD_CLASS_CONST_LONG (#20071, ext/date/php_date.c).
             $this->seedExternalClassConstants($id, [
                 'exclude_start_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_EXCLUDE_START_DATE,

@@ -1371,6 +1371,7 @@ require_once __DIR__.'/../../../ext/pgsql/pg_result_diag_builtins.php';
 require_once __DIR__.'/../../../ext/phar/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/phar/Module.php';
 require_once __DIR__.'/../../../ext/phar/PharDataBuiltin.php';
+require_once __DIR__.'/../../../ext/phar/PharDefaultStubTemplate.php';
 require_once __DIR__.'/../../../ext/phar/PharExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/phar/VmPhar.php';
 require_once __DIR__.'/../../../ext/phar/VmPharData.php';
@@ -5485,6 +5486,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodCreateFromISO8601String
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodCurrent.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetDateInterval.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetEndDate.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetIterator.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetRecurrences.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodGetStartDate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodIteratorMethod.php';
