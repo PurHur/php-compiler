@@ -3663,9 +3663,16 @@ restart:
                     // Object property / static / nested ref slots are live storage (Zend FE_FETCH_R,
                     // #5245). Main-script globals use an indirect wrapper — still need a shared ref
                     // cell so unset($a) does not destroy $b (#5368).
+                    // HashTable bucket cells are destroyed with the array: promote to a shared
+                    // IS_REFERENCE-style cell so `$b =& $a[$k]; unset($a);` keeps the residual (#22027).
+                    if (null !== $rhs->objectPropertyOwner) {
+                        $writeTarget->indirect($rhs);
+                        break;
+                    }
                     if (
-                        null !== $rhs->objectPropertyOwner
-                        || ($rhsSlot->isIndirect() && !$this->context->isGlobalStorage($rhs))
+                        $rhsSlot->isIndirect()
+                        && !$this->context->isGlobalStorage($rhs)
+                        && !$rhs->hashTableBucketCell
                     ) {
                         $writeTarget->indirect($rhs);
                         break;

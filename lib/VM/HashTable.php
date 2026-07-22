@@ -2386,6 +2386,7 @@ final class HashTableBucket {
     public ?string $key;
 
     public function __construct(Variable $value, int $hash, ?string $key) {
+        $value->hashTableBucketCell = true;
         $this->value = $value;
         $this->hash = $hash;
         $this->key = $key;
