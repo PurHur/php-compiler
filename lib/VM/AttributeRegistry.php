@@ -21,14 +21,16 @@ final class AttributeRegistry
         if (null === $ctx) {
             throw new \LogicException('AttributeRegistry requires active VM context');
         }
+        $target = AttributeSupport::TARGET_CLASS;
         $entries = ReflectionSupport::filterEntriesByName($ctx, $entry->attributeEntries, $filter, $flags);
         if ([] !== $entries) {
-            return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
+            return ReflectionSupport::attributesArrayFromEntries($frame, $entries, $target);
         }
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($ctx, $entry->attributeNames, $filter, $flags)
+            ReflectionSupport::filterByName($ctx, $entry->attributeNames, $filter, $flags),
+            $target
         );
     }
 
@@ -43,17 +45,19 @@ final class AttributeRegistry
         if (null === $ctx) {
             throw new \LogicException('AttributeRegistry requires active VM context');
         }
+        $target = AttributeSupport::TARGET_METHOD;
         $allEntries = $entry->methodAttributeEntries[$methodLc] ?? [];
         $entries = ReflectionSupport::filterEntriesByName($ctx, $allEntries, $filter, $flags);
         if ([] !== $entries) {
-            return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
+            return ReflectionSupport::attributesArrayFromEntries($frame, $entries, $target);
         }
 
         $all = $entry->methodAttributeNames[$methodLc] ?? [];
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($ctx, $all, $filter, $flags)
+            ReflectionSupport::filterByName($ctx, $all, $filter, $flags),
+            $target
         );
     }
 
@@ -68,17 +72,19 @@ final class AttributeRegistry
         if (null === $ctx) {
             throw new \LogicException('AttributeRegistry requires active VM context');
         }
+        $target = AttributeSupport::TARGET_PROPERTY;
         $allEntries = $entry->propertyAttributeEntries[$propLc] ?? [];
         $entries = ReflectionSupport::filterEntriesByName($ctx, $allEntries, $filter, $flags);
         if ([] !== $entries) {
-            return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
+            return ReflectionSupport::attributesArrayFromEntries($frame, $entries, $target);
         }
 
         $all = $entry->propertyAttributeNames[$propLc] ?? [];
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($ctx, $all, $filter, $flags)
+            ReflectionSupport::filterByName($ctx, $all, $filter, $flags),
+            $target
         );
     }
 
@@ -93,17 +99,19 @@ final class AttributeRegistry
         if (null === $ctx) {
             throw new \LogicException('AttributeRegistry requires active VM context');
         }
+        $target = AttributeSupport::TARGET_CLASS_CONSTANT;
         $allEntries = $entry->constAttributeEntries[$constLc] ?? [];
         $entries = ReflectionSupport::filterEntriesByName($ctx, $allEntries, $filter, $flags);
         if ([] !== $entries) {
-            return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
+            return ReflectionSupport::attributesArrayFromEntries($frame, $entries, $target);
         }
 
         $all = $entry->constAttributeNames[$constLc] ?? [];
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($ctx, $all, $filter, $flags)
+            ReflectionSupport::filterByName($ctx, $all, $filter, $flags),
+            $target
         );
     }
 
@@ -122,7 +130,8 @@ final class AttributeRegistry
 
         return ReflectionSupport::attributesArrayFromEntries(
             $frame,
-            ReflectionSupport::filterEntriesByName($ctx, $entries, $filter, $flags)
+            ReflectionSupport::filterEntriesByName($ctx, $entries, $filter, $flags),
+            AttributeSupport::TARGET_CLASS_CONSTANT
         );
     }
 
@@ -136,21 +145,23 @@ final class AttributeRegistry
         if (null === $ctx) {
             throw new \LogicException('AttributeRegistry requires active VM context');
         }
+        $target = AttributeSupport::TARGET_FUNCTION;
         if ($reflection->reflectionIsInternalFunction ?? false) {
-            return ReflectionSupport::attributesArray($frame, []);
+            return ReflectionSupport::attributesArray($frame, [], $target);
         }
         $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $reflection);
         if (!$func instanceof \PHPCompiler\Func\PHP) {
-            return ReflectionSupport::attributesArray($frame, []);
+            return ReflectionSupport::attributesArray($frame, [], $target);
         }
         $entries = ReflectionSupport::filterEntriesByName($ctx, $func->attributeEntries, $filter, $flags);
         if ([] !== $entries) {
-            return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
+            return ReflectionSupport::attributesArrayFromEntries($frame, $entries, $target);
         }
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($ctx, $func->attributeNames, $filter, $flags)
+            ReflectionSupport::filterByName($ctx, $func->attributeNames, $filter, $flags),
+            $target
         );
     }
 }

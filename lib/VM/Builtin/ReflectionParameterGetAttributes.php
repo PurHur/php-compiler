@@ -28,7 +28,13 @@ final class ReflectionParameterGetAttributes extends VmClassMethod
             $flags
         );
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom(ReflectionSupport::attributesArrayFromEntries($frame, $entries));
+            $frame->returnVar->copyFrom(
+                ReflectionSupport::attributesArrayFromEntries(
+                    $frame,
+                    $entries,
+                    \PHPCompiler\VM\AttributeSupport::TARGET_PARAMETER
+                )
+            );
         }
     }
 }
