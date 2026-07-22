@@ -1380,6 +1380,35 @@ final class VmReflection
     }
 
     /**
+     * ReflectionClass::getTraits() — trait name => ReflectionClass (#22108).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getTraits
+     *
+     * @return Variable map<string, ReflectionClass>
+     */
+    public static function reflectionClassTraitsMap(Context $ctx, ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        $rcClass = $ctx->classes[ReflectionSupport::REFLECTION_CLASS] ?? null;
+        if (null === $rcClass) {
+            return $result;
+        }
+        foreach (self::traitUsesMap($entry) as $traitName) {
+            $name = (string) $traitName;
+            $obj = new \PHPCompiler\VM\ObjectEntry($rcClass);
+            $obj->constructed = true;
+            $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($name);
+            $slot = new Variable();
+            $slot->object($obj);
+            $ht->add($name, $slot);
+        }
+
+        return $result;
+    }
+
+    /**
      * ReflectionClass::getInterfaceNames() / ReflectionEnum::getInterfaceNames() (#9692).
      *
      * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getInterfaceNames
