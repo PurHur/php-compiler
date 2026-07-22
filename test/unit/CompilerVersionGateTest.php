@@ -1642,6 +1642,47 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
+    public function testVmDoesNotRegisterGraphemeStrSplitOnReferenceOr82Profile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsGraphemeStrSplit());
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['grapheme_str_split']));
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsGraphemeStrSplit());
+            $runtime82 = new Runtime();
+            $this->assertFalse(isset($runtime82->vmContext->functions['grapheme_str_split']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersGraphemeStrSplitOnForwardProfile84(): void
+    {
+        if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::icuAvailable()) {
+            $this->markTestSkipped('ICU-backed ext/intl required for grapheme_str_split (#22340)');
+        }
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsGraphemeStrSplit());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['grapheme_str_split']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterMbStrPadOn82Profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

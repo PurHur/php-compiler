@@ -287,7 +287,7 @@ final class IntlExtensionPolicy
         return str_contains($testFileName, 'idn_phantom');
     }
 
-    /** grapheme_strlen/substr/strpos/extract/str_split — require loaded ext/intl (#17694, php-src ext/intl/php_intl.c). */
+    /** grapheme_strlen/substr/strpos/extract — require loaded ext/intl (#17694, php-src ext/intl/php_intl.c). */
     public static function advertisesGraphemeCore(): bool
     {
         return self::advertisesBuiltins();
@@ -303,6 +303,12 @@ final class IntlExtensionPolicy
     public static function advertisesGraphemeStrimwidth(): bool
     {
         return self::advertisesBuiltins();
+    }
+
+    /** grapheme_str_split — PHP 8.4+ and loaded ext/intl (#17694, #22340). */
+    public static function advertisesGraphemeStrSplit(): bool
+    {
+        return self::advertisesBuiltins() && CompilerVersion::supportsGraphemeStrSplit();
     }
 
     /**
