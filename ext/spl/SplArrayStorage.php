@@ -316,7 +316,7 @@ final class SplArrayStorage
     public static function offsetGet(ObjectEntry $object, Variable $offset): Variable
     {
         $found = self::findOffset(self::state($object)['table'], $offset);
-        if (null === $found) {
+        if (null === $found || $found->resolveIndirect()->isUndefined()) {
             $var = new Variable(Variable::TYPE_NULL);
             $var->null();
 
@@ -357,9 +357,16 @@ final class SplArrayStorage
         }
     }
 
+    /**
+     * php-src spl_array_offset_exists — zend_symtable_exists after HashTable tombstones.
+     * {@see HashTable::offsetUnset} leaves TYPE_UNDEFINED buckets; {@see HashTable::hasKey}
+     * matches array_key_exists (not isset) so null values still exist (#22322).
+     */
     public static function offsetExists(ObjectEntry $object, Variable $offset): bool
     {
-        return null !== self::findOffset(self::state($object)['table'], $offset);
+        [$keyVar] = self::offsetKeyVar($offset);
+
+        return self::state($object)['table']->hasKey($keyVar);
     }
 
     public static function offsetUnset(ObjectEntry $object, Variable $offset): void
