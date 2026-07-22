@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6415 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20440 |
+| Source constructs flagged (warnings) | 20438 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4733,7 +4733,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/CastObjectFromHashtableJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/CastObjectValueBoxJit.php` | 0 | 4 |
 | `lib/JIT/Builtin/CheckdateRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/CheckdnsrrRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/CheckdnsrrRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ChownRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ClassConstFetchRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/CliArgvRuntime.php` | 0 | 1 |
@@ -22562,36 +22562,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 56)
-- new SplDoublyLinkedListConstruct (line 64)
-- new SplDoublyLinkedListDebugInfo (line 101)
-- new Variable (line 185)
-- new OutOfRangeException (line 240)
-- new Variable (line 244)
-- new HashTable (line 276)
-- new Variable (line 277)
-- new Variable (line 283)
-- new Variable (line 287)
-- new HashTable (line 288)
-- new Variable (line 317)
-- new Variable (line 335)
-- new Variable (line 347)
-- new Variable (line 360)
-- new Variable (line 374)
-- new Variable (line 392)
+- new SplDoublyLinkedListConstruct (line 72)
+- new SplDoublyLinkedListDebugInfo (line 109)
+- new Variable (line 193)
+- new OutOfRangeException (line 248)
+- new Variable (line 252)
+- new HashTable (line 284)
+- new Variable (line 285)
+- new Variable (line 291)
+- new Variable (line 295)
+- new HashTable (line 296)
+- new Variable (line 325)
+- new Variable (line 343)
+- new Variable (line 355)
+- new Variable (line 368)
+- new Variable (line 382)
 - new Variable (line 400)
-- new OutOfRangeException (line 423)
-- new Variable (line 425)
-- new OutOfRangeException (line 436)
-- new Variable (line 438)
-- new OutOfRangeException (line 448)
-- new ArgumentCountError (line 542)
-- new ArgumentCountError (line 602)
-- new ArgumentCountError (line 701)
-- new ArgumentCountError (line 728)
-- new ArgumentCountError (line 752)
-- new ArgumentCountError (line 781)
-- new ArgumentCountError (line 919)
-- new ArgumentCountError (line 943)
+- new Variable (line 408)
+- new OutOfRangeException (line 431)
+- new Variable (line 433)
+- new OutOfRangeException (line 444)
+- new Variable (line 446)
+- new OutOfRangeException (line 456)
+- new ArgumentCountError (line 550)
+- new ArgumentCountError (line 610)
+- new ArgumentCountError (line 709)
+- new ArgumentCountError (line 736)
+- new ArgumentCountError (line 760)
+- new ArgumentCountError (line 789)
+- new ArgumentCountError (line 927)
+- new ArgumentCountError (line 951)
 - 53 class method(s)
 
 ### `ext/spl/SplFileInfoBuiltin.php`
@@ -41430,9 +41430,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/CheckdnsrrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 118)
 - 6 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/ChownRuntime.php`
 
