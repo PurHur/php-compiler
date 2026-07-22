@@ -283,7 +283,7 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringPregQuote::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringQuotemeta::implement($this->context);
+        \PHPCompiler\JIT\Builtin\StringQuotemeta::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\CtypeRuntime::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\StringAddslashes::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringStripslashes::implement($this->context);

@@ -2552,8 +2552,94 @@ final class VmReflection
     /** php-src ZEND_ACC_READONLY — ReflectionProperty::IS_READONLY (#22128). */
     public const REFLECTION_IS_READONLY = 128;
 
+    /** php-src ZEND_ACC_VIRTUAL — ReflectionProperty::IS_VIRTUAL (PHP 8.4+). */
+    public const REFLECTION_IS_VIRTUAL = 512;
+
+    /** php-src ZEND_ACC_PUBLIC_SET (PHP 8.4+ asymmetric visibility). */
+    public const REFLECTION_IS_PUBLIC_SET = 1024;
+
+    /** php-src ZEND_ACC_PROTECTED_SET (PHP 8.4+ asymmetric visibility). */
+    public const REFLECTION_IS_PROTECTED_SET = 2048;
+
+    /** php-src ZEND_ACC_PRIVATE_SET (PHP 8.4+ asymmetric visibility). */
+    public const REFLECTION_IS_PRIVATE_SET = 4096;
+
+    /** php-src ZEND_ACC_PPP_MASK — mutually exclusive visibility bits. */
+    public const REFLECTION_PPP_MASK = self::REFLECTION_IS_PUBLIC
+        | self::REFLECTION_IS_PROTECTED
+        | self::REFLECTION_IS_PRIVATE;
+
+    /** php-src ZEND_ACC_PPP_SET_MASK — mutually exclusive set-visibility bits. */
+    public const REFLECTION_PPP_SET_MASK = self::REFLECTION_IS_PUBLIC_SET
+        | self::REFLECTION_IS_PROTECTED_SET
+        | self::REFLECTION_IS_PRIVATE_SET;
+
     /** php-src ZEND_ACC_DEPRECATED — ReflectionFunction::IS_DEPRECATED (#22128). */
     public const REFLECTION_FUNCTION_IS_DEPRECATED = 2048;
+
+    /**
+     * Reflection::getModifierNames($modifiers) — php-src zim_Reflection_getModifierNames (#22127).
+     *
+     * Order: abstract, final, virtual, public|protected|private, protected(set)|private(set),
+     * static, readonly. Visibility uses exact PPP / PPP_SET match (mutually exclusive).
+     *
+     * @return Variable list<string>
+     */
+    public static function reflectionGetModifierNames(int $modifiers): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+
+        $append = static function (string $name) use ($ht): void {
+            $slot = new Variable();
+            $slot->string($name);
+            $ht->append($slot);
+        };
+
+        // ZEND_ACC_ABSTRACT | ZEND_ACC_EXPLICIT_ABSTRACT_CLASS (same bit = 64)
+        if (($modifiers & self::REFLECTION_METHOD_IS_ABSTRACT) !== 0) {
+            $append('abstract');
+        }
+        if (($modifiers & self::REFLECTION_METHOD_IS_FINAL) !== 0) {
+            $append('final');
+        }
+        if (($modifiers & self::REFLECTION_IS_VIRTUAL) !== 0) {
+            $append('virtual');
+        }
+
+        switch ($modifiers & self::REFLECTION_PPP_MASK) {
+            case self::REFLECTION_IS_PUBLIC:
+                $append('public');
+                break;
+            case self::REFLECTION_IS_PRIVATE:
+                $append('private');
+                break;
+            case self::REFLECTION_IS_PROTECTED:
+                $append('protected');
+                break;
+        }
+
+        switch ($modifiers & self::REFLECTION_PPP_SET_MASK) {
+            case self::REFLECTION_IS_PROTECTED_SET:
+                $append('protected(set)');
+                break;
+            case self::REFLECTION_IS_PRIVATE_SET:
+                $append('private(set)');
+                break;
+        }
+
+        if (($modifiers & self::REFLECTION_IS_STATIC) !== 0) {
+            $append('static');
+        }
+
+        if (($modifiers & self::REFLECTION_IS_READONLY) !== 0
+            || ($modifiers & self::REFLECTION_CLASS_IS_READONLY) !== 0) {
+            $append('readonly');
+        }
+
+        return $result;
+    }
 
     /** Register ReflectionAttribute::IS_INSTANCEOF (#11471, ext/reflection/php_reflection.c). */
     public static function registerReflectionAttributeClassConstants(ClassEntry $entry): void

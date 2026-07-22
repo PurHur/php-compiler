@@ -37,6 +37,9 @@ use PHPCompiler\VM\Variable;
  */
 final class ReflectionSupport
 {
+    /** php-src class Reflection — getModifierNames() utility (#22127). */
+    public const REFLECTION = 'reflection';
+
     public const REFLECTION_CLASS = 'reflectionclass';
 
     /** php-src: class ReflectionObject extends ReflectionClass (#20098). */

@@ -79,6 +79,7 @@ use PHPCompiler\VM\Builtin\FiberStart;
 use PHPCompiler\VM\Builtin\FiberSuspend;
 use PHPCompiler\VM\Builtin\FiberThrow;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
+use PHPCompiler\VM\Builtin\ReflectionGetModifierNames;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAccessible;
 use PHPCompiler\VM\Builtin\ReflectionFunctionSetAccessible;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsAccessible;
@@ -597,6 +598,12 @@ final class BuiltinClasses
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+
+        // php-src class Reflection — static getModifierNames() (#22127)
+        $reflection = new ClassEntry('Reflection');
+        $reflection->methods['getmodifiernames'] = new ReflectionGetModifierNames();
+        $reflection->methodVisibility['getmodifiernames'] = $pubStatic;
+        $ctx->classes[ReflectionSupport::REFLECTION] = $reflection;
 
         $attr = new ClassEntry('ReflectionAttribute');
         \PHPCompiler\ext\standard\VmReflection::registerReflectionAttributeClassConstants($attr);
