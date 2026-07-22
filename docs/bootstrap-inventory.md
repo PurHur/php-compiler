@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6423 |
-| Phase A inventory files (M2 ratio SSOT) | 6423 |
+| PHP files on vm.php path | 6430 |
+| Phase A inventory files (M2 ratio SSOT) | 6430 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20526 |
+| Source constructs flagged (warnings) | 20537 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -86,14 +86,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bz2/JitBz2open.php` | 0 | 1 |
 | `ext/bz2/JitBz2read.php` | 0 | 1 |
 | `ext/bz2/JitBz2write.php` | 0 | 1 |
-| `ext/bz2/Module.php` | 0 | 7 |
+| `ext/bz2/JitBzerrno.php` | 0 | 1 |
+| `ext/bz2/JitBzerror.php` | 0 | 1 |
+| `ext/bz2/JitBzerrstr.php` | 0 | 1 |
+| `ext/bz2/JitBzflush.php` | 0 | 1 |
+| `ext/bz2/Module.php` | 0 | 11 |
 | `ext/bz2/VmBz2Core.php` | 0 | 9 |
+| `ext/bz2/VmBz2Error.php` | 0 | 1 |
 | `ext/bz2/VmBz2Native.php` | 0 | 1 |
 | `ext/bz2/VmBz2Stream.php` | 0 | 1 |
 | `ext/bz2/VmBz2StreamPure.php` | 0 | 1 |
 | `ext/bz2/bzclose.php` | 0 | 1 |
 | `ext/bz2/bzcompress.php` | 0 | 1 |
 | `ext/bz2/bzdecompress.php` | 0 | 1 |
+| `ext/bz2/bzerrno.php` | 0 | 1 |
+| `ext/bz2/bzerror.php` | 0 | 1 |
+| `ext/bz2/bzerrstr.php` | 0 | 1 |
+| `ext/bz2/bzflush.php` | 0 | 1 |
 | `ext/bz2/bzopen.php` | 0 | 1 |
 | `ext/bz2/bzread.php` | 0 | 1 |
 | `ext/bz2/bzwrite.php` | 0 | 1 |
@@ -725,7 +734,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/gettext.php` | 0 | 1 |
 | `ext/gettext/ngettext.php` | 0 | 1 |
 | `ext/gettext/textdomain.php` | 0 | 2 |
-| `ext/gmp/GmpConstants.php` | 0 | 1 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
 | `ext/gmp/Module.php` | 0 | 52 |
@@ -4160,7 +4168,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/stats/stats_variance.php` | 0 | 2 |
 | `ext/sysvmsg/Module.php` | 0 | 9 |
 | `ext/sysvmsg/MsgArgs.php` | 0 | 2 |
-| `ext/sysvmsg/SysvmsgConstants.php` | 0 | 1 |
 | `ext/sysvmsg/VmMsg.php` | 0 | 6 |
 | `ext/sysvmsg/msg_get_queue.php` | 0 | 2 |
 | `ext/sysvmsg/msg_queue_exists.php` | 0 | 2 |
@@ -6705,7 +6712,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bz2/Bz2StreamJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 8 class method(s)
 
 ### `ext/bz2/JitBz2.php`
 
@@ -6732,6 +6739,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/bz2/JitBzerrno.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bz2/JitBzerror.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bz2/JitBzerrstr.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bz2/JitBzflush.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/bz2/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6741,6 +6768,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new bzread (line 46)
 - new bzwrite (line 47)
 - new bzclose (line 48)
+- new bzerrno (line 49)
+- new bzerrstr (line 50)
+- new bzerror (line 51)
+- new bzflush (line 52)
 - 3 class method(s)
 
 ### `ext/bz2/VmBz2Core.php`
@@ -6756,6 +6787,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 42 class method(s)
 - 3 closure(s)
 
+### `ext/bz2/VmBz2Error.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/bz2/VmBz2Native.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6769,7 +6805,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bz2/VmBz2StreamPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 12 class method(s)
 
 ### `ext/bz2/bzclose.php`
 
@@ -6782,6 +6818,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 
 ### `ext/bz2/bzdecompress.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/bz2/bzerrno.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/bz2/bzerror.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/bz2/bzerrstr.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/bz2/bzflush.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -11421,11 +11477,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
-### `ext/gmp/GmpConstants.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
 ### `ext/gmp/GmpFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11439,57 +11490,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gmp/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 20)
-- new gmp_init (line 34)
-- new gmp_add (line 35)
-- new gmp_sub (line 36)
-- new gmp_mul (line 37)
-- new gmp_cmp (line 38)
-- new gmp_strval (line 39)
-- new gmp_pow (line 40)
-- new gmp_mod (line 41)
-- new gmp_div_q (line 42)
-- new gmp_div_r (line 43)
-- new gmp_div_qr (line 44)
-- new gmp_abs (line 45)
-- new gmp_neg (line 46)
-- new gmp_and (line 47)
-- new gmp_or (line 48)
-- new gmp_xor (line 49)
-- new gmp_intval (line 50)
-- new gmp_powm (line 51)
-- new gmp_fact (line 52)
-- new gmp_binomial (line 53)
-- new gmp_gcd (line 54)
-- new gmp_lcm (line 55)
-- new gmp_sqrt (line 56)
-- new gmp_sqrtrem (line 57)
-- new gmp_perfect_square (line 58)
-- new gmp_com (line 59)
-- new gmp_random_seed (line 60)
-- new gmp_random_bits (line 61)
-- new gmp_random_range (line 62)
-- new gmp_import (line 63)
-- new gmp_export (line 64)
-- new gmp_sign (line 65)
-- new gmp_prob_prime (line 66)
-- new gmp_nextprime (line 67)
-- new gmp_invert (line 68)
-- new gmp_jacobi (line 69)
-- new gmp_legendre (line 70)
-- new gmp_kronecker (line 71)
-- new gmp_divexact (line 72)
-- new gmp_gcdext (line 73)
-- new gmp_root (line 74)
-- new gmp_rootrem (line 75)
-- new gmp_perfect_power (line 76)
-- new gmp_testbit (line 77)
-- new gmp_setbit (line 78)
-- new gmp_clrbit (line 79)
-- new gmp_scan0 (line 80)
-- new gmp_scan1 (line 81)
-- new gmp_popcount (line 82)
-- new gmp_hamdist (line 83)
+- new VM\Variable (line 26)
+- new gmp_init (line 40)
+- new gmp_add (line 41)
+- new gmp_sub (line 42)
+- new gmp_mul (line 43)
+- new gmp_cmp (line 44)
+- new gmp_strval (line 45)
+- new gmp_pow (line 46)
+- new gmp_mod (line 47)
+- new gmp_div_q (line 48)
+- new gmp_div_r (line 49)
+- new gmp_div_qr (line 50)
+- new gmp_abs (line 51)
+- new gmp_neg (line 52)
+- new gmp_and (line 53)
+- new gmp_or (line 54)
+- new gmp_xor (line 55)
+- new gmp_intval (line 56)
+- new gmp_powm (line 57)
+- new gmp_fact (line 58)
+- new gmp_binomial (line 59)
+- new gmp_gcd (line 60)
+- new gmp_lcm (line 61)
+- new gmp_sqrt (line 62)
+- new gmp_sqrtrem (line 63)
+- new gmp_perfect_square (line 64)
+- new gmp_com (line 65)
+- new gmp_random_seed (line 66)
+- new gmp_random_bits (line 67)
+- new gmp_random_range (line 68)
+- new gmp_import (line 69)
+- new gmp_export (line 70)
+- new gmp_sign (line 71)
+- new gmp_prob_prime (line 72)
+- new gmp_nextprime (line 73)
+- new gmp_invert (line 74)
+- new gmp_jacobi (line 75)
+- new gmp_legendre (line 76)
+- new gmp_kronecker (line 77)
+- new gmp_divexact (line 78)
+- new gmp_gcdext (line 79)
+- new gmp_root (line 80)
+- new gmp_rootrem (line 81)
+- new gmp_perfect_power (line 82)
+- new gmp_testbit (line 83)
+- new gmp_setbit (line 84)
+- new gmp_clrbit (line 85)
+- new gmp_scan0 (line 86)
+- new gmp_scan1 (line 87)
+- new gmp_popcount (line 88)
+- new gmp_hamdist (line 89)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
@@ -36590,14 +36641,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sysvmsg/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 22)
-- new msg_get_queue (line 36)
-- new msg_send (line 37)
-- new msg_receive (line 38)
-- new msg_remove_queue (line 39)
-- new msg_stat_queue (line 40)
-- new msg_set_queue (line 41)
-- new msg_queue_exists (line 42)
+- new VM\Variable (line 28)
+- new msg_get_queue (line 42)
+- new msg_send (line 43)
+- new msg_receive (line 44)
+- new msg_remove_queue (line 45)
+- new msg_stat_queue (line 46)
+- new msg_set_queue (line 47)
+- new msg_queue_exists (line 48)
 - 3 class method(s)
 
 ### `ext/sysvmsg/MsgArgs.php`
@@ -36605,11 +36656,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 19)
 - 7 class method(s)
-
-### `ext/sysvmsg/SysvmsgConstants.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
 
 ### `ext/sysvmsg/VmMsg.php`
 
@@ -41427,9 +41473,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Bz2StreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 276)
-- 11 class method(s)
-- 5 closure(s)
+- new JIT (line 346)
+- 13 class method(s)
+- 9 closure(s)
 
 ### `lib/JIT/Builtin/CallArgv.php`
 

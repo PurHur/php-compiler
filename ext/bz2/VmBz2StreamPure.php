@@ -16,7 +16,7 @@ use PHPCompiler\ext\standard\VmFsReadNative;
  */
 final class VmBz2StreamPure
 {
-    /** @var array<int, array{path: string, writing: bool, blockSize: int, buffer: string, pos: int}> */
+    /** @var array<int, array{path: string, writing: bool, blockSize: int, buffer: string, pos: int, errno: int}> */
     private static array $streams = [];
 
     public static function available(): bool
@@ -27,6 +27,19 @@ final class VmBz2StreamPure
     public static function isHandle(int $handle): bool
     {
         return isset(self::$streams[$handle]);
+    }
+
+    public static function getErrno(int $handle): int
+    {
+        return self::$streams[$handle]['errno'] ?? VmBz2Error::BZ_OK;
+    }
+
+    public static function setErrno(int $handle, int $errno): void
+    {
+        if (!isset(self::$streams[$handle])) {
+            return;
+        }
+        self::$streams[$handle]['errno'] = $errno;
     }
 
     public static function bzopen(string $filename, string $mode): int|false
@@ -67,6 +80,7 @@ final class VmBz2StreamPure
             'blockSize' => $parsed['blockSize'],
             'buffer' => $buffer,
             'pos' => $pos,
+            'errno' => VmBz2Error::BZ_OK,
         ];
 
         return $id;
@@ -76,10 +90,16 @@ final class VmBz2StreamPure
     {
         $stream = self::$streams[$handle] ?? null;
         if (null === $stream || !$stream['writing']) {
+            if (null !== $stream) {
+                self::setErrno($handle, VmBz2Error::BZ_SEQUENCE_ERROR);
+            }
+
             return false;
         }
         if (null !== $length) {
             if ($length < 0) {
+                self::setErrno($handle, VmBz2Error::BZ_PARAM_ERROR);
+
                 return false;
             }
             if ($length < \strlen($data)) {
@@ -87,9 +107,12 @@ final class VmBz2StreamPure
             }
         }
         if ('' === $data) {
+            self::setErrno($handle, VmBz2Error::BZ_OK);
+
             return 0;
         }
         $stream['buffer'] .= $data;
+        $stream['errno'] = VmBz2Error::BZ_OK;
         self::$streams[$handle] = $stream;
 
         return \strlen($data);
@@ -99,21 +122,32 @@ final class VmBz2StreamPure
     {
         $stream = self::$streams[$handle] ?? null;
         if (null === $stream || $stream['writing']) {
+            if (null !== $stream) {
+                self::setErrno($handle, VmBz2Error::BZ_SEQUENCE_ERROR);
+            }
+
             return false;
         }
         if ($length < 0) {
+            self::setErrno($handle, VmBz2Error::BZ_PARAM_ERROR);
+
             return false;
         }
         if (0 === $length) {
+            self::setErrno($handle, VmBz2Error::BZ_OK);
+
             return '';
         }
         $remaining = \strlen($stream['buffer']) - $stream['pos'];
         if ($remaining <= 0) {
+            self::setErrno($handle, VmBz2Error::BZ_OK);
+
             return '';
         }
         $take = \min($length, $remaining);
         $chunk = \substr($stream['buffer'], $stream['pos'], $take);
         $stream['pos'] += $take;
+        $stream['errno'] = VmBz2Error::BZ_OK;
         self::$streams[$handle] = $stream;
 
         return $chunk;

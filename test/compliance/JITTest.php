@@ -746,7 +746,8 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsBz2()
                 && (str_contains($name, 'bz2') || str_contains($name, 'bzcompress'))
-                && !str_contains($name, 'bz2_phantom')) {
+                && !str_contains($name, 'bz2_phantom')
+                && !str_contains($name, 'bz2_error_flush_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsBz2()
