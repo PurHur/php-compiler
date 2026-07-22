@@ -27,7 +27,9 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathBaseConvertRuntime.php');
         $this->assertStringContainsString('MathBaseConvertJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
         $this->assertStringNotContainsString('emitBaseToZvalCore', $source);
         $this->assertStringNotContainsString('emitDigitValue', $source);
         $this->assertStringNotContainsString('sgen_loop_head', $source);

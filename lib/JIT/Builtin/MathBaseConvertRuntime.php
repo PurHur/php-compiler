@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for phpc_base_convert / phpc_basetozval_result via MathBaseConvertJitHelper PHP (#9584).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GlobalIntrospectionNameRuntime #22070).
  * Replaces {@see MathBaseConvertJit} LLVM (~950 LOC). SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
  * php-src: ext/standard/math.c
  */
@@ -274,33 +274,12 @@ final class MathBaseConvertRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'MathBaseConvertJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('MathBaseConvertJitHelper.php parseAndCompile failed (#9584)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9584)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22124'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
