@@ -446,6 +446,30 @@ final class VmPgsqlNative
         return (int) self::requireFfi()->PQsetErrorContextVisibility($conn, $visibility);
     }
 
+    /**
+     * Install php-src-style notice processor (PQsetNoticeProcessor; #22217).
+     * Closure is retained on the connection via {@see VmPgsqlConnection::setNoticeCallback()}.
+     */
+    public static function installNoticeProcessor(\FFI\CData $conn, int $objectId): void
+    {
+        $ffi = self::requireFfi();
+        $cb = static function ($arg, $message) use ($objectId): void {
+            if (null === $message) {
+                return;
+            }
+            $msg = \is_string($message) ? $message : self::ffiString($message);
+            VmPgsqlConnection::appendNotice($objectId, $msg);
+        };
+        VmPgsqlConnection::setNoticeCallback($objectId, $cb);
+        $ffi->PQsetNoticeProcessor($conn, $cb, null);
+    }
+
+    /** Clear notice processor before PQfinish (#22217). */
+    public static function clearNoticeProcessor(\FFI\CData $conn): void
+    {
+        self::requireFfi()->PQsetNoticeProcessor($conn, null, null);
+    }
+
     public static function escapeIdentifier(\FFI\CData $conn, string $value): string
     {
         $ffi = self::requireFfi();
@@ -940,6 +964,8 @@ int PQsetClientEncoding(PGconn *conn, const char *encoding);
 int PQlibVersion(void);
 int PQsetErrorVerbosity(PGconn *conn, int verbosity);
 int PQsetErrorContextVisibility(PGconn *conn, int visibility);
+typedef void (*PQnoticeProcessor)(void *arg, const char *message);
+PQnoticeProcessor PQsetNoticeProcessor(PGconn *conn, PQnoticeProcessor proc, void *arg);
 Oid PQftable(const PGresult *res, int field_num);
 Oid PQftype(const PGresult *res, int field_num);
 int PQfsize(const PGresult *res, int field_num);
