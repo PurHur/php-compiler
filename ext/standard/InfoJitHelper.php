@@ -118,7 +118,7 @@ final class InfoJitHelper
     public static function countLoadedExtensions(int $zendExtensions): int
     {
         if (0 !== $zendExtensions) {
-            return 0;
+            return \count(ModuleRegistry::getLoadedZendExtensions());
         }
 
         return \count(ModuleRegistry::getLoadedExtensions());

@@ -108,6 +108,12 @@ final class VmInfo
     {
         $ht = new HashTable();
         if ($zendExtensions) {
+            foreach (ModuleRegistry::getLoadedZendExtensions() as $name) {
+                $var = new Variable();
+                $var->string($name);
+                $ht->append($var);
+            }
+
             return $ht;
         }
         foreach (ModuleRegistry::getLoadedExtensions() as $name) {
