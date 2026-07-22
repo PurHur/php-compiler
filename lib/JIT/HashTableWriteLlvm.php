@@ -346,27 +346,211 @@ final class HashTableWriteLlvm
                 );
                 break;
             case Variable::TYPE_VALUE:
-                $valuePtr = JitValueBox::valuePtrFromVariable($context, $element);
-                $str = $context->builder->call(
-                    $context->lookupFunction('__value__readString'),
-                    $valuePtr
-                );
-                $owned = $context->builder->call(
-                    $context->lookupFunction('__string__separate'),
-                    $str
-                );
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyString'),
-                    $ht,
-                    $keyPtr,
-                    $owned
-                );
+                // Runtime-typed value boxes (incl. null) must dispatch like index writes (#21947).
+                self::setValueBoxAtStringKey($context, $ht, $keyPtr, $element);
                 break;
             default:
                 throw new \LogicException(
                     HashTableJitHelper::unsupportedStringKeyElementTypeMessage($element->type)
                 );
         }
+    }
+
+    /** Mirror {@see setValueBoxAtIndex} for string keys (null / mixed boxed RHS). */
+    private static function setValueBoxAtStringKey(
+        Context $context,
+        Value $ht,
+        Value $keyPtr,
+        Variable $element
+    ): void {
+        $tag = (string) self::nextSeq();
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $element);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+
+        $stringBlock = BasicBlockHelper::append($context, 'ht_sk_vb_string_'.$tag);
+        $longBlock = BasicBlockHelper::append($context, 'ht_sk_vb_long_'.$tag);
+        $boolBlock = BasicBlockHelper::append($context, 'ht_sk_vb_bool_'.$tag);
+        $doubleBlock = BasicBlockHelper::append($context, 'ht_sk_vb_double_'.$tag);
+        $nullBlock = BasicBlockHelper::append($context, 'ht_sk_vb_null_'.$tag);
+        $objectBlock = BasicBlockHelper::append($context, 'ht_sk_vb_object_'.$tag);
+        $enumCaseBlock = BasicBlockHelper::append($context, 'ht_sk_vb_enum_'.$tag);
+        $hashtableBlock = BasicBlockHelper::append($context, 'ht_sk_vb_ht_'.$tag);
+        $done = BasicBlockHelper::append($context, 'ht_sk_vb_done_'.$tag);
+
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_STRING, false)
+        );
+        $checkLong = BasicBlockHelper::append($context, 'ht_sk_vb_check_long_'.$tag);
+        $context->builder->branchIf($isString, $stringBlock, $checkLong);
+
+        $context->builder->positionAtEnd($checkLong);
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
+        );
+        $checkBool = BasicBlockHelper::append($context, 'ht_sk_vb_check_bool_'.$tag);
+        $context->builder->branchIf($isLong, $longBlock, $checkBool);
+
+        $context->builder->positionAtEnd($checkBool);
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $checkDouble = BasicBlockHelper::append($context, 'ht_sk_vb_check_double_'.$tag);
+        $context->builder->branchIf($isBool, $boolBlock, $checkDouble);
+
+        $context->builder->positionAtEnd($checkDouble);
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $checkNull = BasicBlockHelper::append($context, 'ht_sk_vb_check_null_'.$tag);
+        $context->builder->branchIf($isDouble, $doubleBlock, $checkNull);
+
+        $context->builder->positionAtEnd($checkNull);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $checkObject = BasicBlockHelper::append($context, 'ht_sk_vb_check_object_'.$tag);
+        $context->builder->branchIf($isNull, $nullBlock, $checkObject);
+
+        $context->builder->positionAtEnd($checkObject);
+        $isObject = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_OBJECT, false)
+        );
+        $checkEnumCase = BasicBlockHelper::append($context, 'ht_sk_vb_check_enum_'.$tag);
+        $context->builder->branchIf($isObject, $objectBlock, $checkEnumCase);
+
+        $context->builder->positionAtEnd($checkEnumCase);
+        $isEnumCase = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+        );
+        $checkHt = BasicBlockHelper::append($context, 'ht_sk_vb_check_ht_'.$tag);
+        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $checkHt);
+
+        $context->builder->positionAtEnd($checkHt);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $hashtableBlock, $done);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $str = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyPtr,
+            $owned
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($longBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $ht,
+            $keyPtr,
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $boolByte = $context->builder->load(
+            $context->builder->inBoundsGEP(
+                $valueField,
+                $context->getTypeFromString('int32')->constInt(0, false),
+                $context->getTypeFromString('int64')->constInt(0, false)
+            )
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyBool'),
+            $ht,
+            $keyPtr,
+            $context->builder->icmp(Builder::INT_NE, $boolByte, $i8->constInt(0, false))
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($doubleBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyDouble'),
+            $ht,
+            $keyPtr,
+            $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr)
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyNull'),
+            $ht,
+            $keyPtr
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($objectBlock);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyObject'),
+            $ht,
+            $keyPtr,
+            $obj
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($enumCaseBlock);
+        $enumObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyObject'),
+            $ht,
+            $keyPtr,
+            $enumObj
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($hashtableBlock);
+        $childHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+            $ht,
+            $keyPtr,
+            $childHt
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
     }
 
     /** unset() on a boxed array dimension (#17710). */

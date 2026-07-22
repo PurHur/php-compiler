@@ -72,4 +72,24 @@ final class SessionWireMultiKeyTest extends TestCase
         $this->assertStringContainsString('JitValueBox::copyFromPointer', $fnBody);
         $this->assertStringNotContainsString("__value__readString',\n            \$valPtr", $fnBody);
     }
+
+    /** #21947 — dim-write null must commit via setAtStringKey, not orphan value box. */
+    public function testAssignOperandCommitsWritableStringKeyBeforeValueBoxWrite(): void
+    {
+        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertStringContainsString('#21947', $jit);
+        $marker = 'prepareStringKeyWrite / prepareIndexWrite lvalues';
+        $pos = strpos($jit, $marker);
+        $this->assertNotFalse($pos);
+        $snippet = substr($jit, (int) $pos, 700);
+        $this->assertStringContainsString('writableStringKey', $snippet);
+        $this->assertStringContainsString('HashTableHelper::setAtStringKey', $snippet);
+        $this->assertStringContainsString('HashTableHelper::setAtIndex', $snippet);
+
+        $write = (string) file_get_contents(
+            dirname(__DIR__, 2).'/lib/JIT/HashTableWriteLlvm.php'
+        );
+        $this->assertStringContainsString('setValueBoxAtStringKey', $write);
+        $this->assertStringContainsString('__hashtable__setStringKeyNull', $write);
+    }
 }

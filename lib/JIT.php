@@ -13566,6 +13566,28 @@ class JIT {
 
             return;
         }
+        // prepareStringKeyWrite / prepareIndexWrite lvalues: commit into the HT, not the
+        // orphan value-box slot (null assigns otherwise drop the key — #21947).
+        if (null !== $result->writableHt && null !== $result->writableStringKey) {
+            JIT\HashTableHelper::setAtStringKey(
+                $this->context,
+                $result->writableHt,
+                $result->writableStringKey,
+                $value
+            );
+
+            return;
+        }
+        if (null !== $result->writableHt && null !== $result->writableIndex) {
+            JIT\HashTableHelper::setAtIndex(
+                $this->context,
+                $result->writableHt,
+                $result->writableIndex,
+                $value
+            );
+
+            return;
+        }
         if ($result->isArrayAccessWritableOffset) {
             JIT\ArrayAccessHelper::assignWritableOffset($this->context, $result, $value);
 
