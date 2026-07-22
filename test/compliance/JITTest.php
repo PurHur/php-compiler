@@ -1694,6 +1694,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_method_namespace_helpers')) {
                 continue;
             }
+            // ReflectionFunction tentative return type getters are VM-only (#22169).
+            if (str_contains($name, 'reflection_function_tentative_return')) {
+                continue;
+            }
             // ReflectionClass::getExtension() / ReflectionExtension are VM-only (#11462).
             if (str_contains($name, 'reflection_extension_class')) {
                 continue;

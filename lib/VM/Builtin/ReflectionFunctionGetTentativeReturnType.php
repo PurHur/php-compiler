@@ -9,7 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\ReflectionTypeSupport;
 
-/** ReflectionFunction::getTentativeReturnType() — VM (#22068, ext/reflection/php_reflection.c). */
+/** ReflectionFunction::getTentativeReturnType() — VM (#22169, ext/reflection/php_reflection.c). */
 final class ReflectionFunctionGetTentativeReturnType extends VmClassMethod
 {
     public function __construct()

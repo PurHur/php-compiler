@@ -2468,6 +2468,25 @@ final class ReflectionSupport
     }
 
     /**
+     * php-src: reflection_function_get_tentative_return_type() (#22169).
+     *
+     * Tentative returns are ZEND_ACC_TENTATIVE_RETURN on internal *class methods* only;
+     * free functions / closures / user funcs report null (php-src tables + Zend 8.2).
+     */
+    public static function reflectedFunctionTentativeReturnType(ObjectEntry $reflection): ?CfgType
+    {
+        return null;
+    }
+
+    /**
+     * php-src: reflection_function_has_tentative_return_type() (#22169).
+     */
+    public static function reflectedFunctionHasTentativeReturnType(ObjectEntry $reflection): bool
+    {
+        return null !== self::reflectedFunctionTentativeReturnType($reflection);
+    }
+
+    /**
      * php-src: reflection_method_get_tentative_return_type() (#18226).
      *
      * User-declared methods store explicit return types on the declaring Func; tentative
