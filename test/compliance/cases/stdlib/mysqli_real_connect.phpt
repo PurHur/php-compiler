@@ -32,11 +32,13 @@ $res = mysqli_store_result($link);
 $row = mysqli_fetch_assoc($res);
 echo 'first:', (int) $row['a'], "\n";
 mysqli_free_result($res);
+echo 'more:', mysqli_more_results($link) ? 'yes' : 'no', "\n";
 echo 'next:', mysqli_next_result($link) ? 'ok' : 'fail', "\n";
-$res = mysqli_store_result($link);
+$res = mysqli_use_result($link);
 $row = mysqli_fetch_assoc($res);
 echo 'second:', (int) $row['b'], "\n";
 mysqli_free_result($res);
+echo 'more_after:', mysqli_more_results($link) ? 'yes' : 'no', "\n";
 $stat = mysqli_stat($link);
 echo 'stat:', is_string($stat) && $stat !== '' ? 'ok' : 'fail', "\n";
 mysqli_close($link);
@@ -44,6 +46,8 @@ mysqli_close($link);
 --EXPECT--
 charset:ok
 first:1
+more:yes
 next:ok
 second:2
+more_after:no
 stat:ok
