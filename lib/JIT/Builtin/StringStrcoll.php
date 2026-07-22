@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for strcoll via StrcollJitHelper PHP (#13566 phase 2).
+ * JIT/AOT link for strcoll via StrcollJitHelper PHP (#13566 phase 2, #22256).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer CopyRuntime #22231).
  * Replaces libc `strcoll` LLVM lookups in ext/standard and ksort SORT_LOCALE_STRING.
  * SSOT: {@see \PHPCompiler\ext\standard\VmLocaleCollate}
  */
@@ -127,31 +127,11 @@ final class StringStrcoll
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StrcollJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StrcollJitHelper.php parseAndCompile failed (#13566)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT strcoll (#13566)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22256'
+        );
     }
 }
