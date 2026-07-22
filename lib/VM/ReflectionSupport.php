@@ -904,6 +904,18 @@ final class ReflectionSupport
         return substr($name, $pos + 1);
     }
 
+    /** ReflectionClass::getNamespaceName() — php-src prefix before last backslash (#22087). */
+    public static function classNamespaceNameFromReflection(ObjectEntry $reflection): string
+    {
+        return self::globalConstantNamespaceName(self::classNameFromReflection($reflection));
+    }
+
+    /** ReflectionClass::inNamespace() — php-src (#22087). */
+    public static function classInNamespaceFromReflection(ObjectEntry $reflection): bool
+    {
+        return '' !== self::classNamespaceNameFromReflection($reflection);
+    }
+
     /**
      * ReflectionClass::{isSubclassOf,implementsInterface} — string|ReflectionClass operand (#6302).
      */
