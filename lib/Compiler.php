@@ -8081,7 +8081,9 @@ class Compiler {
     protected function compileTypeConstrainedVariable(Block $block, Type $type, Op\Type|string|null $cfgTypeOrDeclName = null): int {
         $cfgType = $cfgTypeOrDeclName instanceof Op\Type ? $cfgTypeOrDeclName : null;
         $declName = is_string($cfgTypeOrDeclName) ? $cfgTypeOrDeclName : null;
-        $var = new Variable(Variable::TYPE_UNDEFINED);
+        // Untyped (no source type / php-cfg Mixed_) → TYPE_NULL; typed incl. explicit mixed → UNDEFINED (#4240, #22021).
+        $untypedPrototype = null === $cfgTypeOrDeclName || $cfgType instanceof Op\Type\Mixed_;
+        $var = new Variable($untypedPrototype ? Variable::TYPE_NULL : Variable::TYPE_UNDEFINED);
         $operand = new Operand\Temporary;
         $operand->type = $type;
         $return = $block->registerConstant($operand, $var);
@@ -8107,6 +8109,7 @@ class Compiler {
             return $return;
         }
         if (null !== $cfgType && $this->cfgDeclaredTypeIsMixed($cfgType)) {
+            // Op\Type\Mixed_ is php-cfg's untyped marker (already TYPE_NULL). Literal "mixed" stays UNDEFINED.
             return $return;
         }
         // PHPTypes Type::fromDecl('mixed') mis-parses as object userType mixed (#12348).

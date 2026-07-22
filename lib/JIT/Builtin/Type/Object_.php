@@ -144,6 +144,9 @@ class Object_ extends Type {
     /** @var array<int, array<int, array{propertyType: int, type: int, value: int|float|bool|string|null}>> */
     private array $propertyDefaults = [];
 
+    /** @var array<int, array<int, true>> class id => slot => typed init guard (#22021). */
+    private array $typedPropertyInitGuardSlots = [];
+
     /** @var array<int, array<int, int>> class id => property slot => instantiated class id (#3391) */
     private array $runtimePropertyNewDefaults = [];
     /**
@@ -2780,6 +2783,26 @@ class Object_ extends Type {
     public function propertySlotHasCompileTimeDefault(int $classId, int $slotIndex): bool
     {
         return isset($this->propertyDefaults[$classId][$slotIndex]);
+    }
+
+    /**
+     * Typed (incl. explicit mixed) slots raise on UNDEF; untyped warn + NULL (#22021).
+     */
+    public function markPropertyTypedInitGuard(int $classId, string $name): void
+    {
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if ($propset[1] !== $name) {
+                continue;
+            }
+            $this->typedPropertyInitGuardSlots[$classId][$propset[3]] = true;
+
+            return;
+        }
+    }
+
+    public function propertySlotRequiresTypedInitGuard(int $classId, int $slotIndex): bool
+    {
+        return isset($this->typedPropertyInitGuardSlots[$classId][$slotIndex]);
     }
 
     public function markPropertyAllowsNull(int $classId, string $name): void

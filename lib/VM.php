@@ -7032,6 +7032,24 @@ restart:
                                 $result->null();
                                 break;
                             }
+                            // Untyped declared property after unset: E_WARNING + NULL (#22021, zend_object_handlers.c).
+                            if (
+                                $propSlot->resolveIndirect()->isUndefined()
+                                && !VM\TypedPropertyCheck::isUninitialized($propSlot)
+                            ) {
+                                if (!$op->nullsafeFetchPropertyRead) {
+                                    $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                                    $this->context->errors->undefinedPropertyRead(
+                                        $propertyObject->class->name,
+                                        $name,
+                                        $this->context,
+                                        $frame,
+                                        $scriptFile
+                                    );
+                                }
+                                $result->null();
+                                break;
+                            }
                             VM\TypedPropertyCheck::assertReadable($propSlot);
                             $result->indirect($propSlot);
                         }
