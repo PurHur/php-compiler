@@ -159,7 +159,12 @@ final class ClosureSupport
         if (Variable::TYPE_OBJECT === $newThis->type && $state->isStaticClosure()) {
             self::warnCannotBindInstanceToStaticClosure($ctx, $frame);
 
-            return self::wrapState($ctx, $state);
+            return null;
+        }
+        if (Variable::TYPE_NULL === $newThis->type && $state->usesThis()) {
+            self::warnCannotUnbindThis($ctx, $frame);
+
+            return null;
         }
         $bound = $state->cloneForBind();
         if (Variable::TYPE_NULL === $newThis->type) {
@@ -297,6 +302,19 @@ final class ClosureSupport
     ): void {
         $ctx->errors->triggerError(
             'Cannot bind an instance to a static closure',
+            ErrorReporter::E_WARNING,
+            null,
+            $ctx,
+            $frame
+        );
+    }
+
+    private static function warnCannotUnbindThis(
+        Context $ctx,
+        ?Frame $frame
+    ): void {
+        $ctx->errors->triggerError(
+            'Cannot unbind $this of closure using $this',
             ErrorReporter::E_WARNING,
             null,
             $ctx,

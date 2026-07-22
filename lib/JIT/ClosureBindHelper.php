@@ -64,8 +64,11 @@ final class ClosureBindHelper
         }
 
         $inner = self::resolveInnerCall($context, $closure);
-        if (self::emitStaticClosureInstanceBindNoOp($context, $closure, $inner, $newThis)) {
-            return $closure;
+        if (self::emitUnbindThisFailure($context, $inner, $newThis)) {
+            return self::nullResult($context);
+        }
+        if (self::emitStaticClosureInstanceBindFailure($context, $closure, $inner, $newThis)) {
+            return self::nullResult($context);
         }
         if (null === $inner) {
             return self::nullResult($context);
@@ -588,11 +591,32 @@ final class ClosureBindHelper
     }
 
     /**
-     * Zend zend_closure_bind(): binding an instance to a static closure warns and is a no-op.
+     * Zend zend_closure_bind_to(): cannot unbind $this when the closure body uses $this.
      *
-     * @return bool true when bind() should return $closure unchanged
+     * @return bool true when bind() should return null
      */
-    private static function emitStaticClosureInstanceBindNoOp(
+    private static function emitUnbindThisFailure(
+        Context $context,
+        ?Call $inner,
+        Variable $newThis
+    ): bool {
+        if (Variable::TYPE_NULL !== $newThis->type && !($newThis->isNullConstant ?? false)) {
+            return false;
+        }
+        if (null === $inner || !self::closureInnerUsesThis($context, $inner)) {
+            return false;
+        }
+        self::emitBindWarning($context, ClosureBindJitHelper::UNBIND_THIS_WARNING);
+
+        return true;
+    }
+
+    /**
+     * Zend zend_closure_bind(): binding an instance to a static closure warns and returns null.
+     *
+     * @return bool true when bind() should return null
+     */
+    private static function emitStaticClosureInstanceBindFailure(
         Context $context,
         Variable $closure,
         ?Call $inner,
@@ -604,14 +628,13 @@ final class ClosureBindHelper
         if (Variable::TYPE_OBJECT !== $newThis->type || !$closure->closureIsStatic) {
             return false;
         }
-        self::emitStaticClosureInstanceBindWarning($context);
+        self::emitBindWarning($context, ClosureBindJitHelper::STATIC_BIND_WARNING);
 
         return true;
     }
 
-    private static function emitStaticClosureInstanceBindWarning(Context $context): void
+    private static function emitBindWarning(Context $context, string $message): void
     {
-        $message = ClosureBindJitHelper::STATIC_BIND_WARNING;
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
