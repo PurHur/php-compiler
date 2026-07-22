@@ -83,6 +83,7 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionGetModifierNames;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAccessible;
 use PHPCompiler\VM\Builtin\ReflectionFunctionSetAccessible;
+use PHPCompiler\VM\Builtin\ReflectionFunctionToString;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsAccessible;
 use PHPCompiler\VM\Builtin\ReflectionMethodSetAccessible;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsAccessible;
@@ -135,6 +136,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetReadOnlyProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetStaticProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetStaticPropertyValue;
 use PHPCompiler\VM\Builtin\ReflectionClassSetStaticPropertyValue;
+use PHPCompiler\VM\Builtin\ReflectionClassToString;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstants;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDocComment;
@@ -417,6 +419,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetRawValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetRawValueWithoutLazyInitialization;
 use PHPCompiler\VM\Builtin\ReflectionPropertySkipLazyInitialization;
+use PHPCompiler\VM\Builtin\ReflectionPropertyToString;
 use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
@@ -1052,6 +1055,8 @@ final class BuiltinClasses
             $rc->methods[$name] = $method;
             $rc->methodVisibility[$name] = $pub;
         }
+        $rc->methods['__tostring'] = new ReflectionClassToString();
+        $rc->methodVisibility['__tostring'] = $pub;
 
         $rp = new ClassEntry('ReflectionProperty');
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
@@ -1164,6 +1169,8 @@ final class BuiltinClasses
             $rp->methods['isdeprecated'] = new ReflectionPropertyIsDeprecated();
             $rp->methodVisibility['isdeprecated'] = $pub;
         }
+        $rp->methods['__tostring'] = new ReflectionPropertyToString();
+        $rp->methodVisibility['__tostring'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
         $rf = new ClassEntry('ReflectionFunction');
@@ -1229,6 +1236,8 @@ final class BuiltinClasses
             $rf->methods['getnamedarguments'] = $getNamedArguments;
             $rf->methodVisibility['getnamedarguments'] = $pub;
         }
+        $rf->methods['__tostring'] = new ReflectionFunctionToString();
+        $rf->methodVisibility['__tostring'] = $pub;
         \PHPCompiler\ext\standard\VmReflection::registerReflectionFunctionClassConstants($rf);
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
