@@ -1147,6 +1147,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.2+ deprecates `"${var}"` dollar-brace string interpolation (prefer `"{$var}"`).
+     *
+     * php-src: Zend/zend_compile.c / T_DOLLAR_OPEN_CURLY_BRACES (#22001).
+     */
+    public static function supportsDollarBraceStringDeprecation(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.2.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ null coalesce (??) inside double-quoted `{$...}` interpolation (#14063, #14113, #15893).
      *
      * Default 8.4.0-dev reference profile rejects ?? in encapsed braces like Zend 8.2; forward profile

@@ -583,6 +583,8 @@ class Runtime {
     }
 
     public function parse(string $code, string $filename): Script {
+        // Original source — T_DOLLAR_OPEN_CURLY_BRACES before any desugar (#22001).
+        DollarBraceStringDeprecation::emitForSource($code, $filename, $this->vmContext);
         [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
         if (method_exists($this->compiler, 'setBareRethrowLines')) {
             $this->compiler->setBareRethrowLines($bareRethrowLines);
