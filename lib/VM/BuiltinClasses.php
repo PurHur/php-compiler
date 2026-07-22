@@ -152,6 +152,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassIsTrait;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInstantiable;
 use PHPCompiler\VM\Builtin\ReflectionClassIsIterateable;
+use PHPCompiler\VM\Builtin\ReflectionClassIsIterable;
 use PHPCompiler\VM\Builtin\ReflectionClassIsReadOnly;
 use PHPCompiler\VM\Builtin\ReflectionClassIsSubclassOf;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
@@ -873,6 +874,8 @@ final class BuiltinClasses
         $rc->methods['getmodifiers'] = new ReflectionClassGetModifiers();
         $rc->methodVisibility['getmodifiers'] = $pub;
         $rc->methods['isiterateable'] = new ReflectionClassIsIterateable();
+        // php-src: isIterable() — same semantics as isIterateable() (#22117).
+        $rc->methods['isiterable'] = new ReflectionClassIsIterable();
         $rc->methodVisibility['isiterateable'] = $pub;
         $rc->methods['getconstant'] = new ReflectionClassGetConstant();
         $rc->methodVisibility['getconstant'] = $pub;
