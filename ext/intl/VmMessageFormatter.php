@@ -20,8 +20,9 @@ use PHPCfg\Func as CfgFunc;
  *
  * php-src: ext/intl/msgformat/msgformat.c, msgformat_class.c, msgformat.stub.php
  *
- * v1 covers simple / named placeholders and `{n, number}` format + parse without
- * full ICU umsg_* plural/select. Advertisement gates on loaded ext/intl (#19670).
+ * Covers simple / named placeholders, `{n,number}` (locale grouping via
+ * NumberFormatter — #21959), and plural/select (#21099). Advertisement gates on
+ * loaded ext/intl (#19670).
  */
 final class VmMessageFormatter
 {
@@ -837,17 +838,11 @@ final class VmMessageFormatter
     /** @param mixed $val */
     private static function formatNumberSimple(string $locale, $val, ?string $style): string
     {
-        unset($locale, $style);
         if (!\is_int($val) && !\is_float($val) && !(\is_string($val) && is_numeric($val))) {
             return self::stringify($val);
         }
-        $num = (float) $val;
-        // ICU MessageFormat default number style for integers omits fraction digits.
-        if (\is_int($val) || floor($num) == $num) {
-            return (string) (int) $num;
-        }
-
-        return (string) $num;
+        // ICU MessageFormat `{n,number}` uses locale NumberFormat (grouping) — #21959.
+        return VmNumberFormatter::formatMessageArg($locale, $val, $style);
     }
 }
 
