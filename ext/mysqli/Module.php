@@ -54,6 +54,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_stmt_close.php';
         require_once __DIR__.'/mysqli_stmt_execute.php';
         require_once __DIR__.'/mysqli_stmt_fetch.php';
+        require_once __DIR__.'/mysqli_stmt_introspection_api.php';
         require_once __DIR__.'/MysqliReportMode.php';
         require_once __DIR__.'/mysqli_report.php';
         require_once __DIR__.'/MysqliProceduralLink.php';
@@ -143,6 +144,19 @@ class Module extends ModuleAbstract
             new mysqli_stmt_close(),
             new mysqli_stmt_execute(),
             new mysqli_stmt_fetch(),
+            new mysqli_stmt_field_count(),
+            new mysqli_stmt_param_count(),
+            new mysqli_stmt_sqlstate(),
+            new mysqli_stmt_errno(),
+            new mysqli_stmt_error(),
+            new mysqli_stmt_insert_id(),
+            new mysqli_stmt_num_rows(),
+            new mysqli_stmt_affected_rows(),
+            new mysqli_stmt_data_seek(),
+            new mysqli_stmt_reset(),
+            new mysqli_stmt_store_result(),
+            new mysqli_stmt_free_result(),
+            new mysqli_stmt_result_metadata(),
             new mysqli_autocommit(),
             new mysqli_begin_transaction(),
             new mysqli_commit(),
