@@ -5628,6 +5628,8 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsTrait.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsUninitializedLazyObject.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsUserDefined.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassMarkLazyObjectAsInitialized.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewInstance.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewInstanceArgs.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewInstanceWithoutConstructor.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewLazyGhost.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassNewLazyProxy.php';
