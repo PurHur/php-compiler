@@ -997,6 +997,35 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionClass::newInstance() / newInstanceArgs() — php-src zim_ReflectionClass_newInstanceArgs (#22086).
+     *
+     * @param list<Variable> $ctorArgs
+     */
+    public static function instantiateReflectedClass(
+        VmEngine $vm,
+        ClassEntry $entry,
+        array $ctorArgs,
+    ): ObjectEntry {
+        if (!self::reflectionClassIsInstantiable($entry)) {
+            self::throwReflectionException('Class '.$entry->name.' is not instantiable');
+        }
+        ReservedBuiltinClass::assertUserInstantiable($entry);
+        $object = new ObjectEntry($entry);
+        $vm->initInstancePropertyDefaults($object);
+        $thisVar = new Variable(Variable::TYPE_OBJECT);
+        $thisVar->object($object);
+        if (null !== $object->constructor) {
+            $ctx = $vm->context;
+            self::invokeAttributeConstructor($vm, $ctx, $object->constructor, $thisVar, $ctorArgs);
+            $object->constructed = true;
+        } else {
+            $object->constructed = true;
+        }
+
+        return $object;
+    }
+
+    /**
      * ReflectionClass::newLazyGhost/Proxy — class name string or ReflectionClass receiver (#6399).
      */
     public static function classNameFromLazyFactoryArg(Variable $arg, string $method = 'newLazyGhost'): string
