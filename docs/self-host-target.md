@@ -36,7 +36,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **Bootstrap driver** | Prelinked gen-0 refreshed via honest inventory argv emit; native `build/bin-compile-aot-inventory` for M4/M5 | Compiled `bin/compile.php` only |
 | **Bundle size** | **6365/6365** literal Phase A inventory in spine smoke | Full vm.php closure |
 | **Inventory coverage** | **6365** / **6365** ✅ | Full closure |
-| **HelloWorld** | 🚧 probe reports `emit_path=native-prelinked-sidecar` — a committed blob **COPY**, not a native emit ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | Native compile for arbitrary PHP |
+| **HelloWorld** | ✅ `emit_path=native` via gen-0 argv emit helper (`DRIVER -o OUT SOURCE`; [#22178](https://github.com/PurHur/php-compiler/issues/22178)) | Native compile for arbitrary PHP |
 | **Bootstrap loop (M4)** | `make bootstrap-loop-probe` full ladder ✅ — gen-1→gen-2, gen-2→gen-3 full spine, full-revision argv | Native full revision rebuild |
 | **Vendor** | **3/3** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `make north-star5-verify-fast` daily ✅; `--strict` ❌ **red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)) | No Zend `vendor/autoload.php` at bootstrap |
 
@@ -50,7 +50,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | M3 Runtime compile smoke strict | ✅ `make bootstrap-selfhost-runtime-compile-smoke-strict` → `emit_path=native` (#2610) |
 | M3 compiler-unit strict | ✅ `make bootstrap-selfhost-compiler-unit-probe-strict` → `emit_path=native` (#2618) |
 | M2 `BOOTSTRAP_LIB_SPINE_SMOKE=1` spine link | ✅ `compiler_lib_spine_smoke bundle OK` |
-| M3 `make bootstrap-selfhost-helloworld` | 🚧 **DEGRADED** — native emit fails; output is a prelinked blob COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)). The old `emit_path=native` line was a hardcoded string, not a measurement. Require a real emit: `BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT=1` |
+| M3 `make bootstrap-selfhost-helloworld` | ✅ `emit_path=native` — gen-0 argv emit helper compiles HelloWorld ([#22178](https://github.com/PurHur/php-compiler/issues/22178)); `BOOTSTRAP_M3_REQUIRE_NATIVE_EMIT=1` green. Cold `BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK=1` still OOMs at default 6 GiB Docker PHP cap — use prelinked gen-0 argv driver (#9704) until inventory link memory shrinks |
 | M4 `make bootstrap-loop-gen1-link` | ✅ gen-1 link + gen-2 smoke **`emit_path=native`** (`BOOTSTRAP_M4_LINK_COMPILE_DRIVER=1`, #2611); **`BOOTSTRAP_M4_GEN2_STRICT=1` default-on** ([#8711](https://github.com/PurHur/php-compiler/issues/8711)); opt-in Zend bisect: `BOOTSTRAP_M4_GEN2_ZEND_FALLBACK=1`; presenter: [GETTING-STARTED §7](GETTING-STARTED.md) ([#2464](https://github.com/PurHur/php-compiler/issues/2464)) |
 | M4 `make bootstrap-loop-gen1-full-spine-emit` | 🚧 gen-1→gen-2 full spine — heavy opt-in |
 | M4 `make bootstrap-selfhost-full-revision-probe` | ✅ gen-2 inventory argv → gen-3 + fixture smoke ([#2880](https://github.com/PurHur/php-compiler/issues/2880)) |
@@ -70,7 +70,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
 | **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **6365** / **6365** | **100%** |
-| **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | 🚧 probe output is a blob COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | **~60%** |
+| **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | ✅ `emit_path=native` via gen-0 argv helper ([#22178](https://github.com/PurHur/php-compiler/issues/22178)) | **~90%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | 🚧 ladder runs but gen-1→gen-2 is a COPY ([#21860](https://github.com/PurHur/php-compiler/issues/21860)) | **~60%** |
 | **M5** | Full self-host; Zend retired from loop | 🚧 `north-star5-verify-fast` daily ✅; **`--strict` red at step 4a2** ([#21417](https://github.com/PurHur/php-compiler/issues/21417)); `BOOTSTRAP_M5_NO_ZEND=1` empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) | **~75%** |
 

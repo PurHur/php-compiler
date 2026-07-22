@@ -173,7 +173,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 
 | Command | Typical time | Notes |
 |---------|--------------|-------|
-| `make bootstrap-selfhost-helloworld` | **~30s–3 min** | M3 gate — prelinked emit-helper + HelloWorld sidecar when inventory `--check` green ([#9704](https://github.com/PurHur/php-compiler/issues/9704)); cold LLVM link opt-in `BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK=1` |
+| `make bootstrap-selfhost-helloworld` | **~30s–3 min** | M3 gate — prelinked gen-0 **argv** emit-helper compiles HelloWorld (`emit_path=native`, [#22178](https://github.com/PurHur/php-compiler/issues/22178) / [#9704](https://github.com/PurHur/php-compiler/issues/9704)); cold inventory `compile_driver` LLVM link opt-in `BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK=1` still needs **>6 GiB** PHP heap (OOM at default Docker caps — prefer prelinked) |
 | `make bootstrap-selfhost-vm-driver-execute-probe` | **~20ms** | Native env gate only; seeds from `prelinked/bootstrap-gen0` if binary missing |
 | `make north-star5-verify-fast` | **~1–2 min** | PR M5 presenter — inventory + spine + prelinked blobs + VM probe (no relink) |
 | `make north-star5-verify --strict` | **~1h** | Full M5 ladder before merging bootstrap/M5 work (not every PR) |

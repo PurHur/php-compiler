@@ -172,18 +172,32 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     echo "bootstrap-selfhost-helloworld-probe: native emit helper link OK (${EMIT_HELPER}, ${m3_link_mode})"
     if [[ "${BOOTSTRAP_M3_RUNTIME_COMPILE:-1}" == "1" ]]; then
       set +e
+      # Prefer argv emit (BootstrapCompileSmokeM3Emit::emitMainEntry): DRIVER -o OUT SOURCE.
+      # Env PHP_COMPILER_M3_SOURCE/OUT on the gen-0 argv driver segfaults at c:main_before_php;
+      # argv avoids that and still prints helloworld_compile_smoke: compile OK (#22178).
       m3_run_env=(
         PHP_COMPILER_M3_COMPILE_MODE=compile
         PHP_COMPILER_M3_RUNTIME_COMPILE=1
         PHP_COMPILER_M3_EMIT_MINIMAL=1
-        PHP_COMPILER_M3_SOURCE="${SOURCE}"
-        PHP_COMPILER_M3_OUT="${AOT_OUT}"
+        PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1
       )
-      m3_run_env+=(PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1)
       compile_out="$(
-        env "${m3_run_env[@]}" "${EMIT_HELPER}" 2>&1
+        env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+          "${m3_run_env[@]}" "${EMIT_HELPER}" -o "${AOT_OUT}" "${SOURCE}" 2>&1
       )"
       native_compile_code=$?
+      # Ready-stub helpers ignore argv and only print "… ready"; fall back to env dispatch once.
+      if [[ "${native_compile_code}" -eq 0 ]] \
+        && grep -q 'compiler_helloworld_compile_driver ready' <<< "${compile_out}" \
+        && ! grep -qE 'compile_smoke_m3_emit: compile OK|helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
+        compile_out="$(
+          env "${m3_run_env[@]}" \
+            PHP_COMPILER_M3_SOURCE="${SOURCE}" \
+            PHP_COMPILER_M3_OUT="${AOT_OUT}" \
+            "${EMIT_HELPER}" 2>&1
+        )"
+        native_compile_code=$?
+      fi
       set -e
       if [[ "${native_compile_code}" -eq 0 ]] && grep -qE 'compile_smoke_m3_emit: compile OK|helloworld_compile_smoke: compile OK' <<< "${compile_out}"; then
         M3_NATIVE_COMPILE=1
