@@ -3014,6 +3014,7 @@ class Object_ extends Type {
         }
         if ('reflectionfunction' === $lcname) {
             $this->setClassParentName('ReflectionFunction', 'ReflectionFunctionAbstract');
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_FUNC_NAME, Variable::TYPE_STRING);
         }
         if ('reflectionproperty' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);

@@ -1722,6 +1722,14 @@ class JIT {
                 }
             }
         }
+        if (
+            null !== $block->variadicParamIndex
+            && null !== $funcName
+            && '' !== $funcName
+            && (null === $block->func || null === $block->func->class)
+        ) {
+            JIT\Builtin\ReflectionFunctionVariadicLowering::recordFunction(strtolower($funcName));
+        }
         $skipName = $this->jitFunctionSkipName($logicalName, $block);
         if (!is_null($funcName)) {
             $internalName = $this->llvmInternalName($funcName);
