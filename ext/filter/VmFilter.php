@@ -838,10 +838,12 @@ final class VmFilter
     }
 
     /**
-     * FILTER_VALIDATE_INT string parsing (php-src ext/filter/logical_filters.c).
+     * FILTER_VALIDATE_INT string parsing (php-src ext/filter/logical_filters.c — php_filter_int).
+     * Trims leading/trailing whitespace before hex/octal/decimal parse (#21962).
      */
     public static function parseIntFilterString(string $s, int $flags = 0): ?int
     {
+        $s = trim($s);
         $allowHex = 0 !== ($flags & self::FILTER_FLAG_ALLOW_HEX);
         $allowOctal = 0 !== ($flags & self::FILTER_FLAG_ALLOW_OCTAL);
         if ($allowHex && self::isHexIntegerString($s)) {
