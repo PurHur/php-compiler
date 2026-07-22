@@ -19,8 +19,15 @@ final class VmPgsqlConnection
 
     public const CLASS_NAME = 'PgSql\\Connection';
 
-    /** @var array<int, array{native: \FFI\CData, closed: bool, trace_fp: ?\FFI\CData, object: ObjectEntry, notices: list<string>, notice_cb: ?callable}> */
+    /** @var array<int, array{native: \FFI\CData, closed: bool, trace_fp: ?\FFI\CData, object: ObjectEntry, notices: list<string>, notice_cb: ?callable, persistent: bool}> */
     private static array $state = [];
+
+    /**
+     * Process-local persistent PGconn* pool (php-src EG(persistent_list); #22218).
+     *
+     * @var array<string, \FFI\CData>
+     */
+    private static array $persistentPool = [];
 
     private static string $lastError = '';
 
@@ -47,7 +54,7 @@ final class VmPgsqlConnection
         return self::$lastError;
     }
 
-    public static function wrap(\FFI\CData $native, Context $ctx): Variable
+    public static function wrap(\FFI\CData $native, Context $ctx, bool $persistent = false): Variable
     {
         self::registerClass($ctx);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
@@ -59,6 +66,7 @@ final class VmPgsqlConnection
             'object' => $object,
             'notices' => [],
             'notice_cb' => null,
+            'persistent' => $persistent,
         ];
         self::$defaultLinkId = $object->id;
         VmPgsqlNative::installNoticeProcessor($native, $object->id);
@@ -66,6 +74,22 @@ final class VmPgsqlConnection
         $var->object($object);
 
         return $var;
+    }
+
+    /** php-src hash key: "pgsql" + conninfo + "_" + (flags & ~FORCE_NEW) (#22218). */
+    public static function persistentHash(string $conninfo, int $flags): string
+    {
+        return 'pgsql'.$conninfo.'_'.($flags & ~PgsqlConstants::PGSQL_CONNECT_FORCE_NEW);
+    }
+
+    public static function persistentPoolGet(string $hash): ?\FFI\CData
+    {
+        return self::$persistentPool[$hash] ?? null;
+    }
+
+    public static function persistentPoolSet(string $hash, \FFI\CData $native): void
+    {
+        self::$persistentPool[$hash] = $native;
     }
 
     /**
@@ -218,8 +242,13 @@ final class VmPgsqlConnection
             return false;
         }
         self::clearTraceFp($object);
-        VmPgsqlNative::clearNoticeProcessor(self::$state[$object->id]['native']);
-        VmPgsqlNative::finish(self::$state[$object->id]['native']);
+        $persistent = self::$state[$object->id]['persistent'];
+        $native = self::$state[$object->id]['native'];
+        // Persistent: keep PGconn* in the process pool (php-src pgsql_link_free; #22218).
+        if (!$persistent) {
+            VmPgsqlNative::clearNoticeProcessor($native);
+            VmPgsqlNative::finish($native);
+        }
         self::$state[$object->id]['closed'] = true;
         self::$state[$object->id]['notice_cb'] = null;
         self::$state[$object->id]['notices'] = [];
