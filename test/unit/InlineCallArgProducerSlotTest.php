@@ -3594,45 +3594,30 @@ PHP;
         self::assertSame('obj:1:4096:3', ob_get_clean());
     }
 
-    /** Issue #21957 — take2('x', new FilesystemIterator($dir, SKIP_DOTS)) must send New_ result, not flags. */
+    /** Issue #21957 — take2('x', new FilesystemIterator($dir, SKIP_DOTS)) must receive the object. */
     public function testMultiArgNewAsSecondCallArgUsesNewResultNotFlagsConst(): void
     {
         $code = <<<'PHP'
 <?php
-function take2($label, $o) { return get_debug_type($o); }
-$dir = sys_get_temp_dir();
-take2('x', new FilesystemIterator($dir, FilesystemIterator::SKIP_DOTS));
+$dir = sys_get_temp_dir() . '/phpc_fsit_unit_21957';
+if (!is_dir($dir)) {
+    mkdir($dir);
+}
+file_put_contents($dir . '/a.txt', 'x');
+function take2($label, $o) {
+    echo $label, '=', get_debug_type($o);
+    if (!is_object($o)) {
+        echo ' value=', var_export($o, true);
+    }
+    echo "\n";
+}
+take2('inline_two', new FilesystemIterator($dir, FilesystemIterator::SKIP_DOTS));
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'fsit_multiarg_new_call_arg.php');
-
-        $fsitNewSlot = null;
-        $take2Sends = [];
-        foreach ($block->opCodes as $op) {
-            if (OpCode::TYPE_NEW === $op->type) {
-                $classSlot = $op->arg2;
-                if (null !== $classSlot && isset($block->constants[$classSlot])) {
-                    $className = $block->constants[$classSlot]->toString();
-                    if ('FilesystemIterator' === $className) {
-                        $fsitNewSlot = $op->arg1;
-                    }
-                }
-            }
-            if (OpCode::TYPE_ARG_SEND === $op->type) {
-                $take2Sends[] = $op->arg1;
-            }
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
-                if (null !== $fsitNewSlot && \count($take2Sends) >= 2) {
-                    $arg1 = $take2Sends[\count($take2Sends) - 1];
-                    self::assertSame($fsitNewSlot, $arg1, 'arg #1 must be FilesystemIterator New_ slot, not SKIP_DOTS const');
-
-                    return;
-                }
-                $take2Sends = [];
-            }
-        }
-
-        self::fail('Did not find take2 ARG_SEND pair after FilesystemIterator New_');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("inline_two=FilesystemIterator\n", ob_get_clean());
     }
 
     /**
