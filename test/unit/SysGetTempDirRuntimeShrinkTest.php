@@ -8,7 +8,10 @@ use PHPCompiler\ext\standard\SysGetTempDirJitHelper;
 use PHPCompiler\ext\standard\VmSysGetTempDirNative;
 use PHPUnit\Framework\TestCase;
 
-/** sys_get_temp_dir() JIT routes through SysGetTempDirJitHelper PHP not StringFsDirJit LLVM (#9585). */
+/**
+ * sys_get_temp_dir() JIT routes through SysGetTempDirJitHelper PHP (#9585).
+ * NestedJIT via JitVmHelperLink::ensureCompiled (#22187 / peer #22147).
+ */
 final class SysGetTempDirRuntimeShrinkTest extends TestCase
 {
     public function testSysGetTempDirJitHelperDelegatesToVmNative(): void
@@ -28,12 +31,17 @@ final class SysGetTempDirRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\FFI', $pure);
     }
 
-    public function testSysGetTempDirRuntimeUsesJitHelper(): void
+    public function testSysGetTempDirRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SysGetTempDirRuntime.php');
         $this->assertStringContainsString('SysGetTempDirJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
-        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertLessThan(160, \substr_count($source, "\n") + 1);
     }
 
     public function testJitHelperMatchesVmNative(): void
