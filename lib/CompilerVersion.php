@@ -2851,6 +2851,15 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ XSLTProcessor::registerPHPFunctionNS() namespaced XSLT callbacks
+     * (ext/xsl/xsltprocessor.c / xpath_callbacks.c; #22243).
+     */
+    public static function supportsXsltRegisterPHPFunctionNS(): bool
+    {
+        return self::supportsDomApiSince('8.4.0');
+    }
+
+    /**
      * PHP 8.4+ parenthesized asymmetric set modifier `public (private(set))` on properties.
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile

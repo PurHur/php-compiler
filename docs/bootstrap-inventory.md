@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6410 |
-| Phase A inventory files (M2 ratio SSOT) | 6410 |
+| PHP files on vm.php path | 6411 |
+| Phase A inventory files (M2 ratio SSOT) | 6411 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20404 |
+| Source constructs flagged (warnings) | 20408 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4445,7 +4445,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/JitXsltMethod.php` | 0 | 1 |
 | `ext/xsl/JitXsltUserScript.php` | 0 | 1 |
 | `ext/xsl/Module.php` | 0 | 2 |
-| `ext/xsl/VmXsl.php` | 0 | 14 |
+| `ext/xsl/VmXsl.php` | 0 | 15 |
 | `ext/xsl/VmXslDomBridge.php` | 0 | 3 |
 | `ext/xsl/XslExtensionPolicy.php` | 0 | 1 |
 | `ext/xsl/XsltClassMethod.php` | 0 | 1 |
@@ -4455,6 +4455,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltProcessorGetSecurityPrefs.php` | 0 | 2 |
 | `ext/xsl/XsltProcessorHasExsltSupport.php` | 0 | 2 |
 | `ext/xsl/XsltProcessorImportStylesheet.php` | 0 | 2 |
+| `ext/xsl/XsltProcessorRegisterPhpFunctionNS.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorRegisterPhpFunctions.php` | 0 | 1 |
 | `ext/xsl/XsltProcessorRemoveParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorSetParameter.php` | 0 | 3 |
@@ -38852,20 +38853,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xsl/VmXsl.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 32)
-- new XsltProcessorConstruct (line 33)
-- new XsltProcessorImportStylesheet (line 37)
-- new XsltProcessorTransformToXml (line 40)
-- new XsltProcessorTransformToDoc (line 43)
-- new XsltProcessorTransformToUri (line 46)
-- new XsltProcessorSetParameter (line 49)
-- new XsltProcessorGetParameter (line 52)
-- new XsltProcessorRemoveParameter (line 55)
-- new XsltProcessorRegisterPhpFunctions (line 58)
-- new XsltProcessorHasExsltSupport (line 61)
-- new XsltProcessorSetSecurityPrefs (line 64)
-- new XsltProcessorGetSecurityPrefs (line 67)
-- 17 class method(s)
+- new ClassEntry (line 34)
+- new XsltProcessorConstruct (line 35)
+- new XsltProcessorImportStylesheet (line 39)
+- new XsltProcessorTransformToXml (line 42)
+- new XsltProcessorTransformToDoc (line 45)
+- new XsltProcessorTransformToUri (line 48)
+- new XsltProcessorSetParameter (line 51)
+- new XsltProcessorGetParameter (line 54)
+- new XsltProcessorRemoveParameter (line 57)
+- new XsltProcessorRegisterPhpFunctions (line 60)
+- new XsltProcessorRegisterPhpFunctionNS (line 64)
+- new XsltProcessorHasExsltSupport (line 68)
+- new XsltProcessorSetSecurityPrefs (line 71)
+- new XsltProcessorGetSecurityPrefs (line 74)
+- 20 class method(s)
 
 ### `ext/xsl/VmXslDomBridge.php`
 
@@ -38888,7 +38890,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new XSLTProcessor (line 26)
-- 13 class method(s)
+- 14 class method(s)
 
 ### `ext/xsl/XsltProcessorConstruct.php`
 
@@ -38919,6 +38921,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
 - 1 class method(s)
+
+### `ext/xsl/XsltProcessorRegisterPhpFunctionNS.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 34)
+- 2 class method(s)
 
 ### `ext/xsl/XsltProcessorRegisterPhpFunctions.php`
 
@@ -38970,7 +38979,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xsl/XsltRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/yaml/Module.php`
 
@@ -40657,7 +40666,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 225 class method(s)
+- 226 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
