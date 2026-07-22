@@ -476,7 +476,11 @@ final class ReflectionSupport
         array $invokeArgs,
     ): void {
         if ($ctor instanceof Func\PHP) {
-            $vm->invokePhpFunction($ctor, $thisVar, ...$invokeArgs);
+            // Isolate the run stack: invokePhpFunctionOnStack would resume the caller's
+            // caller after a void __construct return (TYPE_RETURN_VOID → nextframe), so
+            // ReflectionAttribute::newInstance() from inside a user function returned early
+            // with null (#22029; same pattern as #4284 / #12069).
+            $vm->invokePhpFunctionIsolated($ctor, $thisVar, ...$invokeArgs);
 
             return;
         }
