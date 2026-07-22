@@ -3620,6 +3620,33 @@ PHP;
         self::assertSame("inline_two=FilesystemIterator\n", ob_get_clean());
     }
 
+    /** Issue #22062 — new FilesystemIterator(__DIR__, SKIP_DOTS) must pass directory path as arg #0. */
+    public function testFilesystemIteratorDirMagicConstWithFlagsCtorArgs(): void
+    {
+        $dir = sys_get_temp_dir() . '/phpc_fsit_unit_22062';
+        $code = <<<PHP
+<?php
+\$dir = '{$dir}';
+if (!is_dir(\$dir)) {
+    mkdir(\$dir);
+}
+file_put_contents(\$dir . '/a.txt', 'x');
+\$f = new FilesystemIterator(__DIR__, FilesystemIterator::SKIP_DOTS);
+echo 'path=', \$f->getPath(), ' flags=', \$f->getFlags(), "\\n";
+\$f2 = new FilesystemIterator(\$dir, FilesystemIterator::SKIP_DOTS);
+echo 'varpath=', \$f2->getPath(), "\\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'fsit_dir_magic_flags.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('flags=4096', $out);
+        self::assertStringNotContainsString('Failed to open directory', $out);
+        self::assertMatchesRegularExpression('/path=.+/', $out);
+        self::assertStringContainsString('varpath='.$dir, $out);
+    }
+
     /**
      * Issue #19769 — new CachingIterator(new ArrayIterator(...), CachingIterator::FULL_CACHE)
      * must send New_ for arg0 and FULL_CACHE int for arg1 (not double-send New_).
