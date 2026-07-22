@@ -560,12 +560,17 @@ class VM {
         $methodLc = strtolower($methodName);
         [$declaring] = $this->resolveInstanceMethod($object->class, $methodLc);
         $func = $declaring->methods[$methodLc];
+        $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $isStatic = (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) || $this->methodIsStatic($func);
         $thisVar = new Variable();
         $thisVar->object($object);
         if ($func instanceof Func\Internal) {
             $caller = $this->coercionCallerFrame();
             $result = new Variable();
-            $catchFrame = $this->invokeVmClassMethod($func, $caller, $result, $thisVar, ...$extraArgs);
+            // Static methods: do not prepend $this (#22288).
+            $catchFrame = $isStatic
+                ? $this->invokeVmClassMethod($func, $caller, $result, ...$extraArgs)
+                : $this->invokeVmClassMethod($func, $caller, $result, $thisVar, ...$extraArgs);
             if (null !== $catchFrame) {
                 throw new VM\MagicMethodInvocationAborted();
             }
@@ -577,6 +582,10 @@ class VM {
         }
 
         // Isolated stack: nested user method must not resume the caller frame mid-builtin (#11452).
+        if ($isStatic) {
+            return $this->invokePhpFunctionIsolated($func, ...$extraArgs);
+        }
+
         return $this->invokePhpFunctionIsolated($func, $thisVar, ...$extraArgs);
     }
 
@@ -14554,7 +14563,17 @@ restart:
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
         $frame->call = $declaringClass->methods[$methodLc];
-        $frame->callArgs = [$receiver];
+        // Zend: `$obj->staticMethod($arg)` does not bind $obj as argument #1 (zend_execute.c;
+        // #22288 DOMXPath::quote, DateTime::createFromFormat, user static methods).
+        // Keep LSB from the receiver class via staticCallClass (static::class === get_class($obj)).
+        $isStatic = (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0)
+            || $this->methodIsStatic($frame->call);
+        if ($isStatic) {
+            $frame->callArgs = [];
+            $frame->staticCallClass = $object->class->name;
+        } else {
+            $frame->callArgs = [$receiver];
+        }
         $frame->callArgEntries = [];
         $frame->builtinCalleeQualifiedMethod = $declaringClass->name.'::'.$declaredName;
 
