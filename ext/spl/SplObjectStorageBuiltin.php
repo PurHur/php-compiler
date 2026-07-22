@@ -88,6 +88,11 @@ final class SplObjectStorageBuiltin
         $entry->methodVisibility['__debuginfo'] = $pub;
         $entry->methodNames['__debuginfo'] = '__debugInfo';
 
+        $entry->methods['__serialize'] = new SplObjectStorageSerialize();
+        $entry->methodVisibility['__serialize'] = $pub;
+        $entry->methods['__unserialize'] = new SplObjectStorageUnserialize();
+        $entry->methodVisibility['__unserialize'] = $pub;
+
         $entry->isInternal = true;
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplObjectStorage');
         $entry->cloneObjectHandler = [self::class, 'cloneInto'];
@@ -105,7 +110,9 @@ final class SplObjectStorageBuiltin
             $entry->methods['detach'],
             $entry->methods['rewind'],
             $entry->methods['getinfo'],
-            $entry->methods['__debuginfo']
+            $entry->methods['__debuginfo'],
+            $entry->methods['__serialize'],
+            $entry->methods['__unserialize']
         );
     }
 
@@ -1011,5 +1018,58 @@ final class SplObjectStorageOffsetUnset extends VmClassMethod
             );
         }
         SplObjectStorageBuiltin::offsetUnset($object, $frame->calledArgs[1]);
+    }
+}
+
+/** php-src SplObjectStorage::__serialize (ext/spl/spl_observer.c; #22268). */
+final class SplObjectStorageSerialize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__serialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::__serialize()'
+        );
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            SplObjectStorageSerializeSupport::exportSerializeBag($object)
+        );
+    }
+}
+
+/** php-src SplObjectStorage::__unserialize (ext/spl/spl_observer.c; #22268). */
+final class SplObjectStorageUnserialize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__unserialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::__unserialize()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplObjectStorage::__unserialize() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(
+                'SplObjectStorage::__unserialize(): Argument #1 ($data) must be of type array'
+            );
+        }
+        SplObjectStorageSerializeSupport::restoreFromSerializeBag($object, $arg);
     }
 }
