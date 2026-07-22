@@ -2596,14 +2596,19 @@ final class ReflectionSupport
     }
 
     /**
+     * Unpack a Reflection *Args array parameter (php-src-strict Argument #N message).
+     *
      * @return list<Variable>
      */
-    public static function invokeArgsFromArray(Variable $argsVar, string $methodLabel): array
-    {
+    public static function invokeArgsFromArray(
+        Variable $argsVar,
+        string $methodLabel,
+        int $argsArgumentNumber = 2
+    ): array {
         $argsVar = $argsVar->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $argsVar->type) {
             throw new \TypeError(
-                $methodLabel.'(): Argument #2 ($args) must be of type array, '
+                $methodLabel.'(): Argument #'.$argsArgumentNumber.' ($args) must be of type array, '
                 .self::valueTypeLabel($argsVar).' given'
             );
         }

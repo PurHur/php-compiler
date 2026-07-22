@@ -28,7 +28,8 @@ final class ReflectionClassNewInstanceArgs extends VmClassMethod
         [, $entry] = ReflectionSupport::requireReflectedClassEntry($frame, $frame->calledArgs[0]);
         $ctorArgs = ReflectionSupport::invokeArgsFromArray(
             $frame->calledArgs[1],
-            'ReflectionClass::newInstanceArgs'
+            'ReflectionClass::newInstanceArgs',
+            1
         );
         $vm = VM::running();
         if (null === $vm) {

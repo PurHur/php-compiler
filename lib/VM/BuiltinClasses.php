@@ -258,6 +258,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetStaticVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
+use PHPCompiler\VM\Builtin\ReflectionFunctionInvokeArgs;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsClosure;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsGenerator;
@@ -1080,6 +1081,7 @@ final class BuiltinClasses
                 'getclosureusedvariables' => new ReflectionFunctionGetClosureUsedVariables(),
                 'getstaticvariables' => new ReflectionFunctionGetStaticVariables(),
                 'invoke' => new ReflectionFunctionInvoke(),
+                'invokeargs' => new ReflectionFunctionInvokeArgs(),
                 'setaccessible' => new ReflectionFunctionSetAccessible(),
                 'isaccessible' => new ReflectionFunctionIsAccessible(),
             ] as $name => $method
