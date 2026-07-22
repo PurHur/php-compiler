@@ -27,6 +27,14 @@ final class ModuleRegistry
     /** @var array<string, true> lowercase registered internal function names */
     private static array $registeredFunctionLookup = [];
 
+    /**
+     * Loaded Zend extensions (php-src zend_llist zend_extensions; #22248).
+     * Keyed by exact display name (case-sensitive, matches zend_get_extension).
+     *
+     * @var array<string, array{name: string, version: string, author: string, url: string, copyright: string}>
+     */
+    private static array $zendExtensions = [];
+
     /** @var list<string> */
     private const DATE_EXTENSION_FUNCTIONS = [
         'checkdate',
@@ -51,6 +59,52 @@ final class ModuleRegistry
         self::$extensionFunctions = [];
         self::$extensionVersions = [];
         self::$registeredFunctionLookup = [];
+        self::$zendExtensions = [];
+    }
+
+    /**
+     * Register a Zend extension for get_loaded_extensions(true) / ReflectionZendExtension (#22248).
+     *
+     * php-src: Zend/zend_extensions.c — zend_register_extension / zend_get_extension
+     */
+    public static function registerZendExtension(
+        string $name,
+        string $version,
+        string $author,
+        string $url,
+        string $copyright
+    ): void {
+        if ('' === $name) {
+            return;
+        }
+        self::$zendExtensions[$name] = [
+            'name' => $name,
+            'version' => $version,
+            'author' => $author,
+            'url' => $url,
+            'copyright' => $copyright,
+        ];
+    }
+
+    public static function zendExtensionLoaded(string $name): bool
+    {
+        return isset(self::$zendExtensions[$name]);
+    }
+
+    /**
+     * @return array{name: string, version: string, author: string, url: string, copyright: string}|null
+     */
+    public static function getZendExtension(string $name): ?array
+    {
+        return self::$zendExtensions[$name] ?? null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function getLoadedZendExtensions(): array
+    {
+        return array_keys(self::$zendExtensions);
     }
 
     public static function register(string $extensionName, ?string $version = null): void
@@ -104,6 +158,16 @@ final class ModuleRegistry
             self::register($module->getExtensionName(), $moduleVersion);
         } elseif ($registerSqlite3ExtensionLoaded) {
             self::register($module->getExtensionName(), $moduleVersion);
+        }
+        // opcache is both a module and a Zend extension in php-src (ZendAccelerator.c, #22248).
+        if ('opcache' === $primary) {
+            self::registerZendExtension(
+                'Zend OPcache',
+                \PHPCompiler\CompilerVersion::reportedPhpVersion(),
+                'Zend Technologies',
+                'http://www.zend.com/',
+                'Copyright (c)'
+            );
         }
         $additional = $module->getAdditionalExtensionNames();
         foreach ($additional as $name) {

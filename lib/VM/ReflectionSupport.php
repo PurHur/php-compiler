@@ -61,6 +61,9 @@ final class ReflectionSupport
 
     public const REFLECTION_EXTENSION = 'reflectionextension';
 
+    /** php-src class ReflectionZendExtension (#22248). */
+    public const REFLECTION_ZEND_EXTENSION = 'reflectionzendextension';
+
     /** php-src REFLECTION_ATTRIBUTE_IS_INSTANCEOF — getAttributes() filter flag (#11471). */
     public const REFLECTION_ATTRIBUTE_IS_INSTANCEOF = 2;
 
@@ -126,6 +129,9 @@ final class ReflectionSupport
     public const PROP_ATTR_TARGET = 'target';
 
     public const PROP_EXTENSION_NAME = 'extension';
+
+    /** Public `$name` on ReflectionZendExtension (php-src, #22248). */
+    public const PROP_ZEND_EXTENSION_NAME = 'name';
 
     /** Internal enum class name on ReflectionEnumUnitCase / ReflectionEnumBackedCase (#10000). */
     public const PROP_ENUM_CLASS_NAME = 'enumClass';
@@ -682,6 +688,20 @@ final class ReflectionSupport
         $obj = $receiver->toObject();
         if (strtolower($obj->class->name) !== self::REFLECTION_EXTENSION) {
             throw new \LogicException('Expected ReflectionExtension instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionZendExtension(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionZendExtension method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_ZEND_EXTENSION) {
+            throw new \LogicException('Expected ReflectionZendExtension instance');
         }
 
         return $obj;
