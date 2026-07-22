@@ -103,6 +103,7 @@ final class ArrayIteratorBuiltin
         }
 
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayIterator');
+        SplArraySerializeSupport::registerMagicMethods($entry, self::CLASS_LC, 'ArrayIterator', $pub);
 
         $entry->methods['__debuginfo'] = new ArrayIteratorDebugInfo();
         $entry->methodVisibility['__debuginfo'] = $pub;
