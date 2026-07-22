@@ -5814,6 +5814,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasDefaultValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasHook.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasHooks.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsAbstract.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsAccessible.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDefaultValueAvailable.php';

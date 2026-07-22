@@ -332,6 +332,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHook;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasDefaultValue;
+use PHPCompiler\VM\Builtin\ReflectionPropertyHasType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefaultValueAvailable;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetMangledName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
@@ -953,6 +954,8 @@ final class BuiltinClasses
         $rp->methodVisibility['getattributes'] = $pub;
         $rp->methods['gettype'] = new ReflectionPropertyGetType();
         $rp->methodVisibility['gettype'] = $pub;
+        $rp->methods['hastype'] = new ReflectionPropertyHasType();
+        $rp->methodVisibility['hastype'] = $pub;
         foreach (
             [
                 'ispublic' => new ReflectionPropertyIsPublic(),
