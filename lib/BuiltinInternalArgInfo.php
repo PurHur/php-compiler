@@ -23,6 +23,30 @@ final class BuiltinInternalArgInfo
         return BuiltinInternalTentativeReturnInfo::tentativeReturnTypeLabelForClassMethod($class, $method);
     }
 
+    /**
+     * Stub return type label for an internal free function (php-types arginfo `return`).
+     *
+     * Empty / missing labels mean no declared return type (ext/reflection/php_reflection.c, #22068).
+     */
+    public static function returnTypeLabelForFunction(string $name): ?string
+    {
+        $lc = strtolower($name);
+        $info = self::instance()->functions[$lc] ?? null;
+        if (null === $info) {
+            return null;
+        }
+        $ret = $info['return'] ?? '';
+        if (!\is_string($ret)) {
+            return null;
+        }
+        $ret = trim($ret);
+        if ('' === $ret) {
+            return null;
+        }
+
+        return $ret;
+    }
+
     public static function paramCountForFunction(string $name): ?int
     {
         $lc = strtolower($name);

@@ -5702,7 +5702,9 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetNumberOfRequ
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetParameters.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetStaticVariables.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetTentativeReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionHasReturnType.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionHasTentativeReturnType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionInvoke.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAccessible.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAnonymous.php';
