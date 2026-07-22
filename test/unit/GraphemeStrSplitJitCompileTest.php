@@ -31,7 +31,13 @@ final class GraphemeStrSplitJitCompileTest extends TestCase
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $proc = proc_open($cmd, $descriptorSpec, $pipes, $root);
+        $env = getenv();
+        if (!\is_array($env)) {
+            $env = [];
+        }
+        // PHP 8.4+ API — enable for AOT lint on 8.4.0-dev reference (#22340).
+        $env['PHP_COMPILER_PROFILE'] = '8.4';
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $root, $env);
         $this->assertIsResource($proc);
         fclose($pipes[0]);
         fclose($pipes[1]);

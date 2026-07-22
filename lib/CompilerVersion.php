@@ -1857,10 +1857,28 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ grapheme_str_split() (ext/intl/grapheme/grapheme_string.c, #6246, #22340).
+     *
+     * Same forward-profile gate as {@see supportsGraphemeStrimwidth()} — withheld on 8.4.0-dev
+     * reference / {@code PHP_COMPILER_PROFILE=8.2} (Zend 8.2 has no grapheme_str_split).
+     */
+    public static function supportsGraphemeStrSplit(): bool
+    {
+        return self::supportsGraphemeStrimwidth();
+    }
+
+    /** grapheme_str_split() visible to function_exists() — only with loaded ext/intl (#17694, #22340). */
+    public static function advertisesGraphemeStrSplit(): bool
+    {
+        return false;
+    }
+
+    /**
      * PHP 8.4 forward-profile core grapheme helpers (ext/intl/grapheme; #16915).
      *
-     * grapheme_strlen/substr/strpos/extract/str_split — implementation in-tree; registered only with
+     * grapheme_strlen/substr/strpos/extract — implementation in-tree; registered only with
      * loaded ext/intl ({@see IntlExtensionPolicy::advertisesBuiltins()}, #17694).
+     * grapheme_str_split is PHP 8.4-only — see {@see supportsGraphemeStrSplit()} (#22340).
      */
     public static function supportsGraphemeForwardProfileCore(): bool
     {

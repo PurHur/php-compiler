@@ -354,7 +354,7 @@ class Module extends ModuleAbstract
             new grapheme_strripos(),
             new grapheme_extract(),
             new grapheme_levenshtein(),
-            new grapheme_str_split(),
+            ...(CompilerVersion::supportsGraphemeStrSplit() ? [new grapheme_str_split()] : []),
             ...(CompilerVersion::supportsGraphemeStrimwidth() ? [new grapheme_strimwidth()] : []),
             new intl_get_error_code(),
             new intl_get_error_message(),

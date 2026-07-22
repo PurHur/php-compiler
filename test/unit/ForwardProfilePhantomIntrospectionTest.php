@@ -394,6 +394,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         try {
             $this->assertFalse(CompilerVersion::supportsGraphemeStrContains());
             $this->assertFalse(CompilerVersion::supportsGraphemeStrimwidth());
+            $this->assertFalse(CompilerVersion::supportsGraphemeStrSplit());
             $this->assertFalse(CompilerVersion::supportsGraphemeForwardProfileCore());
             $this->assertFalse(
                 \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl')
@@ -438,6 +439,7 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsGraphemeStrContains());
             $this->assertTrue(CompilerVersion::supportsGraphemeStrimwidth());
+            $this->assertTrue(CompilerVersion::supportsGraphemeStrSplit());
             $this->assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
             $this->assertFalse(CompilerVersion::advertisesGraphemeForwardProfileCore());
             $this->assertFalse(

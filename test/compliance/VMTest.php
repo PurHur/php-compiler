@@ -505,6 +505,13 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'grapheme_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGraphemeStrSplit()
+                && str_contains($name, 'grapheme_str_split')
+                && !str_contains($name, 'grapheme_str_split_profile_82')
+                && !str_contains($name, 'grapheme_str_split_function_exists_forward_84')
+                && !str_contains($name, 'grapheme_phantom')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsGraphemeCompliance($name)
                 && str_contains($name, 'grapheme_')
                 && !str_contains($name, 'grapheme_phantom')) {
