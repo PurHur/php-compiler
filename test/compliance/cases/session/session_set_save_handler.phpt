@@ -40,6 +40,11 @@ class TestSessionHandler implements SessionHandlerInterface, SessionIdInterface 
     {
         return 0;
     }
+
+    public function create_sid(): string
+    {
+        return bin2hex(random_bytes(16));
+    }
 }
 
 $handler = new TestSessionHandler();

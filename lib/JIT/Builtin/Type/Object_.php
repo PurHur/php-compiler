@@ -1513,11 +1513,10 @@ class Object_ extends Type {
         $this->markInterfaceClass('DOMChildNode');
         $this->setInterfaceExtends('DOMChildNode', ['DOMParentNode']);
         $this->ensureDomLivingParentChildInterfaces();
+        // php-src session.stub.php — SessionId / UpdateTimestamp do not extend Handler (#22262).
         $this->markInterfaceClass('SessionHandlerInterface');
         $this->markInterfaceClass('SessionIdInterface');
-        $this->setInterfaceExtends('SessionIdInterface', ['SessionHandlerInterface']);
         $this->markInterfaceClass('SessionUpdateTimestampHandlerInterface');
-        $this->setInterfaceExtends('SessionUpdateTimestampHandlerInterface', ['SessionHandlerInterface']);
         $this->setClassInterfaces('SessionHandler', ['SessionHandlerInterface', 'SessionIdInterface']);
         $this->markInterfaceClass('Random\\Engine');
         $this->markInterfaceClass('Random\\CryptoSafeEngine');
