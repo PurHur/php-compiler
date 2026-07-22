@@ -337,6 +337,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyGetDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHook;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
+use PHPCompiler\VM\Builtin\ReflectionPropertySetHook;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefaultValueAvailable;
@@ -1015,6 +1016,7 @@ final class BuiltinClasses
                     'hashooks' => new ReflectionPropertyHasHooks(),
                     'gethook' => new ReflectionPropertyGetHook(),
                     'gethooks' => new ReflectionPropertyGetHooks(),
+                    'sethook' => new ReflectionPropertySetHook(),
                     'islazy' => new ReflectionPropertyIsLazy(),
                     'setrawvaluewithoutlazyinitialization' => new ReflectionPropertySetRawValueWithoutLazyInitialization(),
                     'skiplazyinitialization' => new ReflectionPropertySkipLazyInitialization(),
