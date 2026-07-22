@@ -305,7 +305,13 @@ final class VmSprintf
         $floatPrec = $precision ?? 6;
         switch ($spec) {
             case 's':
-                return self::argToString($var, $frame);
+                // php-src formatted_print.c — precision truncates %s to N bytes (#21956).
+                $string = self::argToString($var, $frame);
+                if (null !== $precision && $precision < VmString::byteLength($string)) {
+                    return \substr($string, 0, $precision);
+                }
+
+                return $string;
             case 'd':
                 return self::formatSignedDecimal(self::argToInt($var, $frame), $showSign);
             case 'f':

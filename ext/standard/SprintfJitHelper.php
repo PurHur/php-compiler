@@ -58,7 +58,177 @@ final class SprintfJitHelper
             return (string) $n;
         }
 
+        // %.*s / %.Ns / %*.*s — string precision (+ optional width) (#21956).
+        $starString = self::tryFormatStarPrecisionString($format, $fmtLen, $packedArgs, $packLen);
+        if (null !== $starString) {
+            return $starString;
+        }
+
         return $format;
+    }
+
+    /**
+     * NestedJIT-safe %.*s / %.Ns / %*.*s (php-src formatted_print.c; issue #21956).
+     *
+     * @return ?string null when format is not a handled string-precision conversion
+     */
+    private static function tryFormatStarPrecisionString(
+        string $format,
+        int $fmtLen,
+        string $packedArgs,
+        int $packLen
+    ): ?string {
+        if ($fmtLen < 3 || '%' !== $format[0]) {
+            return null;
+        }
+        $pos = 1;
+        $widthFromArg = false;
+        if ($pos < $fmtLen && '*' === $format[$pos]) {
+            $widthFromArg = true;
+            ++$pos;
+        }
+        if ($pos >= $fmtLen || '.' !== $format[$pos]) {
+            return null;
+        }
+        ++$pos;
+        $precisionFromArg = false;
+        $precision = 0;
+        if ($pos < $fmtLen && '*' === $format[$pos]) {
+            $precisionFromArg = true;
+            ++$pos;
+        } elseif ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+            while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                $precision = ($precision * 10) + self::digitValue($format[$pos]);
+                ++$pos;
+            }
+        } else {
+            // "%.s" → precision 0
+            $precision = 0;
+        }
+        if ($pos >= $fmtLen || 's' !== $format[$pos] || ($pos + 1) !== $fmtLen) {
+            return null;
+        }
+
+        $cursor = 0;
+        $width = null;
+        if ($widthFromArg) {
+            $widthRead = self::readPackedLongAt($packedArgs, $packLen, $cursor);
+            if (null === $widthRead) {
+                return $format;
+            }
+            $width = $widthRead;
+            if ($width < 0) {
+                $width = 0;
+            }
+        }
+        if ($precisionFromArg) {
+            $precRead = self::readPackedLongAt($packedArgs, $packLen, $cursor);
+            if (null === $precRead) {
+                return $format;
+            }
+            $precision = $precRead;
+            if ($precision < 0) {
+                $precision = 0;
+            }
+        }
+        $string = self::readPackedStringAt($packedArgs, $packLen, $cursor);
+        if (null === $string) {
+            return $format;
+        }
+        $out = self::truncateBytes($string, $precision);
+        if (null !== $width) {
+            $out = self::padLeftSpaces($out, $width);
+        }
+
+        return $out;
+    }
+
+    private static function isDigitByte(string $byte): bool
+    {
+        $code = self::byteOrd($byte);
+
+        return $code >= 48 && $code <= 57;
+    }
+
+    private static function digitValue(string $byte): int
+    {
+        return self::byteOrd($byte) - 48;
+    }
+
+    /** @param-out int $cursor */
+    private static function readPackedLongAt(string $packed, int $packLen, int &$cursor): ?int
+    {
+        if ($cursor + 9 > $packLen || !self::isByte($packed[$cursor], 1)) {
+            return null;
+        }
+        ++$cursor;
+        $n = 0;
+        $i = 0;
+        while ($i < 8) {
+            $n |= self::byteOrd($packed[$cursor + $i]) << (8 * $i);
+            ++$i;
+        }
+        $cursor += 8;
+
+        return $n;
+    }
+
+    /** @param-out int $cursor */
+    private static function readPackedStringAt(string $packed, int $packLen, int &$cursor): ?string
+    {
+        // TAG_STRING (4) + 8-byte little-endian length + bytes.
+        if ($cursor + 9 > $packLen || !self::isByte($packed[$cursor], 4)) {
+            return null;
+        }
+        ++$cursor;
+        $len = 0;
+        $i = 0;
+        while ($i < 8) {
+            $len |= self::byteOrd($packed[$cursor + $i]) << (8 * $i);
+            ++$i;
+        }
+        $cursor += 8;
+        if ($len < 0 || $cursor + $len > $packLen) {
+            return null;
+        }
+        $out = '';
+        $i = 0;
+        while ($i < $len) {
+            $out .= $packed[$cursor + $i];
+            ++$i;
+        }
+        $cursor += $len;
+
+        return $out;
+    }
+
+    private static function truncateBytes(string $s, int $precision): string
+    {
+        if ($precision <= 0) {
+            return '';
+        }
+        $out = '';
+        $i = 0;
+        while ($i < $precision && isset($s[$i])) {
+            $out .= $s[$i];
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    private static function padLeftSpaces(string $s, int $width): string
+    {
+        $len = 0;
+        while (isset($s[$len])) {
+            ++$len;
+        }
+        while ($len < $width) {
+            $s = ' '.$s;
+            ++$len;
+        }
+
+        return $s;
     }
 
     public static function numberFormat(
