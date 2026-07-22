@@ -5837,6 +5837,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsVirtual.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetAccessible.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetRawValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetRawValueWithoutLazyInitialization.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetHook.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySkipLazyInitialization.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionReferenceConstruct.php';
