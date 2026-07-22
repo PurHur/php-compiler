@@ -159,25 +159,11 @@ final class RecursiveCachingIteratorConstruct extends VmClassMethod
             1,
             $frame->vmContext
         );
-        $flags = 0;
-        if (isset($frame->calledArgs[2])) {
-            $flagsArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsArg->type) {
-                throw new \TypeError(
-                    'RecursiveCachingIterator::__construct(): Argument #2 ($flags) must be of type int, '
-                    .match ($flagsArg->type) {
-                        Variable::TYPE_NULL => 'null',
-                        Variable::TYPE_BOOLEAN => 'bool',
-                        Variable::TYPE_FLOAT => 'float',
-                        Variable::TYPE_STRING => 'string',
-                        Variable::TYPE_ARRAY => 'array',
-                        Variable::TYPE_OBJECT => 'object',
-                        default => 'mixed',
-                    }.' given'
-                );
-            }
-            $flags = $flagsArg->toInt();
-        }
+        // Same default/null semantics as CachingIterator (#22336; php-src spl.stub.php).
+        $flags = CachingIteratorConstruct::resolveConstructFlags(
+            $frame->calledArgs[2] ?? null,
+            'RecursiveCachingIterator::__construct'
+        );
         SplDualIteratorStorage::callInner($frame, $inner, 'rewind');
         SplCachingIteratorStorage::init($object, $inner, $flags);
     }
