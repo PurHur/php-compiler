@@ -347,6 +347,8 @@ final class VmDom
         $characterData = new ClassEntry('DOMCharacterData');
         $characterData->isInternal = true;
         $characterData->parentLc = self::CLASS_NODE;
+        // php-src php_dom.stub.php — DOMCharacterData implements DOMChildNode (#22389).
+        $characterData->interfaces[] = 'domchildnode';
         $characterData->properties[] = new ClassProperty(self::PROP_DATA, null, $strProto);
         $characterData->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
         // NonDocumentTypeChildNode on CharacterData (Text/Comment/CDATA; #19431).
@@ -582,6 +584,8 @@ final class VmDom
         $document = new ClassEntry('DOMDocument');
         $document->isInternal = true;
         $document->parentLc = self::CLASS_NODE;
+        // php-src php_dom.stub.php — DOMDocument implements DOMParentNode (#22389).
+        $document->interfaces[] = 'domparentnode';
         $documentConstruct = new DocumentConstruct();
         $document->constructor = $documentConstruct;
         $document->methods['__construct'] = $documentConstruct;
@@ -691,6 +695,9 @@ final class VmDom
         $element = new ClassEntry('DOMElement');
         $element->isInternal = true;
         $element->parentLc = self::CLASS_NODE;
+        // php-src php_dom.stub.php — DOMElement implements DOMParentNode, DOMChildNode (#22389).
+        $element->interfaces[] = 'domparentnode';
+        $element->interfaces[] = 'domchildnode';
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $element->properties[] = new ClassProperty(self::PROP_TAG_NAME, null, $strProto);
         $element->properties[] = new ClassProperty(self::PROP_ATTRIBUTES, $nullProto, $objProto);
@@ -785,6 +792,8 @@ final class VmDom
         $fragment = new ClassEntry('DOMDocumentFragment');
         $fragment->isInternal = true;
         $fragment->parentLc = self::CLASS_NODE;
+        // php-src php_dom.stub.php — DOMDocumentFragment implements DOMParentNode (#22389).
+        $fragment->interfaces[] = 'domparentnode';
         $fragmentConstruct = new FragmentConstruct();
         $fragment->constructor = $fragmentConstruct;
         $fragment->methods['__construct'] = $fragmentConstruct;

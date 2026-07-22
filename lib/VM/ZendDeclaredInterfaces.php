@@ -15,8 +15,9 @@ final class ZendDeclaredInterfaces
     {
         self::registerInterface($ctx, 'SeekableIterator', ['iterator']);
         self::registerInterface($ctx, 'Reflector', []);
+        // php-src ext/dom/php_dom.stub.php — DOMChildNode does not extend DOMParentNode (#22389).
         self::registerInterface($ctx, 'DOMParentNode', []);
-        self::registerInterface($ctx, 'DOMChildNode', ['domparentnode']);
+        self::registerInterface($ctx, 'DOMChildNode', []);
         // php-src ext/session/session.stub.php — interfaces do not extend each other (#22262).
         self::registerInterface($ctx, 'SessionHandlerInterface', [], [
             'open', 'close', 'read', 'write', 'destroy', 'gc',
