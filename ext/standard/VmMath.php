@@ -1031,6 +1031,29 @@ final class VmMath
         return \log($num);
     }
 
+    /**
+     * log($num, $base) — logarithm with explicit base (php-src ext/standard/math.c PHP_FUNCTION(log)).
+     *
+     * Order matches php-src: base 2 / 10 fast paths, base == 1.0 → NAN, base ≤ 0 → ValueError.
+     */
+    public static function logWithBase(float $num, float $base): float
+    {
+        if (2.0 === $base) {
+            return \log($num) / \M_LN2;
+        }
+        if (10.0 === $base) {
+            return \log10($num);
+        }
+        if (1.0 === $base) {
+            return \NAN;
+        }
+        if ($base <= 0.0) {
+            throw new \ValueError('log(): Argument #2 ($base) must be greater than 0');
+        }
+
+        return \log($num) / \log($base);
+    }
+
     /** log10() — base-10 logarithm (php-src ext/standard/math.c). */
     public static function log10(float $num): float
     {
