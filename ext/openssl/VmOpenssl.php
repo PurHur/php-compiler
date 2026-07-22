@@ -1233,7 +1233,7 @@ final class VmOpenssl
     }
 
     /**
-     * openssl_pkey_new() — generate asymmetric key pair (php-src ext/openssl/xp.c; #6295).
+     * openssl_pkey_new() — generate asymmetric key pair (php-src ext/openssl/openssl.c; #6295, #22335).
      *
      * @return \PHPCompiler\VM\Variable|false OpenSSLAsymmetricKey wrapper
      */
@@ -1247,6 +1247,10 @@ final class VmOpenssl
 
         $bits = 2048;
         $type = OpensslConstants::OPENSSL_KEYTYPE_RSA;
+        $curveName = null;
+        $dhParams = null;
+        $ecCurveFromNested = null;
+
         if (null !== $configVar) {
             $configVar = $configVar->resolveIndirect();
             if (Variable::TYPE_ARRAY === $configVar->type) {
@@ -1258,21 +1262,106 @@ final class VmOpenssl
                     $valueVar = $valueVar->resolveIndirect();
                     if ('private_key_bits' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
                         $bits = $valueVar->toInt();
-                    }
-                    if ('private_key_type' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
+                    } elseif ('private_key_type' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
                         $type = $valueVar->toInt();
+                    } elseif ('curve_name' === $key && Variable::TYPE_STRING === $valueVar->type) {
+                        $curveName = $valueVar->toString();
+                    } elseif ('dh' === $key && Variable::TYPE_ARRAY === $valueVar->type) {
+                        $dhParams = self::extractDhParams($valueVar);
+                    } elseif ('ec' === $key && Variable::TYPE_ARRAY === $valueVar->type) {
+                        $ecCurveFromNested = self::extractNestedString($valueVar, 'curve_name');
                     }
                 }
             }
         }
 
-        if (OpensslConstants::OPENSSL_KEYTYPE_RSA !== $type) {
+        // php-src openssl_pkey_new: nested dh/ec/rsa/dsa arrays take precedence over private_key_type.
+        if (null !== $dhParams) {
+            if (null === $dhParams['p'] || null === $dhParams['g']) {
+                return false;
+            }
+            $pem = VmOpensslPkeyNative::generateDhFromParams($dhParams['p'], $dhParams['g'], $dhParams['q']);
+            if (false === $pem) {
+                return false;
+            }
+
+            return VmOpensslObjects::wrapKey($ctx, $pem);
+        }
+
+        if (null !== $ecCurveFromNested) {
+            if ('' === $ecCurveFromNested) {
+                return false;
+            }
+            if (0 === VmOpensslPkeyNative::curveNid($ecCurveFromNested)) {
+                self::userWarning(
+                    'openssl_pkey_new(): Unknown elliptic curve (short) name '.$ecCurveFromNested,
+                    $frame
+                );
+
+                return false;
+            }
+            $pem = VmOpensslPkeyNative::generateEc($ecCurveFromNested);
+            if (false === $pem) {
+                self::userWarning('openssl_pkey_new(): Unable to generate key pair', $frame);
+
+                return false;
+            }
+
+            return VmOpensslObjects::wrapKey($ctx, $pem);
+        }
+
+        if (OpensslConstants::OPENSSL_KEYTYPE_RSA === $type) {
+            if ($bits < 384) {
+                self::userWarning(
+                    \sprintf(
+                        'openssl_pkey_new(): Private key length must be at least %d bits, configured to %d',
+                        384,
+                        $bits
+                    ),
+                    $frame
+                );
+
+                return false;
+            }
+            $pem = VmOpensslPkeyNative::generateRsa($bits);
+        } elseif (OpensslConstants::OPENSSL_KEYTYPE_EC === $type) {
+            if (null === $curveName) {
+                self::userWarning(
+                    'openssl_pkey_new(): Missing configuration value: "curve_name" not set',
+                    $frame
+                );
+
+                return false;
+            }
+            if (0 === VmOpensslPkeyNative::curveNid($curveName)) {
+                self::userWarning(
+                    'openssl_pkey_new(): Unknown elliptic curve (short) name '.$curveName,
+                    $frame
+                );
+
+                return false;
+            }
+            $pem = VmOpensslPkeyNative::generateEc($curveName);
+        } elseif (OpensslConstants::OPENSSL_KEYTYPE_DH === $type) {
+            if ($bits < 384) {
+                self::userWarning(
+                    \sprintf(
+                        'openssl_pkey_new(): Private key length must be at least %d bits, configured to %d',
+                        384,
+                        $bits
+                    ),
+                    $frame
+                );
+
+                return false;
+            }
+            $pem = VmOpensslPkeyNative::generateDh($bits);
+        } else {
             self::userWarning('openssl_pkey_new(): Unknown private key type', $frame);
 
             return false;
         }
 
-        $pem = VmOpensslPkeyNative::generateRsa($bits);
         if (false === $pem) {
             self::userWarning('openssl_pkey_new(): Unable to generate key pair', $frame);
 
@@ -1280,6 +1369,50 @@ final class VmOpenssl
         }
 
         return VmOpensslObjects::wrapKey($ctx, $pem);
+    }
+
+    /**
+     * @return array{p: ?string, g: ?string, q: ?string}
+     */
+    private static function extractDhParams(Variable $dhArray): array
+    {
+        $p = null;
+        $g = null;
+        $q = null;
+        foreach ($dhArray->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            if (Variable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $valueVar = $valueVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $valueVar->type) {
+                continue;
+            }
+            $name = $keyVar->toString();
+            if ('p' === $name) {
+                $p = $valueVar->toString();
+            } elseif ('g' === $name) {
+                $g = $valueVar->toString();
+            } elseif ('q' === $name) {
+                $q = $valueVar->toString();
+            }
+        }
+
+        return ['p' => $p, 'g' => $g, 'q' => $q];
+    }
+
+    private static function extractNestedString(Variable $arrayVar, string $key): ?string
+    {
+        foreach ($arrayVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            if (Variable::TYPE_STRING !== $keyVar->type || $key !== $keyVar->toString()) {
+                continue;
+            }
+            $valueVar = $valueVar->resolveIndirect();
+            if (Variable::TYPE_STRING === $valueVar->type) {
+                return $valueVar->toString();
+            }
+        }
+
+        return null;
     }
 
     /**
