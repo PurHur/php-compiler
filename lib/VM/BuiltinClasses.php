@@ -793,6 +793,7 @@ final class BuiltinClasses
             $rm->methods['getnamedarguments'] = new ReflectionFunctionGetNamedArguments();
             $rm->methodVisibility['getnamedarguments'] = $pub;
         }
+        \PHPCompiler\ext\standard\VmReflection::registerReflectionMethodClassConstants($rm);
         $ctx->classes[ReflectionSupport::REFLECTION_METHOD] = $rm;
 
         $rc = new ClassEntry('ReflectionClass');
@@ -1099,6 +1100,7 @@ final class BuiltinClasses
             $rf->methods['getnamedarguments'] = $getNamedArguments;
             $rf->methodVisibility['getnamedarguments'] = $pub;
         }
+        \PHPCompiler\ext\standard\VmReflection::registerReflectionFunctionClassConstants($rf);
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
         if (CompilerVersion::advertisesReflectionConstantClass()) {

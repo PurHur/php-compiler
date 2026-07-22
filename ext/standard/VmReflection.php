@@ -2549,6 +2549,12 @@ final class VmReflection
 
     public const REFLECTION_IS_STATIC = 16;
 
+    /** php-src ZEND_ACC_READONLY — ReflectionProperty::IS_READONLY (#22128). */
+    public const REFLECTION_IS_READONLY = 128;
+
+    /** php-src ZEND_ACC_DEPRECATED — ReflectionFunction::IS_DEPRECATED (#22128). */
+    public const REFLECTION_FUNCTION_IS_DEPRECATED = 2048;
+
     /** Register ReflectionAttribute::IS_INSTANCEOF (#11471, ext/reflection/php_reflection.c). */
     public static function registerReflectionAttributeClassConstants(ClassEntry $entry): void
     {
@@ -2558,17 +2564,14 @@ final class VmReflection
         $entry->constNames['is_instanceof'] = 'IS_INSTANCEOF';
     }
 
-    /** Register ReflectionProperty::IS_* class constants (#5060, #4470). */
-    public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
+    /**
+     * Register int class constants on a Reflection builtin (#22128, php_reflection.stub.php).
+     *
+     * @param array<string, int> $constants lower_snake name => value
+     */
+    private static function registerIntClassConstants(ClassEntry $entry, array $constants): void
     {
-        foreach (
-            [
-                'is_public' => self::REFLECTION_IS_PUBLIC,
-                'is_protected' => self::REFLECTION_IS_PROTECTED,
-                'is_private' => self::REFLECTION_IS_PRIVATE,
-                'is_static' => self::REFLECTION_IS_STATIC,
-            ] as $name => $value
-        ) {
+        foreach ($constants as $name => $value) {
             $const = new Variable();
             $const->int($value);
             $entry->constants[$name] = $const;
@@ -2576,41 +2579,69 @@ final class VmReflection
         }
     }
 
-    /** Register ReflectionClass::SKIP_* lazy-object class constants (#21126, ext/reflection/php_reflection.c). */
+    /** Register ReflectionProperty::IS_* class constants (#5060, #4470, #22128). */
+    public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
+    {
+        self::registerIntClassConstants($entry, [
+            'is_public' => self::REFLECTION_IS_PUBLIC,
+            'is_protected' => self::REFLECTION_IS_PROTECTED,
+            'is_private' => self::REFLECTION_IS_PRIVATE,
+            'is_static' => self::REFLECTION_IS_STATIC,
+            'is_readonly' => self::REFLECTION_IS_READONLY,
+        ]);
+    }
+
+    /** Register ReflectionMethod::IS_* class constants (#7116, #22128, php_reflection.stub.php). */
+    public static function registerReflectionMethodClassConstants(ClassEntry $entry): void
+    {
+        self::registerIntClassConstants($entry, [
+            'is_static' => self::REFLECTION_METHOD_IS_STATIC,
+            'is_public' => self::REFLECTION_METHOD_IS_PUBLIC,
+            'is_protected' => self::REFLECTION_METHOD_IS_PROTECTED,
+            'is_private' => self::REFLECTION_METHOD_IS_PRIVATE,
+            'is_abstract' => self::REFLECTION_METHOD_IS_ABSTRACT,
+            'is_final' => self::REFLECTION_METHOD_IS_FINAL,
+        ]);
+    }
+
+    /** Register ReflectionFunction::IS_DEPRECATED (#22128, php_reflection.stub.php). */
+    public static function registerReflectionFunctionClassConstants(ClassEntry $entry): void
+    {
+        self::registerIntClassConstants($entry, [
+            'is_deprecated' => self::REFLECTION_FUNCTION_IS_DEPRECATED,
+        ]);
+    }
+
+    /**
+     * Register ReflectionClass::IS_* (+ SKIP_* when lazy objects) (#18335, #21126, #22128).
+     * php-src: ext/reflection/php_reflection.stub.php / register_reflection_constants.
+     */
     public static function registerReflectionClassClassConstants(ClassEntry $entry): void
     {
+        self::registerIntClassConstants($entry, [
+            'is_implicit_abstract' => self::REFLECTION_CLASS_IS_IMPLICIT_ABSTRACT,
+            'is_explicit_abstract' => self::REFLECTION_CLASS_IS_EXPLICIT_ABSTRACT,
+            'is_final' => self::REFLECTION_CLASS_IS_FINAL,
+            'is_readonly' => self::REFLECTION_CLASS_IS_READONLY,
+        ]);
         if (!\PHPCompiler\CompilerVersion::supportsLazyObjectFactories()) {
             return;
         }
-        foreach (
-            [
-                'skip_initialization_on_serialize' => \PHPCompiler\VM\LazyObjectSupport::SKIP_INITIALIZATION_ON_SERIALIZE,
-                'skip_destructor' => \PHPCompiler\VM\LazyObjectSupport::SKIP_DESTRUCTOR,
-            ] as $name => $value
-        ) {
-            $const = new Variable();
-            $const->int($value);
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = strtoupper($name);
-        }
+        self::registerIntClassConstants($entry, [
+            'skip_initialization_on_serialize' => \PHPCompiler\VM\LazyObjectSupport::SKIP_INITIALIZATION_ON_SERIALIZE,
+            'skip_destructor' => \PHPCompiler\VM\LazyObjectSupport::SKIP_DESTRUCTOR,
+        ]);
     }
 
     /** Register ReflectionClassConstant::IS_* class constants (#17360, ext/reflection/php_reflection.c). */
     public static function registerReflectionClassConstantClassConstants(ClassEntry $entry): void
     {
-        foreach (
-            [
-                'is_public' => self::REFLECTION_METHOD_IS_PUBLIC,
-                'is_protected' => self::REFLECTION_METHOD_IS_PROTECTED,
-                'is_private' => self::REFLECTION_METHOD_IS_PRIVATE,
-                'is_final' => self::REFLECTION_METHOD_IS_FINAL,
-            ] as $name => $value
-        ) {
-            $const = new Variable();
-            $const->int($value);
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = strtoupper($name);
-        }
+        self::registerIntClassConstants($entry, [
+            'is_public' => self::REFLECTION_METHOD_IS_PUBLIC,
+            'is_protected' => self::REFLECTION_METHOD_IS_PROTECTED,
+            'is_private' => self::REFLECTION_METHOD_IS_PRIVATE,
+            'is_final' => self::REFLECTION_METHOD_IS_FINAL,
+        ]);
     }
 
     /** php-src reflection_class_constant_get_modifiers() (#17360). */
