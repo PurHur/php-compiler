@@ -8000,8 +8000,10 @@ final class VmDom
     }
 
     /**
-     * DOMNodeList::getIterator() — php-src InternalIterator over live items (#21298, #21466).
-     * Snapshot into InternalIterator (class identity matches Zend; foreach keys/values unchanged).
+     * DOMNodeList::getIterator() — php-src InternalIterator over live items (#21298, #21466, #21930).
+     *
+     * Class identity is InternalIterator; membership is live (not a HashTable snapshot) so
+     * foreach + removeChild matches Zend skip / stop-on-unlink semantics.
      */
     public static function nodeListGetIterator(Context $ctx, ObjectEntry $nodeList): ObjectEntry
     {
@@ -8009,20 +8011,11 @@ final class VmDom
             throw new \LogicException('DOMNodeList::getIterator() called on non-nodelist in this compiler build');
         }
         self::refreshNodeListIfLive($nodeList);
-        $ht = new HashTable();
-        $len = \count(DomRegistry::state($nodeList)->listNodeIds);
-        for ($i = 0; $i < $len; ++$i) {
-            $node = self::nodeListItem($nodeList, $i);
-            $v = new Variable();
-            if (null === $node) {
-                $v->null();
-            } else {
-                $v->object($node);
-            }
-            $ht->append($v);
-        }
 
-        return self::internalIteratorFromTable($ctx, $ht);
+        return InternalIteratorBuiltin::fromLiveHandler(
+            $ctx,
+            DomLiveNodeListIterator::forNodeList($nodeList)
+        );
     }
 
     /**

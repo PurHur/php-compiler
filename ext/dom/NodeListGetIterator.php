@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 
 /**
  * DOMNodeList / Dom\NodeList / Dom\HTMLCollection::getIterator()
- * (php-src ext/dom/php_dom.stub.php; #21298).
+ * (php-src ext/dom/php_dom.stub.php; #21298, #21930 live foreach).
  */
 final class NodeListGetIterator extends DomClassMethod
 {
