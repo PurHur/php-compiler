@@ -1822,7 +1822,7 @@ final class ReflectionSupport
         return '' !== self::paramNameFromReflection($reflection);
     }
 
-    /** Declared parameter type for ReflectionParameter::getType()/hasType() (#18337). */
+    /** Declared parameter type for ReflectionParameter::getType()/hasType() (#18337, #22064). */
     public static function declaredParamTypeForReflection(Context $ctx, ObjectEntry $reflection): ?CfgType
     {
         if (self::parameterIsInternal($ctx, $reflection)) {
@@ -1844,14 +1844,30 @@ final class ReflectionSupport
             $index = self::paramPositionFromReflection($reflection);
             $slot = self::parameterScopeSlot($func->block, $index);
 
-            return null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null;
+            return self::userDeclaredParamTypeOrNull(
+                null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null
+            );
         }
 
         $func = self::resolveFunctionForReflectionParameter($ctx, $reflection);
         $index = self::paramIndexFromReflection($reflection);
         $slot = self::parameterScopeSlot($func->block, $index);
 
-        return null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null;
+        return self::userDeclaredParamTypeOrNull(
+            null !== $slot ? ($func->block->paramDeclaredTypes[$slot] ?? null) : null
+        );
+    }
+
+    /**
+     * php-cfg maps absent parameter types to {@see CfgType\Mixed_}; explicit `mixed` is Literal (#22064).
+     */
+    private static function userDeclaredParamTypeOrNull(?CfgType $type): ?CfgType
+    {
+        if (null === $type || $type instanceof CfgType\Mixed_) {
+            return null;
+        }
+
+        return $type;
     }
 
     private static function internalDeclaredParamType(ObjectEntry $reflection): ?CfgType
