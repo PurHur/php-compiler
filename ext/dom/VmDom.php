@@ -8449,32 +8449,19 @@ final class VmDom
     }
 
     /**
-     * DOMNamedNodeMap::getIterator() — php-src InternalIterator; keys are Attr local names (#21298, #21466).
+     * DOMNamedNodeMap::getIterator() — live InternalIterator; keys are Attr local names
+     * (#21298, #21466, #21931 live foreach + removeAttribute).
      */
     public static function namedNodeMapGetIterator(Context $ctx, ObjectEntry $namedNodeMap): ObjectEntry
     {
         if (!self::isNamedNodeMap($namedNodeMap)) {
             throw new \LogicException('DOMNamedNodeMap::getIterator() called on non-namednodemap in this compiler build');
         }
-        $ht = new HashTable();
-        $len = \count(DomRegistry::state($namedNodeMap)->listNodeIds);
-        for ($i = 0; $i < $len; ++$i) {
-            $node = self::namedNodeMapItem($namedNodeMap, $i);
-            if (null === $node) {
-                continue;
-            }
-            // php-src NamedNodeMap iteration keys Attr.name (local), not nodeName (QName).
-            if (self::isAttr($node)) {
-                $key = self::readLocalName($node);
-            } else {
-                $key = DomRegistry::state($node)->nodeName;
-            }
-            $v = new Variable();
-            $v->object($node);
-            $ht->add($key, $v);
-        }
 
-        return self::internalIteratorFromTable($ctx, $ht);
+        return InternalIteratorBuiltin::fromLiveHandler(
+            $ctx,
+            DomLiveNamedNodeMapIterator::forNamedNodeMap($namedNodeMap)
+        );
     }
 
     /**
