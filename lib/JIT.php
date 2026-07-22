@@ -16710,6 +16710,7 @@ class JIT {
         if (!$classOp instanceof Operand\Literal) {
             throw new \LogicException('Static call class must be a literal');
         }
+        $selfScope = 'self' === strtolower((string) $classOp->value);
         $className = $this->resolveJitStaticScopeClass($block, $classOp);
         $declaringClassLc = strtolower($className);
         $methodLc = strtolower($nameOp->value);
@@ -16813,8 +16814,9 @@ class JIT {
             }
             throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
         }
-        // parent:: dispatches to parent code but must not clobber late-static scope (#12245).
-        if (!$parentScope) {
+        // parent:: / self:: dispatch to resolved code but must not clobber late-static scope
+        // (#12245 parent, #21983 self).
+        if (!$parentScope && !$selfScope) {
             $this->context->scope->lateStaticCallClassId = $declaringClassId;
         }
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);

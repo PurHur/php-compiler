@@ -160,6 +160,11 @@ class MagicStringResolver extends NodeVisitorAbstract
                     if ([] !== $this->traitStack) {
                         break;
                     }
+                    // Preserve `self` on StaticCall class so late-static scope is not clobbered
+                    // the way a named ClassName::call would be (#21983, peer of parent #6735/#12245).
+                    if ($this->inStaticCallClassName) {
+                        break;
+                    }
                     if (! empty($this->classStack)) {
                         return new Node\Name\FullyQualified(end($this->classStack), $node->getAttributes());
                     }

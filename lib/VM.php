@@ -4794,6 +4794,7 @@ restart:
                     $instanceScopeCall = false;
                     $scopeClassName = null;
                     $staticCallMethodName = '';
+                    $selfKeywordScope = false;
                     try {
                         $classOperand = $frame->scope[$op->arg1]->resolveIndirect();
                         $staticCallMethodName = $frame->scope[$op->arg2]->toString();
@@ -4813,13 +4814,20 @@ restart:
                             if (!$parentKeywordScope) {
                                 $parentKeywordScope = 'parent' === strtolower($className);
                             }
+                            // Lexical self:: (php-cfg may keep the keyword) — preserve LSB (#21983).
+                            $selfKeywordScope = 'self' === strtolower($className);
                             $lcClass = $this->resolveClassScopeName($className, $frame);
                             $resolvedClassName = isset($this->context->classes[$lcClass])
                                 ? $this->context->classes[$lcClass]->name
                                 : $className;
                             $callableName = $resolvedClassName.'::'.$staticCallMethodName;
                         }
-                        $this->initStaticCallable($frame, $callableName, $parentKeywordScope);
+                        $this->initStaticCallable(
+                            $frame,
+                            $callableName,
+                            $parentKeywordScope,
+                            $selfKeywordScope
+                        );
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -14494,8 +14502,12 @@ restart:
         return null;
     }
 
-    protected function initStaticCallable(Frame $frame, string $callableName, bool $parentKeywordScope = false): void
-    {
+    protected function initStaticCallable(
+        Frame $frame,
+        string $callableName,
+        bool $parentKeywordScope = false,
+        bool $selfKeywordScope = false
+    ): void {
         [$className, $methodName] = explode('::', $callableName, 2);
         $lcClass = $this->resolveClassScopeName($className, $frame);
         if (!isset($this->context->classes[$lcClass])) {
@@ -14505,8 +14517,9 @@ restart:
             throw new \Error($this->classNotFoundMessage($className));
         }
         $class = $this->context->classes[$lcClass];
-        // parent:: runs the parent implementation but keeps the caller's LSB scope (#12245).
-        $frame->staticCallClass = $parentKeywordScope
+        // parent:: / self:: run the resolved implementation but keep the caller's LSB scope
+        // (#12245 parent, #21983 self) — unlike a named ClassName::call which rebinds LSB.
+        $frame->staticCallClass = ($parentKeywordScope || $selfKeywordScope)
             ? $this->lateStaticClassLc($frame)
             : $class->name;
         $methodLc = strtolower($methodName);
