@@ -16307,6 +16307,12 @@ class JIT {
             $this->context->scope->lateStaticCallClassId = $this->context->type->object->lookup($receiverUserType);
         }
         $this->context->scope->toCall = $staticProxy;
+        // Instance call of a static method: omit receiver from args (zend_execute.c; #22288).
+        if (($visFlags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            $this->context->scope->args = [];
+
+            return;
+        }
         $this->context->scope->args = [$splObjectStorageMethod ? $receiverVar : $dispatchReceiver];
     }
 
