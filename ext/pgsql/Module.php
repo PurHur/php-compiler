@@ -82,32 +82,47 @@ class Module extends ModuleAbstract
             new pg_connect(),
             new pg_close(),
             new pg_query(),
+            new pg_query('pg_exec'), // PHP_FALIAS (#22219)
             new pg_fetch_assoc(),
             new pg_fetch_row(),
             new pg_fetch_array(),
             new pg_fetch_object(),
             new pg_fetch_result(),
+            new pg_fetch_result('pg_result'), // PHP_FALIAS (#22219)
             new pg_free_result(),
+            new pg_free_result('pg_freeresult'), // PHP_FALIAS (#22219)
             new pg_result_seek(),
             new pg_result_error(),
             new pg_result_error_field(),
             new pg_last_oid(),
+            new pg_last_oid('pg_getlastoid'), // PHP_FALIAS (#22219)
             new pg_num_rows(),
+            new pg_num_rows('pg_numrows'), // PHP_FALIAS (#22219)
             new pg_last_error(),
+            new pg_last_error('pg_errormessage'), // PHP_FALIAS (#22219)
             new pg_trace(),
             new pg_untrace(),
             new pg_lo_create(),
+            new pg_lo_create('pg_locreate'), // PHP_FALIAS (#22219)
             new pg_lo_unlink(),
+            new pg_lo_unlink('pg_lounlink'), // PHP_FALIAS (#22219)
             new pg_lo_open(),
+            new pg_lo_open('pg_loopen'), // PHP_FALIAS (#22219)
             new pg_lo_close(),
+            new pg_lo_close('pg_loclose'), // PHP_FALIAS (#22219)
             new pg_lo_read(),
+            new pg_lo_read('pg_loread'), // PHP_FALIAS (#22219)
             new pg_lo_write(),
+            new pg_lo_write('pg_lowrite'), // PHP_FALIAS (#22219)
             new pg_lo_read_all(),
+            new pg_lo_read_all('pg_loreadall'), // PHP_FALIAS (#22219)
             new pg_lo_seek(),
             new pg_lo_tell(),
             new pg_lo_truncate(),
             new pg_lo_import(),
+            new pg_lo_import('pg_loimport'), // PHP_FALIAS (#22219)
             new pg_lo_export(),
+            new pg_lo_export('pg_loexport'), // PHP_FALIAS (#22219)
             new pg_copy_to(),
             new pg_copy_from(),
             new pg_meta_data(),
@@ -115,11 +130,17 @@ class Module extends ModuleAbstract
             new pg_field_table(),
             new pg_field_type_oid(),
             new pg_field_is_null(),
+            new pg_field_is_null('pg_fieldisnull'), // PHP_FALIAS (#22219)
             new pg_field_name(),
+            new pg_field_name('pg_fieldname'), // PHP_FALIAS (#22219)
             new pg_field_size(),
+            new pg_field_size('pg_fieldsize'), // PHP_FALIAS (#22219)
             new pg_field_type(),
+            new pg_field_type('pg_fieldtype'), // PHP_FALIAS (#22219)
             new pg_field_num(),
+            new pg_field_num('pg_fieldnum'), // PHP_FALIAS (#22219)
             new pg_field_prtlen(),
+            new pg_field_prtlen('pg_fieldprtlen'), // PHP_FALIAS (#22219)
             new pg_socket(),
             new pg_consume_input(),
             new pg_flush(),
@@ -144,7 +165,9 @@ class Module extends ModuleAbstract
             new pg_options(),
             new pg_tty(),
             new pg_client_encoding(),
+            new pg_client_encoding('pg_clientencoding'), // PHP_FALIAS (#22219)
             new pg_set_client_encoding(),
+            new pg_set_client_encoding('pg_setclientencoding'), // PHP_FALIAS (#22219)
             new pg_ping(),
             new pg_connection_reset(),
             new pg_connection_busy(),
@@ -163,8 +186,10 @@ class Module extends ModuleAbstract
             new pg_escape_bytea(),
             new pg_unescape_bytea(),
             new pg_affected_rows(),
+            new pg_affected_rows('pg_cmdtuples'), // PHP_FALIAS (#22219)
             new pg_fetch_all(),
             new pg_num_fields(),
+            new pg_num_fields('pg_numfields'), // PHP_FALIAS (#22219)
             ...self::php84Functions(),
         ];
     }

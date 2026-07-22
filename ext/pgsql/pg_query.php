@@ -16,9 +16,9 @@ use PHPLLVM\Value;
  */
 final class pg_query extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_query')
     {
-        parent::__construct('pg_query');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
