@@ -520,17 +520,8 @@ final class CachingIteratorConstruct extends VmClassMethod
             $frame,
             $iteratorArg
         );
-        $flags = 0;
-        if (null !== $flagsArg) {
-            $flagsArg = $flagsArg->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsArg->type) {
-                throw new \TypeError(
-                    'CachingIterator::__construct(): Argument #2 ($flags) must be of type int, '
-                    .self::typeLabel($flagsArg).' given'
-                );
-            }
-            $flags = $flagsArg->toInt();
-        }
+        // php-src: int $flags = self::CALL_TOSTRING; explicit null → 0 (Z_PARAM_LONG_OR_NULL).
+        $flags = self::resolveConstructFlags($flagsArg, 'CachingIterator::__construct');
         SplDualIteratorStorage::callInner($frame, $inner, 'rewind');
         SplCachingIteratorStorage::init($object, $inner, $flags);
     }
@@ -552,6 +543,30 @@ final class CachingIteratorConstruct extends VmClassMethod
         }
 
         return [$frame->calledArgs[1], $frame->calledArgs[2] ?? null];
+    }
+
+    /**
+     * Resolve construct $flags (php-src spl_iterators.c / Z_PARAM_LONG_OR_NULL; #22336).
+     *
+     * Omitted arg → CALL_TOSTRING; explicit null → 0; int → value.
+     */
+    public static function resolveConstructFlags(?Variable $flagsArg, string $function = 'CachingIterator::__construct'): int
+    {
+        if (null === $flagsArg) {
+            return CachingIteratorBuiltin::CALL_TOSTRING;
+        }
+        $flagsArg = $flagsArg->resolveIndirect();
+        if (Variable::TYPE_NULL === $flagsArg->type) {
+            return 0;
+        }
+        if (Variable::TYPE_INTEGER !== $flagsArg->type) {
+            throw new \TypeError(
+                $function.'(): Argument #2 ($flags) must be of type int, '
+                .self::typeLabel($flagsArg).' given'
+            );
+        }
+
+        return $flagsArg->toInt();
     }
 
     private static function typeLabel(Variable $var): string
