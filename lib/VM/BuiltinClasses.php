@@ -254,6 +254,13 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtension;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetFileName;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetDocComment;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetEndLine;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetStartLine;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetNamespaceName;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetShortName;
+use PHPCompiler\VM\Builtin\ReflectionFunctionInNamespace;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNamedArguments;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfParameters;
@@ -1095,6 +1102,13 @@ final class BuiltinClasses
                 'isvariadic' => new ReflectionFunctionIsVariadic(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
                 'getextension' => new ReflectionFunctionGetExtension(),
+                'getfilename' => new ReflectionFunctionGetFileName(),
+                'getdoccomment' => new ReflectionFunctionGetDocComment(),
+                'getstartline' => new ReflectionFunctionGetStartLine(),
+                'getendline' => new ReflectionFunctionGetEndLine(),
+                'getnamespacename' => new ReflectionFunctionGetNamespaceName(),
+                'getshortname' => new ReflectionFunctionGetShortName(),
+                'innamespace' => new ReflectionFunctionInNamespace(),
                 'getclosurethis' => new ReflectionFunctionGetClosureThis(),
                 'getclosure' => new ReflectionFunctionGetClosure(),
                 'getclosurescopeclass' => new ReflectionFunctionGetClosureScopeClass(),

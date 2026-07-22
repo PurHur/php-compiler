@@ -5541,6 +5541,7 @@ restart:
                         ? $op->block1->func->name
                         : '{closure}';
                     $closureFunc = new Func\PHP($funcName, $op->block1);
+                    $closureFunc->sourceLocation = $op->sourceLocation;
                     if ([] !== $op->parameterMetadata) {
                         $closureFunc->parameterMetadata = $op->parameterMetadata;
                     }
@@ -5622,6 +5623,7 @@ restart:
                         throw new \LogicException("Duplicate function definition for $lcname()");
                     }
                     $func = new Func\PHP($name, $op->block1);
+                    $func->sourceLocation = $op->sourceLocation;
                     $func->deprecated = $op->deprecatedMetadata;
                     if ([] !== $op->parameterMetadata) {
                         $func->parameterMetadata = $op->parameterMetadata;

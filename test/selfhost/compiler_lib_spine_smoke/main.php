@@ -72,6 +72,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -6363,38 +6364,13 @@ require_once __DIR__.'/../../../ext/tidy/tidy_get_opt_doc.php';
 require_once __DIR__.'/../../../ext/tidy/VmTidy.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_parse_string.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_parse_file.php';
-// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
-// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
-
-$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
-if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
-    run('Standard input code', '<?php echo "vm driver ok\n";', []);
-    exit(0);
-}
-
-$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
-if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
-    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
-    run('Standard input code', '<?php echo "1\n";', []);
-    exit(0);
-}
-
-// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
-$__spineMimeSample = 'Hello 世界';
-$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
-    $__spineMimeSample,
-    'UTF-8',
-    true,
-    "\r\n",
-    0
-);
-$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
-unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
-
-// M2 spine unit: setcookie options array parser Vm inventory (#8698).
-\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
-
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetDocComment.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetEndLine.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetFileName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetNamespaceName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetShortName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetStartLine.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionInNamespace.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_repair_file.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_repair_string.php';
 require_once __DIR__.'/../../../ext/tidy/tidy_get_output.php';
@@ -6473,4 +6449,36 @@ require_once __DIR__.'/../../../ext/mysqli/mysqli_stmt_close.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_stmt_execute.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_stmt_fetch.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_store_result.php';
+// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
+// VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
+
+$vmDriverExecute = getenv('PHP_COMPILER_VM_DRIVER_EXECUTE');
+if (is_string($vmDriverExecute) && ('1' === $vmDriverExecute || 'true' === strtolower($vmDriverExecute))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8693, #2201).
+    run('Standard input code', '<?php echo "vm driver ok\n";', []);
+    exit(0);
+}
+
+$vmSpineSmoke = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
+if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower($vmSpineSmoke))) {
+    // Honest bin/vm.php run() dispatch: main() → run() on -r fixture (#8719, #1846).
+    run('Standard input code', '<?php echo "1\n";', []);
+    exit(0);
+}
+
+// M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
+$__spineMimeSample = 'Hello 世界';
+$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
+    $__spineMimeSample,
+    'UTF-8',
+    true,
+    "\r\n",
+    0
+);
+$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
+unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
+
+// M2 spine unit: setcookie options array parser Vm inventory (#8698).
+\PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
+
 echo "compiler_lib_spine_smoke bundle OK\n";
