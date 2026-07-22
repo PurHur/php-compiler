@@ -28816,6 +28816,8 @@ class Compiler {
     /**
      * Positional sibling inline New_ → multi-arg ctor/call (#17524, re-#15124 / #14483).
      * Allows trailing ClassConstFetch/ConstFetch/scalar options after New_ producers (#19731, #19738).
+     * Nested `new Outer(new Mid(new Inner), Mode::C)` must not map Mid/Inner onto the mode
+     * arg or Outer arg #0 by ordinal alone — require the New_ to feed that call arg (#22007, #19770).
      *
      * @param list<Op\Expr> $producers
      * @param list<Operand|null> $callArgs
@@ -28853,8 +28855,11 @@ class Compiler {
             return null;
         }
         $matched = $producers[$argIndex] ?? null;
-
-        return $matched instanceof Op\Expr\New_ ? $matched : null;
+        if (!$matched instanceof Op\Expr\New_) {
+            return null;
+        }
+        // Nested New_ chain (ParentIterator(RecursiveArrayIterator)) ≠ parallel sibling args (#22007).
+        return $this->inlineNewProducerFeedsCallArg($matched, $callArg) ? $matched : null;
     }
 
     /**
