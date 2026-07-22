@@ -72,6 +72,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_multi_query.php';
         require_once __DIR__.'/mysqli_next_result.php';
         require_once __DIR__.'/mysqli_store_result.php';
+        require_once __DIR__.'/mysqli_multi_result_api.php';
         require_once __DIR__.'/mysqli_info.php';
         require_once __DIR__.'/mysqli_stat.php';
         parent::init($runtime);
@@ -171,6 +172,10 @@ class Module extends ModuleAbstract
             new mysqli_multi_query(),
             new mysqli_next_result(),
             new mysqli_store_result(),
+            new mysqli_use_result(),
+            new mysqli_more_results(),
+            new mysqli_stmt_more_results(),
+            new mysqli_stmt_next_result(),
             new mysqli_info(),
             new mysqli_stat(),
         ];

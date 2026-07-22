@@ -54,6 +54,8 @@ final class VmMysqliStmt
             'store_result' => new MysqliStmtStoreResult(),
             'free_result' => new MysqliStmtFreeResult(),
             'result_metadata' => new MysqliStmtResultMetadata(),
+            'more_results' => new MysqliStmtMoreResults(),
+            'next_result' => new MysqliStmtNextResult(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -289,6 +291,16 @@ final class VmMysqliStmt
         $ctx = self::state($stmt)->ctx ?? throw new \LogicException('mysqli_stmt requires VM context');
 
         return VmMysqliResult::wrap($ctx, $meta);
+    }
+
+    public static function moreResults(ObjectEntry $stmt): bool
+    {
+        return self::requireNative($stmt)->more_results();
+    }
+
+    public static function nextResult(ObjectEntry $stmt): bool
+    {
+        return self::requireNative($stmt)->next_result();
     }
 }
 
@@ -641,6 +653,38 @@ final class MysqliStmtResultMetadata extends MysqliClassMethod
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->object($meta);
+        }
+    }
+}
+
+final class MysqliStmtMoreResults extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('more_results');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::more_results()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::moreResults($receiver));
+        }
+    }
+}
+
+final class MysqliStmtNextResult extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::next_result()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::nextResult($receiver));
         }
     }
 }

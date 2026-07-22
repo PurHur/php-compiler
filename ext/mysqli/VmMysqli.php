@@ -66,7 +66,9 @@ final class VmMysqli
             'set_charset' => new MysqliSetCharset(),
             'multi_query' => new MysqliMultiQuery(),
             'next_result' => new MysqliNextResult(),
+            'more_results' => new MysqliMoreResults(),
             'store_result' => new MysqliStoreResult(),
+            'use_result' => new MysqliUseResult(),
             'insert_id' => new MysqliInsertId(),
             'field_count' => new MysqliFieldCountMethod(),
             'sqlstate' => new MysqliSqlstateMethod(),
@@ -389,10 +391,28 @@ final class VmMysqli
         return $native->next_result();
     }
 
+    public static function moreResultsOnLink(ObjectEntry $entry, Context $ctx): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->more_results();
+    }
+
     public static function storeResultOnLink(ObjectEntry $entry, Context $ctx, int $flags = 0): ObjectEntry|bool
     {
         $native = self::requireNative($entry, $ctx);
         $result = $native->store_result($flags);
+        if (false === $result) {
+            return false;
+        }
+
+        return VmMysqliResult::wrap($ctx, $result);
+    }
+
+    public static function useResultOnLink(ObjectEntry $entry, Context $ctx): ObjectEntry|bool
+    {
+        $native = self::requireNative($entry, $ctx);
+        $result = $native->use_result();
         if (false === $result) {
             return false;
         }
@@ -1325,6 +1345,23 @@ final class MysqliNextResult extends MysqliClassMethod
     }
 }
 
+final class MysqliMoreResults extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('more_results');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::more_results()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::more_results() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::moreResultsOnLink($receiver, $ctx));
+        }
+    }
+}
+
 final class MysqliStoreResult extends MysqliClassMethod
 {
     public function __construct()
@@ -1343,6 +1380,29 @@ final class MysqliStoreResult extends MysqliClassMethod
             return;
         }
         $result = VmMysqli::storeResultOnLink($receiver, $ctx, $flags);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($result);
+        }
+    }
+}
+
+final class MysqliUseResult extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('use_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::use_result()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::use_result() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmMysqli::useResultOnLink($receiver, $ctx);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
