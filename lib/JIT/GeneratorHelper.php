@@ -183,9 +183,8 @@ final class GeneratorHelper
         $map = $context->structFieldMap['__generator_state__'];
         $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
-        $zero = $sizeT->constInt(0, false);
 
-        $context->builder->store($zero, $context->builder->structGep($stateParam, $map['auto_key']));
+        // auto_key is initialized at create/reset — do not zero on every resume (#22343).
         $resumeIp = $context->builder->load($context->builder->structGep($stateParam, $map['resume_ip']));
         $doneBb = $func->appendBasicBlock('gen_done');
         $switchInst = $context->builder->branchSwitch($resumeIp, $doneBb, $n);

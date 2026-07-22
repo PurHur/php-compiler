@@ -7620,13 +7620,15 @@ restart:
                     if (null !== $op->arg3) {
                         if (isset($frame->scope[$op->arg3])) {
                             $gen->currentKey->duplicateFrom($frame->scope[$op->arg3]->resolveIndirect());
+                            $gen->noteExplicitYieldKey($gen->currentKey);
                         } elseif (isset($frame->block->constants[$op->arg3])) {
                             $gen->currentKey->duplicateFrom($frame->block->constants[$op->arg3]);
+                            $gen->noteExplicitYieldKey($gen->currentKey);
                         } else {
-                            $gen->currentKey->int($gen->autoKey++);
+                            $gen->currentKey->int($gen->takeNextAutoKey());
                         }
                     } else {
-                        $gen->currentKey->int($gen->autoKey++);
+                        $gen->currentKey->int($gen->takeNextAutoKey());
                     }
                     if (null !== $op->arg1) {
                         $gen->yieldResultSlot = $op->arg1;
