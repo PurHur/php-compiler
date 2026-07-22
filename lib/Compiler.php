@@ -9828,6 +9828,12 @@ class Compiler {
         }
 
         $classOrScalarName = $this->declNameFromCfgType($checkType);
+        if (null !== $classOrScalarName && null !== $block) {
+            $resolvedClass = $this->resolveTypeHintClassName($classOrScalarName, $block);
+            if (null !== $resolvedClass && '' !== $resolvedClass) {
+                $classOrScalarName = $resolvedClass;
+            }
+        }
         if (
             null !== $classOrScalarName
             && $this->compileTimeDefaultMatchesLiteralType($value, strtolower($classOrScalarName))
