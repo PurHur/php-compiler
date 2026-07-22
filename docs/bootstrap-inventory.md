@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6412 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20428 |
+| Source constructs flagged (warnings) | 20426 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4794,7 +4794,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FputcsvRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FsDirRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FsGlobVecRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/FtokRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/FtokRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FunctionExistsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FunctionStaticRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 2 |
@@ -22696,45 +22696,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 134)
 - new Variable (line 155)
 - new Variable (line 168)
-- new HashTable (line 243)
-- new Variable (line 245)
-- new Variable (line 249)
-- new Variable (line 255)
-- new Variable (line 259)
-- new HashTable (line 260)
-- new ClassEntry (line 372)
-- new SplMinHeapConstruct (line 376)
-- new SplMinHeapCompare (line 379)
-- new ClassEntry (line 402)
-- new SplMaxHeapConstruct (line 406)
-- new SplMaxHeapCompare (line 409)
-- new ClassEntry (line 442)
-- new SplPriorityQueueConstruct (line 448)
-- new SplPriorityQueueDebugInfo (line 477)
-- new Variable (line 525)
-- new Variable (line 527)
-- new HashTable (line 618)
-- new Variable (line 620)
-- new Variable (line 624)
-- new HashTable (line 630)
-- new Variable (line 631)
-- new Variable (line 634)
+- new HashTable (line 246)
+- new Variable (line 248)
+- new Variable (line 252)
+- new Variable (line 258)
+- new Variable (line 262)
+- new HashTable (line 263)
+- new ClassEntry (line 375)
+- new SplMinHeapConstruct (line 379)
+- new SplMinHeapCompare (line 382)
+- new ClassEntry (line 405)
+- new SplMaxHeapConstruct (line 409)
+- new SplMaxHeapCompare (line 412)
+- new ClassEntry (line 445)
+- new SplPriorityQueueConstruct (line 451)
+- new SplPriorityQueueDebugInfo (line 480)
+- new Variable (line 528)
+- new Variable (line 530)
+- new HashTable (line 624)
+- new Variable (line 626)
+- new Variable (line 630)
+- new HashTable (line 636)
 - new Variable (line 637)
-- new Variable (line 641)
-- new HashTable (line 642)
-- new Variable (line 657)
-- new HashTable (line 663)
-- new Variable (line 664)
-- new Variable (line 666)
+- new Variable (line 640)
+- new Variable (line 643)
+- new Variable (line 647)
+- new HashTable (line 648)
+- new Variable (line 663)
+- new HashTable (line 669)
 - new Variable (line 670)
-- new Variable (line 675)
-- new Error (line 802)
-- new ArgumentCountError (line 852)
-- new ArgumentCountError (line 872)
-- new ArgumentCountError (line 892)
-- new ArgumentCountError (line 1097)
-- new ArgumentCountError (line 1218)
-- new ArgumentCountError (line 1378)
+- new Variable (line 672)
+- new Variable (line 676)
+- new Variable (line 681)
+- new Error (line 808)
+- new ArgumentCountError (line 858)
+- new ArgumentCountError (line 878)
+- new ArgumentCountError (line 898)
+- new ArgumentCountError (line 1103)
+- new ArgumentCountError (line 1224)
+- new ArgumentCountError (line 1384)
 - 85 class method(s)
 
 ### `ext/spl/SplIteratorSupport.php`
@@ -29417,10 +29417,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 105)
-- new RecursiveIteratorIterator (line 3105)
-- new RecursiveDirectoryIterator (line 3106)
-- new RecursiveIteratorIterator (line 3207)
-- new RecursiveDirectoryIterator (line 3208)
+- new RecursiveIteratorIterator (line 3117)
+- new RecursiveDirectoryIterator (line 3118)
+- new RecursiveIteratorIterator (line 3219)
+- new RecursiveDirectoryIterator (line 3220)
 - 112 class method(s)
 - 13 closure(s)
 
@@ -41763,9 +41763,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/FtokRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 163)
 - 8 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/FunctionExistsRuntime.php`
 
