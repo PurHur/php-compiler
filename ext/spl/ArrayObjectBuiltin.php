@@ -96,6 +96,7 @@ final class ArrayObjectBuiltin
         }
 
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayObject');
+        SplArraySerializeSupport::registerMagicMethods($entry, self::CLASS_LC, 'ArrayObject', $pub);
 
         $entry->methods['__debuginfo'] = new ArrayObjectDebugInfo();
         $entry->methodVisibility['__debuginfo'] = $pub;
