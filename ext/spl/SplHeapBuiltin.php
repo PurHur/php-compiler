@@ -252,8 +252,10 @@ final class SplHeapBuiltin
     }
 
     /**
-     * Heap ordering: always call compare() (php-src spl_ptr_heap_cmp; #19891).
-     * SplMinHeap/SplMaxHeap provide builtins; user subclasses supply PHP compare().
+     * Heap ordering via compare() (php-src spl_ptr_heap_cmp; #19891, #21977).
+     * Bare SplMinHeap/SplMaxHeap use KIND_MIN/KIND_MAX fast path; user subclasses
+     * of those (and SplHeap) are KIND_USER and dispatch to the instance method so
+     * overridden compare() is honored.
      */
     public static function compareElements(ObjectEntry $object, Variable $a, Variable $b, Frame $frame): int
     {
@@ -267,6 +269,12 @@ final class SplHeapBuiltin
         $result = self::vm($frame)->invokeInstanceMethod($object, 'compare', $a, $b)->resolveIndirect();
 
         return $result->toInt();
+    }
+
+    /** True when $object is exactly SplMinHeap / SplMaxHeap (not a user subclass). */
+    public static function isExactHeapClass(ObjectEntry $object, string $classLc): bool
+    {
+        return strtolower(ltrim($object->class->name, '\\')) === $classLc;
     }
 
     private static function siftUp(ObjectEntry $object, int $index, Frame $frame): void
@@ -775,7 +783,11 @@ final class SplMinHeapConstruct extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplMinHeapBuiltin::CLASS_LC, 'SplMinHeap::__construct()');
-        SplHeapBuiltin::init($object, SplHeapBuiltin::KIND_MIN);
+        // User subclasses must KIND_USER so overridden compare() runs (#21977).
+        $kind = SplHeapBuiltin::isExactHeapClass($object, SplMinHeapBuiltin::CLASS_LC)
+            ? SplHeapBuiltin::KIND_MIN
+            : SplHeapBuiltin::KIND_USER;
+        SplHeapBuiltin::init($object, $kind);
     }
 }
 
@@ -789,7 +801,10 @@ final class SplMaxHeapConstruct extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplMaxHeapBuiltin::CLASS_LC, 'SplMaxHeap::__construct()');
-        SplHeapBuiltin::init($object, SplHeapBuiltin::KIND_MAX);
+        $kind = SplHeapBuiltin::isExactHeapClass($object, SplMaxHeapBuiltin::CLASS_LC)
+            ? SplHeapBuiltin::KIND_MAX
+            : SplHeapBuiltin::KIND_USER;
+        SplHeapBuiltin::init($object, $kind);
     }
 }
 
