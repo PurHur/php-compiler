@@ -419,6 +419,7 @@ use PHPCompiler\VM\Builtin\ReflectionTypeAllowsNull;
 use PHPCompiler\VM\Builtin\ReflectionTypeToString;
 use PHPCompiler\VM\Builtin\WeakMapConstruct;
 use PHPCompiler\VM\Builtin\WeakMapCount;
+use PHPCompiler\VM\Builtin\WeakMapGetIterator;
 use PHPCompiler\VM\Builtin\WeakMapOffsetExists;
 use PHPCompiler\VM\Builtin\WeakMapOffsetGet;
 use PHPCompiler\VM\Builtin\WeakMapOffsetSet;
@@ -595,7 +596,8 @@ final class BuiltinClasses
     private static function registerWeakMap(Context $ctx): void
     {
         $entry = new ClassEntry('WeakMap');
-        $entry->interfaces = ['arrayaccess', 'countable'];
+        // Zend/zend_weakrefs.c — ArrayAccess + Countable + IteratorAggregate (#22267).
+        $entry->interfaces = ['arrayaccess', 'countable', 'iteratoraggregate'];
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $entry->properties[] = new ClassProperty(
             WeakRefSupport::MAP_PROPERTY,
@@ -618,10 +620,14 @@ final class BuiltinClasses
                 'offsetexists' => new WeakMapOffsetExists(),
                 'offsetunset' => new WeakMapOffsetUnset(),
                 'count' => new WeakMapCount(),
+                'getiterator' => new WeakMapGetIterator(),
             ] as $name => $method
         ) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
+            if ('getiterator' === $name) {
+                $entry->methodNames[$name] = 'getIterator';
+            }
         }
         $ctx->classes['weakmap'] = $entry;
     }

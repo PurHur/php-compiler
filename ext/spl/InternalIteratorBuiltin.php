@@ -146,7 +146,7 @@ final class InternalIteratorBuiltin
         return SplArrayStorage::iteratorCurrent($object);
     }
 
-    public static function key(ObjectEntry $object): int|string
+    public static function key(ObjectEntry $object): int|string|Variable
     {
         if (isset(self::$liveHandlers[$object->id])) {
             return self::$liveHandlers[$object->id]->key();
@@ -212,6 +212,11 @@ final class InternalIteratorKey extends VmClassMethod
             return;
         }
         $key = InternalIteratorBuiltin::key($object);
+        if ($key instanceof Variable) {
+            $frame->returnVar->copyFrom($key->resolveIndirect());
+
+            return;
+        }
         if (\is_int($key)) {
             $frame->returnVar->int($key);
         } else {

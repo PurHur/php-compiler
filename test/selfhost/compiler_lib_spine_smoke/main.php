@@ -5891,6 +5891,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueGetValue.p
 require_once __DIR__.'/../../../lib/VM/Builtin/ThrowableGetMessage.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapCount.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapGetIterator.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetExists.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetGet.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetSet.php';
@@ -6097,6 +6098,7 @@ require_once __DIR__.'/../../../lib/VM/VmValueBoxWriteBool.php';
 require_once __DIR__.'/../../../lib/VM/VmValueCompare.php';
 require_once __DIR__.'/../../../lib/VM/VmVarFetch.php';
 require_once __DIR__.'/../../../lib/VM/VmVarFetchJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/WeakMapInternalIteratorHandler.php';
 require_once __DIR__.'/../../../lib/VM/WeakMapIterator.php';
 require_once __DIR__.'/../../../lib/VM/WeakRefRegistry.php';
 require_once __DIR__.'/../../../lib/VM/WeakRefSupport.php';
