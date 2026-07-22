@@ -152,7 +152,10 @@ final class VmUConverter
     }
 
     /**
-     * UConverter::transcode() — one-shot charset conversion (php-src ext/intl/converter; #6401).
+     * UConverter::transcode() — one-shot charset conversion (php-src ext/intl/converter; #6401 / #21978).
+     *
+     * Unmappable codepoints use ICU-like substitution (ASCII → 0x1A), matching instance {@see convert()} —
+     * not bare {@see VmIconv::iconv()} hard-fail.
      */
     public static function transcode(
         string $str,
@@ -162,7 +165,19 @@ final class VmUConverter
     ): string|false {
         unset($options);
 
-        return VmIconv::iconv($fromEncoding, $toEncoding, $str);
+        $to = '' !== $toEncoding ? $toEncoding : 'UTF-8';
+        $from = '' !== $fromEncoding ? $fromEncoding : 'UTF-8';
+        $result = VmIconv::iconv($from, $to, $str);
+        if (false !== $result) {
+            return $result;
+        }
+        $destOk = null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($to, false));
+        $srcOk = null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($from, true));
+        if (!$destOk || !$srcOk) {
+            return false;
+        }
+
+        return self::nativeSubstConvert($str, $from, $to, '');
     }
 
     public static function isUConverterObject(?ObjectEntry $object, ?Context $ctx = null): bool
@@ -252,13 +267,32 @@ final class VmUConverter
         string $from,
         string $to
     ): string {
+        $configured = self::$state[$object->id]['substChars'] ?? '';
+        $out = self::nativeSubstConvert($str, $from, $to, $configured);
+        self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+        self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
+
+        return $out;
+    }
+
+    /**
+     * Shared ICU-like substitution for convert() and static transcode() (#21978).
+     *
+     * @param string $configuredSubstChars empty → charset defaults (ASCII 0x1A / Unicode U+FFFD)
+     */
+    private static function nativeSubstConvert(
+        string $str,
+        string $from,
+        string $to,
+        string $configuredSubstChars
+    ): string {
         if (self::isUtf8Family($from)) {
             $out = '';
             $len = \strlen($str);
             $i = 0;
             $subst = self::isUnicodeCharset($to)
-                ? (self::$state[$object->id]['substChars'] !== ''
-                    ? self::$state[$object->id]['substChars']
+                ? ($configuredSubstChars !== ''
+                    ? $configuredSubstChars
                     : self::defaultSubstChars($to))
                 : "\x1a";
             while ($i < $len) {
@@ -277,20 +311,13 @@ final class VmUConverter
                 $piece = VmIconv::iconv('UTF-8', $to, $char);
                 $out .= false !== $piece ? $piece : $subst;
             }
-            self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
-            self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
 
             return $out;
         }
-        $subst = self::isUnicodeCharset($to)
-            ? (self::$state[$object->id]['substChars'] !== ''
-                ? self::$state[$object->id]['substChars']
-                : "\xef\xbf\xbd")
-            : "\x1a";
-        self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
-        self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
 
-        return $subst;
+        return self::isUnicodeCharset($to)
+            ? ($configuredSubstChars !== '' ? $configuredSubstChars : "\xef\xbf\xbd")
+            : "\x1a";
     }
 
     /**
