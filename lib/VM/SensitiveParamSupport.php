@@ -9,6 +9,7 @@ use PHPCompiler\VM\Builtin\SensitiveParameterValueConstruct;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Builtin\SensitiveParameterValueDebugInfo;
 use PHPCompiler\VM\Builtin\SensitiveParameterValueGetValue;
+use PHPCompiler\ext\standard\VmIni;
 use PHPCfg\Func;
 
 /**
@@ -161,13 +162,16 @@ final class SensitiveParamSupport
      *
      * SensitiveParameterValue markers format as Object(SensitiveParameterValue) — same as any
      * object — not the debug_print_backtrace flat label {@see TRACE_ARG_LABEL} (#21524).
+     *
+     * String args use single quotes, smart_str_append_escaped + zend.exception_string_param_max_len
+     * truncation (#21999). getTrace() raw values are unchanged.
      */
     public static function formatTraceArg(Variable $arg): string
     {
         $arg = $arg->resolveIndirect();
         switch ($arg->type) {
             case Variable::TYPE_STRING:
-                return '"'.$arg->toString().'"';
+                return self::formatTraceStringArg($arg->toString());
             case Variable::TYPE_NULL:
                 return 'NULL';
             case Variable::TYPE_BOOLEAN:
@@ -183,6 +187,66 @@ final class SensitiveParamSupport
             default:
                 return $arg->toString();
         }
+    }
+
+    /**
+     * php-src smart_str_append_scalar / smart_str_append_escaped_truncated
+     * (Zend/zend_smart_str.c, EG(exception_string_param_max_len)).
+     */
+    private static function formatTraceStringArg(string $value): string
+    {
+        $maxLen = VmIni::getExceptionStringParamMaxLen();
+        $len = \strlen($value);
+        $slice = $len > $maxLen ? \substr($value, 0, $maxLen) : $value;
+        $out = "'".self::escapeTraceStringBytes($slice);
+        if ($len > $maxLen) {
+            $out .= '...';
+        }
+
+        return $out."'";
+    }
+
+    /** php-src smart_str_append_escaped (Zend/zend_smart_str.c). */
+    private static function escapeTraceStringBytes(string $s): string
+    {
+        $out = '';
+        $n = \strlen($s);
+        for ($i = 0; $i < $n; ++$i) {
+            $c = \ord($s[$i]);
+            if (32 <= $c && 126 >= $c && 92 !== $c) {
+                $out .= $s[$i];
+                continue;
+            }
+            $out .= '\\';
+            switch ($c) {
+                case 10:
+                    $out .= 'n';
+                    break;
+                case 13:
+                    $out .= 'r';
+                    break;
+                case 9:
+                    $out .= 't';
+                    break;
+                case 12:
+                    $out .= 'f';
+                    break;
+                case 11:
+                    $out .= 'v';
+                    break;
+                case 92:
+                    $out .= '\\';
+                    break;
+                case 27:
+                    $out .= 'e';
+                    break;
+                default:
+                    $out .= 'x'.\strtoupper(\sprintf('%02x', $c));
+                    break;
+            }
+        }
+
+        return $out;
     }
 
     private static function copyArgsList(Frame $frame): Variable

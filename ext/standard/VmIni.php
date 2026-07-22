@@ -143,8 +143,15 @@ final class VmIni
         'pcre.backtrack_limit',
         'pcre.jit',
         'pcre.recursion_limit',
+        'zend.exception_string_param_max_len',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
+
+    /** php-src EG(exception_string_param_max_len) compiled default (Zend/zend_exceptions.c, #21999). */
+    private const CFG_EXCEPTION_STRING_PARAM_MAX_LEN = 15;
+
+    /** php-src hard ceiling for zend.exception_string_param_max_len. */
+    private const EXCEPTION_STRING_PARAM_MAX_LEN_CEILING = 1_000_000;
 
     /** php-src PG(pcre.backtrack_limit) default 1000000 (ext/pcre/php_pcre.c). */
     private const CFG_PCRE_BACKTRACK_LIMIT = '1000000';
@@ -213,6 +220,8 @@ final class VmIni
                 return self::setPcreJit($newValue);
             case 'pcre.recursion_limit':
                 return self::setPcreRecursionLimit($newValue);
+            case 'zend.exception_string_param_max_len':
+                return self::setExceptionStringParamMaxLen($newValue);
             case 'max_execution_time':
                 return self::setMaxExecutionTime($ctx, $newValue);
             case 'register_argc_argv':
@@ -299,6 +308,8 @@ final class VmIni
                 return self::formatBoolIniGet(self::$pcreJit);
             case 'pcre.recursion_limit':
                 return (string) self::$pcreRecursionLimit;
+            case 'zend.exception_string_param_max_len':
+                return (string) self::$exceptionStringParamMaxLen;
             case 'max_execution_time':
                 return self::$maxExecutionTime;
             case 'register_argc_argv':
@@ -352,6 +363,7 @@ final class VmIni
             'pcre.backtrack_limit' => self::CFG_PCRE_BACKTRACK_LIMIT,
             'pcre.jit' => '1',
             'pcre.recursion_limit' => self::CFG_PCRE_RECURSION_LIMIT,
+            'zend.exception_string_param_max_len' => (string) self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN,
             'register_argc_argv' => self::formatRegisterArgcArgvIniGet(self::$registerArgcArgv),
             default => false,
         };
@@ -373,6 +385,12 @@ final class VmIni
     public static function syncPrecision(int $precision): void
     {
         self::$precision = $precision;
+    }
+
+    /** Sync from JIT ini_set path ({@see IniJitHelper}) for getTraceAsString truncation (#21999). */
+    public static function syncExceptionStringParamMaxLen(int $maxLen): void
+    {
+        self::$exceptionStringParamMaxLen = $maxLen;
     }
 
     /** php-src PG(serialize_precision) default -1 (zend_dtoa mode 0; issue #7100). */
@@ -413,6 +431,9 @@ final class VmIni
     private static bool $pcreJit = true;
 
     private static int $pcreRecursionLimit = 100_000;
+
+    /** php-src EG(exception_string_param_max_len) — getTraceAsString truncation (#21999). */
+    private static int $exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
 
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
 
@@ -503,6 +524,12 @@ final class VmIni
     public static function getPcreRecursionLimit(): int
     {
         return self::$pcreRecursionLimit;
+    }
+
+    /** php-src EG(exception_string_param_max_len) for Throwable::getTraceAsString (#21999). */
+    public static function getExceptionStringParamMaxLen(): int
+    {
+        return self::$exceptionStringParamMaxLen;
     }
 
     public static function getUserAgent(): string
@@ -770,6 +797,10 @@ final class VmIni
             case 'pcre.recursion_limit':
                 self::$pcreRecursionLimit = (int) self::CFG_PCRE_RECURSION_LIMIT;
                 break;
+            case 'zend.exception_string_param_max_len':
+                self::$exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
+                IniJitHelper::syncExceptionStringParamMaxLen(self::$exceptionStringParamMaxLen);
+                break;
             case 'max_execution_time':
                 self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
                 $ctx->executionLimits->applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
@@ -810,6 +841,24 @@ final class VmIni
             return false;
         }
         self::$pcreRecursionLimit = $parsed;
+
+        return $old;
+    }
+
+    /**
+     * php-src OnUpdateExceptionStringParamMaxLen — values 0..1000000 (#21999).
+     *
+     * @return string|false
+     */
+    private static function setExceptionStringParamMaxLen(string $newValue): string|false
+    {
+        $parsed = (int) trim($newValue);
+        if ($parsed < 0 || $parsed > self::EXCEPTION_STRING_PARAM_MAX_LEN_CEILING) {
+            return false;
+        }
+        $old = (string) self::$exceptionStringParamMaxLen;
+        self::$exceptionStringParamMaxLen = $parsed;
+        IniJitHelper::syncExceptionStringParamMaxLen($parsed);
 
         return $old;
     }

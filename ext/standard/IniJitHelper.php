@@ -39,6 +39,7 @@ final class IniJitHelper
         'pcre.backtrack_limit',
         'pcre.jit',
         'pcre.recursion_limit',
+        'zend.exception_string_param_max_len',
         'zend.assertions',
         'assert.active',
         'assert.bail',
@@ -130,6 +131,11 @@ final class IniJitHelper
 
     private const CFG_PCRE_RECURSION_LIMIT = '100000';
 
+    /** php-src EG(exception_string_param_max_len) compiled default (#21999). */
+    private const CFG_EXCEPTION_STRING_PARAM_MAX_LEN = 15;
+
+    private const EXCEPTION_STRING_PARAM_MAX_LEN_CEILING = 1_000_000;
+
     private static bool $displayErrors = false;
 
     /** Raw ini_set() value; null uses php.ini default formatting (#11835). */
@@ -159,6 +165,8 @@ final class IniJitHelper
 
     private static int $pcreRecursionLimit = 100_000;
 
+    private static int $exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
+
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
 
     private static bool $registerArgcArgv = true;
@@ -166,6 +174,17 @@ final class IniJitHelper
     public static function syncRegisterArgcArgv(bool $enabled): void
     {
         self::$registerArgcArgv = $enabled;
+    }
+
+    /** Keep NestedJIT/AOT aligned with VmIni runtime value (#21999). */
+    public static function syncExceptionStringParamMaxLen(int $maxLen): void
+    {
+        self::$exceptionStringParamMaxLen = $maxLen;
+    }
+
+    public static function getExceptionStringParamMaxLen(): int
+    {
+        return self::$exceptionStringParamMaxLen;
     }
 
     public static function registerArgcArgvEnabled(): bool
@@ -315,6 +334,9 @@ final class IniJitHelper
         if ('pcre.recursion_limit' === $key) {
             return (string) self::$pcreRecursionLimit;
         }
+        if ('zend.exception_string_param_max_len' === $key) {
+            return (string) self::$exceptionStringParamMaxLen;
+        }
         if ('max_execution_time' === $key) {
             return self::$maxExecutionTime;
         }
@@ -392,6 +414,9 @@ final class IniJitHelper
         }
         if ('pcre.recursion_limit' === $key) {
             return self::setPcreRecursionLimit($newValue);
+        }
+        if ('zend.exception_string_param_max_len' === $key) {
+            return self::setExceptionStringParamMaxLen($newValue);
         }
         if ('max_execution_time' === $key) {
             return self::setMaxExecutionTime($newValue);
@@ -484,6 +509,9 @@ final class IniJitHelper
         if ('pcre.recursion_limit' === $key) {
             return self::CFG_PCRE_RECURSION_LIMIT;
         }
+        if ('zend.exception_string_param_max_len' === $key) {
+            return (string) self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
+        }
         if ('register_argc_argv' === $key) {
             return VmIni::formatRegisterArgcArgvIniGet(self::$registerArgcArgv);
         }
@@ -545,6 +573,10 @@ final class IniJitHelper
                 break;
             case 'pcre.recursion_limit':
                 self::$pcreRecursionLimit = (int) self::CFG_PCRE_RECURSION_LIMIT;
+                break;
+            case 'zend.exception_string_param_max_len':
+                self::$exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
+                VmIni::syncExceptionStringParamMaxLen(self::$exceptionStringParamMaxLen);
                 break;
             case 'max_execution_time':
                 self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
@@ -706,6 +738,19 @@ final class IniJitHelper
         }
         $old = (string) self::$pcreRecursionLimit;
         self::$pcreRecursionLimit = $parsed;
+
+        return $old;
+    }
+
+    private static function setExceptionStringParamMaxLen(string $newValue): ?string
+    {
+        $parsed = (int) trim($newValue);
+        if ($parsed < 0 || $parsed > self::EXCEPTION_STRING_PARAM_MAX_LEN_CEILING) {
+            return null;
+        }
+        $old = (string) self::$exceptionStringParamMaxLen;
+        self::$exceptionStringParamMaxLen = $parsed;
+        VmIni::syncExceptionStringParamMaxLen($parsed);
 
         return $old;
     }
