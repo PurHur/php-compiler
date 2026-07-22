@@ -104,6 +104,7 @@ final class SplDoublyLinkedListBuiltin
 
         $entry->isInternal = true;
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplDoublyLinkedList');
+        SplDllistSerializeSupport::registerMagicMethods($entry, $pub);
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
@@ -120,7 +121,9 @@ final class SplDoublyLinkedListBuiltin
             $entry->methods['offsetget'],
             $entry->methods['rewind'],
             $entry->methods['valid'],
-            $entry->methods['__debuginfo']
+            $entry->methods['__debuginfo'],
+            $entry->methods['__serialize'],
+            $entry->methods['__unserialize']
         );
     }
 
