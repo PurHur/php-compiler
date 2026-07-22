@@ -159,6 +159,37 @@ final class VmPgsqlCore
     }
 
     /**
+     * pg_fetch_all_columns — one column as a packed list (php-src ext/pgsql/pgsql.c; #22216).
+     */
+    public static function fetchAllColumns(ObjectEntry $resultObj, int $field = 0): HashTable
+    {
+        $result = VmPgsqlResult::native($resultObj);
+        if ($field < 0) {
+            throw new \ValueError(
+                'pg_fetch_all_columns(): Argument #2 ($field) must be greater than or equal to 0'
+            );
+        }
+        if ($field >= VmPgsqlNative::nfields($result)) {
+            throw new \ValueError(
+                'pg_fetch_all_columns(): Argument #2 ($field) must be less than the number of fields for this result set'
+            );
+        }
+        $out = new HashTable();
+        $ntuples = VmPgsqlNative::ntuples($result);
+        for ($r = 0; $r < $ntuples; ++$r) {
+            $slot = new Variable();
+            if (VmPgsqlNative::getisnull($result, $r, $field)) {
+                $slot->null();
+            } else {
+                $slot->string(VmPgsqlNative::getvalue($result, $r, $field));
+            }
+            $out->add((string) $r, $slot);
+        }
+
+        return $out;
+    }
+
+    /**
      * pg_copy_to — COPY table TO STDOUT (php-src ext/pgsql/pgsql.c; #20629).
      *
      * @return HashTable|false packed list of row strings

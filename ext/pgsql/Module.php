@@ -189,6 +189,7 @@ class Module extends ModuleAbstract
             new pg_affected_rows(),
             new pg_affected_rows('pg_cmdtuples'), // PHP_FALIAS (#22219)
             new pg_fetch_all(),
+            new pg_fetch_all_columns(),
             new pg_num_fields(),
             new pg_num_fields('pg_numfields'), // PHP_FALIAS (#22219)
             ...self::php84Functions(),
