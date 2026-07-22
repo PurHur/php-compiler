@@ -28,7 +28,9 @@ final class ReflectionFunctionConstruct extends VmClassMethod
         if (VmClosureCall::isClosure($target)) {
             $state = VmClosureCall::resolve($target);
             $receiver->reflectionClosureState = $state;
-            $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($state->func->name);
+            $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string(
+                ReflectionSupport::displayNameForClosureState($state)
+            );
         } else {
             $name = VmReflection::normalizeGlobalIntrospectionName(
                 VmReflection::stringArg($target, 'ReflectionFunction::__construct() name', 1)
