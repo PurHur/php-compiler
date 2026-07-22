@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6415 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20436 |
+| Source constructs flagged (warnings) | 20439 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1965,7 +1965,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 17 |
 | `ext/spl/FilterIteratorBuiltin.php` | 0 | 14 |
-| `ext/spl/GlobIteratorBuiltin.php` | 0 | 4 |
+| `ext/spl/GlobIteratorBuiltin.php` | 0 | 7 |
 | `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 7 |
 | `ext/spl/InternalIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/InternalIteratorLiveHandler.php` | 0 | 1 |
@@ -22297,10 +22297,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/GlobIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 34)
-- new GlobIteratorConstruct (line 43)
-- new ArgumentCountError (line 168)
-- 18 class method(s)
+- new ClassEntry (line 35)
+- new GlobIteratorConstruct (line 44)
+- new Variable (line 161)
+- new ObjectEntry (line 179)
+- new ArgumentCountError (line 231)
+- new ArgumentCountError (line 416)
+- 23 class method(s)
 
 ### `ext/spl/InfiniteIteratorBuiltin.php`
 
