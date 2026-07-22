@@ -7,15 +7,8 @@ class Legacy {
 
 class Control {}
 
-$r = new ReflectionClass(Legacy::class);
-var_export($r->isDeprecated());
-echo "\n";
 $m = new ReflectionMethod(Legacy::class, 'run');
 var_export($m->isDeprecated());
-echo "\n";
-
-$rc = new ReflectionClass(Control::class);
-var_export($rc->isDeprecated());
 echo "\n";
 
 ini_set('error_reporting', '32767');
