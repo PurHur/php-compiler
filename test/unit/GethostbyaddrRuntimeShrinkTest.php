@@ -8,18 +8,28 @@ use PHPCompiler\ext\standard\GethostbyaddrJitHelper;
 use PHPCompiler\ext\standard\VmDns;
 use PHPUnit\Framework\TestCase;
 
-/** GethostbyaddrRuntime must route through GethostbyaddrJitHelper PHP, not glibc LLVM (#9474). */
+/**
+ * GethostbyaddrRuntime NestedJIT via JitVmHelperLink::ensureCompiled (#22370 / peer #22355).
+ * Must route through GethostbyaddrJitHelper PHP, not glibc LLVM (#9474).
+ */
 final class GethostbyaddrRuntimeShrinkTest extends TestCase
 {
-    public function testGethostbyaddrRuntimeUsesJitHelperNotGlibcLlvm(): void
+    public function testGethostbyaddrRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GethostbyaddrRuntime.php');
         $this->assertStringContainsString('GethostbyaddrJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('GethostbyaddrLibcBridge', $source);
         $this->assertStringNotContainsString("lookupFunction('gethostbyaddr')", $source);
         $this->assertStringNotContainsString("lookupFunction('inet_pton')", $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
-        $this->assertLessThan(200, substr_count($source, "\n"));
+        $this->assertLessThan(150, substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/GethostbyaddrLibcBridge.php');
     }
 
