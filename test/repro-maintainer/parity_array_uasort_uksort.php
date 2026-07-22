@@ -2,17 +2,12 @@
 
 declare(strict_types=1);
 
+// #22372 — php-src has uasort()/uksort() only; array_* names must not exist.
 var_export(function_exists('array_uasort'));
 echo "\n";
 var_export(function_exists('array_uksort'));
 echo "\n";
-
-$a = ['b' => 2, 'a' => 1];
-array_uasort($a, static fn ($x, $y) => $x <=> $y);
-var_export($a);
+var_export(function_exists('uasort'));
 echo "\n";
-
-$k = ['b' => 1, 'a' => 2];
-array_uksort($k, static fn ($x, $y) => strcmp((string) $x, (string) $y));
-var_export($k);
+var_export(function_exists('uksort'));
 echo "\n";

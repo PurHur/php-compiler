@@ -108,8 +108,6 @@ final class BuiltinParamNames
             case 'usort':
             case 'uasort':
             case 'uksort':
-            case 'array_uasort':
-            case 'array_uksort':
                 return \PHPCompiler\CompilerVersion::supportsSortingEnum()
                     ? ['array', 'callback', 'direction']
                     : ['array', 'callback'];
