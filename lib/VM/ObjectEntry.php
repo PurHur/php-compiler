@@ -277,7 +277,7 @@ class ObjectEntry {
             if ($property->name !== $name) {
                 continue;
             }
-            // Declared property unset → uninitialized slot (typed with/without default, #4863).
+            // Declared property unset → UNDEF slot (typed Error vs untyped Warning on read, #4863/#22021).
             $slot->reset();
             $slot->type = Variable::TYPE_UNDEFINED;
             $slot->objectPropertyOwner = $this;

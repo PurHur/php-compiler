@@ -29,9 +29,7 @@ final class TypedPropertyUninitGuard
             return;
         }
         [$classId, $slotIndex] = $resolved;
-        if ($object->propertySlotHasCompileTimeDefault($classId, $slotIndex)) {
-            return;
-        }
+        $requiresTypedGuard = $object->propertySlotRequiresTypedInitGuard($classId, $slotIndex);
         $valuePtr = self::valuePtrFromVariable($context, $var);
         if (null === $valuePtr) {
             return;
@@ -48,7 +46,8 @@ final class TypedPropertyUninitGuard
         $checkBlock = $fn->appendBasicBlock('typed_prop_uninit_check');
         $okBlock = $fn->appendBasicBlock('typed_prop_uninit_ok');
         $exitBlock = $fn->appendBasicBlock('typed_prop_uninit_exit');
-        $raiseBlock = $fn->appendBasicBlock('typed_prop_uninit_raise');
+        $raiseBlock = $requiresTypedGuard ? $fn->appendBasicBlock('typed_prop_uninit_raise') : null;
+        $undefWarnBlock = $requiresTypedGuard ? null : $fn->appendBasicBlock('untyped_prop_undef_warn');
 
         $context->builder->positionAtEnd($entry);
         $context->builder->branch($checkBlock);
@@ -64,29 +63,50 @@ final class TypedPropertyUninitGuard
             $typeByte,
             $i8->constInt(VmVariable::TYPE_UNDEFINED, false)
         );
-        $context->builder->branchIf($isUndef, $raiseBlock, $okBlock);
+        if ($requiresTypedGuard) {
+            assert(null !== $raiseBlock);
+            $context->builder->branchIf($isUndef, $raiseBlock, $okBlock);
 
-        $context->builder->positionAtEnd($raiseBlock);
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
-        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ErrorRaise::ensureStandaloneBodies($context);
-        }
-        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        ErrorRaise::emitRaise(
-            $context,
-            sprintf(
-                'Typed property %s::$%s must not be accessed before initialization',
+            $context->builder->positionAtEnd($raiseBlock);
+            $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+            ErrorRaise::registerDeclarations($context);
+            ErrorRaise::ensureLinked($context);
+            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                ErrorRaise::ensureStandaloneBodies($context);
+            }
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            ErrorRaise::emitRaise(
+                $context,
+                sprintf(
+                    'Typed property %s::$%s must not be accessed before initialization',
+                    $declaringClass,
+                    $var->objectPropertyName
+                )
+            );
+            // Thin user-script AOT skips end-of-main abort (#21467); abort here.
+            if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+            }
+            self::emitRaiseAndTerminate($context);
+        } else {
+            assert(null !== $undefWarnBlock);
+            $context->builder->branchIf($isUndef, $undefWarnBlock, $okBlock);
+
+            $context->builder->positionAtEnd($undefWarnBlock);
+            $savedWarn = BasicBlockHelper::tryGetInsertBlock($context);
+            \PHPCompiler\JIT\Builtin\UndefinedPropertyFetchRuntime::emitWarning(
+                $context,
                 $declaringClass,
-                $var->objectPropertyName
-            )
-        );
-        // Thin user-script AOT skips end-of-main abort (#21467); abort here.
-        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+                (string) $var->objectPropertyName
+            );
+            BasicBlockHelper::restoreInsertBlock($context, $savedWarn);
+            // Zend: undefined untyped declared read → NULL (#22021).
+            $context->builder->store(
+                $i8->constInt(VmVariable::TYPE_NULL, false),
+                $context->builder->structGep($valuePtr, $map['type'])
+            );
+            $context->builder->branch($okBlock);
         }
-        self::emitRaiseAndTerminate($context);
 
         $context->builder->positionAtEnd($okBlock);
         $context->builder->branch($exitBlock);

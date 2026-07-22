@@ -50,12 +50,15 @@ final class TypedPropertyCheck
             if ($property->name !== $name) {
                 continue;
             }
-            // Typed slots use TYPE_UNDEFINED prototype; untyped use TYPE_NULL (#4240).
+            // Typed slots (incl. mixed) use TYPE_UNDEFINED prototype; untyped use TYPE_NULL (#4240, #22021).
             if ($property->prototype->isUndefined()) {
                 return true;
             }
             // Post-unset typed property with default (#4863, zend_object_handlers.c).
-            if (Variable::TYPE_UNDEFINED === $target->type && $property->prototype->hasDeclaredTypeConstraint()) {
+            if (
+                Variable::TYPE_UNDEFINED === $target->type
+                && $property->prototype->hasDeclaredTypeConstraint()
+            ) {
                 return true;
             }
             // Readonly without default stays uninitialized until constructor assigns (#4248).

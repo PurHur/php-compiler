@@ -12227,6 +12227,10 @@ class JIT {
                         if (\PHPCompiler\VM\TypedPropertyCheck::propertyAllowsNull($proto)) {
                             $this->context->type->object->markPropertyAllowsNull($classId, $name->value);
                         }
+                        // Typed / explicit mixed prototypes stay UNDEFINED; untyped are TYPE_NULL (#22021).
+                        if ($proto->isUndefined() || $proto->hasDeclaredTypeConstraint()) {
+                            $this->context->type->object->markPropertyTypedInitGuard($classId, $name->value);
+                        }
                     }
                     $this->context->type->object->definePropertyVisibility(
                         $classId,
