@@ -15582,19 +15582,22 @@ restart:
             $this->inheritInterfacePropertyRules($entry, $iface);
             $this->inheritInterfacePropertyHooks($entry, $iface);
             foreach ($iface->constants as $name => $value) {
-                if (!isset($entry->constants[$name])) {
-                    $entry->constants[$name] = $value;
-                    if (isset($iface->constNames[$name])) {
-                        $entry->constNames[$name] = $iface->constNames[$name];
-                    }
-                    $entry->constDeclaringClassLc[$name] = $iface->constDeclaringClassLc[$name]
-                        ?? strtolower(ltrim($iface->name, '\\'));
-                    if (isset($iface->constVisibility[$name])) {
-                        $entry->constVisibility[$name] = $iface->constVisibility[$name];
-                    }
-                    if (isset($iface->constFinal[$name])) {
-                        $entry->constFinal[$name] = true;
-                    }
+                if (isset($entry->constants[$name])) {
+                    // Class/interface body redeclared a final interface constant (#22329).
+                    $this->rejectChildOverrideOfFinalClassConst($entry, $iface, $name);
+                    continue;
+                }
+                $entry->constants[$name] = $value;
+                if (isset($iface->constNames[$name])) {
+                    $entry->constNames[$name] = $iface->constNames[$name];
+                }
+                $entry->constDeclaringClassLc[$name] = $iface->constDeclaringClassLc[$name]
+                    ?? strtolower(ltrim($iface->name, '\\'));
+                if (isset($iface->constVisibility[$name])) {
+                    $entry->constVisibility[$name] = $iface->constVisibility[$name];
+                }
+                if (isset($iface->constFinal[$name])) {
+                    $entry->constFinal[$name] = true;
                 }
             }
         }
@@ -15929,13 +15932,15 @@ restart:
         $childLc = strtolower($entry->name);
         $this->inheritParentPropertyHooks($entry, $parent);
         foreach ($parent->constants as $name => $value) {
-            if (isset($entry->constants[$name])) {
-                continue;
-            }
             // Private class constants are not inherited (Zend zend_constants.c / #19615).
             // Child self::PRIVATE must be Undefined constant Child::X, not a visibility leak.
             $vis = $parent->constVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
             if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                continue;
+            }
+            if (isset($entry->constants[$name])) {
+                // Child redeclared a parent (or grandparent) final constant — zend_inheritance.c (#22329).
+                $this->rejectChildOverrideOfFinalClassConst($entry, $parent, $name);
                 continue;
             }
             $entry->constants[$name] = $value;
@@ -17679,6 +17684,37 @@ restart:
         $b->copyFrom($right);
 
         return $a->identicalTo($b);
+    }
+
+    /**
+     * Child class/interface body must not redeclare a final ancestor constant
+     * (Zend/zend_inheritance.c; #4455 compile-time, #22329 eval/runtime).
+     */
+    private function rejectChildOverrideOfFinalClassConst(
+        ClassEntry $entry,
+        ClassEntry $ancestor,
+        string $nameLc
+    ): void {
+        if (!isset($ancestor->constFinal[$nameLc])) {
+            return;
+        }
+        $childDisplay = $entry->constNames[$nameLc]
+            ?? $ancestor->constNames[$nameLc]
+            ?? $nameLc;
+        $constDisplay = $ancestor->constNames[$nameLc] ?? $childDisplay;
+        $declaringLc = $ancestor->constDeclaringClassLc[$nameLc]
+            ?? strtolower(ltrim($ancestor->name, '\\'));
+        $ownerDisplay = $ancestor->name;
+        if (isset($this->context->classes[$declaringLc])) {
+            $ownerDisplay = $this->context->classes[$declaringLc]->name;
+        }
+        throw new \CompileError(sprintf(
+            '%s::%s cannot override final constant %s::%s',
+            $entry->name,
+            $childDisplay,
+            $ownerDisplay,
+            $constDisplay
+        ));
     }
 
     /**

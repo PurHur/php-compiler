@@ -114,4 +114,23 @@ PHP;
         $this->expectExceptionMessage('Child::X cannot override final constant Grand::X');
         $runtime->parseAndCompile($code, 'grand_final.php');
     }
+
+    /** @covers issue #22329 */
+    public function testEvalCannotOverrideFinalClassConstant(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    final public const X = 'a';
+}
+eval('class B extends A { public const X = "b"; }');
+echo B::X, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_const_eval.php');
+        $this->assertNotNull($block);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('B::X cannot override final constant A::X');
+        $runtime->run($block);
+    }
 }
