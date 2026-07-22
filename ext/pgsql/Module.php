@@ -100,6 +100,7 @@ class Module extends ModuleAbstract
             new pg_num_rows('pg_numrows'), // PHP_FALIAS (#22219)
             new pg_last_error(),
             new pg_last_error('pg_errormessage'), // PHP_FALIAS (#22219)
+            new pg_last_notice(),
             new pg_trace(),
             new pg_untrace(),
             new pg_lo_create(),

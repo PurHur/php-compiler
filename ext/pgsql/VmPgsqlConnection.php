@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\pgsql;
 
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -18,7 +19,7 @@ final class VmPgsqlConnection
 
     public const CLASS_NAME = 'PgSql\\Connection';
 
-    /** @var array<int, array{native: \FFI\CData, closed: bool, trace_fp: ?\FFI\CData, object: ObjectEntry}> */
+    /** @var array<int, array{native: \FFI\CData, closed: bool, trace_fp: ?\FFI\CData, object: ObjectEntry, notices: list<string>, notice_cb: ?callable}> */
     private static array $state = [];
 
     private static string $lastError = '';
@@ -56,12 +57,89 @@ final class VmPgsqlConnection
             'closed' => false,
             'trace_fp' => null,
             'object' => $object,
+            'notices' => [],
+            'notice_cb' => null,
         ];
         self::$defaultLinkId = $object->id;
+        VmPgsqlNative::installNoticeProcessor($native, $object->id);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
 
         return $var;
+    }
+
+    /**
+     * Keep the FFI notice-processor closure alive for the connection lifetime (#22217).
+     */
+    public static function setNoticeCallback(int $objectId, callable $cb): void
+    {
+        if (!isset(self::$state[$objectId])) {
+            return;
+        }
+        self::$state[$objectId]['notice_cb'] = $cb;
+    }
+
+    /**
+     * Append a trimmed NOTICE message (php-src _php_pgsql_notice_handler; #22217).
+     */
+    public static function appendNotice(int $objectId, string $message): void
+    {
+        if (!isset(self::$state[$objectId]) || self::$state[$objectId]['closed']) {
+            return;
+        }
+        self::$state[$objectId]['notices'][] = self::trimNoticeMessage($message);
+    }
+
+    /**
+     * pg_last_notice modes (php-src; #22217).
+     *
+     * @return string|HashTable|bool
+     */
+    public static function lastNotice(ObjectEntry $object, int $mode): string|HashTable|bool
+    {
+        if (!isset(self::$state[$object->id]) || self::$state[$object->id]['closed']) {
+            throw new \TypeError('pg_*(): supplied resource is not a valid PostgreSQL link resource');
+        }
+        $notices = &self::$state[$object->id]['notices'];
+        switch ($mode) {
+            case PgsqlConstants::PGSQL_NOTICE_LAST:
+                if ([] === $notices) {
+                    return '';
+                }
+
+                return $notices[\count($notices) - 1];
+            case PgsqlConstants::PGSQL_NOTICE_ALL:
+                $ht = new HashTable();
+                foreach ($notices as $i => $msg) {
+                    $slot = new Variable();
+                    $slot->string($msg);
+                    $ht->add((string) $i, $slot);
+                }
+
+                return $ht;
+            case PgsqlConstants::PGSQL_NOTICE_CLEAR:
+                $notices = [];
+
+                return true;
+            default:
+                throw new \ValueError(
+                    'pg_last_notice(): Argument #2 ($mode) must be one of PGSQL_NOTICE_LAST, PGSQL_NOTICE_ALL, or PGSQL_NOTICE_CLEAR'
+                );
+        }
+    }
+
+    /** php-src _php_pgsql_trim_message. */
+    public static function trimNoticeMessage(string $message): string
+    {
+        $i = \strlen($message);
+        if ($i > 2 && ('.' === $message[$i - 1]) && ("\r" === $message[$i - 2] || "\n" === $message[$i - 2])) {
+            --$i;
+        }
+        while ($i > 1 && ("\r" === $message[$i - 1] || "\n" === $message[$i - 1])) {
+            --$i;
+        }
+
+        return \substr($message, 0, $i);
     }
 
     public static function isLive(ObjectEntry $object): bool
@@ -140,8 +218,11 @@ final class VmPgsqlConnection
             return false;
         }
         self::clearTraceFp($object);
+        VmPgsqlNative::clearNoticeProcessor(self::$state[$object->id]['native']);
         VmPgsqlNative::finish(self::$state[$object->id]['native']);
         self::$state[$object->id]['closed'] = true;
+        self::$state[$object->id]['notice_cb'] = null;
+        self::$state[$object->id]['notices'] = [];
         if (self::$defaultLinkId === $object->id) {
             self::$defaultLinkId = null;
         }

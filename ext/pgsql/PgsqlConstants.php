@@ -172,6 +172,15 @@ final class PgsqlConstants
     /** libpq PG_DIAG_SEVERITY_NONLOCALIZED ('V') */
     public const PGSQL_DIAG_SEVERITY_NONLOCALIZED = 86;
 
+    /** php-src PGSQL_NOTICE_LAST — last notice string (#22217) */
+    public const PGSQL_NOTICE_LAST = 1;
+
+    /** php-src PGSQL_NOTICE_ALL — all notices as array (#22217) */
+    public const PGSQL_NOTICE_ALL = 2;
+
+    /** php-src PGSQL_NOTICE_CLEAR — clear notice buffer (#22217) */
+    public const PGSQL_NOTICE_CLEAR = 3;
+
     /**
      * @return array<string, int>
      */
@@ -218,6 +227,9 @@ final class PgsqlConstants
             'PGSQL_TRANSACTION_UNKNOWN' => self::PGSQL_TRANSACTION_UNKNOWN,
             'PGSQL_STATUS_LONG' => self::PGSQL_STATUS_LONG,
             'PGSQL_STATUS_STRING' => self::PGSQL_STATUS_STRING,
+            'PGSQL_NOTICE_LAST' => self::PGSQL_NOTICE_LAST,
+            'PGSQL_NOTICE_ALL' => self::PGSQL_NOTICE_ALL,
+            'PGSQL_NOTICE_CLEAR' => self::PGSQL_NOTICE_CLEAR,
             'PGSQL_DIAG_SEVERITY' => self::PGSQL_DIAG_SEVERITY,
             'PGSQL_DIAG_SQLSTATE' => self::PGSQL_DIAG_SQLSTATE,
             'PGSQL_DIAG_MESSAGE_PRIMARY' => self::PGSQL_DIAG_MESSAGE_PRIMARY,
