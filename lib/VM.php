@@ -5533,6 +5533,9 @@ restart:
                         ? $op->block1->func->name
                         : '{closure}';
                     $closureFunc = new Func\PHP($funcName, $op->block1);
+                    if ([] !== $op->parameterMetadata) {
+                        $closureFunc->parameterMetadata = $op->parameterMetadata;
+                    }
                     if ([] !== $op->attributeNames) {
                         $closureFunc->attributeNames = $op->attributeNames;
                     }

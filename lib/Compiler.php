@@ -11682,6 +11682,7 @@ class Compiler {
             $this->compileOperand($expr->result, $block, false),
         );
         $op->block1 = $funcBlock;
+        $op->parameterMetadata = $this->parameterMetadataFromParams($func->params);
         $this->assignAttributeMetadata($op, $expr);
         $this->assignSourceMetadata($op, $expr);
         AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
