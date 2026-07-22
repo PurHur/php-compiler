@@ -12,6 +12,8 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\spl\FilesystemIteratorBuiltin;
+use PHPCompiler\ext\spl\RecursiveDirectoryIteratorBuiltin;
 
 /** Register ext/phar builtin classes (php-src ext/phar/phar.stub.php; #3436, #6490, #19871). */
 final class BuiltinClasses
@@ -39,9 +41,13 @@ final class BuiltinClasses
             return;
         }
 
+        // php-src: Phar extends RecursiveDirectoryIterator (phar_object.c / phar.stub.php; #22293).
+        FilesystemIteratorBuiltin::registerClass($ctx);
+
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
         $entry = $ctx->classes[VmPhar::CLASS_LC] ?? new ClassEntry('Phar');
         $entry->isInternal = true;
+        $entry->parentLc = RecursiveDirectoryIteratorBuiltin::CLASS_LC;
 
         $entry->methods['running'] = new PharRunning();
         $entry->methodVisibility['running'] = $pubStatic;

@@ -10,6 +10,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\spl\DirectoryIteratorStorage;
 use PHPCompiler\ext\spl\SplArrayStorage;
 use PHPCompiler\ext\standard\VmJson;
 
@@ -80,6 +81,8 @@ final class PharBuiltin
             'offsetexists' => [PharOffsetExists::class, 'offsetExists'],
             'offsetunset' => [PharOffsetUnset::class, 'offsetUnset'],
             'createdefaultstub' => [PharCreateDefaultStub::class, 'createDefaultStub'],
+            // Override FilesystemIterator::current — Zend returns PharFileInfo (#22293).
+            'current' => [PharCurrent::class, 'current'],
         ];
         $added = false;
         foreach ($methods as $lc => [$class, $name]) {
@@ -802,5 +805,45 @@ final class PharCreateDefaultStub extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->string(VmPharArchive::createDefaultStub($index, $web));
         }
+    }
+}
+
+/**
+ * Phar::current() — FilesystemIterator override returning PharFileInfo (php-src zim_Phar_current; #22293).
+ */
+final class PharCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = VmPharArchive::requireReceiver($frame, 'Phar::current');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (!DirectoryIteratorStorage::valid($object)) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $localname = DirectoryIteratorStorage::filename($object);
+        $st = VmPharArchive::iteratorArchiveState($object);
+        $content = $st['files'][$localname] ?? '';
+        $info = VmPharFileInfo::createFromEntry(
+            $frame->vmContext,
+            $st['path'],
+            $localname,
+            $content
+        );
+        $entryMeta = VmPharArchive::getEntryMetadata($st['path'], $localname);
+        if ($entryMeta['has']) {
+            VmPharFileInfo::hydrateMetadata($info, $entryMeta['value']);
+        }
+        $attrs = VmPharArchive::getEntryAttrs($st['path'], $localname);
+        VmPharFileInfo::hydrateAttrs($info, $attrs['perms'], $attrs['flags']);
+        $frame->returnVar->object($info);
     }
 }
