@@ -1535,14 +1535,16 @@ final class VmFilter
     }
 
     /**
-     * filter_input_array() — batch filter from request-input snapshot (#3294, #19640).
+     * filter_input_array() — batch filter from request-input snapshot (#3294, #19640, #21937).
+     *
+     * @param HashTable|int|null $definition
      *
      * @return HashTable|null null when the input snapshot is missing
      */
     public static function filterInputArray(
         Context $ctx,
         int $type,
-        ?HashTable $definition,
+        HashTable|int|null $definition,
         int $addEmpty,
         Frame $frame
     ): ?HashTable {
@@ -1585,18 +1587,25 @@ final class VmFilter
     }
 
     /**
-     * filter_var_array() — batch filter_var() over keys (#3294).
+     * filter_var_array() — batch filter_var() over keys (#3294, #21937).
+     *
+     * php-src: `$options` may be `array|int` — an int filter ID applies to every element.
+     *
+     * @param HashTable|int|null $definition
      *
      * @return HashTable|null false-equivalent when definition is null and FILTER_DEFAULT fails
      */
     public static function filterVarArray(
         HashTable $data,
-        ?HashTable $definition,
+        HashTable|int|null $definition,
         int $addEmpty,
         Frame $frame
     ): ?HashTable {
         if (null === $definition) {
             return self::filterVarArrayWithDefaultFilter($data, $frame);
+        }
+        if (\is_int($definition)) {
+            return self::filterVarArrayWithSingleFilter($data, $definition, $frame);
         }
 
         return self::filterVarArrayWithDefinition($data, $definition, $addEmpty, $frame);
@@ -1605,7 +1614,17 @@ final class VmFilter
     /** php-src php_filter_var_array — no definition uses FILTER_DEFAULT for every element. */
     private static function filterVarArrayWithDefaultFilter(HashTable $data, Frame $frame): ?HashTable
     {
-        $filterId = self::FILTER_DEFAULT;
+        return self::filterVarArrayWithSingleFilter($data, self::FILTER_DEFAULT, $frame);
+    }
+
+    /**
+     * php-src: when `$options` is a long filter ID, apply it to every element of `$data`.
+     */
+    private static function filterVarArrayWithSingleFilter(
+        HashTable $data,
+        int $filterId,
+        Frame $frame
+    ): ?HashTable {
         if (!self::isSupportedFilter($filterId)) {
             filter_var::triggerUnknownFilterWarning($frame, $filterId);
 

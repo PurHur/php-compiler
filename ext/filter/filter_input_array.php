@@ -16,7 +16,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** filter_input_array() — batch filter from INPUT_* superglobals (php-src ext/filter/filter.c; #3294). */
+/** filter_input_array() — batch filter from INPUT_* superglobals (php-src ext/filter/filter.c; #3294, #21937). */
 final class filter_input_array extends Internal
 {
     public function execute(Frame $frame): void
@@ -35,16 +35,7 @@ final class filter_input_array extends Internal
         $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input_array');
         $definition = null;
         if ($argc >= 2) {
-            $defArg = $frame->calledArgs[1]->resolveIndirect();
-            if (!$defArg->isUndefined() && Variable::TYPE_NULL !== $defArg->type) {
-                $definition = VmArray::requireArrayParam(
-                    $frame->calledArgs[1],
-                    'filter_input_array',
-                    2,
-                    'definition',
-                    '?array'
-                );
-            }
+            $definition = self::resolveDefinition($frame->calledArgs[1]);
         }
         $addEmpty = 0;
         if (3 === $argc) {
@@ -75,6 +66,24 @@ final class filter_input_array extends Internal
         }
 
         return FilterInputArrayRuntime::filter($context, $args[0], $args[1], $addEmpty);
+    }
+
+    /** @return \PHPCompiler\VM\HashTable|int|null */
+    private static function resolveDefinition(Variable $arg): \PHPCompiler\VM\HashTable|int|null
+    {
+        $defArg = $arg->resolveIndirect();
+        if ($defArg->isUndefined() || Variable::TYPE_NULL === $defArg->type) {
+            return null;
+        }
+        if (Variable::TYPE_INTEGER === $defArg->type) {
+            return $defArg->toInt();
+        }
+        if (Variable::TYPE_ARRAY === $defArg->type) {
+            return $defArg->toArray();
+        }
+        VmArray::requireArrayParam($arg, 'filter_input_array', 2, 'definition', 'array|int|null');
+
+        return null;
     }
 
     private static function compileTimeInt(Context $context, JITVariable $var): ?int
