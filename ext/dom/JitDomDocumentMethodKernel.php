@@ -731,7 +731,7 @@ final class JitDomDocumentMethodKernel
                 $context->getTypeFromString('__object__*'),
                 $context->getTypeFromString('int64'),
             ],
-            $context->getTypeFromString('__string__*'),
+            $context->getTypeFromString('__value__*'),
             'PHPCompiler\\ext\\dom\\DomC14NJitHelper::c14nArgv',
             '/ext/dom/DomC14NJitHelper.php'
         );

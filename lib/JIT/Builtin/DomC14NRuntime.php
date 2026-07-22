@@ -8,7 +8,7 @@ use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMNode::C14N() via DomC14NJitHelper (#19467). */
+/** JIT/AOT link for DOMNode::C14N() via DomC14NJitHelper (#19467, #22378). */
 final class DomC14NRuntime
 {
     public const ABI_NAME = '__phpc_dom_c14n';
@@ -31,18 +31,18 @@ final class DomC14NRuntime
         }
 
         $objPtr = $context->getTypeFromString('__object__*');
-        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_NAME,
             'dom_c14n_bridge',
             [$objPtr, $i64],
-            $strPtr,
+            $valuePtr,
             self::HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#19467'
+            '#22378'
         );
     }
 }

@@ -12265,6 +12265,9 @@ final class VmDom
      *
      * When $xpath is non-null, uses xmlC14NDocSaveTo-equivalent nodeset filtering (#20257).
      *
+     * Relative namespace URIs are invalid for C14N (libxml xmlC14NCheckForRelativeNamespaces);
+     * returns false with libxml-style warnings (#22378).
+     *
      * @param ?array<mixed> $xpath
      * @param ?array<mixed> $nsPrefixes
      */
@@ -12274,24 +12277,47 @@ final class VmDom
         bool $exclusive,
         bool $withComments,
         ?array $xpath,
-        ?array $nsPrefixes
+        ?array $nsPrefixes,
+        ?Frame $frame = null,
+        string $methodLabel = 'DOMNode::C14N'
     ): string|false {
         if (null !== $xpath) {
+            if (!DomRegistry::has($node)) {
+                return false;
+            }
+            // libxml checks the whole document before xpath nodeset dump (#22378).
+            if (self::c14nDocumentHasRelativeNamespace($node)) {
+                self::reportC14NRelativeNamespaceFailure($ctx, $frame, $methodLabel);
+
+                return false;
+            }
+
             return self::c14nWithXPathNodeset($ctx, $node, $exclusive, $withComments, $xpath, $nsPrefixes);
         }
-        unset($ctx, $nsPrefixes);
+        unset($nsPrefixes);
         if (!DomRegistry::has($node)) {
             return false;
         }
         $state = DomRegistry::state($node);
         if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
+            if (self::c14nDocumentHasRelativeNamespace($node)) {
+                self::reportC14NRelativeNamespaceFailure($ctx, $frame, $methodLabel);
+
+                return false;
+            }
             // libxml xmlC14NDocDumpMemory on the document: emit child PIs/comments/element
             // in document order, joined by "\n"; doctype is omitted (#21659).
             return self::c14nSerializeDocumentChildren($node, $withComments, $exclusive);
         }
         // php-src zim_dom_node_C14N / xmlC14NDocDumpMemory: disconnected nodes → "" (#19741).
+        // Orphans skip the relative-NS failure path (Zend returns "" without warnings).
         if (!self::isConnected($node)) {
             return '';
+        }
+        if (self::c14nDocumentHasRelativeNamespace($node)) {
+            self::reportC14NRelativeNamespaceFailure($ctx, $frame, $methodLabel);
+
+            return false;
         }
 
         $payload = self::c14nSerializeNode($node, $withComments, $exclusive, []);
@@ -12306,6 +12332,101 @@ final class VmDom
         }
 
         return $payload;
+    }
+
+    /**
+     * True when any xmlns declaration in the node's document (or subtree) has a relative URI.
+     *
+     * Matches libxml xmlC14NCheckForRelativeNamespaces / xmlParseURI scheme==NULL (#22378).
+     */
+    private static function c14nDocumentHasRelativeNamespace(ObjectEntry $node): bool
+    {
+        $document = self::isDocument($node) ? $node : self::ownerDocumentEntry($node);
+        $root = (null !== $document && self::isDocument($document)) ? $document : $node;
+
+        return self::c14nSubtreeHasRelativeNamespaceUri($root);
+    }
+
+    /**
+     * Walk element namespaceDeclarations; empty href is namespace undeclaration (not relative).
+     */
+    private static function c14nSubtreeHasRelativeNamespaceUri(ObjectEntry $entry): bool
+    {
+        if (!DomRegistry::has($entry)) {
+            return false;
+        }
+        $state = DomRegistry::state($entry);
+        if (self::isElement($entry)) {
+            foreach ($state->namespaceDeclarations as $uri) {
+                if (self::isRelativeNamespaceUri($uri)) {
+                    return true;
+                }
+            }
+        }
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && self::c14nSubtreeHasRelativeNamespaceUri($child)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Relative namespace URI per libxml xmlParseURI (no scheme) — C14N rejects these (#22378).
+     */
+    private static function isRelativeNamespaceUri(string $uri): bool
+    {
+        if ('' === $uri) {
+            return false;
+        }
+
+        // Absolute when a URI scheme is present (ALPHA *(ALPHA / DIGIT / "+" / "-" / ".") ":").
+        return 1 !== preg_match('/^[A-Za-z][A-Za-z0-9+\-.]*:/', $uri);
+    }
+
+    /**
+     * libxml C14N relative-NS failure diagnostics (php-src php_libxml_error_handler; #22378).
+     */
+    private static function reportC14NRelativeNamespaceFailure(
+        Context $ctx,
+        ?Frame $frame,
+        string $methodLabel
+    ): void {
+        $rows = [
+            [
+                1955,
+                "Relative namespace UR is invalid here : (null)\n",
+                $methodLabel.'(): Relative namespace UR is invalid here : (null)',
+            ],
+            [
+                1,
+                "Internal error : checking for relative namespaces\n",
+                $methodLabel.'(): Internal error : checking for relative namespaces',
+            ],
+            [
+                1,
+                "Internal error : processing docs children list\n",
+                $methodLabel.'(): Internal error : processing docs children list',
+            ],
+        ];
+        foreach ($rows as [$code, $message, $warning]) {
+            VmLibxml::handleError(
+                $ctx,
+                [
+                    'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+                    'code' => $code,
+                    'column' => 0,
+                    'message' => $message,
+                    'file' => '',
+                    'line' => 0,
+                ],
+                $frame,
+                null,
+                $warning
+            );
+        }
     }
 
     /**
@@ -12543,8 +12664,16 @@ final class VmDom
         ?array $nsPrefixes,
         ?Frame $frame = null
     ): int|false {
-        unset($frame);
-        $payload = self::c14n($ctx, $node, $exclusive, $withComments, $xpath, $nsPrefixes);
+        $payload = self::c14n(
+            $ctx,
+            $node,
+            $exclusive,
+            $withComments,
+            $xpath,
+            $nsPrefixes,
+            $frame,
+            'DOMNode::C14NFile'
+        );
         if (false === $payload) {
             return false;
         }
