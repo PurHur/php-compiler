@@ -17,11 +17,15 @@ use PHPCfg\Func as CfgFunc;
  * InternalIterator — opaque IteratorAggregate result (php-src Zend/zend_interfaces.c; #11781, #21466).
  *
  * Not user-constructible (private __construct). Created by extension getIterator() factories
- * with a snapshot HashTable so foreach / Iterator methods match Zend class identity.
+ * with either a snapshot HashTable or a live handler (DOM NodeList; #21930) so foreach /
+ * Iterator methods match Zend class identity.
  */
 final class InternalIteratorBuiltin
 {
     public const CLASS_LC = 'internaliterator';
+
+    /** @var array<int, InternalIteratorLiveHandler> */
+    private static array $liveHandlers = [];
 
     public static function registerClass(Context $ctx): void
     {
@@ -72,33 +76,82 @@ final class InternalIteratorBuiltin
         return $entry;
     }
 
+    /**
+     * Live-collection factory (DOMNodeList getIterator; php-src nodelist.c; #21930).
+     */
+    public static function fromLiveHandler(Context $ctx, InternalIteratorLiveHandler $handler): ObjectEntry
+    {
+        $class = $ctx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('InternalIterator is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        self::$liveHandlers[$entry->id] = $handler;
+
+        return $entry;
+    }
+
     public static function init(ObjectEntry $object, HashTable $table): void
     {
+        unset(self::$liveHandlers[$object->id]);
         SplArrayStorage::init($object, $table, 0, null, []);
+    }
+
+    public static function isLive(ObjectEntry $object): bool
+    {
+        return isset(self::$liveHandlers[$object->id]);
+    }
+
+    public static function hasBacking(ObjectEntry $object): bool
+    {
+        return self::isLive($object) || SplArrayStorage::hasState($object);
     }
 
     public static function rewind(ObjectEntry $object): void
     {
+        if (isset(self::$liveHandlers[$object->id])) {
+            self::$liveHandlers[$object->id]->rewind();
+
+            return;
+        }
         SplArrayStorage::rewindIterator($object);
     }
 
     public static function next(ObjectEntry $object): void
     {
+        if (isset(self::$liveHandlers[$object->id])) {
+            self::$liveHandlers[$object->id]->next();
+
+            return;
+        }
         SplArrayStorage::nextIterator($object);
     }
 
     public static function valid(ObjectEntry $object): bool
     {
+        if (isset(self::$liveHandlers[$object->id])) {
+            return self::$liveHandlers[$object->id]->valid();
+        }
+
         return SplArrayStorage::iteratorValid($object);
     }
 
     public static function current(ObjectEntry $object): Variable
     {
+        if (isset(self::$liveHandlers[$object->id])) {
+            return self::$liveHandlers[$object->id]->current();
+        }
+
         return SplArrayStorage::iteratorCurrent($object);
     }
 
     public static function key(ObjectEntry $object): int|string
     {
+        if (isset(self::$liveHandlers[$object->id])) {
+            return self::$liveHandlers[$object->id]->key();
+        }
+
         return SplArrayStorage::iteratorKey($object);
     }
 }
@@ -131,7 +184,7 @@ final class InternalIteratorCurrent extends VmClassMethod
             InternalIteratorBuiltin::CLASS_LC,
             'InternalIterator::current()'
         );
-        if (!SplArrayStorage::hasState($object)) {
+        if (!InternalIteratorBuiltin::hasBacking($object)) {
             throw new \LogicException('InternalIterator::current() cannot be called');
         }
         SplIteratorSupport::copyReturnFrom($frame, InternalIteratorBuiltin::current($object));
@@ -152,7 +205,7 @@ final class InternalIteratorKey extends VmClassMethod
             InternalIteratorBuiltin::CLASS_LC,
             'InternalIterator::key()'
         );
-        if (!SplArrayStorage::hasState($object)) {
+        if (!InternalIteratorBuiltin::hasBacking($object)) {
             throw new \LogicException('InternalIterator::key() cannot be called');
         }
         if (null === $frame->returnVar) {
@@ -181,7 +234,7 @@ final class InternalIteratorNext extends VmClassMethod
             InternalIteratorBuiltin::CLASS_LC,
             'InternalIterator::next()'
         );
-        if (SplArrayStorage::hasState($object)) {
+        if (InternalIteratorBuiltin::hasBacking($object)) {
             InternalIteratorBuiltin::next($object);
         }
     }
@@ -201,7 +254,7 @@ final class InternalIteratorValid extends VmClassMethod
             InternalIteratorBuiltin::CLASS_LC,
             'InternalIterator::valid()'
         );
-        $ok = SplArrayStorage::hasState($object) && InternalIteratorBuiltin::valid($object);
+        $ok = InternalIteratorBuiltin::hasBacking($object) && InternalIteratorBuiltin::valid($object);
         SplIteratorSupport::setReturnBool($frame, $ok);
     }
 }
@@ -220,7 +273,7 @@ final class InternalIteratorRewind extends VmClassMethod
             InternalIteratorBuiltin::CLASS_LC,
             'InternalIterator::rewind()'
         );
-        if (SplArrayStorage::hasState($object)) {
+        if (InternalIteratorBuiltin::hasBacking($object)) {
             InternalIteratorBuiltin::rewind($object);
         }
     }
