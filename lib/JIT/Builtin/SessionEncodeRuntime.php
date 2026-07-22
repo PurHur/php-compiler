@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\SuperglobalInit;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -174,6 +175,10 @@ final class SessionEncodeRuntime
         $context->builder->branchIf($isActive, $bbWork, $bbInactive);
 
         $context->builder->positionAtEnd($bbInactive);
+        self::emitInactiveWarning(
+            $context,
+            'session_encode(): Cannot encode non-existent session'
+        );
         SessionStart::emitWriteBool($context, $outPtr, false);
         $context->builder->branch($bbDone);
 
@@ -224,6 +229,10 @@ final class SessionEncodeRuntime
         $context->builder->branchIf($isActive, $bbWork, $bbInactive);
 
         $context->builder->positionAtEnd($bbInactive);
+        self::emitInactiveWarning(
+            $context,
+            'session_decode(): Session data cannot be decoded when there is no active session'
+        );
         SessionStart::emitWriteBool($context, $outPtr, false);
         $context->builder->branch($bbDone);
 
@@ -248,6 +257,25 @@ final class SessionEncodeRuntime
 
         $context->builder->positionAtEnd($bbDone);
         $context->builder->returnVoid();
+    }
+
+    private static function emitInactiveWarning(Context $context, string $msg): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast(
+            $context->constantFromString($msg),
+            $i8p
+        );
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $i8p->constNull(),
+            $i32->constInt(0, false)
+        );
     }
 
     private static function loadSessionHashtable(Context $context): Value

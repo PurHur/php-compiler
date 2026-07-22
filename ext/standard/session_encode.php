@@ -8,9 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
-/** session_encode() — encode $_SESSION as php handler blob (php-src ext/session/session.c; #6086). */
+/** session_encode() — encode $_SESSION as php handler blob (php-src ext/session/session.c; #6086, #21952). */
 class session_encode extends Internal
 {
     public function __construct()
@@ -22,6 +23,12 @@ class session_encode extends Internal
     {
         if (\count($frame->calledArgs) > 0) {
             throw new \ArgumentCountError('session_encode() expects exactly 0 arguments, '.\count($frame->calledArgs).' given');
+        }
+        if (!VmSession::isActive()) {
+            $this->triggerWarning(
+                $frame,
+                'session_encode(): Cannot encode non-existent session'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -43,5 +50,19 @@ class session_encode extends Internal
         }
 
         return JitSessionEncode::invoke($context, ...$args);
+    }
+
+    private function triggerWarning(Frame $frame, string $message): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 }
