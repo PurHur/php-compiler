@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6377 |
-| Phase A inventory files (M2 ratio SSOT) | 6377 |
+| PHP files on vm.php path | 6378 |
+| Phase A inventory files (M2 ratio SSOT) | 6378 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20195 |
+| Source constructs flagged (warnings) | 20229 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1296,13 +1296,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
 | `ext/mysqli/BuiltinClasses.php` | 0 | 4 |
-| `ext/mysqli/Module.php` | 0 | 41 |
+| `ext/mysqli/Module.php` | 0 | 51 |
 | `ext/mysqli/MysqliClassMethod.php` | 0 | 1 |
 | `ext/mysqli/MysqliConstants.php` | 0 | 1 |
 | `ext/mysqli/MysqliExtensionPolicy.php` | 0 | 1 |
 | `ext/mysqli/MysqliProceduralLink.php` | 0 | 3 |
 | `ext/mysqli/MysqliReportMode.php` | 0 | 1 |
-| `ext/mysqli/VmMysqli.php` | 0 | 57 |
+| `ext/mysqli/VmMysqli.php` | 0 | 73 |
 | `ext/mysqli/VmMysqliStmt.php` | 0 | 11 |
 | `ext/mysqli/mysqli_affected_rows.php` | 0 | 3 |
 | `ext/mysqli/mysqli_autocommit.php` | 0 | 2 |
@@ -1332,6 +1332,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mysqli/mysqli_refresh.php` | 0 | 3 |
 | `ext/mysqli/mysqli_release_savepoint.php` | 0 | 3 |
 | `ext/mysqli/mysqli_report.php` | 0 | 2 |
+| `ext/mysqli/mysqli_result_fetch_api.php` | 0 | 8 |
 | `ext/mysqli/mysqli_rollback.php` | 0 | 2 |
 | `ext/mysqli/mysqli_savepoint.php` | 0 | 3 |
 | `ext/mysqli/mysqli_set_charset.php` | 0 | 3 |
@@ -9576,47 +9577,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 431)
 - new DOMException (line 482)
 - new DOMException (line 955)
-- new DOMException (line 1351)
-- new DOMException (line 1483)
-- new DOMException (line 1492)
-- new DOMException (line 1502)
-- new DOMException (line 1546)
-- new DOMException (line 1572)
-- new DOMException (line 1586)
-- new DOMException (line 1595)
-- new DOMException (line 1604)
-- new DOMException (line 1661)
+- new DOMException (line 1425)
+- new DOMException (line 1557)
+- new DOMException (line 1566)
+- new DOMException (line 1576)
+- new DOMException (line 1620)
+- new DOMException (line 1646)
+- new DOMException (line 1660)
+- new DOMException (line 1669)
 - new DOMException (line 1678)
-- new DOMException (line 1708)
-- new DOMException (line 1723)
-- new DOMException (line 1737)
-- new DOMException (line 1750)
-- new DOMException (line 1764)
-- new DOMException (line 1779)
-- new DOMException (line 1794)
-- new DOMException (line 1808)
-- new DOMException (line 1817)
-- new DOMException (line 1821)
-- new DOMException (line 1845)
-- new Variable (line 2505)
-- new DOMException (line 2511)
-- new Error (line 2524)
-- new Variable (line 2528)
-- new Variable (line 2538)
-- new Variable (line 2666)
-- new DOMException (line 2673)
-- new Error (line 2727)
-- new Variable (line 2762)
-- new Variable (line 2768)
-- new Variable (line 2780)
-- new Variable (line 2792)
-- new Variable (line 2813)
-- new HashTable (line 2824)
-- new Variable (line 2830)
-- new Variable (line 2834)
-- new Variable (line 2851)
-- new Variable (line 2860)
-- 88 class method(s)
+- new DOMException (line 1735)
+- new DOMException (line 1752)
+- new DOMException (line 1782)
+- new DOMException (line 1797)
+- new DOMException (line 1811)
+- new DOMException (line 1824)
+- new DOMException (line 1838)
+- new DOMException (line 1853)
+- new DOMException (line 1868)
+- new DOMException (line 1882)
+- new DOMException (line 1891)
+- new DOMException (line 1895)
+- new DOMException (line 1919)
+- new Variable (line 2579)
+- new DOMException (line 2585)
+- new Error (line 2598)
+- new Variable (line 2602)
+- new Variable (line 2612)
+- new Variable (line 2740)
+- new DOMException (line 2747)
+- new Error (line 2801)
+- new Variable (line 2836)
+- new Variable (line 2842)
+- new Variable (line 2854)
+- new Variable (line 2866)
+- new Variable (line 2887)
+- new HashTable (line 2898)
+- new Variable (line 2904)
+- new Variable (line 2908)
+- new Variable (line 2925)
+- new Variable (line 2934)
+- 91 class method(s)
 - 4 closure(s)
 
 ### `ext/dom/XPathConstruct.php`
@@ -16330,46 +16331,56 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mysqli/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 79)
-- new mysqli_connect (line 98)
-- new mysqli_init (line 99)
-- new mysqli_query (line 100)
-- new mysqli_fetch_assoc (line 101)
-- new mysqli_fetch_array (line 102)
-- new mysqli_fetch_row (line 103)
-- new mysqli_close (line 104)
-- new mysqli_connect_errno (line 105)
-- new mysqli_connect_error (line 106)
-- new mysqli_free_result (line 107)
-- new mysqli_real_escape_string (line 108)
-- new mysqli_real_escape_string (line 109)
-- new mysqli_num_rows (line 110)
-- new mysqli_affected_rows (line 111)
-- new mysqli_error (line 112)
-- new mysqli_errno (line 113)
-- new mysqli_report (line 114)
-- new mysqli_prepare (line 115)
-- new mysqli_stmt_bind_param (line 116)
-- new mysqli_stmt_bind_result (line 117)
-- new mysqli_stmt_close (line 118)
-- new mysqli_stmt_execute (line 119)
-- new mysqli_stmt_fetch (line 120)
-- new mysqli_autocommit (line 121)
-- new mysqli_begin_transaction (line 122)
-- new mysqli_commit (line 123)
-- new mysqli_rollback (line 124)
-- new mysqli_savepoint (line 125)
-- new mysqli_release_savepoint (line 126)
-- new mysqli_refresh (line 127)
-- new mysqli_get_connection_stats (line 128)
-- new mysqli_real_connect (line 129)
-- new mysqli_options (line 130)
-- new mysqli_set_charset (line 131)
-- new mysqli_multi_query (line 132)
-- new mysqli_next_result (line 133)
-- new mysqli_store_result (line 134)
-- new mysqli_info (line 135)
-- new mysqli_stat (line 136)
+- new Variable (line 80)
+- new mysqli_connect (line 99)
+- new mysqli_init (line 100)
+- new mysqli_query (line 101)
+- new mysqli_fetch_assoc (line 102)
+- new mysqli_fetch_array (line 103)
+- new mysqli_fetch_row (line 104)
+- new mysqli_fetch_all (line 105)
+- new mysqli_fetch_object (line 106)
+- new mysqli_fetch_field (line 107)
+- new mysqli_fetch_fields (line 108)
+- new mysqli_fetch_field_direct (line 109)
+- new mysqli_fetch_lengths (line 110)
+- new mysqli_data_seek (line 111)
+- new mysqli_field_seek (line 112)
+- new mysqli_field_tell (line 113)
+- new mysqli_num_fields (line 114)
+- new mysqli_close (line 115)
+- new mysqli_connect_errno (line 116)
+- new mysqli_connect_error (line 117)
+- new mysqli_free_result (line 118)
+- new mysqli_real_escape_string (line 119)
+- new mysqli_real_escape_string (line 120)
+- new mysqli_num_rows (line 121)
+- new mysqli_affected_rows (line 122)
+- new mysqli_error (line 123)
+- new mysqli_errno (line 124)
+- new mysqli_report (line 125)
+- new mysqli_prepare (line 126)
+- new mysqli_stmt_bind_param (line 127)
+- new mysqli_stmt_bind_result (line 128)
+- new mysqli_stmt_close (line 129)
+- new mysqli_stmt_execute (line 130)
+- new mysqli_stmt_fetch (line 131)
+- new mysqli_autocommit (line 132)
+- new mysqli_begin_transaction (line 133)
+- new mysqli_commit (line 134)
+- new mysqli_rollback (line 135)
+- new mysqli_savepoint (line 136)
+- new mysqli_release_savepoint (line 137)
+- new mysqli_refresh (line 138)
+- new mysqli_get_connection_stats (line 139)
+- new mysqli_real_connect (line 140)
+- new mysqli_options (line 141)
+- new mysqli_set_charset (line 142)
+- new mysqli_multi_query (line 143)
+- new mysqli_next_result (line 144)
+- new mysqli_store_result (line 145)
+- new mysqli_info (line 146)
+- new mysqli_stat (line 147)
 - 4 class method(s)
 
 ### `ext/mysqli/MysqliClassMethod.php`
@@ -16440,25 +16451,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new MysqliResultFree (line 457)
 - new MysqliResultFree (line 458)
 - new MysqliResultFetchAll (line 459)
-- new ObjectEntry (line 479)
-- new MysqliResultState (line 480)
-- new mysqli_sql_exception (line 547)
-- new mysqli (line 562)
-- new mysqli_sql_exception (line 567)
-- new MysqliState (line 570)
-- new ArgumentCountError (line 608)
-- new ArgumentCountError (line 660)
-- new ArgumentCountError (line 682)
-- new ArgumentCountError (line 708)
-- new ArgumentCountError (line 844)
-- new ArgumentCountError (line 865)
-- new ArgumentCountError (line 886)
-- new ArgumentCountError (line 970)
+- new MysqliResultFetchObject (line 460)
+- new MysqliResultFetchField (line 461)
+- new MysqliResultFetchFields (line 462)
+- new MysqliResultFetchFieldDirect (line 463)
+- new MysqliResultFetchLengths (line 464)
+- new MysqliResultDataSeek (line 465)
+- new MysqliResultFieldSeek (line 466)
+- new MysqliResultFieldTell (line 467)
+- new ObjectEntry (line 489)
+- new HashTable (line 528)
+- new Variable (line 530)
+- new ObjectEntry (line 627)
+- new MysqliResultState (line 628)
+- new mysqli_sql_exception (line 695)
+- new mysqli (line 710)
+- new mysqli_sql_exception (line 715)
+- new MysqliState (line 718)
+- new ArgumentCountError (line 756)
+- new ArgumentCountError (line 808)
+- new ArgumentCountError (line 830)
+- new ArgumentCountError (line 856)
 - new ArgumentCountError (line 992)
 - new ArgumentCountError (line 1013)
-- new HashTable (line 1167)
-- new Variable (line 1169)
-- 69 class method(s)
+- new ArgumentCountError (line 1034)
+- new ArgumentCountError (line 1118)
+- new ArgumentCountError (line 1140)
+- new ArgumentCountError (line 1161)
+- new HashTable (line 1395)
+- new Variable (line 1397)
+- new ArgumentCountError (line 1418)
+- new HashTable (line 1451)
+- new Variable (line 1453)
+- new ArgumentCountError (line 1474)
+- new ArgumentCountError (line 1495)
+- 87 class method(s)
 
 ### `ext/mysqli/VmMysqliStmt.php`
 
@@ -16662,6 +16689,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 42)
 - 2 class method(s)
+
+### `ext/mysqli/mysqli_result_fetch_api.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 53)
+- new Error (line 85)
+- new HashTable (line 195)
+- new Variable (line 197)
+- new HashTable (line 248)
+- new Variable (line 250)
+- 14 class method(s)
 
 ### `ext/mysqli/mysqli_rollback.php`
 

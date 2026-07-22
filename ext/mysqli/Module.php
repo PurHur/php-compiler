@@ -36,6 +36,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_fetch_assoc.php';
         require_once __DIR__.'/mysqli_fetch_array.php';
         require_once __DIR__.'/mysqli_fetch_row.php';
+        require_once __DIR__.'/mysqli_result_fetch_api.php';
         require_once __DIR__.'/mysqli_close.php';
         require_once __DIR__.'/mysqli_connect_errno.php';
         require_once __DIR__.'/mysqli_connect_error.php';
@@ -101,6 +102,16 @@ class Module extends ModuleAbstract
             new mysqli_fetch_assoc(),
             new mysqli_fetch_array(),
             new mysqli_fetch_row(),
+            new mysqli_fetch_all(),
+            new mysqli_fetch_object(),
+            new mysqli_fetch_field(),
+            new mysqli_fetch_fields(),
+            new mysqli_fetch_field_direct(),
+            new mysqli_fetch_lengths(),
+            new mysqli_data_seek(),
+            new mysqli_field_seek(),
+            new mysqli_field_tell(),
+            new mysqli_num_fields(),
             new mysqli_close(),
             new mysqli_connect_errno(),
             new mysqli_connect_error(),
