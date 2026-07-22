@@ -8,7 +8,10 @@ use PHPCompiler\ext\standard\FtokJitHelper;
 use PHPCompiler\ext\standard\VmFtok;
 use PHPUnit\Framework\TestCase;
 
-/** ftok() JIT routes through FtokJitHelper PHP not StringFsDirJit LLVM (#9585). */
+/**
+ * ftok() JIT routes through FtokJitHelper PHP not StringFsDirJit LLVM (#9585).
+ * NestedJIT via JitVmHelperLink::ensureCompiled (#22300 / peer #22256).
+ */
 final class FtokRuntimeShrinkTest extends TestCase
 {
     public function testVmFtokUsesPureBackendWithoutLibcFfi(): void
@@ -37,12 +40,17 @@ final class FtokRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('ftok')", $source);
     }
 
-    public function testFtokRuntimeUsesJitHelper(): void
+    public function testFtokRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/FtokRuntime.php');
         $this->assertStringContainsString('FtokJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
-        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertLessThan(170, \substr_count($source, "\n") + 1);
     }
 
     public function testFtokJitHelperMatchesVmFtok(): void
