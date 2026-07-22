@@ -23,13 +23,12 @@ final class RecursiveArrayIteratorBuiltin
 {
     public const CLASS_LC = 'recursivearrayiterator';
 
+    /** php-src SPL_ARRAY_CHILD_ARRAYS_ONLY (ext/spl/spl_array.h) — #22321. */
+    public const CHILD_ARRAYS_ONLY = 4;
+
     public static function registerClass(Context $ctx): void
     {
         ArrayIteratorBuiltin::registerClass($ctx);
-
-        if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
-            return;
-        }
 
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry = isset($ctx->classes[self::CLASS_LC])
@@ -40,6 +39,17 @@ final class RecursiveArrayIteratorBuiltin
             && !\in_array('recursiveiterator', $entry->interfaces, true)
             && !\in_array('RecursiveIterator', $entry->interfaces, true)) {
             $entry->interfaces[] = 'recursiveiterator';
+        }
+
+        // php-src REGISTER_SPL_CLASS_CONST_LONG CHILD_ARRAYS_ONLY (#22321).
+        SplClassConstants::registerIntConstants($entry, [
+            'CHILD_ARRAYS_ONLY' => self::CHILD_ARRAYS_ONLY,
+        ]);
+
+        if (self::classIsComplete($entry)) {
+            $ctx->classes[self::CLASS_LC] = $entry;
+
+            return;
         }
 
         $entry->constructor = new RecursiveArrayIteratorConstruct();
@@ -81,14 +91,23 @@ final class RecursiveArrayIteratorBuiltin
         return SplArrayStorage::foreachCurrentByRef($object);
     }
 
+    /**
+     * php-src RecursiveArrayIterator::hasChildren — array always; object unless CHILD_ARRAYS_ONLY (#22321).
+     */
     public static function hasChildren(ObjectEntry $object): bool
     {
         if (!SplArrayStorage::iteratorValid($object)) {
             return false;
         }
         $current = SplArrayStorage::iteratorCurrent($object)->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $current->type) {
+            return true;
+        }
+        if (Variable::TYPE_OBJECT === $current->type) {
+            return 0 === (SplArrayStorage::getFlags($object) & self::CHILD_ARRAYS_ONLY);
+        }
 
-        return Variable::TYPE_ARRAY === $current->type;
+        return false;
     }
 
     public static function getChildren(Context $ctx, ObjectEntry $object): Variable
@@ -97,8 +116,61 @@ final class RecursiveArrayIteratorBuiltin
             throw new \LogicException('RecursiveArrayIterator::getChildren() called on element without children');
         }
         $current = SplArrayStorage::iteratorCurrent($object)->resolveIndirect();
+        $flags = SplArrayStorage::getFlags($object);
 
-        return self::createFromTable($ctx, $current->toArray(), SplArrayStorage::getFlags($object));
+        if (Variable::TYPE_OBJECT === $current->type) {
+            $childObj = $current->toObject();
+            // php-src: instanceof RecursiveArrayIterator → RETURN_OBJ_COPY
+            if (self::objectIsA($ctx, $childObj, self::CLASS_LC)) {
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($childObj);
+
+                return $var;
+            }
+
+            return self::createFromTable($ctx, self::hashTableFromObject($childObj), $flags);
+        }
+
+        return self::createFromTable($ctx, $current->toArray(), $flags);
+    }
+
+    /** @see php-src ArrayIterator::__construct(array|object) property/storage materialization */
+    private static function hashTableFromObject(ObjectEntry $object): HashTable
+    {
+        if (SplArrayStorage::hasState($object)) {
+            return SplArrayStorage::getArrayCopy($object);
+        }
+        $table = new HashTable();
+        foreach ($object->propertiesWithNames() as $name => $prop) {
+            $copy = new Variable();
+            $copy->copyFrom($prop->resolveIndirect());
+            $intKey = HashTable::tryIntFromNumericString((string) $name);
+            if (null !== $intKey) {
+                $table->addIndex($intKey, $copy);
+            } else {
+                $table->add((string) $name, $copy);
+            }
+        }
+
+        return $table;
+    }
+
+    private static function objectIsA(Context $ctx, ObjectEntry $object, string $rootClassLc): bool
+    {
+        $entry = $object->class;
+        while (true) {
+            if (strtolower(ltrim($entry->name, '\\')) === $rootClassLc) {
+                return true;
+            }
+            $parentLc = $entry->parentLc;
+            if (null === $parentLc) {
+                return false;
+            }
+            if (!isset($ctx->classes[$parentLc])) {
+                return $parentLc === $rootClassLc;
+            }
+            $entry = $ctx->classes[$parentLc];
+        }
     }
 
     public static function createFromTable(Context $ctx, HashTable $table, int $flags = 0): Variable
