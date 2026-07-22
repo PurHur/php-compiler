@@ -7414,6 +7414,87 @@ PHP;
         self::assertStringContainsString('bool(true)', $out);
     }
 
+    /**
+     * Issue #22345 — @$doc->loadHTML(...) then trim($d->saveHTML()) must ARG_SEND the
+     * MethodCall result, not the @-suppressed loadHTML bool ("1").
+     */
+    public function testErrorSuppressThenTrimSaveHtmlUsesMethodCallResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$d = new DOMDocument();
+$ok = @$d->loadHTML('<p>x</p>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+echo trim($d->saveHTML());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'suppress_trim_savehtml.php');
+
+        $saveHtmlReturnSlot = null;
+        $trimSendSlot = null;
+        $awaitingSaveHtmlExec = false;
+        $awaitingTrimSend = false;
+        foreach ($this->reachableBlocksFromEntry($block) as $reachable) {
+            foreach ($reachable->opCodes as $op) {
+                if (
+                    OpCode::TYPE_METHODCALL_INIT === $op->type
+                    && null !== $op->arg2
+                    && (
+                        (
+                            isset($reachable->constants[$op->arg2])
+                            && 'saveHTML' === $reachable->constants[$op->arg2]->toString()
+                        )
+                        || (
+                            isset($block->constants[$op->arg2])
+                            && 'saveHTML' === $block->constants[$op->arg2]->toString()
+                        )
+                    )
+                ) {
+                    $awaitingSaveHtmlExec = true;
+                    continue;
+                }
+                if (
+                    $awaitingSaveHtmlExec
+                    && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                    && null !== $op->arg1
+                    && null === $saveHtmlReturnSlot
+                ) {
+                    $saveHtmlReturnSlot = $op->arg1;
+                    $awaitingSaveHtmlExec = false;
+                }
+                if (
+                    OpCode::TYPE_FUNCCALL_INIT === $op->type
+                    && null !== $op->arg1
+                    && (
+                        (
+                            isset($reachable->constants[$op->arg1])
+                            && 'trim' === $reachable->constants[$op->arg1]->toString()
+                        )
+                        || (
+                            isset($block->constants[$op->arg1])
+                            && 'trim' === $block->constants[$op->arg1]->toString()
+                        )
+                    )
+                ) {
+                    $awaitingTrimSend = true;
+                    continue;
+                }
+                if ($awaitingTrimSend && OpCode::TYPE_ARG_SEND === $op->type && null === $trimSendSlot) {
+                    $trimSendSlot = $op->arg1;
+                    $awaitingTrimSend = false;
+                }
+            }
+        }
+
+        self::assertNotNull($saveHtmlReturnSlot, 'saveHTML must FUNCCALL_EXEC_RETURN');
+        self::assertNotNull($trimSendSlot, 'trim() must emit ARG_SEND');
+        self::assertSame($saveHtmlReturnSlot, $trimSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('<p>x</p>', trim($out));
+    }
+
     /** @return list<Block> */
     private function reachableBlocksFromEntry(Block $entry): array
     {

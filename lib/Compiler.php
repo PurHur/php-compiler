@@ -40093,6 +40093,7 @@ class Compiler {
 
     /**
      * `@f(); g(); var_export(h(), true)` — adjacent hoisted callee feeds dead-temp arg, not @ return (#8974).
+     * Also `trim($d->saveHTML())` after `@$d->loadHTML(...)` — MethodCall/StaticCall producer (#22345).
      */
     private function errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer(
         Block $block,
@@ -40116,7 +40117,12 @@ class Compiler {
         $producerIndex = $callIndex - 1;
         $producer = $block->orig->children[$producerIndex] ?? null;
         if (
-            !($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            !(
+                $producer instanceof Op\Expr\FuncCall
+                || $producer instanceof Op\Expr\NsFuncCall
+                || $producer instanceof Op\Expr\MethodCall
+                || $producer instanceof Op\Expr\StaticCall
+            )
             || !$this->isNestedCallArgProducerForConsumer(
                 $producer,
                 $cfgCallOp,
