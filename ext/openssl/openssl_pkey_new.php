@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_pkey_new() — generate asymmetric key (php-src ext/openssl/xp.c; #6295).
+ * openssl_pkey_new() — generate asymmetric key (php-src ext/openssl/openssl.c; #6295, #22335).
  */
 final class openssl_pkey_new extends Internal
 {
@@ -45,7 +45,7 @@ final class openssl_pkey_new extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException(
-            'openssl_pkey_new() is not implemented for JIT in this compiler build (issue #6295)'
+            'openssl_pkey_new() is not implemented for JIT in this compiler build (issue #6295/#22335)'
         );
     }
 }

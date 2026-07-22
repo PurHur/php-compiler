@@ -72,6 +72,225 @@ final class VmOpensslPkeyNative
         }
     }
 
+    /**
+     * Generate EC private key for a named curve (php-src php_openssl_generate_private_key EVP_PKEY_EC; #22335).
+     *
+     * @return string|false PEM, or false on failure
+     */
+    public static function generateEc(string $curveName): string|false
+    {
+        if ('' === $curveName) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $nid = (int) $ffi->OBJ_sn2nid($curveName);
+        if (0 === $nid) {
+            return false;
+        }
+
+        $ec = $ffi->EC_KEY_new_by_curve_name($nid);
+        if (null === $ec) {
+            return false;
+        }
+
+        try {
+            if (1 !== (int) $ffi->EC_KEY_generate_key($ec)) {
+                return false;
+            }
+
+            $pkey = $ffi->EVP_PKEY_new();
+            if (null === $pkey) {
+                return false;
+            }
+            try {
+                if (1 !== (int) $ffi->EVP_PKEY_set1_EC_KEY($pkey, $ec)) {
+                    return false;
+                }
+
+                return self::writePrivateKeyPem($ffi, $pkey, null);
+            } finally {
+                $ffi->EVP_PKEY_free($pkey);
+            }
+        } finally {
+            $ffi->EC_KEY_free($ec);
+        }
+    }
+
+    /**
+     * Resolve curve short name via OBJ_sn2nid (NID_undef = 0).
+     */
+    public static function curveNid(string $curveName): int
+    {
+        if ('' === $curveName) {
+            return 0;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return 0;
+        }
+
+        return (int) $ffi->OBJ_sn2nid($curveName);
+    }
+
+    /**
+     * Generate DH key from explicit p/g (and optional q) BN binaries (php-src php_openssl_pkey_init_dh; #22335).
+     *
+     * @return string|false PEM
+     */
+    public static function generateDhFromParams(string $pBin, string $gBin, ?string $qBin = null): string|false
+    {
+        if ('' === $pBin || '' === $gBin) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $dh = $ffi->DH_new();
+        if (null === $dh) {
+            return false;
+        }
+
+        try {
+            $p = self::bin2bn($ffi, $pBin);
+            $g = self::bin2bn($ffi, $gBin);
+            $q = null !== $qBin && '' !== $qBin ? self::bin2bn($ffi, $qBin) : null;
+            if (null === $p || null === $g) {
+                if (null !== $p) {
+                    $ffi->BN_free($p);
+                }
+                if (null !== $g) {
+                    $ffi->BN_free($g);
+                }
+                if (null !== $q) {
+                    $ffi->BN_free($q);
+                }
+
+                return false;
+            }
+
+            // DH_set0_pqg takes ownership of p/q/g on success.
+            if (1 !== (int) $ffi->DH_set0_pqg($dh, $p, $q, $g)) {
+                $ffi->BN_free($p);
+                $ffi->BN_free($g);
+                if (null !== $q) {
+                    $ffi->BN_free($q);
+                }
+
+                return false;
+            }
+
+            if (1 !== (int) $ffi->DH_generate_key($dh)) {
+                return false;
+            }
+
+            $pkey = $ffi->EVP_PKEY_new();
+            if (null === $pkey) {
+                return false;
+            }
+            try {
+                if (1 !== (int) $ffi->EVP_PKEY_set1_DH($pkey, $dh)) {
+                    return false;
+                }
+
+                return self::writePrivateKeyPem($ffi, $pkey, null);
+            } finally {
+                $ffi->EVP_PKEY_free($pkey);
+            }
+        } finally {
+            $ffi->DH_free($dh);
+        }
+    }
+
+    /**
+     * Generate DH key via paramgen + keygen (php-src php_openssl_generate_private_key EVP_PKEY_DH).
+     *
+     * @return string|false PEM
+     */
+    public static function generateDh(int $bits): string|false
+    {
+        if ($bits < 384) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $ctx = $ffi->EVP_PKEY_CTX_new_id(self::EVP_PKEY_DH, null);
+        if (null === $ctx) {
+            return false;
+        }
+
+        $params = null;
+        try {
+            if (1 !== (int) $ffi->EVP_PKEY_paramgen_init($ctx)) {
+                return false;
+            }
+            // EVP_PKEY_CTRL_DH_PARAMGEN_PRIME_LEN = EVP_PKEY_ALG_CTRL + 1 (0x1001)
+            // EVP_PKEY_OP_PARAMGEN = (1<<1)
+            if (1 !== (int) $ffi->EVP_PKEY_CTX_ctrl($ctx, self::EVP_PKEY_DH, 1 << 1, 0x1001, $bits, null)) {
+                return false;
+            }
+
+            $paramsOut = $ffi->new('EVP_PKEY *[1]');
+            if (1 !== (int) $ffi->EVP_PKEY_paramgen($ctx, $paramsOut) || null === $paramsOut[0]) {
+                return false;
+            }
+            $params = $paramsOut[0];
+
+            $ffi->EVP_PKEY_CTX_free($ctx);
+            $ctx = $ffi->EVP_PKEY_CTX_new($params, null);
+            if (null === $ctx) {
+                return false;
+            }
+
+            if (1 !== (int) $ffi->EVP_PKEY_keygen_init($ctx)) {
+                return false;
+            }
+
+            $pkeyOut = $ffi->new('EVP_PKEY *[1]');
+            if (1 !== (int) $ffi->EVP_PKEY_keygen($ctx, $pkeyOut) || null === $pkeyOut[0]) {
+                return false;
+            }
+
+            try {
+                return self::writePrivateKeyPem($ffi, $pkeyOut[0], null);
+            } finally {
+                $ffi->EVP_PKEY_free($pkeyOut[0]);
+            }
+        } finally {
+            if (null !== $params) {
+                $ffi->EVP_PKEY_free($params);
+            }
+            if (null !== $ctx) {
+                $ffi->EVP_PKEY_CTX_free($ctx);
+            }
+        }
+    }
+
+    /**
+     * @param \FFI $ffi
+     *
+     * @return \FFI\CData|null BIGNUM*
+     */
+    private static function bin2bn($ffi, string $bin)
+    {
+        $len = \strlen($bin);
+        if ($len <= 0) {
+            return null;
+        }
+        $buf = $ffi->new("unsigned char[{$len}]");
+        \FFI::memcpy($buf, $bin, $len);
+
+        return $ffi->BN_bin2bn($buf, $len, null);
+    }
+
     public static function normalizePrivateKeyPem(string $pem, ?string $passphrase = null): string|false
     {
         $ffi = self::ffi();
@@ -139,9 +358,9 @@ final class VmOpensslPkeyNative
     }
 
     /**
-     * openssl_pkey_get_details() array (php-src ext/openssl/openssl.c; #20240).
+     * openssl_pkey_get_details() array (php-src ext/openssl/openssl.c; #20240, #22335).
      *
-     * @return array{bits: int, key: string, type: int, rsa?: array<string, string>}|false
+     * @return array{bits: int, key: string, type: int, rsa?: array<string, string>, ec?: array<string, string>, dh?: array<string, string>}|false
      */
     public static function getDetails(string $pem): array|false
     {
@@ -184,6 +403,16 @@ final class VmOpensslPkeyNative
                 $rsaDetails = self::rsaDetails($ffi, $pkey);
                 if (null !== $rsaDetails) {
                     $details['rsa'] = $rsaDetails;
+                }
+            } elseif (OpensslConstants::OPENSSL_KEYTYPE_EC === $type) {
+                $ecDetails = self::ecDetails($ffi, $pkey);
+                if (null !== $ecDetails) {
+                    $details['ec'] = $ecDetails;
+                }
+            } elseif (OpensslConstants::OPENSSL_KEYTYPE_DH === $type) {
+                $dhDetails = self::dhDetails($ffi, $pkey);
+                if (null !== $dhDetails) {
+                    $details['dh'] = $dhDetails;
                 }
             }
 
@@ -261,6 +490,126 @@ final class VmOpensslPkeyNative
             'iqmp' => 'RSA_get0_iqmp',
         ] as $key => $getter) {
             $bn = $ffi->$getter($rsa);
+            if (null === $bn) {
+                continue;
+            }
+            $bin = self::bn2bin($ffi, $bn);
+            if (null === $bin) {
+                continue;
+            }
+            $details[$key] = $bin;
+        }
+
+        return [] === $details ? null : $details;
+    }
+
+    /**
+     * @param \FFI $ffi
+     * @param \FFI\CData $pkey
+     *
+     * @return array<string, string>|null
+     */
+    private static function ecDetails($ffi, $pkey): ?array
+    {
+        $ecKey = $ffi->EVP_PKEY_get0_EC_KEY($pkey);
+        if (null === $ecKey) {
+            return null;
+        }
+
+        $group = $ffi->EC_KEY_get0_group($ecKey);
+        if (null === $group) {
+            return null;
+        }
+
+        $nid = (int) $ffi->EC_GROUP_get_curve_name($group);
+        if (0 === $nid) {
+            return null;
+        }
+
+        $details = [];
+        $sn = $ffi->OBJ_nid2sn($nid);
+        if (null !== $sn && '' !== $sn) {
+            $details['curve_name'] = \is_string($sn) ? $sn : \FFI::string($sn);
+        }
+
+        $obj = $ffi->OBJ_nid2obj($nid);
+        if (null !== $obj) {
+            $buf = $ffi->new('char[80]');
+            $len = (int) $ffi->OBJ_obj2txt($buf, 80, $obj, 1);
+            $ffi->ASN1_OBJECT_free($obj);
+            if ($len > 0) {
+                $details['curve_oid'] = \FFI::string($buf, $len);
+            }
+        }
+
+        $pub = $ffi->EC_KEY_get0_public_key($ecKey);
+        if (null !== $pub) {
+            $x = $ffi->BN_new();
+            $y = $ffi->BN_new();
+            if (null !== $x && null !== $y) {
+                try {
+                    if (1 === (int) $ffi->EC_POINT_get_affine_coordinates($group, $pub, $x, $y, null)) {
+                        $xBin = self::bn2bin($ffi, $x);
+                        $yBin = self::bn2bin($ffi, $y);
+                        if (null !== $xBin) {
+                            $details['x'] = $xBin;
+                        }
+                        if (null !== $yBin) {
+                            $details['y'] = $yBin;
+                        }
+                    }
+                } finally {
+                    $ffi->BN_free($x);
+                    $ffi->BN_free($y);
+                }
+            }
+        }
+
+        $d = $ffi->EC_KEY_get0_private_key($ecKey);
+        if (null !== $d) {
+            $dBin = self::bn2bin($ffi, $d);
+            if (null !== $dBin) {
+                $details['d'] = $dBin;
+            }
+        }
+
+        return [] === $details ? null : $details;
+    }
+
+    /**
+     * @param \FFI $ffi
+     * @param \FFI\CData $pkey
+     *
+     * @return array<string, string>|null
+     */
+    private static function dhDetails($ffi, $pkey): ?array
+    {
+        $dh = $ffi->EVP_PKEY_get0_DH($pkey);
+        if (null === $dh) {
+            return null;
+        }
+
+        $pPtr = $ffi->new('const BIGNUM *[1]');
+        $qPtr = $ffi->new('const BIGNUM *[1]');
+        $gPtr = $ffi->new('const BIGNUM *[1]');
+        $pPtr[0] = null;
+        $qPtr[0] = null;
+        $gPtr[0] = null;
+        $ffi->DH_get0_pqg($dh, $pPtr, $qPtr, $gPtr);
+
+        $pubPtr = $ffi->new('const BIGNUM *[1]');
+        $privPtr = $ffi->new('const BIGNUM *[1]');
+        $pubPtr[0] = null;
+        $privPtr[0] = null;
+        $ffi->DH_get0_key($dh, $pubPtr, $privPtr);
+
+        $details = [];
+        foreach ([
+            'p' => $pPtr[0],
+            'g' => $gPtr[0],
+            'priv_key' => $privPtr[0],
+            'pub_key' => $pubPtr[0],
+        ] as $key => $bn) {
             if (null === $bn) {
                 continue;
             }
@@ -650,6 +999,11 @@ typedef struct evp_pkey_ctx_st EVP_PKEY_CTX;
 typedef struct evp_cipher_st EVP_CIPHER;
 typedef struct rsa_st RSA;
 typedef struct bignum_st BIGNUM;
+typedef struct ec_key_st EC_KEY;
+typedef struct ec_group_st EC_GROUP;
+typedef struct ec_point_st EC_POINT;
+typedef struct dh_st DH;
+typedef struct asn1_object_st ASN1_OBJECT;
 
 BIO *BIO_new_mem_buf(const void *buf, int len);
 BIO *BIO_new_file(const char *filename, const char *mode);
@@ -658,12 +1012,16 @@ EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 EVP_PKEY *PEM_read_bio_PUBKEY(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 const EVP_CIPHER *EVP_des_ede3_cbc(void);
 void EVP_PKEY_free(EVP_PKEY *pkey);
+EVP_PKEY *EVP_PKEY_new(void);
 EVP_PKEY_CTX *EVP_PKEY_CTX_new_id(int id, void *e);
 EVP_PKEY_CTX *EVP_PKEY_CTX_new(EVP_PKEY *pkey, void *e);
 void EVP_PKEY_CTX_free(EVP_PKEY_CTX *ctx);
 int EVP_PKEY_keygen_init(EVP_PKEY_CTX *ctx);
 int EVP_PKEY_CTX_set_rsa_keygen_bits(EVP_PKEY_CTX *ctx, int bits);
 int EVP_PKEY_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey);
+int EVP_PKEY_paramgen_init(EVP_PKEY_CTX *ctx);
+int EVP_PKEY_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey);
+int EVP_PKEY_CTX_ctrl(EVP_PKEY_CTX *ctx, int keytype, int optype, int cmd, int p1, void *p2);
 int EVP_PKEY_encrypt_init(EVP_PKEY_CTX *ctx);
 int EVP_PKEY_encrypt(EVP_PKEY_CTX *ctx, unsigned char *out, size_t *outlen,
     const unsigned char *in, size_t inlen);
@@ -679,6 +1037,10 @@ int EVP_PKEY_verify_recover(EVP_PKEY_CTX *ctx, unsigned char *rout, size_t *rout
 int EVP_PKEY_CTX_set_rsa_padding(EVP_PKEY_CTX *ctx, int pad);
 int EVP_PKEY_get_bits(const EVP_PKEY *pkey);
 int EVP_PKEY_get_base_id(const EVP_PKEY *pkey);
+int EVP_PKEY_set1_EC_KEY(EVP_PKEY *pkey, EC_KEY *key);
+int EVP_PKEY_set1_DH(EVP_PKEY *pkey, DH *key);
+EC_KEY *EVP_PKEY_get0_EC_KEY(EVP_PKEY *pkey);
+DH *EVP_PKEY_get0_DH(EVP_PKEY *pkey);
 RSA *EVP_PKEY_get0_RSA(EVP_PKEY *pkey);
 BIGNUM *RSA_get0_n(const RSA *d);
 BIGNUM *RSA_get0_e(const RSA *d);
@@ -688,8 +1050,31 @@ BIGNUM *RSA_get0_q(const RSA *d);
 BIGNUM *RSA_get0_dmp1(const RSA *d);
 BIGNUM *RSA_get0_dmq1(const RSA *d);
 BIGNUM *RSA_get0_iqmp(const RSA *d);
+BIGNUM *BN_new(void);
+void BN_free(BIGNUM *a);
+BIGNUM *BN_bin2bn(const unsigned char *s, int len, BIGNUM *ret);
 int BN_num_bits(const BIGNUM *a);
 int BN_bn2bin(const BIGNUM *a, unsigned char *to);
+int OBJ_sn2nid(const char *s);
+const char *OBJ_nid2sn(int n);
+ASN1_OBJECT *OBJ_nid2obj(int n);
+int OBJ_obj2txt(char *buf, int buf_len, const ASN1_OBJECT *a, int no_name);
+void ASN1_OBJECT_free(ASN1_OBJECT *a);
+EC_KEY *EC_KEY_new_by_curve_name(int nid);
+int EC_KEY_generate_key(EC_KEY *key);
+void EC_KEY_free(EC_KEY *key);
+const EC_GROUP *EC_KEY_get0_group(const EC_KEY *key);
+const EC_POINT *EC_KEY_get0_public_key(const EC_KEY *key);
+const BIGNUM *EC_KEY_get0_private_key(const EC_KEY *key);
+int EC_GROUP_get_curve_name(const EC_GROUP *group);
+int EC_POINT_get_affine_coordinates(const EC_GROUP *group, const EC_POINT *p,
+    BIGNUM *x, BIGNUM *y, void *ctx);
+DH *DH_new(void);
+void DH_free(DH *dh);
+int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g);
+int DH_generate_key(DH *dh);
+void DH_get0_pqg(const DH *dh, const BIGNUM **p, const BIGNUM **q, const BIGNUM **g);
+void DH_get0_key(const DH *dh, const BIGNUM **pub_key, const BIGNUM **priv_key);
 int PEM_write_bio_PrivateKey(BIO *bp, EVP_PKEY *x, const EVP_CIPHER *enc,
     const unsigned char *kstr, int klen, void *cb, void *u);
 int PEM_write_bio_PUBKEY(BIO *bp, EVP_PKEY *x);
