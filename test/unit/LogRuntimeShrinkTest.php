@@ -35,6 +35,20 @@ final class LogRuntimeShrinkTest extends TestCase
             VmMath::log(\M_E),
             LogJitHelper::logArgv(\M_E)
         );
+        $this->assertSame(2.0, VmMath::logWithBase(100.0, 10.0));
+        $this->assertSame(3.0, VmMath::logWithBase(8.0, 2.0));
+        $this->assertTrue(\is_nan(VmMath::logWithBase(10.0, 1.0)));
+    }
+
+    public function testMathLogExposesBaseLowering(): void
+    {
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLog.php');
+        $this->assertStringContainsString('invokeWithBase', $bridge);
+        $this->assertStringContainsString('MathLog10::invoke', $bridge);
+        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/log.php');
+        $this->assertStringContainsString('invokeWithBase', $builtin);
+        $this->assertStringContainsString('requireArgCountRange', $builtin);
+        $this->assertStringContainsString('logWithBase', $builtin);
     }
 
     public function testSpineBundleIncludesLogJitHelper(): void

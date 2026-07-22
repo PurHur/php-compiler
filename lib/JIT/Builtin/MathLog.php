@@ -6,12 +6,14 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for log() via LogJitHelper PHP (#15117).
+ * JIT/AOT link for log() via LogJitHelper PHP (#15117, #21980).
  *
- * Replaces libc `log` LLVM lookup in ext/standard/log.php.
+ * One-arg uses LogJitHelper; optional `$base` is pure LLVM on phpc_log / phpc_log10
+ * (avoids NestedJIT of a second helper during MathLog link).
  * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
  * php-src: ext/standard/math.c — PHP_FUNCTION(log)
  */
@@ -27,6 +29,8 @@ final class MathLog
     private const COMPILED_HELPERS = [
         self::LOG_HELPER,
     ];
+
+    private static int $seq = 0;
 
     public static function ensureLinked(Context $context): void
     {
@@ -46,6 +50,49 @@ final class MathLog
             $context->lookupFunction(self::ABI_LOG),
             $num
         );
+    }
+
+    /**
+     * log($num, $base) — php-src math.c order: base 2 / 10 / 1 / ≤0 / else.
+     */
+    public static function invokeWithBase(Context $context, Value $num, Value $base): Value
+    {
+        self::ensureLinked($context);
+        MathLog10::ensureLinked($context);
+
+        $double = $context->getTypeFromString('double');
+        $zero = $double->constReal(0.0);
+        $one = $double->constReal(1.0);
+        $two = $double->constReal(2.0);
+        $ten = $double->constReal(10.0);
+        $ln2 = $double->constReal(\M_LN2);
+        $nan = $double->constReal(\NAN);
+
+        // php-src: after base==1 fast path, base ≤ 0 → ValueError. NAN base is not ≤ 0.
+        $tooSmall = $context->builder->fcmp(Builder::REAL_OLE, $base, $zero);
+        $okBase = $context->builder->not($tooSmall);
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $okBase,
+            'log_base_gt0_'.(++self::$seq),
+            'log(): Argument #2 ($base) must be greater than 0'
+        );
+
+        $is2 = $context->builder->fcmp(Builder::REAL_OEQ, $base, $two);
+        $is10 = $context->builder->fcmp(Builder::REAL_OEQ, $base, $ten);
+        $is1 = $context->builder->fcmp(Builder::REAL_OEQ, $base, $one);
+
+        $logNum = self::invoke($context, $num);
+        $asLog2 = $context->builder->fdiv($logNum, $ln2);
+        $asLog10 = MathLog10::invoke($context, $num);
+        $logBase = self::invoke($context, $base);
+        $general = $context->builder->fdiv($logNum, $logBase);
+
+        // Prefer php-src fast-path order via nested select (2 → 10 → 1 → else).
+        $afterOne = $context->builder->select($is1, $nan, $general);
+        $afterTen = $context->builder->select($is10, $asLog10, $afterOne);
+
+        return $context->builder->select($is2, $asLog2, $afterTen);
     }
 
     private static function implement(Context $context): void
