@@ -1982,7 +1982,10 @@ final class HashTable {
             return;
         }
         $value = $bucket->value->resolveIndirect();
-        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+        // Already deleted tombstone — zend_hash_del is a no-op. Null values must still
+        // be removed (unlike isset); skipping null left array_key_exists / SPL offsetExists
+        // true after unset (#22322 / HashTable tombstone path).
+        if ($value->isUndefined()) {
             return;
         }
         $bucket->value->reset();
