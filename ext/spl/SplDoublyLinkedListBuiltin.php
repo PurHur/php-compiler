@@ -61,6 +61,14 @@ final class SplDoublyLinkedListBuiltin
             }
         }
 
+        // php-src REGISTER_SPL_CLASS_CONST_LONG for IT_MODE_* (#22350).
+        SplClassConstants::registerIntConstants($entry, [
+            'IT_MODE_LIFO' => self::IT_MODE_LIFO,
+            'IT_MODE_FIFO' => self::IT_MODE_FIFO,
+            'IT_MODE_DELETE' => self::IT_MODE_DELETE,
+            'IT_MODE_KEEP' => self::IT_MODE_KEEP,
+        ]);
+
         $entry->constructor = new SplDoublyLinkedListConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
