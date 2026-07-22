@@ -60,6 +60,11 @@ final class RecursiveArrayIteratorBuiltin
         $entry->methods['getchildren'] = new RecursiveArrayIteratorGetChildren();
         $entry->methodVisibility['getchildren'] = $pub;
         $entry->methodNames['getchildren'] = 'getChildren';
+        $entry->methods['count'] = new RecursiveArrayIteratorCount();
+        $entry->methodVisibility['count'] = $pub;
+        $entry->methods['getarraycopy'] = new RecursiveArrayIteratorGetArrayCopy();
+        $entry->methodVisibility['getarraycopy'] = $pub;
+        $entry->methodNames['getarraycopy'] = 'getArrayCopy';
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -155,6 +160,18 @@ final class RecursiveArrayIteratorBuiltin
         $current = self::current($object)->resolveIndirect();
 
         return self::createFromTable($ctx, $current->toArray());
+    }
+
+    /** php-src ArrayIterator::count inherited by RecursiveArrayIterator (#22273). */
+    public static function count(ObjectEntry $object): int
+    {
+        return \count(self::state($object)['keys']);
+    }
+
+    /** php-src ArrayIterator::getArrayCopy inherited by RecursiveArrayIterator (#22273). */
+    public static function getArrayCopy(ObjectEntry $object): HashTable
+    {
+        return self::state($object)['table']->duplicate();
     }
 
     public static function createFromTable(Context $ctx, HashTable $table): Variable
@@ -348,5 +365,49 @@ final class RecursiveArrayIteratorGetChildren extends VmClassMethod
             $frame,
             RecursiveArrayIteratorBuiltin::getChildren($frame->vmContext, $object)
         );
+    }
+}
+
+/** php-src RecursiveArrayIterator::count via ArrayIterator (#22273). */
+final class RecursiveArrayIteratorCount extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('count');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            RecursiveArrayIteratorBuiltin::CLASS_LC,
+            'RecursiveArrayIterator::count()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(RecursiveArrayIteratorBuiltin::count($object));
+    }
+}
+
+/** php-src RecursiveArrayIterator::getArrayCopy via ArrayIterator (#22273). */
+final class RecursiveArrayIteratorGetArrayCopy extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getArrayCopy');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            RecursiveArrayIteratorBuiltin::CLASS_LC,
+            'RecursiveArrayIterator::getArrayCopy()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(RecursiveArrayIteratorBuiltin::getArrayCopy($object));
     }
 }
