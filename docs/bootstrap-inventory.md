@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6388 |
-| Phase A inventory files (M2 ratio SSOT) | 6388 |
+| PHP files on vm.php path | 6392 |
+| Phase A inventory files (M2 ratio SSOT) | 6392 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20322 |
+| Source constructs flagged (warnings) | 20336 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1137,20 +1137,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/transliterator_list_ids.php` | 0 | 3 |
 | `ext/intl/transliterator_transliterate.php` | 0 | 4 |
 | `ext/ldap/BuiltinClasses.php` | 0 | 1 |
+| `ext/ldap/JitLdapDn.php` | 0 | 3 |
 | `ext/ldap/JitLdapEscape.php` | 0 | 2 |
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
+| `ext/ldap/LdapDnJitHelper.php` | 0 | 1 |
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
 | `ext/ldap/LdapExtensionPolicy.php` | 0 | 1 |
-| `ext/ldap/Module.php` | 0 | 34 |
+| `ext/ldap/Module.php` | 0 | 36 |
 | `ext/ldap/VmLdapArg.php` | 0 | 1 |
 | `ext/ldap/VmLdapConnection.php` | 0 | 4 |
 | `ext/ldap/VmLdapCore.php` | 0 | 4 |
+| `ext/ldap/VmLdapDn.php` | 0 | 5 |
 | `ext/ldap/VmLdapEscape.php` | 0 | 1 |
 | `ext/ldap/VmLdapModify.php` | 0 | 1 |
 | `ext/ldap/VmLdapNative.php` | 0 | 1 |
 | `ext/ldap/VmLdapResult.php` | 0 | 7 |
 | `ext/ldap/ldap_connect.php` | 0 | 2 |
 | `ext/ldap/ldap_connect_wallet.php` | 0 | 2 |
+| `ext/ldap/ldap_dn_builtins.php` | 0 | 3 |
 | `ext/ldap/ldap_escape.php` | 0 | 2 |
 | `ext/ldap/ldap_exop_builtins.php` | 0 | 6 |
 | `ext/ldap/ldap_link_builtins.php` | 0 | 10 |
@@ -15186,6 +15190,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/ldap/JitLdapDn.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 49)
+- 5 class method(s)
+
 ### `ext/ldap/JitLdapEscape.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15196,6 +15207,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/ldap/LdapDnJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/ldap/LdapEscapeJitHelper.php`
 
@@ -15211,38 +15227,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 31)
-- new ldap_escape (line 56)
-- new ldap_connect (line 57)
-- new ldap_bind (line 58)
-- new ldap_unbind (line 59)
-- new ldap_close (line 60)
-- new ldap_errno (line 61)
-- new ldap_error (line 62)
-- new ldap_err2str (line 63)
-- new ldap_set_option (line 64)
-- new ldap_get_option (line 65)
-- new ldap_start_tls (line 66)
-- new ldap_search (line 67)
-- new ldap_list (line 68)
-- new ldap_read (line 69)
-- new ldap_count_entries (line 70)
-- new ldap_get_entries (line 71)
-- new ldap_first_entry (line 72)
-- new ldap_next_entry (line 73)
-- new ldap_get_attributes (line 74)
-- new ldap_free_result (line 75)
-- new ldap_exop (line 76)
-- new ldap_exop_sync (line 77)
-- new ldap_parse_exop (line 78)
-- new ldap_exop_whoami (line 79)
-- new ldap_exop_refresh (line 80)
-- new ldap_exop_passwd (line 81)
-- new ldap_mod_add (line 82)
-- new ldap_mod_replace (line 83)
-- new ldap_mod_del (line 84)
-- new ldap_mod_batch (line 85)
-- new ldap_rename (line 86)
-- new ldap_connect_wallet (line 90)
+- new ldap_escape (line 57)
+- new ldap_dn2ufn (line 58)
+- new ldap_explode_dn (line 59)
+- new ldap_connect (line 60)
+- new ldap_bind (line 61)
+- new ldap_unbind (line 62)
+- new ldap_close (line 63)
+- new ldap_errno (line 64)
+- new ldap_error (line 65)
+- new ldap_err2str (line 66)
+- new ldap_set_option (line 67)
+- new ldap_get_option (line 68)
+- new ldap_start_tls (line 69)
+- new ldap_search (line 70)
+- new ldap_list (line 71)
+- new ldap_read (line 72)
+- new ldap_count_entries (line 73)
+- new ldap_get_entries (line 74)
+- new ldap_first_entry (line 75)
+- new ldap_next_entry (line 76)
+- new ldap_get_attributes (line 77)
+- new ldap_free_result (line 78)
+- new ldap_exop (line 79)
+- new ldap_exop_sync (line 80)
+- new ldap_parse_exop (line 81)
+- new ldap_exop_whoami (line 82)
+- new ldap_exop_refresh (line 83)
+- new ldap_exop_passwd (line 84)
+- new ldap_mod_add (line 85)
+- new ldap_mod_replace (line 86)
+- new ldap_mod_del (line 87)
+- new ldap_mod_batch (line 88)
+- new ldap_rename (line 89)
+- new ldap_connect_wallet (line 93)
 - 3 class method(s)
 
 ### `ext/ldap/VmLdapArg.php`
@@ -15266,6 +15284,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 173)
 - 8 class method(s)
 
+### `ext/ldap/VmLdapDn.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 51)
+- new Variable (line 53)
+- new Variable (line 74)
+- new Variable (line 87)
+- 5 class method(s)
+
 ### `ext/ldap/VmLdapEscape.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15279,7 +15306,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/VmLdapNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 31 class method(s)
+- 33 class method(s)
 
 ### `ext/ldap/VmLdapResult.php`
 
@@ -15303,6 +15330,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - 2 class method(s)
+
+### `ext/ldap/ldap_dn_builtins.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 66)
+- 4 class method(s)
 
 ### `ext/ldap/ldap_escape.php`
 
@@ -41959,7 +41993,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/LdapRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 127)
+- new JIT (line 157)
 - 6 class method(s)
 - 1 closure(s)
 
