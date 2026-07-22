@@ -61,19 +61,7 @@ final class AttributeRegistryArgsJitHelper
             }
             $value = $spec['value'];
             if (null !== $value) {
-                $valueVal = new Variable();
-                if (\is_bool($value)) {
-                    $valueVal->bool($value);
-                } elseif (\is_int($value)) {
-                    $valueVal->int($value);
-                } elseif (\is_float($value)) {
-                    $valueVal->float($value);
-                } elseif (\is_string($value)) {
-                    $valueVal->string($value);
-                } else {
-                    throw new \LogicException('Unsupported attribute argument type in JIT helper');
-                }
-                $entryHt->add('value', $valueVal);
+                $entryHt->add('value', self::valueToVariable($value));
             }
             $entryVar = new Variable(Variable::TYPE_ARRAY);
             $entryVar->array($entryHt);
@@ -81,5 +69,38 @@ final class AttributeRegistryArgsJitHelper
         }
 
         return $ht;
+    }
+
+    private static function valueToVariable(mixed $value): Variable
+    {
+        $valueVal = new Variable();
+        if (\is_array($value)) {
+            $inner = new HashTable();
+            if (array_is_list($value)) {
+                foreach ($value as $item) {
+                    $inner->append(self::valueToVariable($item));
+                }
+            } else {
+                foreach ($value as $key => $item) {
+                    $inner->add((string) $key, self::valueToVariable($item));
+                }
+            }
+            $valueVal->array($inner);
+
+            return $valueVal;
+        }
+        if (\is_bool($value)) {
+            $valueVal->bool($value);
+        } elseif (\is_int($value)) {
+            $valueVal->int($value);
+        } elseif (\is_float($value)) {
+            $valueVal->float($value);
+        } elseif (\is_string($value)) {
+            $valueVal->string($value);
+        } else {
+            throw new \LogicException('Unsupported attribute argument type in JIT helper');
+        }
+
+        return $valueVal;
     }
 }

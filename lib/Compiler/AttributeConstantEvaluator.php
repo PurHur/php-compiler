@@ -74,6 +74,9 @@ final class AttributeConstantEvaluator
         if ($expr instanceof Expr\New_) {
             return self::evalNew($expr);
         }
+        if ($expr instanceof Expr\Array_) {
+            return self::evalArray($expr);
+        }
         if ($expr instanceof Expr\ClassConstFetch) {
             return self::evalClassConstFetch($expr); // int|CompileTimeEnumCase
         }
@@ -214,5 +217,47 @@ final class AttributeConstantEvaluator
         }
 
         return new CompileTimeNew($expr->class->toString(), $args);
+    }
+
+    /**
+     * Array literals in attribute ctor args / nested `new` args (php-src zend_ast_evaluate; #22391).
+     *
+     * @return array<int|string, mixed>
+     */
+    private static function evalArray(Expr\Array_ $expr): array
+    {
+        $result = [];
+        $nextIndex = 0;
+        foreach ($expr->items as $item) {
+            if (null === $item) {
+                throw new \LogicException(
+                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+                );
+            }
+            if ($item->unpack) {
+                throw new \LogicException(
+                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+                );
+            }
+            $value = self::evalExpr($item->value);
+            if (null === $item->key) {
+                $result[$nextIndex] = $value;
+                ++$nextIndex;
+
+                continue;
+            }
+            $key = self::evalExpr($item->key);
+            if (!\is_int($key) && !\is_string($key)) {
+                throw new \LogicException(
+                    'Attribute constructor arguments must be compile-time constant expressions in this compiler build'
+                );
+            }
+            $result[$key] = $value;
+            if (\is_int($key) && $key >= $nextIndex) {
+                $nextIndex = $key + 1;
+            }
+        }
+
+        return $result;
     }
 }

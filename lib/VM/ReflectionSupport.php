@@ -345,8 +345,35 @@ final class ReflectionSupport
 
             return $copy;
         }
+        if (\is_array($value)) {
+            return self::phpArrayToVariable($value, $ctx);
+        }
 
         return self::scalarToVariable($value);
+    }
+
+    /**
+     * Materialize a PHP array from attribute const-eval (nested `new` / scalars; #22391).
+     *
+     * @param array<int|string, mixed> $value
+     */
+    public static function phpArrayToVariable(array $value, ?Context $ctx = null): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        if (array_is_list($value)) {
+            foreach ($value as $item) {
+                $ht->append(self::attributeValueToVariable($item, $ctx));
+            }
+
+            return $result;
+        }
+        foreach ($value as $key => $item) {
+            $ht->add((string) $key, self::attributeValueToVariable($item, $ctx));
+        }
+
+        return $result;
     }
 
     public static function scalarToVariable(mixed $value): Variable
@@ -640,7 +667,7 @@ final class ReflectionSupport
                     $name = Variable::TYPE_NULL === $resolved->type ? null : $resolved->toString();
                 } elseif ('value' === $key->toString()) {
                     $value = match ($resolved->type) {
-                        Variable::TYPE_OBJECT, Variable::TYPE_ENUM_CASE => $resolved,
+                        Variable::TYPE_OBJECT, Variable::TYPE_ENUM_CASE, Variable::TYPE_ARRAY => $resolved,
                         default => self::variableToScalar($resolved),
                     };
                 }
