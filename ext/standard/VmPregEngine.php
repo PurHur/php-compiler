@@ -166,7 +166,7 @@ final class VmPregEngine
 
             return null;
         }
-        for ($start = $offset; $start <= $len; ++$start) {
+        for ($start = $offset; $start <= $len; ) {
             $captures = [];
             $engine->resetMatchStart($start);
             if ($engine->matchNode($ast, $subject, $start, $len, $captures)) {
@@ -178,6 +178,16 @@ final class VmPregEngine
                 self::$lastMatchLimitError = $engine->limitErrorCode;
 
                 return false;
+            }
+            if ($start >= $len) {
+                break;
+            }
+            // PCRE2_UTF: advance by code point so mid-sequence bytes are not start positions (#22003).
+            if ($engine->utf) {
+                $width = VmPregUtf8::utf8CharByteWidth($subject, $start);
+                $start += $width > 0 ? $width : 1;
+            } else {
+                ++$start;
             }
         }
 
@@ -441,7 +451,9 @@ final class VmPregEngine
                 }
             }
             if ($this->peek() !== '}') {
-                $this->abortCompile(); return new VmPregAstEmptyNode();
+                $this->abortCompile();
+
+                return [0, 0, $greedy];
             }
             $this->advance(1);
             if ($this->peek() === '?') {
@@ -452,7 +464,9 @@ final class VmPregEngine
             return [$min, $max, $greedy];
         }
 
-        $this->abortCompile(); return new VmPregAstEmptyNode();
+        $this->abortCompile();
+
+        return [0, 0, $greedy];
     }
 
     private function parseDigits(): int
@@ -865,7 +879,28 @@ final class VmPregEngine
 
             return new VmPregAstCharNode(\chr((int) \hexdec($hex)), $this->caseless);
         }
+        if ('p' === $ch || 'P' === $ch) {
+            $this->advance(1);
+
+            return $this->parseUnicodePropertyEscape('P' === $ch);
+        }
         $this->advance(1);
+        if ($this->utf) {
+            // PCRE2_UTF|PCRE2_UCP: \w/\d/\s use Unicode properties (#22003).
+            return match ($ch) {
+                'd' => new VmPregAstUnicodePropNode('digit', false),
+                'D' => new VmPregAstUnicodePropNode('digit', true),
+                'w' => new VmPregAstUnicodePropNode('word', false),
+                'W' => new VmPregAstUnicodePropNode('word', true),
+                's' => new VmPregAstUnicodePropNode('space', false),
+                'S' => new VmPregAstUnicodePropNode('space', true),
+                'A' => new VmPregAstBolNode(false),
+                'K' => new VmPregAstKeepOutNode(),
+                'Z' => new VmPregAstEolNode(false, true),
+                'z' => new VmPregAstEolNode(false, true),
+                default => new VmPregAstCharNode($ch, $this->caseless),
+            };
+        }
 
         return match ($ch) {
             'd' => new VmPregAstClassNode([['0', '9']], false, false),
@@ -880,6 +915,48 @@ final class VmPregEngine
             'z' => new VmPregAstEolNode(false, true),
             default => new VmPregAstCharNode($ch, $this->caseless),
         };
+    }
+
+    /** Parse `\p{L}` / `\P{L}` / `\pL` Unicode property escapes (PCRE2, #22003). */
+    private function parseUnicodePropertyEscape(bool $negated): VmPregAstNode
+    {
+        if ($this->atEnd()) {
+            $this->abortCompile();
+
+            return new VmPregAstEmptyNode();
+        }
+        $name = '';
+        if ('{' === $this->peek()) {
+            $this->advance(1);
+            $start = $this->pos;
+            while (!$this->atEnd() && '}' !== $this->peek()) {
+                $this->advance(1);
+            }
+            if ('}' !== $this->peek()) {
+                $this->abortCompile();
+
+                return new VmPregAstEmptyNode();
+            }
+            $name = \substr($this->regex, $start, $this->pos - $start);
+            $this->advance(1);
+        } else {
+            // Single-letter form \pL
+            $name = $this->peek();
+            if ('' === $name || !\ctype_alpha($name)) {
+                $this->abortCompile();
+
+                return new VmPregAstEmptyNode();
+            }
+            $this->advance(1);
+        }
+        $name = \trim($name);
+        if ('' === $name) {
+            $this->abortCompile();
+
+            return new VmPregAstEmptyNode();
+        }
+
+        return new VmPregAstUnicodePropNode($name, $negated);
     }
 
     private function readLiteralChar(): string
@@ -2165,6 +2242,37 @@ final class VmPregAstAtomicNode implements VmPregAstNode
         array &$captures
     ): bool {
         return $engine->matchAtomic($this->inner, $subject, $pos, $len, $captures);
+    }
+}
+
+/** PCRE `\p{…}` / `\P{…}` / UCP `\w` — one UTF-8 code point (#22003). */
+final class VmPregAstUnicodePropNode implements VmPregAstNode
+{
+    public function __construct(
+        private readonly string $kind,
+        private readonly bool $negated
+    ) {
+    }
+
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        unset($engine);
+        $decoded = VmPregUtf8::codepointAt($subject, $pos, $len);
+        if (null === $decoded) {
+            return false;
+        }
+        [$cp, $width] = $decoded;
+        if (!VmPregUtf8::codepointMatchesProp($cp, $this->kind, $this->negated)) {
+            return false;
+        }
+        $captures[0] = [$pos, $pos + $width];
+
+        return true;
     }
 }
 
