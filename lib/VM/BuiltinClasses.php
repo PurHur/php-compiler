@@ -234,6 +234,9 @@ use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingFile;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingGenerator;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingLine;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetFunction;
+use PHPCompiler\VM\Builtin\ReflectionReferenceFromArrayElement;
+use PHPCompiler\VM\Builtin\ReflectionReferenceGetId;
+use PHPCompiler\VM\Builtin\ReflectionReferenceConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromFunction;
@@ -1368,6 +1371,20 @@ final class BuiltinClasses
             $rgen->methodVisibility[$name] = $pub;
         }
         $ctx->classes[ReflectionSupport::REFLECTION_GENERATOR] = $rgen;
+
+        $rref = new ClassEntry('ReflectionReference');
+        $rref->isFinal = true;
+        $rref->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_REFERENCE_ID, null, $strProto);
+        $rref->constructor = new ReflectionReferenceConstruct();
+        $rref->methods['__construct'] = $rref->constructor;
+        $rref->methodVisibility['__construct'] = $pub;
+        $rref->methods['fromarrayelement'] = new ReflectionReferenceFromArrayElement();
+        $rref->methodVisibility['fromarrayelement'] = $pubStatic;
+        $rref->methodNames['fromarrayelement'] = 'fromArrayElement';
+        $rref->methods['getid'] = new ReflectionReferenceGetId();
+        $rref->methodVisibility['getid'] = $pub;
+        $rref->methodNames['getid'] = 'getId';
+        $ctx->classes[ReflectionSupport::REFLECTION_REFERENCE] = $rref;
     }
 
     /**

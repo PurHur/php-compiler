@@ -3655,6 +3655,27 @@ final class VmReflection
         return $obj;
     }
 
+    /**
+     * Build a ReflectionReference for an array bucket IS_REFERENCE cell (#22065).
+     */
+    public static function newReflectionReference(Context $ctx, Variable $bucketValue): \PHPCompiler\VM\ObjectEntry
+    {
+        $class = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_REFERENCE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ReflectionReference is not registered in this compiler build');
+        }
+        if (!\PHPCompiler\VM\ReflectionReferenceSupport::bucketValueIsReference($bucketValue)) {
+            throw new \LogicException('ReflectionReference requires a reference bucket value');
+        }
+        $obj = new \PHPCompiler\VM\ObjectEntry($class);
+        $obj->constructed = true;
+        $idVar = new Variable();
+        $idVar->string(\PHPCompiler\VM\ReflectionReferenceSupport::idForBucketValue($bucketValue));
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_REFERENCE_ID)->copyFrom($idVar);
+
+        return $obj;
+    }
+
     private static function propertyExistsInvalidTypeName(int $type): string
     {
         switch ($type) {
