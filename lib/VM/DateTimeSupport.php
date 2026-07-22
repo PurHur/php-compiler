@@ -1249,6 +1249,47 @@ final class DateTimeSupport
     }
 
     /**
+     * php-src zend_get_properties_for(ZEND_PROP_PURPOSE_VAR_EXPORT) — DateTime wire (#22407).
+     *
+     * @return array<string, Variable>
+     */
+    public static function varExportPropertyMap(ObjectEntry $dt): array
+    {
+        $wire = self::exportZendJsonWireDateTimeLike($dt);
+        $date = new Variable(Variable::TYPE_STRING);
+        $date->string($wire['date']);
+        $type = new Variable(Variable::TYPE_INTEGER);
+        $type->int($wire['timezone_type']);
+        $tz = new Variable(Variable::TYPE_STRING);
+        $tz->string($wire['timezone']);
+
+        return [
+            'date' => $date,
+            'timezone_type' => $type,
+            'timezone' => $tz,
+        ];
+    }
+
+    /**
+     * php-src zend_get_properties_for(ZEND_PROP_PURPOSE_VAR_EXPORT) — DateTimeZone wire (#22407).
+     *
+     * @return array<string, Variable>
+     */
+    public static function varExportTimezonePropertyMap(ObjectEntry $zone): array
+    {
+        $wire = self::exportZendJsonWireDateTimeZone($zone);
+        $type = new Variable(Variable::TYPE_INTEGER);
+        $type->int($wire['timezone_type']);
+        $tz = new Variable(Variable::TYPE_STRING);
+        $tz->string($wire['timezone']);
+
+        return [
+            'timezone_type' => $type,
+            'timezone' => $tz,
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $data Zend DateTime unserialize payload
      */
     public static function restoreFromZendSerialize(Context $ctx, string $classKey, array $data): ObjectEntry
@@ -1277,5 +1318,28 @@ final class DateTimeSupport
         self::markDateTimeLikeInitialized($entry);
 
         return $entry;
+    }
+
+    /**
+     * php-src php_date_timezone_initialize_from_hash — DateTimeZone::__set_state (#22407).
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function restoreTimezoneFromZendSerialize(Context $ctx, array $data): ObjectEntry
+    {
+        $timezoneType = $data['timezone_type'] ?? null;
+        $timezone = $data['timezone'] ?? null;
+        if (!\is_int($timezoneType)
+            || $timezoneType < 1
+            || $timezoneType > 3
+            || !\is_string($timezone)
+            || str_contains($timezone, "\0")) {
+            throw new \Error('Invalid serialization data for DateTimeZone object');
+        }
+        try {
+            return self::newDateTimeZoneVariable($ctx, $timezone)->toObject();
+        } catch (NativeDateInvalidTimeZoneException) {
+            throw new \Error('Invalid serialization data for DateTimeZone object');
+        }
     }
 }
