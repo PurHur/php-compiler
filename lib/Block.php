@@ -403,13 +403,22 @@ class Block {
         if (false === $paramIdx) {
             return null;
         }
+
+        return $this->paramSlotForIndex((int) $paramIdx) ?? $this->slotIndexForVariableName($name);
+    }
+
+    /**
+     * Scope slot receiving TYPE_ARG_RECV for parameter index (excludes $this; #21984).
+     */
+    public function paramSlotForIndex(int $paramIdx): ?int
+    {
         foreach ($this->opCodes as $op) {
             if (OpCode::TYPE_ARG_RECV === $op->type && (int) $op->arg2 === $paramIdx) {
                 return (int) $op->arg1;
             }
         }
 
-        return $this->slotIndexForVariableName($name);
+        return null;
     }
 
     /**

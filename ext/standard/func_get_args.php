@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** func_get_args() — copy of arguments passed to the current user function (issue #197). */
+/** func_get_args() — current parameter values of the enclosing user function (#197, #21984). */
 final class func_get_args extends Internal
 {
     public function __construct()

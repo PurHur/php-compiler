@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** func_get_arg() — positional argument from the current user function (issue #11614). */
+/** func_get_arg() — current positional parameter of the enclosing user function (#11614, #22025, #21984). */
 final class func_get_arg extends Internal
 {
     private const VALUE_ERROR_NEGATIVE = 'func_get_arg(): Argument #1 ($position) must be greater than or equal to 0';
