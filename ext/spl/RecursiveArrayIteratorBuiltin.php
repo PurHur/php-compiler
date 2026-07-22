@@ -206,7 +206,7 @@ final class RecursiveArrayIteratorConstruct extends VmClassMethod
             $frame->calledArgs[1],
             'RecursiveArrayIterator::__construct',
             1
-        );
+        )->duplicate();
         RecursiveArrayIteratorBuiltin::init($object, $table);
     }
 }
