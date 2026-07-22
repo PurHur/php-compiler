@@ -5751,6 +5751,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodCreateFromClosure
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodCreateFromMethodName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetAttributes.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetClosure.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetClosureCalledClass.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetClosureScopeClass.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetClosureThis.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetClosureUsedVariables.php';
