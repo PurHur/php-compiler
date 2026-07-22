@@ -11,6 +11,8 @@ final class OpensslConstants
 {
     public const OPENSSL_RAW_DATA = 1;
     public const OPENSSL_ZERO_PADDING = 2;
+    /** php-src openssl.stub.php — refuse silent \\0 key pad when short (#22326). */
+    public const OPENSSL_DONT_ZERO_PAD_KEY = 4;
     public const OPENSSL_PKCS1_PADDING = 1;
     public const OPENSSL_NO_PADDING = 3;
     public const OPENSSL_PKCS1_OAEP_PADDING = 4;
@@ -84,6 +86,7 @@ final class OpensslConstants
         return [
             'OPENSSL_RAW_DATA' => self::OPENSSL_RAW_DATA,
             'OPENSSL_ZERO_PADDING' => self::OPENSSL_ZERO_PADDING,
+            'OPENSSL_DONT_ZERO_PAD_KEY' => self::OPENSSL_DONT_ZERO_PAD_KEY,
             'OPENSSL_PKCS1_PADDING' => self::OPENSSL_PKCS1_PADDING,
             'OPENSSL_NO_PADDING' => self::OPENSSL_NO_PADDING,
             'OPENSSL_PKCS1_OAEP_PADDING' => self::OPENSSL_PKCS1_OAEP_PADDING,

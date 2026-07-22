@@ -497,6 +497,69 @@ final class VmOpenssl
      *
      * @return string|false ciphertext bytes (caller applies base64 unless OPENSSL_RAW_DATA)
      */
+    /**
+     * Pad/truncate key + IV like php-src {@code php_openssl_cipher_init} / {@code php_openssl_validate_iv}
+     * (ext/openssl/openssl_backend_common.c; #22326).
+     *
+     * @return array{0: string, 1: string}|false [passphrase, iv]
+     */
+    public static function normalizeCipherKeyAndIv(
+        string $funcName,
+        string $passphrase,
+        string $iv,
+        int $keyLen,
+        int $ivLen,
+        bool $isAead,
+        int $options,
+        bool $isEncrypt,
+        ?Frame $frame
+    ): array|false {
+        if (!$isAead && $ivLen > 0) {
+            $ivBytes = \strlen($iv);
+            if (0 === $ivBytes) {
+                if ($isEncrypt) {
+                    self::userWarning(
+                        $funcName.'(): Using an empty Initialization Vector (iv) is potentially insecure and not recommended',
+                        $frame
+                    );
+                }
+                $iv = \str_repeat("\0", $ivLen);
+            } elseif ($ivBytes < $ivLen) {
+                self::userWarning(\sprintf(
+                    '%s(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
+                    $funcName,
+                    $ivBytes,
+                    $ivLen
+                ), $frame);
+                $iv .= \str_repeat("\0", $ivLen - $ivBytes);
+            } elseif ($ivBytes > $ivLen) {
+                self::userWarning(\sprintf(
+                    '%s(): IV passed is %d bytes long which is longer than the %d expected by selected cipher, truncating',
+                    $funcName,
+                    $ivBytes,
+                    $ivLen
+                ), $frame);
+                $iv = \substr($iv, 0, $ivLen);
+            }
+        }
+
+        $passLen = \strlen($passphrase);
+        if ($keyLen > $passLen) {
+            if (0 !== ($options & OpensslConstants::OPENSSL_DONT_ZERO_PAD_KEY)) {
+                // Fixed-length ciphers (AES) cannot adopt a shorter key — php-src EVP_CIPHER_CTX_set_key_length fails.
+                self::userWarning($funcName.'(): Key length cannot be set for the cipher algorithm', $frame);
+
+                return false;
+            }
+            $passphrase .= \str_repeat("\0", $keyLen - $passLen);
+        } elseif ($passLen > $keyLen) {
+            // Variable-length ciphers may accept longer keys via EVP; AES truncates to cipher key_len (Zend).
+            $passphrase = \substr($passphrase, 0, $keyLen);
+        }
+
+        return [$passphrase, $iv];
+    }
+
     public static function encrypt(
         string $data,
         string $cipherAlgo,
@@ -515,30 +578,36 @@ final class VmOpenssl
         }
 
         $cipher = strtolower($cipherAlgo);
-        if (false === OpensslCipherRegistry::cipherIvLength($cipher)) {
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
+        if (false === $ivLen) {
             self::userWarning('openssl_encrypt(): Unknown cipher algorithm', $frame);
 
             return false;
         }
 
         $isAead = OpensslCipherRegistry::isAeadCipher($cipher);
-        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
-        if (!$isAead && false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
-            self::userWarning(\sprintf(
-                'openssl_encrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
-                \strlen($iv),
-                $ivLen
-            ), $frame);
-
-            return false;
-        }
-
         $keyLen = OpensslCipherRegistry::cipherKeyLength($cipher);
-        if (false === $keyLen || \strlen($passphrase) !== $keyLen) {
+        if (false === $keyLen || $keyLen <= 0) {
             self::userWarning('openssl_encrypt(): Invalid key length', $frame);
 
             return false;
         }
+
+        $normalized = self::normalizeCipherKeyAndIv(
+            'openssl_encrypt',
+            $passphrase,
+            $iv,
+            $keyLen,
+            $ivLen,
+            $isAead,
+            $options,
+            true,
+            $frame
+        );
+        if (false === $normalized) {
+            return false;
+        }
+        [$passphrase, $iv] = $normalized;
 
         $wantTag = null !== $tagVar;
         if ($isAead && !$wantTag) {
@@ -607,30 +676,36 @@ final class VmOpenssl
         }
 
         $cipher = strtolower($cipherAlgo);
-        if (false === OpensslCipherRegistry::cipherIvLength($cipher)) {
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
+        if (false === $ivLen) {
             self::userWarning('openssl_decrypt(): Unknown cipher algorithm', $frame);
 
             return false;
         }
 
         $isAead = OpensslCipherRegistry::isAeadCipher($cipher);
-        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
-        if (!$isAead && false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
-            self::userWarning(\sprintf(
-                'openssl_decrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
-                \strlen($iv),
-                $ivLen
-            ), $frame);
-
-            return false;
-        }
-
         $keyLen = OpensslCipherRegistry::cipherKeyLength($cipher);
-        if (false === $keyLen || \strlen($passphrase) !== $keyLen) {
+        if (false === $keyLen || $keyLen <= 0) {
             self::userWarning('openssl_decrypt(): Invalid key length', $frame);
 
             return false;
         }
+
+        $normalized = self::normalizeCipherKeyAndIv(
+            'openssl_decrypt',
+            $passphrase,
+            $iv,
+            $keyLen,
+            $ivLen,
+            $isAead,
+            $options,
+            false,
+            $frame
+        );
+        if (false === $normalized) {
+            return false;
+        }
+        [$passphrase, $iv] = $normalized;
 
         if ('' !== $tag && !$isAead) {
             self::userWarning(
