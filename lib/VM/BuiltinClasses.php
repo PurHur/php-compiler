@@ -269,7 +269,9 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfRequiredParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetStaticVariables;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
+use PHPCompiler\VM\Builtin\ReflectionFunctionHasTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
 use PHPCompiler\VM\Builtin\ReflectionFunctionInvokeArgs;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
@@ -1111,6 +1113,8 @@ final class BuiltinClasses
                 'getnumberofrequiredparameters' => new ReflectionFunctionGetNumberOfRequiredParameters(),
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
                 'hasreturntype' => new ReflectionFunctionHasReturnType(),
+                'gettentativereturntype' => new ReflectionFunctionGetTentativeReturnType(),
+                'hastentativereturntype' => new ReflectionFunctionHasTentativeReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),
                 'isclosure' => new ReflectionFunctionIsClosure(),
                 'isdisabled' => new ReflectionFunctionIsDisabled(),
