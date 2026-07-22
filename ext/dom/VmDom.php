@@ -6741,9 +6741,33 @@ final class VmDom
 
             break;
         }
-        if (null !== $htmlEncoding) {
-            $cursor = self::decodeHtmlLoadBytes($cursor, $htmlEncoding);
+
+        // libxml htmlReadMemory encoding (#22023 / php-src ext/dom/document.c):
+        // XML PI → that charset; UTF-8 BOM → UTF-8; early <meta charset> → that charset;
+        // else legacy DOMDocument defaults to ISO-8859-1 (bare UTF-8 bytes → mojibake).
+        $isLiving = VmDomLiving::isLivingDocument($document);
+        $state = DomRegistry::state($document);
+        $overrideEncoding = $isLiving ? $state->encoding : null;
+        $hadBom = false;
+        if (str_starts_with($cursor, "\xEF\xBB\xBF")) {
+            $hadBom = true;
+            $cursor = substr($cursor, 3);
         }
+        $metaCharset = self::extractHtmlMetaCharset($cursor);
+        $decodeEncoding = null;
+        if (null !== $overrideEncoding && '' !== $overrideEncoding) {
+            $decodeEncoding = $overrideEncoding;
+        } elseif (null !== $htmlEncoding) {
+            $decodeEncoding = $htmlEncoding;
+        } elseif ($hadBom) {
+            $decodeEncoding = 'UTF-8';
+        } elseif (null !== $metaCharset && self::isHtmlMetaCharsetEarly($cursor, $metaCharset['offset'])) {
+            $decodeEncoding = $metaCharset['charset'];
+        } else {
+            // Living HTML5 docs default UTF-8; legacy DOMDocument matches libxml Latin-1.
+            $decodeEncoding = $isLiving ? 'UTF-8' : 'ISO-8859-1';
+        }
+        $cursor = self::decodeHtmlLoadBytes($cursor, $decodeEncoding);
 
         $source = self::normalizeHtmlLoadSource($cursor, $options);
         $root = self::parseHtmlElementTree($ctx, $source, $document, $frame);
@@ -6751,7 +6775,6 @@ final class VmDom
             return false;
         }
 
-        $state = DomRegistry::state($document);
         $state->isHtmlDocument = true;
         $noDefDtd = 0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NODEFDTD);
         if (null !== $doctypeDecl) {
@@ -6782,9 +6805,10 @@ final class VmDom
         $state->idAttrByElement = [];
         $state->elementIds = [];
         $state->xmlVersion = '1.0';
-        // Living Dom\* may set overrideEncoding before loadHTML (#20898); legacy resets.
-        if (!VmDomLiving::isLivingDocument($document)) {
-            $state->encoding = null;
+        // Living Dom\* may set overrideEncoding before loadHTML (#20898).
+        // Legacy: meta charset sets DOMDocument::$encoding (even when too late to redecode); else null.
+        if (!$isLiving) {
+            $state->encoding = null !== $metaCharset ? $metaCharset['charset'] : null;
         }
         $state->xmlStandalone = false;
         $state->documentElementName = DomRegistry::state($root)->nodeName;
@@ -7009,6 +7033,220 @@ final class VmDom
         $converted = CharsetEngine::convert($from, 'UTF-8', $source);
 
         return false === $converted ? $source : $converted;
+    }
+
+    /**
+     * First &lt;meta charset&gt; / http-equiv Content-Type charset in HTML source (#22023).
+     *
+     * Preg-free for AOT/VmPregPure (#17954).
+     *
+     * @return null|array{charset: string, offset: int}
+     */
+    private static function extractHtmlMetaCharset(string $html): ?array
+    {
+        $len = \strlen($html);
+        $offset = 0;
+        while ($offset < $len) {
+            $lt = strpos($html, '<', $offset);
+            if (false === $lt) {
+                break;
+            }
+            if ($lt + 4 <= $len && 0 === substr_compare($html, '<!--', $lt, 4)) {
+                $end = strpos($html, '-->', $lt + 4);
+                $offset = false === $end ? $len : $end + 3;
+
+                continue;
+            }
+            if ($lt + 5 <= $len && 0 === substr_compare($html, 'meta', $lt + 1, 4, true)) {
+                $boundary = $html[$lt + 5] ?? '';
+                if ('' === $boundary || ctype_space($boundary) || '/' === $boundary || '>' === $boundary) {
+                    $gt = strpos($html, '>', $lt);
+                    if (false === $gt) {
+                        break;
+                    }
+                    $attrs = substr($html, $lt + 5, $gt - ($lt + 5));
+                    $charset = self::parseHtmlMetaCharsetAttributes($attrs);
+                    if (null !== $charset) {
+                        return ['charset' => $charset, 'offset' => $lt];
+                    }
+                    $offset = $gt + 1;
+
+                    continue;
+                }
+            }
+            $offset = $lt + 1;
+        }
+
+        return null;
+    }
+
+    /** @return null|string charset token from a &lt;meta …&gt; attribute string */
+    private static function parseHtmlMetaCharsetAttributes(string $attrs): ?string
+    {
+        $charset = self::extractHtmlAttributeValue($attrs, 'charset');
+        if (null !== $charset && '' !== $charset) {
+            return $charset;
+        }
+        $httpEquiv = self::extractHtmlAttributeValue($attrs, 'http-equiv');
+        if (null === $httpEquiv || 0 !== strcasecmp($httpEquiv, 'content-type')) {
+            return null;
+        }
+        $content = self::extractHtmlAttributeValue($attrs, 'content');
+        if (null === $content) {
+            return null;
+        }
+        $at = stripos($content, 'charset');
+        if (false === $at) {
+            return null;
+        }
+        $i = $at + 7; // strlen('charset')
+        $len = \strlen($content);
+        while ($i < $len && ctype_space($content[$i])) {
+            ++$i;
+        }
+        if ($i >= $len || '=' !== $content[$i]) {
+            return null;
+        }
+        ++$i;
+        while ($i < $len && ctype_space($content[$i])) {
+            ++$i;
+        }
+        if ($i >= $len) {
+            return null;
+        }
+        $start = $i;
+        while ($i < $len && ';' !== $content[$i] && !ctype_space($content[$i])) {
+            ++$i;
+        }
+        $value = substr($content, $start, $i - $start);
+
+        return '' === $value ? null : $value;
+    }
+
+    /** Preg-free HTML attribute value lookup (quoted or bare). */
+    private static function extractHtmlAttributeValue(string $attrs, string $name): ?string
+    {
+        $len = \strlen($attrs);
+        $i = 0;
+        while ($i < $len) {
+            while ($i < $len && (ctype_space($attrs[$i]) || '/' === $attrs[$i])) {
+                ++$i;
+            }
+            if ($i >= $len) {
+                break;
+            }
+            $nameStart = $i;
+            while ($i < $len && '=' !== $attrs[$i] && !ctype_space($attrs[$i]) && '/' !== $attrs[$i] && '>' !== $attrs[$i]) {
+                ++$i;
+            }
+            $attrName = substr($attrs, $nameStart, $i - $nameStart);
+            while ($i < $len && ctype_space($attrs[$i])) {
+                ++$i;
+            }
+            if ($i >= $len || '=' !== $attrs[$i]) {
+                if (0 === strcasecmp($attrName, $name)) {
+                    return '';
+                }
+
+                continue;
+            }
+            ++$i;
+            while ($i < $len && ctype_space($attrs[$i])) {
+                ++$i;
+            }
+            if ($i >= $len) {
+                return 0 === strcasecmp($attrName, $name) ? '' : null;
+            }
+            $quote = $attrs[$i];
+            if ('"' === $quote || "'" === $quote) {
+                ++$i;
+                $valueStart = $i;
+                while ($i < $len && $attrs[$i] !== $quote) {
+                    ++$i;
+                }
+                $value = substr($attrs, $valueStart, $i - $valueStart);
+                if ($i < $len) {
+                    ++$i;
+                }
+            } else {
+                $valueStart = $i;
+                while ($i < $len && !ctype_space($attrs[$i]) && '/' !== $attrs[$i] && '>' !== $attrs[$i]) {
+                    ++$i;
+                }
+                $value = substr($attrs, $valueStart, $i - $valueStart);
+            }
+            if (0 === strcasecmp($attrName, $name)) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Meta charset is early enough to redecode when only head-context markup precedes it
+     * (libxml htmlCheckEncoding / HTML5 prescan; #22023).
+     */
+    private static function isHtmlMetaCharsetEarly(string $html, int $metaOffset): bool
+    {
+        $i = 0;
+        while ($i < $metaOffset) {
+            if (ctype_space($html[$i])) {
+                ++$i;
+
+                continue;
+            }
+            if ('<' !== $html[$i]) {
+                return false;
+            }
+            if ($i + 4 <= $metaOffset && 0 === substr_compare($html, '<!--', $i, 4)) {
+                $end = strpos($html, '-->', $i + 4);
+                if (false === $end || $end >= $metaOffset) {
+                    return true;
+                }
+                $i = $end + 3;
+
+                continue;
+            }
+            if ($i + 2 <= $metaOffset && '!' === $html[$i + 1]
+                && $i + 9 <= $metaOffset
+                && 0 === substr_compare($html, 'DOCTYPE', $i + 2, 7, true)) {
+                $gt = strpos($html, '>', $i);
+                if (false === $gt || $gt >= $metaOffset) {
+                    return true;
+                }
+                $i = $gt + 1;
+
+                continue;
+            }
+            $nameStart = $i + 1;
+            if ($nameStart < $metaOffset && '/' === $html[$nameStart]) {
+                ++$nameStart;
+            }
+            $nameEnd = $nameStart;
+            while ($nameEnd < $metaOffset && self::isHtmlTagNameChar($html[$nameEnd])) {
+                ++$nameEnd;
+            }
+            $name = strtolower(substr($html, $nameStart, $nameEnd - $nameStart));
+            if (!self::isHtmlHeadContextTagName($name)) {
+                return false;
+            }
+            $gt = strpos($html, '>', $i);
+            if (false === $gt || $gt >= $metaOffset) {
+                return true;
+            }
+            $i = $gt + 1;
+        }
+
+        return true;
+    }
+
+    private static function isHtmlHeadContextTagName(string $name): bool
+    {
+        return match ($name) {
+            'html', 'head', 'meta', 'title', 'link', 'base', 'style', 'script', 'noscript', 'template' => true,
+            default => false,
+        };
     }
 
     /**
