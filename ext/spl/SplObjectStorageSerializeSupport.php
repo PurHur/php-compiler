@@ -15,6 +15,7 @@ use PHPCompiler\VM\Variable;
 
 /**
  * Zend serialize wire for SplObjectStorage (php-src ext/spl/spl_object_storage.c; #14164).
+ * __serialize/__unserialize bag shape (#22268) — php-src ext/spl/spl_observer.c.
  */
 final class SplObjectStorageSerializeSupport
 {
@@ -23,6 +24,83 @@ final class SplObjectStorageSerializeSupport
     public static function isSplObjectStorageClass(string $lcClass): bool
     {
         return self::CLASS_LC === $lcClass;
+    }
+
+    /**
+     * php-src SplObjectStorage::__serialize — [0 => flat object/info pairs, 1 => members].
+     */
+    public static function exportSerializeBag(ObjectEntry $storage): Variable
+    {
+        $pairs = [];
+        foreach (SplObjectStorageBuiltin::exportSerializeEntries($storage) as [$object, $info]) {
+            $objCopy = new Variable();
+            $objCopy->copyFrom($object->resolveIndirect());
+            $pairs[] = $objCopy;
+            $infoCopy = new Variable();
+            $infoCopy->copyFrom($info->resolveIndirect());
+            $pairs[] = $infoCopy;
+        }
+
+        $storageVar = new Variable(Variable::TYPE_ARRAY);
+        $storageVar->newArray();
+        if ([] !== $pairs) {
+            $storageVar->toArray()->assignPackedList($pairs);
+        }
+
+        $membersVar = new Variable(Variable::TYPE_ARRAY);
+        $membersVar->newArray();
+
+        $result = new Variable(Variable::TYPE_ARRAY);
+        $result->newArray();
+        $result->toArray()->assignPackedList([$storageVar, $membersVar]);
+
+        return $result;
+    }
+
+    /**
+     * php-src SplObjectStorage::__unserialize — attach pairs; does not clear existing storage.
+     */
+    public static function restoreFromSerializeBag(ObjectEntry $storage, Variable $data): void
+    {
+        $ht = $data->toArray();
+        $storageSlot = null;
+        $membersSlot = null;
+        foreach ($ht->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $key->type) {
+                continue;
+            }
+            $idx = $key->toInt();
+            if (0 === $idx) {
+                $storageSlot = $valueVar->resolveIndirect();
+            } elseif (1 === $idx) {
+                $membersSlot = $valueVar->resolveIndirect();
+            }
+        }
+        if (
+            null === $storageSlot || null === $membersSlot
+            || Variable::TYPE_ARRAY !== $storageSlot->type
+            || Variable::TYPE_ARRAY !== $membersSlot->type
+        ) {
+            throw new \UnexpectedValueException('Incomplete or ill-typed serialization data');
+        }
+
+        $slots = [];
+        foreach ($storageSlot->toArray()->iterateKeyed(false) as [, $slot]) {
+            $slots[] = $slot->resolveIndirect();
+        }
+        if (0 !== (\count($slots) % 2)) {
+            throw new \UnexpectedValueException('Odd number of elements');
+        }
+        for ($i = 0; isset($slots[$i + 1]); $i += 2) {
+            $object = $slots[$i];
+            if (Variable::TYPE_OBJECT !== $object->type) {
+                throw new \UnexpectedValueException('Non-object key');
+            }
+            SplObjectStorageBuiltin::attach($storage, $object, $slots[$i + 1]);
+        }
+        // Members bag (index 1) is accepted for Zend shape parity; dynamic props unused on internal SOS.
+        unset($membersSlot);
     }
 
     public static function encodeZendSerializeWire(
