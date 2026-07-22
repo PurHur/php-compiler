@@ -2812,17 +2812,29 @@ final class VmDateTimeNative
     }
 
     /**
+     * Parse zone.tab ISO 6709 coordinates (±DDMM±DDDMM or ±DDMMSS±DDDMMSS).
+     *
+     * php-src/timelib zone.tab rows use seconds when needed for accuracy
+     * (e.g. America/New_York `+404251-0740023`). Matching only the minute form
+     * zeroes latitude/longitude while country_code/comments still parse (#22291).
+     *
      * @return array{latitude: float, longitude: float}
      */
     private static function parseZoneTabCoordinates(string $coords): array
     {
-        if (!preg_match('/^([+-])(\d{2})(\d{2})([+-])(\d{3})(\d{2})$/', $coords, $matches)) {
+        if (!preg_match(
+            '/^([+-])(\d{2})(\d{2})(\d{2})?([+-])(\d{3})(\d{2})(\d{2})?$/',
+            $coords,
+            $matches
+        )) {
             return ['latitude' => 0.0, 'longitude' => 0.0];
         }
         $latSign = '+' === $matches[1] ? 1 : -1;
-        $lat = $latSign * ((int) $matches[2] + ((int) $matches[3]) / 60);
-        $lonSign = '+' === $matches[4] ? 1 : -1;
-        $lon = $lonSign * ((int) $matches[5] + ((int) $matches[6]) / 60);
+        $latSec = isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : 0;
+        $lat = $latSign * ((int) $matches[2] + ((int) $matches[3]) / 60.0 + $latSec / 3600.0);
+        $lonSign = '+' === $matches[5] ? 1 : -1;
+        $lonSec = isset($matches[8]) && '' !== $matches[8] ? (int) $matches[8] : 0;
+        $lon = $lonSign * ((int) $matches[6] + ((int) $matches[7]) / 60.0 + $lonSec / 3600.0);
 
         return ['latitude' => $lat, 'longitude' => $lon];
     }
