@@ -46,6 +46,7 @@ use PHPCompiler\VM\ObjectPropertyIterator;
 use PHPCompiler\VM\WeakMapIterator;
 use PHPCompiler\VM\WeakRefSupport;
 use PHPCompiler\VM\ReferencableCheck;
+use PHPCompiler\VM\ReflectionPropertyHookSupport;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TraitCompositionConflictMessage;
@@ -11555,6 +11556,14 @@ restart:
             return false;
         }
         $meta = $this->classPropertyMeta($owner, $propName);
+        if (null !== ReflectionPropertyHookSupport::runtimeHookClosure(
+            $this->context,
+            $owner->class,
+            $propName,
+            'set'
+        )) {
+            return true;
+        }
         $setLc = $meta?->setHookMethodLc
             ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
 
@@ -11613,6 +11622,23 @@ restart:
             return false;
         }
         $meta = $this->classPropertyMeta($owner, $propName);
+        $runtimeSet = ReflectionPropertyHookSupport::runtimeHookClosure(
+            $this->context,
+            $owner->class,
+            $propName,
+            'set'
+        );
+        if (null !== $runtimeSet) {
+            $this->context->propertyHookSetAborted = false;
+            $thisVar = new Variable();
+            $thisVar->object($owner);
+            $this->invokeReflectionRuntimePropertyHook($runtimeSet, $thisVar, $value->resolveIndirect(), $frame);
+            if ($this->context->propertyHookSetAborted) {
+                return false;
+            }
+
+            return true;
+        }
         $setLc = $meta?->setHookMethodLc
             ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($propName));
         if (!isset($owner->class->methods[$setLc])) {
@@ -11631,6 +11657,28 @@ restart:
         }
 
         return true;
+    }
+
+    /**
+     * Invoke a ReflectionProperty::setHook() closure with $this bound (#22116).
+     */
+    private function invokeReflectionRuntimePropertyHook(
+        VM\ClosureState $state,
+        Variable $thisVar,
+        ?Variable $setValue,
+        Frame $frame
+    ): Variable {
+        $prevBound = $state->boundThis;
+        $state->boundThis = $thisVar;
+        try {
+            if (null !== $setValue) {
+                return $this->invokeClosure($state, $setValue);
+            }
+
+            return $this->invokeClosure($state);
+        } finally {
+            $state->boundThis = $prevBound;
+        }
     }
 
     /**
@@ -11699,6 +11747,26 @@ restart:
             $cached->copyFrom($object->getProperty($name)->resolveIndirect());
 
             return $cached;
+        }
+        $runtimeGet = ReflectionPropertyHookSupport::runtimeHookClosure(
+            $this->context,
+            $object->class,
+            $name,
+            'get'
+        );
+        if (null !== $runtimeGet) {
+            $thisVar = new Variable();
+            $thisVar->object($object);
+            $result = $this->invokeReflectionRuntimePropertyHook($runtimeGet, $thisVar, null, $frame);
+            $catchFrame = $this->enforcePropertyHookGetReturn($object, $name, $meta, $result, $frame);
+            if (null !== $catchFrame) {
+                throw new VM\PropertyHookRefWriteSignal($catchFrame);
+            }
+            if (null !== $meta) {
+                VM\LazyPropertySupport::cacheLazyGetHookResult($object, $name, $meta, $result);
+            }
+
+            return $result;
         }
         $getLc = $meta?->getHookMethodLc
             ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($name));

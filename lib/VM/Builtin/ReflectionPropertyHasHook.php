@@ -24,14 +24,13 @@ final class ReflectionPropertyHasHook extends VmClassMethod
             $frame,
             $frame->calledArgs[0]
         );
-        unset($ctx);
         $hookKind = ReflectionPropertyHookSupport::parsePropertyHookTypeArg(
             $frame->calledArgs[1],
             'ReflectionProperty::hasHook'
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(
-                ReflectionPropertyHookSupport::hasHook($entry, $meta, $property, $hookKind)
+                ReflectionPropertyHookSupport::hasHook($entry, $meta, $property, $hookKind, $ctx)
             );
         }
     }

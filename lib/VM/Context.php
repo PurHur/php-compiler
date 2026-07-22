@@ -93,6 +93,13 @@ class Context {
      */
     public array $propertyHookRegistry = [];
 
+    /**
+     * Runtime property hooks installed via ReflectionProperty::setHook() (#22116).
+     *
+     * @var array<string, array<string, array<string, ClosureState>>>
+     */
+    public array $reflectionPropertyRuntimeHooks = [];
+
     /** Pending thrown value while dispatching catch handlers (issue #1362). */
     public ?Variable $pendingException = null;
 

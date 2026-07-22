@@ -98,6 +98,13 @@ final class ReflectionPropertyHookSupport
         string $property,
         Context $ctx
     ): bool {
+        if (null !== $ctx) {
+            $classLc = strtolower($entry->name);
+            $propLc = strtolower($property);
+            if (!empty($ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc])) {
+                return true;
+            }
+        }
         if (null !== $meta) {
             return null !== $meta->getHookMethodLc
                 || null !== $meta->setHookMethodLc
@@ -112,8 +119,12 @@ final class ReflectionPropertyHookSupport
         ClassEntry $entry,
         ?ClassProperty $meta,
         string $property,
-        string $hookKind
+        string $hookKind,
+        ?Context $ctx = null
     ): bool {
+        if (null !== $ctx && null !== self::runtimeHookClosure($ctx, $entry, $property, $hookKind)) {
+            return true;
+        }
         if (null !== $meta) {
             return match ($hookKind) {
                 'get' => null !== $meta->getHookMethodLc,
@@ -133,6 +144,13 @@ final class ReflectionPropertyHookSupport
     {
         $result = [];
         foreach (['get', 'set'] as $hookKind) {
+            $runtime = self::runtimeHookClosure($ctx, $entry, $property, $hookKind);
+            if (null !== $runtime) {
+                $out = new Variable(Variable::TYPE_OBJECT);
+                $out->object(ClosureSupport::wrapState($ctx, $runtime));
+                $result[$hookKind] = $out;
+                continue;
+            }
             $methodLc = self::hookMethodLc($entry, $meta, $property, $hookKind);
             if (null !== $methodLc) {
                 $result[$hookKind] = self::hookClosure($ctx, $entry, $methodLc);
@@ -152,8 +170,9 @@ final class ReflectionPropertyHookSupport
         string $property,
         string $hookKind
     ): ?Variable {
+        $hasRuntime = null !== self::runtimeHookClosure($ctx, $entry, $property, $hookKind);
         $methodLc = self::hookMethodLc($entry, $meta, $property, $hookKind);
-        if (null === $methodLc || !isset($entry->methods[$methodLc])) {
+        if (!$hasRuntime && (null === $methodLc || !isset($entry->methods[$methodLc]))) {
             return null;
         }
         $rmClass = $ctx->classes[ReflectionSupport::REFLECTION_METHOD] ?? null;
@@ -186,6 +205,46 @@ final class ReflectionPropertyHookSupport
         $hooks = $entry->staticPropertyHooks[strtolower($property)] ?? [];
 
         return $hooks[$hookKind] ?? null;
+    }
+
+    public static function runtimeHookClosure(
+        Context $ctx,
+        ClassEntry $entry,
+        string $property,
+        string $hookKind
+    ): ?ClosureState {
+        $classLc = strtolower($entry->name);
+        $propLc = strtolower($property);
+
+        return $ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc][$hookKind] ?? null;
+    }
+
+    public static function installRuntimeHook(
+        Context $ctx,
+        ClassEntry $entry,
+        ClassProperty $meta,
+        string $property,
+        string $hookKind,
+        ClosureState $state
+    ): void {
+        $classLc = strtolower($entry->name);
+        $propLc = strtolower($property);
+        if (!isset($ctx->reflectionPropertyRuntimeHooks[$classLc])) {
+            $ctx->reflectionPropertyRuntimeHooks[$classLc] = [];
+        }
+        if (!isset($ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc])) {
+            $ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc] = [];
+        }
+        $ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc][$hookKind] = $state;
+        if ('set' === $hookKind) {
+            $meta->setHookMethodLc = strtolower(
+                \PHPCompiler\SourcePreprocessor\PropertyHooks::setHookMethodName($property)
+            );
+        } else {
+            $meta->getHookMethodLc = strtolower(
+                \PHPCompiler\SourcePreprocessor\PropertyHooks::getHookMethodName($property)
+            );
+        }
     }
 
     public static function parsePropertyHookTypeArg(Variable $arg, string $function): string
