@@ -51,29 +51,33 @@ final class OpensslEncryptJitHelper
 
             return null;
         }
-        if (false === OpensslCipherRegistry::cipherIvLength($cipher)) {
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
+        if (false === $ivLen) {
             VmOpenssl::userWarningForFrame('openssl_encrypt(): Unknown cipher algorithm', null);
 
             return null;
         }
-        if (!$isAead) {
-            $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
-            if (false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
-                VmOpenssl::userWarningForFrame(\sprintf(
-                    'openssl_encrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
-                    \strlen($iv),
-                    $ivLen
-                ), null);
-
-                return null;
-            }
-        }
         $keyLen = OpensslCipherRegistry::cipherKeyLength($cipher);
-        if (false === $keyLen || \strlen($passphrase) !== $keyLen) {
+        if (false === $keyLen || $keyLen <= 0) {
             VmOpenssl::userWarningForFrame('openssl_encrypt(): Invalid key length', null);
 
             return null;
         }
+        $normalized = VmOpenssl::normalizeCipherKeyAndIv(
+            'openssl_encrypt',
+            $passphrase,
+            $iv,
+            $keyLen,
+            $ivLen,
+            $isAead,
+            $options,
+            true,
+            null
+        );
+        if (false === $normalized) {
+            return null;
+        }
+        [$passphrase, $iv] = $normalized;
 
         $zeroPadding = 0 !== ($options & OpensslConstants::OPENSSL_ZERO_PADDING);
         $result = VmOpensslCipherNative::encrypt(
