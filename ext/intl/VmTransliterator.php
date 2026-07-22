@@ -11,7 +11,9 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
@@ -387,6 +389,133 @@ final class VmTransliterator
     public static function coerceSubjectArg(Variable $var, string $function, int $position): string
     {
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'string');
+    }
+
+    /**
+     * Procedural transliterator_transliterate() arg #1 — Z_PARAM_OBJ_OF_CLASS_OR_STR
+     * (php-src transliterator_methods.c, #22161).
+     *
+     * @return ObjectEntry|null Transliterator object, or null when string ID create failed
+     *                       (intl error already set; caller emits E_WARNING + returns false)
+     */
+    public static function resolveProceduralTransliteratorArg(Frame $frame, Variable $var): ?ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $object = $var->toObject();
+            if (self::isTransliteratorObject($object)) {
+                return $object;
+            }
+            throw new \TypeError(\sprintf(
+                'transliterator_transliterate(): Argument #1 ($transliterator) must be of type Transliterator|string, %s given',
+                $object->class->name
+            ));
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            if (Variable::TYPE_STRING !== $var->type) {
+                throw new \TypeError(\sprintf(
+                    'transliterator_transliterate(): Argument #1 ($transliterator) must be of type Transliterator|string, %s given',
+                    ReflectionSupport::valueTypeLabelPublic($var)
+                ));
+            }
+            $id = $var->toString();
+        } else {
+            $id = VmString::coerceStringBuiltinArg(
+                $var,
+                'transliterator_transliterate',
+                0,
+                'transliterator',
+                'Transliterator|string'
+            );
+        }
+        $object = self::create($frame->vmContext, $id, self::FORWARD);
+        if (null === $object) {
+            $frame->vmContext->errors->languageWarning(
+                \sprintf(
+                    'transliterator_transliterate(): Could not create transliterator with ID "%s" (%s)',
+                    $id,
+                    IntlError::getMessage()
+                ),
+                null,
+                0,
+                $frame->vmContext,
+                $frame
+            );
+        }
+
+        return $object;
+    }
+
+    /** Drop temp Transliterator state after procedural string-ID path (#22161). */
+    public static function release(ObjectEntry $tr): void
+    {
+        unset(self::$state[$tr->id]);
+    }
+
+    /**
+     * Compile-time / host fold for string-ID transliterate (AOT literal path, #22161).
+     *
+     * @return string|false
+     */
+    public static function transliterateId(string $id, string $subject, int $start = 0, int $end = -1)
+    {
+        if ('' === $id) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'transliterator_create: id is empty: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $handle = self::openTransliterator($id, self::FORWARD);
+        $fallback = null === $handle && self::supportsFallbackId($id);
+        if (null === $handle && !$fallback) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'transliterator_create: unable to open transliterator with ID "'.$id.'": U_INVALID_ID'
+            );
+
+            return false;
+        }
+        $len = \strlen($subject);
+        if ($start < 0) {
+            $start = 0;
+        }
+        if ($end < 0 || $end > $len) {
+            $end = $len;
+        }
+        if ($start > $end) {
+            IntlError::clear();
+
+            return $subject;
+        }
+        $prefix = substr($subject, 0, $start);
+        $middle = substr($subject, $start, $end - $start);
+        $suffix = substr($subject, $end);
+        IntlError::clear();
+        if (null !== $handle) {
+            $converted = self::transUChars($handle, $middle);
+            $close = 'utrans_close'.self::$symSuffix;
+            $ffi = self::ffi();
+            if (null !== $ffi) {
+                try {
+                    $ffi->$close($handle);
+                } catch (\Throwable) {
+                }
+            }
+            if (null === $converted) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'transliterator_transliterate: transliteration failed: U_ILLEGAL_ARGUMENT_ERROR'
+                );
+
+                return false;
+            }
+
+            return $prefix.$converted.$suffix;
+        }
+
+        return $prefix.self::fallbackLatinAscii($middle).$suffix;
     }
 
     public static function coerceDirectionArg(Variable $var, string $function, int $position): int

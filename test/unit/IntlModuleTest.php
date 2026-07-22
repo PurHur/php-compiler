@@ -167,6 +167,33 @@ PHP;
         self::assertSame("obj\ncafe\nbad_null\n", ob_get_clean());
     }
 
+    public function test_transliterator_string_id_via_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerTransliterator($runtime->vmContext);
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\transliterator_create());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\transliterator_transliterate());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\intl_get_error_message());
+        $code = <<<'PHP'
+<?php
+$id = 'Any-Latin; Latin-ASCII';
+echo 'str=', transliterator_transliterate($id, '東京'), "\n";
+$bad = @transliterator_transliterate('Not-A-Real-ID-XYZ', '東京');
+echo 'bad=', var_export($bad, true), "\n";
+echo 'has_create_err=', (int) (false !== strpos(intl_get_error_message(), 'transliterator_create')), "\n";
+try {
+    transliterator_transliterate([], 'x');
+    echo "array_ok\n";
+} catch (TypeError $e) {
+    echo 'union=', (int) (false !== strpos($e->getMessage(), 'Transliterator|string')), "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_transliterator_string_id.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("str=dong jing\nbad=false\nhas_create_err=1\nunion=1\n", ob_get_clean());
+    }
+
     public function test_resourcebundle_version_via_forced_registration(): void
     {
         $runtime = new Runtime();
