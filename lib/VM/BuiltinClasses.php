@@ -1607,6 +1607,7 @@ final class BuiltinClasses
 
         $dt = new ClassEntry('DateTime');
         $dt->interfaces = [DateTimeSupport::CLASS_DATETIMEINTERFACE];
+        DateTimeInterfaceSupport::registerClassConstants($dt);
         $dt->properties[] = new ClassProperty(DateTimeSupport::TS_PROPERTY, null, $intProto);
         $dt->properties[] = new ClassProperty(DateTimeSupport::TZ_PROPERTY, null, $strProto);
         $dt->properties[] = new ClassProperty(DateTimeSupport::MICROSECOND_PROPERTY, null, $intProto);
@@ -1633,6 +1634,7 @@ final class BuiltinClasses
 
         $dti = new ClassEntry('DateTimeImmutable');
         $dti->interfaces = [DateTimeSupport::CLASS_DATETIMEINTERFACE];
+        DateTimeInterfaceSupport::registerClassConstants($dti);
         $dti->properties[] = new ClassProperty(DateTimeSupport::TS_PROPERTY, null, $intProto);
         $dti->properties[] = new ClassProperty(DateTimeSupport::TZ_PROPERTY, null, $strProto);
         $dti->properties[] = new ClassProperty(DateTimeSupport::MICROSECOND_PROPERTY, null, $intProto);

@@ -96,6 +96,24 @@ PHP;
         $this->assertSame("1\n1\nY-m-d\\TH:i:sP\n2026-06-07\n", ob_get_clean());
     }
 
+    /** @covers issue #22271 */
+    public function testDateTimeClassFormatConstantsDefined(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo defined('DateTime::ATOM') ? '1' : '0', "\n";
+echo defined('DateTimeImmutable::ATOM') ? '1' : '0', "\n";
+$r = new ReflectionClass(DateTime::class);
+echo count($r->getConstants()), "\n";
+echo $r->hasConstant('RFC3339_EXTENDED') ? '1' : '0', "\n";
+echo DateTime::ATOM, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'datetime_format_constants.php'));
+        $this->assertSame("1\n1\n14\n1\nY-m-d\\TH:i:sP\n", ob_get_clean());
+    }
+
     /** @covers issue #10946 */
     public function testDateTimeAddSubGetTimezoneSetTimestamp(): void
     {

@@ -40,13 +40,23 @@ final class DateTimeInterfaceSupport
     {
         $entry = new ClassEntry(self::INTERFACE_NAME);
         $entry->isInterface = true;
+        self::registerClassConstants($entry);
+        $ctx->classes[self::INTERFACE_LC] = $entry;
+    }
+
+    /**
+     * php-src copies DateTimeInterface format constants onto DateTime / DateTimeImmutable
+     * class entries (ext/date/php_date.c / php_date.stub.php) so defined() and
+     * ReflectionClass::getConstants() see them on the concrete classes (#22271).
+     */
+    public static function registerClassConstants(ClassEntry $entry): void
+    {
         foreach (self::FORMAT_CONSTANTS as $name => $format) {
             $const = new Variable(Variable::TYPE_STRING);
             $const->string($format);
             $entry->constants[$name] = $const;
             $entry->constNames[$name] = strtoupper($name);
         }
-        $ctx->classes[self::INTERFACE_LC] = $entry;
     }
 
     public static function isDateTimeInterfaceLc(string $ifaceLc): bool
