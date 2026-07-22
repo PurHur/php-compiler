@@ -37,6 +37,12 @@ final class GeneratorState
 
     public bool $hasCurrent = false;
 
+    /**
+     * Next auto-increment yield key (Zend largest_used_integer_key + 1).
+     *
+     * Starts at 0. Explicit non-negative integer keys bump this to max(autoKey, key+1)
+     * with zend_long wrap after PHP_INT_MAX (#22343 / zend_generators.c).
+     */
     public int $autoKey = 0;
 
     public Variable $currentKey;
@@ -123,6 +129,50 @@ final class GeneratorState
         $this->currentValue->duplicateFrom($value);
         $this->currentSnapshot->duplicateFrom($this->currentValue);
         $this->hasCurrent = true;
+    }
+
+    /**
+     * Assign the next auto-increment key and advance (Zend ++largest_used_integer_key).
+     */
+    public function takeNextAutoKey(): int
+    {
+        $key = $this->autoKey;
+        if (PHP_INT_MAX === $this->autoKey) {
+            $this->autoKey = PHP_INT_MIN;
+        } else {
+            ++$this->autoKey;
+        }
+
+        return $key;
+    }
+
+    /**
+     * After publishing an explicit yield key, update auto-increment like Zend (#22343).
+     *
+     * Only IS_LONG keys participate; floats/strings/negatives that are not greater
+     * than the current largest leave autoKey unchanged. Yield-from delegated keys
+     * do not call this (php-src leaves largest_used_integer_key alone).
+     */
+    public function noteExplicitYieldKey(Variable $key): void
+    {
+        $key = $key->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $key->type) {
+            return;
+        }
+        $k = $key->toInt();
+        // autoKey is next key (= largest + 1). Update when k > largest, i.e. k >= autoKey
+        // for the common non-wrapped range. After publishing PHP_INT_MAX, autoKey wraps to
+        // PHP_INT_MIN; further explicit keys must not change it (0 > PHP_INT_MAX is false).
+        if (PHP_INT_MIN === $this->autoKey) {
+            return;
+        }
+        if ($k >= $this->autoKey) {
+            if (PHP_INT_MAX === $k) {
+                $this->autoKey = PHP_INT_MIN;
+            } else {
+                $this->autoKey = $k + 1;
+            }
+        }
     }
 
     public function clearCurrentValue(): void

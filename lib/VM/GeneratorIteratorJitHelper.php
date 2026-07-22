@@ -53,6 +53,7 @@ final class GeneratorIteratorJitHelper
         if (null !== $keyOp) {
             $keyVar = $context->getVariableFromOp($keyOp);
             $jit->assignValueToGeneratorField($keyField, $keyVar, $keyOp);
+            self::emitBumpAutoKeyFromExplicitKey($context, $stateParam, $keyField);
         } else {
             $autoKey = $context->builder->load($context->builder->structGep($stateParam, $map['auto_key']));
             $context->builder->call(
@@ -61,7 +62,7 @@ final class GeneratorIteratorJitHelper
                 $context->builder->truncOrBitCast($autoKey, $context->getTypeFromString('int64'))
             );
             $context->builder->store(
-                $context->builder->addNoSignedWrap($autoKey, $sizeT->constInt(1, false)),
+                $context->builder->add($autoKey, $sizeT->constInt(1, false)),
                 $context->builder->structGep($stateParam, $map['auto_key'])
             );
         }
@@ -75,6 +76,61 @@ final class GeneratorIteratorJitHelper
             $context->builder->structGep($stateParam, $map['resume_ip'])
         );
         $context->builder->returnValue($i64->constInt(1, false));
+    }
+
+    /**
+     * Zend zend_generators.c — bump auto_key after an explicit IS_LONG yield key (#22343).
+     */
+    private static function emitBumpAutoKeyFromExplicitKey(
+        Context $context,
+        Value $stateParam,
+        Value $keyField
+    ): void {
+        $map = $context->structFieldMap['__generator_state__'];
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $checkBb = $fn->appendBasicBlock('gen_autokey_check');
+        $bumpBb = $fn->appendBasicBlock('gen_autokey_bump');
+        $doneBb = $fn->appendBasicBlock('gen_autokey_done');
+
+        $keyPtr = JitValueBox::pointer($context, $keyField);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($keyField, $context->structFieldMap['__value__']['type'])
+        );
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(\PHPCompiler\JIT\Variable::TYPE_NATIVE_LONG & 0x7f, false)
+        );
+        // Also accept VM TYPE_INTEGER tag (1) for generator fields written from VM-shaped values.
+        $isVmInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_INTEGER & 0x7f, false)
+        );
+        $isIntKey = $context->builder->or($isLong, $isVmInt);
+        $context->builder->branchIf($isIntKey, $checkBb, $doneBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $k = $context->builder->call($context->lookupFunction('__value__readLong'), $keyPtr);
+        $autoKeyPtr = $context->builder->structGep($stateParam, $map['auto_key']);
+        $autoKey = $context->builder->load($autoKeyPtr);
+        $autoAsI64 = $context->builder->truncOrBitCast($autoKey, $i64);
+        $kGte = $context->builder->icmp(Builder::INT_SGE, $k, $autoAsI64);
+        $context->builder->branchIf($kGte, $bumpBb, $doneBb);
+
+        $context->builder->positionAtEnd($bumpBb);
+        $next = $context->builder->add($k, $i64->constInt(1, false));
+        $context->builder->store(
+            $context->builder->truncOrBitCast($next, $sizeT),
+            $autoKeyPtr
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
     }
 
     public static function compileIterValid(Context $context, Variable $gen): Value
