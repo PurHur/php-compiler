@@ -5749,6 +5749,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetExecutingLi
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetFunction.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetThis.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetTrace.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorIsClosed.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGetModifierNames.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodCreateFromClosure.php';

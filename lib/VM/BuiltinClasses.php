@@ -241,6 +241,7 @@ use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingLine;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetFunction;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetThis;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetTrace;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorIsClosed;
 use PHPCompiler\VM\Builtin\ReflectionReferenceFromArrayElement;
 use PHPCompiler\VM\Builtin\ReflectionReferenceGetId;
 use PHPCompiler\VM\Builtin\ReflectionReferenceConstruct;
@@ -1451,6 +1452,10 @@ final class BuiltinClasses
         ) {
             $rgen->methods[$name] = $method;
             $rgen->methodVisibility[$name] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionGeneratorIsClosed()) {
+            $rgen->methods['isclosed'] = new ReflectionGeneratorIsClosed();
+            $rgen->methodVisibility['isclosed'] = $pub;
         }
         $ctx->classes[ReflectionSupport::REFLECTION_GENERATOR] = $rgen;
 
