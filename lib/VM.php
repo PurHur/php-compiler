@@ -3596,6 +3596,15 @@ restart:
                     } else {
                         $writeTarget = $lhs->isIndirect() ? $lhsPeel : $lhs;
                     }
+                    // Zend BIND_STATIC + ASSIGN_REF: `$s = &$param` rebinds the CV only; the
+                    // static_variables HT keeps its prior value and next BIND restores it (#21993).
+                    if (
+                        $lhs->isIndirect()
+                        && null !== $lhsPeel
+                        && null !== $this->context->functionStaticKeyForStorage($lhsPeel)
+                    ) {
+                        $writeTarget = $lhs;
+                    }
                     if (
                         null !== $op->arg3
                         && OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK === (int) $op->arg3
