@@ -1,5 +1,5 @@
 --TEST--
-ReflectionProperty::isFinal() for final plain (hook-less) properties (#22341, #22241, ext/reflection/php_reflection.c)
+ReflectionProperty::isFinal()/getModifiers() for plain final properties (#22341, #22364, ext/reflection/php_reflection.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -16,6 +16,12 @@ var_export(method_exists(ReflectionProperty::class, 'isFinal'));
 echo "\n";
 var_export([$rx->isFinal(), $ry->isFinal(), $rz->isFinal()]);
 echo "\n";
+echo ReflectionProperty::IS_FINAL, "\n";
+echo $rx->getModifiers(), "\n";
+echo $ry->getModifiers(), "\n";
+echo $rz->getModifiers(), "\n";
+echo json_encode(Reflection::getModifierNames($rx->getModifiers())), "\n";
+echo json_encode(Reflection::getModifierNames($rz->getModifiers())), "\n";
 --EXPECT--
 true
 array (
@@ -23,3 +29,9 @@ array (
   1 => false,
   2 => true,
 )
+32
+33
+1
+34
+["final","public"]
+["final","protected"]

@@ -9,8 +9,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
 /**
- * ReflectionProperty::getModifiers() — VM (#22143, ext/reflection/php_reflection.c).
- * Returns ReflectionProperty::IS_* bitmask (visibility | static | readonly).
+ * ReflectionProperty::getModifiers() — VM (#22143, #22341, ext/reflection/php_reflection.c).
+ * Returns ReflectionProperty::IS_* bitmask (visibility | static | readonly | final).
  */
 final class ReflectionPropertyGetModifiers extends VmClassMethod
 {
