@@ -625,14 +625,30 @@ final class TypeCheck
     public const SCALAR_USED_AS_ARRAY_MESSAGE = 'Cannot use a scalar value as an array';
 
     /**
-     * True when []= / dim-write targets a scalar container (null/bool/int/float).
+     * True when FETCH_DIM_W / []= must auto-vivify an empty array (zend_execute.c, #21992).
+     *
+     * Zend promotes null and undefined containers; bool/int/float still Error
+     * ({@see isScalarUsedAsArray()}).
+     */
+    public static function isNullContainerForDimAutovivify(Variable $value): bool
+    {
+        $resolved = $value->resolveIndirect();
+
+        return Variable::TYPE_NULL === $resolved->type
+            || Variable::TYPE_UNDEFINED === $resolved->type;
+    }
+
+    /**
+     * True when []= / dim-write targets a true scalar (bool/int/float).
+     *
+     * Null/undefined are not included — Zend auto-vivifies them (#21992); see
+     * {@see isNullContainerForDimAutovivify()}.
      */
     public static function isScalarUsedAsArray(Variable $value): bool
     {
         $resolved = $value->resolveIndirect();
 
         return \in_array($resolved->type, [
-            Variable::TYPE_NULL,
             Variable::TYPE_BOOLEAN,
             Variable::TYPE_INTEGER,
             Variable::TYPE_FLOAT,

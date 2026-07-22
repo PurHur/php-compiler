@@ -3912,6 +3912,10 @@ restart:
                             $container = $materialized;
                         }
                     }
+                    // ZEND_FETCH_DIM_W: null/undefined containers auto-vivify (#21992, zend_execute.c).
+                    if ($forWrite && TypeCheck::isNullContainerForDimAutovivify($container)) {
+                        $container->array(new HashTable());
+                    }
                     $isGlobals = Variable::TYPE_ARRAY === $container->type
                         && $this->context->isGlobalsTable($container);
                     if ($forWrite && Variable::TYPE_ARRAY === $container->type && !$isGlobals) {
