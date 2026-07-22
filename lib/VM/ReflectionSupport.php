@@ -2962,6 +2962,331 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionClass::__toString() — php-src _class_string (#22379).
+     *
+     * Shape starts with `Class [ … ] {`; nested sections are a structured subset
+     * (need not be byte-identical to Zend).
+     */
+    public static function classReflectionToString(Context $ctx, ObjectEntry $reflection): string
+    {
+        $className = self::classNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            self::throwReflectionException(self::classNotFoundMessage($className));
+        }
+
+        $isInternal = $entry->isInternal;
+        $tag = $isInternal ? '<internal' : '<user';
+        if ($isInternal) {
+            $ext = VmReflection::extensionNameForInternalClass($entry->name);
+            if ('' !== $ext) {
+                $tag .= ':'.$ext;
+            }
+        }
+        $tag .= '>';
+
+        $mods = '';
+        if ($entry->isAbstract) {
+            $mods .= 'abstract ';
+        }
+        if ($entry->isFinal) {
+            $mods .= 'final ';
+        }
+        if ($entry->readonly) {
+            $mods .= 'readonly ';
+        }
+        if ($entry->isInterface) {
+            $kind = 'interface';
+        } elseif ($entry->isTrait) {
+            $kind = 'trait';
+        } elseif ($entry->isEnum) {
+            $kind = 'enum';
+        } else {
+            $kind = 'class';
+        }
+
+        $out = "Class [ {$tag} {$mods}{$kind} {$entry->name} ] {\n";
+
+        $loc = $entry->sourceLocation;
+        if (null !== $loc && !$isInternal && '' !== $loc->filename && $loc->startLine > 0) {
+            $end = $loc->endLine > 0 ? $loc->endLine : $loc->startLine;
+            $out .= "  @@ {$loc->filename} {$loc->startLine} - {$end}\n";
+        }
+
+        $constants = [];
+        foreach ($entry->constNames as $lc => $display) {
+            $constants[] = $display;
+        }
+        $out .= "\n  - Constants [".\count($constants)."] {\n";
+        foreach ($constants as $constName) {
+            $out .= "    Constant [ {$constName} ]\n";
+        }
+        $out .= "  }\n";
+
+        $staticProps = [];
+        $instanceProps = [];
+        foreach ($entry->staticProperties as $lc => $storage) {
+            $staticProps[] = $storage->objectPropertyName ?? $lc;
+        }
+        foreach ($entry->properties as $prop) {
+            if ($prop instanceof ClassProperty) {
+                $instanceProps[] = $prop->name;
+            }
+        }
+        $out .= "\n  - Static properties [".\count($staticProps)."] {\n";
+        foreach ($staticProps as $propName) {
+            $fake = self::makeTemporaryPropertyReflection($ctx, $entry->name, $propName);
+            $out .= '    '.rtrim(self::propertyReflectionToString($ctx, $fake))."\n";
+        }
+        $out .= "  }\n";
+
+        $staticMethods = [];
+        $instanceMethods = [];
+        foreach ($entry->methods as $methodLc => $_) {
+            $vis = $entry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $name = $entry->methodNames[$methodLc] ?? $methodLc;
+            if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+                $staticMethods[] = $name;
+            } else {
+                $instanceMethods[] = $name;
+            }
+        }
+        foreach (array_keys($entry->abstractMethods) as $methodLc) {
+            if (isset($entry->methods[$methodLc])) {
+                continue;
+            }
+            $vis = $entry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $name = $entry->methodNames[$methodLc] ?? $methodLc;
+            if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+                $staticMethods[] = $name;
+            } else {
+                $instanceMethods[] = $name;
+            }
+        }
+
+        $out .= "\n  - Static methods [".\count($staticMethods)."] {\n";
+        foreach ($staticMethods as $methodName) {
+            $out .= self::formatNestedMethodLine($ctx, $entry->name, $methodName);
+        }
+        $out .= "  }\n";
+
+        $out .= "\n  - Properties [".\count($instanceProps)."] {\n";
+        foreach ($instanceProps as $propName) {
+            $fake = self::makeTemporaryPropertyReflection($ctx, $entry->name, $propName);
+            $out .= '    '.rtrim(self::propertyReflectionToString($ctx, $fake))."\n";
+        }
+        $out .= "  }\n";
+
+        $out .= "\n  - Methods [".\count($instanceMethods)."] {\n";
+        foreach ($instanceMethods as $methodName) {
+            $out .= self::formatNestedMethodLine($ctx, $entry->name, $methodName);
+        }
+        $out .= "  }\n";
+
+        $out .= "}\n";
+
+        return $out;
+    }
+
+    /**
+     * ReflectionProperty::__toString() — php-src _property_string (#22379).
+     *
+     * Must start with `Property [` and be non-empty.
+     */
+    public static function propertyReflectionToString(Context $ctx, ObjectEntry $reflection): string
+    {
+        $className = self::classNameFromReflection($reflection);
+        $property = self::propertyNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            self::throwReflectionException(self::classNotFoundMessage($className));
+        }
+
+        $isDynamic = self::isDynamicReflectionProperty($reflection);
+        $modifiers = VmReflection::propertyReflectionModifiers($entry, $property, $ctx, $isDynamic);
+
+        $mods = '';
+        if (($modifiers & VmReflection::REFLECTION_IS_PUBLIC) !== 0) {
+            $mods .= 'public ';
+        } elseif (($modifiers & VmReflection::REFLECTION_IS_PROTECTED) !== 0) {
+            $mods .= 'protected ';
+        } elseif (($modifiers & VmReflection::REFLECTION_IS_PRIVATE) !== 0) {
+            $mods .= 'private ';
+        }
+        if (($modifiers & VmReflection::REFLECTION_IS_STATIC) !== 0) {
+            $mods .= 'static ';
+        }
+        if (($modifiers & VmReflection::REFLECTION_IS_READONLY) !== 0) {
+            $mods .= 'readonly ';
+        }
+        if (($modifiers & VmReflection::REFLECTION_IS_FINAL) !== 0) {
+            $mods .= 'final ';
+        }
+
+        $defaultPart = '';
+        if (!$isDynamic) {
+            $defaultPart = self::formatPropertyDefaultSuffix($ctx, $entry, $property);
+        }
+
+        return "Property [ {$mods}\${$property}{$defaultPart} ]\n";
+    }
+
+    /**
+     * ReflectionFunction::__toString() — php-src _function_string for free functions (#22379).
+     *
+     * Must start with `Function [` and be non-empty.
+     */
+    public static function functionReflectionToString(Context $ctx, ObjectEntry $reflection): string
+    {
+        $name = self::functionNameFromReflection($reflection);
+        $isInternal = self::isReflectionInternalFunction($reflection);
+        $tag = $isInternal ? '<internal' : '<user';
+        if ($isInternal) {
+            $ext = VmReflection::extensionNameForFunction($ctx, $name);
+            if ('' !== $ext) {
+                $tag .= ':'.$ext;
+            }
+        }
+        $tag .= '>';
+
+        $amp = self::functionReturnsReference($ctx, $reflection) ? '&' : '';
+        $out = "Function [ {$tag} function {$amp}{$name} ] {\n";
+
+        if (!$isInternal) {
+            $loc = self::functionSourceLocation($ctx, $reflection);
+            if (null !== $loc && '' !== $loc->filename && $loc->startLine > 0) {
+                $end = $loc->endLine > 0 ? $loc->endLine : $loc->startLine;
+                $out .= "  @@ {$loc->filename} {$loc->startLine} - {$end}\n";
+            }
+        }
+
+        $paramNames = self::reflectedFunctionParameterNames($ctx, $reflection);
+        $paramCount = \count($paramNames);
+        if ($paramCount > 0) {
+            $out .= "\n  - Parameters [{$paramCount}] {\n";
+            $required = self::reflectedFunctionRequiredParameterCount($ctx, $reflection);
+            for ($i = 0; $i < $paramCount; ++$i) {
+                $kind = $i < $required ? 'required' : 'optional';
+                $out .= "    Parameter #{$i} [ <{$kind}> \${$paramNames[$i]} ]\n";
+            }
+            $out .= "  }\n";
+        }
+
+        $out .= "}\n";
+
+        return $out;
+    }
+
+    /** @return list<string> */
+    private static function reflectedFunctionParameterNames(Context $ctx, ObjectEntry $reflection): array
+    {
+        $funcName = self::functionNameFromReflection($reflection);
+        if (self::isReflectionInternalFunction($reflection)) {
+            return BuiltinParamNames::paramNamesForInternalFunction($funcName) ?? [];
+        }
+        $func = self::resolveFunctionFromReflection($ctx, $reflection);
+
+        return array_values($func->block->paramNames);
+    }
+
+    private static function reflectedFunctionRequiredParameterCount(Context $ctx, ObjectEntry $reflection): int
+    {
+        $funcName = self::functionNameFromReflection($reflection);
+        if (self::isReflectionInternalFunction($reflection)) {
+            return BuiltinInternalArgInfo::requiredParamCountForFunction($funcName)
+                ?? \count(BuiltinParamNames::paramNamesForInternalFunction($funcName) ?? []);
+        }
+        $func = self::resolveFunctionFromReflection($ctx, $reflection);
+
+        return self::requiredParameterCountFromBlock($func->block);
+    }
+
+    private static function formatPropertyDefaultSuffix(Context $ctx, ClassEntry $entry, string $property): string
+    {
+        $staticKey = VmReflection::findStaticPropertyKey($entry, $property, $ctx);
+        if (null !== $staticKey) {
+            $slot = $entry->staticProperties[$staticKey] ?? null;
+            if ($slot instanceof Variable) {
+                $printed = self::formatReflectionScalar($slot->resolveIndirect());
+                if (null !== $printed) {
+                    return ' = '.$printed;
+                }
+            }
+
+            return '';
+        }
+        $meta = VmReflection::findClassProperty($entry, $property, $ctx);
+        if (null === $meta || null === $meta->default) {
+            return '';
+        }
+        $printed = self::formatReflectionScalar($meta->default->resolveIndirect());
+        if (null === $printed) {
+            return '';
+        }
+
+        return ' = '.$printed;
+    }
+
+    private static function formatReflectionScalar(Variable $value): ?string
+    {
+        switch ($value->type) {
+            case Variable::TYPE_NULL:
+                return 'NULL';
+            case Variable::TYPE_BOOLEAN:
+                return $value->toBool() ? 'true' : 'false';
+            case Variable::TYPE_INTEGER:
+                return (string) $value->toInt();
+            case Variable::TYPE_FLOAT:
+                return (string) $value->toFloat();
+            case Variable::TYPE_STRING:
+                return var_export($value->toString(), true);
+            default:
+                return null;
+        }
+    }
+
+    private static function makeTemporaryPropertyReflection(
+        Context $ctx,
+        string $className,
+        string $property
+    ): ObjectEntry {
+        $propClass = $ctx->classes[self::REFLECTION_PROPERTY] ?? null;
+        if (null === $propClass) {
+            throw new \LogicException('ReflectionProperty is not registered in this compiler build');
+        }
+        $obj = new ObjectEntry($propClass);
+        $obj->constructed = true;
+        $obj->getProperty(self::PROP_CLASS_NAME)->string($className);
+        $obj->getProperty(self::PROP_PROPERTY_NAME)->string($property);
+        $obj->getProperty(self::PROP_DECLARING_CLASS_NAME)->string($className);
+        $obj->getProperty(self::PROP_IS_DYNAMIC)->bool(false);
+        $obj->getProperty(self::PROP_ACCESSIBLE)->bool(false);
+
+        return $obj;
+    }
+
+    private static function formatNestedMethodLine(Context $ctx, string $className, string $methodName): string
+    {
+        $methodClass = $ctx->classes[self::REFLECTION_METHOD] ?? null;
+        if (null === $methodClass) {
+            return "    Method [ method {$methodName} ] {\n    }\n";
+        }
+        $obj = new ObjectEntry($methodClass);
+        $obj->constructed = true;
+        $obj->getProperty(self::PROP_REFLECTION_METHOD_CLASS)->string($className);
+        $obj->getProperty(self::PROP_REFLECTION_METHOD_FUNC)->string($methodName);
+        $obj->getProperty(self::PROP_ACCESSIBLE)->bool(false);
+        $body = self::methodReflectionToString($ctx, $obj);
+        $lines = explode("\n", rtrim($body));
+        $indented = '';
+        foreach ($lines as $line) {
+            $indented .= '    '.$line."\n";
+        }
+
+        return $indented;
+    }
+
+    /**
      * ReflectionFunction::{getFileName,getStartLine,getEndLine} — false for internals / missing (#22144).
      */
     public static function returnFunctionFileName(?Variable $returnVar, ?SourceLocation $location, bool $isInternal): void

@@ -5655,6 +5655,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassResetAsLazyGhost.p
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassResetAsLazyObject.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassResetAsLazyProxy.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassSetStaticPropertyValue.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionCompositeTypeGetTypes.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetAttributes.php';
@@ -5752,6 +5753,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsVariadic.php'
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsInternal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsUserDefined.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionSetAccessible.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetExecutingFile.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetExecutingGenerator.php';
@@ -5881,6 +5883,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetRawValue.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetRawValueWithoutLazyInitialization.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySkipLazyInitialization.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionReferenceConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionReferenceFromArrayElement.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionReferenceGetId.php';
@@ -6194,7 +6197,6 @@ require_once __DIR__.'/../../../ext/pspell/pspell_new.php';
 require_once __DIR__.'/../../../ext/pspell/pspell_suggest.php';
 require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
 require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
-require_once __DIR__.'/../../../ext/phar/PharDefaultStubTemplate.php';
 require_once __DIR__.'/../../../ext/phar/bootstrap_pharexception.php';
 require_once __DIR__.'/../../../ext/apcu/ApcuFunction.php';
 require_once __DIR__.'/../../../ext/apcu/Module.php';
