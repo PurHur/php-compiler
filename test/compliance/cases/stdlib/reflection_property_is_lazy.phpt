@@ -1,5 +1,7 @@
 --TEST--
 ReflectionProperty::isLazy() — lazy ghost property probe (issue #6515, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class Entity {

@@ -1101,14 +1101,18 @@ final class BuiltinClasses
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
                 'ispromoted' => new ReflectionPropertyIsPromoted(),
                 'isinitialized' => new ReflectionPropertyIsInitialized(),
-                'getreadabletype' => new ReflectionPropertyGetReadableType(),
-                'getsettabletype' => new ReflectionPropertyGetSettableType(),
                 'hasdefaultvalue' => new ReflectionPropertyHasDefaultValue(),
                 'isdefaultvalueavailable' => new ReflectionPropertyIsDefaultValueAvailable(),
             ] as $name => $method
         ) {
             $rp->methods[$name] = $method;
             $rp->methodVisibility[$name] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyReadableSettableType()) {
+            $rp->methods['getreadabletype'] = new ReflectionPropertyGetReadableType();
+            $rp->methodVisibility['getreadabletype'] = $pub;
+            $rp->methods['getsettabletype'] = new ReflectionPropertyGetSettableType();
+            $rp->methodVisibility['getsettabletype'] = $pub;
         }
         if (CompilerVersion::supportsAsymmetricVisibility()) {
             foreach (

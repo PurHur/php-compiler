@@ -1204,14 +1204,29 @@ final class CompilerVersion
 
     /**
      * PHP 8.4+ ReflectionProperty hook/lazy introspection
-     * ({hasHook,hasHooks,getHook,getHooks,isLazy,skipLazyInitialization,isFinal}, ext/reflection/php_reflection.c, #17493, #20511).
+     * ({hasHook,hasHooks,getHook,getHooks,isLazy,skipLazyInitialization,isFinal,isAbstract,isVirtual},
+     * ext/reflection/php_reflection.c, #17493, #20511, #22309).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (methods absent). Do not tie to {@see supportsPropertyHooks()} — that enables hook *syntax* on
+     * default 8.4.0-dev (#19952) while Zend 8.2 still lacks these ReflectionProperty methods (#22309).
+     * Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionPropertyHookProbes(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ ReflectionProperty::{getReadableType,getSettableType}
+     * (ext/reflection/php_reflection.c, #7053, #9873, #22309).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
      * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
-    public static function supportsReflectionPropertyHookProbes(): bool
+    public static function supportsReflectionPropertyReadableSettableType(): bool
     {
-        return self::supportsPropertyHooks();
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
