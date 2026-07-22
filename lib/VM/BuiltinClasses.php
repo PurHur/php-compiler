@@ -11,6 +11,7 @@ use PHPCompiler\VM\Builtin\DatePeriodCreateFromISO8601String;
 use PHPCompiler\VM\Builtin\DatePeriodCurrent;
 use PHPCompiler\VM\Builtin\DatePeriodGetDateInterval;
 use PHPCompiler\VM\Builtin\DatePeriodGetEndDate;
+use PHPCompiler\VM\Builtin\DatePeriodGetIterator;
 use PHPCompiler\VM\Builtin\DatePeriodGetRecurrences;
 use PHPCompiler\VM\Builtin\DatePeriodGetStartDate;
 use PHPCompiler\VM\Builtin\DatePeriodKey;
@@ -1689,7 +1690,8 @@ final class BuiltinClasses
         $nullProto = new Variable(Variable::TYPE_NULL);
         $dp = new ClassEntry('DatePeriod');
         DatePeriodSupport::registerClassConstants($dp);
-        $dp->interfaces = ['iterator'];
+        // php-src php_date.c / date.stub.php — IteratorAggregate + getIterator → InternalIterator (#22263).
+        $dp->interfaces = ['iteratoraggregate'];
         $dp->properties[] = new ClassProperty('start', null, $objProto);
         $dp->properties[] = new ClassProperty('current', null, $nullProto);
         $dp->properties[] = new ClassProperty('end', null, $nullProto);
@@ -1703,6 +1705,7 @@ final class BuiltinClasses
         $dp->constructor = new DatePeriodConstruct();
         $dp->methods['__construct'] = $dp->constructor;
         $dp->methodVisibility['__construct'] = $pub;
+        // Keep Iterator protocol handlers for InternalIterator snapshot / JIT helpers (#14228).
         $dp->methods['rewind'] = new DatePeriodRewind();
         $dp->methodVisibility['rewind'] = $pub;
         $dp->methods['valid'] = new DatePeriodValid();
@@ -1713,6 +1716,9 @@ final class BuiltinClasses
         $dp->methodVisibility['key'] = $pub;
         $dp->methods['next'] = new DatePeriodNext();
         $dp->methodVisibility['next'] = $pub;
+        $dp->methods['getiterator'] = new DatePeriodGetIterator();
+        $dp->methodVisibility['getiterator'] = $pub;
+        $dp->methodNames['getiterator'] = 'getIterator';
         $dp->methods['getstartdate'] = new DatePeriodGetStartDate();
         $dp->methodVisibility['getstartdate'] = $pub;
         $dp->methods['getenddate'] = new DatePeriodGetEndDate();

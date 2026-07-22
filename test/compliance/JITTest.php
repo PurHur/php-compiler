@@ -989,6 +989,10 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'date_period_create_from_iso8601_phantom')) {
                 continue;
             }
+            // getIterator → InternalIterator snapshot still trips MCJIT pcreJit init (#22263 / #16796).
+            if (str_contains($name, 'dateperiod_getiterator')) {
+                continue;
+            }
             if (!CompilerVersion::supportsDomElementInsertAdjacentHtml()
                 && str_contains($name, 'dom_element_insert_adjacent_html')
                 && !str_contains($name, 'insert_adjacent_html_phantom')) {
