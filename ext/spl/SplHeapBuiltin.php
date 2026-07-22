@@ -186,7 +186,9 @@ final class SplHeapBuiltin
     public static function rewind(ObjectEntry $object): void
     {
         self::ensureInit($object);
-        self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
+        // php-src spl_heap_it_rewind / spl_heap_it_get_current_key: key = remaining count − 1 (#22290).
+        $n = self::count($object);
+        self::$store[$object->id]['iterPos'] = $n > 0 ? $n - 1 : -1;
     }
 
     public static function valid(ObjectEntry $object): bool
@@ -215,7 +217,8 @@ final class SplHeapBuiltin
         }
         // php-src: iterating SplHeap extracts elements (heap empties under foreach).
         self::extract($object, $frame);
-        self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
+        $n = self::count($object);
+        self::$store[$object->id]['iterPos'] = $n > 0 ? $n - 1 : -1;
     }
 
     public static function isCorrupted(ObjectEntry $object): bool
@@ -570,7 +573,9 @@ final class SplPriorityQueueBuiltin
 
     public static function rewind(ObjectEntry $object): void
     {
-        self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
+        // php-src spl_pqueue_it_get_current_key: key = remaining count − 1 (#22290).
+        $n = self::count($object);
+        self::$store[$object->id]['iterPos'] = $n > 0 ? $n - 1 : -1;
     }
 
     public static function valid(ObjectEntry $object): bool
@@ -594,7 +599,8 @@ final class SplPriorityQueueBuiltin
             return;
         }
         self::extract($object);
-        self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
+        $n = self::count($object);
+        self::$store[$object->id]['iterPos'] = $n > 0 ? $n - 1 : -1;
     }
 
     public static function isCorrupted(ObjectEntry $object): bool
