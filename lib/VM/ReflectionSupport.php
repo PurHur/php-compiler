@@ -2395,16 +2395,11 @@ final class ReflectionSupport
         return self::reflectionAccessibleForced($reflection);
     }
 
+    /**
+     * php-src 8.1+: ReflectionProperty::getValue() / setValue() ignore accessible (#22091, re-#9823).
+     */
     public static function assertReflectionPropertyAccessible(Context $ctx, ObjectEntry $reflection): void
     {
-        if (self::isReflectionPropertyAccessible($ctx, $reflection)) {
-            return;
-        }
-        $className = self::classNameFromReflection($reflection);
-        $property = self::propertyNameFromReflection($reflection);
-        self::throwReflectionException(
-            'Cannot access non-public property '.$className.'::$'.$property
-        );
     }
 
     /** php-src reflection_function_is_accessible — global functions always accessible (#9823). */
