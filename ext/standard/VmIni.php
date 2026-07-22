@@ -144,6 +144,7 @@ final class VmIni
         'pcre.jit',
         'pcre.recursion_limit',
         'zend.exception_string_param_max_len',
+        'zend.exception_ignore_args',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
@@ -152,6 +153,9 @@ final class VmIni
 
     /** php-src hard ceiling for zend.exception_string_param_max_len. */
     private const EXCEPTION_STRING_PARAM_MAX_LEN_CEILING = 1_000_000;
+
+    /** php-src EG(exception_ignore_args) compiled default On since PHP 8.0 (Zend/zend_exceptions.c, #21998). */
+    private const CFG_EXCEPTION_IGNORE_ARGS = true;
 
     /** php-src PG(pcre.backtrack_limit) default 1000000 (ext/pcre/php_pcre.c). */
     private const CFG_PCRE_BACKTRACK_LIMIT = '1000000';
@@ -222,6 +226,8 @@ final class VmIni
                 return self::setPcreRecursionLimit($newValue);
             case 'zend.exception_string_param_max_len':
                 return self::setExceptionStringParamMaxLen($newValue);
+            case 'zend.exception_ignore_args':
+                return self::setExceptionIgnoreArgs($newValue);
             case 'max_execution_time':
                 return self::setMaxExecutionTime($ctx, $newValue);
             case 'register_argc_argv':
@@ -310,6 +316,8 @@ final class VmIni
                 return (string) self::$pcreRecursionLimit;
             case 'zend.exception_string_param_max_len':
                 return (string) self::$exceptionStringParamMaxLen;
+            case 'zend.exception_ignore_args':
+                return self::formatRegisterArgcArgvIniGet(self::$exceptionIgnoreArgs);
             case 'max_execution_time':
                 return self::$maxExecutionTime;
             case 'register_argc_argv':
@@ -393,6 +401,12 @@ final class VmIni
         self::$exceptionStringParamMaxLen = $maxLen;
     }
 
+    /** Sync from JIT ini_set path ({@see IniJitHelper}) for Exception::getTrace() args (#21998). */
+    public static function syncExceptionIgnoreArgs(bool $ignore): void
+    {
+        self::$exceptionIgnoreArgs = $ignore;
+    }
+
     /** php-src PG(serialize_precision) default -1 (zend_dtoa mode 0; issue #7100). */
     public static function getSerializePrecision(): string
     {
@@ -434,6 +448,9 @@ final class VmIni
 
     /** php-src EG(exception_string_param_max_len) — getTraceAsString truncation (#21999). */
     private static int $exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
+
+    /** php-src EG(exception_ignore_args) — omit Exception::getTrace() args (#21998). */
+    private static bool $exceptionIgnoreArgs = self::CFG_EXCEPTION_IGNORE_ARGS;
 
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
 
@@ -530,6 +547,12 @@ final class VmIni
     public static function getExceptionStringParamMaxLen(): int
     {
         return self::$exceptionStringParamMaxLen;
+    }
+
+    /** php-src EG(exception_ignore_args) for Throwable::getTrace() (#21998). */
+    public static function exceptionIgnoreArgsEnabled(): bool
+    {
+        return self::$exceptionIgnoreArgs;
     }
 
     public static function getUserAgent(): string
@@ -801,6 +824,10 @@ final class VmIni
                 self::$exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
                 IniJitHelper::syncExceptionStringParamMaxLen(self::$exceptionStringParamMaxLen);
                 break;
+            case 'zend.exception_ignore_args':
+                self::$exceptionIgnoreArgs = self::CFG_EXCEPTION_IGNORE_ARGS;
+                IniJitHelper::syncExceptionIgnoreArgs(self::$exceptionIgnoreArgs);
+                break;
             case 'max_execution_time':
                 self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
                 $ctx->executionLimits->applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
@@ -859,6 +886,20 @@ final class VmIni
         $old = (string) self::$exceptionStringParamMaxLen;
         self::$exceptionStringParamMaxLen = $parsed;
         IniJitHelper::syncExceptionStringParamMaxLen($parsed);
+
+        return $old;
+    }
+
+    /**
+     * php-src OnUpdateBool for zend.exception_ignore_args (#21998).
+     *
+     * @return string|false
+     */
+    private static function setExceptionIgnoreArgs(string $newValue): string|false
+    {
+        $old = self::formatRegisterArgcArgvIniGet(self::$exceptionIgnoreArgs);
+        self::$exceptionIgnoreArgs = self::parseBoolIni($newValue);
+        IniJitHelper::syncExceptionIgnoreArgs(self::$exceptionIgnoreArgs);
 
         return $old;
     }

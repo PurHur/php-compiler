@@ -1,5 +1,6 @@
 <?php
 /** Repro #21524 — getTraceAsString formats SensitiveParameterValue as Object(...). */
+ini_set('zend.exception_ignore_args', '0');
 function sp(#[\SensitiveParameter] string $p): void
 {
     throw new Exception('boom');

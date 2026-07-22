@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\VmDebugBacktrace;
+use PHPCompiler\ext\standard\VmIni;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 
@@ -14,9 +15,6 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
  */
 final class ExceptionTrace
 {
-    /** Include args with #[\SensitiveParameter] redaction (Zend zend_exceptions.c; #21339 / re-#15036). */
-    private const TRACE_OPTIONS = 0;
-
     /**
      * Snapshot caller frame for manual `new Throwable()` (not thrown) — Zend object_init_ex (#9905).
      */
@@ -30,7 +28,7 @@ final class ExceptionTrace
             return;
         }
         $object->manualConstructTrace = self::sanitizeCapturedTrace(
-            VmDebugBacktrace::build($caller, self::TRACE_OPTIONS)
+            VmDebugBacktrace::build($caller, self::traceCaptureOptions())
         );
     }
 
@@ -50,10 +48,11 @@ final class ExceptionTrace
         if (Variable::TYPE_ARRAY === $existing->type && $existing->toArray()->getNumElements() > 0) {
             return;
         }
-        $built = VmDebugBacktrace::build($frame, self::TRACE_OPTIONS);
+        $opts = self::traceCaptureOptions();
+        $built = VmDebugBacktrace::build($frame, $opts);
         if (0 === $built->toArray()->getNumElements()) {
             // #14369 / #14132: bridge throws (return-type TypeError) run off runStack — anchor throw-site frame.
-            $built = VmDebugBacktrace::buildFromFrames([$frame], self::TRACE_OPTIONS);
+            $built = VmDebugBacktrace::buildFromFrames([$frame], $opts);
         }
         $traceProp->duplicateFrom(self::sanitizeCapturedTrace($built));
     }
@@ -92,7 +91,7 @@ final class ExceptionTrace
             $ht->append(VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $builtinName));
         }
         $userTrace = self::sanitizeCapturedTrace(
-            VmDebugBacktrace::build($callerFrame, self::TRACE_OPTIONS)
+            VmDebugBacktrace::build($callerFrame, self::traceCaptureOptions())
         );
         foreach ($userTrace->toArray()->iterate(true) as $frameVar) {
             $ht->append($frameVar);
@@ -158,6 +157,15 @@ final class ExceptionTrace
         }
 
         return $trace;
+    }
+
+    /**
+     * php-src EG(exception_ignore_args) — omit trace[].args when On (#21998).
+     * When Off, include args with #[\SensitiveParameter] redaction (#21339 / re-#15036).
+     */
+    private static function traceCaptureOptions(): int
+    {
+        return VmIni::exceptionIgnoreArgsEnabled() ? VmDebugBacktrace::IGNORE_ARGS : 0;
     }
 
     /** Zend stores throw-site frames only; `{main}` is synthesized in getTraceAsString(). */
