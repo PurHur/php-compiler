@@ -29,5 +29,5 @@
     ],
     "build_target": "inventory argv emit (Zend native rebuild, BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=0)",
     "issue": "#3053, #1492, #2880, #3046, #8713",
-    "lowering_source_fingerprint": "4b79d5c8f83e99e8a7b1c6b794354f5f8218a4cd483ec9b988f9fd14cf999d3c"
+    "lowering_source_fingerprint": "300f2c75234894777aa9707b4124d6027fb208f008834cd1cff4f0849c84d0e9"
 }
