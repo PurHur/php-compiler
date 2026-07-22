@@ -34,7 +34,7 @@ final class VmMysqli
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['query'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['execute_query'])) {
             return;
         }
 
@@ -50,6 +50,7 @@ final class VmMysqli
 
         $methods = [
             'query' => new MysqliQuery(),
+            'execute_query' => new MysqliExecuteQuery(),
             'close' => new MysqliClose(),
             'real_escape_string' => new MysqliRealEscapeString(),
             'prepare' => new MysqliPrepare(),
@@ -222,6 +223,158 @@ final class VmMysqli
         }
 
         return $state->native;
+    }
+
+    /**
+     * Optional bind-in-execute params list (php-src mysqli_execute_query; #21895).
+     *
+     * @return list<mixed>|null
+     */
+    public static function paramsListFromVariable(Variable $var, string $label, int $argIndex0): ?array
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($params) must be of type ?array, %s given',
+                $label,
+                $argIndex0 + 1,
+                MysqliClassMethod::typeLabelPublic($resolved)
+            ));
+        }
+        $out = [];
+        $i = 0;
+        foreach ($resolved->toArray()->iterateKeyed(true) as [$keyVar, $itemVar]) {
+            if (!self::isListIndexKey($keyVar, $i)) {
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($params) must be a list array',
+                    $label,
+                    $argIndex0 + 1
+                ));
+            }
+            $out[] = VmMysqliStmt::scalarFromVariable($itemVar->resolveIndirect());
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    private static function isListIndexKey(Variable $keyVar, int $expected): bool
+    {
+        $key = $keyVar->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return $key->toInt() === $expected;
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            return (string) $expected === $key->toString();
+        }
+
+        return false;
+    }
+
+    /**
+     * mysqli_execute_query / mysqli::execute_query (php-src ext/mysqli/mysqli_api.c; #21895).
+     *
+     * @param list<mixed>|null $params
+     *
+     * @return ObjectEntry|bool
+     */
+    public static function executeQueryOnLink(
+        ObjectEntry $link,
+        string $query,
+        ?array $params,
+        Context $ctx,
+        string $label,
+        int $paramsArgPos
+    ): ObjectEntry|bool {
+        if (!MysqliExtensionPolicy::hasNativeDriver()) {
+            return false;
+        }
+        $native = self::requireNative($link, $ctx);
+        if (null !== $params && !\array_is_list($params)) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($params) must be a list array',
+                $label,
+                $paramsArgPos
+            ));
+        }
+
+        // Prefer host PHP 8.2+ execute_query when available.
+        if (\is_callable([$native, 'execute_query'])) {
+            try {
+                $result = null === $params
+                    ? $native->execute_query($query)
+                    : $native->execute_query($query, $params);
+            } catch (\ValueError $e) {
+                $msg = $e->getMessage();
+                if (\str_contains($msg, 'must be a list array')
+                    || \str_contains($msg, 'must consist of exactly')) {
+                    throw new \ValueError(\preg_replace(
+                        '/^[^:]+:/',
+                        $label.'():',
+                        $msg,
+                        1
+                    ) ?? $msg);
+                }
+                throw $e;
+            }
+            if (true === $result) {
+                return true;
+            }
+            if (false === $result) {
+                return false;
+            }
+
+            return VmMysqliResult::wrap($ctx, $result);
+        }
+
+        // Compose prepare → execute(+params) → get_result on older host mysqli.
+        $stmt = $native->prepare($query);
+        if (false === $stmt) {
+            return false;
+        }
+        if (null !== $params) {
+            $paramCount = (int) $stmt->param_count;
+            $n = \count($params);
+            if ($n !== $paramCount) {
+                $stmt->close();
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($params) must consist of exactly %d elements, %d present',
+                    $label,
+                    $paramsArgPos,
+                    $paramCount,
+                    $n
+                ));
+            }
+            if (!$stmt->execute($params)) {
+                $stmt->close();
+
+                return false;
+            }
+        } elseif (!$stmt->execute()) {
+            $stmt->close();
+
+            return false;
+        }
+        if (0 === (int) $stmt->field_count) {
+            $stmt->close();
+
+            return true;
+        }
+        if (!\method_exists($stmt, 'get_result')) {
+            $stmt->close();
+
+            return false;
+        }
+        $result = $stmt->get_result();
+        $stmt->close();
+        if (false === $result) {
+            return false;
+        }
+
+        return VmMysqliResult::wrap($ctx, $result);
     }
 
     /** @return never */
@@ -929,6 +1082,44 @@ final class MysqliQuery extends MysqliClassMethod
         } else {
             $ctx = VmMysqli::state($receiver)->ctx ?? throw new \LogicException('No VM context');
             $frame->returnVar->object(VmMysqliResult::wrap($ctx, $result));
+        }
+    }
+}
+
+/** mysqli::execute_query() — php-src ext/mysqli/mysqli_api.c (#21895). */
+final class MysqliExecuteQuery extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('execute_query');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::execute_query()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::execute_query() expects at least 1 argument, 0 given');
+        }
+        $sql = $this->stringArg($frame->calledArgs[1], 'mysqli::execute_query', 0, 'query');
+        $params = null;
+        if (\count($frame->calledArgs) >= 3) {
+            $params = VmMysqli::paramsListFromVariable(
+                $frame->calledArgs[2],
+                'mysqli::execute_query',
+                1
+            );
+        }
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::execute_query() requires VM context');
+        $result = VmMysqli::executeQueryOnLink($receiver, $sql, $params, $ctx, 'mysqli::execute_query', 2);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (true === $result) {
+            $frame->returnVar->bool(true);
+        } elseif (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($result);
         }
     }
 }
