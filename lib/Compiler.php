@@ -7246,7 +7246,13 @@ class Compiler {
                             || LazyPropertyRewriter::isLazyFromAttributes($child->getAttributes());
                         $declare->propertyFinal = $this->isFinalPropertyDeclaration($child);
                         if ($declare->propertyFinal && !CompilerVersion::supportsFinalProperties()) {
-                            $this->throwCompileError('Properties cannot be declared final');
+                            // php-src Zend/zend_compile.c — pre-8.4 (#22308, re-#22241).
+                            $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
+                            $this->throwCompileError(sprintf(
+                                'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
+                                $classDisplay,
+                                $propName
+                            ));
                         }
                     }
                     $this->assignAttributeMetadata($declare, $child);

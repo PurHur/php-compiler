@@ -11,9 +11,9 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ClassFinal;
 
 /**
- * Compile-time checks for PHP 8.4 final properties (#22241).
+ * Compile-time checks for PHP 8.4 final properties (#22241, #22308).
  *
- * php-src: Zend/zend_compile.c — final property flags;
+ * php-src: Zend/zend_compile.c — final property flags / pre-8.4 reject;
  * Zend/zend_inheritance.c — "Cannot override final property %s::$%s".
  */
 final class FinalPropertyOverrideCheck
@@ -119,7 +119,12 @@ final class FinalPropertyOverrideCheck
         foreach ($this->classes as $class) {
             foreach ($class['properties'] as $prop) {
                 if (!empty($prop['fromFlags'])) {
-                    throw new \CompileError('Properties cannot be declared final');
+                    // Zend 8.2 Fatal (zend_compile.c) — #22308.
+                    throw new \CompileError(sprintf(
+                        'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
+                        $class['display'],
+                        $prop['display']
+                    ));
                 }
             }
         }

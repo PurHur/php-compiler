@@ -1068,9 +1068,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ final properties — hooked and plain (Zend/zend_compile.c, #16799, #22241).
+     * PHP 8.4+ final properties — hooked and plain (Zend/zend_compile.c, #16799, #22241, #22308).
      *
-     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * ("Cannot declare property … final, the final modifier is allowed only for methods…").
      * Forward profile via `PHP_COMPILER_PROFILE=8.4` enables parse/compile of `final public $x`.
      * php-src: Zend/zend_inheritance.c — Cannot override final property.
      */

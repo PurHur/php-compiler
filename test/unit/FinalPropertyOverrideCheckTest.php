@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #22241 */
+/** @covers issue #22241, #22308 */
 final class FinalPropertyOverrideCheckTest extends TestCase
 {
     protected function setUp(): void
@@ -36,6 +36,26 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("a\n", ob_get_clean());
+    }
+
+    public function testPlainFinalPropertyRejectedOnReferenceProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertFalse(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public final string $x = 'a';
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Cannot declare property C::$x final, the final modifier is allowed only for methods, classes, and class constants'
+        );
+        $runtime->parseAndCompile($code, 'final_plain_reject_ref.php');
     }
 
     public function testChildCannotOverrideFinalProperty(): void
