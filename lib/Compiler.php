@@ -7178,7 +7178,7 @@ class Compiler {
                         $defaultSlot = $this->tryFoldPropertyDefaultSlot($child, $result);
                         if (null === $defaultSlot) {
                             if (null !== $child->defaultBlock) {
-                                $this->compileOps($child->defaultBlock->children, $result);
+                                $this->compileDefaultBlockChildrenWithProducerCfg($child->defaultBlock, $result);
                             }
                             $defaultSlot = $this->compileOperand($child->defaultVar, $result, true);
                             if (!isset($result->constants[$defaultSlot])) {
@@ -8213,7 +8213,8 @@ class Compiler {
             }
             $beforeCount = \count($block->opCodes);
             if (null !== $param->defaultBlock) {
-                $this->compileOps($param->defaultBlock->children, $block);
+                // Same Array_/New_ rematerialize as function statics (#22390, #8561).
+                $this->compileDefaultBlockChildrenWithProducerCfg($param->defaultBlock, $block);
             }
             $resultSlot = $this->compileOperand($param->defaultVar, $block, true);
             $newOps = \array_slice($block->opCodes, $beforeCount);
@@ -8225,7 +8226,7 @@ class Compiler {
             return null;
         }
         if (null !== $param->defaultBlock) {
-            $this->compileOps($param->defaultBlock->children, $block);
+            $this->compileDefaultBlockChildrenWithProducerCfg($param->defaultBlock, $block);
         }
         $slot = $this->compileOperand($param->defaultVar, $block, true);
         if (!isset($block->constants[$slot])) {
@@ -11463,6 +11464,7 @@ class Compiler {
                 return $return;
             case Op\Expr\New_::class:
                 $className = $this->literalScopeClassName($expr->class);
+
                 if (null !== $className) {
                     $lc = strtolower(ltrim($className, '\\'));
                     if (isset($this->abstractClasses[$lc])) {
@@ -13797,7 +13799,9 @@ class Compiler {
         $skipOp->block1 = $continueBlock;
 
         if (null !== $terminal->defaultBlock) {
-            $this->compileOps($terminal->defaultBlock->children, $block);
+            // php-cfg places Array_/New_ in defaultBlock, not the function body. Rematerialize
+            // so TYPE_ARG_SEND wires the INIT_ARRAY slot (not a dead mixed temp) (#22390, #8561).
+            $this->compileDefaultBlockChildrenWithProducerCfg($terminal->defaultBlock, $block);
         }
         $initSlot = $this->compileOperand($terminal->defaultVar, $block, true);
 
@@ -15636,14 +15640,20 @@ class Compiler {
                 if ($child instanceof Op\Expr\Array_) {
                     $callArgProbe = $callOp->args[$argIndex] ?? $arg;
                     // var_export([array_any([], fn), array_all([], fn)]) — stmt-before Array_ (#14516).
+                    // new C([...]) in param/static defaultBlocks: php-cfg often leaves the ctor arg
+                    // as inferred unknown/mixed while Array_.result is int[] (#22390, #8561).
+                    $deadTempWantsArray = $this->callArgIsDeadInlineTemporary($callArgProbe)
+                        && (
+                            $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            || $callOp instanceof Op\Expr\New_
+                        );
                     if (
                         $i === $callIndex - 1
                         && (
                             $this->operandsReferToSameVariable($child->result, $callArgProbe)
                             || $this->operandsReferToSameVariable($child->result, $arg)
                             || (
-                                $this->callArgIsDeadInlineTemporary($callArgProbe)
-                                && $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                                $deadTempWantsArray
                                 && !$this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
                                     $callOp,
                                     $argIndex,
@@ -37118,6 +37128,21 @@ class Compiler {
     }
 
     /**
+     * Compile a php-cfg defaultBlock (param/static/property `new`/array inits) so inline
+     * Array_ producers are visible to TYPE_ARG_SEND wiring (#22390, #8561, #15848).
+     */
+    private function compileDefaultBlockChildrenWithProducerCfg(CfgBlock $defaultBlock, Block $block): void
+    {
+        $savedProducerCfg = $this->rematerializeInlineProducerCfgBlock;
+        $this->rematerializeInlineProducerCfgBlock = $defaultBlock;
+        try {
+            $this->compileOps($defaultBlock->children, $block);
+        } finally {
+            $this->rematerializeInlineProducerCfgBlock = $savedProducerCfg;
+        }
+    }
+
+    /**
      * CFG stmt children for hoisted inline call-arg producer lookup during rematerialization (#15848).
      *
      * @return list<Op>
@@ -43447,18 +43472,25 @@ class Compiler {
                 && null !== $callArgOperand
                 && !$this->callArgOperandExpectsArrayProducer($callArgOperand)
             ) {
-                $producers = (null !== $cfgCallOp && null !== $block->orig)
-                    ? $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
-                    : [];
-                $outerArray = [] !== $producers
-                    ? $this->matchOutermostNestedInlineArrayProducerForArgZero(
-                        $producers,
-                        (int) $argIndex,
-                        \count($cfgCallOp->args ?? $args),
-                        \count($producers)
-                    )
-                    : null;
-                $inlineArray = $outerArray instanceof Op\Expr\Array_ ? $outerArray : null;
+                // new C([...]) — php-cfg often leaves the ctor arg Temporary untyped; the
+                // stmt-before Array_ is the real operand (static/param defaults) (#22390).
+                $keepUntypedNewCtorArray = $cfgCallOp instanceof Op\Expr\New_
+                    && $this->callArgIsDeadInlineTemporary($callArgOperand)
+                    && $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) === $inlineArray;
+                if (!$keepUntypedNewCtorArray) {
+                    $producers = (null !== $cfgCallOp && null !== $block->orig)
+                        ? $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
+                        : [];
+                    $outerArray = [] !== $producers
+                        ? $this->matchOutermostNestedInlineArrayProducerForArgZero(
+                            $producers,
+                            (int) $argIndex,
+                            \count($cfgCallOp->args ?? $args),
+                            \count($producers)
+                        )
+                        : null;
+                    $inlineArray = $outerArray instanceof Op\Expr\Array_ ? $outerArray : null;
+                }
             }
             if (
                 null !== $inlineArray
