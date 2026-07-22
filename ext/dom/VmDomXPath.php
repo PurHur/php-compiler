@@ -1034,7 +1034,7 @@ final class VmDomXPath
         }
 
         return (bool) preg_match(
-            '~^[*\w][\w:-]*(?:\[(?:@[^\]]+|[\d]+|(?:local-name|name|namespace-uri)\(\)\s*=\s*["\'][^"\']*["\'])\])?$~i',
+            '~^[*\w][\w:-]*(?:\[(?:@[^\]]+|[\d]+|(?:local-name|name|namespace-uri)\(\)\s*=\s*["\'][^"\']*["\']|text\(\)\s*=\s*["\'].*?["\']|contains\(\s*text\(\)\s*,\s*["\'].*?["\']\s*\))\])?$~is',
             $expression
         );
     }
@@ -1064,6 +1064,36 @@ final class VmDomXPath
                 'position' => null,
                 'fnPred' => strtolower($matches[2]),
                 'fnPredValue' => $matches[4],
+            ];
+        }
+        // [text()='…'] / [text()="…"] — child text node equality (#22008).
+        if (preg_match(
+            '~^(.+?)\[text\(\)\s*=\s*(["\'])(.*?)\2\]$~s',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => null,
+                'attrValue' => '',
+                'position' => null,
+                'fnPred' => 'text-eq',
+                'fnPredValue' => $matches[3],
+            ];
+        }
+        // [contains(text(),'…')] — first child text string-value (#22008).
+        if (preg_match(
+            '~^(.+?)\[contains\(\s*text\(\)\s*,\s*(["\'])(.*?)\2\s*\)\]$~is',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => null,
+                'attrValue' => '',
+                'position' => null,
+                'fnPred' => 'contains-text',
+                'fnPredValue' => $matches[3],
             ];
         }
         if (preg_match(
@@ -1145,7 +1175,8 @@ final class VmDomXPath
     }
 
     /**
-     * Apply optional [@attr='v'] / [n] / [local-name()="…"] predicates (#19456, #20456, #21125).
+     * Apply optional [@attr='v'] / [n] / [local-name()="…"] / [text()=…] predicates
+     * (#19456, #20456, #21125, #22008).
      *
      * @param list<int>             $nodeIds
      * @param array<string, string> $namespaces
@@ -1194,7 +1225,7 @@ final class VmDomXPath
     }
 
     /**
-     * XPath 1.0 name()/local-name()/namespace-uri() equality against a candidate node (#21125).
+     * XPath 1.0 name()/local-name()/namespace-uri()/text() predicates (#21125, #22008).
      */
     private static function elementMatchesNameFunctionPredicate(
         ?ObjectEntry $node,
@@ -1213,8 +1244,51 @@ final class VmDomXPath
         if ('namespace-uri' === $fnPred) {
             return (VmDom::readNamespaceUri($node) ?? '') === $expected;
         }
+        // text()='…' — any child text/cdata string-value equals expected (XPath 1.0).
+        if ('text-eq' === $fnPred) {
+            return self::elementHasChildTextEqual($node, $expected);
+        }
+        // contains(text(), '…') — string-value of first child text/cdata node.
+        if ('contains-text' === $fnPred) {
+            return str_contains(self::firstChildTextStringValue($node), $expected);
+        }
 
         return false;
+    }
+
+    /** @return list<ObjectEntry> child text/cdata nodes in document order */
+    private static function childTextNodes(ObjectEntry $node): array
+    {
+        $out = [];
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && VmDom::isTextOrCdataNode($child)) {
+                $out[] = $child;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function elementHasChildTextEqual(ObjectEntry $node, string $expected): bool
+    {
+        foreach (self::childTextNodes($node) as $text) {
+            if (self::xpathStringValue($text) === $expected) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function firstChildTextStringValue(ObjectEntry $node): string
+    {
+        $texts = self::childTextNodes($node);
+        if ([] === $texts) {
+            return '';
+        }
+
+        return self::xpathStringValue($texts[0]);
     }
 
     /**
