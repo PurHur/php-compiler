@@ -43,6 +43,15 @@ final class XsltProcessorSetProfiling extends XsltClassMethod
             0,
             'filename'
         );
+        // php-src Z_PARAM_PATH_OR_NULL rejects embedded NUL before storing (#22272).
+        if (null !== $filename) {
+            VmString::rejectNullByteBuiltinStringArg(
+                $filename,
+                'XSLTProcessor::setProfiling',
+                0,
+                'filename'
+            );
+        }
         $result = VmXsl::setProfiling($entry, $filename);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             $ret->bool($result);
