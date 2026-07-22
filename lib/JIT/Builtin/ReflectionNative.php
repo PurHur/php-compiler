@@ -76,5 +76,16 @@ final class ReflectionNative
                 $context->registerFunction($name, $fn);
             }
         }
+
+        $i1 = $context->getTypeFromString('int1');
+        $variadicAbi = '__compiler_refl_func_is_variadic';
+        $existingVariadic = $context->module->getNamedFunction($variadicAbi);
+        if (null !== $existingVariadic) {
+            $context->registerFunction($variadicAbi, $existingVariadic);
+        } else {
+            $ft = $context->context->functionType($i1, false, $i8p);
+            $fn = $context->module->addFunction($variadicAbi, $ft);
+            $context->registerFunction($variadicAbi, $fn);
+        }
     }
 }

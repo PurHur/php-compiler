@@ -247,9 +247,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfRequiredParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetStaticVariables;
-use PHPCompiler\VM\Builtin\ReflectionFunctionGetTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
-use PHPCompiler\VM\Builtin\ReflectionFunctionHasTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsClosure;
@@ -257,6 +255,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionIsGenerator;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsVariadic;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromMethodName;
@@ -1037,13 +1036,12 @@ final class BuiltinClasses
                 'getnumberofrequiredparameters' => new ReflectionFunctionGetNumberOfRequiredParameters(),
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
                 'hasreturntype' => new ReflectionFunctionHasReturnType(),
-                'gettentativereturntype' => new ReflectionFunctionGetTentativeReturnType(),
-                'hastentativereturntype' => new ReflectionFunctionHasTentativeReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),
                 'isclosure' => new ReflectionFunctionIsClosure(),
                 'isgenerator' => new ReflectionFunctionIsGenerator(),
                 'isinternal' => new ReflectionFunctionIsInternal(),
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
+                'isvariadic' => new ReflectionFunctionIsVariadic(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
                 'getclosurethis' => new ReflectionFunctionGetClosureThis(),
                 'getclosure' => new ReflectionFunctionGetClosure(),

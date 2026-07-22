@@ -1310,6 +1310,24 @@ final class ReflectionSupport
     }
 
     /**
+     * php-src: zim_reflection_function_abstract_isVariadic (#22045).
+     *
+     * Shared by ReflectionFunction / ReflectionMethod in php-src; method path is
+     * {@see self::isReflectionMethodVariadic()}.
+     */
+    public static function isReflectionFunctionVariadic(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if ($reflection->reflectionIsInternalFunction ?? false) {
+            $name = self::functionNameFromReflection($reflection);
+
+            return null !== BuiltinParamNames::variadicParamIndexForFunction($name);
+        }
+        $func = self::resolveFunctionFromReflection($ctx, $reflection);
+
+        return null !== $func->block->variadicParamIndex;
+    }
+
+    /**
      * php-src: ext/reflection/php_reflection.c — reflection_method_is_generator().
      */
     public static function isReflectionMethodGenerator(Context $ctx, ObjectEntry $reflection): bool
@@ -2386,46 +2404,6 @@ final class ReflectionSupport
         }
 
         return !$type instanceof CfgType\Mixed_;
-    }
-
-    /**
-     * Internal free-function stub return type from php-types arginfo (#22068).
-     *
-     * php-src: zim_reflection_function_getReturnType / stub metadata (basic_functions.stub.php).
-     */
-    public static function reflectedFunctionInternalReturnType(ObjectEntry $reflection): ?CfgType
-    {
-        $label = BuiltinInternalArgInfo::returnTypeLabelForFunction(
-            self::functionNameFromReflection($reflection)
-        );
-        if (null === $label) {
-            return null;
-        }
-
-        return ReflectionTypeSupport::cfgTypeFromLabel($label);
-    }
-
-    /** php-src: reflection_function_has_return_type() for internals (#22068). */
-    public static function reflectedFunctionHasInternalReturnType(ObjectEntry $reflection): bool
-    {
-        return null !== BuiltinInternalArgInfo::returnTypeLabelForFunction(
-            self::functionNameFromReflection($reflection)
-        );
-    }
-
-    /**
-     * Free functions never carry ZEND_ACC_TENTATIVE_RETURN in php-src (#22068).
-     * Methods exist on ReflectionFunction for API parity with ReflectionFunctionAbstract.
-     */
-    public static function reflectedFunctionTentativeReturnType(ObjectEntry $reflection): ?CfgType
-    {
-        return null;
-    }
-
-    /** php-src: reflection_function_has_tentative_return_type() (#22068). */
-    public static function reflectedFunctionHasTentativeReturnType(ObjectEntry $reflection): bool
-    {
-        return null !== self::reflectedFunctionTentativeReturnType($reflection);
     }
 
     /** php-src: reflection_method_is_internal() (#18228). */

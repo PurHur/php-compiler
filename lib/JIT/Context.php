@@ -944,6 +944,9 @@ class Context {
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
         $this->functionProxies['reflectionconstant::getattributes'] = new Call\ReflectionConstantGetAttributes();
         $this->functionProxies['reflectionmethod::getattributes'] = new Call\ReflectionMethodGetAttributes();
+        $this->functionProxies['reflectionfunction::__construct'] = new Call\ReflectionFunctionConstruct();
+        $this->functionProxies['reflectionfunction::getname'] = new Call\ReflectionFunctionGetName();
+        $this->functionProxies['reflectionfunction::isvariadic'] = new Call\ReflectionFunctionIsVariadic();
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
             $this->functionProxies['reflectionparameter::issensitiveparameter'] = new Call\ReflectionParameterIsSensitiveParameter();
         }
@@ -1465,6 +1468,7 @@ class Context {
         Builtin\AttributeRegistryLowering::implementLookupFunctions($this);
         Builtin\ParamSensitiveLowering::implementLookupFunctions($this);
         Builtin\ReflectionNamedArgumentsLowering::implementLookupFunctions($this);
+        Builtin\ReflectionFunctionVariadicLowering::implementLookupFunctions($this);
         VmActiveContextInitLlvm::emitPendingBeforeSeal($this);
         $this->sealInitFunction();
         $initSuffix = (string) getenv('PHP_COMPILER_INIT_SYMBOL_SUFFIX');
