@@ -856,7 +856,7 @@ final class VmDomJitDispatch
                 $nsPrefixes = NodeC14N::phpArrayFromVariable($nsVar);
             }
         }
-        $payload = VmDom::c14n($ctx, $node, $exclusive, $withComments, $xpath, $nsPrefixes);
+        $payload = VmDom::c14n($ctx, $node, $exclusive, $withComments, $xpath, $nsPrefixes, null, 'DOMNode::C14N');
         $result = new Variable();
         if (false === $payload) {
             $result->bool(false);

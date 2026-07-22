@@ -22,7 +22,16 @@ final class NodeC14N extends DomClassMethod
             throw new \LogicException('DOMNode::C14N() requires VM context in this compiler build');
         }
         [$exclusive, $withComments, $xpath, $nsPrefixes] = self::parseC14NArgs($frame, 1);
-        $result = VmDom::c14n($frame->vmContext, $node, $exclusive, $withComments, $xpath, $nsPrefixes);
+        $result = VmDom::c14n(
+            $frame->vmContext,
+            $node,
+            $exclusive,
+            $withComments,
+            $xpath,
+            $nsPrefixes,
+            $frame,
+            'DOMNode::C14N'
+        );
         if (null !== $frame->returnVar) {
             if (false === $result) {
                 $frame->returnVar->bool(false);

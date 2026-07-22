@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMNode::C14N() (#19467). */
+/** LLVM lowering for DOMNode::C14N() (#19467, #22378). */
 final class JitDomC14N
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -20,13 +20,13 @@ final class JitDomC14N
         }
         DomC14NRuntime::ensureLinked($context);
         $exclusive = self::exclusiveAsI64($context, $args[1] ?? null);
-        $str = $context->builder->call(
+
+        // ABI returns __value__* (string or bool false for relative-NS failure; #22378).
+        return $context->builder->call(
             $context->lookupFunction(DomC14NRuntime::ABI_NAME),
             self::loadObjectArg($context, $args[0]),
             $exclusive
         );
-
-        return self::boxStringResult($context, $str);
     }
 
     private static function exclusiveAsI64(Context $context, ?JITVariable $arg): Value
@@ -51,22 +51,6 @@ final class JitDomC14N
 
         // Non-constant exclusive flag: default inclusive (0). Issue repros use literal true/false.
         return $context->context->int64Type()->constInt(0, false);
-    }
-
-    private static function boxStringResult(Context $context, Value $str): Value
-    {
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
-        $slot = JitValueBox::alloc($context);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $slot),
-            $owned
-        );
-
-        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
