@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlreader;
 
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Variable;
+
 /**
  * XMLReader node-type and parser-option constants (libxml2 xmlReaderTypes; php-src ext/xmlreader).
  *
  * @see https://github.com/php/php-src/blob/master/ext/xmlreader/php_xmlreader.stub.php
+ * @see https://github.com/php/php-src/blob/master/ext/xmlreader/php_xmlreader.c — REGISTER_XMLREADER_CLASS_CONST_LONG
  */
 final class XmlReaderConstants
 {
@@ -63,5 +67,22 @@ final class XmlReaderConstants
             'VALIDATE' => self::VALIDATE,
             'SUBST_ENTITIES' => self::SUBST_ENTITIES,
         ];
+    }
+
+    /**
+     * Register XMLReader::* on the ClassEntry for discovery APIs (#22349).
+     *
+     * Storage keys are lowercase; {@see ClassEntry::$constNames} keeps Zend display case
+     * (same convention as SplClassConstants::registerIntConstants).
+     */
+    public static function registerOnClassEntry(ClassEntry $entry): void
+    {
+        foreach (self::classConstants() as $name => $value) {
+            $lc = strtolower($name);
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$lc] = $const;
+            $entry->constNames[$lc] = $name;
+        }
     }
 }

@@ -139,11 +139,9 @@ final class VmXmlReader
             $entry->methodNames['fromstream'] = 'fromStream';
         }
 
-        foreach (XmlReaderConstants::classConstants() as $name => $value) {
-            $var = new Variable(Variable::TYPE_INTEGER);
-            $var->int($value);
-            $entry->constants[$name] = $var;
-        }
+        // php-src REGISTER_XMLREADER_CLASS_CONST_LONG — lc keys + constNames for
+        // defined()/constant()/ReflectionClass::getConstant (#22349).
+        XmlReaderConstants::registerOnClassEntry($entry);
 
         $ctx->classes[self::CLASS_LC] = $entry;
         $ctx->classes[self::CLASS_LC]->isInternal = true;
