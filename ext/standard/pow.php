@@ -25,9 +25,8 @@ final class pow extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('pow() requires exactly two arguments');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#21982).
+        $this->requireExactArgCount($frame, 'pow', 2);
         $base = $frame->calledArgs[0]->resolveIndirect();
         $exp = $frame->calledArgs[1]->resolveIndirect();
         if (VmMath::requiresForwardProfileStrictDoubleNull()) {
@@ -42,8 +41,8 @@ final class pow extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('pow() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'pow', 2)) {
+            return $context->getTypeFromString('double')->constReal(0.0);
         }
         if (VmMath::requiresForwardProfileStrictDoubleNull()) {
             if (JITVariable::TYPE_NULL === $args[0]->type) {

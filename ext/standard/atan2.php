@@ -25,9 +25,8 @@ final class atan2 extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('atan2() requires exactly two arguments');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#21982).
+        $this->requireExactArgCount($frame, 'atan2', 2);
         $y = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'atan2',
@@ -51,8 +50,8 @@ final class atan2 extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== \count($args)) {
-            throw new \LogicException('atan2() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'atan2', 2)) {
+            return $context->getTypeFromString('double')->constReal(0.0);
         }
         [$y, $x] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'atan2', 'y', 'x', 'float');
 
