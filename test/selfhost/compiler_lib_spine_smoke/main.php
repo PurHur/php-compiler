@@ -5714,6 +5714,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionInvoke.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAccessible.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAnonymous.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsClosure.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsStatic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsDeprecated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsGenerator.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsVariadic.php';
