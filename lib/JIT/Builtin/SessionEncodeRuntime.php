@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
@@ -16,9 +15,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for session_encode()/session_decode() via SessionEncodeJitHelper PHP (#6086, #9440).
+ * JIT/AOT link for session_encode()/session_decode() via SessionEncodeJitHelper PHP (#6086, #9440, #22076).
  *
  * Replaces former ~530-line LLVM wire/apply bodies with thin bridges into {@see VmSessionSerializer} SSOT.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SessionCreateIdRuntime #21941 / FunctionExistsRuntime #22016).
  * php-src: ext/session/session.c — php_session_encode / php_session_decode
  */
 final class SessionEncodeRuntime
@@ -302,32 +302,12 @@ final class SessionEncodeRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SessionEncodeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('SessionEncodeJitHelper.php parseAndCompile failed (#9440)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9440)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22076'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
