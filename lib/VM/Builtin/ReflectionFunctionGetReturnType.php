@@ -10,7 +10,7 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionFunction::getReturnType() — VM (#3355). */
+/** ReflectionFunction::getReturnType() — VM (#3355, #22068; ext/reflection/php_reflection.c). */
 final class ReflectionFunctionGetReturnType extends VmClassMethod
 {
     public function __construct()
@@ -20,21 +20,27 @@ final class ReflectionFunctionGetReturnType extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $ctx = VmReflection::requireContext($frame);
-        $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
-        if (null !== $frame->returnVar && ReflectionSupport::isReflectionInternalFunction($receiver)) {
-            $frame->returnVar->null();
-
+        if (null === $frame->returnVar) {
             return;
         }
-        $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
-        if (null !== $frame->returnVar) {
-            $declared = $func->block->returnDeclaredType;
+        $ctx = VmReflection::requireContext($frame);
+        $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
+        if (ReflectionSupport::isReflectionInternalFunction($receiver)) {
+            $declared = ReflectionSupport::reflectedFunctionInternalReturnType($receiver);
             if (null === $declared) {
                 $frame->returnVar->null();
             } else {
                 $frame->returnVar->copyFrom(ReflectionTypeSupport::buildTypeVariable($ctx, $declared));
             }
+
+            return;
+        }
+        $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
+        $declared = $func->block->returnDeclaredType;
+        if (null === $declared || !ReflectionSupport::hasDeclaredReturnType($declared)) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->copyFrom(ReflectionTypeSupport::buildTypeVariable($ctx, $declared));
         }
     }
 }

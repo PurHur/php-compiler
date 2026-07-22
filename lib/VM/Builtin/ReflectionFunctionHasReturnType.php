@@ -9,7 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionFunction::hasReturnType() — VM (#5141, ext/reflection/php_reflection.c). */
+/** ReflectionFunction::hasReturnType() — VM (#5141, #22068; ext/reflection/php_reflection.c). */
 final class ReflectionFunctionHasReturnType extends VmClassMethod
 {
     public function __construct()
@@ -25,7 +25,8 @@ final class ReflectionFunctionHasReturnType extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         if (ReflectionSupport::isReflectionInternalFunction($receiver)) {
-            $frame->returnVar->bool(false);
+            // php-src: ignores ZEND_TYPE_IS_TENTATIVE; free-function stubs use non-tentative types.
+            $frame->returnVar->bool(ReflectionSupport::reflectedFunctionHasInternalReturnType($receiver));
 
             return;
         }
