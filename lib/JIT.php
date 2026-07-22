@@ -7722,6 +7722,7 @@ class JIT {
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_ARRAY_DIM_FETCH_WRITE:
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
+                    $fetchIs = !$forWrite && $op->arrayDimFetchIs;
                     $value = $this->context->getVariableFromOp($block->getOperand($op->arg2));
                     if (
                         $forWrite
@@ -7764,6 +7765,52 @@ class JIT {
                     $dim = $this->context->getVariableFromOp($dimOp);
                     $containerOp = $block->getOperand($op->arg2);
                     $containerUserType = $containerOp->type->userType ?? '';
+                    if ($fetchIs) {
+                        // FETCH_DIM_IS for nested isset()/empty() chains (#21991).
+                        $bracketLabel = Variable::cannotUseBracketLabel($value->type);
+                        if (null !== $bracketLabel) {
+                            $nullBox = JIT\JitValueBox::alloc($this->context);
+                            $nullVar = new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VALUE,
+                                $nullBox
+                            );
+                            $this->context->setVariableOp($resultOp, $nullVar);
+                            break;
+                        }
+                        if (
+                            $value->type === Variable::TYPE_HASHTABLE
+                            || Variable::TYPE_VALUE === $value->type
+                            || ($value->type & Variable::IS_NATIVE_ARRAY)
+                        ) {
+                            $htVar = Variable::TYPE_HASHTABLE === $value->type
+                                ? $value
+                                : JIT\HashTableHelper::asDetachedHashtable($this->context, $value);
+                            $ht = JIT\HashTableHelper::loadHashtablePointer($this->context, $htVar);
+                            $exists = JIT\HashTableHelper::offsetIsSetDim($this->context, $ht, $dim);
+                            $hasKey = JIT\BasicBlockHelper::append($this->context, 'dim_is_has');
+                            $missKey = JIT\BasicBlockHelper::append($this->context, 'dim_is_miss');
+                            $doneIs = JIT\BasicBlockHelper::append($this->context, 'dim_is_done');
+                            $this->context->builder->branchIf($exists, $hasKey, $missKey);
+                            $this->context->builder->positionAtEnd($missKey);
+                            $nullBox = JIT\JitValueBox::alloc($this->context);
+                            $nullVar = new Variable(
+                                $this->context,
+                                Variable::TYPE_VALUE,
+                                Variable::KIND_VALUE,
+                                $nullBox
+                            );
+                            $this->context->setVariableOp($resultOp, $nullVar);
+                            $this->context->builder->branch($doneIs);
+                            $this->context->builder->positionAtEnd($hasKey);
+                            $fetched = $value->dimFetch($dim, $resultOp->type, false);
+                            $this->assignOperand($resultOp, $fetched);
+                            $this->context->builder->branch($doneIs);
+                            $this->context->builder->positionAtEnd($doneIs);
+                            break;
+                        }
+                    }
                     if (
                         $value->type === Variable::TYPE_OBJECT
                         && 'splobjectstorage' === strtolower($containerUserType)

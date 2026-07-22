@@ -3879,6 +3879,7 @@ restart:
                     $containerSlot = $frame->scope[$op->arg2];
                     $container = $containerSlot->resolveIndirect();
                     $forWrite = OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type;
+                    $fetchIs = !$forWrite && $op->arrayDimFetchIs;
                     $catchFrame = $this->rejectMagicGetIndirectModify($containerSlot, $forWrite, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -4015,7 +4016,7 @@ restart:
                         $arg1->string($readShell->toString());
                     } elseif ($container->type === Variable::TYPE_ARRAY) {
                         if ($this->context->isGlobalsTable($container)) {
-                            if (!$forWrite && Variable::TYPE_STRING === $arg3->type
+                            if (!$forWrite && !$fetchIs && Variable::TYPE_STRING === $arg3->type
                                 && !$this->context->globalsTableOffsetIsSet($arg3)) {
                                 $this->context->errors->undefinedGlobalVariable(
                                     $arg3->toString(),
@@ -4029,7 +4030,7 @@ restart:
                         }
                         $table = $container->toArray();
                         try {
-                            if (!$forWrite && !$table->keyExists($arg3)) {
+                            if (!$forWrite && !$fetchIs && !$table->keyExists($arg3)) {
                                 $this->context->errors->undefinedArrayKey(
                                     $arg3,
                                     $this->context,
@@ -4100,13 +4101,15 @@ restart:
                     } else {
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
                         if (!$forWrite && TypeCheck::isScalarNonContainerDimRead($container)) {
-                            $resolved = $container->resolveIndirect();
-                            $this->context->errors->arrayOffsetOnNonContainer(
-                                TypeCheck::typeNameForConstraint($resolved->type),
-                                $this->context,
-                                $frame,
-                                $scriptFile
-                            );
+                            if (!$fetchIs) {
+                                $resolved = $container->resolveIndirect();
+                                $this->context->errors->arrayOffsetOnNonContainer(
+                                    TypeCheck::typeNameForConstraint($resolved->type),
+                                    $this->context,
+                                    $frame,
+                                    $scriptFile
+                                );
+                            }
                             $arg1->null();
                             break;
                         }
