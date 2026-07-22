@@ -3510,7 +3510,7 @@ final class VmDom
         $data = self::characterDataReadContent($node);
         $len = \strlen($data);
         if ($offset < 0 || $offset > $len) {
-            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+            throw new \DOMException('Index Size Error', DomExceptionConstants::INDEX_SIZE_ERR);
         }
         self::writeCharacterDataContent($node, substr($data, 0, $offset).$arg.substr($data, $offset));
     }
@@ -3520,7 +3520,7 @@ final class VmDom
         $data = self::characterDataReadContent($node);
         $len = \strlen($data);
         if ($offset < 0 || $offset > $len || $count < 0) {
-            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+            throw new \DOMException('Index Size Error', DomExceptionConstants::INDEX_SIZE_ERR);
         }
         if ($count > $len - $offset) {
             $count = $len - $offset;
@@ -3533,7 +3533,7 @@ final class VmDom
         $data = self::characterDataReadContent($node);
         $len = \strlen($data);
         if ($offset < 0 || $offset > $len || $count < 0) {
-            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+            throw new \DOMException('Index Size Error', DomExceptionConstants::INDEX_SIZE_ERR);
         }
         if ($count > $len - $offset) {
             $count = $len - $offset;
@@ -3552,7 +3552,7 @@ final class VmDom
         $data = self::characterDataReadContent($node);
         $len = \strlen($data);
         if ($offset < 0 || $count < 0 || $offset > $len) {
-            throw new \DOMException('Index size error', DomExceptionConstants::INDEX_SIZE_ERR);
+            throw new \DOMException('Index Size Error', DomExceptionConstants::INDEX_SIZE_ERR);
         }
 
         return substr($data, $offset, $count);

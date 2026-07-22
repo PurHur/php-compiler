@@ -303,6 +303,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_character_data_data_write.phpt',
             'dom_character_data_data_write.phpt'
         );
+        yield 'dom_character_data_index_size_error.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_character_data_index_size_error.phpt',
+            'dom_character_data_index_size_error.phpt'
+        );
         yield 'dom_childnodes_empty.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_childnodes_empty.phpt',
             'dom_childnodes_empty.phpt'
