@@ -101,6 +101,54 @@ final class JitSimpleXmlUserScript
         if (null === $tree) {
             return null;
         }
+
+        // Optional filename — php-src zim_SimpleXMLElement_asXML (#22006).
+        if (isset($args[1]) && JITVariable::TYPE_NULL !== $args[1]->type) {
+            $pathLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+            if (null !== $pathLit && '' === $pathLit) {
+                return null;
+            }
+            // Serialize at compile time; write at runtime so AOT binaries honor CWD (#22006).
+            $xml = $tree->asXML();
+            if (false === $xml) {
+                $slot = JitValueBox::alloc($context);
+                JitValueBox::writeBool(
+                    $context,
+                    $slot,
+                    $context->getTypeFromString('int1')->constInt(0, false)
+                );
+
+                return JitValueBox::normalizeValuePtr($context, $slot);
+            }
+            $pathStr = JitStringBuiltinArg::lowerPath(
+                $context,
+                $args[1],
+                'SimpleXMLElement::asXML',
+                0,
+                'filename'
+            );
+            $dataStr = $context->builder->load($context->constantStringFromString($xml));
+            $dataOwned = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $dataStr
+            );
+            $written = $context->builder->call(
+                $context->lookupFunction('__compiler_file_put_contents'),
+                $pathStr,
+                $dataOwned,
+                $context->getTypeFromString('int64')->constInt(0, false)
+            );
+            $ok = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_NE,
+                $written,
+                $context->getTypeFromString('int64')->constInt(-1, true)
+            );
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool($context, $slot, $ok);
+
+            return JitValueBox::normalizeValuePtr($context, $slot);
+        }
+
         $xml = $tree->asXML();
         if (false === $xml) {
             return null;
