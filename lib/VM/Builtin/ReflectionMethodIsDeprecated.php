@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
@@ -27,11 +28,17 @@ final class ReflectionMethodIsDeprecated extends VmClassMethod
             throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
         }
         $methodLc = strtolower($methodName);
-        if (null !== $frame->returnVar) {
-            $meta = $entry->methodDeprecated[$methodLc] ?? null;
-            $frame->returnVar->bool(
-                null !== $meta && $meta->isDeprecatedForReflection()
-            );
+        if (null === $frame->returnVar) {
+            return;
         }
+        if (!CompilerVersion::supportsReflectionFunctionIsDeprecated()) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $meta = $entry->methodDeprecated[$methodLc] ?? null;
+        $frame->returnVar->bool(
+            null !== $meta && $meta->isDeprecatedForReflection()
+        );
     }
 }
