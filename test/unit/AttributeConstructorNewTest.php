@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #5418 */
+/** @covers issue #5418 #22391 */
 final class AttributeConstructorNewTest extends TestCase
 {
     public function testNewInAttributeConstructorMaterializesOnReflection(): void
@@ -27,5 +27,47 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'attribute_constructor_new.php'));
         $out = ob_get_clean();
         $this->assertMatchesRegularExpression('/object\(stdClass\)#\d+/', $out);
+    }
+
+    public function testNewWithArrayCtorArgMaterializesOnReflection(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Box {
+    public array $a;
+    public function __construct(array $a) { $this->a = $a; }
+}
+#[Attribute]
+class A {
+    public function __construct(public Box $b) {}
+}
+#[A(new Box([9]))]
+class T {}
+$r = (new ReflectionClass(T::class))->getAttributes(A::class)[0]->newInstance();
+echo implode(",", $r->b->a), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'attribute_constructor_new_array.php'));
+        $this->assertSame("9\n", ob_get_clean());
+    }
+
+    public function testBareArrayAttributeArg(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+#[Attribute]
+class A {
+    public function __construct(public array $a) {}
+}
+#[A([1, "k" => 2])]
+class T {}
+$r = (new ReflectionClass(T::class))->getAttributes(A::class)[0]->newInstance();
+echo $r->a[0], ",", $r->a["k"], "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'attribute_constructor_bare_array.php'));
+        $this->assertSame("1,2\n", ob_get_clean());
     }
 }
