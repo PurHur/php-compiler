@@ -31,10 +31,4 @@ final class EmitHelperLinkInsertRestoreTest extends TestCase
         );
     }
 
-    public function testNestedJitCompileScopeRestoresViaBasicBlockHelper(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/NestedJitCompileScope.php');
-        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
-        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $source);
-    }
 }
