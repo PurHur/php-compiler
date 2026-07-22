@@ -41,7 +41,13 @@ final class HashTable {
     private MaskedArray $buckets;
     private int $numUsed = 0;
     private int $numElements = 0;
+    /** Array cursor for key()/current()/next()/prev()/reset()/end() (zend_hash nInternalPointer). */
     private int $internalPointer = 0;
+    /**
+     * Foreach cursor (Zend Z_FE_POS) — independent of nInternalPointer so unset() of the
+     * current by-ref element does not double-advance past the next bucket (#21985).
+     */
+    private int $foreachPointer = self::INVALID_INDEX;
     private int $nextFreeElement = 0;
 
 
@@ -148,6 +154,7 @@ final class HashTable {
             }
         }
         $out->internalPointer = $this->internalPointer;
+        $out->foreachPointer = $this->foreachPointer;
         if ($this->flags & self::FLAG_ALLOW_COW_VIOLATION) {
             $out->markResourceLikeHandle();
         }
@@ -268,15 +275,16 @@ final class HashTable {
         return $pairs;
     }
 
+    /** Zend FE_RESET — foreach position only; does not touch nInternalPointer (#21985). */
     public function iterReset(): void
     {
-        $this->internalPointer = self::INVALID_INDEX;
+        $this->foreachPointer = self::INVALID_INDEX;
     }
 
     public function iterValid(): bool
     {
-        while (++$this->internalPointer < $this->numUsed) {
-            if (!$this->buckets->read($this->internalPointer)->value->isUndefined()) {
+        while (++$this->foreachPointer < $this->numUsed) {
+            if (!$this->buckets->read($this->foreachPointer)->value->isUndefined()) {
                 return true;
             }
         }
@@ -286,27 +294,14 @@ final class HashTable {
 
     public function iterCurrentKey(): Variable
     {
-        $bucket = $this->buckets->read($this->internalPointer);
+        $bucket = $this->buckets->read($this->foreachPointer);
 
         return $this->bucketKeyToVariable($bucket);
     }
 
     public function iterCurrentValue(bool $byRef = false): Variable
     {
-        $bucket = $this->buckets->read($this->internalPointer);
-        if ($byRef) {
-            return $bucket->value;
-        }
-        // Zend ZEND_FE_FETCH_R: by-value foreach copies referenced slots in place (#5419).
-        if ($bucket->value->isIndirect()) {
-            $unref = new Variable();
-            $unref->copyFrom($bucket->value->resolveIndirect());
-            $bucket->value->copyFrom($unref);
-        }
-        $result = new Variable();
-        $result->copyFrom($bucket->value->resolveIndirect());
-
-        return $result;
+        return $this->valueAtBucketIndex($this->foreachPointer, $byRef);
     }
 
     /**
@@ -318,7 +313,7 @@ final class HashTable {
             return null;
         }
 
-        return $this->iterCurrentKey();
+        return $this->bucketKeyToVariable($this->buckets->read($this->internalPointer));
     }
 
     /**
@@ -330,7 +325,7 @@ final class HashTable {
             return null;
         }
 
-        return $this->iterCurrentValue();
+        return $this->valueAtBucketIndex($this->internalPointer, false);
     }
 
     /**
@@ -357,7 +352,7 @@ final class HashTable {
         }
         $this->internalPointer = $idx;
 
-        return $this->iterCurrentValue();
+        return $this->valueAtBucketIndex($this->internalPointer, false);
     }
 
     /**
@@ -385,7 +380,7 @@ final class HashTable {
         }
         $this->internalPointer = $idx;
 
-        return $this->iterCurrentValue();
+        return $this->valueAtBucketIndex($this->internalPointer, false);
     }
 
     /**
@@ -401,7 +396,7 @@ final class HashTable {
         }
         $this->internalPointer = $idx;
 
-        return $this->iterCurrentValue();
+        return $this->valueAtBucketIndex($this->internalPointer, false);
     }
 
     /**
@@ -417,7 +412,28 @@ final class HashTable {
         }
         $this->internalPointer = $idx;
 
-        return $this->iterCurrentValue();
+        return $this->valueAtBucketIndex($this->internalPointer, false);
+    }
+
+    /**
+     * Read bucket value; by-value path unrefs IS_INDIRECT slots in place (ZEND_FE_FETCH_R / #5419).
+     */
+    private function valueAtBucketIndex(int $index, bool $byRef): Variable
+    {
+        $bucket = $this->buckets->read($index);
+        if ($byRef) {
+            return $bucket->value;
+        }
+        // Zend ZEND_FE_FETCH_R: by-value foreach copies referenced slots in place (#5419).
+        if ($bucket->value->isIndirect()) {
+            $unref = new Variable();
+            $unref->copyFrom($bucket->value->resolveIndirect());
+            $bucket->value->copyFrom($unref);
+        }
+        $result = new Variable();
+        $result->copyFrom($bucket->value->resolveIndirect());
+
+        return $result;
     }
 
     private function pointerIsValid(): bool
@@ -1979,6 +1995,8 @@ final class HashTable {
 
     /**
      * Zend zend_hash_internal_pointer_update() after unset at nInternalPointer (Zend/zend_hash.c; #10349).
+     * Updates key()/current() only — foreach uses {@see $foreachPointer} (Z_FE_POS) and must not
+     * be pre-advanced here or ITER_VALID's ++ skips the next element (#21985).
      */
     private function updateInternalPointerAfterUnsetCurrent(int $fromIndex): void
     {

@@ -217,6 +217,34 @@ class HashTableTest extends TestCase
         $this->assertSame('y', $key->toString());
     }
 
+    /**
+     * Foreach cursor (Z_FE_POS) must not skip the next element when unset deletes the
+     * current bucket — nInternalPointer update must not feed ITER_VALID's ++ (#21985).
+     */
+    public function testForeachCursorContinuesAfterUnsetCurrent(): void
+    {
+        $ht = new HashTable();
+        foreach ([1, 2, 3] as $i => $n) {
+            $v = new Variable();
+            $v->int($n);
+            $ht->addIndex($i, $v);
+        }
+        $ht->iterReset();
+        $this->assertTrue($ht->iterValid());
+        $this->assertSame(0, $ht->iterCurrentKey()->toInt());
+        $this->assertTrue($ht->iterValid());
+        $this->assertSame(1, $ht->iterCurrentKey()->toInt());
+
+        $remove = new Variable();
+        $remove->int(1);
+        $ht->offsetUnset($remove);
+
+        $this->assertTrue($ht->iterValid(), 'foreach must visit key 2 after unset of current');
+        $this->assertSame(2, $ht->iterCurrentKey()->toInt());
+        $this->assertSame(3, $ht->iterCurrentValue(false)->toInt());
+        $this->assertFalse($ht->iterValid());
+    }
+
     public function testPointerUnchangedAfterUnsetNonCurrent(): void
     {
         $ht = new HashTable();
