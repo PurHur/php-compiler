@@ -75,6 +75,28 @@ PHP;
     }
 
     /**
+     * #22142 / #19822: unset PHP_COMPILER_PROFILE on 8.4.0-dev matches Zend 8.2 (inert #[\Override]).
+     * Forced via putenv clear so this always runs even when the harness exports a forward profile.
+     */
+    public function testIssue22142InvalidOverrideCompilesOnUnsetReferenceProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsOverrideAttribute());
+            $runtime = new Runtime();
+            ob_start();
+            $runtime->run($runtime->parseAndCompile(
+                $this->issue19822InvalidOverrideSource(),
+                'issue_22142_override_reference.php'
+            ));
+            $this->assertSame("ok\n", ob_get_clean());
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
+    }
+
+    /**
      * #19822: default / 8.2 reference profile must treat #[\Override] as inert (Zend 8.2).
      * Forced via putenv so this always runs even when the harness exports a forward profile.
      */

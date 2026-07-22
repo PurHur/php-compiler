@@ -1,11 +1,7 @@
 --TEST--
-Language: #[\Override] on method not in parent — compile-time fatal (#21388)
---SKIPIF--
-<?php
-if (!PHPCompiler\CompilerVersion::supportsOverrideAttribute()) {
-    echo "skip — Override validation disabled on reference profile\n";
-}
-?>
+Language: #[\Override] on method not in parent — compile-time fatal (#21388, #22142)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class Base {
@@ -18,3 +14,5 @@ class Bad extends Base {
 echo "should not reach here\n";
 --EXPECT_EXIT--
 255
+--EXPECTF--
+parseAndCompile failure: target=%s: Bad::nonExistent() has #[\Override] attribute, but no matching parent method exists

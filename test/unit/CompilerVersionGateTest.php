@@ -610,9 +610,20 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testAdvertisesOverrideAttributeClassTrueOnDefaultProfile(): void
+    public function testAdvertisesOverrideAttributeClassFalseOnUnsetReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::advertisesOverrideAttributeClass());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            // 8.4.0-dev + unset profile → Zend 8.2 phantom gate (#22142).
+            $this->assertFalse(CompilerVersion::advertisesOverrideAttributeClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testAdvertisesOverrideAttributeClassTrueWhenProfile84(): void
@@ -1404,9 +1415,20 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());
     }
 
-    public function testSupportsOverrideAttributeTrueOnDefaultProfile(): void
+    public function testSupportsOverrideAttributeFalseOnUnsetReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            // 8.4.0-dev + unset profile → Zend 8.2 reference (#22142, re-#19822).
+            $this->assertFalse(CompilerVersion::supportsOverrideAttribute());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsOverrideAttributeFalseWhenProfile82(): void
