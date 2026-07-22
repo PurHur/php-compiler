@@ -80,6 +80,7 @@ class Module extends ModuleAbstract
 
         return [
             new pg_connect(),
+            new pg_pconnect(),
             new pg_close(),
             new pg_query(),
             new pg_query('pg_exec'), // PHP_FALIAS (#22219)

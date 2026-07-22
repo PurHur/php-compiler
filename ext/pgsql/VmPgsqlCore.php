@@ -54,6 +54,67 @@ final class VmPgsqlCore
     }
 
     /**
+     * pg_pconnect — persistent process-local pool (php-src php_pgsql_do_connect(persistent=1); #22218).
+     *
+     * @return Variable|false
+     */
+    public static function pconnect(string $conninfo, Context $ctx, int $flags = 0): Variable|false
+    {
+        if (!VmPgsqlNative::available()) {
+            VmPgsqlConnection::setLastError('could not find driver');
+
+            return false;
+        }
+        $hash = VmPgsqlConnection::persistentHash($conninfo, $flags);
+        $existing = VmPgsqlConnection::persistentPoolGet($hash);
+        if (null !== $existing) {
+            if (0 !== ($flags & PgsqlConstants::PGSQL_CONNECT_FORCE_NEW)) {
+                VmPgsqlNative::drainResults($existing);
+                VmPgsqlNative::reset($existing);
+            }
+            if (VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($existing)) {
+                VmPgsqlNative::reset($existing);
+                if (VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($existing)) {
+                    VmPgsqlConnection::setLastError('PostgreSQL connection lost, unable to reconnect');
+                    @\trigger_error(
+                        'pg_pconnect(): PostgreSQL connection lost, unable to reconnect',
+                        \E_USER_WARNING
+                    );
+
+                    return false;
+                }
+            }
+            // Match Zend ≥7.2: RESET ALL on reused persistent links.
+            $reset = VmPgsqlNative::exec($existing, 'RESET ALL;');
+            if (null !== $reset) {
+                VmPgsqlNative::clear($reset);
+            }
+            VmPgsqlConnection::setLastError('');
+
+            return VmPgsqlConnection::wrap($existing, $ctx, true);
+        }
+
+        $native = VmPgsqlNative::connect($conninfo);
+        if (null === $native || VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($native)) {
+            $msg = VmPgsqlNative::errorMessage($native);
+            VmPgsqlConnection::setLastError($msg);
+            if (null !== $native) {
+                VmPgsqlNative::finish($native);
+            }
+            @\trigger_error(
+                'pg_pconnect(): Unable to connect to PostgreSQL server: '.$msg,
+                \E_USER_WARNING
+            );
+
+            return false;
+        }
+        VmPgsqlConnection::persistentPoolSet($hash, $native);
+        VmPgsqlConnection::setLastError('');
+
+        return VmPgsqlConnection::wrap($native, $ctx, true);
+    }
+
+    /**
      * pg_connect_poll — libpq PQconnectPoll (php-src; #21896).
      */
     public static function connectPoll(ObjectEntry $connection): int
