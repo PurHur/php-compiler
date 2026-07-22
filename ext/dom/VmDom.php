@@ -10,6 +10,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\spl\InternalIteratorBuiltin;
@@ -6693,21 +6694,58 @@ final class VmDom
 
         $trimmed = trim($html);
         $childIds = [];
-        $doctypeDecl = self::parseHtmlDoctypeDeclaration($trimmed);
-        $afterDoctype = $trimmed;
-        if (null !== $doctypeDecl) {
-            $afterDoctype = preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/is', '', $trimmed) ?? $trimmed;
+        // libxml htmlReadMemory: leading <?xml encoding="..."> (HTML PI, often ends with '>' not
+        // the XML '?''>' form) is both a document PI child and an encoding hint — strip it from
+        // the tree source so following markup is not swallowed (#22022 / php-src ext/dom/document.c).
+        $doctypeDecl = null;
+        $htmlEncoding = null;
+        $encodingEligible = true;
+        $cursor = $trimmed;
+        while (true) {
+            $cursor = ltrim($cursor);
+            if ('' === $cursor) {
+                break;
+            }
+            $htmlPi = self::parseHtmlProcessingInstructionAt($cursor, 0);
+            if (null !== $htmlPi) {
+                if ($encodingEligible && 'xml' === $htmlPi['target']) {
+                    $declared = self::extractXmlEncodingDeclaration($htmlPi['data']);
+                    if (null !== $declared) {
+                        $htmlEncoding = $declared;
+                    }
+                }
+                $encodingEligible = false;
+                $pi = self::createHtmlLoadProcessingInstruction(
+                    $ctx,
+                    $htmlPi['target'],
+                    $htmlPi['data'],
+                    $document
+                );
+                $childIds[] = $pi->id;
+                self::linkChildToParent($pi, $document);
+                self::propagateDocumentId($pi, $document->id);
+                $cursor = substr($cursor, $htmlPi['end']);
+
+                continue;
+            }
+            if (null === $doctypeDecl) {
+                $maybeDoctype = self::parseHtmlDoctypeDeclaration($cursor);
+                if (null !== $maybeDoctype) {
+                    $doctypeDecl = $maybeDoctype;
+                    $encodingEligible = false;
+                    $cursor = preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/is', '', $cursor, 1) ?? $cursor;
+
+                    continue;
+                }
+            }
+
+            break;
         }
-        $afterPreamble = $afterDoctype;
-        while (preg_match('/^\s*<\?([^\s?]+)\s+(.*?)\?>\s*/s', $afterPreamble, $piMatch)) {
-            $pi = self::createProcessingInstruction($ctx, $piMatch[1], $piMatch[2], $document);
-            $childIds[] = $pi->id;
-            self::linkChildToParent($pi, $document);
-            self::propagateDocumentId($pi, $document->id);
-            $afterPreamble = substr($afterPreamble, \strlen($piMatch[0]));
+        if (null !== $htmlEncoding) {
+            $cursor = self::decodeHtmlLoadBytes($cursor, $htmlEncoding);
         }
 
-        $source = self::normalizeHtmlLoadSource($html, $options);
+        $source = self::normalizeHtmlLoadSource($cursor, $options);
         $root = self::parseHtmlElementTree($ctx, $source, $document, $frame);
         if (null === $root) {
             return false;
@@ -6869,6 +6907,140 @@ final class VmDom
         return '<html><body>'.$trimmed.'</body></html>';
     }
 
+    /**
+     * HTML processing instruction — closes at '>' (optional '?' before), unlike XML PI close
+     * (libxml htmlParse, php-src ext/dom/document.c; #22022).
+     *
+     * @return null|array{target: string, data: string, end: int}
+     */
+    private static function parseHtmlProcessingInstructionAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        if (!isset($content[$pos + 1]) || '?' !== $content[$pos + 1]) {
+            return null;
+        }
+        // Preg-free scan — VmPregPure lacks \G (#17954); HTML PI ends at '>'.
+        $len = \strlen($content);
+        $i = $pos + 2;
+        if ($i >= $len || !self::isHtmlTagNameStart($content[$i])) {
+            return null;
+        }
+        $targetStart = $i;
+        ++$i;
+        while ($i < $len && self::isHtmlPiTargetChar($content[$i])) {
+            ++$i;
+        }
+        $target = substr($content, $targetStart, $i - $targetStart);
+        $dataStart = $i;
+        while ($i < $len && '>' !== $content[$i]) {
+            ++$i;
+        }
+        if ($i >= $len) {
+            return null;
+        }
+        $data = substr($content, $dataStart, $i - $dataStart);
+        if (isset($data[0]) && ctype_space($data[0])) {
+            $data = ltrim($data);
+        }
+
+        return [
+            'target' => $target,
+            'data' => $data,
+            'end' => $i + 1,
+        ];
+    }
+
+    private static function isHtmlPiTargetChar(string $ch): bool
+    {
+        return !ctype_space($ch) && '?' !== $ch && '<' !== $ch && '>' !== $ch;
+    }
+
+    /** @return null|string encoding name from xml encoding= PI data */
+    private static function extractXmlEncodingDeclaration(string $piData): ?string
+    {
+        // Preg-free (no backrefs) for AOT/VmPregPure (#17954 / #22022).
+        $at = stripos($piData, 'encoding');
+        if (false === $at) {
+            return null;
+        }
+        $len = \strlen($piData);
+        $i = $at + 8; // strlen('encoding')
+        while ($i < $len && ctype_space($piData[$i])) {
+            ++$i;
+        }
+        if ($i >= $len || '=' !== $piData[$i]) {
+            return null;
+        }
+        ++$i;
+        while ($i < $len && ctype_space($piData[$i])) {
+            ++$i;
+        }
+        if ($i >= $len) {
+            return null;
+        }
+        $quote = $piData[$i];
+        if ('"' !== $quote && "'" !== $quote) {
+            return null;
+        }
+        ++$i;
+        $start = $i;
+        while ($i < $len && $piData[$i] !== $quote) {
+            ++$i;
+        }
+        if ($i >= $len) {
+            return null;
+        }
+        $encoding = substr($piData, $start, $i - $start);
+
+        return '' === $encoding ? null : $encoding;
+    }
+
+    /**
+     * Interpret loadHTML source bytes in $encoding into UTF-8 DOM text (libxml htmlReadMemory).
+     */
+    private static function decodeHtmlLoadBytes(string $source, string $encoding): string
+    {
+        $from = CharsetEngine::canonicalize($encoding);
+        if (null === $from || 'UTF-8' === $from) {
+            return $source;
+        }
+        $converted = CharsetEngine::convert($from, 'UTF-8', $source);
+
+        return false === $converted ? $source : $converted;
+    }
+
+    /**
+     * Create a PI from HTML load (allows target "xml" — libxml emits encoding PIs; #22022).
+     */
+    private static function createHtmlLoadProcessingInstruction(
+        Context $ctx,
+        string $target,
+        string $data,
+        ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        if (0 !== strcasecmp($target, 'xml')) {
+            return self::createProcessingInstruction($ctx, $target, $data, $ownerDocument);
+        }
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_PROCESSING_INSTRUCTION);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_PROCESSING_INSTRUCTION_NODE;
+        $state->nodeName = $target;
+        $state->textContent = $data;
+        $state->documentId = $ownerDocument->id;
+        DomRegistry::attach($entry, $state);
+        $entry->getProperty(self::PROP_NODE_NAME)->string($target);
+        $entry->getProperty(self::PROP_NODE_VALUE)->string($data);
+        $entry->getProperty(self::PROP_TARGET)->string($target);
+        $entry->getProperty(self::PROP_DATA)->string($data);
+        self::initNodePropertySlots($entry);
+
+        return $entry;
+    }
+
     private static function parseHtmlElementTree(
         Context $ctx,
         string $html,
@@ -6993,6 +7165,21 @@ final class VmDom
                 $state->childIds[] = $commentNode->id;
                 self::linkChildToParent($commentNode, $parent);
                 $pos = $comment['end'];
+
+                continue;
+            }
+            // HTML PIs (<?…>) — do not abort the sibling walk (#22022).
+            $htmlPi = self::parseHtmlProcessingInstructionAt($inner, $pos);
+            if (null !== $htmlPi) {
+                $piNode = self::createHtmlLoadProcessingInstruction(
+                    $ctx,
+                    $htmlPi['target'],
+                    $htmlPi['data'],
+                    $ownerDocument
+                );
+                $state->childIds[] = $piNode->id;
+                self::linkChildToParent($piNode, $parent);
+                $pos = $htmlPi['end'];
 
                 continue;
             }
