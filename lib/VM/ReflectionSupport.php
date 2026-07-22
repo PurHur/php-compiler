@@ -2334,18 +2334,11 @@ final class ReflectionSupport
         return self::reflectionAccessibleForced($reflection);
     }
 
+    /**
+     * php-src 8.1+: ReflectionMethod::invoke() / invokeArgs() ignore accessible (#22090, re-#9823).
+     */
     public static function assertReflectionMethodAccessible(Context $ctx, ObjectEntry $reflection): void
     {
-        if (self::isReflectionMethodAccessible($ctx, $reflection)) {
-            return;
-        }
-        $className = self::classNameFromReflection($reflection);
-        $methodName = self::methodNameFromReflection($reflection);
-        $flags = self::reflectedMethodCfgFlags($ctx, $reflection);
-        $vis = MethodVisibility::isPrivate($flags) ? 'private' : 'protected';
-        self::throwReflectionException(
-            'Trying to invoke '.$vis.' method '.$className.'::'.$methodName.'() from global scope'
-        );
     }
 
     /** php-src reflection_property_is_accessible (#9823). */
