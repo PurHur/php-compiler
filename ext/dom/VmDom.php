@@ -5762,13 +5762,44 @@ final class VmDom
         ObjectEntry $oldChild
     ): ObjectEntry {
         self::assertMutationParent($parent);
-        if (self::isDocumentFragment($newChild)) {
-            throw new \DOMException('Hierarchy request error');
-        }
-        if (!self::isElement($newChild)) {
-            throw new \DOMException('Hierarchy request error');
-        }
         self::assertChildOfParent($parent, $oldChild, 'DOMNode::replaceChild()');
+        // php-src ext/dom/node.c dom_node_replace_child — DocumentFragment expands in place (#21976).
+        if (self::isDocumentFragment($newChild)) {
+            $parentState = DomRegistry::state($parent);
+            $index = self::childIndex($parentState->childIds, $oldChild->id);
+            if (null === $index) {
+                throw new \DOMException('Not found error');
+            }
+            $refChild = null;
+            if (isset($parentState->childIds[$index + 1])) {
+                $refChild = DomRegistry::entry($parentState->childIds[$index + 1]);
+            }
+            self::unregisterSubtreeElementIdsIfConnected($oldChild);
+            $parentState->childIds = \array_values(\array_filter(
+                $parentState->childIds,
+                static fn (int $id): bool => $id !== $oldChild->id
+            ));
+            self::linkChildToParent($oldChild, null);
+            if (self::isDocument($parent)) {
+                $docEl = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $docEl->type && $docEl->toObject()->id === $oldChild->id) {
+                    $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->null();
+                    $parentState->documentElementName = null;
+                }
+            }
+            self::insertFragmentChildrenBefore($ctx, $parent, $newChild, $refChild);
+            self::syncSubtree($ctx, $parent);
+
+            return $oldChild;
+        }
+        // Same child kinds as appendChild/insertBefore (Element, Text, CDATA, Comment, …).
+        // Previously Element-only — createTextNode replacements threw Hierarchy request error (#21976).
+        if (!self::isTreeMutationChild($newChild)) {
+            throw new \DOMException(
+                'Hierarchy Request Error',
+                DomExceptionConstants::HIERARCHY_REQUEST_ERR
+            );
+        }
         self::assertSameDocument($parent, $newChild);
         self::assertNotAncestorOfParent($parent, $newChild);
         self::unregisterSubtreeElementIdsIfConnected($oldChild);
@@ -5782,8 +5813,15 @@ final class VmDom
         self::linkChildToParent($oldChild, null);
         self::linkChildToParent($newChild, $parent);
         if (self::isDocument($parent)) {
-            $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
-            $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
+            $docEl = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            $oldWasDocEl = Variable::TYPE_OBJECT === $docEl->type && $docEl->toObject()->id === $oldChild->id;
+            if (self::isElement($newChild)) {
+                $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
+                $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
+            } elseif ($oldWasDocEl) {
+                $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->null();
+                $parentState->documentElementName = null;
+            }
             self::propagateDocumentId($newChild, $parent->id);
         }
         self::syncSubtree($ctx, $parent);
