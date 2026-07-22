@@ -15,6 +15,7 @@ final class XsltInstanceMethodJit
         'xsltprocessor::hasexsltsupport' => true,
         'xsltprocessor::setsecurityprefs' => true,
         'xsltprocessor::getsecurityprefs' => true,
+        'xsltprocessor::setprofiling' => true,
     ];
 
     public static function isXsltInstanceMethodProxy(string $proxyName): bool

@@ -17,13 +17,15 @@ final class JitXsltMethod
             'hasexsltsupport' => JitXsltUserScript::tryHasExsltSupport($context, ...$args),
             'setsecurityprefs' => JitXsltUserScript::trySetSecurityPrefs($context, ...$args),
             'getsecurityprefs' => JitXsltUserScript::tryGetSecurityPrefs($context, ...$args),
+            'setprofiling' => JitXsltUserScript::trySetProfiling($context, ...$args),
             default => null,
         };
         if (null === $result) {
             throw new \LogicException(
                 'XSLTProcessor::'.$methodLc.'() user-script AOT requires a tracked host processor'
                 .(('setsecurityprefs' === $methodLc) ? ' and compile-time int prefs' : '')
-                .' (#20392)'
+                .(('setprofiling' === $methodLc) ? ' and compile-time ?string filename' : '')
+                .' (#20392/#22272)'
             );
         }
 

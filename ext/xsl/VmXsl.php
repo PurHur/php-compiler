@@ -74,6 +74,9 @@ final class VmXsl
         $entry->methods['getsecurityprefs'] = new XsltProcessorGetSecurityPrefs();
         $entry->methodVisibility['getsecurityprefs'] = $pub;
         $entry->methodNames['getsecurityprefs'] = 'getSecurityPrefs';
+        $entry->methods['setprofiling'] = new XsltProcessorSetProfiling();
+        $entry->methodVisibility['setprofiling'] = $pub;
+        $entry->methodNames['setprofiling'] = 'setProfiling';
 
         $ctx->classes[self::CLASS_LC] = $entry;
         $ctx->classes[self::CLASS_LC]->isInternal = true;
@@ -229,6 +232,18 @@ final class VmXsl
     public static function getSecurityPrefs(ObjectEntry $entry): int
     {
         return XsltHostBridge::getSecurityPrefs(XsltRegistry::processor($entry));
+    }
+
+    /**
+     * XSLTProcessor::setProfiling() — php-src xsltprocessor.c (#22272).
+     *
+     * @return bool Always true on success (php-src RETURN_TRUE).
+     */
+    public static function setProfiling(ObjectEntry $entry, ?string $filename): bool
+    {
+        self::requireProcessor($entry, 'XSLTProcessor::setProfiling()');
+
+        return XsltHostBridge::setProfiling(XsltRegistry::processor($entry), $filename);
     }
 
     /**
