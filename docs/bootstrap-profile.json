@@ -1321,6 +1321,7 @@
         "ext/mysqli/mysqli_connect_error.php",
         "ext/mysqli/mysqli_errno.php",
         "ext/mysqli/mysqli_error.php",
+        "ext/mysqli/mysqli_execute_query.php",
         "ext/mysqli/mysqli_fetch_array.php",
         "ext/mysqli/mysqli_fetch_assoc.php",
         "ext/mysqli/mysqli_fetch_row.php",
@@ -6615,9 +6616,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6381,
+        "inventory_files": 6382,
         "excluded": 0,
-        "eligible": 6381,
+        "eligible": 6382,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

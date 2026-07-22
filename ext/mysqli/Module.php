@@ -33,6 +33,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_connect.php';
         require_once __DIR__.'/mysqli_init.php';
         require_once __DIR__.'/mysqli_query.php';
+        require_once __DIR__.'/mysqli_execute_query.php';
         require_once __DIR__.'/mysqli_fetch_assoc.php';
         require_once __DIR__.'/mysqli_fetch_array.php';
         require_once __DIR__.'/mysqli_fetch_row.php';
@@ -102,6 +103,7 @@ class Module extends ModuleAbstract
             new mysqli_connect(),
             new mysqli_init(),
             new mysqli_query(),
+            new mysqli_execute_query(),
             new mysqli_fetch_assoc(),
             new mysqli_fetch_array(),
             new mysqli_fetch_row(),

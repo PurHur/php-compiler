@@ -78,6 +78,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -6461,6 +6462,7 @@ require_once __DIR__.'/../../../ext/mysqli/mysqli_store_result.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetInterfaces.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionReturnsReference.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodReturnsReference.php';
+require_once __DIR__.'/../../../ext/mysqli/mysqli_execute_query.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
