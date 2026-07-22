@@ -37,6 +37,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_fetch_array.php';
         require_once __DIR__.'/mysqli_fetch_row.php';
         require_once __DIR__.'/mysqli_result_fetch_api.php';
+        require_once __DIR__.'/mysqli_conn_info_api.php';
         require_once __DIR__.'/mysqli_close.php';
         require_once __DIR__.'/mysqli_connect_errno.php';
         require_once __DIR__.'/mysqli_connect_error.php';
@@ -112,6 +113,19 @@ class Module extends ModuleAbstract
             new mysqli_field_seek(),
             new mysqli_field_tell(),
             new mysqli_num_fields(),
+            new mysqli_insert_id(),
+            new mysqli_field_count(),
+            new mysqli_sqlstate(),
+            new mysqli_warning_count(),
+            new mysqli_character_set_name(),
+            new mysqli_get_charset(),
+            new mysqli_get_server_info(),
+            new mysqli_get_host_info(),
+            new mysqli_get_proto_info(),
+            new mysqli_get_client_info(),
+            new mysqli_get_client_version(),
+            new mysqli_get_server_version(),
+            new mysqli_ssl_set(),
             new mysqli_close(),
             new mysqli_connect_errno(),
             new mysqli_connect_error(),
