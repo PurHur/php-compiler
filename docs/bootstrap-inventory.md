@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6415 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20437 |
+| Source constructs flagged (warnings) | 20440 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1975,7 +1975,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/Module.php` | 0 | 2 |
 | `ext/spl/MultipleIteratorBuiltin.php` | 0 | 18 |
 | `ext/spl/ParentIteratorBuiltin.php` | 0 | 8 |
-| `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 8 |
+| `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 11 |
 | `ext/spl/RecursiveCachingIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/RecursiveTreeIteratorBuiltin.php` | 0 | 6 |
@@ -22415,14 +22415,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/RecursiveArrayIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 37)
-- new RecursiveArrayIteratorConstruct (line 45)
-- new RecursiveArrayIteratorHasChildren (line 48)
-- new RecursiveArrayIteratorGetChildren (line 51)
-- new ObjectEntry (line 110)
-- new Variable (line 113)
-- new HashTable (line 134)
-- 11 class method(s)
+- new ClassEntry (line 36)
+- new RecursiveArrayIteratorConstruct (line 55)
+- new RecursiveArrayIteratorHasChildren (line 58)
+- new RecursiveArrayIteratorGetChildren (line 61)
+- new Variable (line 125)
+- new HashTable (line 143)
+- new Variable (line 145)
+- new ObjectEntry (line 182)
+- new Variable (line 185)
+- new HashTable (line 206)
+- 13 class method(s)
 
 ### `ext/spl/RecursiveCachingIteratorBuiltin.php`
 
