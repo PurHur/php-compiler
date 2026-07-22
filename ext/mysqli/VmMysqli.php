@@ -457,6 +457,14 @@ final class VmMysqliResult
             'close' => new MysqliResultFree(),
             'free_result' => new MysqliResultFree(),
             'fetch_all' => new MysqliResultFetchAll(),
+            'fetch_object' => new MysqliResultFetchObject(),
+            'fetch_field' => new MysqliResultFetchField(),
+            'fetch_fields' => new MysqliResultFetchFields(),
+            'fetch_field_direct' => new MysqliResultFetchFieldDirect(),
+            'fetch_lengths' => new MysqliResultFetchLengths(),
+            'data_seek' => new MysqliResultDataSeek(),
+            'field_seek' => new MysqliResultFieldSeek(),
+            'field_tell' => new MysqliResultFieldTell(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -468,6 +476,146 @@ final class VmMysqliResult
         }
 
         $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    /** Import host stdClass / mysqli field object into a VM stdClass (#22195). */
+    public static function importNativeObject(Context $ctx, object $native): ObjectEntry
+    {
+        $classLc = strtolower($native::class);
+        $class = $ctx->classes[$classLc] ?? ($ctx->classes['stdclass'] ?? null);
+        if (null === $class) {
+            throw new \LogicException('stdClass is not registered');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        foreach (get_object_vars($native) as $key => $item) {
+            self::assignScalarToVariable($entry->allocateProperty((string) $key), $item);
+        }
+
+        return $entry;
+    }
+
+    public static function assignScalarToVariable(Variable $slot, mixed $item): void
+    {
+        if (null === $item) {
+            $slot->null();
+        } elseif (\is_int($item)) {
+            $slot->int($item);
+        } elseif (\is_float($item)) {
+            $slot->float($item);
+        } elseif (\is_bool($item)) {
+            $slot->bool($item);
+        } else {
+            $slot->string((string) $item);
+        }
+    }
+
+    /** @return list<array<int|string, mixed>> */
+    public static function fetchAllRows(\mysqli_result $native, int $mode): array
+    {
+        $nativeMode = match ($mode) {
+            MysqliConstants::MYSQLI_ASSOC => \MYSQLI_ASSOC,
+            MysqliConstants::MYSQLI_BOTH => \MYSQLI_BOTH,
+            default => \MYSQLI_NUM,
+        };
+        $rows = $native->fetch_all($nativeMode);
+
+        return \is_array($rows) ? $rows : [];
+    }
+
+    public static function assignRows(Variable $returnVar, array $rows): void
+    {
+        $ht = new HashTable();
+        foreach ($rows as $i => $row) {
+            $slot = new Variable();
+            VmMysqli::assignRow($slot, $row);
+            $ht->add((string) $i, $slot);
+        }
+        $returnVar->array($ht);
+    }
+
+    public static function fetchObject(
+        Context $ctx,
+        \mysqli_result $native,
+        string $class = 'stdClass',
+        array $constructorArgs = []
+    ): ?ObjectEntry {
+        $obj = $native->fetch_object($class, $constructorArgs);
+        if (null === $obj) {
+            return null;
+        }
+
+        return self::importNativeObject($ctx, $obj);
+    }
+
+    public static function fetchField(\mysqli_result $native, Context $ctx): ?ObjectEntry
+    {
+        $field = $native->fetch_field();
+        if (false === $field || null === $field) {
+            return null;
+        }
+
+        return self::importNativeObject($ctx, $field);
+    }
+
+    /** @return list<ObjectEntry> */
+    public static function fetchFields(\mysqli_result $native, Context $ctx): array
+    {
+        $fields = $native->fetch_fields();
+        if (!\is_array($fields)) {
+            return [];
+        }
+        $out = [];
+        foreach ($fields as $field) {
+            if (\is_object($field)) {
+                $out[] = self::importNativeObject($ctx, $field);
+            }
+        }
+
+        return $out;
+    }
+
+    public static function fetchFieldDirect(\mysqli_result $native, Context $ctx, int $index): ?ObjectEntry
+    {
+        $field = $native->fetch_field_direct($index);
+        if (false === $field || null === $field) {
+            return null;
+        }
+
+        return self::importNativeObject($ctx, $field);
+    }
+
+    /** @return list<int>|null */
+    public static function fetchLengths(\mysqli_result $native): ?array
+    {
+        $lengths = $native->fetch_lengths;
+        if (!\is_array($lengths)) {
+            return null;
+        }
+
+        return array_map('intval', $lengths);
+    }
+
+    public static function requireResultObject(Variable $var, string $label): ObjectEntry
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($result) must be of type mysqli_result, %s given',
+                $label,
+                MysqliClassMethod::typeLabelPublic($resolved)
+            ));
+        }
+        $obj = $resolved->toObject();
+        if (self::CLASS_LC !== strtolower($obj->class->name)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($result) must be of type mysqli_result, %s given',
+                $label,
+                $obj->class->name
+            ));
+        }
+
+        return $obj;
     }
 
     public static function wrap(Context $ctx, \mysqli_result $native): ObjectEntry
@@ -1158,19 +1306,215 @@ final class MysqliResultFetchAll extends MysqliClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $nativeMode = match ($mode) {
-            MysqliConstants::MYSQLI_ASSOC => \MYSQLI_ASSOC,
-            MysqliConstants::MYSQLI_BOTH => \MYSQLI_BOTH,
-            default => \MYSQLI_NUM,
-        };
-        $rows = $native->fetch_all($nativeMode);
+        VmMysqliResult::assignRows($frame->returnVar, VmMysqliResult::fetchAllRows($native, $mode));
+    }
+}
+
+final class MysqliResultFetchObject extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetch_object');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::fetch_object()');
+        $native = VmMysqliResult::requireNative($receiver);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli_result::fetch_object() requires VM context');
+        $class = 'stdClass';
+        $ctorArgs = [];
+        if (\count($frame->calledArgs) >= 2) {
+            $class = $this->stringArg($frame->calledArgs[1], 'mysqli_result::fetch_object', 0, 'class');
+        }
+        if (\count($frame->calledArgs) >= 3) {
+            $ctorVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $ctorVar->type) {
+                foreach ($ctorVar->toArray()->iterate(true) as $itemVar) {
+                    $ctorArgs[] = match ($itemVar->type) {
+                        Variable::TYPE_NULL => null,
+                        Variable::TYPE_BOOLEAN => $itemVar->toBool(),
+                        Variable::TYPE_INTEGER => $itemVar->toInt(),
+                        Variable::TYPE_FLOAT => $itemVar->toFloat(),
+                        default => $itemVar->toString(),
+                    };
+                }
+            }
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $obj = VmMysqliResult::fetchObject($ctx, $native, $class, $ctorArgs);
+        if (null === $obj) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->object($obj);
+        }
+    }
+}
+
+final class MysqliResultFetchField extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetch_field');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::fetch_field()');
+        $native = VmMysqliResult::requireNative($receiver);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli_result::fetch_field() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $field = VmMysqliResult::fetchField($native, $ctx);
+        if (null === $field) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->object($field);
+        }
+    }
+}
+
+final class MysqliResultFetchFields extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetch_fields');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::fetch_fields()');
+        $native = VmMysqliResult::requireNative($receiver);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli_result::fetch_fields() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
         $ht = new HashTable();
-        foreach ($rows as $i => $row) {
+        foreach (VmMysqliResult::fetchFields($native, $ctx) as $i => $field) {
             $slot = new Variable();
-            VmMysqli::assignRow($slot, $row);
+            $slot->object($field);
             $ht->add((string) $i, $slot);
         }
         $frame->returnVar->array($ht);
+    }
+}
+
+final class MysqliResultFetchFieldDirect extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetch_field_direct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::fetch_field_direct()');
+        $native = VmMysqliResult::requireNative($receiver);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli_result::fetch_field_direct() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli_result::fetch_field_direct() expects exactly 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'mysqli_result::fetch_field_direct', 0, 'index');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $field = VmMysqliResult::fetchFieldDirect($native, $ctx, $index);
+        if (null === $field) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($field);
+        }
+    }
+}
+
+final class MysqliResultFetchLengths extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetch_lengths');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::fetch_lengths()');
+        $native = VmMysqliResult::requireNative($receiver);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $lengths = VmMysqliResult::fetchLengths($native);
+        if (null === $lengths) {
+            $frame->returnVar->bool(false);
+        } else {
+            $ht = new HashTable();
+            foreach ($lengths as $i => $len) {
+                $slot = new Variable();
+                $slot->int($len);
+                $ht->add((string) $i, $slot);
+            }
+            $frame->returnVar->array($ht);
+        }
+    }
+}
+
+final class MysqliResultDataSeek extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('data_seek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::data_seek()');
+        $native = VmMysqliResult::requireNative($receiver);
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli_result::data_seek() expects exactly 1 argument, 0 given');
+        }
+        $offset = $this->intArg($frame->calledArgs[1], 'mysqli_result::data_seek', 0, 'offset');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($native->data_seek($offset));
+        }
+    }
+}
+
+final class MysqliResultFieldSeek extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('field_seek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::field_seek()');
+        $native = VmMysqliResult::requireNative($receiver);
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli_result::field_seek() expects exactly 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'mysqli_result::field_seek', 0, 'index');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($native->field_seek($index));
+        }
+    }
+}
+
+final class MysqliResultFieldTell extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('field_tell');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::field_tell()');
+        $native = VmMysqliResult::requireNative($receiver);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($native->current_field);
+        }
     }
 }
 
