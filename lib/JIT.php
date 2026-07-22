@@ -354,6 +354,21 @@ class JIT {
             }
             if ($cfgBlock instanceof Block && null !== $cfgBlock->func) {
                 $this->context->activeFunction = strtolower($cfgBlock->func->getScopedName());
+                // Queued method bodies must bind self:: to *this* method's declaring class.
+                // runQueue copies the previous item's className; after DECLARE_CLASS popScope it is
+                // empty, and after another helper's method it is stale — both break NestedJIT
+                // self::$props (#22037). Traits keep composing-class binding from above (#18878).
+                if (null !== $cfgBlock->func->class) {
+                    $declaring = (string) $cfgBlock->func->class->value;
+                    $declLc = strtolower(ltrim($declaring, '\\'));
+                    if (!$this->context->type->object->isTraitClass($declLc)) {
+                        $this->context->scope->className = $declLc;
+                        if ($this->context->type->object->hasDeclaredClass($declaring)) {
+                            $this->context->scope->classId = $this->context->type->object->lookup($declaring);
+                        }
+                        $this->context->scope->calledClassName = $declLc;
+                    }
+                }
             } else {
                 foreach ($this->context->functions as $name => $candidate) {
                     if ($candidate === $llvmFunc) {

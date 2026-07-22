@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
@@ -20,7 +20,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT embed + standalone link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545, #20930).
  *
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\PendingHeadersJitHelper}
- * (IncludePath #20877 / Serialize #20773 shape — no thin stub fork).
+ * via {@see JitVmHelperLink::ensureCompiled} (peer FunctionExistsRuntime #22016 / RewriteVarsRuntime #21968).
  * SSOT: {@see \PHPCompiler\ext\standard\PendingHeadersJitHelper}.
  * php-src: ext/standard/head.c
  */
@@ -434,36 +434,14 @@ final class PendingHeadersJitBridge
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
         // PendingHeadersJitHelper uses phpc_getenv_kernel (not raw getenv) under NestedJIT (#21888).
         StringGetenv::ensureNativeHtInternalProxies($context);
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'PendingHeadersJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('PendingHeadersJitHelper.php parseAndCompile failed (#9545)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9545)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22034'
+        );
     }
 
     private static function ensureHashtableHelpers(Context $context): void

@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * PendingHeaders: NestedJIT PendingHeadersJitHelper + thin AOT link stubs (#9545, #20930, #21005).
+ * PendingHeaders: JitVmHelperLink + PendingHeadersJitHelper PHP (#9545, #20930, #21005, #22034).
  */
 final class PendingHeadersRuntimeShrinkTest extends TestCase
 {
@@ -26,9 +26,13 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersJitBridge.php');
         $this->assertStringContainsString('PendingHeadersJitHelper', $source);
         $this->assertStringContainsString('ensureJitHelperCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('fillThinAotLinkStubs', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementDeferredInventoryStubs', $source);
         $this->assertStringNotContainsString('ph_sent_inv_stub', $source);
