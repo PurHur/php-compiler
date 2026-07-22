@@ -52,4 +52,38 @@ final class Bz2StreamJitHelper
     {
         return VmBz2Stream::bzclose($handle) ? 1 : 0;
     }
+
+    public static function bzerrnoArgv(int $handle): int
+    {
+        if (!VmBz2Stream::isBzHandle($handle)) {
+            throw new \TypeError('bzerrno(): Argument #1 ($bz) must be a bz2 stream');
+        }
+
+        return VmBz2Error::errno($handle);
+    }
+
+    public static function bzerrstrArgv(int $handle): string
+    {
+        if (!VmBz2Stream::isBzHandle($handle)) {
+            throw new \TypeError('bzerrstr(): Argument #1 ($bz) must be a bz2 stream');
+        }
+
+        return VmBz2Error::errstr($handle);
+    }
+
+    /** @return array{errno: int, errstr: string} */
+    public static function bzerrorArgv(int $handle): array
+    {
+        if (!VmBz2Stream::isBzHandle($handle)) {
+            throw new \TypeError('bzerror(): Argument #1 ($bz) must be a bz2 stream');
+        }
+
+        return VmBz2Error::error($handle);
+    }
+
+    /** @return 0|1 */
+    public static function bzflushArgv(int $handle): int
+    {
+        return VmBz2Error::flush($handle) ? 1 : 0;
+    }
 }

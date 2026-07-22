@@ -29,12 +29,24 @@ final class Bz2StreamRuntime
 
     private const BZCLOSE = 'PHPCompiler\\ext\\bz2\\Bz2StreamJitHelper::bzcloseArgv';
 
+    private const BZERRNO = 'PHPCompiler\\ext\\bz2\\Bz2StreamJitHelper::bzerrnoArgv';
+
+    private const BZERRSTR = 'PHPCompiler\\ext\\bz2\\Bz2StreamJitHelper::bzerrstrArgv';
+
+    private const BZFLUSH = 'PHPCompiler\\ext\\bz2\\Bz2StreamJitHelper::bzflushArgv';
+
+    private const BZERROR = 'PHPCompiler\\ext\\bz2\\Bz2StreamJitHelper::bzerrorArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::BZOPEN,
         self::BZWRITE,
         self::BZREAD,
         self::BZCLOSE,
+        self::BZERRNO,
+        self::BZERRSTR,
+        self::BZFLUSH,
+        self::BZERROR,
     ];
 
     /** @var list<string> */
@@ -43,6 +55,10 @@ final class Bz2StreamRuntime
         '__compiler_bzwrite',
         '__compiler_bzread',
         '__compiler_bzclose',
+        '__compiler_bzerrno',
+        '__compiler_bzerrstr',
+        '__compiler_bzflush',
+        '__compiler_bzerror',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -61,13 +77,6 @@ final class Bz2StreamRuntime
             return;
         }
 
-        $probe = $context->module->getNamedFunction('__compiler_bzopen');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
@@ -79,6 +88,10 @@ final class Bz2StreamRuntime
         self::implementIfMissing($context, '__compiler_bzwrite', static fn (Context $ctx, LlvmFunction $fn) => self::emitBzwriteBridge($ctx, $fn));
         self::implementIfMissing($context, '__compiler_bzread', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::BZREAD, 2));
         self::implementIfMissing($context, '__compiler_bzclose', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::BZCLOSE, 1));
+        self::implementIfMissing($context, '__compiler_bzerrno', static fn (Context $ctx, LlvmFunction $fn) => self::emitI64Bridge($ctx, $fn, self::BZERRNO, 1));
+        self::implementIfMissing($context, '__compiler_bzerrstr', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::BZERRSTR, 1));
+        self::implementIfMissing($context, '__compiler_bzflush', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::BZFLUSH, 1));
+        self::implementIfMissing($context, '__compiler_bzerror', static fn (Context $ctx, LlvmFunction $fn) => self::emitHashtableBridge($ctx, $fn, self::BZERROR, 1));
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -108,6 +121,14 @@ final class Bz2StreamRuntime
             '__compiler_bzwrite' => $context->context->functionType($i64, false, $i64, $strPtr, $i64),
             '__compiler_bzread' => $context->context->functionType($strPtr, false, $i64, $i64),
             '__compiler_bzclose' => $context->context->functionType($i32, false, $i64),
+            '__compiler_bzerrno' => $context->context->functionType($i64, false, $i64),
+            '__compiler_bzerrstr' => $context->context->functionType($strPtr, false, $i64),
+            '__compiler_bzflush' => $context->context->functionType($i32, false, $i64),
+            '__compiler_bzerror' => $context->context->functionType(
+                $context->getTypeFromString('__hashtable__*'),
+                false,
+                $i64
+            ),
             default => throw new \LogicException('Bz2StreamRuntime: unknown '.$name),
         };
         $fn = null !== $probe
@@ -203,6 +224,55 @@ final class Bz2StreamRuntime
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32)
+        );
+    }
+
+    private static function emitI64Bridge(
+        Context $context,
+        LlvmFunction $fn,
+        string $helperLogical,
+        int $argCount
+    ): void {
+        $entry = $fn->appendBasicBlock('bz_i64_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $args = [];
+        for ($i = 0; $i < $argCount; ++$i) {
+            $args[] = $context->builder->trunc($fn->getParam($i), $i32);
+        }
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helperLogical),
+            $args
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
+    }
+
+    private static function emitHashtableBridge(
+        Context $context,
+        LlvmFunction $fn,
+        string $helperLogical,
+        int $argCount
+    ): void {
+        $entry = $fn->appendBasicBlock('bz_ht_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $args = [];
+        for ($i = 0; $i < $argCount; ++$i) {
+            $args[] = $context->builder->trunc($fn->getParam($i), $i32);
+        }
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helperLogical),
+            $args
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceToHashtablePtr($context, $raw)
         );
     }
 
