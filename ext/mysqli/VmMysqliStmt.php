@@ -41,6 +41,19 @@ final class VmMysqliStmt
             'bind_result' => new MysqliStmtBindResult(),
             'fetch' => new MysqliStmtFetch(),
             'close' => new MysqliStmtClose(),
+            'field_count' => new MysqliStmtFieldCount(),
+            'param_count' => new MysqliStmtParamCount(),
+            'sqlstate' => new MysqliStmtSqlstate(),
+            'errno' => new MysqliStmtErrno(),
+            'error' => new MysqliStmtError(),
+            'insert_id' => new MysqliStmtInsertId(),
+            'num_rows' => new MysqliStmtNumRows(),
+            'affected_rows' => new MysqliStmtAffectedRows(),
+            'data_seek' => new MysqliStmtDataSeek(),
+            'reset' => new MysqliStmtReset(),
+            'store_result' => new MysqliStmtStoreResult(),
+            'free_result' => new MysqliStmtFreeResult(),
+            'result_metadata' => new MysqliStmtResultMetadata(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -192,14 +205,90 @@ final class VmMysqliStmt
         if (!MysqliExtensionPolicy::hasNativeDriver()) {
             return false;
         }
-        $nativeLink = VmMysqli::requireNative($link);
+        $state = VmMysqli::state($link);
+        $ctx = $state->ctx ?? throw new \LogicException('No VM context');
+        $nativeLink = VmMysqli::requireNative($link, $ctx);
         $nativeStmt = $nativeLink->prepare($sql);
         if (false === $nativeStmt) {
             return false;
         }
-        $ctx = VmMysqli::state($link)->ctx ?? throw new \LogicException('No VM context');
 
         return self::wrap($ctx, $nativeStmt);
+    }
+
+    public static function fieldCount(ObjectEntry $stmt): int
+    {
+        return (int) self::requireNative($stmt)->field_count;
+    }
+
+    public static function paramCount(ObjectEntry $stmt): int
+    {
+        return (int) self::requireNative($stmt)->param_count;
+    }
+
+    public static function sqlstate(ObjectEntry $stmt): string
+    {
+        return (string) self::requireNative($stmt)->sqlstate;
+    }
+
+    public static function errno(ObjectEntry $stmt): int
+    {
+        return (int) self::requireNative($stmt)->errno;
+    }
+
+    public static function error(ObjectEntry $stmt): string
+    {
+        return (string) self::requireNative($stmt)->error;
+    }
+
+    /** @return int|string */
+    public static function insertId(ObjectEntry $stmt)
+    {
+        return self::requireNative($stmt)->insert_id;
+    }
+
+    public static function numRows(ObjectEntry $stmt): int
+    {
+        return (int) self::requireNative($stmt)->num_rows;
+    }
+
+    public static function affectedRows(ObjectEntry $stmt): int
+    {
+        return (int) self::requireNative($stmt)->affected_rows;
+    }
+
+    public static function dataSeek(ObjectEntry $stmt, int $offset): bool
+    {
+        return self::requireNative($stmt)->data_seek($offset);
+    }
+
+    public static function reset(ObjectEntry $stmt): bool
+    {
+        return self::requireNative($stmt)->reset();
+    }
+
+    public static function storeResult(ObjectEntry $stmt): bool
+    {
+        return self::requireNative($stmt)->store_result();
+    }
+
+    public static function freeResult(ObjectEntry $stmt): bool
+    {
+        self::requireNative($stmt)->free_result();
+
+        return true;
+    }
+
+    public static function resultMetadata(ObjectEntry $stmt): ObjectEntry|false
+    {
+        $native = self::requireNative($stmt);
+        $meta = $native->result_metadata();
+        if (false === $meta || null === $meta) {
+            return false;
+        }
+        $ctx = self::state($stmt)->ctx ?? throw new \LogicException('mysqli_stmt requires VM context');
+
+        return VmMysqliResult::wrap($ctx, $meta);
     }
 }
 
@@ -334,6 +423,224 @@ final class MysqliStmtClose extends MysqliClassMethod
         VmMysqliStmt::destroyState($receiver);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
+        }
+    }
+}
+
+final class MysqliStmtFieldCount extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('field_count');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::field_count()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqliStmt::fieldCount($receiver));
+        }
+    }
+}
+
+final class MysqliStmtParamCount extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('param_count');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::param_count()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqliStmt::paramCount($receiver));
+        }
+    }
+}
+
+final class MysqliStmtSqlstate extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('sqlstate');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::sqlstate()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmMysqliStmt::sqlstate($receiver));
+        }
+    }
+}
+
+final class MysqliStmtErrno extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('errno');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::errno()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqliStmt::errno($receiver));
+        }
+    }
+}
+
+final class MysqliStmtError extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('error');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::error()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmMysqliStmt::error($receiver));
+        }
+    }
+}
+
+final class MysqliStmtInsertId extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('insert_id');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::insert_id()');
+        if (null !== $frame->returnVar) {
+            VmMysqli::assignInsertId($frame->returnVar, VmMysqliStmt::insertId($receiver));
+        }
+    }
+}
+
+final class MysqliStmtNumRows extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('num_rows');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::num_rows()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqliStmt::numRows($receiver));
+        }
+    }
+}
+
+final class MysqliStmtAffectedRows extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('affected_rows');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::affected_rows()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqliStmt::affectedRows($receiver));
+        }
+    }
+}
+
+final class MysqliStmtDataSeek extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('data_seek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::data_seek()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli_stmt::data_seek() expects exactly 1 argument, 0 given');
+        }
+        $offset = $this->intArg($frame->calledArgs[1], 'mysqli_stmt::data_seek', 0, 'offset');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::dataSeek($receiver, $offset));
+        }
+    }
+}
+
+final class MysqliStmtReset extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('reset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::reset()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::reset($receiver));
+        }
+    }
+}
+
+final class MysqliStmtStoreResult extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('store_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::store_result()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::storeResult($receiver));
+        }
+    }
+}
+
+final class MysqliStmtFreeResult extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('free_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::free_result()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::freeResult($receiver));
+        }
+    }
+}
+
+final class MysqliStmtResultMetadata extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('result_metadata');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::result_metadata()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $meta = VmMysqliStmt::resultMetadata($receiver);
+        if (false === $meta) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($meta);
         }
     }
 }
