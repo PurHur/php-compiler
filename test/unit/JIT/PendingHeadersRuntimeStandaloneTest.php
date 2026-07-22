@@ -26,8 +26,10 @@ final class PendingHeadersRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
         $bridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersJitBridge.php');
         $this->assertStringContainsString('ensureJitHelperCompiled', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $bridge);
         $this->assertStringContainsString('fillThinAotLinkStubs', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
         $this->assertStringNotContainsString('implementDeferredInventoryStubs', $bridge);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $bridge);
