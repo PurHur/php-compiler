@@ -230,6 +230,7 @@ final class VmPhpMemoryStream
             return -1;
         }
 
+        // php-src main/streams/memory.c — php_stream_memory_seek: reject past fsize (#21986).
         $len = \strlen($state->buffer);
         $pos = match ($whence) {
             \SEEK_SET => $offset,
@@ -237,7 +238,7 @@ final class VmPhpMemoryStream
             \SEEK_END => $len + $offset,
             default => -1,
         };
-        if ($pos < 0) {
+        if ($pos < 0 || $pos > $len) {
             return -1;
         }
         $state->position = $pos;
@@ -381,6 +382,9 @@ final class VmPhpMemoryStream
             return false;
         }
         if ($offset >= 0 && 0 !== self::seek($handle, $offset, \SEEK_SET)) {
+            // php-src ext/standard/file.c — PHP_FUNCTION(stream_get_contents) (#21986).
+            VmFs::warnStreamGetContentsSeekFailed($offset);
+
             return false;
         }
         if ($maxlength < 0) {

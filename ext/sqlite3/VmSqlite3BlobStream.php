@@ -191,6 +191,8 @@ final class VmSqlite3BlobStream
     public static function streamGetContents(int $handle, int $maxlength = -1, int $offset = -1): string|false
     {
         if ($offset >= 0 && 0 !== self::seek($handle, $offset, \SEEK_SET)) {
+            \PHPCompiler\ext\standard\VmFs::warnStreamGetContentsSeekFailed($offset);
+
             return false;
         }
         if ($maxlength < 0) {
