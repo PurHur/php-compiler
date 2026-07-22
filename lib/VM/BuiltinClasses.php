@@ -141,7 +141,6 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetFileName;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionClassGetStartLine;
-use PHPCompiler\VM\Builtin\ReflectionClassIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionClassImplementsInterface;
 use PHPCompiler\VM\Builtin\ReflectionClassIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionClassIsAnonymous;
@@ -914,8 +913,6 @@ final class BuiltinClasses
         $rc->methodVisibility['isanonymous'] = $pub;
         $rc->methods['isstatic'] = new ReflectionClassIsStatic();
         $rc->methodVisibility['isstatic'] = $pub;
-        $rc->methods['isdeprecated'] = new ReflectionClassIsDeprecated();
-        $rc->methodVisibility['isdeprecated'] = $pub;
         $rc->methods['getdeprecatedmessage'] = new ReflectionClassGetDeprecatedMessage();
         $rc->methodVisibility['getdeprecatedmessage'] = $pub;
         $rc->methods['getdeprecatedversion'] = new ReflectionClassGetDeprecatedVersion();
