@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6412 |
-| Phase A inventory files (M2 ratio SSOT) | 6412 |
+| PHP files on vm.php path | 6413 |
+| Phase A inventory files (M2 ratio SSOT) | 6413 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20426 |
+| Source constructs flagged (warnings) | 20429 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1562,6 +1562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharBuiltin.php` | 0 | 23 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 21 |
+| `ext/phar/PharDefaultStubTemplate.php` | 0 | 3 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 4 |
 | `ext/phar/VmPharArchive.php` | 0 | 66 |
@@ -18870,6 +18871,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 567)
 - 31 class method(s)
 
+### `ext/phar/PharDefaultStubTemplate.php`
+
+**Warnings** (review for bootstrap subset):
+- new PharException (line 58)
+- new PharException (line 64)
+- 2 class method(s)
+
 ### `ext/phar/PharExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18937,20 +18945,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new BadMethodCallException (line 1205)
 - new BadMethodCallException (line 1208)
 - new Variable (line 1210)
-- new Error (line 1264)
-- new UnexpectedValueException (line 1466)
-- new UnexpectedValueException (line 1537)
-- new UnexpectedValueException (line 1553)
-- new UnexpectedValueException (line 1558)
-- new PharException (line 1578)
-- new PharException (line 1588)
-- new Error (line 1623)
+- new Error (line 1258)
+- new UnexpectedValueException (line 1460)
+- new UnexpectedValueException (line 1531)
+- new UnexpectedValueException (line 1547)
+- new UnexpectedValueException (line 1552)
+- new PharException (line 1572)
+- new PharException (line 1582)
+- new Error (line 1617)
+- new PharException (line 1636)
 - new PharException (line 1642)
-- new PharException (line 1648)
-- new PharException (line 1655)
-- new PharException (line 1667)
-- new PharException (line 1680)
-- new PharException (line 1688)
+- new PharException (line 1649)
+- new PharException (line 1661)
+- new PharException (line 1674)
+- new PharException (line 1682)
 - 80 class method(s)
 
 ### `ext/phar/VmPharData.php`
