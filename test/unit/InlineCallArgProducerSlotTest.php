@@ -4315,6 +4315,65 @@ PHP;
         self::assertStringContainsString("'b' => 20", $out);
     }
 
+    /** Issue #21981 — array_keys(array_flip([...])) ARG_SEND uses nested FuncCall EXEC_RETURN, not INIT_ARRAY. */
+    public function testArrayKeysNestedArrayFlipProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_keys(array_flip(['a', 'b'])));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_keys_nested_flip.php');
+
+        $flipReturnSlot = null;
+        $keysSendSlot = null;
+        $initArraySlot = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $initArraySlot) {
+                $initArraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $flipReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $keysSendSlot) {
+                $keysSendSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($flipReturnSlot, 'array_flip return slot');
+        self::assertNotNull($keysSendSlot, 'array_keys ARG_SEND slot');
+        self::assertNotNull($initArraySlot, 'INIT_ARRAY slot');
+        self::assertSame($flipReturnSlot, $keysSendSlot, 'array_keys must receive flip EXEC_RETURN');
+        self::assertNotSame($initArraySlot, $keysSendSlot, 'array_keys must not steal nested INIT_ARRAY');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("0 => 'a'", $out);
+        self::assertStringContainsString("1 => 'b'", $out);
+    }
+
+    /** Issue #21981 — maintainer_gap nested producers match Zend (no TypeError). */
+    public function testArrayKeysNestedCallNullMaintainerGapRepro(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_keys_nested_call_null.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_keys_nested_call_null.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("0 => 'a'", $out);
+        self::assertStringContainsString("0 => 'b'", $out);
+        self::assertStringContainsString("0 => 'k'", $out);
+        self::assertStringNotContainsString('TypeError', $out);
+    }
+
     /** Issue #15558 — maintainer_gap repro: assignment form matches var_export probe (#13776). */
     public function testArrayCombineInlineArrayKeysMaintainerGapRepro(): void
     {
