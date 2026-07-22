@@ -604,7 +604,44 @@ final class VmIntlTimeZone
     }
 
     /**
-     * php-src intltz_get_display_name — zoneinfo abbr / GMT forms (#20769).
+     * ICU English long / generic display names for Olson IDs (en_US; #22004).
+     *
+     * Locale-sensitive ICU resource bundles are deferred — this curated table matches
+     * TimeZone::getDisplayName(DISPLAY_LONG|LONG_GENERIC) under en_US for the Windows↔Olson
+     * subset already shipped for #20852, plus UTC/GMT aliases.
+     *
+     * @var array<string, array{std: string, dst: string, generic: string}>
+     */
+    private const EN_LONG_DISPLAY = [
+        'UTC' => ['std' => 'Coordinated Universal Time', 'dst' => 'GMT', 'generic' => 'GMT'],
+        'Etc/UTC' => ['std' => 'Coordinated Universal Time', 'dst' => 'GMT', 'generic' => 'GMT'],
+        'GMT' => ['std' => 'Greenwich Mean Time', 'dst' => 'GMT', 'generic' => 'Greenwich Mean Time'],
+        'Etc/GMT' => ['std' => 'Greenwich Mean Time', 'dst' => 'GMT', 'generic' => 'Greenwich Mean Time'],
+        'America/New_York' => ['std' => 'Eastern Standard Time', 'dst' => 'Eastern Daylight Time', 'generic' => 'Eastern Time'],
+        'America/Chicago' => ['std' => 'Central Standard Time', 'dst' => 'Central Daylight Time', 'generic' => 'Central Time'],
+        'America/Denver' => ['std' => 'Mountain Standard Time', 'dst' => 'Mountain Daylight Time', 'generic' => 'Mountain Time'],
+        'America/Los_Angeles' => ['std' => 'Pacific Standard Time', 'dst' => 'Pacific Daylight Time', 'generic' => 'Pacific Time'],
+        'America/Anchorage' => ['std' => 'Alaska Standard Time', 'dst' => 'Alaska Daylight Time', 'generic' => 'Alaska Time'],
+        'Pacific/Honolulu' => ['std' => 'Hawaii-Aleutian Standard Time', 'dst' => 'Hawaii-Aleutian Daylight Time', 'generic' => 'Hawaii-Aleutian Standard Time'],
+        'Europe/London' => ['std' => 'Greenwich Mean Time', 'dst' => 'British Summer Time', 'generic' => 'United Kingdom Time'],
+        'Atlantic/Reykjavik' => ['std' => 'Greenwich Mean Time', 'dst' => 'GMT', 'generic' => 'Greenwich Mean Time'],
+        'Europe/Berlin' => ['std' => 'Central European Standard Time', 'dst' => 'Central European Summer Time', 'generic' => 'Central European Time'],
+        'Europe/Budapest' => ['std' => 'Central European Standard Time', 'dst' => 'Central European Summer Time', 'generic' => 'Central European Time'],
+        'Europe/Paris' => ['std' => 'Central European Standard Time', 'dst' => 'Central European Summer Time', 'generic' => 'Central European Time'],
+        'Europe/Bucharest' => ['std' => 'Eastern European Standard Time', 'dst' => 'Eastern European Summer Time', 'generic' => 'Eastern European Time'],
+        'Europe/Helsinki' => ['std' => 'Eastern European Standard Time', 'dst' => 'Eastern European Summer Time', 'generic' => 'Eastern European Time'],
+        'Europe/Moscow' => ['std' => 'Moscow Standard Time', 'dst' => 'Moscow Summer Time', 'generic' => 'Moscow Standard Time'],
+        'Asia/Tokyo' => ['std' => 'Japan Standard Time', 'dst' => 'Japan Daylight Time', 'generic' => 'Japan Standard Time'],
+        'Asia/Shanghai' => ['std' => 'China Standard Time', 'dst' => 'China Daylight Time', 'generic' => 'China Standard Time'],
+        'Asia/Singapore' => ['std' => 'Singapore Standard Time', 'dst' => 'GMT+08:00', 'generic' => 'Singapore Standard Time'],
+        'Asia/Seoul' => ['std' => 'Korean Standard Time', 'dst' => 'Korean Daylight Time', 'generic' => 'Korean Standard Time'],
+        'Asia/Kolkata' => ['std' => 'India Standard Time', 'dst' => 'GMT+05:30', 'generic' => 'India Standard Time'],
+        'Australia/Sydney' => ['std' => 'Australian Eastern Standard Time', 'dst' => 'Australian Eastern Daylight Time', 'generic' => 'Eastern Australia Time'],
+        'Pacific/Auckland' => ['std' => 'New Zealand Standard Time', 'dst' => 'New Zealand Daylight Time', 'generic' => 'New Zealand Time'],
+    ];
+
+    /**
+     * php-src intltz_get_display_name — zoneinfo abbr / GMT / ICU English long forms (#20769, #22004).
      */
     public static function getDisplayName(
         ObjectEntry $object,
@@ -612,8 +649,20 @@ final class VmIntlTimeZone
         int $style = self::DISPLAY_LONG,
         ?string $locale = null
     ): string|false {
-        unset($locale); // locale-sensitive ICU names deferred; zoneinfo forms are locale-agnostic.
-        $id = self::idOf($object);
+        return self::displayNameForId(self::idOf($object), $dst, $style, $locale);
+    }
+
+    /**
+     * Display name for an Olson ID (no ObjectEntry) — shared by IntlTimeZone + IntlDateFormatter (#22004).
+     */
+    public static function displayNameForId(
+        string $id,
+        bool $dst = false,
+        int $style = self::DISPLAY_LONG,
+        ?string $locale = null
+    ): string|false {
+        unset($locale); // non-en_US ICU resource bundles deferred; English table below.
+        $id = self::resolveTimezoneId($id);
         $meta = self::offsetMeta($id);
         $offsetMs = $meta['rawMs'] + ($dst ? $meta['dstMs'] : 0);
         $abbr = $dst ? $meta['abbrDst'] : $meta['abbrStd'];
@@ -624,11 +673,31 @@ final class VmIntlTimeZone
             self::DISPLAY_SHORT_COMMONLY_USED => '' !== $abbr ? $abbr : $id,
             self::DISPLAY_SHORT_GMT => self::formatGmtOffset($offsetMs, false),
             self::DISPLAY_LONG_GMT => self::formatGmtOffset($offsetMs, true),
-            self::DISPLAY_LONG,
+            self::DISPLAY_LONG => self::englishLongName($id, $dst, $abbr),
             self::DISPLAY_LONG_GENERIC,
-            self::DISPLAY_GENERIC_LOCATION => '' !== $abbr ? $abbr : $id,
+            self::DISPLAY_GENERIC_LOCATION => self::englishGenericName($id, $abbr),
             default => false,
         };
+    }
+
+    private static function englishLongName(string $id, bool $dst, string $abbr): string
+    {
+        $row = self::EN_LONG_DISPLAY[$id] ?? null;
+        if (null !== $row) {
+            return $dst ? $row['dst'] : $row['std'];
+        }
+
+        return '' !== $abbr ? $abbr : $id;
+    }
+
+    private static function englishGenericName(string $id, string $abbr): string
+    {
+        $row = self::EN_LONG_DISPLAY[$id] ?? null;
+        if (null !== $row) {
+            return $row['generic'];
+        }
+
+        return '' !== $abbr ? $abbr : $id;
     }
 
     public static function toDateTimeZone(Context $ctx, ObjectEntry $object): ObjectEntry|false

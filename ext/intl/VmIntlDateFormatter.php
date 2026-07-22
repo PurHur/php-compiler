@@ -48,6 +48,9 @@ final class VmIntlDateFormatter
     /** Narrow no-break space (U+202F) — ICU en_US time patterns before `a`. */
     private const NNBSP = "\u{202F}";
 
+    /** Sentinel embedded via date() literals then replaced with ICU long zone name (#22004). */
+    private const LONG_ZONE_MARKER = "\x1EZL\x1E";
+
     /** ULOC_ACTUAL_LOCALE / ULOC_VALID_LOCALE — php-src Locale::ACTUAL_LOCALE / VALID_LOCALE */
     public const ULOC_ACTUAL_LOCALE = 0;
     public const ULOC_VALID_LOCALE = 1;
@@ -169,9 +172,8 @@ final class VmIntlDateFormatter
         }
         [$timestamp, $microsecond] = $resolved;
         IntlError::clear();
-        $phpFormat = self::icuPatternToPhpFormat($pattern);
 
-        return VmDateTimeNative::format($timestamp, $microsecond, $state['timezone'], $phpFormat);
+        return self::formatIcuPattern($pattern, $timestamp, $microsecond, $state['timezone']);
     }
 
     /**
@@ -1052,9 +1054,44 @@ final class VmIntlDateFormatter
             return false;
         }
         IntlError::clear();
-        $phpFormat = self::icuPatternToPhpFormat($effective);
 
-        return VmDateTimeNative::format($timestamp, $microsecond, $timezone, $phpFormat);
+        return self::formatIcuPattern($effective, $timestamp, $microsecond, $timezone);
+    }
+
+    /**
+     * Format an ICU SimpleDateFormat subset, substituting ICU long zone names for zzzz (#22004).
+     *
+     * Short z..zzz still use PHP date() `T` (abbr). Long zzzz cannot use PHP `e` (Olson ID);
+     * a sentinel is formatted then replaced with {@see VmIntlTimeZone::displayNameForId()}.
+     */
+    private static function formatIcuPattern(
+        string $pattern,
+        int $timestamp,
+        int $microsecond,
+        string $timezone
+    ): string {
+        $phpFormat = self::icuPatternToPhpFormat($pattern, true);
+        $out = VmDateTimeNative::format($timestamp, $microsecond, $timezone, $phpFormat);
+        if (!str_contains($out, self::LONG_ZONE_MARKER)) {
+            return $out;
+        }
+        // Prefer abbr (`T`) over date() `I` — VmDateTimeNative `I` is not DST-reliable (#22004).
+        $abbrNow = VmDateTimeNative::format($timestamp, 0, $timezone, 'T');
+        $meta = VmIntlTimeZone::offsetMeta($timezone);
+        $isDst = $meta['useDst']
+            && '' !== $abbrNow
+            && $abbrNow === $meta['abbrDst']
+            && $meta['abbrDst'] !== $meta['abbrStd'];
+        $name = VmIntlTimeZone::displayNameForId(
+            $timezone,
+            $isDst,
+            VmIntlTimeZone::DISPLAY_LONG
+        );
+        if (!\is_string($name) || '' === $name) {
+            $name = $timezone;
+        }
+
+        return str_replace(self::LONG_ZONE_MARKER, $name, $out);
     }
 
     private static function timezoneFromDatetimeArg(Variable $var, Context $ctx): ?string
@@ -1086,8 +1123,11 @@ final class VmIntlDateFormatter
      *
      * Supported: y/yy/yyyy, M/MM/MMM/MMMM, d/dd, E/EEE/EEEE, H/HH, h/hh, m/mm, s/ss, a, z/zzzz,
      * and literal punctuation (including U+202F).
+     *
+     * @param bool $forFormat when true, zzzz becomes {@see LONG_ZONE_MARKER} for post-substitution;
+     *                        parse keeps PHP `e` so matchPhpFormatPrefix can consume zone text
      */
-    public static function icuPatternToPhpFormat(string $pattern): string
+    public static function icuPatternToPhpFormat(string $pattern, bool $forFormat = false): string
     {
         $out = '';
         $len = \strlen($pattern);
@@ -1120,7 +1160,7 @@ final class VmIntlDateFormatter
                     $run .= $pattern[$i];
                     $i++;
                 }
-                $out .= self::mapIcuRun($run);
+                $out .= self::mapIcuRun($run, $forFormat);
                 continue;
             }
             $out .= self::escapePhpDateLiteral($ch);
@@ -1130,7 +1170,7 @@ final class VmIntlDateFormatter
         return $out;
     }
 
-    private static function mapIcuRun(string $run): string
+    private static function mapIcuRun(string $run, bool $forFormat = false): string
     {
         $ch = $run[0];
         $n = \strlen($run);
@@ -1154,8 +1194,10 @@ final class VmIntlDateFormatter
             'm' => 'i',
             's' => 's',
             'a' => 'A',
-            // ICU zone: z..zzz ≈ short; zzzz ≈ long — PHP date() only has T / e (#3336 subset).
-            'z' => $n >= 4 ? 'e' : 'T',
+            // ICU zone: z..zzz ≈ short (PHP T); zzzz ≈ long display name (#3336 / #22004).
+            'z' => $n >= 4
+                ? ($forFormat ? self::escapePhpDateLiteral(self::LONG_ZONE_MARKER) : 'e')
+                : 'T',
             default => self::escapePhpDateLiteral($run),
         };
     }
@@ -1347,12 +1389,14 @@ final class VmIntlDateFormatter
                     break;
                 case 'e':
                 case 'T':
-                    // Timezone display tokens are format-only in this subset; reject unexpected letters.
+                    // Timezone display tokens are format-only; consume abbr, Olson ID, or ICU long
+                    // names with spaces ("Eastern Standard Time") (#22004).
                     if ($pos >= $timeLen || (!\ctype_alnum($time[$pos]) && '+' !== $time[$pos] && '-' !== $time[$pos])) {
                         return null;
                     }
                     while ($pos < $timeLen && (
                         \ctype_alnum($time[$pos])
+                        || ' ' === $time[$pos]
                         || '_' === $time[$pos]
                         || '/' === $time[$pos]
                         || '+' === $time[$pos]
