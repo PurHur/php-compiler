@@ -362,7 +362,9 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyAsymmetricProbe;
 use PHPCompiler\VM\Builtin\ReflectionPropertyAccessProbe;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetModifiers;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefault;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPublic;
@@ -370,6 +372,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyIsInitialized;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsLazy;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPromoted;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsReadOnly;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetRawValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetRawValueWithoutLazyInitialization;
 use PHPCompiler\VM\Builtin\ReflectionPropertySkipLazyInitialization;
@@ -985,6 +988,9 @@ final class BuiltinClasses
                 'ispublic' => new ReflectionPropertyIsPublic(),
                 'isprivate' => new ReflectionPropertyIsPrivate(),
                 'isprotected' => new ReflectionPropertyIsProtected(),
+                'isstatic' => new ReflectionPropertyIsStatic(),
+                'isdefault' => new ReflectionPropertyIsDefault(),
+                'getmodifiers' => new ReflectionPropertyGetModifiers(),
                 'getmangledname' => new ReflectionPropertyGetMangledName(),
                 'isreadonly' => new ReflectionPropertyIsReadOnly(),
                 'ispromoted' => new ReflectionPropertyIsPromoted(),

@@ -2755,6 +2755,44 @@ final class VmReflection
         return self::REFLECTION_IS_PUBLIC;
     }
 
+    /** True when $property is a static property on $class or an ancestor (#22143). */
+    public static function propertyIsStatic(ClassEntry $class, string $property, Context $ctx): bool
+    {
+        return null !== self::findStaticPropertyKey($class, $property, $ctx);
+    }
+
+    /**
+     * php-src zim_ReflectionProperty_getModifiers — IS_* bitmask (#22143).
+     * Dynamic properties are public-only (ZEND_ACC_PUBLIC|ZEND_ACC_VIRTUAL).
+     */
+    public static function propertyReflectionModifiers(
+        ClassEntry $entry,
+        string $property,
+        Context $ctx,
+        bool $isDynamic = false
+    ): int {
+        if ($isDynamic) {
+            return self::REFLECTION_IS_PUBLIC;
+        }
+        if (self::isEnumReflectionPseudoProperty($entry, $property)) {
+            return self::REFLECTION_IS_PUBLIC | self::REFLECTION_IS_READONLY;
+        }
+        $meta = self::propertyVisibilityMeta($entry, $property, $ctx);
+        if (null === $meta) {
+            return self::REFLECTION_IS_PUBLIC;
+        }
+        $modifiers = self::visibilityToReflectionBitmask($meta['visibility']);
+        if (self::propertyIsStatic($entry, $property, $ctx)) {
+            $modifiers |= self::REFLECTION_IS_STATIC;
+        }
+        $instance = self::findClassProperty($entry, $property, $ctx);
+        if (null !== $instance && $instance->readonly) {
+            $modifiers |= self::REFLECTION_IS_READONLY;
+        }
+
+        return $modifiers;
+    }
+
     /** php-src ReflectionClass::IS_* values returned by getModifiers() (#18335). */
     public const REFLECTION_CLASS_IS_IMPLICIT_ABSTRACT = 16;
 

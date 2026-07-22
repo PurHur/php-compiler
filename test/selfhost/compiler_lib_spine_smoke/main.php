@@ -5813,6 +5813,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDocComment.p
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetHook.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetHooks.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetMangledName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetModifiers.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetRawValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetReadableType.php';
@@ -5825,6 +5826,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasHooks.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyHasType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsAbstract.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsAccessible.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDefault.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDefaultValueAvailable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDeprecated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDynamic.php';
@@ -5836,6 +5838,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsPromoted.php'
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsProtected.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsPublic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsReadOnly.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsStatic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsVirtual.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetAccessible.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetHook.php';
