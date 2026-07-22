@@ -1525,7 +1525,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
-| `ext/pgsql/Module.php` | 0 | 119 |
+| `ext/pgsql/Module.php` | 0 | 120 |
 | `ext/pgsql/PgsqlConstants.php` | 0 | 1 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
@@ -1534,7 +1534,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/VmPgsqlLob.php` | 0 | 4 |
 | `ext/pgsql/VmPgsqlNative.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlResult.php` | 0 | 4 |
-| `ext/pgsql/pg_async_builtins.php` | 0 | 18 |
+| `ext/pgsql/pg_async_builtins.php` | 0 | 19 |
 | `ext/pgsql/pg_change_password.php` | 0 | 2 |
 | `ext/pgsql/pg_close.php` | 0 | 2 |
 | `ext/pgsql/pg_connect.php` | 0 | 2 |
@@ -4808,7 +4808,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/GetClassRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GetHeadersRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/GetcwdJit.php` | 0 | 2 |
-| `lib/JIT/Builtin/GethostbyaddrRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/GethostbyaddrRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GethostbynamelRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GetimagesizeJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/Getopt.php` | 0 | 2 |
@@ -18445,59 +18445,60 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pg_socket (line 144)
 - new pg_consume_input (line 145)
 - new pg_flush (line 146)
-- new pg_send_query (line 147)
-- new pg_send_query_params (line 148)
-- new pg_send_prepare (line 149)
-- new pg_send_execute (line 150)
-- new pg_get_result (line 151)
-- new pg_cancel_query (line 152)
-- new pg_get_notify (line 153)
-- new pg_result_status (line 154)
-- new pg_get_pid (line 155)
-- new pg_set_error_verbosity (line 156)
-- new pg_set_error_context_visibility (line 157)
-- new pg_put_line (line 158)
-- new pg_end_copy (line 159)
-- new pg_version (line 160)
-- new pg_parameter_status (line 161)
-- new pg_host (line 162)
-- new pg_port (line 163)
-- new pg_dbname (line 164)
-- new pg_options (line 165)
-- new pg_tty (line 166)
-- new pg_client_encoding (line 167)
+- new pg_connect_poll (line 147)
+- new pg_send_query (line 148)
+- new pg_send_query_params (line 149)
+- new pg_send_prepare (line 150)
+- new pg_send_execute (line 151)
+- new pg_get_result (line 152)
+- new pg_cancel_query (line 153)
+- new pg_get_notify (line 154)
+- new pg_result_status (line 155)
+- new pg_get_pid (line 156)
+- new pg_set_error_verbosity (line 157)
+- new pg_set_error_context_visibility (line 158)
+- new pg_put_line (line 159)
+- new pg_end_copy (line 160)
+- new pg_version (line 161)
+- new pg_parameter_status (line 162)
+- new pg_host (line 163)
+- new pg_port (line 164)
+- new pg_dbname (line 165)
+- new pg_options (line 166)
+- new pg_tty (line 167)
 - new pg_client_encoding (line 168)
-- new pg_set_client_encoding (line 169)
+- new pg_client_encoding (line 169)
 - new pg_set_client_encoding (line 170)
-- new pg_ping (line 171)
-- new pg_connection_reset (line 172)
-- new pg_connection_busy (line 173)
-- new pg_connection_status (line 174)
-- new pg_transaction_status (line 175)
-- new pg_insert (line 176)
-- new pg_update (line 177)
-- new pg_delete (line 178)
-- new pg_select (line 179)
-- new pg_query_params (line 180)
-- new pg_prepare (line 181)
-- new pg_execute (line 182)
-- new pg_escape_string (line 183)
-- new pg_escape_literal (line 184)
-- new pg_escape_identifier (line 185)
-- new pg_escape_bytea (line 186)
-- new pg_unescape_bytea (line 187)
-- new pg_affected_rows (line 188)
+- new pg_set_client_encoding (line 171)
+- new pg_ping (line 172)
+- new pg_connection_reset (line 173)
+- new pg_connection_busy (line 174)
+- new pg_connection_status (line 175)
+- new pg_transaction_status (line 176)
+- new pg_insert (line 177)
+- new pg_update (line 178)
+- new pg_delete (line 179)
+- new pg_select (line 180)
+- new pg_query_params (line 181)
+- new pg_prepare (line 182)
+- new pg_execute (line 183)
+- new pg_escape_string (line 184)
+- new pg_escape_literal (line 185)
+- new pg_escape_identifier (line 186)
+- new pg_escape_bytea (line 187)
+- new pg_unescape_bytea (line 188)
 - new pg_affected_rows (line 189)
-- new pg_fetch_all (line 190)
-- new pg_num_fields (line 191)
+- new pg_affected_rows (line 190)
+- new pg_fetch_all (line 191)
 - new pg_num_fields (line 192)
-- new pg_change_password (line 207)
-- new pg_jit (line 208)
-- new pg_put_copy_data (line 209)
-- new pg_put_copy_end (line 210)
-- new pg_result_memory_size (line 211)
-- new pg_set_chunked_rows_size (line 212)
-- new pg_socket_poll (line 213)
+- new pg_num_fields (line 193)
+- new pg_change_password (line 208)
+- new pg_jit (line 209)
+- new pg_put_copy_data (line 210)
+- new pg_put_copy_end (line 211)
+- new pg_result_memory_size (line 212)
+- new pg_set_chunked_rows_size (line 213)
+- new pg_socket_poll (line 214)
 - 7 class method(s)
 
 ### `ext/pgsql/PgsqlConstants.php`
@@ -18526,31 +18527,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/VmPgsqlCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 175)
-- new Variable (line 188)
-- new HashTable (line 326)
-- new HashTable (line 329)
-- new Variable (line 345)
-- new HashTable (line 371)
-- new Variable (line 392)
-- new Variable (line 613)
-- new HashTable (line 901)
-- new HashTable (line 951)
-- new Variable (line 956)
+- new HashTable (line 195)
+- new Variable (line 208)
+- new HashTable (line 346)
+- new HashTable (line 349)
+- new Variable (line 365)
+- new HashTable (line 391)
+- new Variable (line 412)
+- new Variable (line 633)
+- new HashTable (line 921)
+- new HashTable (line 971)
 - new Variable (line 976)
-- new HashTable (line 1345)
-- new HashTable (line 1349)
-- new Variable (line 1354)
-- new Variable (line 1363)
-- new Variable (line 1372)
-- new HashTable (line 1419)
-- new Variable (line 1424)
-- new Variable (line 1433)
-- new ObjectEntry (line 1492)
-- new Variable (line 1682)
-- new Variable (line 1689)
-- new Variable (line 1696)
-- 62 class method(s)
+- new Variable (line 996)
+- new HashTable (line 1365)
+- new HashTable (line 1369)
+- new Variable (line 1374)
+- new Variable (line 1383)
+- new Variable (line 1392)
+- new HashTable (line 1439)
+- new Variable (line 1444)
+- new Variable (line 1453)
+- new ObjectEntry (line 1512)
+- new Variable (line 1702)
+- new Variable (line 1709)
+- new Variable (line 1716)
+- 63 class method(s)
 
 ### `ext/pgsql/VmPgsqlLob.php`
 
@@ -18563,7 +18564,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/VmPgsqlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 92 class method(s)
+- 94 class method(s)
 
 ### `ext/pgsql/VmPgsqlResult.php`
 
@@ -18576,24 +18577,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/pg_async_builtins.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
-- new ArgumentCountError (line 69)
-- new ArgumentCountError (line 98)
-- new ArgumentCountError (line 141)
-- new ArgumentCountError (line 192)
-- new ArgumentCountError (line 246)
-- new ArgumentCountError (line 298)
-- trait PgSendAsyncReturn (line 345)
-- new ArgumentCountError (line 379)
-- new ArgumentCountError (line 414)
-- new ArgumentCountError (line 450)
-- new ArgumentCountError (line 486)
-- new ArgumentCountError (line 520)
-- new ArgumentCountError (line 562)
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 62)
+- new ArgumentCountError (line 101)
+- new ArgumentCountError (line 130)
+- new ArgumentCountError (line 173)
+- new ArgumentCountError (line 224)
+- new ArgumentCountError (line 278)
+- new ArgumentCountError (line 330)
+- trait PgSendAsyncReturn (line 377)
+- new ArgumentCountError (line 411)
+- new ArgumentCountError (line 446)
+- new ArgumentCountError (line 482)
+- new ArgumentCountError (line 518)
+- new ArgumentCountError (line 552)
 - new ArgumentCountError (line 594)
-- new ArgumentCountError (line 657)
-- new ArgumentCountError (line 714)
-- 33 class method(s)
+- new ArgumentCountError (line 626)
+- new ArgumentCountError (line 689)
+- new ArgumentCountError (line 746)
+- 35 class method(s)
 
 ### `ext/pgsql/pg_change_password.php`
 
@@ -18610,7 +18612,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/pg_connect.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/pgsql/pg_connection_info_builtins.php`
@@ -41858,9 +41860,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GethostbyaddrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 149)
 - 7 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/GethostbynamelRuntime.php`
 

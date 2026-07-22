@@ -144,6 +144,7 @@ class Module extends ModuleAbstract
             new pg_socket(),
             new pg_consume_input(),
             new pg_flush(),
+            new pg_connect_poll(),
             new pg_send_query(),
             new pg_send_query_params(),
             new pg_send_prepare(),

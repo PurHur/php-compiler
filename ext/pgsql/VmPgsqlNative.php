@@ -52,6 +52,24 @@ final class VmPgsqlNative
         return $conn;
     }
 
+    /**
+     * Non-blocking connect start (libpq PQconnectStart; php-src PGSQL_CONNECT_ASYNC; #21896).
+     *
+     * @return \FFI\CData|null PGconn*
+     */
+    public static function connectStart(string $conninfo): ?\FFI\CData
+    {
+        return self::requireFfi()->PQconnectStart($conninfo);
+    }
+
+    /**
+     * Poll an async connect (libpq PQconnectPoll → PGRES_POLLING_*; #21896).
+     */
+    public static function connectPoll(\FFI\CData $conn): int
+    {
+        return (int) self::requireFfi()->PQconnectPoll($conn);
+    }
+
     public static function status(\FFI\CData $conn): int
     {
         return (int) self::requireFfi()->PQstatus($conn);
@@ -873,6 +891,8 @@ typedef struct pgNotify {
 typedef struct _IO_FILE FILE;
 typedef unsigned int Oid;
 PGconn *PQconnectdb(const char *conninfo);
+PGconn *PQconnectStart(const char *conninfo);
+int PQconnectPoll(PGconn *conn);
 int PQstatus(const PGconn *conn);
 char *PQerrorMessage(const PGconn *conn);
 void PQfinish(PGconn *conn);

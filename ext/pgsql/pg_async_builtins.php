@@ -12,9 +12,41 @@ use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
- * pg_socket / pg_consume_input / pg_flush (php-src ext/pgsql; #20636).
+ * pg_socket / pg_consume_input / pg_flush / pg_connect_poll (php-src ext/pgsql; #20636, #21896).
  * Loaded via Module::getFunctions() + spine require.
  */
+
+/**
+ * pg_connect_poll — PQconnectPoll (php-src ext/pgsql/pgsql.c; #21896).
+ */
+final class pg_connect_poll extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_connect_poll');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_connect_poll() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_connect_poll', 1);
+        $frame->returnVar->int(VmPgsqlCore::connectPoll($conn));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_connect_poll() is not implemented for JIT (#21896)');
+    }
+}
 
 final class pg_socket extends Internal
 {

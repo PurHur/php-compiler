@@ -17,20 +17,32 @@ final class VmPgsqlCore
     /**
      * @return Variable|false PgSql\Connection object variable, or false on failure
      */
-    public static function connect(string $conninfo, Context $ctx): Variable|false
+    public static function connect(string $conninfo, Context $ctx, int $flags = 0): Variable|false
     {
         if (!VmPgsqlNative::available()) {
             VmPgsqlConnection::setLastError('could not find driver');
 
             return false;
         }
-        $native = VmPgsqlNative::connect($conninfo);
+        $async = 0 !== ($flags & PgsqlConstants::PGSQL_CONNECT_ASYNC);
+        $native = $async
+            ? VmPgsqlNative::connectStart($conninfo)
+            : VmPgsqlNative::connect($conninfo);
         if (null === $native) {
-            VmPgsqlConnection::setLastError('PQconnectdb failed');
+            VmPgsqlConnection::setLastError($async ? 'PQconnectStart failed' : 'PQconnectdb failed');
 
             return false;
         }
-        if (VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($native)) {
+        // Async: keep CONNECTION_* != BAD for pg_connect_poll; only reject BAD (php-src).
+        // Sync: require CONNECTION_OK.
+        if ($async) {
+            if (PgsqlConstants::PGSQL_CONNECTION_BAD === VmPgsqlNative::status($native)) {
+                VmPgsqlConnection::setLastError(VmPgsqlNative::errorMessage($native));
+                VmPgsqlNative::finish($native);
+
+                return false;
+            }
+        } elseif (VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($native)) {
             VmPgsqlConnection::setLastError(VmPgsqlNative::errorMessage($native));
             VmPgsqlNative::finish($native);
 
@@ -39,6 +51,14 @@ final class VmPgsqlCore
         VmPgsqlConnection::setLastError('');
 
         return VmPgsqlConnection::wrap($native, $ctx);
+    }
+
+    /**
+     * pg_connect_poll — libpq PQconnectPoll (php-src; #21896).
+     */
+    public static function connectPoll(ObjectEntry $connection): int
+    {
+        return VmPgsqlNative::connectPoll(VmPgsqlConnection::native($connection));
     }
 
     /**

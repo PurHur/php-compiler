@@ -76,6 +76,27 @@ final class PgsqlConstants
     /** libpq CONNECTION_SSL_STARTUP */
     public const PGSQL_CONNECTION_SSL_STARTUP = 7;
 
+    /** php-src PGSQL_CONNECT_FORCE_NEW (1<<1) */
+    public const PGSQL_CONNECT_FORCE_NEW = 1 << 1;
+
+    /** php-src PGSQL_CONNECT_ASYNC (1<<2) — PQconnectStart + pg_connect_poll */
+    public const PGSQL_CONNECT_ASYNC = 1 << 2;
+
+    /** libpq PGRES_POLLING_FAILED */
+    public const PGSQL_POLLING_FAILED = 0;
+
+    /** libpq PGRES_POLLING_READING */
+    public const PGSQL_POLLING_READING = 1;
+
+    /** libpq PGRES_POLLING_WRITING */
+    public const PGSQL_POLLING_WRITING = 2;
+
+    /** libpq PGRES_POLLING_OK */
+    public const PGSQL_POLLING_OK = 3;
+
+    /** libpq PGRES_POLLING_ACTIVE (compat) */
+    public const PGSQL_POLLING_ACTIVE = 4;
+
     /** libpq PQTRANS_IDLE */
     public const PGSQL_TRANSACTION_IDLE = 0;
 
@@ -183,6 +204,13 @@ final class PgsqlConstants
             'PGSQL_CONNECTION_AUTH_OK' => self::PGSQL_CONNECTION_AUTH_OK,
             'PGSQL_CONNECTION_SETENV' => self::PGSQL_CONNECTION_SETENV,
             'PGSQL_CONNECTION_SSL_STARTUP' => self::PGSQL_CONNECTION_SSL_STARTUP,
+            'PGSQL_CONNECT_FORCE_NEW' => self::PGSQL_CONNECT_FORCE_NEW,
+            'PGSQL_CONNECT_ASYNC' => self::PGSQL_CONNECT_ASYNC,
+            'PGSQL_POLLING_FAILED' => self::PGSQL_POLLING_FAILED,
+            'PGSQL_POLLING_READING' => self::PGSQL_POLLING_READING,
+            'PGSQL_POLLING_WRITING' => self::PGSQL_POLLING_WRITING,
+            'PGSQL_POLLING_OK' => self::PGSQL_POLLING_OK,
+            'PGSQL_POLLING_ACTIVE' => self::PGSQL_POLLING_ACTIVE,
             'PGSQL_TRANSACTION_IDLE' => self::PGSQL_TRANSACTION_IDLE,
             'PGSQL_TRANSACTION_ACTIVE' => self::PGSQL_TRANSACTION_ACTIVE,
             'PGSQL_TRANSACTION_INTRANS' => self::PGSQL_TRANSACTION_INTRANS,
