@@ -3251,24 +3251,27 @@ final class ReflectionSupport
         return $rf;
     }
 
-    private static function displayNameForClosureState(ClosureState $state): string
+    /**
+     * ReflectionFunction::getName() for Closure objects (zend_closures.c / php_reflection.c).
+     *
+     * fromCallable wrappers keep the underlying function or method short name (#22330);
+     * plain user closures stay `{closure}` / `{anonymous}#N`.
+     */
+    public static function displayNameForClosureState(ClosureState $state): string
     {
         if (null !== $state->methodName && '' !== $state->methodName) {
-            $scope = $state->boundScopeClass ?? '';
-            if ('' === $scope && null !== $state->methodReceiver) {
-                $recv = $state->methodReceiver->resolveIndirect();
-                if (Variable::TYPE_OBJECT === $recv->type) {
-                    $scope = $recv->toObject()->class->name;
-                }
-            }
-            if ('' !== $scope) {
-                return $scope.'::'.$state->methodName;
-            }
-
+            // Zend reports the method name only (e.g. createFromFormat / m), not Class::method.
             return $state->methodName;
         }
+        if (null !== $state->wrappedFunc) {
+            return $state->wrappedFunc->getName();
+        }
+        $name = $state->func->getName();
+        if (preg_match('/^\{anonymous\}#\d+$/', $name)) {
+            return '{closure}';
+        }
 
-        return $state->func->getName();
+        return $name;
     }
 
     /**
