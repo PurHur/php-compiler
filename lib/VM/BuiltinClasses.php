@@ -238,6 +238,8 @@ use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingFile;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingGenerator;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingLine;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetFunction;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetThis;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorGetTrace;
 use PHPCompiler\VM\Builtin\ReflectionReferenceFromArrayElement;
 use PHPCompiler\VM\Builtin\ReflectionReferenceGetId;
 use PHPCompiler\VM\Builtin\ReflectionReferenceConstruct;
@@ -1396,6 +1398,8 @@ final class BuiltinClasses
                 'getexecutingline' => new ReflectionGeneratorGetExecutingLine(),
                 'getexecutingfile' => new ReflectionGeneratorGetExecutingFile(),
                 'getexecutinggenerator' => new ReflectionGeneratorGetExecutingGenerator(),
+                'getthis' => new ReflectionGeneratorGetThis(),
+                'gettrace' => new ReflectionGeneratorGetTrace(),
             ] as $name => $method
         ) {
             $rgen->methods[$name] = $method;

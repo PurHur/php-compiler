@@ -84,12 +84,26 @@ final class GeneratorState
     /** Closure binding when this generator was created from a closure (#6567). */
     public ?ClosureState $closureCall = null;
 
+    /** @var list<Variable> */
+    public readonly array $calledArgs;
+
+    /**
+     * @param list<Variable> $calledArgs
+     */
     public function __construct(
         public readonly \PHPCompiler\VM $vm,
         public readonly Func\PHP $func,
-        /** @var list<Variable> */
-        public readonly array $calledArgs,
+        array $calledArgs,
     ) {
+        // Snapshot call args so generator lifetime is not tied to caller scope slots
+        // (temps like `(new G())->gen()` otherwise lose $this — #22067).
+        $snap = [];
+        foreach ($calledArgs as $i => $arg) {
+            $copy = new Variable();
+            $copy->duplicateFrom($arg->resolveIndirect());
+            $snap[$i] = $copy;
+        }
+        $this->calledArgs = $snap;
         $this->currentKey = new Variable();
         $this->currentKey->generatorYieldStorage = true;
         $this->currentValue = new Variable();

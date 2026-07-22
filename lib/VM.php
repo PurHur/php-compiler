@@ -13591,6 +13591,8 @@ restart:
             if (null !== $gen->closureCall) {
                 $this->applyClosureBinding($gen->frame, $gen->closureCall);
             }
+            // Instance-method / bound-closure generators need $this in scope (#22067).
+            VM\GeneratorTrace::ensureFrameThisBound($gen->frame, $gen);
         }
         $this->applyGeneratorPendingSend($gen);
         $this->applyGeneratorPendingThrow($gen);
