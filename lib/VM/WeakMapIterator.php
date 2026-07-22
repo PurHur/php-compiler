@@ -7,7 +7,7 @@ namespace PHPCompiler\VM;
 /**
  * Foreach iterator over WeakMap entries — keys are live object handles, not stored strings (#4434).
  *
- * @see https://github.com/php/php-src/blob/master/ext/standard/weakrefs.c
+ * @see https://github.com/php/php-src/blob/master/Zend/zend_weakrefs.c
  */
 final class WeakMapIterator
 {
@@ -18,11 +18,22 @@ final class WeakMapIterator
 
     public function __construct(ObjectEntry $weakMap)
     {
+        $this->pairs = self::collectLivePairs($weakMap);
+    }
+
+    /**
+     * Live WeakMap entries as [key, value] pairs (object/enum keys; #4434, #22267).
+     *
+     * @return list<array{0: Variable, 1: Variable}>
+     */
+    public static function collectLivePairs(ObjectEntry $weakMap): array
+    {
         WeakRefSupport::purgeStaleMapEntries($weakMap);
         $ht = WeakRefSupport::mapTable($weakMap);
         if (null === $ht) {
-            return;
+            return [];
         }
+        $pairs = [];
         foreach ($ht->iterateKeyed(true) as $pair) {
             [$storedKeyVar, $value] = $pair;
             $storedKeyVar = $storedKeyVar->resolveIndirect();
@@ -31,11 +42,11 @@ final class WeakMapIterator
                 if (!WeakRefSupport::isTargetAlive($storedKeyVar)) {
                     continue;
                 }
-                $this->pairs[] = [$storedKeyVar, $value];
+                $pairs[] = [$storedKeyVar, $value];
                 continue;
             }
             if (EnumCaseSupport::isEnumCaseVariable($storedKeyVar)) {
-                $this->pairs[] = [$storedKeyVar, $value];
+                $pairs[] = [$storedKeyVar, $value];
                 continue;
             }
             if (Variable::TYPE_STRING !== $storedKeyVar->type) {
@@ -45,8 +56,10 @@ final class WeakMapIterator
             if (null === $keyObject) {
                 continue;
             }
-            $this->pairs[] = [$keyObject, $value];
+            $pairs[] = [$keyObject, $value];
         }
+
+        return $pairs;
     }
 
     public function reset(): void

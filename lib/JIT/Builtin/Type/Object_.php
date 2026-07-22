@@ -3194,7 +3194,14 @@ class Object_ extends Type {
         if ('weakmap' === $lcname) {
             $this->weakMapClassId = $id;
             $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);
-            $this->setClassInterfaces($displayName, ['arrayaccess', 'countable']);
+            // Zend/zend_weakrefs.c — ArrayAccess + Countable + IteratorAggregate (#22267).
+            $this->setClassInterfaces($displayName, ['arrayaccess', 'countable', 'iteratoraggregate']);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'offsetset', 'offsetget', 'offsetexists', 'offsetunset', 'count', 'getiterator',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
         }
         if ('streambucket' === $lcname) {
             // Removed: stream_bucket_new() returns stdClass (#10325).

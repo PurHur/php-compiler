@@ -22,5 +22,8 @@ interface InternalIteratorLiveHandler
 
     public function current(): Variable;
 
-    public function key(): int|string;
+    /**
+     * Iteration key — int/string for array-like walks; Variable for object keys (WeakMap; #22267).
+     */
+    public function key(): int|string|Variable;
 }
