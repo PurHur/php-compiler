@@ -1810,20 +1810,10 @@ final class ReflectionSupport
 
     public static function parameterCanBePassedByValue(Context $ctx, ObjectEntry $reflection): bool
     {
-        if (self::parameterIsInternal($ctx, $reflection)) {
-            return self::internalParameterCanBePassedByValue($ctx, $reflection);
-        }
-        if (!self::parameterIsPassedByReference($ctx, $reflection)) {
-            return true;
-        }
-        $block = self::resolveParameterBlock($ctx, $reflection);
-        $index = self::parameterIndexForReflection($reflection);
-        $slot = self::parameterScopeSlot($block, $index);
-        if (null === $slot || !isset($block->paramDeclaredTypes[$slot])) {
-            return true;
-        }
-
-        return self::cfgTypeAllowsPassByValueWithByRef($block->paramDeclaredTypes[$slot]);
+        // php-src zim_ReflectionParameter_canBePassedByValue:
+        // RETVAL_BOOL(ZEND_ARG_SEND_MODE(param->arg_info) != ZEND_SEND_BY_REF)
+        // User params are never ZEND_SEND_PREFER_REF; forced by-ref ⇒ false (#22145).
+        return !self::parameterIsPassedByReference($ctx, $reflection);
     }
 
     /** php-src: ReflectionParameter::isNamed() — PHP 8.0+ always true for declared parameters. */
@@ -1981,19 +1971,6 @@ final class ReflectionSupport
         }
 
         return \in_array($index, BuiltinByRefParams::forFunction($callable), true);
-    }
-
-    private static function internalParameterCanBePassedByValue(Context $ctx, ObjectEntry $reflection): bool
-    {
-        if (!self::internalParameterIsPassedByReference($ctx, $reflection)) {
-            return true;
-        }
-        $info = self::internalParameterInfo($ctx, $reflection);
-        if (null === $info) {
-            return true;
-        }
-
-        return BuiltinInternalArgInfo::typeStringAllowsPassByValueWithByRef($info['type']);
     }
 
     /**
@@ -2215,41 +2192,6 @@ final class ReflectionSupport
         }
 
         return $required;
-    }
-
-    private static function cfgTypeAllowsPassByValueWithByRef(CfgType $type): bool
-    {
-        if ($type instanceof CfgType\Nullable) {
-            return self::cfgTypeAllowsPassByValueWithByRef($type->type);
-        }
-        if ($type instanceof CfgType\Union_) {
-            foreach ($type->types as $member) {
-                if ($member instanceof CfgType\Literal && 'null' === strtolower($member->name)) {
-                    continue;
-                }
-                if (self::cfgTypeAllowsPassByValueWithByRef($member)) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-        if ($type instanceof CfgType\Intersection) {
-            foreach ($type->types as $member) {
-                if (!self::cfgTypeAllowsPassByValueWithByRef($member)) {
-                    return false;
-                }
-            }
-
-            return [] !== $type->types;
-        }
-        if ($type instanceof CfgType\Literal) {
-            $name = strtolower($type->name);
-
-            return !\in_array($name, ['int', 'float', 'string', 'bool', 'array', 'callable', 'iterable', 'never', 'true', 'false'], true);
-        }
-
-        return true;
     }
 
     public static function parameterDefaultValueIsAvailable(\PHPCompiler\Block $block, int $paramIndex): bool
