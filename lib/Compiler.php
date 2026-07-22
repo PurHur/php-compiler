@@ -22863,7 +22863,7 @@ class Compiler {
     /**
      * Hoisted ConstFetch / ClassConstFetch / UnaryMinus|Plus stmts immediately before a call (#15899, #16523).
      *
-     * @return list<Op\Expr\ConstFetch|Op\Expr\ClassConstFetch|Op\Expr\UnaryMinus|Op\Expr\UnaryPlus>
+     * @return list<Op\Expr\ConstFetch|Op\Expr\ClassConstFetch|Op\Expr\MagicScriptConst|Op\Expr\UnaryMinus|Op\Expr\UnaryPlus>
      */
     private function hoistedPreludeProducersImmediatelyBeforeCall(Op $callOp, Block $block): array
     {
@@ -22883,7 +22883,11 @@ class Compiler {
         $producers = [];
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
-            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+            if (
+                $child instanceof Op\Expr\ConstFetch
+                || $child instanceof Op\Expr\ClassConstFetch
+                || $child instanceof Op\Expr\MagicScriptConst
+            ) {
                 array_unshift($producers, $child);
                 continue;
             }
