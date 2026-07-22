@@ -241,6 +241,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureScopeClass;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtension;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNamedArguments;
@@ -1054,6 +1055,7 @@ final class BuiltinClasses
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
                 'isvariadic' => new ReflectionFunctionIsVariadic(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
+                'getextension' => new ReflectionFunctionGetExtension(),
                 'getclosurethis' => new ReflectionFunctionGetClosureThis(),
                 'getclosure' => new ReflectionFunctionGetClosure(),
                 'getclosurescopeclass' => new ReflectionFunctionGetClosureScopeClass(),
