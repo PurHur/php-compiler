@@ -494,8 +494,8 @@ final class DomLivingBuiltinClasses
     /**
      * Register Dom\ParentNode / Dom\ChildNode (php-src ext/dom/php_dom.stub.php; #20961).
      *
-     * Interfaces are independent (ChildNode does not extend ParentNode — unlike legacy
-     * DOMChildNode quirk in ZendDeclaredInterfaces).
+     * Interfaces are independent (ChildNode does not extend ParentNode — same as classic
+     * DOMParentNode / DOMChildNode in php_dom.stub.php; #22389).
      */
     private static function registerParentAndChildNodeInterfaces(Context $ctx): void
     {

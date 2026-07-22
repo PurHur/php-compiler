@@ -1509,9 +1509,16 @@ class Object_ extends Type {
         $this->markInterfaceClass('SeekableIterator');
         $this->setInterfaceExtends('SeekableIterator', ['Iterator']);
         $this->markInterfaceClass('Reflector');
+        // php-src php_dom.stub.php — classic ParentNode/ChildNode are independent (#22389).
         $this->markInterfaceClass('DOMParentNode');
         $this->markInterfaceClass('DOMChildNode');
-        $this->setInterfaceExtends('DOMChildNode', ['DOMParentNode']);
+        $this->setClassInterfaces('DOMDocument', ['domparentnode']);
+        $this->setClassInterfaces('DOMDocumentFragment', ['domparentnode']);
+        $this->setClassInterfaces('DOMElement', ['domparentnode', 'domchildnode']);
+        $this->setClassInterfaces('DOMCharacterData', ['domchildnode']);
+        $this->setClassInterfaces('DOMText', ['domchildnode']);
+        $this->setClassInterfaces('DOMComment', ['domchildnode']);
+        $this->setClassInterfaces('DOMCdataSection', ['domchildnode']);
         $this->ensureDomLivingParentChildInterfaces();
         // php-src session.stub.php — SessionId / UpdateTimestamp do not extend Handler (#22262).
         $this->markInterfaceClass('SessionHandlerInterface');
@@ -1526,7 +1533,7 @@ class Object_ extends Type {
     /**
      * Dom\ParentNode / Dom\ChildNode for instanceof / interface_exists under PROFILE=8.4 (#20961).
      *
-     * Unlike legacy DOMChildNode, living ChildNode does not extend ParentNode (php_dom.stub.php).
+     * Living ChildNode does not extend ParentNode — same as classic DOMChildNode (php_dom.stub.php; #22389).
      */
     private function ensureDomLivingParentChildInterfaces(): void
     {
