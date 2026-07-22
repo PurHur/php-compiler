@@ -15,9 +15,9 @@ use PHPLLVM\Value;
  */
 final class pg_num_rows extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_num_rows')
     {
-        parent::__construct('pg_num_rows');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void

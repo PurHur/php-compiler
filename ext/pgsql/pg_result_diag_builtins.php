@@ -92,9 +92,9 @@ final class pg_result_error_field extends Internal
 
 final class pg_last_oid extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_last_oid')
     {
-        parent::__construct('pg_last_oid');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void

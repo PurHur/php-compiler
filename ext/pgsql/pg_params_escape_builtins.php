@@ -357,9 +357,9 @@ final class pg_unescape_bytea extends Internal
 
 final class pg_affected_rows extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_affected_rows')
     {
-        parent::__construct('pg_affected_rows');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -419,9 +419,9 @@ final class pg_fetch_all extends Internal
 
 final class pg_num_fields extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_num_fields')
     {
-        parent::__construct('pg_num_fields');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
