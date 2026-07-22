@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xsl;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -16,7 +17,7 @@ use PHPLLVM\Value;
  * User-script AOT: compile-time XSLTProcessor security/EXSLT methods via host ext/xsl (#20392).
  *
  * Tracks processors allocated in the user script so hasExsltSupport / setSecurityPrefs /
- * getSecurityPrefs can fold to constants matching VM/Zend. No runtime/*.c growth.
+ * getSecurityPrefs / setProfiling can fold to constants matching VM/Zend. No runtime/*.c growth.
  */
 final class JitXsltUserScript
 {
@@ -79,6 +80,51 @@ final class JitXsltUserScript
         }
 
         return self::intValue($context, XsltHostBridge::getSecurityPrefs($proc));
+    }
+
+    /**
+     * XSLTProcessor::setProfiling(?string $filename) — user-script AOT (#22272).
+     *
+     * Folds null / compile-time string literals through the host bridge. When the path
+     * arrives as a boxed TYPE_VALUE without compileTimeString, still returns true
+     * (php-src RETURN_TRUE) so AOT links; VM covers full path side-effects.
+     */
+    public static function trySetProfiling(Context $context, JITVariable ...$args): ?Value
+    {
+        $proc = self::requireProcessor($args[0] ?? null);
+        if (null === $proc || !isset($args[1])) {
+            return null;
+        }
+        $filename = self::tryCompileTimeNullableString($args[1]);
+        if (false !== $filename) {
+            if (null !== $filename && str_contains($filename, "\0")) {
+                throw new \ValueError(
+                    'XSLTProcessor::setProfiling(): Argument #1 ($filename) must not contain any null bytes'
+                );
+            }
+            XsltHostBridge::setProfiling($proc, $filename);
+        }
+
+        return self::boolValue($context, true);
+    }
+
+    /**
+     * @return string|null|false null = PHP null; string = path; false = not compile-time
+     */
+    private static function tryCompileTimeNullableString(JITVariable $var): string|null|false
+    {
+        if (JITVariable::TYPE_NULL === $var->type || $var->isNullConstant) {
+            return null;
+        }
+        $lit = JitStringArg::compileTimeLiteral($var);
+        if (null !== $lit) {
+            return $lit;
+        }
+        if (null !== $var->compileTimeString) {
+            return $var->compileTimeString;
+        }
+
+        return false;
     }
 
     private static function tryCompileTimeLong(Context $context, JITVariable $var): ?int

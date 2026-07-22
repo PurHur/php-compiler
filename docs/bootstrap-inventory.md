@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6414 |
-| Phase A inventory files (M2 ratio SSOT) | 6414 |
+| PHP files on vm.php path | 6415 |
+| Phase A inventory files (M2 ratio SSOT) | 6415 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20434 |
+| Source constructs flagged (warnings) | 20443 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1985,7 +1985,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplArrayStorage.php` | 0 | 19 |
 | `ext/spl/SplArrayUserSortMethod.php` | 0 | 2 |
 | `ext/spl/SplClassConstants.php` | 0 | 2 |
-| `ext/spl/SplDllistSerializeSupport.php` | 0 | 2 |
+| `ext/spl/SplDllistSerializeSupport.php` | 0 | 6 |
 | `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 32 |
 | `ext/spl/SplFileInfoBuiltin.php` | 0 | 16 |
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
@@ -4446,7 +4446,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/JitXsltMethod.php` | 0 | 1 |
 | `ext/xsl/JitXsltUserScript.php` | 0 | 1 |
 | `ext/xsl/Module.php` | 0 | 2 |
-| `ext/xsl/VmXsl.php` | 0 | 15 |
+| `ext/xsl/VmXsl.php` | 0 | 16 |
 | `ext/xsl/VmXslDomBridge.php` | 0 | 3 |
 | `ext/xsl/XslExtensionPolicy.php` | 0 | 1 |
 | `ext/xsl/XsltClassMethod.php` | 0 | 1 |
@@ -4460,6 +4460,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltProcessorRegisterPhpFunctions.php` | 0 | 1 |
 | `ext/xsl/XsltProcessorRemoveParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorSetParameter.php` | 0 | 3 |
+| `ext/xsl/XsltProcessorSetProfiling.php` | 0 | 4 |
 | `ext/xsl/XsltProcessorSetSecurityPrefs.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToDoc.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToUri.php` | 0 | 3 |
@@ -18786,32 +18787,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 43)
-- new PharRunning (line 46)
-- new PharCanWrite (line 50)
-- new PharCanCompress (line 54)
-- new PharGetSupportedCompression (line 58)
-- new PharGetSupportedSignatures (line 62)
-- new PharApiVersion (line 66)
-- new PharIsValidPharFilename (line 70)
-- new PharLoadPhar (line 74)
-- new PharUnlinkArchive (line 78)
-- new PharMapPhar (line 82)
-- new PharInterceptFileFuncs (line 86)
-- new PharMount (line 90)
-- new PharMungServer (line 94)
-- new PharWebPhar (line 98)
-- new ClassEntry (line 103)
-- new Variable (line 125)
-- new ArgumentCountError (line 246)
-- new ArgumentCountError (line 276)
-- new ArgumentCountError (line 304)
-- new ArgumentCountError (line 328)
-- new ArgumentCountError (line 365)
-- new ArgumentCountError (line 387)
-- new ArgumentCountError (line 412)
-- new PharException (line 423)
-- new ArgumentCountError (line 447)
+- new ClassEntry (line 48)
+- new PharRunning (line 52)
+- new PharCanWrite (line 56)
+- new PharCanCompress (line 60)
+- new PharGetSupportedCompression (line 64)
+- new PharGetSupportedSignatures (line 68)
+- new PharApiVersion (line 72)
+- new PharIsValidPharFilename (line 76)
+- new PharLoadPhar (line 80)
+- new PharUnlinkArchive (line 84)
+- new PharMapPhar (line 88)
+- new PharInterceptFileFuncs (line 92)
+- new PharMount (line 96)
+- new PharMungServer (line 100)
+- new PharWebPhar (line 104)
+- new ClassEntry (line 109)
+- new Variable (line 131)
+- new ArgumentCountError (line 252)
+- new ArgumentCountError (line 282)
+- new ArgumentCountError (line 310)
+- new ArgumentCountError (line 334)
+- new ArgumentCountError (line 371)
+- new ArgumentCountError (line 393)
+- new ArgumentCountError (line 418)
+- new PharException (line 429)
+- new ArgumentCountError (line 453)
 - 15 class method(s)
 - 23 closure(s)
 
@@ -18823,29 +18824,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/PharBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new PharConstruct (line 36)
-- new ArgumentCountError (line 107)
-- new ArgumentCountError (line 123)
-- new ArgumentCountError (line 141)
-- new ArgumentCountError (line 157)
-- new ArgumentCountError (line 177)
-- new ArgumentCountError (line 198)
-- new UnexpectedValueException (line 216)
-- new ArgumentCountError (line 232)
-- new ArgumentCountError (line 251)
-- new ArgumentCountError (line 282)
-- new ArgumentCountError (line 366)
-- new ArgumentCountError (line 415)
-- new ArgumentCountError (line 484)
-- new ArgumentCountError (line 514)
-- new ArgumentCountError (line 606)
-- new ArgumentCountError (line 648)
-- new ArgumentCountError (line 689)
-- new ArgumentCountError (line 719)
-- new ArgumentCountError (line 735)
-- new ArgumentCountError (line 755)
-- new ArgumentCountError (line 772)
-- 42 class method(s)
+- new PharConstruct (line 37)
+- new ArgumentCountError (line 110)
+- new ArgumentCountError (line 126)
+- new ArgumentCountError (line 144)
+- new ArgumentCountError (line 160)
+- new ArgumentCountError (line 180)
+- new ArgumentCountError (line 201)
+- new UnexpectedValueException (line 219)
+- new ArgumentCountError (line 235)
+- new ArgumentCountError (line 254)
+- new ArgumentCountError (line 285)
+- new ArgumentCountError (line 369)
+- new ArgumentCountError (line 418)
+- new ArgumentCountError (line 487)
+- new ArgumentCountError (line 517)
+- new ArgumentCountError (line 609)
+- new ArgumentCountError (line 651)
+- new ArgumentCountError (line 692)
+- new ArgumentCountError (line 722)
+- new ArgumentCountError (line 738)
+- new ArgumentCountError (line 758)
+- new ArgumentCountError (line 775)
+- 43 class method(s)
 
 ### `ext/phar/PharDataBuiltin.php`
 
@@ -18895,72 +18896,72 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharArchive.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 133)
-- new UnexpectedValueException (line 139)
-- new UnexpectedValueException (line 224)
-- new UnexpectedValueException (line 237)
-- new UnexpectedValueException (line 249)
-- new UnexpectedValueException (line 261)
-- new UnexpectedValueException (line 274)
-- new UnexpectedValueException (line 278)
-- new UnexpectedValueException (line 292)
-- new RecursiveIteratorIterator (line 295)
-- new RecursiveDirectoryIterator (line 296)
-- new UnexpectedValueException (line 379)
-- new BadMethodCallException (line 456)
-- new BadMethodCallException (line 533)
-- new BadMethodCallException (line 539)
-- new BadMethodCallException (line 551)
-- new BadMethodCallException (line 588)
-- new BadMethodCallException (line 594)
-- new BadMethodCallException (line 643)
-- new BadMethodCallException (line 669)
-- new BadMethodCallException (line 672)
-- new UnexpectedValueException (line 680)
-- new ObjectEntry (line 682)
-- new UnexpectedValueException (line 730)
-- new ObjectEntry (line 732)
-- new BadMethodCallException (line 766)
-- new BadMethodCallException (line 770)
-- new BadMethodCallException (line 773)
-- new BadMethodCallException (line 776)
-- new UnexpectedValueException (line 791)
-- new UnexpectedValueException (line 796)
-- new ObjectEntry (line 801)
-- new UnexpectedValueException (line 852)
-- new ObjectEntry (line 857)
-- new BadMethodCallException (line 874)
-- new BadMethodCallException (line 878)
-- new BadMethodCallException (line 881)
+- new UnexpectedValueException (line 179)
+- new UnexpectedValueException (line 185)
+- new UnexpectedValueException (line 270)
+- new UnexpectedValueException (line 283)
+- new UnexpectedValueException (line 295)
+- new UnexpectedValueException (line 307)
+- new UnexpectedValueException (line 320)
+- new UnexpectedValueException (line 324)
+- new UnexpectedValueException (line 338)
+- new RecursiveIteratorIterator (line 341)
+- new RecursiveDirectoryIterator (line 342)
+- new UnexpectedValueException (line 425)
+- new BadMethodCallException (line 502)
+- new BadMethodCallException (line 579)
+- new BadMethodCallException (line 585)
+- new BadMethodCallException (line 597)
+- new BadMethodCallException (line 634)
+- new BadMethodCallException (line 640)
+- new BadMethodCallException (line 689)
+- new BadMethodCallException (line 715)
+- new BadMethodCallException (line 718)
+- new UnexpectedValueException (line 726)
+- new ObjectEntry (line 728)
+- new UnexpectedValueException (line 776)
+- new ObjectEntry (line 778)
+- new BadMethodCallException (line 812)
+- new BadMethodCallException (line 816)
+- new BadMethodCallException (line 819)
+- new BadMethodCallException (line 822)
+- new UnexpectedValueException (line 837)
+- new UnexpectedValueException (line 842)
+- new ObjectEntry (line 847)
 - new UnexpectedValueException (line 898)
-- new ObjectEntry (line 901)
-- new UnexpectedValueException (line 951)
-- new ObjectEntry (line 953)
-- new UnexpectedValueException (line 1025)
-- new UnexpectedValueException (line 1030)
-- new UnexpectedValueException (line 1035)
-- new UnexpectedValueException (line 1083)
-- new PharException (line 1164)
-- new PharException (line 1176)
-- new UnexpectedValueException (line 1181)
-- new BadMethodCallException (line 1205)
-- new BadMethodCallException (line 1208)
-- new Variable (line 1210)
-- new Error (line 1258)
-- new UnexpectedValueException (line 1460)
-- new UnexpectedValueException (line 1531)
-- new UnexpectedValueException (line 1547)
-- new UnexpectedValueException (line 1552)
-- new PharException (line 1572)
-- new PharException (line 1582)
-- new Error (line 1617)
-- new PharException (line 1636)
-- new PharException (line 1642)
-- new PharException (line 1649)
-- new PharException (line 1661)
-- new PharException (line 1674)
+- new ObjectEntry (line 903)
+- new BadMethodCallException (line 920)
+- new BadMethodCallException (line 924)
+- new BadMethodCallException (line 927)
+- new UnexpectedValueException (line 944)
+- new ObjectEntry (line 947)
+- new UnexpectedValueException (line 997)
+- new ObjectEntry (line 999)
+- new UnexpectedValueException (line 1071)
+- new UnexpectedValueException (line 1076)
+- new UnexpectedValueException (line 1081)
+- new UnexpectedValueException (line 1129)
+- new PharException (line 1210)
+- new PharException (line 1222)
+- new UnexpectedValueException (line 1227)
+- new BadMethodCallException (line 1251)
+- new BadMethodCallException (line 1254)
+- new Variable (line 1256)
+- new Error (line 1304)
+- new UnexpectedValueException (line 1506)
+- new UnexpectedValueException (line 1577)
+- new UnexpectedValueException (line 1593)
+- new UnexpectedValueException (line 1598)
+- new PharException (line 1618)
+- new PharException (line 1628)
+- new Error (line 1663)
 - new PharException (line 1682)
-- 80 class method(s)
+- new PharException (line 1688)
+- new PharException (line 1695)
+- new PharException (line 1707)
+- new PharException (line 1720)
+- new PharException (line 1728)
+- 82 class method(s)
 
 ### `ext/phar/VmPharData.php`
 
@@ -22552,8 +22553,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplDllistSerializeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 51)
-- 3 class method(s)
+- new UnexpectedValueException (line 66)
+- new ObjectEntry (line 97)
+- new SplDllistSerialize (line 106)
+- new SplDllistUnserialize (line 109)
+- new ArgumentCountError (line 153)
+- 8 class method(s)
 
 ### `ext/spl/SplDoublyLinkedListBuiltin.php`
 
@@ -22561,34 +22566,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 56)
 - new SplDoublyLinkedListConstruct (line 64)
 - new SplDoublyLinkedListDebugInfo (line 101)
-- new Variable (line 182)
-- new OutOfRangeException (line 237)
-- new Variable (line 241)
-- new HashTable (line 273)
-- new Variable (line 274)
-- new Variable (line 280)
-- new Variable (line 284)
-- new HashTable (line 285)
-- new Variable (line 314)
-- new Variable (line 332)
-- new Variable (line 344)
-- new Variable (line 357)
-- new Variable (line 371)
-- new Variable (line 389)
-- new Variable (line 397)
-- new OutOfRangeException (line 420)
-- new Variable (line 422)
-- new OutOfRangeException (line 433)
-- new Variable (line 435)
-- new OutOfRangeException (line 445)
-- new ArgumentCountError (line 539)
-- new ArgumentCountError (line 599)
-- new ArgumentCountError (line 698)
-- new ArgumentCountError (line 725)
-- new ArgumentCountError (line 749)
-- new ArgumentCountError (line 778)
-- new ArgumentCountError (line 916)
-- new ArgumentCountError (line 940)
+- new Variable (line 185)
+- new OutOfRangeException (line 240)
+- new Variable (line 244)
+- new HashTable (line 276)
+- new Variable (line 277)
+- new Variable (line 283)
+- new Variable (line 287)
+- new HashTable (line 288)
+- new Variable (line 317)
+- new Variable (line 335)
+- new Variable (line 347)
+- new Variable (line 360)
+- new Variable (line 374)
+- new Variable (line 392)
+- new Variable (line 400)
+- new OutOfRangeException (line 423)
+- new Variable (line 425)
+- new OutOfRangeException (line 436)
+- new Variable (line 438)
+- new OutOfRangeException (line 448)
+- new ArgumentCountError (line 542)
+- new ArgumentCountError (line 602)
+- new ArgumentCountError (line 701)
+- new ArgumentCountError (line 728)
+- new ArgumentCountError (line 752)
+- new ArgumentCountError (line 781)
+- new ArgumentCountError (line 919)
+- new ArgumentCountError (line 943)
 - 53 class method(s)
 
 ### `ext/spl/SplFileInfoBuiltin.php`
@@ -38870,7 +38875,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xsl/JitXsltUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 14 class method(s)
 
 ### `ext/xsl/Module.php`
 
@@ -38895,7 +38900,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XsltProcessorHasExsltSupport (line 68)
 - new XsltProcessorSetSecurityPrefs (line 71)
 - new XsltProcessorGetSecurityPrefs (line 74)
-- 20 class method(s)
+- new XsltProcessorSetProfiling (line 77)
+- 21 class method(s)
 
 ### `ext/xsl/VmXslDomBridge.php`
 
@@ -38918,7 +38924,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new XSLTProcessor (line 26)
-- 14 class method(s)
+- 15 class method(s)
 
 ### `ext/xsl/XsltProcessorConstruct.php`
 
@@ -38973,6 +38979,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xsl/XsltProcessorSetProfiling.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 35)
 - 1 class method(s)
 - 1 closure(s)
 
@@ -46582,7 +46596,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/XsltInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\XsltMethod (line 43)
+- new Call\XsltMethod (line 44)
 - 3 class method(s)
 
 ### `lib/JitMcjitEmbed.php`

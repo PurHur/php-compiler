@@ -4284,6 +4284,7 @@ require_once __DIR__.'/../../../ext/xsl/XsltProcessorRegisterPhpFunctions.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorRegisterPhpFunctionNS.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorRemoveParameter.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorSetParameter.php';
+require_once __DIR__.'/../../../ext/xsl/XsltProcessorSetProfiling.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorSetSecurityPrefs.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorTransformToDoc.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorTransformToUri.php';

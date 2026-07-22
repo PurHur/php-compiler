@@ -115,4 +115,12 @@ final class XsltHostBridge
     {
         return $proc->getSecurityPrefs();
     }
+
+    /**
+     * Host setProfiling(?string $filename): bool — libxslt profile dump path; null disables (#22272).
+     */
+    public static function setProfiling(\XSLTProcessor $proc, ?string $filename): bool
+    {
+        return $proc->setProfiling($filename);
+    }
 }
