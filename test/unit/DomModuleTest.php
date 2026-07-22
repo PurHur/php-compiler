@@ -614,6 +614,25 @@ PHP;
         self::assertSame("1\n1\nb\n", ob_get_clean());
     }
 
+    /** @see https://github.com/PurHur/php-compiler/issues/22008 */
+    public function test_dom_xpath_query_text_predicates(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<r><a>hello</a></r>');
+$xpath = new DOMXPath($doc);
+echo $xpath->query("//a[text()='hello']")->length, "\n";
+echo $xpath->query("//a[contains(text(),'ell')]")->length, "\n";
+echo $xpath->query('//a')->length, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_xpath_text_pred.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n1\n1\n", ob_get_clean());
+    }
+
     public function test_dom_html_document_create_from_string_living_namespace(): void
     {
         $previous = getenv('PHP_COMPILER_PROFILE');
