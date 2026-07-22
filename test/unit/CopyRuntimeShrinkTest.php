@@ -8,7 +8,10 @@ use PHPCompiler\ext\standard\CopyJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** copy() JIT routes through CopyJitHelper PHP not StringFsDirJit libc LLVM (#9585). */
+/**
+ * copy() JIT routes through CopyJitHelper PHP not StringFsDirJit libc LLVM (#9585).
+ * NestedJIT via JitVmHelperLink::ensureCompiled (#22231 / peer #22205).
+ */
 final class CopyRuntimeShrinkTest extends TestCase
 {
     public function testStringFsDirJitDelegatesCopyToRuntime(): void
@@ -19,13 +22,18 @@ final class CopyRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('fopen')", $source);
     }
 
-    public function testCopyRuntimeUsesJitHelper(): void
+    public function testCopyRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CopyRuntime.php');
         $this->assertStringContainsString('CopyJitHelper::copyArgv', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString("lookupFunction('fread')", $source);
-        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
     }
 
     public function testCopyJitHelperUsesTriggerErrorJitHelperForDirectoryWarning(): void
