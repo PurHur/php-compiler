@@ -40616,8 +40616,11 @@ class Compiler {
         if (false === $producerOrdinal) {
             return null;
         }
+        // Only block folding onto arg #0 in an @ end-block (suppress inner result — #15916).
+        // Trailing return-mode true after a sibling PropertyFetch keeps producerOrdinal 0 with
+        // boolNullArgIndices=[1]; rejecting that misbinds PropertyFetch to arg1 (#21975).
         if (
-            0 === $producerOrdinal
+            0 === $argIndex
             && null !== $block->orig
             && $this->isErrorSuppressEndBlock($block->orig)
         ) {
