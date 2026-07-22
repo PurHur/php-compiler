@@ -933,6 +933,7 @@ class Context {
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
         $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
         $this->functionProxies['reflectionclass::isiterateable'] = new Call\ReflectionClassIsIterateable();
+        $this->functionProxies['reflectionclass::isiterable'] = new Call\ReflectionClassIsIterateable();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
