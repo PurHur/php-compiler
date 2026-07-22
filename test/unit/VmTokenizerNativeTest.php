@@ -43,6 +43,7 @@ final class VmTokenizerNativeTest extends TestCase
             '<?php $a = "hello";',
             '<?php $a = "hello $world";',
             "<?php \$a = <<<'EOF'\nline\nEOF;",
+            "<?php\n\techo 1;",
         ];
 
         foreach ($samples as $sample) {

@@ -244,18 +244,62 @@ final class LanguageScanner
         return true;
     }
 
+    /**
+     * php-src Zend/zend_language_scanner.l — whitespace glued to T_OPEN_TAG (#21951).
+     *
+     * Same-line horizontal runs stay on the tag; a lone line break after `<?php` is included;
+     * further whitespace (e.g. tab on the next line) is left for T_WHITESPACE.
+     */
     private function consumeOpenTagTrailingWhitespace(): void
     {
+        $consumedHorizontal = false;
         while ($this->pos < $this->len) {
             $ch = $this->source[$this->pos];
-            if (!$this->isHorizontalOrVerticalSpace($ch)) {
-                break;
+            if ($this->isOpenTagTrailingHorizontal($ch)) {
+                ++$this->pos;
+                $consumedHorizontal = true;
+                continue;
             }
-            if ("\n" === $ch) {
-                ++$this->line;
-            }
-            ++$this->pos;
+            break;
         }
+
+        if ($consumedHorizontal || $this->pos >= $this->len) {
+            return;
+        }
+
+        if ($this->consumeLineEndingAtOpenTag()) {
+            return;
+        }
+    }
+
+    private function isOpenTagTrailingHorizontal(string $ch): bool
+    {
+        return \str_contains(" \t\f\v", $ch);
+    }
+
+    private function consumeLineEndingAtOpenTag(): bool
+    {
+        if ($this->pos >= $this->len) {
+            return false;
+        }
+        $ch = $this->source[$this->pos];
+        if ("\r" === $ch) {
+            ++$this->pos;
+            if ($this->pos < $this->len && "\n" === $this->source[$this->pos]) {
+                ++$this->pos;
+            }
+            ++$this->line;
+
+            return true;
+        }
+        if ("\n" === $ch) {
+            ++$this->pos;
+            ++$this->line;
+
+            return true;
+        }
+
+        return false;
     }
 
     private function scanWhitespace(): void
