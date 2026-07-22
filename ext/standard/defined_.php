@@ -24,9 +24,8 @@ final class defined_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('defined() requires exactly one argument');
-        }
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#21964).
+        $this->requireExactArgCount($frame, 'defined', 1);
         if (null === $frame->vmContext) {
             throw new \LogicException('defined() requires VM context');
         }
@@ -40,8 +39,8 @@ final class defined_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== count($args)) {
-            throw new \LogicException('defined() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'defined', 1)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         $i1 = $context->getTypeFromString('int1');
         // Z_PARAM_STR — soft-null DEP+coerce on 8.4 (#21281); empty name is never defined.

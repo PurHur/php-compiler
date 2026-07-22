@@ -22,10 +22,8 @@ final class JitPregMatchEx
 
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        // Arity is guarded in preg_match::call (#21964).
         $argc = \count($args);
-        if ($argc < 2 || $argc > 5) {
-            throw new \LogicException('preg_match() requires 2 to 5 arguments in this compiler build');
-        }
 
         StringPregMatch::ensureLinked($context);
 

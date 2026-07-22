@@ -29,10 +29,9 @@ final class strpos extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#21964).
+        $this->requireArgCountRange($frame, 'strpos', 2, 3);
         $argc = count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('strpos() requires two or three arguments');
-        }
         $haystackStr = self::vmStringArg($frame, 0, 'haystack');
         $needleStr = self::vmStringArg($frame, 1, 'needle');
         if (null === $frame->returnVar) {
@@ -55,10 +54,10 @@ final class strpos extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('strpos() requires two or three arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'strpos', 2, 3)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        $argc = count($args);
         $hayLit = JitStringArg::compileTimeLiteral($args[0]);
         $needleLit = JitStringArg::compileTimeLiteral($args[1]);
         $offsetLit = 3 === $argc ? self::tryCompileTimeInt($context, $args[2]) : 0;

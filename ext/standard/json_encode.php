@@ -27,17 +27,8 @@ final class json_encode extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0])) {
-            throw new \LogicException('json_encode() requires at least one argument');
-        }
-        foreach (\array_keys($frame->calledArgs) as $idx) {
-            if ($idx < 0 || $idx > 2) {
-                throw new \ArgumentCountError(\sprintf(
-                    'json_encode() expects at most 3 arguments, %d given',
-                    $idx + 1
-                ));
-            }
-        }
+        // php-src ext/json/json.c — ArgumentCountError (#21964).
+        $this->requireArgCountRange($frame, 'json_encode', 1, 3);
         if (null === $frame->returnVar) {
             return;
         }
@@ -73,11 +64,8 @@ final class json_encode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1) {
-            throw new \LogicException('json_encode() requires at least one argument');
-        }
-        if (\count($args) > 3) {
-            throw new \LogicException('json_encode() accepts at most three arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'json_encode', 1, 3)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
 
         // Resolve compile-time flags before lowerIntBuiltinArg mutates the arg shape.

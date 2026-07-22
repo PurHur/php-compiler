@@ -32,9 +32,8 @@ final class settype extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('settype() requires exactly two arguments');
-        }
+        // php-src ext/standard/type.c — ArgumentCountError (#21964).
+        $this->requireExactArgCount($frame, 'settype', 2);
         $slot = $frame->calledArgs[0];
         $typeVar = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_STRING !== $typeVar->type) {
@@ -48,8 +47,8 @@ final class settype extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('settype() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'settype', 2)) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
 
         return JitSettype::invoke($context, $args[0], $args[1]);
