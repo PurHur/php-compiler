@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * pg_query_params / prepare / execute / escape_* / fetch_all / affected_rows / num_fields (#20661).
+ * pg_query_params / prepare / execute / escape_* / fetch_all / fetch_all_columns / affected_rows / num_fields (#20661, #22216).
  * Loaded via Module::getFunctions() + spine require.
  */
 
@@ -414,6 +414,42 @@ final class pg_fetch_all extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException('pg_fetch_all() is not implemented for JIT (#20661)');
+    }
+}
+
+/**
+ * pg_fetch_all_columns (php-src ext/pgsql/pgsql.c; #22216).
+ */
+final class pg_fetch_all_columns extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_fetch_all_columns');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_fetch_all_columns() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPgsqlArg::requireResult($frame->calledArgs[0], 'pg_fetch_all_columns', 1);
+        $field = 0;
+        if ($argc >= 2) {
+            $field = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        }
+        $frame->returnVar->array(VmPgsqlCore::fetchAllColumns($result, $field));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_fetch_all_columns() is not implemented for JIT (#22216)');
     }
 }
 
