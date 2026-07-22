@@ -1996,6 +1996,10 @@ final class VmReflection
     /**
      * Arguments passed to the innermost enclosing user function (excludes $this).
      *
+     * Values are the **current** parameter locals (php-src `zend_get_parameters_array_ex`),
+     * not the call-time `calledArgs` snapshot (#21984 / #22025). Variadic extras stay on
+     * the call-time argv (mutating `...$rest` does not rewrite those slots).
+     *
      * Block::$func is a php-cfg {@see CfgFunc} (not {@see Func\PHP}); zero-arg calls leave
      * calledArgs empty, so detect user frames via {@see Block::isMainScript()} (#19617).
      *
@@ -2004,6 +2008,7 @@ final class VmReflection
     public static function userCallArgs(Frame $frame): array
     {
         $entryCandidate = null;
+        $userFrame = null;
         for ($f = $frame->parent; null !== $f; $f = $f->parent) {
             if (null === $f->block || null === $f->block->func || $f->hasHandler()) {
                 continue;
@@ -2013,27 +2018,52 @@ final class VmReflection
                 continue;
             }
             if ([] !== $f->calledArgs) {
-                $args = $f->calledArgs;
-                if (null !== $f->block->func->class) {
-                    return array_slice($args, 1);
-                }
-
-                return $args;
+                $userFrame = $f;
+                break;
             }
             // Innermost zero-arg user function / method / closure frame.
             if (null === $entryCandidate) {
                 $entryCandidate = $f;
             }
         }
-        if (null !== $entryCandidate) {
-            $args = $entryCandidate->calledArgs;
-            if (null !== $entryCandidate->block->func->class) {
-                return array_slice($args, 1);
-            }
-
-            return $args;
+        if (null === $userFrame) {
+            $userFrame = $entryCandidate;
         }
-        throw new \LogicException('Must be called from a function context');
+        if (null === $userFrame) {
+            throw new \LogicException('Must be called from a function context');
+        }
+
+        return self::liveUserCallArgs($userFrame);
+    }
+
+    /**
+     * Current parameter values for {@see userCallArgs()} (php-src-strict; #21984).
+     *
+     * @return list<Variable>
+     */
+    private static function liveUserCallArgs(Frame $userFrame): array
+    {
+        $block = $userFrame->block;
+        $cfgFunc = $block->func;
+        $isInstance = null !== $cfgFunc->class
+            && 0 === (($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC);
+        $called = $userFrame->calledArgs;
+        $snapshot = $isInstance ? array_slice($called, 1) : array_values($called);
+        $variadicIdx = $block->variadicParamIndex;
+        $out = [];
+        foreach ($snapshot as $i => $callArg) {
+            $useLive = null === $variadicIdx || $i < $variadicIdx;
+            if ($useLive) {
+                $slot = $block->paramSlotForIndex((int) $i);
+                if (null !== $slot && isset($userFrame->scope[$slot])) {
+                    $out[] = $userFrame->scope[$slot];
+                    continue;
+                }
+            }
+            $out[] = $callArg;
+        }
+
+        return $out;
     }
 
     /** @param list<Variable> $args */
