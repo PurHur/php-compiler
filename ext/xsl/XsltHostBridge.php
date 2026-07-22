@@ -84,6 +84,23 @@ final class XsltHostBridge
         $proc->registerPHPFunctions($restrict);
     }
 
+    /**
+     * Host PHP 8.4+ registerPHPFunctionNS(); no-op when the harness build lacks the method (#22243).
+     *
+     * @param callable $callable Host-callable (string function name, Closure, …)
+     */
+    public static function registerPHPFunctionNS(
+        \XSLTProcessor $proc,
+        string $namespaceUri,
+        string $name,
+        callable $callable
+    ): void {
+        if (!\is_callable([$proc, 'registerPHPFunctionNS'])) {
+            return;
+        }
+        $proc->registerPHPFunctionNS($namespaceUri, $name, $callable);
+    }
+
     public static function hasExsltSupport(\XSLTProcessor $proc): bool
     {
         return $proc->hasExsltSupport();

@@ -12,9 +12,17 @@ final class XsltRegistry
     /** @var array<int, \XSLTProcessor> */
     private static array $processors = [];
 
+    /**
+     * Namespaced XSLT PHP callables from registerPHPFunctionNS() (#22243).
+     *
+     * @var array<int, array<string, array<string, \PHPCompiler\VM\Variable>>>
+     */
+    private static array $phpFunctionNs = [];
+
     public static function attach(ObjectEntry $entry, \XSLTProcessor $processor): void
     {
         self::$processors[$entry->id] = $processor;
+        self::$phpFunctionNs[$entry->id] = [];
     }
 
     public static function has(ObjectEntry $entry): bool
@@ -29,5 +37,20 @@ final class XsltRegistry
         }
 
         return self::$processors[$entry->id];
+    }
+
+    public static function storePhpFunctionNS(
+        ObjectEntry $entry,
+        string $namespaceUri,
+        string $name,
+        \PHPCompiler\VM\Variable $callable
+    ): void {
+        if (!isset(self::$phpFunctionNs[$entry->id])) {
+            self::$phpFunctionNs[$entry->id] = [];
+        }
+        if (!isset(self::$phpFunctionNs[$entry->id][$namespaceUri])) {
+            self::$phpFunctionNs[$entry->id][$namespaceUri] = [];
+        }
+        self::$phpFunctionNs[$entry->id][$namespaceUri][$name] = $callable;
     }
 }
