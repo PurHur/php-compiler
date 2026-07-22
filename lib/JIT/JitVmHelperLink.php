@@ -52,6 +52,8 @@ final class JitVmHelperLink
         $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
         NestedVmActiveContextLlvm::ensureMethod($context);
+        // Restore caller insert after NestedJIT (#21972 / peer #21965 GethostbynamelRuntime).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         // User-script standalone: clear env so nested *JitHelper compile is full NestedJIT (#15407, #20246).
         $clearUserScriptEnv = $context->shouldClearUserScriptEnvForNestedHelperCompile();
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel, $clearUserScriptEnv): void {
@@ -92,6 +94,11 @@ final class JitVmHelperLink
                 }
             }
         });
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
         foreach ($compiledHelpers as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {

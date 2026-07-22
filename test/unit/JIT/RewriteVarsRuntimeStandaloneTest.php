@@ -44,6 +44,15 @@ final class RewriteVarsRuntimeStandaloneTest extends TestCase
         try {
             $runtime = new Runtime(Runtime::MODE_AOT);
             $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            $void = $ctx->context->voidType();
+            $ft = $ctx->context->functionType($void, false);
+            $fn = $ctx->module->addFunction('__test_rewrite_vars_caller', $ft);
+            $entry = $fn->appendBasicBlock('entry');
+            $ctx->builder->positionAtEnd($entry);
+            $ctx->main = $fn;
+            $ctx->activeFunction = '__test_rewrite_vars_caller';
+            $ctx->registerFunction('__test_rewrite_vars_caller', $fn);
+
             RewriteVarsRuntime::ensureLinked($ctx);
             $this->assertArrayHasKey(
                 'phpcompiler\\ext\\standard\\vmurlrewriterob::ensureregistered',
@@ -53,6 +62,9 @@ final class RewriteVarsRuntimeStandaloneTest extends TestCase
                 'phpcompiler\\ext\\standard\\outputrewritevarsjithelper::add',
                 $ctx->functions
             );
+            // Must not throw LogicException("Current basic block has no parent function") (#21972).
+            JIT\BasicBlockHelper::parentFunction($ctx);
+            $this->assertNotNull(JIT\BasicBlockHelper::append($ctx, 'after_rewrite_vars'));
         } finally {
             if (false === $prev || '' === (string) $prev) {
                 \putenv('PHP_COMPILER_EMIT_HELPER_LINK=');
