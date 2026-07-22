@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for glob()/scandir() via FsGlobJitHelper PHP (#11515, #12909).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SysGetTempDirRuntime #22187).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\FsGlobJitHelper}; thin LLVM
  * bridge forwards the ABI. php-src: ext/standard/dir.c
  */
@@ -48,32 +48,11 @@ final class FsGlobVecRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'FsGlobJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('FsGlobJitHelper.php parseAndCompile failed (#11515)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#11515)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22205'
+        );
     }
 }
