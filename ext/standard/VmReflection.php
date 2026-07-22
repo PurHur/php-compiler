@@ -1409,6 +1409,35 @@ final class VmReflection
     }
 
     /**
+     * ReflectionClass::getInterfaces() — interface name => ReflectionClass (#22170).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getInterfaces
+     * Same order as getInterfaceNames() (ce->interfaces walk).
+     *
+     * @return Variable map<string, ReflectionClass>
+     */
+    public static function reflectionClassInterfacesMap(Context $ctx, ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        $rcClass = $ctx->classes[ReflectionSupport::REFLECTION_CLASS] ?? null;
+        if (null === $rcClass) {
+            return $result;
+        }
+        foreach (self::reflectionClassInterfaceNamesList($entry, $ctx) as $name) {
+            $obj = new \PHPCompiler\VM\ObjectEntry($rcClass);
+            $obj->constructed = true;
+            $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($name);
+            $slot = new Variable();
+            $slot->object($obj);
+            $ht->add($name, $slot);
+        }
+
+        return $result;
+    }
+
+    /**
      * ReflectionClass::getInterfaceNames() / ReflectionEnum::getInterfaceNames() (#9692).
      *
      * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getInterfaceNames
