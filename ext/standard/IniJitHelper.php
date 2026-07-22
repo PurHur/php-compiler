@@ -40,6 +40,7 @@ final class IniJitHelper
         'pcre.jit',
         'pcre.recursion_limit',
         'zend.exception_string_param_max_len',
+        'zend.exception_ignore_args',
         'zend.assertions',
         'assert.active',
         'assert.bail',
@@ -136,6 +137,9 @@ final class IniJitHelper
 
     private const EXCEPTION_STRING_PARAM_MAX_LEN_CEILING = 1_000_000;
 
+    /** php-src EG(exception_ignore_args) compiled default On (#21998). */
+    private const CFG_EXCEPTION_IGNORE_ARGS = true;
+
     private static bool $displayErrors = false;
 
     /** Raw ini_set() value; null uses php.ini default formatting (#11835). */
@@ -167,6 +171,8 @@ final class IniJitHelper
 
     private static int $exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
 
+    private static bool $exceptionIgnoreArgs = self::CFG_EXCEPTION_IGNORE_ARGS;
+
     private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
 
     private static bool $registerArgcArgv = true;
@@ -185,6 +191,17 @@ final class IniJitHelper
     public static function getExceptionStringParamMaxLen(): int
     {
         return self::$exceptionStringParamMaxLen;
+    }
+
+    /** Keep NestedJIT/AOT aligned with VmIni runtime value (#21998). */
+    public static function syncExceptionIgnoreArgs(bool $ignore): void
+    {
+        self::$exceptionIgnoreArgs = $ignore;
+    }
+
+    public static function exceptionIgnoreArgsEnabled(): bool
+    {
+        return self::$exceptionIgnoreArgs;
     }
 
     public static function registerArgcArgvEnabled(): bool
@@ -337,6 +354,9 @@ final class IniJitHelper
         if ('zend.exception_string_param_max_len' === $key) {
             return (string) self::$exceptionStringParamMaxLen;
         }
+        if ('zend.exception_ignore_args' === $key) {
+            return VmIni::formatRegisterArgcArgvIniGet(self::$exceptionIgnoreArgs);
+        }
         if ('max_execution_time' === $key) {
             return self::$maxExecutionTime;
         }
@@ -417,6 +437,9 @@ final class IniJitHelper
         }
         if ('zend.exception_string_param_max_len' === $key) {
             return self::setExceptionStringParamMaxLen($newValue);
+        }
+        if ('zend.exception_ignore_args' === $key) {
+            return self::setExceptionIgnoreArgs($newValue);
         }
         if ('max_execution_time' === $key) {
             return self::setMaxExecutionTime($newValue);
@@ -577,6 +600,10 @@ final class IniJitHelper
             case 'zend.exception_string_param_max_len':
                 self::$exceptionStringParamMaxLen = self::CFG_EXCEPTION_STRING_PARAM_MAX_LEN;
                 VmIni::syncExceptionStringParamMaxLen(self::$exceptionStringParamMaxLen);
+                break;
+            case 'zend.exception_ignore_args':
+                self::$exceptionIgnoreArgs = self::CFG_EXCEPTION_IGNORE_ARGS;
+                VmIni::syncExceptionIgnoreArgs(self::$exceptionIgnoreArgs);
                 break;
             case 'max_execution_time':
                 self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
@@ -751,6 +778,15 @@ final class IniJitHelper
         $old = (string) self::$exceptionStringParamMaxLen;
         self::$exceptionStringParamMaxLen = $parsed;
         VmIni::syncExceptionStringParamMaxLen($parsed);
+
+        return $old;
+    }
+
+    private static function setExceptionIgnoreArgs(string $newValue): string
+    {
+        $old = VmIni::formatRegisterArgcArgvIniGet(self::$exceptionIgnoreArgs);
+        self::$exceptionIgnoreArgs = VmIni::parseBoolIni($newValue);
+        VmIni::syncExceptionIgnoreArgs(self::$exceptionIgnoreArgs);
 
         return $old;
     }

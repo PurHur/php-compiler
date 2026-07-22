@@ -2,6 +2,7 @@
 Language: #[\SensitiveParameter] redacts Throwable::getTrace() args via SensitiveParameterValue (#21339/#21524, VM)
 --FILE--
 <?php
+ini_set('zend.exception_ignore_args', '0');
 function f(#[\SensitiveParameter] string $secret, string $ok): void {
     throw new Exception('trace');
 }
