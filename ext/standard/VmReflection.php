@@ -2610,6 +2610,12 @@ final class VmReflection
     /** php-src ZEND_ACC_READONLY — ReflectionProperty::IS_READONLY (#22128). */
     public const REFLECTION_IS_READONLY = 128;
 
+    /**
+     * php-src ZEND_ACC_FINAL — ReflectionProperty::IS_FINAL (PHP 8.4+ final properties, #22341).
+     * Same bit as {@see REFLECTION_METHOD_IS_FINAL} / ReflectionMethod::IS_FINAL.
+     */
+    public const REFLECTION_IS_FINAL = 32;
+
     /** php-src ZEND_ACC_VIRTUAL — ReflectionProperty::IS_VIRTUAL (PHP 8.4+). */
     public const REFLECTION_IS_VIRTUAL = 512;
 
@@ -2723,16 +2729,21 @@ final class VmReflection
         }
     }
 
-    /** Register ReflectionProperty::IS_* class constants (#5060, #4470, #22128). */
+    /** Register ReflectionProperty::IS_* class constants (#5060, #4470, #22128, #22341). */
     public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
     {
-        self::registerIntClassConstants($entry, [
+        $constants = [
             'is_public' => self::REFLECTION_IS_PUBLIC,
             'is_protected' => self::REFLECTION_IS_PROTECTED,
             'is_private' => self::REFLECTION_IS_PRIVATE,
             'is_static' => self::REFLECTION_IS_STATIC,
             'is_readonly' => self::REFLECTION_IS_READONLY,
-        ]);
+        ];
+        // php-src 8.4+ ReflectionProperty::IS_FINAL (ZEND_ACC_FINAL) — absent on 8.2 reference.
+        if (CompilerVersion::supportsFinalProperties()) {
+            $constants['is_final'] = self::REFLECTION_IS_FINAL;
+        }
+        self::registerIntClassConstants($entry, $constants);
     }
 
     /** Register ReflectionMethod::IS_* class constants (#7116, #22128, php_reflection.stub.php). */
@@ -2906,8 +2917,9 @@ final class VmReflection
     }
 
     /**
-     * php-src zim_ReflectionProperty_getModifiers — IS_* bitmask (#22143).
+     * php-src zim_ReflectionProperty_getModifiers — IS_* bitmask (#22143, #22341).
      * Dynamic properties are public-only (ZEND_ACC_PUBLIC|ZEND_ACC_VIRTUAL).
+     * keep_flags includes ZEND_ACC_FINAL for PHP 8.4 final properties.
      */
     public static function propertyReflectionModifiers(
         ClassEntry $entry,
@@ -2933,8 +2945,32 @@ final class VmReflection
         if (null !== $instance && $instance->readonly) {
             $modifiers |= self::REFLECTION_IS_READONLY;
         }
+        // php-src prop->flags & ZEND_ACC_FINAL → ReflectionProperty::IS_FINAL (#22341).
+        if (null !== $instance && $instance->propertyFinal) {
+            $modifiers |= self::REFLECTION_IS_FINAL;
+        } elseif (self::propertyIsFinalFromHookRegistry($entry, $property, $ctx)) {
+            $modifiers |= self::REFLECTION_IS_FINAL;
+        }
 
         return $modifiers;
+    }
+
+    /**
+     * Fallback when ClassProperty::$propertyFinal was not populated but the hook registry
+     * recorded a final property (hooked finals, #20511 / #22341).
+     */
+    private static function propertyIsFinalFromHookRegistry(
+        ClassEntry $entry,
+        string $property,
+        Context $ctx
+    ): bool {
+        $lcClass = strtolower($entry->name);
+        $propLc = strtolower($property);
+        $propMeta = $ctx->propertyHookRegistry[$lcClass][$property]
+            ?? $ctx->propertyHookRegistry[$lcClass][$propLc]
+            ?? null;
+
+        return is_array($propMeta) && !empty($propMeta['finalProperty']);
     }
 
     /** php-src ReflectionClass::IS_* values returned by getModifiers() (#18335). */
