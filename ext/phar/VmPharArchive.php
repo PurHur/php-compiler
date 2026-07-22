@@ -10,6 +10,8 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ObjectRegistry;
+use PHPCompiler\ext\spl\DirectoryIteratorStorage;
+use PHPCompiler\ext\spl\SplFileInfoStorage;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStatPath;
 use PHPCompiler\ext\standard\VmString;
@@ -122,6 +124,50 @@ final class VmPharArchive
             'format' => $format,
         ];
         self::$objectsByPath[$path] = $object;
+        self::syncDirectoryIterator($object);
+    }
+
+    /**
+     * Wire RecursiveDirectoryIterator state over phar://$path (php-src Phar ctor; #22293).
+     * When the archive is missing/unreadable, leave SplFileInfo empty so getFilename() === ''.
+     */
+    public static function syncDirectoryIterator(ObjectEntry $object): void
+    {
+        $st = self::requireState($object);
+        $path = $st['path'];
+        if (VmStatPath::isFile($path)) {
+            try {
+                DirectoryIteratorStorage::open(
+                    $object,
+                    'phar://'.$path,
+                    DirectoryIteratorStorage::FLAG_SKIP_DOTS
+                );
+                if (!DirectoryIteratorStorage::valid($object)) {
+                    SplFileInfoStorage::init($object, '');
+                }
+
+                return;
+            } catch (\Throwable $e) {
+                // Fall through to empty SplFileInfo.
+            }
+        }
+        SplFileInfoStorage::init($object, '');
+    }
+
+    /**
+     * Archive state for Phar::current() PharFileInfo hydration (#22293).
+     *
+     * @return array{
+     *   path: string,
+     *   files: array<string, string>,
+     *   dirs: array<string, true>,
+     *   fileMetadata: array<string, mixed>,
+     *   fileAttrs: array<string, array{perms: int, flags: int>}
+     * }
+     */
+    public static function iteratorArchiveState(ObjectEntry $object): array
+    {
+        return self::requireState($object);
     }
 
     public static function open(ObjectEntry $object, string $path): void
