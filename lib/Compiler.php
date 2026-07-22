@@ -2332,17 +2332,9 @@ class Compiler {
                         break;
                     } elseif (
                         $child instanceof Op\Expr\ArrayDimFetch
-                        && $i + 1 < $opCount
-                        && $this->isArrayDimFetchOnlyIssetVar($child, $ops[$i + 1])
+                        && $this->isArrayDimFetchSkippedForIssetEmptyOrUnset($child, $ops, $i, $block)
                     ) {
-                        // Lowered by compileIsset via isset(container, dim) — no eager fetch (#99, #273, #539).
-                        break;
-                    } elseif (
-                        $child instanceof Op\Expr\ArrayDimFetch
-                        && $i + 1 < $opCount
-                        && $this->isArrayDimFetchOnlyUnsetVar($child, $ops[$i + 1])
-                    ) {
-                        // Lowered by compileTerminal Unset via TYPE_UNSET(container, dim) (#1224).
+                        // Lowered by compileIsset / Empty_ / Unset — including nested dim chains (#99, #21991).
                         break;
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
@@ -2455,13 +2447,6 @@ class Compiler {
                         ));
                         ++$i;
                         [$block, $i] = $this->compileListDestructGroup($ops, $i, $block);
-                        break;
-                    } elseif (
-                        $child instanceof Op\Expr\ArrayDimFetch
-                        && $i + 1 < $opCount
-                        && $this->isArrayDimFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
-                    ) {
-                        // Lowered by compileExpr Empty_ via TYPE_EMPTY_DIMENSION (#5307, #14798).
                         break;
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
@@ -5089,6 +5074,7 @@ class Compiler {
 
     /**
      * php-cfg emits ArrayDimFetch as its own stmt before Isset_; skip duplicate lowering.
+     * Nested `$a['x']['y']` chains are skipped entirely and quiet-fetched from compileIsset (#21991).
      */
     private function isArrayDimFetchOnlyIssetVar(
         Op\Expr\ArrayDimFetch $fetch,
@@ -5114,6 +5100,115 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * Skip ArrayDimFetch stmts consumed by isset()/empty()/unset(), including nested dim chains
+     * (`$a['x']['y']`) where only the innermost is adjacent to isset/empty (#21991).
+     *
+     * @param Op[] $ops
+     */
+    private function isArrayDimFetchSkippedForIssetEmptyOrUnset(
+        Op\Expr\ArrayDimFetch $fetch,
+        array $ops,
+        int $i,
+        Block $block
+    ): bool {
+        $opCount = count($ops);
+        if ($i + 1 >= $opCount) {
+            return false;
+        }
+        $next = $ops[$i + 1];
+        if (
+            $this->isArrayDimFetchOnlyIssetVar($fetch, $next)
+            || $this->isArrayDimFetchOnlyEmptyVar($fetch, $next, $block)
+            || $this->isArrayDimFetchOnlyUnsetVar($fetch, $next)
+        ) {
+            return true;
+        }
+        if (!$next instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        if (!$this->arrayDimFetchConsumesPriorResult($next, $fetch)) {
+            return false;
+        }
+
+        return $this->isArrayDimFetchSkippedForIssetEmptyOrUnset($next, $ops, $i + 1, $block);
+    }
+
+    private function arrayDimFetchConsumesPriorResult(
+        Op\Expr\ArrayDimFetch $consumer,
+        Op\Expr\ArrayDimFetch $producer
+    ): bool {
+        $var = $consumer->var;
+        if ($var === $producer || $var === $producer->result) {
+            return true;
+        }
+        while ($var instanceof Temporary) {
+            if ($var === $producer->result) {
+                return true;
+            }
+            if (null === $var->original) {
+                break;
+            }
+            $var = $var->original;
+        }
+
+        return $var === $producer->result;
+    }
+
+    /**
+     * Outermost-first ArrayDimFetch chain for isset()/empty() nested dims (#21991).
+     *
+     * @return list<Op\Expr\ArrayDimFetch>
+     */
+    protected function collectArrayDimFetchChain(Op\Expr\ArrayDimFetch $innermost, Block $block): array
+    {
+        $chain = [$innermost];
+        $seen = [spl_object_id($innermost) => true];
+        $var = $innermost->var;
+        while (true) {
+            $prev = $this->findCoalesceArrayDimFetch($var, $block);
+            if (null === $prev || isset($seen[spl_object_id($prev)])) {
+                break;
+            }
+            $seen[spl_object_id($prev)] = true;
+            array_unshift($chain, $prev);
+            $var = $prev->var;
+        }
+
+        return $chain;
+    }
+
+    /**
+     * Quiet FETCH_DIM_IS for all but the last dim in an isset()/empty() chain (#21991).
+     *
+     * @param list<Op\Expr\ArrayDimFetch> $chain outermost first
+     * @return array{0: list<OpCode>, 1: int} prefix opcodes + container slot for the final dim
+     */
+    private function emitQuietDimFetchChainPrefix(array $chain, Block $block): array
+    {
+        $first = $chain[0];
+        $containerSlot = $this->compileOperand($first->var, $block, true);
+        if (count($chain) < 2) {
+            return [[], $containerSlot];
+        }
+        $opcodes = [];
+        $prefixLen = count($chain) - 1;
+        for ($i = 0; $i < $prefixLen; ++$i) {
+            $fetch = $chain[$i];
+            $this->rejectArrayEmptyOffsetRead($fetch, $block);
+            $resultSlot = $this->compileOperand($fetch->result, $block, false);
+            $dimSlot = null !== $fetch->dim
+                ? $this->compileOperand($fetch->dim, $block, true)
+                : null;
+            $op = new OpCode(OpCode::TYPE_ARRAY_DIM_FETCH, $resultSlot, $containerSlot, $dimSlot);
+            $op->arrayDimFetchIs = true;
+            $opcodes[] = $op;
+            $containerSlot = $resultSlot;
+        }
+
+        return [$opcodes, $containerSlot];
     }
 
     /**
@@ -5214,6 +5309,7 @@ class Compiler {
 
     /**
      * php-cfg isset()/empty() prelude stmts between hoisted sibling call-arg producers (#15646).
+     * Nested `$a['x']['y']` dim chains before isset/empty are also preludes (#21991).
      *
      * @param list<Op> $cfgChildren
      */
@@ -5223,10 +5319,106 @@ class Compiler {
             return false;
         }
         $next = $cfgChildren[$index + 1] ?? null;
-
-        return ($stmt instanceof Op\Expr\PropertyFetch && $this->isPropertyFetchOnlyIssetVar($stmt, $next))
+        if (
+            ($stmt instanceof Op\Expr\PropertyFetch && $this->isPropertyFetchOnlyIssetVar($stmt, $next))
+            || ($stmt instanceof Op\Expr\StaticPropertyFetch && $this->isStaticPropertyFetchOnlyIssetVar($stmt, $next))
+            || ($stmt instanceof Op\Expr\PropertyFetch && $this->propertyFetchResultFeedsEmpty($stmt, $next))
+            || ($stmt instanceof Op\Expr\StaticPropertyFetch && $this->staticPropertyFetchResultFeedsEmpty($stmt, $next))
             || ($stmt instanceof Op\Expr\ArrayDimFetch && $this->isArrayDimFetchOnlyIssetVar($stmt, $next))
-            || ($stmt instanceof Op\Expr\StaticPropertyFetch && $this->isStaticPropertyFetchOnlyIssetVar($stmt, $next));
+            || ($stmt instanceof Op\Expr\ArrayDimFetch && $this->isArrayDimFetchOnlyUnsetVar($stmt, $next))
+            || ($stmt instanceof Op\Expr\ArrayDimFetch && $this->arrayDimFetchResultFeedsEmpty($stmt, $next))
+        ) {
+            return true;
+        }
+        // Nested dim chain: `$a['x']['y']` then isset/empty/unset (#21991).
+        if (!$stmt instanceof Op\Expr\ArrayDimFetch) {
+            return false;
+        }
+        $j = $index;
+        $current = $stmt;
+        while ($j + 1 < \count($cfgChildren) && ($cfgChildren[$j + 1] ?? null) instanceof Op\Expr\ArrayDimFetch) {
+            /** @var Op\Expr\ArrayDimFetch $nextDim */
+            $nextDim = $cfgChildren[$j + 1];
+            if (!$this->arrayDimFetchConsumesPriorResult($nextDim, $current)) {
+                break;
+            }
+            $current = $nextDim;
+            ++$j;
+        }
+        $tail = $cfgChildren[$j + 1] ?? null;
+        if (null === $tail) {
+            return false;
+        }
+
+        return $this->isArrayDimFetchOnlyIssetVar($current, $tail)
+            || $this->isArrayDimFetchOnlyUnsetVar($current, $tail)
+            || $this->arrayDimFetchResultFeedsEmpty($current, $tail);
+    }
+
+    private function arrayDimFetchResultFeedsEmpty(Op\Expr\ArrayDimFetch $fetch, ?Op $next): bool
+    {
+        if (!$next instanceof Op\Expr\Empty_) {
+            return false;
+        }
+        $target = $next->expr;
+        if ($target === $fetch || $target === $fetch->result) {
+            return true;
+        }
+        while ($target instanceof Temporary) {
+            if ($target === $fetch->result) {
+                return true;
+            }
+            if (null === $target->original) {
+                break;
+            }
+            $target = $target->original;
+        }
+
+        return $target === $fetch->result;
+    }
+
+    private function propertyFetchResultFeedsEmpty(Op\Expr\PropertyFetch $fetch, ?Op $next): bool
+    {
+        if (!$next instanceof Op\Expr\Empty_) {
+            return false;
+        }
+        $target = $next->expr;
+        if ($target === $fetch || $target === $fetch->result) {
+            return true;
+        }
+        while ($target instanceof Temporary) {
+            if ($target === $fetch->result) {
+                return true;
+            }
+            if (null === $target->original) {
+                break;
+            }
+            $target = $target->original;
+        }
+
+        return $target === $fetch->result;
+    }
+
+    private function staticPropertyFetchResultFeedsEmpty(Op\Expr\StaticPropertyFetch $fetch, ?Op $next): bool
+    {
+        if (!$next instanceof Op\Expr\Empty_) {
+            return false;
+        }
+        $target = $next->expr;
+        if ($target === $fetch || $target === $fetch->result) {
+            return true;
+        }
+        while ($target instanceof Temporary) {
+            if ($target === $fetch->result) {
+                return true;
+            }
+            if (null === $target->original) {
+                break;
+            }
+            $target = $target->original;
+        }
+
+        return $target === $fetch->result;
     }
 
     /**
@@ -10990,18 +11182,25 @@ class Compiler {
                     ? $this->findCoalesceArrayDimFetch($emptyOperand, $block)
                     : null;
                 if (null !== $dimFetch) {
-                    $this->rejectArrayEmptyOffsetRead($dimFetch, $block);
+                    $chain = $this->collectArrayDimFetchChain($dimFetch, $block);
+                    foreach ($chain as $chainFetch) {
+                        $this->rejectArrayEmptyOffsetRead($chainFetch, $block);
+                    }
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
-                    [$containerSlot, $dimSlot] = $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
+                    [$prefixOps, $containerSlot] = $this->emitQuietDimFetchChainPrefix($chain, $block);
+                    $lastFetch = $chain[count($chain) - 1];
+                    $dimSlot = null !== $lastFetch->dim
+                        ? $this->compileOperand($lastFetch->dim, $block, true)
+                        : null;
                     if (null !== $containerSlot) {
-                        return [
-                            new OpCode(
-                                OpCode::TYPE_EMPTY_DIMENSION,
-                                $resultSlot,
-                                $containerSlot,
-                                $dimSlot
-                            ),
-                        ];
+                        $prefixOps[] = new OpCode(
+                            OpCode::TYPE_EMPTY_DIMENSION,
+                            $resultSlot,
+                            $containerSlot,
+                            $dimSlot
+                        );
+
+                        return $prefixOps;
                     }
                 }
 
@@ -11630,15 +11829,25 @@ class Compiler {
             ? null
             : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
         if (null !== $dimFetch) {
-            $this->rejectArrayEmptyOffsetRead($dimFetch, $block);
+            $chain = $this->collectArrayDimFetchChain($dimFetch, $block);
+            foreach ($chain as $chainFetch) {
+                $this->rejectArrayEmptyOffsetRead($chainFetch, $block);
+            }
+            [$prefixOps, $containerSlot] = $this->emitQuietDimFetchChainPrefix($chain, $block);
+            $lastFetch = $chain[count($chain) - 1];
+            $dimSlot = null !== $lastFetch->dim
+                ? $this->compileOperand($lastFetch->dim, $block, true)
+                : null;
+            $issetOp = $this->makeIssetOpCode($resultSlot, $containerSlot, $dimSlot, false);
+            $prefixOps[] = $issetOp;
+
+            return $prefixOps;
         }
         [$containerSlot, $dimSlot] = null !== $propFetch
             ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
             : (null !== $staticPropFetch
                 ? $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $block)
-                : (null !== $dimFetch
-                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-                    : $this->resolveIssetTarget($expr->vars[0], $block)));
+                : $this->resolveIssetTarget($expr->vars[0], $block));
         if (null === $containerSlot) {
             $varSlot = $this->compileOperand($expr->vars[0], $block, true);
 
@@ -24841,6 +25050,22 @@ class Compiler {
                 )
             ));
         }
+
+        // Drop nested dim-fetch preludes for isset()/empty() so call args bind the bool (#21991).
+        $producers = array_values(array_filter(
+            $producers,
+            function (Op\Expr $producer) use ($cfgChildren): bool {
+                if (!$producer instanceof Op\Expr\ArrayDimFetch) {
+                    return true;
+                }
+                $index = array_search($producer, $cfgChildren, true);
+                if (false === $index) {
+                    return true;
+                }
+
+                return !$this->isIssetOrEmptyInlineCallArgPreludeStmt($producer, (int) $index, $cfgChildren);
+            }
+        ));
 
         return $this->filterDeadVoidStatementMethodCallProducers($producers, $callOp, $cfgChildren);
     }
@@ -38989,6 +39214,12 @@ class Compiler {
      */
     private function matchChainedArrayDimFetchInlineCallArgProducer(array $producers, int $argIndex): ?Op\Expr
     {
+        // Nested dim chain before isset()/empty() is a quiet prelude, not the call arg (#21991).
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Isset_ || $producer instanceof Op\Expr\Empty_) {
+                return null;
+            }
+        }
         $dimFetches = array_values(array_filter(
             $producers,
             static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\ArrayDimFetch
@@ -50684,8 +50915,13 @@ class Compiler {
             array_merge($nestedProducerOps, $outerArgSends)
         );
         if (null !== $pendingDimFetchSlot) {
-            // var_export($u[0] === $u[1]) — Identical feeds arg #0, not trailing ArrayDimFetch rhs (#12082).
+            // var_export(empty($a['x']['y'])) / isset(...) — quiet dim-fetch prelude must not steal arg #0 (#21991).
             if (null !== $block->orig) {
+                $issetEmptyProducer = $this->findHoistedIssetOrEmptyProducerForCallArg($block, $cfgCallOp, 0);
+                if (null !== $issetEmptyProducer) {
+                    return;
+                }
+                // var_export($u[0] === $u[1]) — Identical feeds arg #0, not trailing ArrayDimFetch rhs (#12082).
                 $comparisonProducer = $this->matchBooleanBinaryOpInlineCallArgProducer(
                     $this->precedingInlineCallArgProducersBeforeCfgOp(
                         $block->orig->children,

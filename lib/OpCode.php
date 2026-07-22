@@ -295,6 +295,11 @@ class OpCode {
     public bool $isIncDec = false;
     /** isset()/empty() on PropertyFetch, not ArrayDimFetch (issue #5117, zend_hash.c). */
     public bool $issetOnProperty = false;
+    /**
+     * TYPE_ARRAY_DIM_FETCH in isset()/empty() nested-dim chains — Zend FETCH_DIM_IS / BP_VAR_IS
+     * (no undefined-key / scalar-offset warnings; missing → null) (#21991, zend_execute.c).
+     */
+    public bool $arrayDimFetchIs = false;
     /** unset() on PropertyFetch, not ArrayDimFetch (issue #19681, SimpleXML sxe_prop_dim_delete). */
     public bool $unsetOnProperty = false;
     /** ?? / ??= on static hooked properties: probe backing storage, not get hook (#9683). */
