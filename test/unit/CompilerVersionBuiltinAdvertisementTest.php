@@ -625,9 +625,24 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::advertisesPhp85ArrayFirstLast());
     }
 
-    public function testDateTimeMicrosecondAdvertisedOnReferenceProfile(): void
+    public function testDateTimeMicrosecondWithheldOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDateTimeMicrosecond());
+        $this->assertFalse(CompilerVersion::supportsDateTimeMicrosecond());
+    }
+
+    public function testDateTimeMicrosecondWithheldWhenProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDateTimeMicrosecond());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testDateTimeMicrosecondTrueWhenProfile84(): void
@@ -1038,17 +1053,40 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersDateTimeMicrosecondOnReferenceProfile(): void
+    public function testVmDoesNotRegisterDateTimeMicrosecondOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $dt = $runtime->vmContext->classes['datetime'] ?? null;
         $this->assertNotNull($dt);
-        $this->assertTrue(isset($dt->methods['getmicrosecond']));
-        $this->assertTrue(isset($dt->methods['setmicrosecond']));
+        $this->assertFalse(isset($dt->methods['getmicrosecond']));
+        $this->assertFalse(isset($dt->methods['setmicrosecond']));
         $dti = $runtime->vmContext->classes['datetimeimmutable'] ?? null;
         $this->assertNotNull($dti);
-        $this->assertTrue(isset($dti->methods['getmicrosecond']));
-        $this->assertTrue(isset($dti->methods['setmicrosecond']));
+        $this->assertFalse(isset($dti->methods['getmicrosecond']));
+        $this->assertFalse(isset($dti->methods['setmicrosecond']));
+    }
+
+    public function testVmRegistersDateTimeMicrosecondWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $dt = $runtime->vmContext->classes['datetime'] ?? null;
+            $this->assertNotNull($dt);
+            $this->assertTrue(isset($dt->methods['getmicrosecond']));
+            $this->assertTrue(isset($dt->methods['setmicrosecond']));
+            $dti = $runtime->vmContext->classes['datetimeimmutable'] ?? null;
+            $this->assertNotNull($dti);
+            $this->assertTrue(isset($dti->methods['getmicrosecond']));
+            $this->assertTrue(isset($dti->methods['setmicrosecond']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterConvertCyrStringOnReferenceProfile(): void

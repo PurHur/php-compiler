@@ -302,10 +302,13 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsDateTimeMicrosecond()
-                && (str_contains($name, 'datetime_microsecond')
-                    || str_contains($name, 'datetime_create_from_interface')
-                    || str_contains($name, 'datetime_immutable_create_from_mutable')
-                    || str_contains($name, 'datetime_create_from_immutable'))) {
+                && str_contains($name, 'datetime_microsecond')
+                && !str_contains($name, 'datetime_microsecond_phantom')
+                && !str_contains($name, 'datetime_microsecond_forward_84')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDateTimeMicrosecond()
+                && str_contains($name, 'datetime_microsecond_phantom')) {
                 continue;
             }
             if (str_contains($name, 'datetime_create_from_timestamp')) {

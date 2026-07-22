@@ -18,11 +18,9 @@ echo "\n";
 $immutableCopy = DateTimeImmutable::createFromInterface($mutable);
 var_export($immutableCopy instanceof DateTimeImmutable);
 echo "\n";
-$fromImmutable->setMicrosecond(123456);
-var_export($immutable->getMicrosecond());
-echo "\n";
-var_export($fromImmutable->getMicrosecond());
-echo "\n";
+$fromImmutable->setTime(12, 0, 0, 123456);
+echo (int) $immutable->format('u'), "\n";
+echo (int) $fromImmutable->format('u'), "\n";
 try {
     DateTime::createFromInterface(new DateTimeZone('UTC'));
 } catch (TypeError $e) {
