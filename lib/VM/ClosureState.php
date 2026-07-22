@@ -255,6 +255,16 @@ final class ClosureState
         return (($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
     }
 
+    /** True when the closure body reads $this (Zend zend_closure_bind_to unbind reject). */
+    public function usesThis(): bool
+    {
+        if ($this->isStaticClosure()) {
+            return false;
+        }
+
+        return null !== $this->func->block->slotIndexForVariableName('this');
+    }
+
     public static function register(Context $ctx): void
     {
         $entry = new ClassEntry('Closure');

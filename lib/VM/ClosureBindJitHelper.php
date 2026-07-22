@@ -24,6 +24,8 @@ final class ClosureBindJitHelper
 
     public const STATIC_BIND_WARNING = 'Cannot bind an instance to a static closure';
 
+    public const UNBIND_THIS_WARNING = 'Cannot unbind $this of closure using $this';
+
     /**
      * JIT-native $newThis type is invalid for bind/bindTo (#4192).
      */
