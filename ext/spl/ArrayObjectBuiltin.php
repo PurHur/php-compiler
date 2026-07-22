@@ -43,14 +43,11 @@ final class ArrayObjectBuiltin
             $entry->interfaces[] = 'serializable';
         }
 
-        foreach ([
+        // php-src REGISTER_SPL_CLASS_CONST_LONG — lc keys + constNames for defined()/getConstant (#22348).
+        SplClassConstants::registerIntConstants($entry, [
             'STD_PROP_LIST' => 1,
             'ARRAY_AS_PROPS' => 2,
-        ] as $name => $value) {
-            $const = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_INTEGER);
-            $const->int($value);
-            $entry->constants[$name] = $const;
-        }
+        ]);
 
         $entry->constructor = new ArrayObjectConstruct();
         $entry->methods['__construct'] = $entry->constructor;
