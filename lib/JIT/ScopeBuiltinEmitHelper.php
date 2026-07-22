@@ -223,8 +223,17 @@ final class ScopeBuiltinEmitHelper
         $context->builder->branchIf($isAssigned, $okBlock, $missBlock);
 
         $context->builder->positionAtEnd($okBlock);
+        $hasValueBlock = BasicBlockHelper::append($context, 'compact_local_has_value_'.$tag);
+        $undefAfterAssignBlock = BasicBlockHelper::append($context, 'compact_local_undef_'.$tag);
+        self::branchIfLocalValueIsDefinedForCompact($context, $local, $hasValueBlock, $undefAfterAssignBlock);
+
+        $context->builder->positionAtEnd($hasValueBlock);
         $keyStr = $context->builder->load($context->constantStringFromString($name));
         self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $local);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($undefAfterAssignBlock);
+        self::emitCompactUndefinedVariableWarning($context, $name);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($missBlock);
@@ -531,5 +540,34 @@ final class ScopeBuiltinEmitHelper
     private static function emitCompactUndefinedVariableWarning(Context $context, string $name): void
     {
         ScopeBuiltinRuntime::emitCompactUndefinedVariableWarning($context, $name);
+    }
+
+    /** unset() leaves assigned flag set — runtime type check before compact import (#21940). */
+    private static function branchIfLocalValueIsDefinedForCompact(
+        Context $context,
+        Variable $local,
+        BasicBlock $definedBlock,
+        BasicBlock $undefinedBlock
+    ): void {
+        if (Variable::KIND_VARIABLE !== $local->kind || Variable::TYPE_VALUE !== $local->type) {
+            $context->builder->branch($definedBlock);
+
+            return;
+        }
+        $valuePtr = JitValueBox::normalizeValuePtr(
+            $context,
+            JitValueBox::pointer($context, $local->value)
+        );
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false)
+        );
+        $context->builder->branchIf($isUndef, $undefinedBlock, $definedBlock);
     }
 }
