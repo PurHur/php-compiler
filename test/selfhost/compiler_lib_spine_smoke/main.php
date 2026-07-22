@@ -4430,6 +4430,7 @@ require_once __DIR__.'/../../../lib/Compiler/TraitComposedMethodResolver.php';
 require_once __DIR__.'/../../../lib/Compiler/TypedClassConstInheritCheck.php';
 require_once __DIR__.'/../../../lib/CompilerVersion.php';
 require_once __DIR__.'/../../../lib/CurlyBraceOffsetRejector.php';
+require_once __DIR__.'/../../../lib/DollarBraceStringDeprecation.php';
 require_once __DIR__.'/../../../lib/DnfParenIntersectionSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/DnfType.php';
 require_once __DIR__.'/../../../lib/Doctor.php';

@@ -334,15 +334,15 @@ final class IncludeHelper
         if (null === $resultOperand) {
             return;
         }
-        $jit->assignOperand(
+        // assignOperand() is private; helpers must use assignOperandForced (#21905 gen-0 refresh).
+        $jit->assignOperandForced(
             $resultOperand,
             new Variable(
                 $jit->context,
                 Variable::TYPE_NATIVE_LONG,
                 Variable::KIND_VALUE,
                 $jit->context->constantFromInteger(IncludeJitHelper::skippedSelfHostIncludeReturnInt())
-            ),
-            true
+            )
         );
     }
 }
