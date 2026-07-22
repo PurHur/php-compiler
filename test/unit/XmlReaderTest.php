@@ -32,8 +32,27 @@ final class XmlReaderTest extends TestCase
         self::assertTrue(ModuleRegistry::extensionLoaded('xmlreader'));
 
         $class = $ctx->classes[VmXmlReader::CLASS_LC];
-        self::assertSame(XmlReaderConstants::ELEMENT, $class->constants['ELEMENT']->toInt());
-        self::assertSame(XmlReaderConstants::END_ELEMENT, $class->constants['END_ELEMENT']->toInt());
+        self::assertSame(XmlReaderConstants::ELEMENT, $class->constants['element']->toInt());
+        self::assertSame(XmlReaderConstants::END_ELEMENT, $class->constants['end_element']->toInt());
+        self::assertSame('ELEMENT', $class->constNames['element']);
+        self::assertSame('END_ELEMENT', $class->constNames['end_element']);
+    }
+
+    /** @covers \PHPCompiler\ext\xmlreader\XmlReaderConstants::registerOnClassEntry */
+    public function test_xmlreader_class_constants_discovery_apis(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo defined('XMLReader::ELEMENT') ? 'Y' : 'N', "\n";
+echo constant('XMLReader::ELEMENT'), "\n";
+echo (new ReflectionClass('XMLReader'))->getConstant('ELEMENT'), "\n";
+echo XMLReader::ELEMENT, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'xmlreader_const_discovery.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("Y\n1\n1\n1\n", ob_get_clean());
     }
 
     public function test_xmlreader_open_read_repro(): void
