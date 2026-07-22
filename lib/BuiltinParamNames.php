@@ -26,6 +26,8 @@ final class BuiltinParamNames
             'datetimezone::__construct' => ['timezone'],
             'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
             'splfileobject::seek' => ['line'],
+            'splfileobject::fgetcsv' => ['separator', 'enclosure', 'escape'],
+            'splfileobject::fputcsv' => ['fields', 'separator', 'enclosure', 'escape', 'eol'],
             'collator::create' => ['locale'],
             'collator::compare' => ['string1', 'string2'],
             'collator::asort' => ['array', 'flags'],
@@ -546,6 +548,20 @@ final class BuiltinParamNames
      */
     public static function paramNamesForInternalFunction(string $name): ?array
     {
+        if (str_contains($name, '::')) {
+            $explicit = self::forClassMethod(strtolower($name));
+            if (null !== $explicit) {
+                return $explicit;
+            }
+            [$class, $method] = explode('::', $name, 2);
+            $fromArgInfo = BuiltinInternalArgInfo::paramNamesForClassMethod($class, $method);
+            if ([] !== $fromArgInfo) {
+                return $fromArgInfo;
+            }
+
+            return null;
+        }
+
         $explicit = self::forFunction($name);
         if (null !== $explicit) {
             return $explicit;
@@ -698,6 +714,10 @@ final class BuiltinParamNames
         $lc = strtolower($qualifiedMethod);
         if (str_ends_with($lc, '::createfromformat')) {
             return ['datetime' => 1];
+        }
+        if (str_ends_with($lc, '::fgetcsv') || str_ends_with($lc, '::fputcsv')) {
+            // php-src arginfo `delimiter` → stub `separator` (#12018, #22097).
+            return ['delimiter' => str_ends_with($lc, '::fputcsv') ? 1 : 0];
         }
 
         return [];

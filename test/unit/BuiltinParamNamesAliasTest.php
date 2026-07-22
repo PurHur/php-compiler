@@ -451,6 +451,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'separator', 'fputcsv'));
         self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'eol', 'fputcsv'));
 
+        $splFputcsv = BuiltinParamNames::paramNamesForInternalFunction('SplFileObject::fputcsv');
+        self::assertSame(['fields', 'separator', 'enclosure', 'escape', 'eol'], $splFputcsv);
+        self::assertSame(
+            3,
+            BuiltinParamNames::lookupNamedParamIndex($splFputcsv, 'escape', 'SplFileObject::fputcsv')
+        );
+        self::assertSame(
+            1,
+            BuiltinParamNames::lookupNamedParamIndex($splFputcsv, 'delimiter', 'SplFileObject::fputcsv')
+        );
+
         $ctx = BuiltinParamNames::forFunction('stream_context_create');
         self::assertSame(['options', 'params'], $ctx);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ctx, 'options', 'stream_context_create'));
