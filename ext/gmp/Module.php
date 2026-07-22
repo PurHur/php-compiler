@@ -16,13 +16,7 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         VmGmpObject::registerClass($runtime->vmContext);
-        foreach ([
-            'GMP_MSW_FIRST' => VmGmp::GMP_MSW_FIRST,
-            'GMP_LSW_FIRST' => VmGmp::GMP_LSW_FIRST,
-            'GMP_LITTLE_ENDIAN' => VmGmp::GMP_LITTLE_ENDIAN,
-            'GMP_BIG_ENDIAN' => VmGmp::GMP_BIG_ENDIAN,
-            'GMP_NATIVE_ENDIAN' => VmGmp::GMP_NATIVE_ENDIAN,
-        ] as $name => $value) {
+        foreach (GmpConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
