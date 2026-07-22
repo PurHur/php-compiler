@@ -1,6 +1,6 @@
 {
     "version": 1,
-    "generated_at": "2026-07-22T16:44:07+00:00",
+    "generated_at": "2026-07-22T17:11:07+00:00",
     "driver": "prelinked/bootstrap-gen0/bin-compile-aot",
     "compiler_minimal_sidecar": "prelinked/bootstrap-gen0/compiler_minimal_aot_blob",
     "compiler_lib_sidecar": "prelinked/bootstrap-gen0/compiler_lib_aot_blob",
@@ -29,5 +29,5 @@
     ],
     "build_target": "inventory argv emit (Zend native rebuild, BOOTSTRAP_INVENTORY_DRIVER_USE_PRELINKED=0)",
     "issue": "#3053, #1492, #2880, #3046, #8713",
-    "lowering_source_fingerprint": "14c38a342857c2fb3aaffdd8a0b9524b2d473959999fe6571098ba37201da6af"
+    "lowering_source_fingerprint": "c2989d88c01841e7c89a8260bf3d66e0c2f83a7749540e429bcb93594e066459"
 }
