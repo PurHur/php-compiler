@@ -21,6 +21,14 @@ final class UnpackEngine
     /** php-src pack.c: repetitions = -1 for '*' in unpack(). */
     private const STAR_ARG = -1;
 
+    /**
+     * php-src unpack() parses repeat counts with strtol and rejects values outside INT_MIN..INT_MAX
+     * (#21884 — "Type %c: integer overflow").
+     */
+    private const FORMAT_ARG_INT_MAX = 2147483647;
+
+    private const FORMAT_ARG_INT_MIN = -2147483648;
+
     private static ?bool $machineLe = null;
 
     private static function machineLe(): bool
@@ -158,9 +166,24 @@ final class UnpackEngine
                     ++$i;
                 } elseif ($c >= '0' && $c <= '9') {
                     $arg = 0;
+                    $overflow = false;
                     while ($i < $flen && $format[$i] >= '0' && $format[$i] <= '9') {
-                        $arg = $arg * 10 + ((int) $format[$i] - (int) '0');
+                        $digit = (int) $format[$i] - (int) '0';
+                        // Mirror php-src strtol + INT_MAX range check (pack.c php_unpack).
+                        if ($arg > (int) ((self::FORMAT_ARG_INT_MAX - $digit) / 10)) {
+                            $overflow = true;
+                            while ($i < $flen && $format[$i] >= '0' && $format[$i] <= '9') {
+                                ++$i;
+                            }
+                            break;
+                        }
+                        $arg = $arg * 10 + $digit;
                         ++$i;
+                    }
+                    if ($overflow || $arg < self::FORMAT_ARG_INT_MIN || $arg > self::FORMAT_ARG_INT_MAX) {
+                        self::fail(\sprintf('unpack(): Type %s: integer overflow', $code));
+
+                        return null;
                     }
                 }
             }
