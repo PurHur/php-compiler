@@ -67,6 +67,18 @@ final class VmMysqli
             'multi_query' => new MysqliMultiQuery(),
             'next_result' => new MysqliNextResult(),
             'store_result' => new MysqliStoreResult(),
+            'insert_id' => new MysqliInsertId(),
+            'field_count' => new MysqliFieldCountMethod(),
+            'sqlstate' => new MysqliSqlstateMethod(),
+            'warning_count' => new MysqliWarningCountMethod(),
+            'character_set_name' => new MysqliCharacterSetName(),
+            'get_charset' => new MysqliGetCharset(),
+            'get_server_info' => new MysqliGetServerInfo(),
+            'get_host_info' => new MysqliGetHostInfo(),
+            'get_proto_info' => new MysqliGetProtoInfo(),
+            'get_server_version' => new MysqliGetServerVersion(),
+            'get_client_info' => new MysqliGetClientInfoMethod(),
+            'ssl_set' => new MysqliSslSet(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -405,6 +417,134 @@ final class VmMysqli
         }
 
         return (string) $stat;
+    }
+
+    /** @return int|string */
+    public static function insertIdOnLink(ObjectEntry $entry, Context $ctx)
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->insert_id;
+    }
+
+    public static function fieldCountOnLink(ObjectEntry $entry, Context $ctx): int
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (int) $native->field_count;
+    }
+
+    public static function sqlstateOnLink(ObjectEntry $entry, Context $ctx): string
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (string) $native->sqlstate;
+    }
+
+    public static function warningCountOnLink(ObjectEntry $entry, Context $ctx): int
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (int) $native->warning_count;
+    }
+
+    public static function characterSetNameOnLink(ObjectEntry $entry, Context $ctx): string
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (string) $native->character_set_name();
+    }
+
+    public static function getCharsetOnLink(ObjectEntry $entry, Context $ctx): ?ObjectEntry
+    {
+        $native = self::requireNative($entry, $ctx);
+        $charset = $native->get_charset();
+        if (false === $charset || null === $charset) {
+            return null;
+        }
+
+        return VmMysqliResult::importNativeObject($ctx, $charset);
+    }
+
+    public static function serverInfoOnLink(ObjectEntry $entry, Context $ctx): string
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (string) $native->server_info;
+    }
+
+    public static function hostInfoOnLink(ObjectEntry $entry, Context $ctx): string
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (string) $native->host_info;
+    }
+
+    public static function protoInfoOnLink(ObjectEntry $entry, Context $ctx): int
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (int) $native->protocol_version;
+    }
+
+    public static function serverVersionOnLink(ObjectEntry $entry, Context $ctx): int
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (int) $native->server_version;
+    }
+
+    public static function clientInfo(): string
+    {
+        if (!MysqliExtensionPolicy::hasNativeDriver()) {
+            return 'mysqlnd (unavailable)';
+        }
+
+        return (string) \mysqli_get_client_info();
+    }
+
+    public static function clientVersion(): int
+    {
+        if (!MysqliExtensionPolicy::hasNativeDriver()) {
+            return 0;
+        }
+
+        return (int) \mysqli_get_client_version();
+    }
+
+    public static function clientInfoOnLink(ObjectEntry $entry, Context $ctx): string
+    {
+        $native = self::requireNative($entry, $ctx);
+        if (method_exists($native, 'get_client_info')) {
+            return (string) $native->get_client_info();
+        }
+
+        return self::clientInfo();
+    }
+
+    public static function sslSetOnLink(
+        ObjectEntry $entry,
+        Context $ctx,
+        ?string $key,
+        ?string $certificate,
+        ?string $caCertificate,
+        ?string $caPath,
+        ?string $cipherAlgos
+    ): bool {
+        $native = self::requireNativeOrInit($entry, $ctx);
+
+        return $native->ssl_set($key, $certificate, $caCertificate, $caPath, $cipherAlgos);
+    }
+
+    public static function assignInsertId(Variable $returnVar, int|string $id): void
+    {
+        if (\is_int($id)) {
+            $returnVar->int($id);
+        } elseif (is_numeric($id) && (string) (int) $id === (string) $id) {
+            $returnVar->int((int) $id);
+        } else {
+            $returnVar->string((string) $id);
+        }
     }
 
     public static function requireNativeOrInit(ObjectEntry $entry, Context $ctx): \mysqli
@@ -1208,6 +1348,234 @@ final class MysqliStoreResult extends MysqliClassMethod
         } else {
             $frame->returnVar->object($result);
         }
+    }
+}
+
+final class MysqliInsertId extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('insert_id');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::insert_id()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::insert_id() requires VM context');
+        if (null !== $frame->returnVar) {
+            VmMysqli::assignInsertId($frame->returnVar, VmMysqli::insertIdOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliFieldCountMethod extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('field_count');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::field_count()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::field_count() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqli::fieldCountOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliSqlstateMethod extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('sqlstate');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::sqlstate()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::sqlstate() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmMysqli::sqlstateOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliWarningCountMethod extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('warning_count');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::warning_count()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::warning_count() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqli::warningCountOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliCharacterSetName extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('character_set_name');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::character_set_name()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::character_set_name() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmMysqli::characterSetNameOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliGetCharset extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_charset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::get_charset()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::get_charset() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $charset = VmMysqli::getCharsetOnLink($receiver, $ctx);
+        if (null === $charset) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($charset);
+        }
+    }
+}
+
+final class MysqliGetServerInfo extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_server_info');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::get_server_info()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::get_server_info() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmMysqli::serverInfoOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliGetHostInfo extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_host_info');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::get_host_info()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::get_host_info() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmMysqli::hostInfoOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliGetProtoInfo extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_proto_info');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::get_proto_info()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::get_proto_info() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqli::protoInfoOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliGetServerVersion extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_server_version');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::get_server_version()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::get_server_version() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqli::serverVersionOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliGetClientInfoMethod extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_client_info');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::get_client_info()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::get_client_info() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmMysqli::clientInfoOnLink($receiver, $ctx));
+        }
+    }
+}
+
+final class MysqliSslSet extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('ssl_set');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::ssl_set()');
+        if (\count($frame->calledArgs) < 6) {
+            throw new \ArgumentCountError('mysqli::ssl_set() expects exactly 5 arguments, '.(\count($frame->calledArgs) - 1).' given');
+        }
+        $key = $this->nullableStringArg($frame->calledArgs[1]);
+        $certificate = $this->nullableStringArg($frame->calledArgs[2]);
+        $caCertificate = $this->nullableStringArg($frame->calledArgs[3]);
+        $caPath = $this->nullableStringArg($frame->calledArgs[4]);
+        $cipherAlgos = $this->nullableStringArg($frame->calledArgs[5]);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::ssl_set() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::sslSetOnLink($receiver, $ctx, $key, $certificate, $caCertificate, $caPath, $cipherAlgos));
+        }
+    }
+
+    private function nullableStringArg(Variable $var): ?string
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toString();
     }
 }
 
