@@ -2722,6 +2722,127 @@ final class ReflectionSupport
         return $entry->methodSourceLocations[$methodLc] ?? null;
     }
 
+    /**
+     * ReflectionFunction source metadata — Func\PHP::$sourceLocation or ClosureState (#22144).
+     */
+    public static function functionSourceLocation(Context $ctx, ObjectEntry $reflection): ?SourceLocation
+    {
+        $state = $reflection->reflectionClosureState;
+        if (null !== $state) {
+            $func = $state->func;
+            if ($func instanceof Func\PHP && null !== $func->sourceLocation) {
+                return $func->sourceLocation;
+            }
+            if ('' !== $state->definitionFile || $state->definitionLine > 0) {
+                return new SourceLocation(
+                    null,
+                    $state->definitionLine,
+                    $state->definitionLine,
+                    $state->definitionFile
+                );
+            }
+
+            return null;
+        }
+        if ($reflection->reflectionIsInternalFunction) {
+            return null;
+        }
+        $name = self::functionNameFromReflection($reflection);
+        $func = $ctx->functions[strtolower($name)] ?? null;
+        if ($func instanceof Func\PHP) {
+            return $func->sourceLocation;
+        }
+
+        return null;
+    }
+
+    /**
+     * ReflectionFunction::getShortName() — php-src suffix after last backslash; closures → {closure} (#22144).
+     */
+    public static function functionShortNameFromReflection(ObjectEntry $reflection): string
+    {
+        $state = $reflection->reflectionClosureState;
+        if (null !== $state && $state->isUserClosure()) {
+            return '{closure}';
+        }
+
+        return self::globalConstantShortName(self::functionNameFromReflection($reflection));
+    }
+
+    /**
+     * ReflectionFunction::getNamespaceName() — php-src prefix before last backslash (#22144).
+     */
+    public static function functionNamespaceNameFromReflection(ObjectEntry $reflection): string
+    {
+        $state = $reflection->reflectionClosureState;
+        if (null !== $state && $state->isUserClosure()) {
+            // Named display is {anonymous}#N without NS; Zend uses declaring namespace.
+            // Prefer Func name when it is Demo\{closure}-shaped; else empty until tracked.
+            $name = $state->func->getName();
+            if (str_contains($name, '\\')) {
+                return self::globalConstantNamespaceName($name);
+            }
+
+            return '';
+        }
+
+        return self::globalConstantNamespaceName(self::functionNameFromReflection($reflection));
+    }
+
+    /** ReflectionFunction::inNamespace() — php-src (#22144). */
+    public static function functionInNamespaceFromReflection(ObjectEntry $reflection): bool
+    {
+        return '' !== self::functionNamespaceNameFromReflection($reflection);
+    }
+
+    /**
+     * ReflectionFunction::{getFileName,getStartLine,getEndLine} — false for internals / missing (#22144).
+     */
+    public static function returnFunctionFileName(?Variable $returnVar, ?SourceLocation $location, bool $isInternal): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if ($isInternal || null === $location) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $file = $location->filename;
+        if ('' === $file || 'unknown' === $file) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $returnVar->string($file);
+    }
+
+    public static function returnFunctionStartLine(?Variable $returnVar, ?SourceLocation $location, bool $isInternal): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if ($isInternal || null === $location || $location->startLine <= 0) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $returnVar->int($location->startLine);
+    }
+
+    public static function returnFunctionEndLine(?Variable $returnVar, ?SourceLocation $location, bool $isInternal): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if ($isInternal || null === $location || $location->endLine <= 0) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $returnVar->int($location->endLine);
+    }
+
     public static function propertySourceLocation(Context $ctx, ClassEntry $entry, string $property): ?SourceLocation
     {
         $lc = strtolower($property);

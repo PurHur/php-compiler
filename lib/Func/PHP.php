@@ -11,6 +11,7 @@ namespace PHPCompiler\Func;
 
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\DeprecatedMetadata;
+use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Func;
 use PHPCompiler\Frame;
 use PHPCompiler\Block;
@@ -21,6 +22,8 @@ final class PHP extends Func {
     public Block $block;
     /** #[\Deprecated] metadata when declared on this function/method (#3569). */
     public ?DeprecatedMetadata $deprecated = null;
+    /** Compile-time docblock + declaration site for ReflectionFunction (#22144 / #7358). */
+    public ?SourceLocation $sourceLocation = null;
     /** @var list<\PHPCompiler\Compiler\ParameterMetadata> */
     public array $parameterMetadata = [];
     /** @var list<string> */
