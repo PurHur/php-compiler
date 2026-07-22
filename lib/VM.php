@@ -9835,6 +9835,21 @@ restart:
             return $this->dispatchVmTypeError($e, $frame);
         } catch (\ValueError $e) {
             return $this->dispatchVmValueError($e, $frame);
+        } catch (\RuntimeException $e) {
+            // ArrayAccess dim write (e.g. SplFixedArray OOB) — same bridge as method calls (#21994).
+            $resolved = $dst->resolveIndirect();
+            if ($resolved->isArrayAccessOffset()) {
+                $dst->null();
+            }
+
+            return $this->dispatchVmRuntimeException($e, $frame);
+        } catch (\LogicException $e) {
+            $resolved = $dst->resolveIndirect();
+            if ($resolved->isArrayAccessOffset()) {
+                $dst->null();
+            }
+
+            return $this->dispatchVmLogicException($e, $frame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
