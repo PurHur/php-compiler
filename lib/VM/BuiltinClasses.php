@@ -289,6 +289,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodInvokeArgs;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetDeclaringClass;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetEndLine;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetExtension;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetFileName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetModifiers;
@@ -775,6 +776,7 @@ final class BuiltinClasses
                 'getfilename' => new ReflectionMethodGetFileName(),
                 'isuserdefined' => new ReflectionMethodIsUserDefined(),
                 'getextensionname' => new ReflectionMethodGetExtensionName(),
+                'getextension' => new ReflectionMethodGetExtension(),
             ] as $name => $method
         ) {
             $rm->methods[$name] = $method;
