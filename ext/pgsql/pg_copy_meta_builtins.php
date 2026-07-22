@@ -289,9 +289,9 @@ final class pg_field_type_oid extends Internal
 
 final class pg_field_is_null extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_field_is_null')
     {
-        parent::__construct('pg_field_is_null');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -342,9 +342,9 @@ final class pg_field_is_null extends Internal
  */
 final class pg_field_name extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_field_name')
     {
-        parent::__construct('pg_field_name');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -375,9 +375,9 @@ final class pg_field_name extends Internal
  */
 final class pg_field_size extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_field_size')
     {
-        parent::__construct('pg_field_size');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -408,9 +408,9 @@ final class pg_field_size extends Internal
  */
 final class pg_field_type extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_field_type')
     {
-        parent::__construct('pg_field_type');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -441,9 +441,9 @@ final class pg_field_type extends Internal
  */
 final class pg_field_num extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_field_num')
     {
-        parent::__construct('pg_field_num');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -474,9 +474,9 @@ final class pg_field_num extends Internal
  */
 final class pg_field_prtlen extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_field_prtlen')
     {
-        parent::__construct('pg_field_prtlen');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void

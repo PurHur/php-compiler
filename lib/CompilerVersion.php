@@ -1068,6 +1068,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ final properties — hooked and plain (Zend/zend_compile.c, #16799, #22241).
+     *
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
+     * Forward profile via `PHP_COMPILER_PROFILE=8.4` enables parse/compile of `final public $x`.
+     * php-src: Zend/zend_inheritance.c — Cannot override final property.
+     */
+    public static function supportsFinalProperties(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ `lazy` property modifier — deferred default initializer (#16813).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
@@ -1164,6 +1176,17 @@ final class CompilerVersion
      * php-src: Zend/zend_language_parser.y encapsed variable grammar.
      */
     public static function supportsEncapsedCoalesce(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ ReflectionGenerator::isClosed() (ext/reflection/php_reflection.c, #22242).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionGeneratorIsClosed(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }

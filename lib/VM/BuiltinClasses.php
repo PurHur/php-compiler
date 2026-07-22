@@ -219,10 +219,17 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseToString;
 use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetClasses;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetClassNames;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetConstants;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetDependencies;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetFunctions;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetINIEntries;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetVersion;
+use PHPCompiler\VM\Builtin\ReflectionExtensionInfo;
+use PHPCompiler\VM\Builtin\ReflectionExtensionIsPersistent;
+use PHPCompiler\VM\Builtin\ReflectionExtensionIsTemporary;
+use PHPCompiler\VM\Builtin\ReflectionExtensionToString;
 use PHPCompiler\VM\Builtin\ReflectionZendExtensionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionZendExtensionGetAuthor;
 use PHPCompiler\VM\Builtin\ReflectionZendExtensionGetCopyright;
@@ -248,6 +255,7 @@ use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingLine;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetFunction;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetThis;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetTrace;
+use PHPCompiler\VM\Builtin\ReflectionGeneratorIsClosed;
 use PHPCompiler\VM\Builtin\ReflectionReferenceFromArrayElement;
 use PHPCompiler\VM\Builtin\ReflectionReferenceGetId;
 use PHPCompiler\VM\Builtin\ReflectionReferenceConstruct;
@@ -668,6 +676,20 @@ final class BuiltinClasses
         $rext->methodVisibility['getclasses'] = $pub;
         $rext->methods['getconstants'] = new ReflectionExtensionGetConstants();
         $rext->methodVisibility['getconstants'] = $pub;
+        $rext->methods['getclassnames'] = new ReflectionExtensionGetClassNames();
+        $rext->methodVisibility['getclassnames'] = $pub;
+        $rext->methods['getdependencies'] = new ReflectionExtensionGetDependencies();
+        $rext->methodVisibility['getdependencies'] = $pub;
+        $rext->methods['getinientries'] = new ReflectionExtensionGetINIEntries();
+        $rext->methodVisibility['getinientries'] = $pub;
+        $rext->methods['ispersistent'] = new ReflectionExtensionIsPersistent();
+        $rext->methodVisibility['ispersistent'] = $pub;
+        $rext->methods['istemporary'] = new ReflectionExtensionIsTemporary();
+        $rext->methodVisibility['istemporary'] = $pub;
+        $rext->methods['info'] = new ReflectionExtensionInfo();
+        $rext->methodVisibility['info'] = $pub;
+        $rext->methods['__tostring'] = new ReflectionExtensionToString();
+        $rext->methodVisibility['__tostring'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_EXTENSION] = $rext;
 
         $rzext = new ClassEntry('ReflectionZendExtension');
@@ -1477,6 +1499,10 @@ final class BuiltinClasses
         ) {
             $rgen->methods[$name] = $method;
             $rgen->methodVisibility[$name] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionGeneratorIsClosed()) {
+            $rgen->methods['isclosed'] = new ReflectionGeneratorIsClosed();
+            $rgen->methodVisibility['isclosed'] = $pub;
         }
         $ctx->classes[ReflectionSupport::REFLECTION_GENERATOR] = $rgen;
 

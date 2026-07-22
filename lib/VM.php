@@ -16246,6 +16246,7 @@ restart:
                         (bool) ($op->propertyLazy ?? false)
                     );
                     $prop->fromConstructorPromotion = $op->propertyFromConstructorPromotion;
+                    $prop->propertyFinal = (bool) ($op->propertyFinal ?? false);
                     // readonly-class promoted props are readonly even without `readonly` on the param (#15409).
                     if ($entry->readonly) {
                         $prop->readonly = true;
@@ -16845,6 +16846,7 @@ restart:
         );
         $property->defaultInitBlock = $block->fragmentForOpcodes($pendingNewDefaultOps);
         $property->defaultInitResultSlot = $resultSlot;
+        $property->propertyFinal = (bool) ($declareOp->propertyFinal ?? false);
         $entry->properties[] = $property;
     }
 

@@ -20,9 +20,9 @@ use PHPLLVM\Value;
 
 final class pg_lo_create extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_create')
     {
-        parent::__construct('pg_lo_create');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -85,9 +85,9 @@ final class pg_lo_create extends Internal
 
 final class pg_lo_unlink extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_unlink')
     {
-        parent::__construct('pg_lo_unlink');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -129,9 +129,9 @@ final class pg_lo_unlink extends Internal
 
 final class pg_lo_open extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_open')
     {
-        parent::__construct('pg_lo_open');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -187,9 +187,9 @@ final class pg_lo_open extends Internal
 
 final class pg_lo_close extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_close')
     {
-        parent::__construct('pg_lo_close');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -218,9 +218,9 @@ final class pg_lo_close extends Internal
 
 final class pg_lo_read extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_read')
     {
-        parent::__construct('pg_lo_read');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -258,9 +258,9 @@ final class pg_lo_read extends Internal
 
 final class pg_lo_write extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_write')
     {
-        parent::__construct('pg_lo_write');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -299,9 +299,9 @@ final class pg_lo_write extends Internal
 
 final class pg_lo_read_all extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_read_all')
     {
-        parent::__construct('pg_lo_read_all');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -432,9 +432,9 @@ final class pg_lo_truncate extends Internal
 
 final class pg_lo_import extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_import')
     {
-        parent::__construct('pg_lo_import');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -478,9 +478,9 @@ final class pg_lo_import extends Internal
 
 final class pg_lo_export extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_lo_export')
     {
-        parent::__construct('pg_lo_export');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void

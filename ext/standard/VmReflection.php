@@ -4134,4 +4134,205 @@ final class VmReflection
 
         return $ht;
     }
+
+    /**
+     * ReflectionExtension::getClassNames() — indexed names matching getClasses() keys (#22247).
+     *
+     * php-src: ext/reflection/php_reflection.c — ZEND_METHOD(ReflectionExtension, getClassNames)
+     */
+    public static function reflectionExtensionClassNamesTable(Context $ctx, string $extension): HashTable
+    {
+        $ht = new HashTable();
+        $index = 0;
+        foreach (self::reflectionExtensionClassesTable($ctx, $extension)->iterateKeyed(false) as [$keyVar]) {
+            $slot = new Variable();
+            $slot->string($keyVar->toString());
+            $ht->addIndex($index, $slot);
+            ++$index;
+        }
+
+        return $ht;
+    }
+
+    /**
+     * ReflectionExtension::getDependencies() — name => Required|Optional|Conflicts (#22247).
+     *
+     * php-src: ext/reflection/php_reflection.c — ZEND_METHOD(ReflectionExtension, getDependencies)
+     * Module deps are not stored on our Module entries yet; mirror php-src zend_module_dep tables.
+     *
+     * @return HashTable<string, string>
+     */
+    public static function reflectionExtensionDependenciesTable(string $extension): HashTable
+    {
+        $ht = new HashTable();
+        $deps = self::EXTENSION_DEPENDENCIES[strtolower($extension)] ?? [];
+        foreach ($deps as $name => $relation) {
+            $slot = new Variable();
+            $slot->string($relation);
+            $ht->add($name, $slot);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * php-src zend_module_dep tables for bundled extensions (subset used by ReflectionExtension).
+     *
+     * @var array<string, array<string, string>>
+     */
+    private const EXTENSION_DEPENDENCIES = [
+        'standard' => ['session' => 'Optional'],
+        'spl' => ['json' => 'Required'],
+        'session' => ['hash' => 'Optional', 'spl' => 'Required'],
+        'sodium' => ['standard' => 'Required'],
+        'pdo' => ['spl' => 'Required'],
+        'xml' => ['libxml' => 'Required'],
+        'dom' => ['libxml' => 'Required', 'domxml' => 'Conflicts'],
+        'mbstring' => ['pcre' => 'Required'],
+        'simplexml' => ['libxml' => 'Required', 'spl' => 'Required'],
+        'exif' => ['standard' => 'Required', 'mbstring' => 'Optional'],
+        'phar' => [
+            'apc' => 'Optional',
+            'bz2' => 'Optional',
+            'openssl' => 'Optional',
+            'zlib' => 'Optional',
+            'standard' => 'Optional',
+            'hash' => 'Required',
+            'spl' => 'Required',
+        ],
+    ];
+
+    /** Bundled extensions are MODULE_PERSISTENT (no dl()); php-src module->type. */
+    public static function reflectionExtensionIsPersistent(string $extension): bool
+    {
+        return ModuleRegistry::extensionLoaded($extension);
+    }
+
+    /** Temporary = MODULE_TEMPORARY (dl()); we never load via dl(). */
+    public static function reflectionExtensionIsTemporary(string $extension): bool
+    {
+        return false;
+    }
+
+    /**
+     * Approximate module_number for __toString header (1-based registration order).
+     */
+    public static function reflectionExtensionModuleNumber(string $extension): int
+    {
+        $ext = strtolower($extension);
+        $n = 1;
+        foreach (ModuleRegistry::getLoadedExtensions() as $name) {
+            if (strtolower($name) === $ext) {
+                return $n;
+            }
+            ++$n;
+        }
+
+        return 0;
+    }
+
+    /**
+     * ReflectionExtension::info() — php_info_print_module text subset (#22247).
+     *
+     * Full per-module PHP_MINFO is not ported; emit name + support row like simple modules.
+     */
+    public static function reflectionExtensionInfoText(string $extension): string
+    {
+        $name = $extension;
+        foreach (ModuleRegistry::getLoadedExtensions() as $loaded) {
+            if (strtolower($loaded) === strtolower($extension)) {
+                $name = $loaded;
+                break;
+            }
+        }
+
+        return "\n".$name."\n\n".$name." support => enabled\n\n";
+    }
+
+    /**
+     * ReflectionExtension::__toString() — _extension_string shape (#22247).
+     *
+     * Omits full nested ReflectionFunction/Class dumps; lists names so cast is non-empty and structured.
+     */
+    public static function reflectionExtensionToString(Context $ctx, string $extension): string
+    {
+        $name = $extension;
+        foreach (ModuleRegistry::getLoadedExtensions() as $loaded) {
+            if (strtolower($loaded) === strtolower($extension)) {
+                $name = $loaded;
+                break;
+            }
+        }
+        $version = self::reflectionExtensionVersion($name);
+        $moduleNumber = self::reflectionExtensionModuleNumber($name);
+        $persistent = self::reflectionExtensionIsPersistent($name);
+        $temporary = self::reflectionExtensionIsTemporary($name);
+
+        $out = 'Extension [ ';
+        if ($persistent) {
+            $out .= '<persistent> ';
+        }
+        if ($temporary) {
+            $out .= '<temporary> ';
+        }
+        $out .= 'extension #'.$moduleNumber.' '.$name.' version '.$version." ] {\n";
+
+        $deps = self::reflectionExtensionDependenciesTable($name);
+        $depLines = '';
+        foreach ($deps->iterateKeyed(false) as [$keyVar, $valVar]) {
+            $depLines .= '    Dependency [ '.$keyVar->toString().' ('.$valVar->toString().") ]\n";
+        }
+        if ('' !== $depLines) {
+            $out .= "\n  - Dependencies {\n".$depLines."  }\n";
+        }
+
+        $ini = VmIni::reflectionIniEntries($ctx, $name);
+        $iniLines = '';
+        foreach ($ini->iterateKeyed(false) as [$keyVar, $valVar]) {
+            $iniLines .= '    Entry [ '.$keyVar->toString().' ]';
+            if (Variable::TYPE_NULL === $valVar->type) {
+                $iniLines .= " { }\n";
+            } else {
+                $iniLines .= " { Current = '".$valVar->toString()."' }\n";
+            }
+        }
+        if ('' !== $iniLines) {
+            $out .= "\n  - INI {\n".$iniLines."  }\n";
+        }
+
+        $constants = self::reflectionExtensionConstantsTable($ctx, $name);
+        $constCount = 0;
+        $constLines = '';
+        foreach ($constants->iterateKeyed(false) as [$keyVar, $valVar]) {
+            ++$constCount;
+            $constLines .= '    Constant [ '.$keyVar->toString().' ] { '.$valVar->toString()." }\n";
+        }
+        if ($constCount > 0) {
+            $out .= "\n  - Constants [".$constCount."] {\n".$constLines."  }\n";
+        }
+
+        $functions = self::reflectionExtensionFunctionsTable($ctx, $name);
+        $fnLines = '';
+        foreach ($functions->iterateKeyed(false) as [$keyVar]) {
+            $fnLines .= '    Function [ <internal:'.strtolower($name).'> function '.$keyVar->toString()." ] {\n\n    }\n";
+        }
+        if ('' !== $fnLines) {
+            $out .= "\n  - Functions {\n".$fnLines."  }\n";
+        }
+
+        $classes = self::reflectionExtensionClassNamesTable($ctx, $name);
+        $classCount = 0;
+        $classLines = '';
+        foreach ($classes->iterate(false) as $nameVar) {
+            ++$classCount;
+            $classLines .= '    Class [ <internal:'.strtolower($name).'> class '.$nameVar->toString()." ] {\n\n    }\n";
+        }
+        if ($classCount > 0) {
+            $out .= "\n  - Classes [".$classCount."] {\n".$classLines."  }\n";
+        }
+
+        $out .= "}\n";
+
+        return $out;
+    }
 }

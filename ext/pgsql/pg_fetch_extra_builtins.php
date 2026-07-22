@@ -148,9 +148,9 @@ final class pg_fetch_object extends Internal
 
 final class pg_fetch_result extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_fetch_result')
     {
-        parent::__construct('pg_fetch_result');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
@@ -205,9 +205,9 @@ final class pg_fetch_result extends Internal
 
 final class pg_free_result extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_free_result')
     {
-        parent::__construct('pg_free_result');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void

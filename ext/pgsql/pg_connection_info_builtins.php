@@ -205,9 +205,9 @@ final class pg_tty extends pg_link_info_string
 
 final class pg_client_encoding extends pg_link_info_string
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_client_encoding')
     {
-        parent::__construct('pg_client_encoding');
+        parent::__construct($name);
     }
 
     protected function fetch(\FFI\CData $conn): string
@@ -219,9 +219,9 @@ final class pg_client_encoding extends pg_link_info_string
 
 final class pg_set_client_encoding extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_set_client_encoding')
     {
-        parent::__construct('pg_set_client_encoding');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void

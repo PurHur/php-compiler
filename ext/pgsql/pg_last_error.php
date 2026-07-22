@@ -15,9 +15,9 @@ use PHPLLVM\Value;
  */
 final class pg_last_error extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'pg_last_error')
     {
-        parent::__construct('pg_last_error');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
