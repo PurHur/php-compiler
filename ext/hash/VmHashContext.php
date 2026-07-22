@@ -33,7 +33,43 @@ final class VmHashContext
         $entry->isInternal = true;
         $entry->methods['__debuginfo'] = new HashContextDebugInfo();
         $entry->methodNames['__debuginfo'] = '__debugInfo';
+        HashContextSerializeSupport::registerMagicMethods($entry);
         $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    public static function hasStore(ObjectEntry $entry): bool
+    {
+        return isset(self::$store[$entry->id])
+            && self::CLASS_LC === strtolower($entry->class->name);
+    }
+
+    /**
+     * @return array{algo: int, ctx: array<string, mixed>, finalized: bool}|null
+     */
+    public static function exportStoreState(ObjectEntry $entry): ?array
+    {
+        $state = self::$store[$entry->id] ?? null;
+        if (null === $state || self::CLASS_LC !== strtolower($entry->class->name)) {
+            return null;
+        }
+
+        return $state;
+    }
+
+    /**
+     * @param array<string, mixed> $ctx
+     */
+    public static function bindStore(
+        ObjectEntry $entry,
+        int $algoId,
+        array $ctx,
+        bool $finalized = false
+    ): void {
+        self::$store[$entry->id] = [
+            'algo' => $algoId,
+            'ctx' => $ctx,
+            'finalized' => $finalized,
+        ];
     }
 
     public static function debugInfoAlgoName(ObjectEntry $entry): string
