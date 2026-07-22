@@ -2086,13 +2086,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DateTime::getMicrosecond() / setMicrosecond() (ext/date/php_date.c, #7082, #21792).
+     * PHP 8.4+ DateTime::getMicrosecond() / setMicrosecond() (ext/date/php_date.c, #7082, #21792, #22374).
      *
-     * Forward profile on 8.4.0-dev — {@see advertisesBuiltinSince} treats -dev as 8.4.0 (#14983).
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile and
+     * explicit PROFILE=8.2 match Zend 8.2 (methods undefined).
      */
     public static function supportsDateTimeMicrosecond(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

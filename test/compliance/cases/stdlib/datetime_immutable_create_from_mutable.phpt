@@ -7,11 +7,9 @@ $immutable = DateTimeImmutable::createFromMutable($mutable);
 var_export($immutable instanceof DateTimeImmutable);
 echo "\n";
 echo $immutable->format('c'), "\n";
-$mutable->setMicrosecond(123456);
-var_export($mutable->getMicrosecond());
-echo "\n";
-var_export($immutable->getMicrosecond());
-echo "\n";
+$mutable->setTime(12, 0, 0, 123456);
+echo (int) $mutable->format('u'), "\n";
+echo (int) $immutable->format('u'), "\n";
 try {
     DateTimeImmutable::createFromMutable(new DateTimeZone('UTC'));
 } catch (TypeError $e) {
