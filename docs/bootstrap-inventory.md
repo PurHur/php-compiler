@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6413 |
-| Phase A inventory files (M2 ratio SSOT) | 6413 |
+| PHP files on vm.php path | 6414 |
+| Phase A inventory files (M2 ratio SSOT) | 6414 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20445 |
+| Source constructs flagged (warnings) | 20465 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -805,6 +805,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/HashAlgosJitHelper.php` | 0 | 1 |
 | `ext/hash/HashContextDebugInfo.php` | 0 | 3 |
 | `ext/hash/HashContextJitHelper.php` | 0 | 1 |
+| `ext/hash/HashContextSerializeSupport.php` | 0 | 20 |
 | `ext/hash/HashCryptoKernelArgs.php` | 0 | 1 |
 | `ext/hash/HashFunction.php` | 0 | 1 |
 | `ext/hash/JitHashAlgos.php` | 0 | 1 |
@@ -11970,6 +11971,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `ext/hash/HashContextSerializeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashContextSerialize (line 31)
+- new HashContextUnserialize (line 34)
+- new Exception (line 43)
+- new Exception (line 50)
+- new Exception (line 67)
+- new Exception (line 84)
+- new Exception (line 88)
+- new Exception (line 92)
+- new Exception (line 97)
+- new Exception (line 102)
+- new Exception (line 190)
+- new Exception (line 196)
+- new Exception (line 211)
+- new Exception (line 228)
+- new Exception (line 234)
+- new Exception (line 257)
+- new Exception (line 263)
+- new Exception (line 286)
+- new ArgumentCountError (line 368)
+- 10 class method(s)
+
 ### `ext/hash/HashCryptoKernelArgs.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12037,11 +12062,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashContextDebugInfo (line 34)
-- new ObjectEntry (line 59)
-- new Variable (line 66)
-- new ObjectEntry (line 145)
-- new Variable (line 152)
-- 9 class method(s)
+- new ObjectEntry (line 95)
+- new Variable (line 102)
+- new ObjectEntry (line 181)
+- new Variable (line 188)
+- 12 class method(s)
 
 ### `ext/hash/VmMhash.php`
 
