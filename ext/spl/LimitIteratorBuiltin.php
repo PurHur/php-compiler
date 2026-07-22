@@ -49,11 +49,13 @@ final class LimitIteratorBuiltin
             'key' => LimitIteratorKey::class,
             'next' => LimitIteratorNext::class,
             'seek' => LimitIteratorSeek::class,
+            'getposition' => LimitIteratorGetPosition::class,
             'getinneriterator' => LimitIteratorGetInnerIterator::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
+        $entry->methodNames['getposition'] = 'getPosition';
         $entry->methodNames['getinneriterator'] = 'getInnerIterator';
 
         $entry->isInternal = true;
@@ -62,7 +64,13 @@ final class LimitIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['seek'], $entry->methods['__construct']);
+        return isset(
+            $entry->methods['rewind'],
+            $entry->methods['valid'],
+            $entry->methods['seek'],
+            $entry->methods['getposition'],
+            $entry->methods['__construct']
+        );
     }
 }
 
@@ -461,6 +469,29 @@ final class LimitIteratorSeek extends VmClassMethod
             Variable::TYPE_OBJECT => 'object',
             default => 'mixed',
         };
+    }
+}
+
+/**
+ * LimitIterator::getPosition() — absolute iterator position (php-src spl_iterators.c; #22264).
+ */
+final class LimitIteratorGetPosition extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPosition');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            LimitIteratorBuiltin::CLASS_LC,
+            'LimitIterator::getPosition()'
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(SplLimitIteratorStorage::position($object));
+        }
     }
 }
 

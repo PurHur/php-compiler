@@ -30,7 +30,7 @@ final class SplHeapBuiltin
     /** User concrete subclass — ordering via overridden compare() (#19891). */
     public const KIND_USER = 0;
 
-    /** @var array<int, array{elements: list<Variable>, kind: int, flags: int, iterPos: int}> */
+    /** @var array<int, array{elements: list<Variable>, kind: int, flags: int, corrupted: bool, iterPos: int}> */
     private static array $store = [];
 
     public static function registerClasses(Context $ctx): void
@@ -71,6 +71,7 @@ final class SplHeapBuiltin
             'top' => SplHeapTop::class,
             'count' => SplHeapCount::class,
             'isempty' => SplHeapIsEmpty::class,
+            'iscorrupted' => SplHeapIsCorrupted::class,
             'rewind' => SplHeapRewind::class,
             'valid' => SplHeapValid::class,
             'current' => SplHeapCurrent::class,
@@ -82,6 +83,7 @@ final class SplHeapBuiltin
             $entry->methodVisibility[$lc] = $pub;
         }
         $entry->methodNames['isempty'] = 'isEmpty';
+        $entry->methodNames['iscorrupted'] = 'isCorrupted';
         $entry->methodNames['recoverfromcorruption'] = 'recoverFromCorruption';
         $entry->methods['__debuginfo'] = new SplHeapDebugInfo();
         $entry->methodVisibility['__debuginfo'] = $pub;
@@ -92,7 +94,13 @@ final class SplHeapBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['insert'], $entry->methods['extract'], $entry->methods['rewind'], $entry->methods['__debuginfo']);
+        return isset(
+            $entry->methods['insert'],
+            $entry->methods['extract'],
+            $entry->methods['rewind'],
+            $entry->methods['iscorrupted'],
+            $entry->methods['__debuginfo']
+        );
     }
 
     public static function init(ObjectEntry $object, int $kind): void
@@ -101,6 +109,7 @@ final class SplHeapBuiltin
             'elements' => [],
             'kind' => $kind,
             'flags' => 0,
+            'corrupted' => false,
             'iterPos' => -1,
         ];
     }
@@ -209,10 +218,17 @@ final class SplHeapBuiltin
         self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
     }
 
+    public static function isCorrupted(ObjectEntry $object): bool
+    {
+        self::ensureInit($object);
+
+        return self::state($object)['corrupted'];
+    }
+
     public static function recoverFromCorruption(ObjectEntry $object): bool
     {
         self::ensureInit($object);
-        self::state($object);
+        self::$store[$object->id]['corrupted'] = false;
 
         return true;
     }
@@ -231,7 +247,7 @@ final class SplHeapBuiltin
         $ht->addNew("\0SplHeap\0flags", $flags);
 
         $corrupted = new Variable();
-        $corrupted->bool(false);
+        $corrupted->bool($state['corrupted']);
         $ht->addNew("\0SplHeap\0isCorrupted", $corrupted);
 
         $values = [];
@@ -318,7 +334,7 @@ final class SplHeapBuiltin
         }
     }
 
-    /** @return array{elements: list<Variable>, kind: int, flags: int, iterPos: int} */
+    /** @return array{elements: list<Variable>, kind: int, flags: int, corrupted: bool, iterPos: int} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -411,7 +427,7 @@ final class SplPriorityQueueBuiltin
 
     public const EXTR_BOTH = 3;
 
-    /** @var array<int, array{elements: list<array{data: Variable, priority: Variable}>, flags: int, iterPos: int}> */
+    /** @var array<int, array{elements: list<array{data: Variable, priority: Variable}>, flags: int, corrupted: bool, iterPos: int}> */
     private static array $store = [];
 
     public static function registerClass(Context $ctx): void
@@ -438,6 +454,7 @@ final class SplPriorityQueueBuiltin
             'top' => SplPriorityQueueTop::class,
             'count' => SplPriorityQueueCount::class,
             'isempty' => SplPriorityQueueIsEmpty::class,
+            'iscorrupted' => SplPriorityQueueIsCorrupted::class,
             'setextractflags' => SplPriorityQueueSetExtractFlags::class,
             'getextractflags' => SplPriorityQueueGetExtractFlags::class,
             'rewind' => SplPriorityQueueRewind::class,
@@ -453,6 +470,7 @@ final class SplPriorityQueueBuiltin
         }
         $entry->methodVisibility['compare'] = CfgFunc::FLAG_PROTECTED;
         $entry->methodNames['isempty'] = 'isEmpty';
+        $entry->methodNames['iscorrupted'] = 'isCorrupted';
         $entry->methodNames['setextractflags'] = 'setExtractFlags';
         $entry->methodNames['getextractflags'] = 'getExtractFlags';
         $entry->methodNames['recoverfromcorruption'] = 'recoverFromCorruption';
@@ -470,7 +488,13 @@ final class SplPriorityQueueBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['insert'], $entry->methods['extract'], $entry->methods['setextractflags'], $entry->methods['__debuginfo']);
+        return isset(
+            $entry->methods['insert'],
+            $entry->methods['extract'],
+            $entry->methods['setextractflags'],
+            $entry->methods['iscorrupted'],
+            $entry->methods['__debuginfo']
+        );
     }
 
     public static function init(ObjectEntry $object): void
@@ -478,6 +502,7 @@ final class SplPriorityQueueBuiltin
         self::$store[$object->id] = [
             'elements' => [],
             'flags' => self::EXTR_DATA,
+            'corrupted' => false,
             'iterPos' => -1,
         ];
     }
@@ -572,9 +597,14 @@ final class SplPriorityQueueBuiltin
         self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
     }
 
+    public static function isCorrupted(ObjectEntry $object): bool
+    {
+        return self::state($object)['corrupted'];
+    }
+
     public static function recoverFromCorruption(ObjectEntry $object): bool
     {
-        self::state($object);
+        self::$store[$object->id]['corrupted'] = false;
 
         return true;
     }
@@ -592,7 +622,7 @@ final class SplPriorityQueueBuiltin
         $ht->addNew("\0SplPriorityQueue\0flags", $flags);
 
         $corrupted = new Variable();
-        $corrupted->bool(false);
+        $corrupted->bool($state['corrupted']);
         $ht->addNew("\0SplPriorityQueue\0isCorrupted", $corrupted);
 
         $rows = [];
@@ -700,7 +730,7 @@ final class SplPriorityQueueBuiltin
         }
     }
 
-    /** @return array{elements: list<array{data: Variable, priority: Variable}>, flags: int, iterPos: int} */
+    /** @return array{elements: list<array{data: Variable, priority: Variable}>, flags: int, corrupted: bool, iterPos: int} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -929,6 +959,21 @@ final class SplHeapIsEmpty extends VmClassMethod
     }
 }
 
+/** SplHeap::isCorrupted() — SPL_HEAP_CORRUPTED flag (php-src spl_heap.c; #22264). */
+final class SplHeapIsCorrupted extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isCorrupted');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::isCorrupted()');
+        SplIteratorSupport::setReturnBool($frame, SplHeapBuiltin::isCorrupted($object));
+    }
+}
+
 final class SplHeapRewind extends VmClassMethod
 {
     public function __construct()
@@ -1133,6 +1178,25 @@ final class SplPriorityQueueIsEmpty extends VmClassMethod
             'SplPriorityQueue::isEmpty()'
         );
         SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::isEmpty($object));
+    }
+}
+
+/** SplPriorityQueue::isCorrupted() — SPL_HEAP_CORRUPTED flag (php-src spl_heap.c; #22264). */
+final class SplPriorityQueueIsCorrupted extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isCorrupted');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::isCorrupted()'
+        );
+        SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::isCorrupted($object));
     }
 }
 
