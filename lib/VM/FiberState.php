@@ -61,6 +61,14 @@ final class FiberState
     /** Completed hook read waiting for the fiber callback property fetch (#9862). */
     public ?Variable $propertyHookResumeRead = null;
 
+    /**
+     * Original Fiber entry callable (Closure object) for ReflectionFiber::getCallable() (#22066).
+     *
+     * Kept separately from {@see $callback} so identity matches Zend even if ClosureState::ownerObject
+     * is later rebound by wrapObject().
+     */
+    public Variable $entryCallable;
+
     public function __construct(
         public readonly ClosureState $callback,
         public readonly ObjectEntry $object,
@@ -74,5 +82,7 @@ final class FiberState
         $this->pendingThrow->null();
         $this->returnValue = new Variable();
         $this->returnValue->null();
+        $this->entryCallable = new Variable();
+        $this->entryCallable->null();
     }
 }

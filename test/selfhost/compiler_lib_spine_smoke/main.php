@@ -5607,6 +5607,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetStaticPropertie
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetStaticPropertyValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetTraitAliases.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetTraitNames.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetTraits.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasConstant.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasMethod.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassHasProperty.php';
@@ -5690,6 +5691,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFiber.
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFile.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingLine.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetFiber.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetCallable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetTrace.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberIsRunning.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberIsStarted.php';
@@ -5733,6 +5735,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetExecutingFi
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetExecutingGenerator.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetExecutingLine.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGeneratorGetFunction.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionGetModifierNames.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodCreateFromClosure.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodCreateFromMethodName.php';
