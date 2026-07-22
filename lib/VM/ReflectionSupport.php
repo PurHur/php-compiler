@@ -1656,6 +1656,46 @@ final class ReflectionSupport
         return true;
     }
 
+    /**
+     * ReflectionParameter::isDefaultValueConstant() (#22026, zim_reflection_parameter_is_default_value_constant).
+     * Throws when no default is available (php-src "Internal error: Failed to retrieve the default value").
+     */
+    public static function parameterDefaultValueIsConstantForReflection(
+        Context $ctx,
+        ObjectEntry $reflection,
+    ): bool {
+        if (!self::parameterDefaultValueIsAvailableForReflection($ctx, $reflection)) {
+            self::throwReflectionException('Internal error: Failed to retrieve the default value');
+        }
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return false;
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+
+        return isset($block->paramDefaultConstantNames[$index]);
+    }
+
+    /**
+     * ReflectionParameter::getDefaultValueConstantName() (#22026).
+     * Returns null when the default exists but is not a constant fetch.
+     */
+    public static function parameterDefaultValueConstantNameForReflection(
+        Context $ctx,
+        ObjectEntry $reflection,
+    ): ?string {
+        if (!self::parameterDefaultValueIsAvailableForReflection($ctx, $reflection)) {
+            self::throwReflectionException('Internal error: Failed to retrieve the default value');
+        }
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            return null;
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+
+        return $block->paramDefaultConstantNames[$index] ?? null;
+    }
+
     public static function parameterAllowsNull(Context $ctx, ObjectEntry $reflection): bool
     {
         if (self::parameterIsInternal($ctx, $reflection)) {

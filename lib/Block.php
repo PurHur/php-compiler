@@ -177,6 +177,14 @@ class Block {
     /** Result slot in {@see self::$paramRuntimeDefaultInitBlocks} per parameter index (#6652). */
     public array $paramRuntimeDefaultResultSlots = [];
 
+    /**
+     * Parameter index => constant-default name for ReflectionParameter::isDefaultValueConstant()
+     * / getDefaultValueConstantName() (#22026, ext/reflection/php_reflection.c).
+     *
+     * @var array<int, string>
+     */
+    public array $paramDefaultConstantNames = [];
+
     /** Function body contains `yield` (issue #167). */
     public bool $isGenerator = false;
 
@@ -826,6 +834,7 @@ class Block {
             $this->paramImplicitNullable = $parent->paramImplicitNullable;
             $this->paramRuntimeDefaultInitBlocks = $parent->paramRuntimeDefaultInitBlocks;
             $this->paramRuntimeDefaultResultSlots = $parent->paramRuntimeDefaultResultSlots;
+            $this->paramDefaultConstantNames = $parent->paramDefaultConstantNames;
             $this->noDiscard = $parent->noDiscard;
             $this->noDiscardMessage = $parent->noDiscardMessage;
         }

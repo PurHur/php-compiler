@@ -5768,11 +5768,13 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterCanBePassedByV
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetAttributes.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetDefaultValue.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetDefaultValueConstantName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterHasType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDefaultValueAvailable.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDefaultValueConstant.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDeprecated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsNamed.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsOptional.php';
