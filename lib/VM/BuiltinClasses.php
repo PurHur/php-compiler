@@ -287,6 +287,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromMethodName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosure;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureCalledClass;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureScopeClass;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureThis;
@@ -775,6 +776,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getclosure'] = $pub;
         $rm->methods['getclosurescopeclass'] = new ReflectionMethodGetClosureScopeClass();
         $rm->methodVisibility['getclosurescopeclass'] = $pub;
+        $rm->methods['getclosurecalledclass'] = new ReflectionMethodGetClosureCalledClass();
+        $rm->methodVisibility['getclosurecalledclass'] = $pub;
         $rm->methods['getclosurethis'] = new ReflectionMethodGetClosureThis();
         $rm->methodVisibility['getclosurethis'] = $pub;
         $rm->methods['getclosureusedvariables'] = new ReflectionMethodGetClosureUsedVariables();

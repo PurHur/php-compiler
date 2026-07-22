@@ -1686,6 +1686,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_returns_reference')) {
                 continue;
             }
+            // ReflectionMethod::getClosureCalledClass is VM-only (#22166).
+            if (str_contains($name, 'reflection_method_get_closure_called_class')) {
+                continue;
+            }
             // ReflectionClass::getExtension() / ReflectionExtension are VM-only (#11462).
             if (str_contains($name, 'reflection_extension_class')) {
                 continue;
