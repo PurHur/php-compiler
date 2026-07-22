@@ -364,6 +364,49 @@ final class VmNumberFormatter
         return $attrs;
     }
 
+    /**
+     * MessageFormat `{n,number[,style]}` via ICU default NumberFormat (#21959).
+     *
+     * php-src: ext/intl/msgformat/msgformat_format.c → umsg_format → unum DECIMAL
+     * (locale grouping / decimal separators). Style `integer` truncates toward zero
+     * then formats with 0 fraction digits (not NumberFormatter ROUND_HALFEVEN).
+     *
+     * @param int|float $num
+     */
+    public static function formatMessageArg(string $locale, $num, ?string $style = null): string
+    {
+        $styleLc = null !== $style ? strtolower(trim($style)) : '';
+        $nfStyle = match ($styleLc) {
+            'percent' => self::PERCENT,
+            'currency' => self::CURRENCY,
+            default => self::DECIMAL,
+        };
+        $value = (float) $num;
+        if ('integer' === $styleLc) {
+            $value = (float) (int) $value;
+        }
+        $attrs = self::defaultAttributesForStyle($nfStyle);
+        if ('integer' === $styleLc) {
+            $attrs[self::FRACTION_DIGITS] = 0;
+            $attrs[self::MIN_FRACTION_DIGITS] = 0;
+            $attrs[self::MAX_FRACTION_DIGITS] = 0;
+        }
+        $resolvedLocale = '' !== $locale ? $locale : VmLocale::getDefault();
+        $state = [
+            'locale' => $resolvedLocale,
+            'style' => $nfStyle,
+            'pattern' => self::defaultPatternForStyle($nfStyle),
+            'attributes' => $attrs,
+            'symbols' => self::defaultSymbolsForLocale($resolvedLocale),
+            'textAttributes' => self::defaultTextAttributes(),
+            'errorCode' => IntlError::U_ZERO_ERROR,
+            'errorMessage' => 'U_ZERO_ERROR',
+        ];
+        $result = self::formatFromState($state, $value);
+
+        return false === $result ? (string) $value : $result;
+    }
+
     public static function isRuleBasedStyle(int $style): bool
     {
         return self::SPELLOUT === $style
