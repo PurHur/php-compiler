@@ -202,11 +202,12 @@ final class ArrayIteratorConstruct extends VmClassMethod
         );
         $table = new HashTable();
         if (isset($frame->calledArgs[1])) {
+            // php-src spl_array_object_new_ex copies the input hashtable (#22020).
             $table = SplIteratorSupport::requireArrayArg(
                 $frame->calledArgs[1],
                 'ArrayIterator::__construct',
                 1
-            );
+            )->duplicate();
         }
         $flags = 0;
         if (isset($frame->calledArgs[2])) {
