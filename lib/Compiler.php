@@ -35978,6 +35978,18 @@ class Compiler {
             }
         }
 
+        // take2('x', new FilesystemIterator($dir, SKIP_DOTS)) — sole producer is New_ at
+        // producers[0] while the call arg is index 1 (literal first arg has no producer) (#21957).
+        if (1 === \count($producers)) {
+            $sole = $producers[0];
+            if (
+                $sole instanceof Op\Expr\New_
+                && $this->inlineNewProducerFeedsCallArg($sole, $callArg)
+            ) {
+                return $sole;
+            }
+        }
+
         return null;
     }
 
