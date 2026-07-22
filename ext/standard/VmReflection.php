@@ -2812,6 +2812,31 @@ final class VmReflection
             }
         }
 
+        // php-src add_reflection_property: enum virtual name/value props (#22030, zend_enum.c).
+        if ($entry->isEnum) {
+            $entryLc = strtolower(ltrim($entry->name, '\\'));
+            $enumProps = null !== $entry->backedType ? ['name', 'value'] : ['name'];
+            foreach ($enumProps as $enumProp) {
+                $lc = strtolower($enumProp);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                if (!self::propertyMatchesReflectionFilter(CfgFunc::FLAG_PUBLIC, false, $filter)) {
+                    continue;
+                }
+                $proto = new Variable();
+                $proto->null();
+                $result[] = new ClassProperty(
+                    $enumProp,
+                    null,
+                    $proto,
+                    true,
+                    CfgFunc::FLAG_PUBLIC,
+                    $entryLc,
+                );
+            }
+        }
+
         return $result;
     }
 
