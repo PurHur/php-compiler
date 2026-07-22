@@ -2883,12 +2883,15 @@ final class VmReflection
                 }
             }
             foreach ($methodLcs as $methodLc) {
-                $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                if (!self::methodMatchesReflectionFilter($vis, $filter)) {
+                $flags = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (isset($class->abstractMethods[$methodLc])) {
+                    $flags |= \PHPCfg\Func::FLAG_ABSTRACT;
+                }
+                if (!self::methodMatchesReflectionFilter($flags, $filter)) {
                     continue;
                 }
                 // php-src add_reflection_method_sub: parent-private methods hidden on child (#7191).
-                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
+                if (($flags & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
                     continue;
                 }
                 // PDO_*_Ext / similar parent-only methods are not visible on subclasses (#21552).
