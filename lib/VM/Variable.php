@@ -145,6 +145,13 @@ final class Variable {
     /** Dim lvalue → hooked property container pending set-hook writeback (#6775). */
     public ?Variable $hookedPropertyDimWriteBackContainer = null;
 
+    /**
+     * True when this Variable is a HashTable bucket cell (not a shared IS_REFERENCE payload).
+     * ASSIGN_REF to a dim must promote in-place values to a shared ref cell so HT destroy
+     * does not wipe aliases (#22027; Zend zend_fetch_dimension_address / IS_REFERENCE).
+     */
+    public bool $hashTableBucketCell = false;
+
     public function __construct(int $type = self::TYPE_NULL) {
         $this->type = $type;
     }
