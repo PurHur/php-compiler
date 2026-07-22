@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
@@ -32,9 +33,8 @@ final class constant_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('constant() requires exactly one argument');
-        }
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#21964).
+        $this->requireExactArgCount($frame, 'constant', 1);
         if (InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::requireString($frame, 0, 'constant', 'name');
             $name = $frame->calledArgs[0]->resolveIndirect()->toString();
@@ -58,8 +58,10 @@ final class constant_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('constant() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'constant', 1)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         $nameArg = self::lowerJitNameArg($context, $args[0]);

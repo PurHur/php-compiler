@@ -36,10 +36,9 @@ final class array_count extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/array.c — ArgumentCountError (#21964).
+        $this->requireArgCountRange($frame, 'count', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('count() expects at least 1 argument, at most 2');
-        }
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->vmContext) {
             throw new \LogicException('count() requires VM context in this compiler build');
@@ -82,16 +81,11 @@ final class array_count extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
         TypeErrorRaise::ensureLinked($context);
-        if ($argc < 1 || $argc > 2) {
-            TypeErrorRaise::emitArgumentCountError(
-                $context,
-                'count() expects at least 1 argument, '.$argc.' given'
-            );
-
+        if (!$this->requireArgCountRangeJit($context, $args, 'count', 1, 2)) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        $argc = \count($args);
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             // php-src 8.0+: always TypeError on null (#21914).
             TypeErrorRaise::emitRaise(

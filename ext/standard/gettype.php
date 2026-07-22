@@ -40,9 +40,8 @@ final class gettype extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('gettype() requires exactly one argument');
-        }
+        // php-src ext/standard/basic_functions.c — ArgumentCountError (#21964).
+        $this->requireExactArgCount($frame, 'gettype', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($v);
         if (null === $frame->returnVar) {
@@ -71,8 +70,8 @@ final class gettype extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('gettype() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'gettype', 1)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             TypedPropertyUninitGuard::emitBeforeRead($context, $args[0]);

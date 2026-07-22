@@ -17,9 +17,8 @@ final class abs extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('Expecting exactly one argument to abs()');
-        }
+        // php-src ext/standard/math.c — ArgumentCountError (#21964).
+        $this->requireExactArgCount($frame, 'abs', 1);
         $num = VmMath::parseNumberBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'abs',
@@ -54,8 +53,8 @@ final class abs extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('Expecting exactly one argument to abs()');
+        if (!$this->requireExactJitArgCount($context, $args, 'abs', 1)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $args[0]->type) {
             $v = $context->helper->loadValue($args[0]);

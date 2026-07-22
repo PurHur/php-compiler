@@ -41,10 +41,9 @@ final class implode extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#21964).
+        $this->requireArgCountRange($frame, $this->getName(), 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException($this->getName().'() requires one or two arguments in this compiler build');
-        }
         if (1 === $argc) {
             self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
             $glue = '';
@@ -105,10 +104,10 @@ final class implode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException($this->getName().'() requires one or two arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, $this->getName(), 1, 2)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
+        $argc = \count($args);
         if (1 === $argc) {
             self::rejectNullSeparatorJit($context, $args[0], $this->getName());
             $i64 = $context->getTypeFromString('int64');

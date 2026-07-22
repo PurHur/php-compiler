@@ -16,10 +16,8 @@ final class preg_match extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 5) {
-            throw new \LogicException('preg_match() requires 2 to 5 arguments in this compiler build');
-        }
+        // php-src ext/pcre/php_pcre.c — ArgumentCountError (#21964).
+        $this->requireArgCountRange($frame, 'preg_match', 2, 5);
         // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226 TypeError).
         // $subject soft-null: E_DEPRECATED + '' on 8.4 (php-src php_pcre.c / #21198).
         $pattern = VmString::trimFamilyStringArgForFrame($frame, 0, 'preg_match', 0, 'pattern');
@@ -63,6 +61,10 @@ final class preg_match extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireArgCountRangeJit($context, $args, 'preg_match', 2, 5)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
         return JitPregMatchEx::invoke($context, ...$args);
     }
 }

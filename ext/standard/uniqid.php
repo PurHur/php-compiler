@@ -28,10 +28,9 @@ final class uniqid extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/uniqid.c — ArgumentCountError (#21964).
+        $this->requireAtMostArgCount($frame, 'uniqid', 2);
         $argc = \count($frame->calledArgs);
-        if ($argc > 2) {
-            throw new \LogicException('uniqid() accepts at most two arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -60,8 +59,8 @@ final class uniqid extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) > 2) {
-            throw new \LogicException('uniqid() accepts at most two arguments in this compiler build');
+        if (!$this->requireAtMostJitArgCount($context, $args, 'uniqid', 2)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
         $prefix = $context->builder->load($context->constantStringFromString(''));
         if (isset($args[0])) {
