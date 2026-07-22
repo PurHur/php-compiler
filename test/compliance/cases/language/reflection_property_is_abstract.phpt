@@ -1,5 +1,7 @@
 --TEST--
 ReflectionProperty::isAbstract() on abstract property hook (#6983, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 abstract class A {

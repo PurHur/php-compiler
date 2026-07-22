@@ -1,5 +1,7 @@
 --TEST--
 ReflectionProperty::getHooks() string keys and getHook() (#4806, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class Box {
@@ -19,7 +21,8 @@ echo $hooks['set'] instanceof Closure ? "set-closure\n" : "set-not-closure\n";
 $getHook = $rp->getHook(PropertyHookType::Get);
 echo $getHook instanceof ReflectionMethod ? "getHook-rm\n" : "getHook-not-rm\n";
 echo $getHook->getName(), "\n";
-var_export($rp->getHook(PropertyHookType::Set) instanceof ReflectionMethod);
+$setIsRm = $rp->getHook(PropertyHookType::Set) instanceof ReflectionMethod;
+var_export($setIsRm);
 echo "\n";
 --EXPECT--
 get,set

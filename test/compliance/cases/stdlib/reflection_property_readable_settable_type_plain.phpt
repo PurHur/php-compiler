@@ -1,5 +1,7 @@
 --TEST--
 ReflectionProperty::getReadableType()/getSettableType() plain typed property (#9873)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);

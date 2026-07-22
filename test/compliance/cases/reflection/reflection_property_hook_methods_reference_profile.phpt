@@ -1,8 +1,8 @@
 --TEST--
-ReflectionProperty hook/lazy APIs phantom on 8.2 reference profile (#17493, ext/reflection/php_reflection.c)
+ReflectionProperty hook/lazy/final APIs phantom on 8.2 reference profile (#17493, #20511, #22309, ext/reflection/php_reflection.c)
 --FILE--
 <?php
-foreach (['hasHook', 'hasHooks', 'getHook', 'getHooks', 'setHook', 'skipLazyInitialization', 'isLazy'] as $method) {
+foreach (['hasHook', 'hasHooks', 'getHook', 'getHooks', 'setHook', 'skipLazyInitialization', 'isLazy', 'isFinal', 'isAbstract', 'isVirtual'] as $method) {
     echo $method, '=', method_exists(ReflectionProperty::class, $method) ? 'yes' : 'no', "\n";
 }
 --EXPECT--
@@ -13,3 +13,6 @@ getHooks=no
 setHook=no
 skipLazyInitialization=no
 isLazy=no
+isFinal=no
+isAbstract=no
+isVirtual=no

@@ -1,5 +1,7 @@
 --TEST--
 ReflectionProperty::skipLazyInitialization() — lazy ghost default without init (#7094)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class Box7094 {

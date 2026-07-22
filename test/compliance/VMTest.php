@@ -381,6 +381,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_property_hook_methods_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReflectionPropertyReadableSettableType()
+                && str_contains($name, 'reflection_property_readable_settable_type_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionPropertyReadableSettableType()
+                && str_contains($name, 'reflection_property_readable_settable_type_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsAsymmetricVisibility()
                 && str_contains($name, 'reflection_property_asymmetric_probes_forward_profile')) {
                 continue;

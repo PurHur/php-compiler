@@ -1,5 +1,7 @@
 --TEST--
 ReflectionProperty hook introspection (#7295, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class C {
@@ -25,7 +27,8 @@ $hooks = $p->getHooks();
 var_export(count($hooks) >= 1);
 echo "\n";
 $first = array_values($hooks)[0] ?? null;
-var_export($first instanceof Closure);
+$isClosure = $first instanceof Closure;
+var_export($isClosure);
 echo "\n";
 --EXPECT--
 true

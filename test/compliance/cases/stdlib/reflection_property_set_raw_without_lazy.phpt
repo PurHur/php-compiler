@@ -1,5 +1,7 @@
 --TEST--
 ReflectionProperty::setRawValueWithoutLazyInitialization() — lazy ghost raw write (#7095)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class Entity7095 {

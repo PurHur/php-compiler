@@ -1,10 +1,10 @@
 --TEST--
-ReflectionProperty hook/lazy APIs on 8.4 forward profile (#17493, ext/reflection/php_reflection.c)
+ReflectionProperty hook/lazy/final APIs on 8.4 forward profile (#17493, #20511, #22309, ext/reflection/php_reflection.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-foreach (['hasHook', 'hasHooks', 'getHook', 'getHooks', 'setHook', 'skipLazyInitialization', 'isLazy'] as $method) {
+foreach (['hasHook', 'hasHooks', 'getHook', 'getHooks', 'setHook', 'skipLazyInitialization', 'isLazy', 'isFinal', 'isAbstract', 'isVirtual'] as $method) {
     echo $method, '=', method_exists(ReflectionProperty::class, $method) ? 'yes' : 'no', "\n";
 }
 --EXPECT--
@@ -15,3 +15,6 @@ getHooks=yes
 setHook=yes
 skipLazyInitialization=yes
 isLazy=yes
+isFinal=yes
+isAbstract=yes
+isVirtual=yes
