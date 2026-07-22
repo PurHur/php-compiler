@@ -211,7 +211,7 @@ final class UsortRuntime
         HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
     }
 
-    /** uasort()/array_uasort() strcmp — string-key value sort in LLVM (#5698, asort_ parity). */
+    /** uasort() strcmp — string-key value sort in LLVM (#5698, asort_ parity). */
     private static function sortValuesByStrcmp(Context $context, JITVariable $array): void
     {
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {

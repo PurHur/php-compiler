@@ -611,8 +611,6 @@ final class VmReflection
      * @var list<string> lowercase names
      */
     private const REFLECTION_REFERENCE_PROFILE_HIDDEN = [
-        'array_uasort',
-        'array_uksort',
         'frexp',
         'get_debug_backtrace',
         'get_declared_attributes',
