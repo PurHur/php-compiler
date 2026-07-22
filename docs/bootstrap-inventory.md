@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6415 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20443 |
+| Source constructs flagged (warnings) | 20437 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1975,7 +1975,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/Module.php` | 0 | 2 |
 | `ext/spl/MultipleIteratorBuiltin.php` | 0 | 18 |
 | `ext/spl/ParentIteratorBuiltin.php` | 0 | 8 |
-| `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 14 |
+| `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/RecursiveCachingIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/RecursiveTreeIteratorBuiltin.php` | 0 | 6 |
@@ -22412,20 +22412,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/RecursiveArrayIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 33)
-- new RecursiveArrayIteratorConstruct (line 44)
-- new RecursiveArrayIteratorCurrent (line 47)
-- new RecursiveArrayIteratorKey (line 49)
-- new RecursiveArrayIteratorNext (line 51)
-- new RecursiveArrayIteratorRewind (line 53)
-- new RecursiveArrayIteratorValid (line 55)
-- new RecursiveArrayIteratorHasChildren (line 57)
-- new RecursiveArrayIteratorGetChildren (line 60)
-- new RecursiveArrayIteratorCount (line 63)
-- new RecursiveArrayIteratorGetArrayCopy (line 65)
-- new ObjectEntry (line 183)
-- new Variable (line 186)
-- 25 class method(s)
+- new ClassEntry (line 37)
+- new RecursiveArrayIteratorConstruct (line 45)
+- new RecursiveArrayIteratorHasChildren (line 48)
+- new RecursiveArrayIteratorGetChildren (line 51)
+- new ObjectEntry (line 110)
+- new Variable (line 113)
+- new HashTable (line 134)
+- 11 class method(s)
 
 ### `ext/spl/RecursiveCachingIteratorBuiltin.php`
 
@@ -22500,12 +22494,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplArraySerializeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 69)
-- new UnexpectedValueException (line 79)
-- new ObjectEntry (line 142)
-- new SplArraySerialize (line 162)
-- new SplArrayUnserialize (line 164)
-- new ArgumentCountError (line 211)
+- new UnexpectedValueException (line 73)
+- new UnexpectedValueException (line 83)
+- new ObjectEntry (line 146)
+- new SplArraySerialize (line 166)
+- new SplArrayUnserialize (line 168)
+- new ArgumentCountError (line 215)
 - 8 class method(s)
 
 ### `ext/spl/SplArraySortMethod.php`
@@ -22522,20 +22516,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 266)
 - new Variable (line 280)
 - new ObjectEntry (line 296)
-- new Variable (line 307)
-- new Variable (line 317)
-- new Variable (line 323)
-- new Variable (line 404)
-- new Variable (line 406)
-- new HashTable (line 430)
-- new Variable (line 456)
-- new Variable (line 458)
-- new HashTable (line 482)
-- new Variable (line 495)
-- new Variable (line 514)
-- new Variable (line 520)
-- new Variable (line 526)
-- new Variable (line 532)
+- new Variable (line 310)
+- new Variable (line 320)
+- new Variable (line 326)
+- new Variable (line 407)
+- new Variable (line 409)
+- new HashTable (line 433)
+- new Variable (line 459)
+- new Variable (line 461)
+- new HashTable (line 485)
+- new Variable (line 498)
+- new Variable (line 517)
+- new Variable (line 523)
+- new Variable (line 529)
+- new Variable (line 535)
 - 38 class method(s)
 
 ### `ext/spl/SplArrayUserSortMethod.php`

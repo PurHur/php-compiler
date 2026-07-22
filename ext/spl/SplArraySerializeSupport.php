@@ -21,9 +21,13 @@ final class SplArraySerializeSupport
     public const CLASS_ARRAYOBJECT = 'arrayobject';
     public const CLASS_ARRAYITERATOR = 'arrayiterator';
 
+    public const CLASS_RECURSIVEARRAYITERATOR = 'recursivearrayiterator';
+
     public static function isSplArrayClass(string $lcClass): bool
     {
-        return self::CLASS_ARRAYOBJECT === $lcClass || self::CLASS_ARRAYITERATOR === $lcClass;
+        return self::CLASS_ARRAYOBJECT === $lcClass
+            || self::CLASS_ARRAYITERATOR === $lcClass
+            || self::CLASS_RECURSIVEARRAYITERATOR === $lcClass;
     }
 
     /**

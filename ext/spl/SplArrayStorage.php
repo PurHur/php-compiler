@@ -299,7 +299,10 @@ final class SplArrayStorage
         // foreach-by-ref / offset writes on the iterator mutate the ArrayObject (#19444).
         $state = self::state($object);
         $table = $state['table'];
-        if (ArrayIteratorBuiltin::CLASS_LC === $lc) {
+        if (
+            ArrayIteratorBuiltin::CLASS_LC === $lc
+            || RecursiveArrayIteratorBuiltin::CLASS_LC === $lc
+        ) {
             SplArrayStorage::init($entry, $table, $state['flags'], null, []);
         } else {
             SplArrayStorage::init($entry, $table, 0, null, []);
