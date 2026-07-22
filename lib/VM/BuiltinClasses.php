@@ -223,6 +223,7 @@ use PHPCompiler\VM\Builtin\ReflectionExtensionGetFunctions;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetVersion;
 use PHPCompiler\VM\Builtin\ReflectionFiberConstruct;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetCallable;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFile;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingLine;
@@ -1373,6 +1374,7 @@ final class BuiltinClasses
                 'getexecutingline' => new ReflectionFiberGetExecutingLine(),
                 'getexecutingfile' => new ReflectionFiberGetExecutingFile(),
                 'gettrace' => new ReflectionFiberGetTrace(),
+                'getcallable' => new ReflectionFiberGetCallable(),
                 'getexecutingfiber' => new ReflectionFiberGetExecutingFiber(),
             ] as $name => $method
         ) {

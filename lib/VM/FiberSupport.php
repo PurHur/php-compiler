@@ -42,8 +42,12 @@ final class FiberSupport
 
     public static function attachCallback(ObjectEntry $object, Variable $callback): void
     {
-        $closure = VmClosureCall::resolve($callback);
-        $object->fiberState = new FiberState($closure, $object);
+        $resolved = $callback->resolveIndirect();
+        $closure = VmClosureCall::resolve($resolved);
+        $state = new FiberState($closure, $object);
+        // Preserve the exact Closure object Zend returns from ReflectionFiber::getCallable() (#22066).
+        $state->entryCallable->copyFrom($resolved);
+        $object->fiberState = $state;
         $object->constructed = true;
     }
 
