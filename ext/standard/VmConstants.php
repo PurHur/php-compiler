@@ -119,11 +119,14 @@ final class VmConstants
             );
         }
         $constLc = strtolower($constName);
-        $constKey = VmReflection::findClassConstantKey($classEntry, $constName, $ctx);
-        if (null === $constKey) {
+        // Walk parentLc so subclass::CONST (e.g. RecursiveArrayIterator::ARRAY_AS_PROPS) resolves (#22348).
+        $decl = VmReflection::findClassConstantDecl($classEntry, $constName, $ctx);
+        if (null === $decl) {
             return null;
         }
-        $vis = $classEntry->constVisibility[$constLc] ?? CfgFunc::FLAG_PUBLIC;
+        $declaring = $decl['declaring'];
+        $constKey = $decl['constLc'];
+        $vis = $declaring->constVisibility[$constLc] ?? CfgFunc::FLAG_PUBLIC;
         try {
             ClassConstVisibility::assertAccessible(
                 $vis,
@@ -138,16 +141,16 @@ final class VmConstants
             throw new \Error($e->getMessage(), 0, $e);
         }
         $result = new Variable();
-        if ($classEntry->isEnum && null !== $classEntry->backedType) {
-            \PHPCompiler\VM\EnumSupport::ensureBackedEnumValuesUnique($classEntry);
+        if ($declaring->isEnum && null !== $declaring->backedType) {
+            \PHPCompiler\VM\EnumSupport::ensureBackedEnumValuesUnique($declaring);
         }
-        if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $constKey, $result)) {
+        if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($declaring, $constKey, $result)) {
             $result->copyFrom(EnumCaseSupport::materializeConstantValue($ctx, $result));
 
             return $result;
         }
         $result->copyFrom(
-            EnumCaseSupport::materializeConstantValue($ctx, $classEntry->constants[$constKey])
+            EnumCaseSupport::materializeConstantValue($ctx, $declaring->constants[$constKey])
         );
 
         return $result;
