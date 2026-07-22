@@ -78,6 +78,29 @@ class ClassProperty {
         return null !== $this->defaultInitBlock && null !== $this->defaultInitResultSlot;
     }
 
+    /**
+     * True when the property declaration carries a type (incl. explicit `mixed`).
+     *
+     * Compiler stamps untyped prototypes as TYPE_NULL and typed (incl. `mixed`) as
+     * TYPE_UNDEFINED (#4240, #22021). Untyped props without an initializer still have
+     * an implicit null default in Zend (#22047).
+     */
+    public function hasDeclaredType(): bool
+    {
+        $proto = $this->prototype;
+        if (Variable::TYPE_UNDEFINED === $proto->type) {
+            return true;
+        }
+        if (null !== $proto->declaredTypeLabel && '' !== $proto->declaredTypeLabel) {
+            return true;
+        }
+        if (null !== $proto->classConstraint && '' !== $proto->classConstraint) {
+            return true;
+        }
+
+        return $proto->hasDeclaredTypeConstraint();
+    }
+
     public function getVariable(): Variable {
         $var = clone $this->prototype;
         if (

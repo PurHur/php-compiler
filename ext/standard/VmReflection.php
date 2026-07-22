@@ -1803,8 +1803,11 @@ final class VmReflection
         if ($prop->fromConstructorPromotion) {
             return false;
         }
-
-        return null !== $prop->default || $prop->hasRuntimeDefaultInit();
+        if (null !== $prop->default || $prop->hasRuntimeDefaultInit()) {
+            return true;
+        }
+        // Untyped `public $b;` — Zend includes implicit null (#22047, php_reflection.c).
+        return !$prop->hasDeclaredType();
     }
 
     public static function staticPropertyHasDefaultValue(Variable $storage): bool
@@ -1817,8 +1820,14 @@ final class VmReflection
         if ($prop->fromConstructorPromotion) {
             return false;
         }
-
-        return null !== $prop->default && !$prop->hasRuntimeDefaultInit();
+        if ($prop->hasRuntimeDefaultInit()) {
+            return false;
+        }
+        if (null !== $prop->default) {
+            return true;
+        }
+        // Implicit null default is readable without evaluating an init block (#22047).
+        return !$prop->hasDeclaredType();
     }
 
     public static function copyPropertyDefaultValue(Variable $dest, ClassProperty $prop, Context $ctx): bool

@@ -16924,6 +16924,13 @@ restart:
                 $property->defaultInitResultSlot
             );
         }
+        // Untyped property without initializer: Zend implicit null (#22047).
+        if (!$property->fromConstructorPromotion && !$property->hasDeclaredType()) {
+            $copy = new Variable();
+            $copy->null();
+
+            return $copy;
+        }
 
         return null;
     }
