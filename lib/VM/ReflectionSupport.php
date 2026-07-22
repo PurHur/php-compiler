@@ -2593,6 +2593,45 @@ final class ReflectionSupport
         return null !== $decl && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
     }
 
+    /**
+     * ReflectionFunctionAbstract::returnsReference() — FLAG_RETURNS_REF (#22171).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionFunctionAbstract_returnsReference
+     */
+    public static function functionReturnsReference(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $state = $reflection->reflectionClosureState;
+        if (null !== $state) {
+            return self::phpFuncReturnsReference($state->func);
+        }
+        if ($reflection->reflectionIsInternalFunction) {
+            return false;
+        }
+        $func = $ctx->functions[strtolower(self::functionNameFromReflection($reflection))] ?? null;
+
+        return self::phpFuncReturnsReference($func);
+    }
+
+    /**
+     * ReflectionMethod::returnsReference() (#22171).
+     */
+    public static function methodReturnsReference(Context $ctx, ObjectEntry $reflection): bool
+    {
+        [, , $func] = self::resolveReflectedMethod($ctx, $reflection);
+
+        return self::phpFuncReturnsReference($func);
+    }
+
+    private static function phpFuncReturnsReference(?Func $func): bool
+    {
+        if (!$func instanceof Func\PHP) {
+            return false;
+        }
+        $decl = $func->block->func;
+
+        return null !== $decl && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
     /** php-src ext/reflection/php_reflection.c — ReflectionMethod::hasPrototype (#7262). */
     public static function methodHasPrototype(Context $ctx, ClassEntry $entry, string $methodLc): bool
     {

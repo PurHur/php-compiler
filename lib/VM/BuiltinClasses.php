@@ -281,6 +281,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsVariadic;
+use PHPCompiler\VM\Builtin\ReflectionFunctionReturnsReference;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromClosure;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromMethodName;
@@ -305,6 +306,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodIsConstructor;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsDestructor;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsVariadic;
+use PHPCompiler\VM\Builtin\ReflectionMethodReturnsReference;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvoke;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvokeArgs;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetDeclaringClass;
@@ -761,6 +763,8 @@ final class BuiltinClasses
         $rm->methodVisibility['isinternal'] = $pub;
         $rm->methods['isvariadic'] = new ReflectionMethodIsVariadic();
         $rm->methodVisibility['isvariadic'] = $pub;
+        $rm->methods['returnsreference'] = new ReflectionMethodReturnsReference();
+        $rm->methodVisibility['returnsreference'] = $pub;
         $rm->methods['getprototype'] = new ReflectionMethodGetPrototype();
         $rm->methodVisibility['getprototype'] = $pub;
         $rm->methods['invoke'] = new ReflectionMethodInvoke();
@@ -1103,6 +1107,7 @@ final class BuiltinClasses
                 'isstatic' => new ReflectionFunctionIsStatic(),
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
                 'isvariadic' => new ReflectionFunctionIsVariadic(),
+                'returnsreference' => new ReflectionFunctionReturnsReference(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
                 'getextension' => new ReflectionFunctionGetExtension(),
                 'getfilename' => new ReflectionFunctionGetFileName(),
