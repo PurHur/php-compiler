@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_copy via CopyJitHelper PHP (#9585).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer FsGlobVecRuntime #22205).
  * Replaces {@see StringFsDirJit::emitCopy} libc fread/fwrite/chmod LLVM.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::copy()}
  * php-src: ext/standard/file.c — PHP_FUNCTION(copy)
@@ -145,33 +145,12 @@ final class CopyRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CopyJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('CopyJitHelper.php parseAndCompile failed (#9585)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT copy (#9585)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22231'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
