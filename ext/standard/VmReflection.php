@@ -3773,6 +3773,19 @@ final class VmReflection
         return null;
     }
 
+    /**
+     * ReflectionClass/Method::getExtensionName() for internal classes (#22098, ext/reflection/php_reflection.c).
+     */
+    public static function extensionNameForInternalClass(string $className): string
+    {
+        $logical = self::logicalExtensionForInternalClass($className);
+        if (null === $logical || 'core' === $logical) {
+            return 'Core';
+        }
+
+        return $logical;
+    }
+
     /** php-src reflection_extension_get_version — phpversion($extension) (#18326). */
     public static function reflectionExtensionVersion(string $extension): string
     {
