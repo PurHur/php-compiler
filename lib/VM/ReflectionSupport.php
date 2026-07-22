@@ -2835,6 +2835,28 @@ final class ReflectionSupport
     }
 
     /**
+     * ReflectionMethod::getShortName() — method name (not Class::method); php-src (#22167).
+     */
+    public static function methodShortNameFromReflection(ObjectEntry $reflection): string
+    {
+        return self::methodNameFromReflection($reflection);
+    }
+
+    /**
+     * ReflectionMethod::getNamespaceName() — empty for class methods (ns is on the class) (#22167).
+     */
+    public static function methodNamespaceNameFromReflection(ObjectEntry $reflection): string
+    {
+        return '';
+    }
+
+    /** ReflectionMethod::inNamespace() — always false for class methods (#22167). */
+    public static function methodInNamespaceFromReflection(ObjectEntry $reflection): bool
+    {
+        return '' !== self::methodNamespaceNameFromReflection($reflection);
+    }
+
+    /**
      * ReflectionFunction::{getFileName,getStartLine,getEndLine} — false for internals / missing (#22144).
      */
     public static function returnFunctionFileName(?Variable $returnVar, ?SourceLocation $location, bool $isInternal): void
