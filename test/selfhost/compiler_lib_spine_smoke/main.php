@@ -5621,6 +5621,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstance.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInstantiable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInterface.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsInternal.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsIterable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsIterateable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsReadOnly.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassIsStatic.php';
