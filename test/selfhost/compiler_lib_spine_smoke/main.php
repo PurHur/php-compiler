@@ -5694,10 +5694,17 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseIsDeprecate
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetClasses.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetClassNames.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetConstants.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetDependencies.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetFunctions.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetINIEntries.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetVersion.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionInfo.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionIsPersistent.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionIsTemporary.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFiber.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFile.php';

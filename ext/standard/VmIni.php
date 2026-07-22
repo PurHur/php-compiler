@@ -925,6 +925,25 @@ final class VmIni
     }
 
     /**
+     * ReflectionExtension::getINIEntries() — name => local value|null (ext/reflection/php_reflection.c, #22247).
+     *
+     * php-src walks EG(ini_directives) filtered by module_number; unset values are NULL (not '').
+     */
+    public static function reflectionIniEntries(Context $ctx, string $extension): HashTable
+    {
+        $keys = self::keysForExtension($extension);
+        $result = new HashTable();
+        if (null === $keys) {
+            return $result;
+        }
+        foreach ($keys as $key) {
+            $result->add($key, self::detailVar(self::detailLocalValue($ctx, $key)));
+        }
+
+        return $result;
+    }
+
+    /**
      * ini_get_all() — introspection for supported directives (ext/standard/ini.c, #3205).
      *
      * @return HashTable|false
