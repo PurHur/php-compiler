@@ -42051,7 +42051,7 @@ class Compiler {
                 && 0 === (int) $argIndex
                 && \in_array(
                     strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
-                    ['is_array', 'count'],
+                    ['is_array', 'count', 'array_keys'],
                     true
                 )
             ) {
@@ -47321,7 +47321,7 @@ class Compiler {
                 && 0 === (int) $argIndex
                 && \in_array(
                     strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''),
-                    ['is_array', 'count'],
+                    ['is_array', 'count', 'array_keys'],
                     true
                 )
             ) {
@@ -50089,6 +50089,29 @@ class Compiler {
             // array_keys(f()[k] ?? []) — keep coalesce merge slot, not ?? RHS INIT_ARRAY (#16127, re-#16435).
             return;
         }
+        // array_keys(array_flip([...])) — adjacent FuncCall result feeds arg #0; do not steal nested INIT_ARRAY (#21981).
+        if (null !== $block->orig) {
+            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            if (\is_int($callIndex) && $callIndex > 0) {
+                $adjacentIndex = $callIndex - 1;
+                while ($adjacentIndex >= 0) {
+                    $skip = $block->orig->children[$adjacentIndex] ?? null;
+                    if ($skip instanceof Op\Expr\ConstFetch || $skip instanceof Op\Expr\ClassConstFetch) {
+                        --$adjacentIndex;
+                        continue;
+                    }
+                    if ($this->isUnaryInlineSiblingCallArgExpr($skip)) {
+                        --$adjacentIndex;
+                        continue;
+                    }
+                    break;
+                }
+                $adjacent = $block->orig->children[$adjacentIndex] ?? null;
+                if ($adjacent instanceof Op\Expr\FuncCall || $adjacent instanceof Op\Expr\NsFuncCall) {
+                    return;
+                }
+            }
+        }
         $correctOrdinal = $this->inlineArrayKeysHoistedArrayOrdinal($block, $cfgCallOp);
         $correctSlot = null !== $correctOrdinal
             ? $this->slotForInitArrayOrdinal($block, $correctOrdinal, $pendingOps)
@@ -51421,7 +51444,7 @@ class Compiler {
         ?string $calleeName = null
     ): void {
         $callee = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
-        if (!\in_array($callee, ['is_array', 'count'], true) || null === $cfgCallOp || null === $block->orig) {
+        if (!\in_array($callee, ['is_array', 'count', 'array_keys'], true) || null === $cfgCallOp || null === $block->orig) {
             return;
         }
         if (!\is_array($cfgCallOp->args ?? null) || 1 !== \count($cfgCallOp->args)) {
