@@ -260,7 +260,7 @@ final class VmScope
         foreach ($frame->calledArgs as $argIndex => $arg) {
             foreach (self::collectCompactNames($frame, (int) $argIndex + 1, $arg->resolveIndirect()) as $name) {
                 $value = self::resolveCompactVariable($frame, $caller, $name);
-                if (null === $value) {
+                if (null === $value || $value->resolveIndirect()->isUndefined()) {
                     self::compactUndefinedVariableWarning($frame, $name);
                     continue;
                 }
