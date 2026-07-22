@@ -436,6 +436,10 @@ patch_already_applied() {
       grep -qE 'propertyFlags = \$node->flags|\$cfgProp->readonly =|\$prop->readonly =|\$property->readonly =|->readonly = 0 !== \\(\\$node->flags & .*MODIFIER_READONLY\\)' \
         "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-parser-final-property.patch)
+      grep -q 'PHP_COMPILER_FINAL_PROPERTY' \
+        "$ROOT/vendor/nikic/php-parser/lib/PhpParser/ParserAbstract.php" 2>/dev/null
+      ;;
     php-cfg-attribute-groups.patch)
       grep -q "attrGroups'\] = \$expr->attrGroups" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
@@ -5343,6 +5347,37 @@ PY
   return 0
 }
 
+apply_php_parser_final_property_overlay() {
+  local vendor="$ROOT/vendor/nikic/php-parser/lib/PhpParser/ParserAbstract.php"
+  local prelinked="$ROOT/prelinked/bootstrap-vendor/sources/nikic/php-parser/lib/PhpParser/ParserAbstract.php"
+  local target
+  for target in "$vendor" "$prelinked"; do
+    [[ -f "$target" ]] || continue
+    if grep -q 'PHP_COMPILER_FINAL_PROPERTY' "$target" 2>/dev/null; then
+      echo "Skip php-parser-final-property.patch (already applied: ${target#$ROOT/})"
+      continue
+    fi
+    python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+text = path.read_text()
+old = """        if ($node->flags & Class_::MODIFIER_FINAL) {
+            $this->emitError(new Error('Properties cannot be declared final',
+                $this->getAttributesAt($modifierPos)));
+        }"""
+new = """        // PHP_COMPILER_FINAL_PROPERTY: PHP 8.4+ allows final properties (#22241).
+        // Compile gate: PHPCompiler\\CompilerVersion::supportsFinalProperties()."""
+if old not in text:
+    sys.stderr.write(f"php-parser-final-property: checkProperty final-block anchor missing in {path}\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+    echo "Applied php-parser-final-property.patch (${target#$ROOT/})"
+  done
+  return 0
+}
+
 apply_php_cfg_property_readonly_overlay() {
   local prop="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
@@ -6166,6 +6201,10 @@ PY
     apply_php_cfg_property_readonly_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-parser-final-property.patch" ]]; then
+    apply_php_parser_final_property_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-llvm-memory-buffer-bitcode.patch" ]]; then
     apply_php_llvm_memory_buffer_overlay
     return $?
@@ -6218,6 +6257,7 @@ PY
 }
 
 if [[ "${1:-}" != "--verify-only" ]]; then
+apply_patch "$PATCH_DIR/php-parser-final-property.patch"
 apply_patch "$PATCH_DIR/php-llvm-chooser.patch"
 apply_patch "$PATCH_DIR/php-llvm-mcjit-libc-mem.patch"
 apply_patch "$PATCH_DIR/php-llvm-mcjit-libc-mem-llvm7.patch"

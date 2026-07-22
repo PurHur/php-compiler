@@ -4415,6 +4415,7 @@ require_once __DIR__.'/../../../lib/Compiler/EnumParentCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/FinalClassConstCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/FinalClassExtensionCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/FinalMethodOverrideCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/FinalPropertyOverrideCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/FunctionStaticAnonymousClassCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/GeneratorNeverReturnCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/GeneratorStaticMethodCompileCheck.php';

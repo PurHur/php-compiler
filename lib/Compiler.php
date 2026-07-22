@@ -37,6 +37,7 @@ use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
+use PHPCompiler\VM\ClassFinal;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\LazyPropertyRewriter;
@@ -71,6 +72,7 @@ use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\ImplementsHierarchyCompileCheck;
 use PHPCompiler\VM\ImplementsHierarchyRuntimeCheck;
 use PHPCompiler\Compiler\FinalMethodOverrideCheck;
+use PHPCompiler\Compiler\FinalPropertyOverrideCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Compiler\GeneratorNeverReturnCompileCheck;
@@ -543,6 +545,7 @@ class Compiler {
         FinalClassExtensionCheck::validate($script);
         ImplementsHierarchyCompileCheck::validate($script);
         FinalMethodOverrideCheck::validate($script);
+        FinalPropertyOverrideCheck::validate($script, $this->propertyHookRegistry);
         OverrideValidator::validateScript($script);
         FinalClassConstCheck::validate($script);
         TraitClassConstConflictCheck::validate($script);
@@ -7241,6 +7244,10 @@ class Compiler {
                             || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyLazy = (property_exists($child, 'propertyLazy') && $child->propertyLazy)
                             || LazyPropertyRewriter::isLazyFromAttributes($child->getAttributes());
+                        $declare->propertyFinal = $this->isFinalPropertyDeclaration($child);
+                        if ($declare->propertyFinal && !CompilerVersion::supportsFinalProperties()) {
+                            $this->throwCompileError('Properties cannot be declared final');
+                        }
                     }
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeTargetValidator::assertEntriesForTarget(
@@ -7973,6 +7980,20 @@ class Compiler {
     protected function isReadonlyPropertyFlags(int $flags): bool
     {
         return 0 !== ($flags & ClassReadonly::MODIFIER_READONLY);
+    }
+
+    /**
+     * PHP 8.4 final property from php-parser MODIFIER_FINAL (#22241).
+     *
+     * Hooked finals strip `final` before parse and set registry finalProperty (#16799).
+     */
+    protected function isFinalPropertyDeclaration(Op\Stmt\Property $prop): bool
+    {
+        if (property_exists($prop, 'propertyFlags') && ClassFinal::fromClassFlags((int) $prop->propertyFlags)) {
+            return true;
+        }
+
+        return ClassFinal::fromClassFlags((int) $prop->visibility);
     }
 
     protected function isPromotedParamReadonly(Op\Expr\Param $param): bool
