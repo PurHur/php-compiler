@@ -6785,18 +6785,24 @@ class JIT {
         );
         $bb = $func->appendBasicBlock('stub');
         $saved = $this->context->builder;
+        $savedActive = $this->context->activeFunction;
         $this->context->builder = $this->context->context->builderCreate();
         $this->context->builder->positionAtEnd($bb);
+        // Register before defaults: string defaults need entryAlloca/parentFunction (#21972).
+        // Collect while insert is live — after clearInsertionPosition main may be null.
+        $this->context->functions[$lcname] = $func;
+        $this->context->activeFunction = $lcname;
+        $defaultArgs = $this->collectParamDefaults($block);
         $this->emitSelfHostStubReturn($callbackType, $func);
         $this->context->builder->clearInsertionPosition();
         $this->context->builder = $saved;
-        $this->context->functions[$lcname] = $func;
+        $this->context->activeFunction = $savedActive;
         $this->context->functionReturnType[$lcname] = $callbackType;
         $this->context->functionProxies[$lcname] = new JIT\Call\Native(
             $func,
             $logicalName,
             $args,
-            $this->collectParamDefaults($block)
+            $defaultArgs
         );
         if (null !== $logicalName) {
             JIT\NoDiscardCallGuard::registerCallee($this->context, $logicalName, $block);

@@ -11,6 +11,7 @@ use PHPLLVM\BasicBlock;
  *
  * Also clears outer emit-helper / self-host stub env so NestedJIT lowers real helper bodies
  * (e.g. VmUrlRewriterOb during RewriteVarsRuntime — #21965, peer SELFHOST_AOT clear).
+ *
  */
 final class NestedJitCompileScope
 {
