@@ -271,6 +271,8 @@ class OpCode {
 
     /** TYPE_DECLARE_PROPERTY: property is readonly (#3149, #3432). */
     public bool $propertyReadonly = false;
+    /** TYPE_DECLARE_PROPERTY: PHP 8.4 final modifier — ZEND_ACC_FINAL (#22241, #20511). */
+    public bool $propertyFinal = false;
     /** TYPE_DECLARE_PROPERTY: PHP 8.4 lazy modifier — deferred default init (#16813). */
     public bool $propertyLazy = false;
     /** TYPE_DECLARE_PROPERTY: constructor promotion (#4758, #5091). */

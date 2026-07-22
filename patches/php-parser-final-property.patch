@@ -1,0 +1,16 @@
+--- vendor/nikic/php-parser/lib/PhpParser/ParserAbstract.php
++++ vendor/nikic/php-parser/lib/PhpParser/ParserAbstract.php
+@@ -1040,10 +1040,8 @@
+             $this->emitError(new Error('Properties cannot be declared abstract',
+                 $this->getAttributesAt($modifierPos)));
+         }
+ 
+-        if ($node->flags & Class_::MODIFIER_FINAL) {
+-            $this->emitError(new Error('Properties cannot be declared final',
+-                $this->getAttributesAt($modifierPos)));
+-        }
++        // PHP_COMPILER_FINAL_PROPERTY: PHP 8.4+ allows final properties (#22241).
++        // Compile gate: PHPCompiler\CompilerVersion::supportsFinalProperties().
+     }
+ 
+     protected function checkUseUse(UseUse $node, $namePos) {
