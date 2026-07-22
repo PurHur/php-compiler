@@ -9,8 +9,10 @@ use PHPCompiler\ext\curl\CurlConstants;
 use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\fileinfo\FileinfoConstants;
 use PHPCompiler\ext\filter\FilterConstants;
+use PHPCompiler\ext\ftp\FtpConstants;
 use PHPCompiler\ext\gd\GdConstants;
 use PHPCompiler\ext\gd\GdExtensionPolicy;
+use PHPCompiler\ext\gmp\GmpConstants;
 use PHPCompiler\ext\hash\MhashRegistry;
 use PHPCompiler\ext\iconv\IconvConstants;
 use PHPCompiler\ext\inotify\InotifyConstants;
@@ -19,13 +21,20 @@ use PHPCompiler\ext\ldap\LdapConstants;
 use PHPCompiler\ext\ldap\LdapExtensionPolicy;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\mbstring\MbstringConstants;
+use PHPCompiler\ext\mysqli\MysqliConstants;
+use PHPCompiler\ext\odbc\OdbcConstants;
 use PHPCompiler\ext\openssl\OpensslConstants;
 use PHPCompiler\ext\pcntl\PcntlConstants;
+use PHPCompiler\ext\pgsql\PgsqlConstants;
 use PHPCompiler\ext\posix\PosixConstants;
+use PHPCompiler\ext\pspell\PspellConstants;
 use PHPCompiler\ext\random\RandomConstants;
 use PHPCompiler\ext\session\SessionConstants;
+use PHPCompiler\ext\soap\SoapConstants;
 use PHPCompiler\ext\sockets\SocketConstants;
 use PHPCompiler\ext\sodium\SodiumConstants;
+use PHPCompiler\ext\sysvmsg\SysvmsgConstants;
+use PHPCompiler\ext\tidy\TidyConstants;
 use PHPCompiler\ext\tokenizer\TokenConstants;
 use PHPCompiler\ext\uuid\UuidConstants;
 use PHPCompiler\ext\xml\XmlConstants;
@@ -88,6 +97,16 @@ final class ExtensionConstantGroups
         if (\PHPCompiler\ext\sodium\SodiumExtensionPolicy::advertisesExtension()) {
             $groups['sodium'] = SodiumConstants::registeredConstants();
         }
+        // Module buckets for extensions that register into Context::$constants (#22337 / re-#19113).
+        $groups['ftp'] = FtpConstants::registeredConstants();
+        $groups['mysqli'] = MysqliConstants::registeredConstants();
+        $groups['gmp'] = GmpConstants::registeredConstants();
+        $groups['soap'] = SoapConstants::registeredConstants();
+        $groups['tidy'] = TidyConstants::registeredConstants();
+        $groups['pgsql'] = PgsqlConstants::registeredConstants();
+        $groups['pspell'] = PspellConstants::registeredConstants();
+        $groups['odbc'] = OdbcConstants::registeredConstants();
+        $groups['sysvmsg'] = SysvmsgConstants::registeredConstants();
 
         return $groups;
     }
