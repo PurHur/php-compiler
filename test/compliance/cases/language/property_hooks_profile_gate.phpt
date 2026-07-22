@@ -1,13 +1,13 @@
 --TEST--
-Language: property hooks on default 8.4.0-dev profile (#19952, Zend/zend_compile.c)
+Language: property hooks rejected on default reference profile (#22371, re-#18531, Zend/zend_language_parser.y)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
 putenv('PHP_COMPILER_PROFILE');
-if (!PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
-    die('skip default profile does not enable property hooks');
+if (PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+    die('skip property hooks unexpectedly enabled on default profile');
 }
 ?>
 --FILE--
@@ -18,8 +18,7 @@ class User {
         get => $this->name;
     }
 }
-$u = new User();
-$u->name = "alice";
-echo $u->name . "\n";
---EXPECT--
-Alice
+--EXPECT_EXIT--
+255
+--EXPECTF--
+Parse error: syntax error, unexpected token "{", expecting "," or ";" in %s on line %d

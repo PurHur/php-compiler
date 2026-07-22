@@ -1053,18 +1053,14 @@ final class CompilerVersion
     /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
-     * Explicit `PHP_COMPILER_PROFILE=8.2` rejects like Zend 8.2 (#14062, #18019). Unset profile on
-     * 8.4.0-dev enables hooks (#19952); `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+ also enables.
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile (reported PHP_VERSION
+     * 8.2.x) rejects like Zend 8.2 (#22371, re-#18531 / #19952). Explicit `PHP_COMPILER_PROFILE=8.2`
+     * still rejects; `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+ enables.
      * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
      */
     public static function supportsPropertyHooks(): bool
     {
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
-        }
-
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
@@ -1209,8 +1205,8 @@ final class CompilerVersion
      * ext/reflection/php_reflection.c, #17493, #20511, #22309).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (methods absent). Do not tie to {@see supportsPropertyHooks()} — that enables hook *syntax* on
-     * default 8.4.0-dev (#19952) while Zend 8.2 still lacks these ReflectionProperty methods (#22309).
+     * (methods absent). Same gate as {@see supportsPropertyHooks()} (#22371); kept separate so Reflection
+     * probes can diverge if php-src ever ships methods without hook syntax.
      * Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionPropertyHookProbes(): bool

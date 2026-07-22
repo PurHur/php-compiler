@@ -1219,12 +1219,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsPropertyHooksTrueOn84DevDefaultProfile(): void
+    public function testSupportsPropertyHooksFalseOn84DevDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsPropertyHooks());
+            // 8.4.0-dev languageProfileVersion is < 8.4.0 — match Zend 8.2 / reported 8.2.x (#22371).
+            $this->assertFalse(CompilerVersion::supportsPropertyHooks());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
