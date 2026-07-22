@@ -1798,6 +1798,12 @@ final class VmReflection
 
     public static function propertyHasDefaultValue(ClassProperty $prop): bool
     {
+        // Constructor-promoted properties: default lives on the parameter, not the
+        // property AST (php-src zend_compile.c / zim_reflection_property_hasDefaultValue) (#22046).
+        if ($prop->fromConstructorPromotion) {
+            return false;
+        }
+
         return null !== $prop->default || $prop->hasRuntimeDefaultInit();
     }
 
@@ -1808,11 +1814,18 @@ final class VmReflection
 
     public static function propertyDefaultValueIsAvailable(ClassProperty $prop): bool
     {
+        if ($prop->fromConstructorPromotion) {
+            return false;
+        }
+
         return null !== $prop->default && !$prop->hasRuntimeDefaultInit();
     }
 
     public static function copyPropertyDefaultValue(Variable $dest, ClassProperty $prop, Context $ctx): bool
     {
+        if ($prop->fromConstructorPromotion) {
+            return false;
+        }
         $value = $ctx->runtime->vm()->evaluatePropertyDefaultForReflection($prop);
         if (null === $value) {
             return false;

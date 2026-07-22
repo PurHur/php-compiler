@@ -16908,6 +16908,10 @@ restart:
     /** Evaluate declared default for ReflectionProperty::getDefaultValue() (#11239). */
     public function evaluatePropertyDefaultForReflection(VM\ClassProperty $property): ?Variable
     {
+        // Promoted ctor props: param default is not a property default (#22046).
+        if ($property->fromConstructorPromotion) {
+            return null;
+        }
         if (null !== $property->default && !$property->hasRuntimeDefaultInit()) {
             $copy = new Variable();
             $copy->copyFrom($property->default);
