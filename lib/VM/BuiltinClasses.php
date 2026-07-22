@@ -151,6 +151,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassIsInterface;
 use PHPCompiler\VM\Builtin\ReflectionClassIsTrait;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInstantiable;
+use PHPCompiler\VM\Builtin\ReflectionClassIsCloneable;
 use PHPCompiler\VM\Builtin\ReflectionClassIsIterateable;
 use PHPCompiler\VM\Builtin\ReflectionClassIsIterable;
 use PHPCompiler\VM\Builtin\ReflectionClassIsReadOnly;
@@ -857,6 +858,8 @@ final class BuiltinClasses
         $rc->methodVisibility['isinstance'] = $pub;
         $rc->methods['isinstantiable'] = new ReflectionClassIsInstantiable();
         $rc->methodVisibility['isinstantiable'] = $pub;
+        $rc->methods['iscloneable'] = new ReflectionClassIsCloneable();
+        $rc->methodVisibility['iscloneable'] = $pub;
         $rc->methods['newinstance'] = new ReflectionClassNewInstance();
         $rc->methodVisibility['newinstance'] = $pub;
         $rc->methods['newinstanceargs'] = new ReflectionClassNewInstanceArgs();

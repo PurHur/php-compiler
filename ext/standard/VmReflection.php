@@ -2660,6 +2660,29 @@ final class VmReflection
         return $chain;
     }
 
+    /**
+     * php-src zim_ReflectionClass_isCloneable — ce->clone public flag or default clone_obj (#22109).
+     */
+    public static function reflectionClassIsCloneable(ClassEntry $entry, Context $ctx): bool
+    {
+        if ($entry->isInterface || $entry->isTrait || $entry->isEnum || $entry->isAbstract) {
+            return false;
+        }
+        if ([] !== $entry->abstractMethods) {
+            return false;
+        }
+        $cloneLc = '__clone';
+        foreach (self::classHierarchyChain($entry, $ctx) as $class) {
+            if (isset($class->methods[$cloneLc])) {
+                $vis = $class->methodVisibility[$cloneLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+
+                return ($vis & \PHPCfg\Func::FLAG_PUBLIC) !== 0;
+            }
+        }
+
+        return true;
+    }
+
     public static function matchesReflectionVisibilityFilter(int $cfgVisibility, int $filter): bool
     {
         return self::propertyMatchesReflectionFilter($cfgVisibility, false, $filter);
