@@ -1544,6 +1544,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'stream_resource_compare') && !str_contains($name, '_jit')) {
                 continue;
             }
+            // DateTime format-constant ReflectionClass map: VM + AOT (#22271); MCJIT Reflection unstable — light *_jit.phpt.
+            if (str_contains($name, 'datetime_format_constants_defined') && !str_contains($name, '_jit')) {
+                continue;
+            }
             // DatePeriod option-flag ReflectionClass map: VM + AOT (#20071); MCJIT OOM on Reflection — light *_jit.phpt.
             if (str_contains($name, 'dateperiod_option_flags_defined') && !str_contains($name, '_jit')) {
                 continue;
