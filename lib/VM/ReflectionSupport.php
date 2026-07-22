@@ -81,6 +81,11 @@ final class ReflectionSupport
 
     public const REFLECTION_GENERATOR = 'reflectiongenerator';
 
+    public const REFLECTION_REFERENCE = 'reflectionreference';
+
+    /** Opaque getId() payload on ReflectionReference instances (#22065). */
+    public const PROP_REFLECTION_REFERENCE_ID = 'referenceId';
+
     public const PROP_CLASS_NAME = 'name';
 
     public const PROP_METHOD_NAME = 'method';
@@ -801,6 +806,20 @@ final class ReflectionSupport
         $obj = $receiver->toObject();
         if (strtolower($obj->class->name) !== self::REFLECTION_GENERATOR) {
             throw new \LogicException('Expected ReflectionGenerator instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionReference(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionReference method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_REFERENCE) {
+            throw new \LogicException('Expected ReflectionReference instance');
         }
 
         return $obj;

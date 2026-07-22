@@ -5839,6 +5839,9 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetRawValue.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetRawValueWithoutLazyInitialization.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySkipLazyInitialization.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionReferenceConstruct.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionReferenceFromArrayElement.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionReferenceGetId.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionSourceGetter.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionTypeAllowsNull.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionTypeToString.php';
@@ -5991,6 +5994,7 @@ require_once __DIR__.'/../../../lib/VM/ReferencableCheck.php';
 require_once __DIR__.'/../../../lib/VM/ReflectionPropertyHookSupport.php';
 require_once __DIR__.'/../../../lib/VM/ReflectionPropertyTypeSupport.php';
 require_once __DIR__.'/../../../lib/VM/ReflectionSupport.php';
+require_once __DIR__.'/../../../lib/VM/ReflectionReferenceSupport.php';
 require_once __DIR__.'/../../../lib/VM/ReflectionTypeSupport.php';
 require_once __DIR__.'/../../../lib/VM/ReservedBuiltinClass.php';
 require_once __DIR__.'/../../../lib/VM/ResourceState.php';
