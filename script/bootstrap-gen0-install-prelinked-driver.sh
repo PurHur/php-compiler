@@ -121,8 +121,51 @@ bootstrap_gen0_seed_prelinked_m3_sidecars() {
     chmod +x "${root}/build/$(basename "${sidecar}")" 2>/dev/null || true
   done
   shopt -u nullglob
+  # #22178: ready-stub .m3_compile_driver_aot_blob ignores COMPILE_MODE/argv; prefer gen-0 argv driver.
+  bootstrap_gen0_repair_compile_driver_ready_stub || true
   bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
   bootstrap_lowering_source_seed_build_stamp_from_prelinked 2>/dev/null || true
+  return 0
+}
+
+# Replace ready-echo compile_driver sidecar with gen-0 bin/compile argv driver when present (#22178).
+bootstrap_gen0_repair_compile_driver_ready_stub() {
+  local root="${ROOT:-}"
+  local cd_blob bin_blob prelinked_bin
+  if [[ -z "${root}" ]]; then
+    return 1
+  fi
+  cd_blob="${root}/build/.m3_compile_driver_aot_blob"
+  bin_blob="${root}/build/.m3_bin_compile_aot_blob"
+  prelinked_bin="${root}/prelinked/bootstrap-gen0/.m3_bin_compile_aot_blob"
+  if [[ ! -x "${bin_blob}" || ! -s "${bin_blob}" ]]; then
+    if [[ -x "${prelinked_bin}" && -s "${prelinked_bin}" ]] \
+      && ! bootstrap_gen0_prelinked_sidecar_looks_stale "${prelinked_bin}"; then
+      mkdir -p "${root}/build"
+      cp -f "${prelinked_bin}" "${bin_blob}"
+      chmod +x "${bin_blob}"
+    else
+      return 1
+    fi
+  fi
+  local need_repair=0
+  if [[ ! -x "${cd_blob}" || ! -s "${cd_blob}" ]]; then
+    need_repair=1
+  elif cmp -s "${cd_blob}" "${bin_blob}"; then
+    return 0
+  else
+    # Ready-stub prints only this line and never enters emitMainEntry (#22178 / re-#21860).
+    if "${cd_blob}" 2>/dev/null | grep -q 'compiler_helloworld_compile_driver ready'; then
+      need_repair=1
+    fi
+  fi
+  if [[ "${need_repair}" -ne 1 ]]; then
+    return 0
+  fi
+  mkdir -p "${root}/build"
+  cp -f "${bin_blob}" "${cd_blob}"
+  chmod +x "${cd_blob}"
+  echo "bootstrap-gen0-install: repaired ready-stub .m3_compile_driver_aot_blob from gen-0 argv driver (#22178)" >&2
   return 0
 }
 
