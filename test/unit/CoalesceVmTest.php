@@ -79,6 +79,35 @@ echo $u["k"], "\n";
         );
     }
 
+    /** Issue #21992: ??= / dim-write on undefined or null container auto-vivifies (zend_execute.c). */
+    public function testNullCoalesceAssignDimAutovivifyUndefAndNull(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$b["k"] ??= "y";
+echo $b["k"], "\n";
+$c = null;
+$c["k"] ??= "y";
+var_export($c);
+echo "\n";
+$d["k"] = "z";
+echo $d["k"], "\n";
+$e = null;
+$e["k"] = "z";
+var_export($e);
+echo "\n";
+try {
+    $i = 0;
+    $i["k"] ??= "no";
+    echo "scalar-ok\n";
+} catch (Error $err) {
+    echo get_class($err), ": ", $err->getMessage(), "\n";
+}
+',
+            "y\narray (\n  'k' => 'y',\n)\nz\narray (\n  'k' => 'z',\n)\nError: Cannot use a scalar value as an array\n"
+        );
+    }
+
     public function testNullCoalesceAssign(): void
     {
         $this->assertVmOutput(

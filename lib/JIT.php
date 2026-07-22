@@ -7762,6 +7762,11 @@ class JIT {
                     }
                     $resultOp = $block->getOperand($op->arg1);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($resultOp);
+                    // ZEND_FETCH_DIM_W: compile-time null container auto-vivifies (#21992).
+                    if ($forWrite && Variable::TYPE_NULL === $value->type) {
+                        JIT\HashTableHelper::initArray($this->context, $value);
+                        $this->context->setVariableOp($block->getOperand($op->arg2), $value);
+                    }
                     if (null === $op->arg3) {
                         $bracketLabel = Variable::cannotUseBracketLabel($value->type);
                         if (null !== $bracketLabel) {

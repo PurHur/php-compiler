@@ -1592,6 +1592,18 @@ final class HashTableWriteLlvm
         if ($result->type & Variable::IS_NATIVE_ARRAY) {
             return;
         }
+        if (Variable::TYPE_NULL === $result->type) {
+            // FETCH_DIM_W / []= on null auto-vivifies (#21992, zend_execute.c).
+            $slot = BasicBlockHelper::entryAlloca(
+                $context,
+                $context->getTypeFromString('__hashtable__*')
+            );
+            $result->free();
+            $result->type = Variable::TYPE_HASHTABLE;
+            $result->kind = Variable::KIND_VARIABLE;
+            $result->value = $slot;
+            $result->initialize();
+        }
         if (Variable::TYPE_STRING === $result->type) {
             // Inline include may bind array-literal temps to inherited string slots (#16866).
             $slot = BasicBlockHelper::entryAlloca(
