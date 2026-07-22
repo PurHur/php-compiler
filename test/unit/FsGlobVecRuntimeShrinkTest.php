@@ -9,7 +9,10 @@ use PHPCompiler\ext\standard\VmDir;
 use PHPCompiler\ext\standard\VmFsGlob;
 use PHPUnit\Framework\TestCase;
 
-/** StringFsGlobVecJit routes through FsGlobJitHelper PHP not libc LLVM (#11515, #12909). */
+/**
+ * StringFsGlobVecJit routes through FsGlobJitHelper PHP not libc LLVM (#11515, #12909).
+ * NestedJIT via JitVmHelperLink::ensureCompiled (#22205 / peer #22187).
+ */
 final class FsGlobVecRuntimeShrinkTest extends TestCase
 {
     public function testStringFsGlobVecJitIsThinDispatcher(): void
@@ -21,6 +24,19 @@ final class FsGlobVecRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitScandirVec', $source);
         $this->assertLessThan(25, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/FsGlobVecStandaloneLlvm.php');
+    }
+
+    public function testFsGlobVecRuntimeUsesJitVmHelperLink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/FsGlobVecRuntime.php');
+        $this->assertStringContainsString('FsGlobJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertLessThan(70, \substr_count($source, "\n") + 1);
     }
 
     public function testJitFsGlobUsesFsGlobJitHelperOnEmbedAndStandalone(): void
