@@ -51,6 +51,38 @@ final class VmPhpMemoryStreamRuntimeShrinkTest extends TestCase
         VmFs::fclose($handle);
     }
 
+    /** php-src memory.c — seek past fsize fails; stream_get_contents returns false (#21986). */
+    public function testSeekPastEndFailsAndStreamGetContentsReturnsFalse(): void
+    {
+        $handle = VmPhpMemoryStream::open('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        VmPhpMemoryStream::write($handle, 'abcdef');
+        $this->assertSame(0, VmPhpMemoryStream::seek($handle, 0, SEEK_SET));
+        $this->assertSame(-1, VmPhpMemoryStream::seek($handle, 100, SEEK_SET));
+        $this->assertSame(0, VmPhpMemoryStream::seek($handle, 6, SEEK_SET));
+        $this->assertSame(-1, VmPhpMemoryStream::seek($handle, 7, SEEK_SET));
+        VmPhpMemoryStream::close($handle);
+
+        $fs = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($fs);
+        VmFs::fwrite($fs, 'abcdef');
+        VmFs::rewind($fs);
+        $prev = set_error_handler(static function (): bool {
+            return true;
+        });
+        try {
+            $result = VmFs::streamGetContents($fs, 1, 100);
+        } finally {
+            restore_error_handler();
+            if (null !== $prev) {
+                set_error_handler($prev);
+            }
+        }
+        $this->assertFalse($result);
+        $this->assertSame(-1, VmFs::fseek($fs, 100));
+        VmFs::fclose($fs);
+    }
+
     public function testMemoryStreamFgetsAndStreamGetLine(): void
     {
         $handle = VmFs::fopen('php://memory', 'r+');
@@ -115,12 +147,13 @@ final class VmPhpMemoryStreamRuntimeShrinkTest extends TestCase
         VmFs::fclose($handle);
     }
 
-    public function testFtellPastEofOnEmptyMemoryStreamReturnsFalse(): void
+    /** php-src memory.c — seek past fsize fails; position unchanged (#21986). */
+    public function testFseekPastEofOnEmptyMemoryStreamFails(): void
     {
         $handle = VmFs::fopen('php://memory', 'r+');
         $this->assertNotFalse($handle);
-        $this->assertSame(0, VmFs::fseek($handle, 99));
-        $this->assertFalse(VmFs::ftell($handle));
+        $this->assertSame(-1, VmFs::fseek($handle, 99));
+        $this->assertSame(0, VmFs::ftell($handle));
         $this->assertSame(0, VmFs::fseek($handle, 0));
         $this->assertSame(0, VmFs::ftell($handle));
         VmFs::fclose($handle);

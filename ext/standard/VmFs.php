@@ -886,6 +886,35 @@ final class VmFs
         return $written;
     }
 
+    /**
+     * php-src ext/standard/file.c — stream_get_contents seek failure (#21986).
+     */
+    public static function warnStreamGetContentsSeekFailed(int $offset): void
+    {
+        $message = \sprintf(
+            'stream_get_contents(): Failed to seek to position %d in the stream',
+            $offset
+        );
+        $vm = VM::running();
+        if (null === $vm) {
+            @\trigger_error($message, \E_USER_WARNING);
+
+            return;
+        }
+        $frame = $vm->builtinHandlerFrame();
+        if (null === $frame) {
+            $frames = $vm->context->runStackFrames();
+            $frame = [] !== $frames ? $frames[0] : null;
+        }
+        $vm->context->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            null,
+            $vm->context,
+            $frame
+        );
+    }
+
     private static function warnLockExNonRegularFile(): void
     {
         $message = 'file_put_contents(): Exclusive locks may only be set for regular files';
@@ -2256,6 +2285,8 @@ final class VmFs
             return false;
         }
         if ($offset >= 0 && 0 !== @\fseek($fp, $offset, \SEEK_SET)) {
+            self::warnStreamGetContentsSeekFailed($offset);
+
             return false;
         }
         if ($maxlength < 0) {

@@ -436,6 +436,8 @@ final class VmPhpFdStream
             return false;
         }
         if ($offset >= 0 && 0 !== self::seek($handle, $offset, self::SEEK_SET)) {
+            VmFs::warnStreamGetContentsSeekFailed($offset);
+
             return false;
         }
         if ($maxlength < 0) {
