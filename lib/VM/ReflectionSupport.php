@@ -2975,6 +2975,20 @@ final class ReflectionSupport
         return null !== $reflection->reflectionClosureState;
     }
 
+    /**
+     * php-src: ReflectionFunctionAbstract::isStatic() for ReflectionFunction (#22024).
+     * Named/internal functions are never static; closures report ZEND_ACC_STATIC / FLAG_STATIC.
+     */
+    public static function isReflectionFunctionStatic(ObjectEntry $reflection): bool
+    {
+        $state = $reflection->reflectionClosureState;
+        if (null === $state) {
+            return false;
+        }
+
+        return $state->isStaticClosure();
+    }
+
     public static function newReflectionClassObjectForName(Context $ctx, string $className): ObjectEntry
     {
         $entry = VmReflection::resolveClassEntry($ctx, $className);

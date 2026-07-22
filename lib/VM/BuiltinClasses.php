@@ -254,6 +254,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionIsClosure;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsGenerator;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsVariadic;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
@@ -1040,6 +1041,7 @@ final class BuiltinClasses
                 'isclosure' => new ReflectionFunctionIsClosure(),
                 'isgenerator' => new ReflectionFunctionIsGenerator(),
                 'isinternal' => new ReflectionFunctionIsInternal(),
+                'isstatic' => new ReflectionFunctionIsStatic(),
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
                 'isvariadic' => new ReflectionFunctionIsVariadic(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
