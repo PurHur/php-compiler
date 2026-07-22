@@ -185,6 +185,22 @@ final class ErrorReporter
         );
     }
 
+    /**
+     * Zend/zend_execute.c — multi-byte RHS assigned to a string offset keeps only byte 0 (#22380).
+     */
+    public function onlyFirstByteAssignedToStringOffset(
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            Variable::STRING_OFFSET_FIRST_BYTE_WARNING,
+            $context,
+            $frame,
+            $file
+        );
+    }
+
     public function undefinedVariable(
         string $name,
         ?Context $context = null,
