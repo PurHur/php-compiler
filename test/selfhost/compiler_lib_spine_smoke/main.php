@@ -5579,8 +5579,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ExceptionWakeup.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberGetCurrent.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberGetReturn.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/FiberGetTrace.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/FiberGetTraceAsString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberIsRunning.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberIsStarted.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberIsSuspended.php';

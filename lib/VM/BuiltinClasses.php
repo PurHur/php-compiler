@@ -73,8 +73,6 @@ use PHPCompiler\VM\Builtin\ExceptionWakeup;
 use PHPCompiler\VM\Builtin\FiberConstruct;
 use PHPCompiler\VM\Builtin\FiberGetCurrent;
 use PHPCompiler\VM\Builtin\FiberGetReturn;
-use PHPCompiler\VM\Builtin\FiberGetTrace;
-use PHPCompiler\VM\Builtin\FiberGetTraceAsString;
 use PHPCompiler\VM\Builtin\FiberIsRunning;
 use PHPCompiler\VM\Builtin\FiberIsStarted;
 use PHPCompiler\VM\Builtin\FiberIsSuspended;
@@ -1942,8 +1940,7 @@ final class BuiltinClasses
                 'isrunning' => new FiberIsRunning(),
                 'isterminated' => new FiberIsTerminated(),
                 'getreturn' => new FiberGetReturn(),
-                'gettrace' => new FiberGetTrace(),
-                'gettraceasstring' => new FiberGetTraceAsString(),
+                // php-src Fiber has no getTrace/getTraceAsString — use ReflectionFiber::getTrace (#22562).
             ] as $name => $method
         ) {
             $entry->methods[$name] = $method;
