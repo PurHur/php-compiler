@@ -16,7 +16,8 @@ use PHPLLVM\Value;
 /**
  * socket_export_stream() — Socket to stream resource (php-src ext/sockets/sockets.c; #6349).
  *
- * Inverse of socket_import_stream(); returns the VmFs handle backing an imported Socket.
+ * Inverse of socket_import_stream(); returns the VmFs handle for imported Sockets,
+ * or wraps a socket_create() fd as a stream (#6349, #22542).
  */
 final class socket_export_stream extends Internal
 {

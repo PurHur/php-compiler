@@ -20968,12 +20968,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/VmSocket.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 56)
-- new ObjectEntry (line 86)
-- new Variable (line 231)
-- new ObjectEntry (line 232)
-- new Variable (line 320)
-- 23 class method(s)
+- new ClassEntry (line 57)
+- new ObjectEntry (line 87)
+- new Variable (line 232)
+- new ObjectEntry (line 233)
+- new Variable (line 353)
+- 26 class method(s)
 
 ### `ext/sockets/VmSocketAddrinfo.php`
 
@@ -21109,7 +21109,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/socket_export_stream.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 33)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -51655,7 +51655,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 250)
 - new Variable (line 434)
 - new Error (line 464)
-- 49 class method(s)
+- 50 class method(s)
 - 1 closure(s)
 
 ### `lib/VM/TypedPropertyCheck.php`

@@ -10,6 +10,7 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsStdio;
+use PHPCompiler\ext\standard\VmPhpFdStream;
 use PHPCompiler\ext\standard\VmStreamMeta;
 
 /**
@@ -288,11 +289,34 @@ final class VmSocket
         return null !== $object && 0 === strcasecmp($object->class->name, 'Socket');
     }
 
-    public static function streamHandleForObject(ObjectEntry $object): ?int
+    /**
+     * Existing import/export VmFs handle only — does not allocate (#22542).
+     * Use {@see streamHandleForObject()} when export may need to wrap a created fd.
+     */
+    public static function existingStreamHandleForObject(ObjectEntry $object): ?int
     {
         $handle = self::$streamHandles[$object->id] ?? null;
+        if (null === $handle) {
+            return null;
+        }
+        if (!VmFs::isValidHandle($handle)) {
+            unset(self::$streamHandles[$object->id]);
 
-        return null !== $handle && VmFs::isValidHandle($handle) ? $handle : null;
+            return null;
+        }
+
+        return $handle;
+    }
+
+    public static function streamHandleForObject(ObjectEntry $object): ?int
+    {
+        $handle = self::existingStreamHandleForObject($object);
+        if (null !== $handle) {
+            return $handle;
+        }
+
+        // socket_create() sockets have a live fd but no import stream — wrap for export (#22542).
+        return self::ensureExportStreamHandle($object->id, $object);
     }
 
     /** VM object id or JIT object address (ptrToInt). */
@@ -302,12 +326,21 @@ final class VmSocket
             return null;
         }
         $handle = self::$streamHandles[$key] ?? null;
+        if (null !== $handle) {
+            if (VmFs::isValidHandle($handle)) {
+                return $handle;
+            }
+            unset(self::$streamHandles[$key]);
+        }
 
-        return null !== $handle && VmFs::isValidHandle($handle) ? $handle : null;
+        return self::ensureExportStreamHandle($key, null);
     }
 
     /**
-     * socket_export_stream() — return VmFs stream handle for imported Socket (#6349).
+     * socket_export_stream() — VmFs stream for imported or created Socket (#6349, #22542).
+     *
+     * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_export_stream)
+     * wraps php_sock->bsd_socket in a php_stream (including socket_create fds).
      *
      * @return Variable|false
      */
@@ -321,5 +354,55 @@ final class VmSocket
         $var->streamHandle($handle, $ctx);
 
         return $var;
+    }
+
+    /**
+     * Allocate a VmPhpFdStream over a live socket fd when export has no import handle (#22542).
+     *
+     * Shares the Socket's fd (no dup) so fclose(stream)/socket_close stay coupled like Zend.
+     */
+    private static function ensureExportStreamHandle(int $key, ?ObjectEntry $object): ?int
+    {
+        $fd = null !== $object ? self::fdForObject($object) : self::fdForLookupKey($key);
+        if (null === $fd || $fd < 0) {
+            return null;
+        }
+        if (!VmPhpFdStream::available()) {
+            return null;
+        }
+
+        $domain = null !== $object
+            ? self::domainForObject($object)
+            : (self::$domains[$key] ?? null);
+        $uri = self::exportStreamUri($fd, $domain);
+        $handle = VmPhpFdStream::adopt($fd, $uri, 'r+');
+        if (false === $handle) {
+            return null;
+        }
+
+        VmFs::registerStreamPath($handle, $uri);
+        VmFs::registerStreamMode($handle, 'r+');
+        // socketFdForHandle prefers VmPhpFdStream::fdForHandle; keep map for findHandleIdForSocketFd.
+        self::$streamHandles[$key] = $handle;
+        if (null !== $object) {
+            self::$streamHandles[$object->id] = $handle;
+        }
+
+        return $handle;
+    }
+
+    /** URI scheme → stream_type via VmStreamMeta::streamTypeForUri (tcp/udp/unix_socket). */
+    private static function exportStreamUri(int $fd, ?int $domain): string
+    {
+        if (VmSockets::AF_UNIX === $domain) {
+            return 'unix://socket_export';
+        }
+        // SOL_SOCKET=1, SO_TYPE=3 (Linux; SocketConstants::registeredConstants)
+        $sockType = SocketsLibcThinAbi::getsockoptInt($fd, 1, 3);
+        if (SocketConstants::SOCK_DGRAM === $sockType) {
+            return 'udp://socket_export';
+        }
+
+        return 'tcp://socket_export';
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sockets;
 
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsPathNative;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
@@ -812,6 +813,15 @@ final class VmSockets
 
     public static function close(ObjectEntry $object): void
     {
+        // Exported streams share the Socket fd (#22542) — fclose first to avoid double close(2).
+        $exportHandle = VmSocket::existingStreamHandleForObject($object);
+        if (null !== $exportHandle) {
+            VmFs::fclose($exportHandle);
+            VmSocket::release($object);
+            unset(self::$socketErrors[$object->id]);
+
+            return;
+        }
         $fd = VmSocket::ownedFdForObject($object);
         if (null !== $fd) {
             SocketsLibcThinAbi::close($fd);
