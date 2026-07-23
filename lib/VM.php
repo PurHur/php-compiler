@@ -2024,17 +2024,30 @@ class VM {
         $result = [];
         /** @var array<string, true> $seenLc */
         $seenLc = [];
+        /** @var array<string, true> $seenPrivate */
+        $seenPrivate = [];
+        /** @var array<string, true> $seenDeclaredLc — skip raw re-add of declared slots (#22521) */
+        $seenDeclaredLc = [];
         foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
             foreach ($class->properties as $meta) {
                 $lc = strtolower($meta->name);
-                if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
-                    continue;
+                $isPrivate = ($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
+                $seenDeclaredLc[$lc] = true;
+                if ($isPrivate) {
+                    $privKey = ($meta->declaringClassLc !== '' ? $meta->declaringClassLc : strtolower($class->name))."\0".$lc;
+                    if (isset($seenPrivate[$privKey]) || isset($hookBackingLc[$lc])) {
+                        continue;
+                    }
+                    $seenPrivate[$privKey] = true;
+                } else {
+                    if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
+                        continue;
+                    }
+                    $seenLc[$lc] = true;
                 }
                 if ($meta->phpInvisible) {
-                    $seenLc[$lc] = true;
                     continue;
                 }
-                $seenLc[$lc] = true;
                 if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
                     continue;
                 }
@@ -2054,7 +2067,7 @@ class VM {
 
                     continue;
                 }
-                if (!$object->hasProperty($meta->name)) {
+                if (!$object->hasPropertyForMeta($meta)) {
                     if (!$meta->prototype->hasDeclaredTypeConstraint()) {
                         $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
                         $copy = new Variable();
@@ -2064,7 +2077,7 @@ class VM {
 
                     continue;
                 }
-                $value = $object->getProperty($meta->name)->resolveIndirect();
+                $value = $object->getPropertyForMeta($meta)->resolveIndirect();
                 if (VM\TypedPropertyCheck::isUninitialized($value)) {
                     if ($meta->prototype->hasDeclaredTypeConstraint()) {
                         continue;
@@ -2084,7 +2097,7 @@ class VM {
         }
         foreach ($object->getRawProperties() as $name => $prop) {
             $nameLc = strtolower($name);
-            if (isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
+            if (isset($seenDeclaredLc[$nameLc]) || isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
                 continue;
             }
             $value = $prop->resolveIndirect();
@@ -2396,13 +2409,27 @@ class VM {
         $result = [];
         /** @var array<string, true> $seenLc */
         $seenLc = [];
+        /** @var array<string, true> $seenPrivate */
+        $seenPrivate = [];
+        /** @var array<string, true> $seenDeclaredLc */
+        $seenDeclaredLc = [];
         foreach (array_reverse(ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
             foreach ($class->properties as $meta) {
                 $lc = strtolower($meta->name);
-                if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
-                    continue;
+                $isPrivate = ($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
+                $seenDeclaredLc[$lc] = true;
+                if ($isPrivate) {
+                    $privKey = ($meta->declaringClassLc !== '' ? $meta->declaringClassLc : strtolower($class->name))."\0".$lc;
+                    if (isset($seenPrivate[$privKey]) || isset($hookBackingLc[$lc])) {
+                        continue;
+                    }
+                    $seenPrivate[$privKey] = true;
+                } else {
+                    if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
+                        continue;
+                    }
+                    $seenLc[$lc] = true;
                 }
-                $seenLc[$lc] = true;
                 if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
                     continue;
                 }
@@ -2421,10 +2448,10 @@ class VM {
 
                     continue;
                 }
-                if (!$object->hasProperty($meta->name)) {
+                if (!$object->hasPropertyForMeta($meta)) {
                     continue;
                 }
-                $value = $object->getProperty($meta->name)->resolveIndirect();
+                $value = $object->getPropertyForMeta($meta)->resolveIndirect();
                 if (VM\TypedPropertyCheck::omitFromSerialize($value)) {
                     continue;
                 }
@@ -2435,7 +2462,7 @@ class VM {
         }
         foreach ($object->getRawProperties() as $name => $prop) {
             $nameLc = strtolower($name);
-            if (isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
+            if (isset($seenDeclaredLc[$nameLc]) || isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
                 continue;
             }
             $value = $prop->resolveIndirect();
@@ -2783,6 +2810,10 @@ class VM {
      */
     protected function fetchObjectPropertyWriteLvalue(ObjectEntry $object, string $name, Frame $frame): Variable
     {
+        $meta = $this->classPropertyMeta($object, $name, $frame);
+        if (null !== $meta && $object->hasPropertyForMeta($meta)) {
+            return $object->getPropertyForMeta($meta);
+        }
         if ($object->hasProperty($name)) {
             return $object->getProperty($name);
         }
@@ -7048,7 +7079,7 @@ restart:
                         }
                     }
                     if (!$magicGetForRead && !$forWrite) {
-                        $invisibleParentPrivateMeta = $this->classPropertyMeta($propertyObject, $name);
+                        $invisibleParentPrivateMeta = $this->classPropertyMeta($propertyObject, $name, $frame);
                         if (
                             null !== $invisibleParentPrivateMeta
                             && (
@@ -7209,7 +7240,10 @@ restart:
                                 $frame = $catchFrame;
                                 goto restart;
                             }
-                            $propSlot = $propertyObject->getProperty($name);
+                            $propMeta = $this->classPropertyMeta($propertyObject, $name, $frame);
+                            $propSlot = null !== $propMeta && $propertyObject->hasPropertyForMeta($propMeta)
+                                ? $propertyObject->getPropertyForMeta($propMeta)
+                                : $propertyObject->getProperty($name);
                             if (
                                 $op->nullsafeFetchPropertyRead
                                 && $op->nullsafeUninitNullableToNull
@@ -11486,15 +11520,39 @@ restart:
         }
     }
 
-    private function classPropertyMeta(ObjectEntry $object, string $propertyName): ?VM\ClassProperty
+    private function classPropertyMeta(ObjectEntry $object, string $propertyName, ?Frame $frame = null): ?VM\ClassProperty
     {
+        $matches = [];
         foreach ($object->class->properties as $prop) {
             if ($prop->name === $propertyName) {
+                $matches[] = $prop;
+            }
+        }
+        if ([] === $matches) {
+            return null;
+        }
+        if (1 === \count($matches)) {
+            return $matches[0];
+        }
+        $callerLc = null !== $frame ? $this->callerClassLc($frame) : null;
+        if (null !== $callerLc) {
+            foreach ($matches as $prop) {
+                if (
+                    ($prop->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0
+                    && $prop->declaringClassLc === $callerLc
+                ) {
+                    return $prop;
+                }
+            }
+        }
+        foreach ($matches as $prop) {
+            if (($prop->visibility & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
                 return $prop;
             }
         }
 
-        return null;
+        // Most-derived private (child props are listed before inherited parent privates).
+        return $matches[0];
     }
 
     private function enforcePropertyHookGetReturn(
@@ -13025,7 +13083,7 @@ restart:
 
     private function enforcePropertyReadVisibility(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
-        $meta = $this->classPropertyMeta($object, $propName);
+        $meta = $this->classPropertyMeta($object, $propName, $frame);
         if (null === $meta) {
             return null;
         }
@@ -13062,7 +13120,7 @@ restart:
             && $this->context->lazyGhostInitializing === $object) {
             return null;
         }
-        $meta = $this->classPropertyMeta($object, $propName);
+        $meta = $this->classPropertyMeta($object, $propName, $frame);
         if (null === $meta) {
             return null;
         }
@@ -16470,12 +16528,22 @@ restart:
             $entry->usesLazyGhostTrait = true;
         }
         foreach ($parent->properties as $property) {
+            $isPrivate = ($property->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
             $exists = false;
             foreach ($entry->properties as $existing) {
-                if ($existing->name === $property->name) {
-                    $exists = true;
-                    break;
+                if ($existing->name !== $property->name) {
+                    continue;
                 }
+                // Parent private slots coexist with same-name child privates (#22521).
+                if ($isPrivate) {
+                    if ($existing->declaringClassLc === $property->declaringClassLc) {
+                        $exists = true;
+                        break;
+                    }
+                    continue;
+                }
+                $exists = true;
+                break;
             }
             if (!$exists) {
                 $entry->properties[] = $property;

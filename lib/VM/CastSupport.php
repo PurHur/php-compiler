@@ -188,10 +188,10 @@ final class CastSupport
                 $declared[$meta->name] = true;
                 continue;
             }
-            if (!$obj->hasProperty($meta->name)) {
+            if (!$obj->hasPropertyForMeta($meta)) {
                 continue;
             }
-            $value = $obj->getProperty($meta->name)->resolveIndirect();
+            $value = $obj->getPropertyForMeta($meta)->resolveIndirect();
             if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
                 continue;
             }

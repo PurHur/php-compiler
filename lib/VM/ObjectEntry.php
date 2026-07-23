@@ -25,8 +25,17 @@ class ObjectEntry {
     {
         return self::$counter;
     }
-    /** @var array<string, Variable> */
+    /** @var array<string, Variable> bare name / primary slot (most-derived private or public/protected) */
     private array $properties = [];
+
+    /**
+     * Ancestor private slots shadowed by a same-name child private (#22521).
+     *
+     * Key: {@see PropertyMangle::shadowedPrivateKey()} (`declaringLc\0name`).
+     *
+     * @var array<string, Variable>
+     */
+    private array $shadowedPrivateProperties = [];
 
     /** Zend object property internal pointer (ext/standard/array.c; #11196). */
     private int $propertyInternalPointer = 0;
@@ -132,7 +141,13 @@ class ObjectEntry {
             $var = $property->getVariable();
             $var->objectPropertyOwner = $this;
             $var->objectPropertyName = $property->name;
-            $this->properties[$property->name] = $var;
+            $isPrivate = ($property->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
+            // Child props are declared before inherited parent props — keep primary = most-derived.
+            if ($isPrivate && isset($this->properties[$property->name])) {
+                $this->shadowedPrivateProperties[PropertyMangle::shadowedPrivateKey($property)] = $var;
+            } else {
+                $this->properties[$property->name] = $var;
+            }
         }
         ObjectRegistry::register($this);
     }
@@ -153,6 +168,17 @@ class ObjectEntry {
     public function destroyForGc(): void
     {
         foreach ($this->properties as $prop) {
+            if (TypedPropertyCheck::isUninitialized($prop)) {
+                continue;
+            }
+            ObjectLifetime::releaseDirectObject($prop);
+            if (Variable::TYPE_INDIRECT === $prop->type) {
+                $prop->resolveIndirect()->null();
+            } else {
+                $prop->null();
+            }
+        }
+        foreach ($this->shadowedPrivateProperties as $prop) {
             if (TypedPropertyCheck::isUninitialized($prop)) {
                 continue;
             }
@@ -203,6 +229,19 @@ class ObjectEntry {
         return isset($this->properties[$name]);
     }
 
+    /** True when this meta has a distinct instance slot (#22521). */
+    public function hasPropertyForMeta(ClassProperty $meta): bool
+    {
+        if (($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $shadowKey = PropertyMangle::shadowedPrivateKey($meta);
+            if (isset($this->shadowedPrivateProperties[$shadowKey])) {
+                return true;
+            }
+        }
+
+        return $this->hasProperty($meta->name);
+    }
+
     public function allocateProperty(string $name): Variable
     {
         $var = new Variable(Variable::TYPE_NULL);
@@ -240,6 +279,21 @@ class ObjectEntry {
         }
 
         return $this->properties[$name];
+    }
+
+    /**
+     * Slot for a specific ClassProperty — parent private when child shadows (#22521).
+     */
+    public function getPropertyForMeta(ClassProperty $meta): Variable
+    {
+        if (($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $shadowKey = PropertyMangle::shadowedPrivateKey($meta);
+            if (isset($this->shadowedPrivateProperties[$shadowKey])) {
+                return $this->shadowedPrivateProperties[$shadowKey];
+            }
+        }
+
+        return $this->getProperty($meta->name);
     }
 
     public function issetProperty(string $name): bool
@@ -385,6 +439,15 @@ class ObjectEntry {
                 ? $clone->getProperty($name)
                 : $clone->allocateProperty($name);
             $dest->copyFromForClone($var);
+        }
+        foreach ($this->shadowedPrivateProperties as $shadowKey => $var) {
+            if (!isset($clone->shadowedPrivateProperties[$shadowKey])) {
+                $slot = new Variable(Variable::TYPE_NULL);
+                $slot->objectPropertyOwner = $clone;
+                $slot->objectPropertyName = $var->objectPropertyName;
+                $clone->shadowedPrivateProperties[$shadowKey] = $slot;
+            }
+            $clone->shadowedPrivateProperties[$shadowKey]->copyFromForClone($var);
         }
         $clone->constructed = $this->constructed;
         $clone->closureState = $this->closureState;
