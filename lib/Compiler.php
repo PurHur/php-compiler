@@ -2090,12 +2090,25 @@ class Compiler {
                     break;
                 }
                 $resultVar = $candidate->result;
-                if (!isset($needed[spl_object_id($resultVar)])) {
+                // php-cfg parseArg() clones producer temps for call sites (#8560); match the
+                // clone via shared ops, not only identical operand objects (#22660).
+                $matchedArgId = null;
+                if (isset($needed[spl_object_id($resultVar)])) {
+                    $matchedArgId = spl_object_id($resultVar);
+                } else {
+                    foreach ($needed as $argId => $argTemp) {
+                        if ($this->nullsafeCallArgTempFedByProducer($argTemp, $candidate)) {
+                            $matchedArgId = $argId;
+                            break;
+                        }
+                    }
+                }
+                if (null === $matchedArgId) {
                     continue;
                 }
 
                 $slice[] = $candidate;
-                unset($needed[spl_object_id($resultVar)]);
+                unset($needed[$matchedArgId]);
                 $deferredOpIndexes[$j] = true;
 
                 foreach ($this->nullsafePreludeOperandVars($candidate) as $dep) {
@@ -13760,7 +13773,33 @@ class Compiler {
         $fetchBlock->inheritUndefinedLocals = true;
         $fetchBlock->inheritScopeFrom($block);
         if (!empty($deferredPreludeOps)) {
-            $this->compileOps($deferredPreludeOps, $fetchBlock);
+            // parseArg clones leave producer->result usages empty and NullsafeMethodCall is
+            // not in fetchBlock->orig, so bare compileOps would emit EXEC_NORETURN and
+            // ARG_SEND would allocate a fresh empty slot for the clone (#22660 / #8560).
+            foreach ($expr->args as $arg) {
+                if (!$arg instanceof Operand\Temporary) {
+                    continue;
+                }
+                foreach ($deferredPreludeOps as $preludeOp) {
+                    if (
+                        !$preludeOp instanceof Op\Expr
+                        || null === $preludeOp->result
+                        || !$this->nullsafeCallArgTempFedByProducer($arg, $preludeOp)
+                    ) {
+                        continue;
+                    }
+                    $sharedSlot = $fetchBlock->getVarSlot($preludeOp->result, false);
+                    $fetchBlock->bindOperandScopeSlot($arg, $sharedSlot);
+                    break;
+                }
+            }
+            $prevForceReturn = $this->forceDeferredSiblingCallReturnSlot;
+            $this->forceDeferredSiblingCallReturnSlot = true;
+            try {
+                $this->compileOps($deferredPreludeOps, $fetchBlock);
+            } finally {
+                $this->forceDeferredSiblingCallReturnSlot = $prevForceReturn;
+            }
         }
         $fetchBlock->addOpCode(new OpCode(
             OpCode::TYPE_METHODCALL_INIT,
@@ -13811,6 +13850,27 @@ class Compiler {
             Op\Expr\Closure::class => [],
             default => [],
         };
+    }
+
+    /**
+     * True when a nullsafe call-arg temporary is the producer result or a parseArg clone
+     * whose ops still reference that producer (#8560, #22660).
+     */
+    private function nullsafeCallArgTempFedByProducer(Operand $argTemp, Op\Expr $producer): bool
+    {
+        if ($argTemp === $producer->result || $this->operandsReferToSameVariable($argTemp, $producer->result)) {
+            return true;
+        }
+        if (!$argTemp instanceof Operand\Temporary) {
+            return false;
+        }
+        foreach ($argTemp->ops ?? [] as $embedded) {
+            if ($embedded === $producer) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function isNullsafeMethodCallArgPreludeProducer(Op\Expr $expr): bool
