@@ -1534,12 +1534,13 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
     }
 
-    public function testSupportsTypedClassConstantsTrueOnDefaultDevProfile(): void
+    public function testSupportsTypedClassConstantsFalseOnDefaultDevProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsTypedClassConstants());
+            // 8.4.0-dev advertises phpversion() 8.2.31 — Zend 8.2 parse-errors typed class consts (#22705).
+            $this->assertFalse(CompilerVersion::supportsTypedClassConstants());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -7951,7 +7951,7 @@ class Compiler {
     }
 
     /**
-     * Zend 8.2 rejects typed class constants at parse time; enable at 8.3+ on stable target (#12798).
+     * Zend 8.2 rejects typed class constants at parse time; enable at 8.3+ forward/stable (#12798, #22705).
      */
     protected function rejectTypedClassConstantIfUnsupported(Operand $nameOp): void
     {
