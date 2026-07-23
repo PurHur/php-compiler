@@ -209,6 +209,7 @@ final class VmIntlChar
             'isdigit' => [new IntlCharIsDigit(), 'isdigit'],
             'isalnum' => [new IntlCharIsAlnum(), 'isalnum'],
             'isspace' => [new IntlCharIsSpace(), 'isspace'],
+            'iswhitespace' => [new IntlCharIsWhitespace(), 'isWhitespace'],
             'islower' => [new IntlCharIsLower(), 'islower'],
             'isupper' => [new IntlCharIsUpper(), 'isupper'],
             'isblank' => [new IntlCharIsBlank(), 'isblank'],
@@ -789,6 +790,25 @@ final class VmIntlChar
             'u_isspace',
             $codepoint,
             static fn (int $cp): bool => \in_array($cp, [0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x20], true)
+        );
+    }
+
+    /**
+     * IntlChar::isWhitespace() — php-src / ICU u_isWhitespace (#22405).
+     *
+     * Java Character.isWhitespace semantics (distinct from u_isspace / u_isUWhiteSpace):
+     * Zs/Zl/Zp except no-break spaces, plus HT/LF/VT/FF/CR and C0 separators 0x1C..0x1F.
+     */
+    public static function isWhitespace(string|int $codepoint): bool
+    {
+        return self::unaryBoolIcu(
+            'u_isWhitespace',
+            $codepoint,
+            static fn (int $cp): bool => \in_array(
+                $cp,
+                [0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x1C, 0x1D, 0x1E, 0x1F, 0x20],
+                true
+            )
         );
     }
 
@@ -1636,6 +1656,7 @@ UBool u_isalpha{$suffix}(UChar32 c);
 UBool u_isdigit{$suffix}(UChar32 c);
 UBool u_isalnum{$suffix}(UChar32 c);
 UBool u_isspace{$suffix}(UChar32 c);
+UBool u_isWhitespace{$suffix}(UChar32 c);
 UBool u_islower{$suffix}(UChar32 c);
 UBool u_isupper{$suffix}(UChar32 c);
 UBool u_isblank{$suffix}(UChar32 c);
@@ -1922,6 +1943,31 @@ final class IntlCharIsSpace extends VmClassMethod
             return;
         }
         $frame->returnVar->bool(VmIntlChar::isspace($codepoint));
+    }
+}
+
+/** IntlChar::isWhitespace() — php-src / ICU u_isWhitespace (#22405). */
+final class IntlCharIsWhitespace extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isWhitespace');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isWhitespace() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isWhitespace', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isWhitespace($codepoint));
     }
 }
 
