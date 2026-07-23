@@ -24,11 +24,15 @@ final class BuiltinClasses
         self::registerExceptions($ctx);
         VmPDO::registerClass($ctx);
         VmPDOStatement::registerClass($ctx);
+        VmPDORow::registerClass($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
         if (isset($ctx->classes['pdoexception'])) {
             $ctx->classes['pdoexception']->isInternal = true;
+        }
+        if (isset($ctx->classes[VmPDORow::CLASS_LC])) {
+            $ctx->classes[VmPDORow::CLASS_LC]->isInternal = true;
         }
     }
 

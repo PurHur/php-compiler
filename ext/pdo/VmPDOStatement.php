@@ -559,6 +559,22 @@ final class PDOStatementFetch extends PdoClassMethod
 
             return;
         }
+        if (PdoConstants::FETCH_LAZY === $mode) {
+            $ctx = $frame->vmContext;
+            if (null === $ctx) {
+                throw new \LogicException('PDOStatement::fetch() requires VM context');
+            }
+            // FETCH_LAZY uses assoc column names on PDORow (php-src pdo_get_lazy_object; #22294).
+            $assoc = [];
+            foreach ($row as $key => $value) {
+                if (\is_string($key)) {
+                    $assoc[$key] = $value;
+                }
+            }
+            $frame->returnVar->object(VmPDORow::fromRow($ctx, $st, $assoc));
+
+            return;
+        }
         VmPDO::assignRow($frame->returnVar, $row);
     }
 }
@@ -577,6 +593,12 @@ final class PDOStatementFetchAll extends PdoClassMethod
         $mode = $st->fetchMode;
         if (\count($frame->calledArgs) >= 2) {
             $mode = $this->intArg($frame->calledArgs[1], 'PDOStatement::fetchAll', 0, 'mode');
+        }
+        // php-src do_fetch_opt_type: PDO::FETCH_LAZY cannot be used with fetchAll().
+        if (PdoConstants::FETCH_LAZY === $mode) {
+            throw new \ValueError(
+                'PDOStatement::fetchAll(): Argument #1 ($mode) PDO::FETCH_LAZY cannot be used with PDOStatement::fetchAll()'
+            );
         }
         $ht = new HashTable();
         $i = 0;
