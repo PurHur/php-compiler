@@ -25,6 +25,39 @@ final class DateTimeSupport
     public const CLASS_DATETIMEZONE = 'datetimezone';
     public const CLASS_DATETIMEINTERFACE = DateTimeInterfaceSupport::INTERFACE_LC;
 
+    /**
+     * Compiler-only DateTime* storage keys — not present on Zend objects.
+     *
+     * php-src get_mangled_object_vars() reads zend_get_properties_no_lazy_init (raw
+     * property table); DateTime state lives in C, so the table is empty (#22445).
+     */
+    public static function isInternalStorageProperty(string $name): bool
+    {
+        return self::TS_PROPERTY === $name
+            || self::TZ_PROPERTY === $name
+            || self::MICROSECOND_PROPERTY === $name
+            || self::TZ_NAME_PROPERTY === $name;
+    }
+
+    /**
+     * Strip {@see isInternalStorageProperty()} keys from get_mangled_object_vars (#22445).
+     *
+     * @param array<string, Variable> $props
+     * @return array<string, Variable>
+     */
+    public static function filterInternalStorageFromMangledVars(array $props): array
+    {
+        $out = [];
+        foreach ($props as $key => $value) {
+            if (self::isInternalStorageProperty((string) $key)) {
+                continue;
+            }
+            $out[$key] = $value;
+        }
+
+        return $out;
+    }
+
     /** @var array<int, true> DateTime/DateTimeImmutable instances initialized via initDateTime* (#7276). */
     private static array $dateTimeLikeInitialized = [];
 

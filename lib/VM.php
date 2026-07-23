@@ -1930,14 +1930,18 @@ class VM {
     }
 
     /**
-     * get_mangled_object_vars() — mangled keys, dynamic props, get hooks (#3497, #10491).
+     * get_mangled_object_vars() — mangled keys, dynamic props, get hooks (#3497, #10491, #22445).
      *
-     * php-src: zend_get_mangled_object_vars / ZEND_PROP_PURPOSE_DEBUG
+     * php-src: Zend/zend_builtin_functions.c — ZEND_FUNCTION(get_mangled_object_vars)
+     * uses zend_get_properties_no_lazy_init (raw property table), not DEBUG purpose.
+     * DateTime / DateTimeImmutable / DateTimeZone store state in C on Zend — filter
+     * compiler __dt_* storage keys (#22445).
      *
      * @return array<string, Variable>
      */
     public function collectMangledObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
     {
+<<<<<<< HEAD
         // DateInterval: Zend date_interval_get_properties wire (not raw slots / uninit date_string) (#22446).
         $dateMap = $this->dateIntervalObjectVarsPropertyMap($object);
         if (null !== $dateMap) {
@@ -1945,6 +1949,11 @@ class VM {
         }
 
         return $this->collectDebugPropertiesForBuiltin($object, $frame);
+=======
+        return DateTimeSupport::filterInternalStorageFromMangledVars(
+            $this->collectDebugPropertiesForBuiltin($object, $frame)
+        );
+>>>>>>> 18e8e4221 (Stdlib: hide DateTime __dt_* from get_mangled_object_vars (#22445))
     }
 
     /**
