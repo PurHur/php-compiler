@@ -748,6 +748,13 @@ final class Variable {
         $this->type = self::TYPE_NULL;
     }
 
+    /** Mark slot unbound (?? / coalesce left branch when property absent; #22649). */
+    public function undefined(): void
+    {
+        $this->reset();
+        $this->type = self::TYPE_UNDEFINED;
+    }
+
     /** Clear a WeakReference target slot without dropping a strong ref (#13474, zend_weakrefs.c). */
     public function clearWeakTarget(): void
     {
