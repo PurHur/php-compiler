@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6431 |
-| Phase A inventory files (M2 ratio SSOT) | 6431 |
+| PHP files on vm.php path | 6432 |
+| Phase A inventory files (M2 ratio SSOT) | 6432 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20557 |
+| Source constructs flagged (warnings) | 20562 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1533,6 +1533,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/VmPDO.php` | 0 | 85 |
+| `ext/pdo/VmPDORow.php` | 0 | 5 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 48 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
@@ -18314,8 +18315,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 66)
-- new ClassProperty (line 67)
+- new Variable (line 70)
+- new ClassProperty (line 71)
 - 3 class method(s)
 
 ### `ext/pdo/Module.php`
@@ -18423,6 +18424,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PDOException (line 1567)
 - 53 class method(s)
 
+### `ext/pdo/VmPDORow.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 34)
+- new PDORowConstruct (line 38)
+- new ObjectEntry (line 60)
+- new PDOException (line 88)
+- 3 class method(s)
+
 ### `ext/pdo/VmPDOStatement.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18454,25 +18464,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PDOStatementNext (line 73)
 - new ObjectEntry (line 109)
 - new PdoStatementState (line 110)
-- new HashTable (line 581)
-- new Variable (line 584)
-- new ArgumentCountError (line 606)
-- new ArgumentCountError (line 646)
-- new ObjectEntry (line 741)
-- new ArgumentCountError (line 922)
-- new HashTable (line 964)
-- new Variable (line 965)
-- new Variable (line 968)
-- new Variable (line 975)
-- new ArgumentCountError (line 998)
-- new HashTable (line 1011)
-- new Variable (line 1013)
-- new HashTable (line 1015)
-- new ArgumentCountError (line 1037)
-- new ArgumentCountError (line 1072)
-- new ArgumentCountError (line 1106)
-- new PdoStatementInternalIterator (line 1177)
-- new Variable (line 1217)
+- new HashTable (line 603)
+- new Variable (line 606)
+- new ArgumentCountError (line 628)
+- new ArgumentCountError (line 668)
+- new ObjectEntry (line 763)
+- new ArgumentCountError (line 944)
+- new HashTable (line 986)
+- new Variable (line 987)
+- new Variable (line 990)
+- new Variable (line 997)
+- new ArgumentCountError (line 1020)
+- new HashTable (line 1033)
+- new Variable (line 1035)
+- new HashTable (line 1037)
+- new ArgumentCountError (line 1059)
+- new ArgumentCountError (line 1094)
+- new ArgumentCountError (line 1128)
+- new PdoStatementInternalIterator (line 1199)
+- new Variable (line 1239)
 - 45 class method(s)
 
 ### `ext/pdo/pdo_drivers.php`
