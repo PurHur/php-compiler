@@ -175,18 +175,44 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, self::CLASS_SODIUM_EXCEPTION, $message, $file, $line);
     }
 
+    /**
+     * Bridge native PDOException — copies public $errorInfo (php-src pdo.stub.php; #22455).
+     *
+     * @param list<mixed>|null $errorInfo SQLSTATE / driver code / message triple
+     */
     public static function materializePDOException(
         Context $ctx,
         string $message,
         string $file = '',
         int $line = 0,
-        int $code = 0
+        int $code = 0,
+        ?array $errorInfo = null
     ): Variable {
         if (!isset($ctx->classes[self::CLASS_PDO_EXCEPTION])) {
             return self::materializeRuntimeException($ctx, $message, $file, $line);
         }
         $var = self::materializeThrowable($ctx, self::CLASS_PDO_EXCEPTION, $message, $file, $line);
-        $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+        $obj = $var->toObject();
+        $obj->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+        if (null !== $errorInfo && $obj->hasProperty('errorInfo')) {
+            $ht = new HashTable();
+            foreach (\array_values($errorInfo) as $i => $cell) {
+                $slot = new Variable();
+                if (null === $cell) {
+                    $slot->null();
+                } elseif (\is_int($cell)) {
+                    $slot->int($cell);
+                } elseif (\is_float($cell)) {
+                    $slot->float($cell);
+                } elseif (\is_bool($cell)) {
+                    $slot->bool($cell);
+                } else {
+                    $slot->string((string) $cell);
+                }
+                $ht->add((string) $i, $slot);
+            }
+            $obj->getProperty('errorInfo')->array($ht);
+        }
 
         return $var;
     }
