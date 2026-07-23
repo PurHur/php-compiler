@@ -15,9 +15,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * grapheme_levenshtein() — grapheme-cluster edit distance (php-src ext/intl/grapheme; #6998).
+ * grapheme_levenshtein() — grapheme-cluster edit distance (not shipped by Zend; kept unregistered, #22661).
  *
- * VM: {@see VmGrapheme}; JIT: compile-time fold via {@see JitGrapheme} (runtime defer #6998).
+ * Historical experiment (#6998). Zend/php-src has no stub entry (php/php-src#10180).
+ * Internal helper remains at {@see VmGrapheme::levenshtein()} for unit tests.
  */
 final class grapheme_levenshtein extends Internal
 {

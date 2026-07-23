@@ -1395,6 +1395,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/mbstring/mb_ucwords.php',
         ],
         [
+            'names' => ['grapheme_levenshtein'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsGraphemeLevenshtein'],
+            'since' => '8.4.0',
+            'module' => 'intl',
+            'relPath' => 'ext/intl/grapheme_levenshtein.php',
+        ],
+        [
             'names' => ['generator_to_array'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsGeneratorToArray'],
             'since' => '8.4.0',

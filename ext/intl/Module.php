@@ -354,7 +354,8 @@ class Module extends ModuleAbstract
             new grapheme_strrpos(),
             new grapheme_strripos(),
             new grapheme_extract(),
-            new grapheme_levenshtein(),
+            // Never shipped by Zend — withhold on every profile (#22661 / #6998).
+            ...(CompilerVersion::supportsGraphemeLevenshtein() ? [new grapheme_levenshtein()] : []),
             ...(CompilerVersion::supportsGraphemeStrSplit() ? [new grapheme_str_split()] : []),
             ...(CompilerVersion::supportsGraphemeStrimwidth() ? [new grapheme_strimwidth()] : []),
             new intl_get_error_code(),
