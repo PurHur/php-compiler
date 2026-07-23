@@ -43,9 +43,9 @@ final class SscanfJitHelper
             $outVars[] = new Variable();
         }
 
-        [$assigned, $consumed] = VmSscanf::parseWithConsumed($input, $format, $outVars);
+        [$assigned, $consumed, $stored] = VmSscanf::parseWithConsumed($input, $format, $outVars);
         $payload = '';
-        for ($i = 0; $i < $assigned; ++$i) {
+        for ($i = 0; $i < $stored; ++$i) {
             $payload .= self::encodeVariable($outVars[$i]->resolveIndirect());
         }
 

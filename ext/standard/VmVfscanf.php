@@ -68,9 +68,10 @@ final class VmVfscanf
             }
         }
         $ht = new HashTable();
+        $stored = $scanned[2] ?? $assigned;
         for ($i = 0; $i < $slots; ++$i) {
             $copy = new Variable();
-            if ($i < $assigned) {
+            if ($i < $stored) {
                 $copy->copyFrom($temps[$i]);
             } else {
                 $copy->null();
@@ -84,7 +85,7 @@ final class VmVfscanf
     /**
      * @param list<\PHPCompiler\VM\Variable> $outVars
      *
-     * @return array{0: string, 1: int}|false
+     * @return array{0: string, 1: int, 2: int}|false
      */
     private static function readAndScan(int $handle, string $format, array $outVars): array|false
     {
@@ -98,7 +99,7 @@ final class VmVfscanf
     /**
      * @param list<\PHPCompiler\VM\Variable> $outVars
      *
-     * @return array{0: string, 1: int}|false
+     * @return array{0: string, 1: int, 2: int}|false
      */
     private static function readAndScanSeekable(int $handle, string $format, array $outVars): array|false
     {
@@ -110,10 +111,10 @@ final class VmVfscanf
         if (false === $data) {
             return false;
         }
-        [$assigned, $consumed] = VmSscanf::parseWithConsumed($data, $format, $outVars);
+        [$assigned, $consumed, $stored] = VmSscanf::parseWithConsumed($data, $format, $outVars);
         self::repositionStreamAfterScan($handle, $start, $data, $consumed);
 
-        return [$data, $assigned];
+        return [$data, $assigned, $stored];
     }
 
     /**
@@ -121,19 +122,19 @@ final class VmVfscanf
      *
      * @param list<\PHPCompiler\VM\Variable> $outVars
      *
-     * @return array{0: string, 1: int}|false
+     * @return array{0: string, 1: int, 2: int}|false
      */
     private static function readAndScanNonSeekable(int $handle, string $format, array $outVars): array|false
     {
         $buffer = '';
         while (true) {
-            [$assigned, $consumed] = VmSscanf::parseWithConsumed($buffer, $format, $outVars);
+            [$assigned, $consumed, $stored] = VmSscanf::parseWithConsumed($buffer, $format, $outVars);
             if ($assigned > 0) {
                 if ($consumed < \strlen($buffer)) {
                     VmFs::pushbackUnread($handle, \substr($buffer, $consumed));
                 }
 
-                return [$buffer, $assigned];
+                return [$buffer, $assigned, $stored];
             }
             if ('' !== $buffer && (VmFs::eof($handle) || ($consumed > 0 && 0 === $assigned))) {
                 break;
@@ -150,12 +151,12 @@ final class VmVfscanf
                 break;
             }
         }
-        [$assigned, $consumed] = VmSscanf::parseWithConsumed($buffer, $format, $outVars);
+        [$assigned, $consumed, $stored] = VmSscanf::parseWithConsumed($buffer, $format, $outVars);
         if ($consumed < \strlen($buffer)) {
             VmFs::pushbackUnread($handle, \substr($buffer, $consumed));
         }
 
-        return [$buffer, $assigned];
+        return [$buffer, $assigned, $stored];
     }
 
     private static function streamSupportsTell(int $handle): bool

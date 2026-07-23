@@ -150,8 +150,8 @@ final class JitSscanf
         foreach ($outArgs as $_) {
             $temps[] = new VMVariable();
         }
-        $assigned = VmSscanf::parse($input, $format, $temps);
-        for ($i = 0; $i < $assigned; ++$i) {
+        [$assigned, , $stored] = VmSscanf::parseWithConsumed($input, $format, $temps);
+        for ($i = 0; $i < $stored; ++$i) {
             self::writeVmVarToOut($context, $outArgs[$i], $temps[$i]);
         }
 
