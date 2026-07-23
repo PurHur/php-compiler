@@ -1,7 +1,7 @@
 --TEST--
-posix_sysconf/pathconf/fpathconf/eaccess + POSIX_SC_*/POSIX_PC_* (#20509)
---SKIPIF--
-<?php if (!function_exists('posix_sysconf')) die('skip no posix_sysconf'); ?>
+posix_sysconf/pathconf/fpathconf/eaccess + POSIX_SC_*/POSIX_PC_* (#20509, #22483)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 declare(strict_types=1);

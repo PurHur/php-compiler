@@ -39,6 +39,44 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
     }
 
+    public function testPosixSysconfApisWithheldOnDefault84DevReference(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPosixSysconfApis());
+        $this->assertFalse(CompilerVersion::advertisesPosixSysconfApis());
+    }
+
+    public function testPosixSysconfApisWithheldOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPosixSysconfApis());
+            $this->assertFalse(CompilerVersion::advertisesPosixSysconfApis());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testPosixSysconfApisAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPosixSysconfApis());
+            $this->assertTrue(CompilerVersion::advertisesPosixSysconfApis());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testJsonValidateWithheldOnDefault84DevReference(): void
     {
         $this->assertFalse(CompilerVersion::supportsJsonValidate());
@@ -954,6 +992,34 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+    }
+
+    public function testVmDoesNotRegisterPosixSysconfApisOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['posix_sysconf', 'posix_pathconf', 'posix_fpathconf', 'posix_eaccess'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
+    }
+
+    public function testVmRegistersPosixSysconfApisOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['posix_sysconf', 'posix_pathconf', 'posix_fpathconf', 'posix_eaccess'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersJsonValidateOnForwardProfile(): void

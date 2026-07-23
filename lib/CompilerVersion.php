@@ -2001,6 +2001,42 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ posix_sysconf/pathconf/fpathconf/eaccess + POSIX_SC_* / POSIX_PC_*
+     * (ext/posix/posix.stub.php, #20509, #22483).
+     *
+     * Withheld on 8.4.0-dev reference profile and PROFILE=8.2 (matches Zend 8.2
+     * function_exists/defined gate). Enable via stable 8.4.0+ or explicit
+     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsPosixSysconfApis(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /** posix_sysconf family visible to function_exists()/defined() — stable or forward 8.3+ (#22483). */
+    public static function advertisesPosixSysconfApis(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return self::supportsPosixSysconfApis();
+    }
+
+    /**
      * PHP 8.3+ array_first_key()/array_last_key() (ext/standard/array.c, issue #15539, #15675).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
