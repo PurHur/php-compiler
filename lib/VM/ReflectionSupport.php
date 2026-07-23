@@ -3022,17 +3022,27 @@ final class ReflectionSupport
         if ($entry->readonly) {
             $mods .= 'readonly ';
         }
+        // Zend _class_string: enums export as "final class" with UnitEnum/BackedEnum (#22448).
         if ($entry->isInterface) {
             $kind = 'interface';
         } elseif ($entry->isTrait) {
             $kind = 'trait';
         } elseif ($entry->isEnum) {
-            $kind = 'enum';
+            if (!$entry->isFinal && !str_contains($mods, 'final ')) {
+                $mods .= 'final ';
+            }
+            $kind = 'class';
         } else {
             $kind = 'class';
         }
 
-        $out = "Class [ {$tag} {$mods}{$kind} {$entry->name} ] {\n";
+        $implements = '';
+        $ifaceNames = VmReflection::reflectionClassInterfaceNamesList($entry, $ctx);
+        if ([] !== $ifaceNames) {
+            $implements = ' implements '.implode(', ', $ifaceNames);
+        }
+
+        $out = "Class [ {$tag} {$mods}{$kind} {$entry->name}{$implements} ] {\n";
 
         $loc = $entry->sourceLocation;
         if (null !== $loc && !$isInternal && '' !== $loc->filename && $loc->startLine > 0) {

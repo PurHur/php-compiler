@@ -6578,6 +6578,7 @@ restart:
                     $classEntry->attributeNames = $op->attributeNames;
                     $classEntry->attributeEntries = $op->attributeEntries;
                     $classEntry->classDeprecated = $op->deprecatedMetadata;
+                    $classEntry->sourceLocation = $op->sourceLocation;
                     VM\ImplementsHierarchyRuntimeCheck::assertAllowed(
                         $name,
                         $op->classImplements,
