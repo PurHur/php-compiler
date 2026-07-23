@@ -107,7 +107,9 @@ PHP;
         $this->assertSame("3\n1\nx\n2\nno-hidden\n1\n3\n", ob_get_clean());
     }
 
-    /** Issue #6603: get_class_vars() lists public hooked properties with declared defaults (null). */
+    /**
+     * #22493 / php-src add_class_vars: virtual hooked props omitted; backed hooks keep defaults (#6603).
+     */
     public function testVmGetClassVarsPropertyHooks(): void
     {
         $this->skipUnlessPropertyHooksEnabled();
@@ -118,19 +120,24 @@ class C6603 {
     public string $title { get => 'hook:' . $this->backing; }
 }
 echo array_key_exists('title', get_class_vars(C6603::class)) ? "yes\n" : "no\n";
-$vars = get_class_vars(C6603::class);
-echo array_key_exists('title', $vars) && $vars['title'] === null ? "null-default\n" : "bad-default\n";
 class G6603 {
     private string $x = 'g_only';
     public string $y { get => $this->x; }
 }
 $gVars = get_class_vars(G6603::class);
 echo array_key_exists('y', $gVars) ? "g-yes\n" : "g-no\n";
+class H22493 {
+    public string $a { get => 'x'; set {} }
+    public $b = 2;
+    public string $c { get => $this->c; set => $this->c = $value; }
+}
+echo json_encode(get_class_vars(H22493::class)), "\n";
+echo array_key_exists('a', get_class_vars(H22493::class)) ? "a-yes\n" : "a-no\n";
 PHP;
         $rt = new Runtime();
         $block = $rt->parseAndCompile($code, 'get_class_vars_property_hooks.php');
         ob_start();
         $rt->run($block);
-        $this->assertSame("yes\nnull-default\ng-yes\n", ob_get_clean());
+        $this->assertSame("no\ng-no\n{\"b\":2,\"c\":null}\na-no\n", ob_get_clean());
     }
 }

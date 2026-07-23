@@ -1792,7 +1792,7 @@ final class VmReflection
     /**
      * get_class_vars() — default values for public properties declared on $entry (#3159).
      *
-     * php-src: ext/standard/class.c — PHP_FUNCTION(get_class_vars)
+     * php-src: Zend/zend_builtin_functions.c — add_class_vars / PHP_FUNCTION(get_class_vars)
      */
     public static function getClassVarsArray(ClassEntry $entry): Variable
     {
@@ -1803,14 +1803,13 @@ final class VmReflection
             if (!MethodVisibility::isPublic($prop->visibility)) {
                 continue;
             }
-            $copy = new Variable();
-            // php-src add_class_vars: public hooked props appear with declared defaults, not get-hook reads (#6603).
+            // php-src add_class_vars: skip ZEND_ACC_VIRTUAL — virtual hooked props have no
+            // default-properties slot (#22493). Backed hooked props still appear with defaults (#6603).
             if ($prop->propertyHookVirtual) {
-                self::copyClassVarDefault($copy, $prop);
-                $ht->add($prop->name, $copy);
-
                 continue;
             }
+            $copy = new Variable();
+            // php-src add_class_vars: public backed hooked props use declared defaults, not get-hook reads (#6603).
             self::copyClassVarDefault($copy, $prop);
             $ht->add($prop->name, $copy);
         }

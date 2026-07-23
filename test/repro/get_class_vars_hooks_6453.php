@@ -7,6 +7,7 @@ class C {
     }
 }
 
+// Virtual — omitted from get_class_vars (#22493 / ZEND_ACC_VIRTUAL).
 var_export(array_key_exists('title', get_class_vars(C::class)));
 echo "\n";
 print_r(get_class_vars(C::class));
