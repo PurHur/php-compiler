@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
@@ -21,7 +22,8 @@ final class DocumentLoadXML extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::loadXML() expects at least 1 argument');
         }
-        $xml = $this->stringArg($frame->calledArgs[1], 'DOMDocument::loadXML()', 0);
+        // Z_PARAM_STR: null → E_DEPRECATED then '' → ValueError empty (#22680).
+        $xml = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'DOMDocument::loadXML', 0, 'source');
         $options = 0;
         if (isset($frame->calledArgs[2])) {
             $optionsVar = $frame->calledArgs[2]->resolveIndirect();
