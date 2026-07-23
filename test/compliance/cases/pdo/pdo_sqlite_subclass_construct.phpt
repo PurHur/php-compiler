@@ -1,5 +1,7 @@
 --TEST--
-Pdo\Sqlite::__construct initializes like PDO::connect (#21096)
+Pdo\Sqlite::__construct initializes like PDO::connect (#21096, #22600)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
 if (!class_exists('PDO')) die('skip no PDO');

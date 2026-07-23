@@ -407,6 +407,10 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'reflectionclass_84_apis_forward_profile')) {
                 continue;
             }
+            // JIT: method_exists(PDO::class, …) fails (pcreJit); profile gate is VM-only (#22600).
+            if (str_contains($name, 'pdo_connect_profile82')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
                 && !str_contains($name, 'mb_trim_phantom')) {

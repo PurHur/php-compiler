@@ -12,11 +12,11 @@ use PHPCompiler\CompilerVersion;
  * PDO + PDOException are always advertised (Zend ships ext/pdo). The sqlite driver
  * surface needs libsqlite3 FFI ({@see \PHPCompiler\ext\sqlite3\VmSqlite3Native}).
  *
- * PHP 8.4 driver subclasses ({@see Pdo\Mysql}, {@see Pdo\Pgsql}) are advertised on
- * language profile ≥ 8.4 ahead of native libmysql/libpq FFI (#20548). They are not
- * listed in getAvailableDrivers() until a real connection factory exists (sqlite-style
- * lib gate); PDO::connect('mysql:…'/'pgsql:…') therefore throws "could not find driver"
- * like Zend when the driver module is absent.
+     * PHP 8.4 {@see PDO::connect()} and driver subclasses ({@see Pdo\Mysql}, {@see Pdo\Pgsql})
+     * are advertised on language profile ≥ 8.4 ahead of native libmysql/libpq FFI
+     * (#20548, #22600). They are not listed in getAvailableDrivers() until a real
+     * connection factory exists (sqlite-style lib gate); PDO::connect('mysql:…'/'pgsql:…')
+     * therefore throws "could not find driver" like Zend when the driver module is absent.
  *
  * Logical {@code pdo_pgsql} follows the subclass advertise gate so
  * {@code extension_loaded('pdo_pgsql')} matches builds that ship the Pdo\Pgsql API
@@ -62,6 +62,16 @@ final class PdoExtensionPolicy
     {
         return self::advertisesExtension()
             && version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ PDO::connect() factory (pdo_dbh.stub.php; #20529, #22600).
+     *
+     * Same profile gate as {@see CompilerVersion::supportsPdoConnect()}.
+     */
+    public static function advertisesConnect(): bool
+    {
+        return self::advertisesExtension() && CompilerVersion::supportsPdoConnect();
     }
 
     public static function advertisesMysqlSubclass(): bool

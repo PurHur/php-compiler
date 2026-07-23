@@ -54,6 +54,41 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsPdoConnectFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPdoConnect());
+    }
+
+    public function testSupportsPdoConnectFalseOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPdoConnect());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsPdoConnectTrueOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPdoConnect());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsStrIncrementTrueOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

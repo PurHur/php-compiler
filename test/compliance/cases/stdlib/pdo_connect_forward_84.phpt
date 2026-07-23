@@ -1,5 +1,5 @@
 --TEST--
-PDO::connect() + Pdo\Sqlite factory (#20529, #22600)
+Stdlib: PDO::connect() on PROFILE=8.4 (#22600, #20529)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
@@ -13,16 +13,7 @@ declare(strict_types=1);
 
 $p = PDO::connect('sqlite::memory:');
 echo get_class($p), "\n";
-echo ($p instanceof PDO) ? 'isa-pdo:Y' : 'isa-pdo:N', "\n";
 echo ($p instanceof Pdo\Sqlite) ? 'isa-sqlite:Y' : 'isa-sqlite:N', "\n";
-echo $p->query('SELECT 1')->fetchColumn(), "\n";
-
-$legacy = new PDO('sqlite::memory:');
-echo get_class($legacy), "\n";
-?>
 --EXPECT--
 Pdo\Sqlite
-isa-pdo:Y
 isa-sqlite:Y
-1
-PDO

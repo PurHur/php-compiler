@@ -80,7 +80,6 @@ final class VmPDO
             'setattribute' => new PDOSetAttribute(),
             'getattribute' => new PDOGetAttribute(),
             'getavailabledrivers' => new PDOGetAvailableDrivers(),
-            'connect' => new PDOConnect(),
             'lastinsertid' => new PDOLastInsertId(),
             'quote' => new PDOQuote(),
             'begintransaction' => new PDOBeginTransaction(),
@@ -90,6 +89,10 @@ final class VmPDO
             'errorcode' => new PDOErrorCode(),
             'errorinfo' => new PDOErrorInfo(),
         ];
+        // PHP 8.4+ only — Zend 8.2 stubs omit PDO::connect (#22600, re-#20529).
+        if (PdoExtensionPolicy::advertisesConnect()) {
+            $methods['connect'] = new PDOConnect();
+        }
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
@@ -104,7 +107,9 @@ final class VmPDO
         $entry->methodNames['errorcode'] = 'errorCode';
         $entry->methodNames['errorinfo'] = 'errorInfo';
         $entry->methodVisibility['getavailabledrivers'] = CfgFunc::FLAG_STATIC | $pub;
-        $entry->methodVisibility['connect'] = CfgFunc::FLAG_STATIC | $pub;
+        if (isset($entry->methods['connect'])) {
+            $entry->methodVisibility['connect'] = CfgFunc::FLAG_STATIC | $pub;
+        }
 
         $ctx->classes[self::CLASS_LC] = $entry;
         self::registerDriverSubclasses($ctx);
