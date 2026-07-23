@@ -1703,6 +1703,20 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ ReflectionProperty::{getRawValue,setRawValue} (ext/reflection/php_reflection.stub.php, #22601; re-#6451).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev / PROFILE=8.2 matches Zend 8.2
+     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     *
+     * Note: getMangledName / isDefaultValueAvailable are never registered — not php-src ReflectionProperty APIs
+     * (parameter side uses isDefaultValueAvailable; property side uses hasDefaultValue).
+     */
+    public static function supportsReflectionPropertyPhp84RawValueApis(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
  * PHP 8.4+ gc_status() schema (php-src 8.3+ 12-key table; Zend/zend_builtin_functions.c, #12780, #20627).
  *
  * Forward profile returns running/protected/full/buffer_size **and** legacy counters plus timing floats.

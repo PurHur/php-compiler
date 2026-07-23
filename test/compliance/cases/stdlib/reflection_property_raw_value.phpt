@@ -1,5 +1,7 @@
 --TEST--
-ReflectionProperty::setRawValue()/getRawValue() — bypass property hooks (#6451)
+ReflectionProperty::setRawValue()/getRawValue() — bypass property hooks (#6451, #22601)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class Box6451 {
