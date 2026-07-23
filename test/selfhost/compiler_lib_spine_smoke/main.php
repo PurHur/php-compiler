@@ -345,6 +345,7 @@ require_once __DIR__.'/../../../ext/dom/DomXPathEvaluateJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomXPathQueryJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/ElementAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/ElementClosest.php';
+require_once __DIR__.'/../../../ext/dom/ElementConstruct.php';
 require_once __DIR__.'/../../../ext/dom/ElementGetAttribute.php';
 require_once __DIR__.'/../../../ext/dom/ElementGetAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementGetAttributeNames.php';
