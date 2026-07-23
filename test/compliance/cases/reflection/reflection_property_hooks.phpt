@@ -17,7 +17,7 @@ var_export($p->isVirtual());
 echo "\n";
 var_export($p->isDynamic());
 echo "\n";
-var_export($p->getMangledName());
+var_export($p->getName());
 echo "\n";
 var_export($p->hasHook(PropertyHookType::Get));
 echo "\n";

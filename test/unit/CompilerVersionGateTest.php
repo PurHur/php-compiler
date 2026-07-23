@@ -439,6 +439,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsReflectionClassPhp84Apis());
     }
 
+    public function testSupportsReflectionPropertyPhp84RawValueApisFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionPropertyPhp84RawValueApis());
+    }
+
+    public function testSupportsReflectionPropertyPhp84RawValueApisTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionPropertyPhp84RawValueApis());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsReflectionClassPhp84ApisTrueOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
