@@ -21,7 +21,14 @@ final class DomDocumentLoadHTML implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        if (JitDomDocumentMethodKernel::shouldUse($context) && isset($args[1])) {
+        $source = $args[1] ?? null;
+        $isNullOrEmpty = null !== $source && (
+            Variable::TYPE_NULL === $source->type
+            || $source->isNullConstant
+            || '' === (JitStringBuiltinArg::compileTimeLiteral($source) ?? $source->compileTimeString ?? null)
+        );
+
+        if (JitDomDocumentMethodKernel::shouldUse($context) && isset($args[1]) && !$isNullOrEmpty) {
             JitDomLoadHTMLUserScript::rememberCompileTimeOptions($context, $args[2] ?? null);
             $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             if (null !== $lit) {
@@ -32,20 +39,26 @@ final class DomDocumentLoadHTML implements Call
             }
         }
 
-        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
+        // Skip ABI link / fresh-continue for compile-time null/empty — ValueError IR only (#22680).
+        if (!$isNullOrEmpty && !JitDomDocumentMethodKernel::shouldUse($context)) {
             DomLoadHTMLRuntime::ensureLinked($context);
         }
 
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+        if (!$isNullOrEmpty && JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::branchToFreshContinue($context, 'dom_lh_invoke');
         }
 
         $result = JitDomLoadHTML::invoke($context, ...$args);
 
+        // Catchable ValueError leaves the insert block terminated (branch to try dispatch).
+        // Do not stitch a reachable main_cont — that would run post-call try-body code (#22680).
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
-            $mainCont = BasicBlockHelper::append($context, 'main_cont_after_dom_lh');
-            $context->builder->branch($mainCont);
-            $context->builder->positionAtEnd($mainCont);
+            $insert = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null !== $insert && null === $insert->getTerminator()) {
+                $mainCont = BasicBlockHelper::append($context, 'main_cont_after_dom_lh');
+                $context->builder->branch($mainCont);
+                $context->builder->positionAtEnd($mainCont);
+            }
         }
 
         return $result;

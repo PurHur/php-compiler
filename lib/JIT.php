@@ -13916,7 +13916,8 @@ class JIT {
                     $valueRef
                     
                 );
-                    $result->isNullConstant = $value->isNullConstant;
+                    // Null → VALUE box is always a compile-time null for builtin soft-null (#22680).
+                    $result->isNullConstant = true;
     
                     return;
                 case Variable::TYPE_NATIVE_LONG:
@@ -15915,6 +15916,16 @@ class JIT {
     /**
      * Nested loadHTML helper compile can leave method-call receiver temps without script-global alias (#17954).
      */
+    private function isNestedJitHelperScopeClassName(string $className): bool
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+
+        return str_ends_with($lc, 'jithelper')
+            || str_starts_with($lc, 'phpcompiler\\ext\\')
+            || str_starts_with($lc, 'phpcompiler\\jit\\builtin\\')
+            || str_starts_with($lc, 'phpcompiler\\vm\\');
+    }
+
     private function resolveUserScriptDomDocumentReceiver(
         Block $block,
         Operand $receiverOp,
@@ -16036,12 +16047,30 @@ class JIT {
 
         $externalReceiverClass = $this->resolveInstanceMethodReceiverClass($receiverOp);
         $userType = $receiverOp->type?->userType;
+        // NestedJIT helper compiles can leak scope->className into user-script lowering
+        // (CaseCompareJitHelper, ErrorSilenceJitHelper, …) — ignore those outside NestedJIT (#22680).
+        $scopeClassName = $this->context->scope->className;
+        if (
+            '' !== $scopeClassName
+            && !JIT\NestedJitCompileScope::isActive()
+            && $this->isNestedJitHelperScopeClassName($scopeClassName)
+        ) {
+            $scopeClassName = '';
+        }
         $className = (is_string($userType) && '' !== ltrim($userType, '\\'))
             ? $userType
             : (null !== $externalReceiverClass
                 ? $externalReceiverClass
-                : ($this->context->scope->className !== '' ? $this->context->scope->className : 'object'));
+                : ('' !== $scopeClassName ? $scopeClassName : 'object'));
         $declaringClassLc = strtolower(ltrim($className, '\\'));
+        if (
+            '' !== $declaringClassLc
+            && !JIT\NestedJitCompileScope::isActive()
+            && $this->isNestedJitHelperScopeClassName($declaringClassLc)
+        ) {
+            $className = 'object';
+            $declaringClassLc = 'object';
+        }
         $methodLc = strtolower($methodName);
 
         if ('object' === $declaringClassLc) {
@@ -16057,6 +16086,18 @@ class JIT {
             } elseif ('getnamedarguments' === $methodLc && $this->context->functionIsRegistered('reflectionfunction::getnamedarguments')) {
                 $className = 'ReflectionFunction';
                 $declaringClassLc = 'reflectionfunction';
+            } elseif ('loadhtml' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::loadhtml');
+                if ($this->context->functionIsRegistered('domdocument::loadhtml')) {
+                    $className = 'DOMDocument';
+                    $declaringClassLc = 'domdocument';
+                }
+            } elseif ('loadxml' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::loadxml');
+                if ($this->context->functionIsRegistered('domdocument::loadxml')) {
+                    $className = 'DOMDocument';
+                    $declaringClassLc = 'domdocument';
+                }
             } elseif ('appendchild' === $methodLc && $this->context->functionIsRegistered('domnode::appendchild')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';

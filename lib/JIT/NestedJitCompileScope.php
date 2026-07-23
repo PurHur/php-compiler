@@ -54,6 +54,12 @@ final class NestedJitCompileScope
         $savedBlockEntryStorage = $context->scope->blockEntryStorage;
         $savedVariables = $context->scope->variables;
         $savedNamedBindings = $context->namedVariableBindings;
+        // Nested helper compile sets scope->className (e.g. CaseCompareJitHelper); leaking it
+        // makes later user-script $obj->method() resolve against the helper class (#22680 AOT).
+        $savedClassName = $context->scope->className;
+        // Nested helper compile of ErrorSilence/etc. can mutate tryCatch->handlerStack while
+        // lowering inside an outer try — DEP then loses catchable ValueError (#22680).
+        $savedHandlerStack = $context->tryCatch->handlerStack;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
         $context->scope->variables = new \SplObjectStorage();
@@ -70,6 +76,8 @@ final class NestedJitCompileScope
             $context->scope->blockEntryStorage = $savedBlockEntryStorage;
             $context->scope->variables = $savedVariables;
             $context->namedVariableBindings = $savedNamedBindings;
+            $context->scope->className = $savedClassName;
+            $context->tryCatch->handlerStack = $savedHandlerStack;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
             self::restoreInsertBlock($context, $restoreBlock);

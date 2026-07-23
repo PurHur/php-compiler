@@ -20,7 +20,13 @@ final class VmDomJitDispatch
      */
     public static function loadHTML(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
-        $html = self::stringArg($extra[0] ?? self::missingArg('loadHTML', 0), 'loadHTML', 0);
+        // Z_PARAM_STR: null → E_DEPRECATED then '' → ValueError empty (#22680).
+        $html = VmString::coerceStringBuiltinArg(
+            ($extra[0] ?? self::missingArg('loadHTML', 0))->resolveIndirect(),
+            'DOMDocument::loadHTML',
+            0,
+            'source'
+        );
         $options = 0;
         if (isset($extra[1])) {
             $optionsVar = $extra[1]->resolveIndirect();

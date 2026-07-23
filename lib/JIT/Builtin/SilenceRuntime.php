@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -230,24 +231,20 @@ final class SilenceRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $savedBuilder = $context->builder;
-        $savedActive = $context->activeFunction;
-        $restoreBlock = self::captureInsertBlock($context);
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
             \putenv('PHP_COMPILER_SELFHOST_AOT=0');
         }
         try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ErrorSilenceJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ErrorSilenceJitHelper.php parseAndCompile failed (#9197)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
+            NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+                $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ErrorSilenceJitHelper.php');
+                if (null === $block) {
+                    throw new \LogicException('ErrorSilenceJitHelper.php parseAndCompile failed (#9197)');
+                }
+                $jit = new JIT($context);
+                $jit->compile($block);
+            });
         } finally {
-            $context->builder = $savedBuilder;
-            self::restoreInsertBlock($context, $restoreBlock);
-            $context->activeFunction = $savedActive;
             if (\function_exists('putenv')) {
                 if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
                     \putenv('PHP_COMPILER_SELFHOST_AOT=');

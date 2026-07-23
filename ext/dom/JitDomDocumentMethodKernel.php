@@ -1019,14 +1019,10 @@ final class JitDomDocumentMethodKernel
             return;
         }
 
+        // Save before nested helper compile — NestedJitCompileScope detaches the builder (#22680).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#18268');
         $ft = $context->context->functionType($returnType, false, ...$paramTypes);
@@ -1082,14 +1078,10 @@ final class JitDomDocumentMethodKernel
             return;
         }
 
+        // Save before nested helper compile — NestedJitCompileScope detaches the builder (#22680).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#17954');
         $ft = $context->context->functionType($returnType, false, ...$paramTypes);
@@ -1137,14 +1129,10 @@ final class JitDomDocumentMethodKernel
             return;
         }
 
+        // Save before nested helper compile — NestedJitCompileScope detaches the builder (#22680).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         $objPtr = $context->getTypeFromString('__object__*');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -1205,14 +1193,10 @@ final class JitDomDocumentMethodKernel
             return;
         }
 
+        // Save before nested helper compile — NestedJitCompileScope detaches the builder (#22680).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         $objPtr = $context->getTypeFromString('__object__*');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -1288,14 +1272,10 @@ final class JitDomDocumentMethodKernel
             return;
         }
 
+        // Save before nested helper compile — NestedJitCompileScope detaches the builder (#22680).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         $objPtr = $context->getTypeFromString('__object__*');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -1425,14 +1405,10 @@ final class JitDomDocumentMethodKernel
             return;
         }
 
+        // Save before nested helper compile — NestedJitCompileScope detaches the builder (#22680).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         $valuePtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
@@ -1494,14 +1470,10 @@ final class JitDomDocumentMethodKernel
             return;
         }
 
+        // Save before nested helper compile — NestedJitCompileScope detaches the builder (#22680).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         $valuePtr = $context->getTypeFromString('__value__*');
         $doubleTy = $context->getTypeFromString('double');
@@ -1562,14 +1534,10 @@ final class JitDomDocumentMethodKernel
             return;
         }
 
+        // Save before nested helper compile — NestedJitCompileScope detaches the builder (#22680).
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureNestedHelperProxies($context);
         self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
 
         $valuePtr = $context->getTypeFromString('__value__*');
         $strPtr = $context->getTypeFromString('__string__*');
