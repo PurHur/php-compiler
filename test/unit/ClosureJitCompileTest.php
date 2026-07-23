@@ -41,6 +41,17 @@ final class ClosureJitCompileTest extends TestCase
         $verify->invoke($context);
     }
 
+    /**
+     * By-ref int capture must retarget slot storage to the aliased box (#22642).
+     * Full AOT/module-verify is covered by compiler_minimal Zend rebuild + repro script.
+     */
+    public function testBindCaptureSlotByReferenceRetargetsNativeStorage(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/lib/VM/VmClosure.php');
+        $this->assertStringContainsString('borrowedValueEntry = true', $source);
+        $this->assertStringContainsString('do not valueDelref the old native alloca (#22642)', $source);
+    }
+
     public function testBinJitRunClosureUseByRefInline(): void
     {
         if (!$this->jitProbeOk()) {

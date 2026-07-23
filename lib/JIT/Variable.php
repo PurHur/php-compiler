@@ -780,6 +780,15 @@ final class Variable {
                 && null === $this->objectPropertySlot
                 && !$this->borrowedValueEntry
             ) {
+                $assert = getenv('PHP_COMPILER_LLVM_ASSERT');
+                if ('1' === $assert || 'true' === strtolower((string) $assert)) {
+                    $slotTy = $this->context->getStringFromType($this->value->typeOf());
+                    if ('__value__*' !== $slotTy && '__value__value*' !== $slotTy) {
+                        throw new \LogicException(
+                            'Variable::free TYPE_VALUE slot is '.$slotTy.' (want __value__*) — #22642'
+                        );
+                    }
+                }
                 $this->context->builder->call(
                     $this->context->lookupFunction('__value__valueDelref'),
                     $this->value
