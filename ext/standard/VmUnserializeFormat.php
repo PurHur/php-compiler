@@ -84,7 +84,7 @@ final class VmUnserializeFormat
         $canonical = [];
         $slotForCell = [];
 
-        return self::cellToVariable($root, $canonical, $slotForCell);
+        return self::unwrapUnserializeRoot(self::cellToVariable($root, $canonical, $slotForCell));
     }
 
     public static function decodeToVariableWithContext(
@@ -101,7 +101,19 @@ final class VmUnserializeFormat
         $canonical = [];
         $slotForCell = [];
 
-        return self::cellToVariableWithContext($ctx, $root, $canonical, $slotForCell, $frame);
+        return self::unwrapUnserializeRoot(
+            self::cellToVariableWithContext($ctx, $root, $canonical, $slotForCell, $frame)
+        );
+    }
+
+    /** Root array/object values are stored as ISREF wrappers; callers want the concrete zval (#22652). */
+    private static function unwrapUnserializeRoot(Variable $var): Variable
+    {
+        if ($var->isIndirect()) {
+            return $var->resolveIndirect();
+        }
+
+        return $var;
     }
 
     /**
@@ -252,10 +264,9 @@ final class VmUnserializeFormat
         if (!isset($this->refTable[$index])) {
             return $this->failCell();
         }
-        $cell = $this->refTable[$index];
-        $this->pushRef($cell);
 
-        return $cell;
+        // php-src var_push happens before the r: match (cursor[0] != 'R'); reuse cell.
+        return $this->refTable[$index];
     }
 
     /**
@@ -309,7 +320,11 @@ final class VmUnserializeFormat
         return $cell;
     }
 
-    /** php-src var_push_deref — R: index; (#12080) */
+    /**
+     * php-src var_push_deref — R: index; (#12080, #22652).
+     *
+     * Uppercase R: skips var_push at php_var_unserialize_internal entry (`*p != 'R'`).
+     */
     private function parseReference(): VmUnserializeCell|false
     {
         if (!$this->expect('R:')) {
@@ -322,10 +337,8 @@ final class VmUnserializeFormat
         if (!isset($this->refTable[$index])) {
             return $this->failCell();
         }
-        $cell = $this->refTable[$index];
-        $this->pushRef($cell);
 
-        return $cell;
+        return $this->refTable[$index];
     }
 
     private function parseNull(): VmUnserializeCell|false
@@ -356,7 +369,7 @@ final class VmUnserializeFormat
         return $cell;
     }
 
-    private function parseInt(): VmUnserializeCell|false
+    private function parseInt(bool $trackRef = true): VmUnserializeCell|false
     {
         if (!$this->expect('i:')) {
             return $this->failCell();
@@ -367,7 +380,9 @@ final class VmUnserializeFormat
         }
         $cell = new VmUnserializeCell();
         $cell->value = $number;
-        $this->pushRef($cell);
+        if ($trackRef) {
+            $this->pushRef($cell);
+        }
 
         return $cell;
     }
@@ -403,7 +418,7 @@ final class VmUnserializeFormat
         return $cell;
     }
 
-    private function parseString(): VmUnserializeCell|false
+    private function parseString(bool $trackRef = true): VmUnserializeCell|false
     {
         if (!$this->expect('s:')) {
             return $this->failCell();
@@ -418,7 +433,9 @@ final class VmUnserializeFormat
         }
         $cell = new VmUnserializeCell();
         $cell->value = $content;
-        $this->pushRef($cell);
+        if ($trackRef) {
+            $this->pushRef($cell);
+        }
 
         return $cell;
     }
@@ -439,6 +456,11 @@ final class VmUnserializeFormat
         if (!$this->expect('{')) {
             return $this->failCell($start);
         }
+
+        // php-src var_push(rval) before parsing nested data — enables R: self-refs (#22652).
+        $cell = new VmUnserializeCell();
+        $cell->value = [];
+        $this->pushRef($cell);
 
         /** @var array<int|string, VmUnserializeCell> $elements */
         $elements = [];
@@ -461,23 +483,25 @@ final class VmUnserializeFormat
             return $this->failCell();
         }
 
-        $cell = new VmUnserializeCell();
         $cell->value = $elements;
-        $this->pushRef($cell);
 
         return $cell;
     }
 
+    /**
+     * Array keys are unserialized with var_hash=NULL in php-src (process_nested_array_data) —
+     * they must not consume R:/r: indices (#22652).
+     */
     private function parseArrayKey(): VmUnserializeCell|false
     {
         if ($this->pos >= $this->length) {
             return $this->failCell();
         }
         if ('i' === $this->payload[$this->pos]) {
-            return $this->parseInt();
+            return $this->parseInt(false);
         }
         if ('s' === $this->payload[$this->pos]) {
-            return $this->parseString();
+            return $this->parseString(false);
         }
 
         return $this->failCell();
@@ -512,6 +536,8 @@ final class VmUnserializeFormat
 
         if (\is_array($cell->value)) {
             $var = new Variable();
+            // Register before children so R: self-refs resolve (#22652, var_unserializer.re).
+            $canonical[$id] = $var;
             $ht = new HashTable();
             $isList = self::isListCellMap($cell->value);
             foreach ($cell->value as $key => $child) {
@@ -532,10 +558,12 @@ final class VmUnserializeFormat
                 }
             }
             $var->array($ht);
-            $canonical[$id] = $var;
-            $slotForCell[$id] = $var;
+            // Match scalar path: element slots are ISREF wrappers so R: aliases share storage.
+            $wrapper = new Variable();
+            $wrapper->indirect($var);
+            $slotForCell[$id] = $wrapper;
 
-            return $var;
+            return $wrapper;
         }
 
         if ($cell->value instanceof VmUnserializeRootObject) {
@@ -665,6 +693,8 @@ final class VmUnserializeFormat
 
         if (\is_array($cell->value)) {
             $var = new Variable();
+            // Register before children so R: self-refs resolve (#22652, var_unserializer.re).
+            $canonical[$id] = $var;
             $ht = new HashTable();
             $isList = self::isListCellMap($cell->value);
             foreach ($cell->value as $key => $child) {
@@ -685,10 +715,11 @@ final class VmUnserializeFormat
                 }
             }
             $var->array($ht);
-            $canonical[$id] = $var;
-            $slotForCell[$id] = $var;
+            $wrapper = new Variable();
+            $wrapper->indirect($var);
+            $slotForCell[$id] = $wrapper;
 
-            return $var;
+            return $wrapper;
         }
 
         return self::cellToVariable($cell, $canonical, $slotForCell);

@@ -687,6 +687,9 @@ final class HashTable {
      */
     public function compareLooseEqual(self $other): bool
     {
+        if ($this === $other) {
+            return true;
+        }
         if ($this->getNumElements() !== $other->getNumElements()) {
             return false;
         }
@@ -699,7 +702,7 @@ final class HashTable {
             if (!$leftKey->equals($rightKey)) {
                 return false;
             }
-            if (!$leftVal->equals($rightVal)) {
+            if (!$leftVal->identicalTo($rightVal) && !$leftVal->equals($rightVal)) {
                 return false;
             }
         }
