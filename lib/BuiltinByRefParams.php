@@ -220,6 +220,9 @@ final class BuiltinByRefParams
             case 'pdostatement::bindparam':
                 // $this + $param + &$var (+ optional $type/$maxLength/…) — php-src pdo.stub.php (#19853)
                 return [2];
+            case 'pdostatement::bindcolumn':
+                // $this + $column + &$var (+ optional $type/…) — php-src pdo.stub.php (#22274)
+                return [2];
             case 'msg_send':
                 // php-src ext/sysvmsg/sysvmsg.stub.php — &$error_code (#3666)
                 return [5];

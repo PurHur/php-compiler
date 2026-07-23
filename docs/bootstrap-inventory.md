@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6431 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20547 |
+| Source constructs flagged (warnings) | 20557 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1533,7 +1533,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/VmPDO.php` | 0 | 85 |
-| `ext/pdo/VmPDOStatement.php` | 0 | 37 |
+| `ext/pdo/VmPDOStatement.php` | 0 | 48 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
 | `ext/pgsql/Module.php` | 0 | 123 |
@@ -4860,7 +4860,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/LastErrorRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/LateStaticBindingGlobals.php` | 0 | 1 |
 | `lib/JIT/Builtin/LateStaticBindingRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/Lcg.php` | 0 | 2 |
+| `lib/JIT/Builtin/Lcg.php` | 0 | 1 |
 | `lib/JIT/Builtin/LdapRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LibcryptRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ListSpreadTailRuntime.php` | 0 | 1 |
@@ -18426,43 +18426,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/VmPDOStatement.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 36)
-- new PDOStatementExecute (line 47)
-- new PDOStatementFetch (line 48)
-- new PDOStatementFetchAll (line 49)
-- new PDOStatementFetchColumn (line 50)
-- new PDOStatementFetchObject (line 51)
-- new PDOStatementBindValue (line 52)
-- new PDOStatementBindParam (line 53)
-- new PDOStatementRowCount (line 54)
-- new PDOStatementColumnCount (line 55)
-- new PDOStatementCloseCursor (line 56)
-- new PDOStatementSetFetchMode (line 57)
-- new PDOStatementErrorCode (line 58)
-- new PDOStatementErrorInfo (line 59)
-- new PDOStatementGetColumnMeta (line 60)
-- new PDOStatementRewind (line 61)
-- new PDOStatementValid (line 62)
-- new PDOStatementCurrent (line 63)
-- new PDOStatementKey (line 64)
-- new PDOStatementNext (line 65)
-- new ObjectEntry (line 95)
-- new PdoStatementState (line 96)
-- new HashTable (line 464)
-- new Variable (line 467)
-- new ArgumentCountError (line 489)
-- new ArgumentCountError (line 529)
-- new ObjectEntry (line 624)
-- new ArgumentCountError (line 805)
-- new HashTable (line 847)
-- new Variable (line 848)
-- new Variable (line 851)
-- new Variable (line 858)
-- new ArgumentCountError (line 881)
-- new HashTable (line 894)
-- new Variable (line 896)
-- new HashTable (line 898)
-- 31 class method(s)
+- new ClassEntry (line 38)
+- new PDOStatementExecute (line 49)
+- new PDOStatementFetch (line 50)
+- new PDOStatementFetchAll (line 51)
+- new PDOStatementFetchColumn (line 52)
+- new PDOStatementFetchObject (line 53)
+- new PDOStatementBindValue (line 54)
+- new PDOStatementBindParam (line 55)
+- new PDOStatementBindColumn (line 56)
+- new PDOStatementRowCount (line 57)
+- new PDOStatementColumnCount (line 58)
+- new PDOStatementCloseCursor (line 59)
+- new PDOStatementSetFetchMode (line 60)
+- new PDOStatementErrorCode (line 61)
+- new PDOStatementErrorInfo (line 62)
+- new PDOStatementGetColumnMeta (line 63)
+- new PDOStatementGetAttribute (line 64)
+- new PDOStatementSetAttribute (line 65)
+- new PDOStatementNextRowset (line 66)
+- new PDOStatementDebugDumpParams (line 67)
+- new PDOStatementGetIterator (line 68)
+- new PDOStatementRewind (line 69)
+- new PDOStatementValid (line 70)
+- new PDOStatementCurrent (line 71)
+- new PDOStatementKey (line 72)
+- new PDOStatementNext (line 73)
+- new ObjectEntry (line 109)
+- new PdoStatementState (line 110)
+- new HashTable (line 581)
+- new Variable (line 584)
+- new ArgumentCountError (line 606)
+- new ArgumentCountError (line 646)
+- new ObjectEntry (line 741)
+- new ArgumentCountError (line 922)
+- new HashTable (line 964)
+- new Variable (line 965)
+- new Variable (line 968)
+- new Variable (line 975)
+- new ArgumentCountError (line 998)
+- new HashTable (line 1011)
+- new Variable (line 1013)
+- new HashTable (line 1015)
+- new ArgumentCountError (line 1037)
+- new ArgumentCountError (line 1072)
+- new ArgumentCountError (line 1106)
+- new PdoStatementInternalIterator (line 1177)
+- new Variable (line 1217)
+- 45 class method(s)
 
 ### `ext/pdo/pdo_drivers.php`
 
@@ -42201,7 +42212,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Lcg.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 50)
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/LdapRuntime.php`

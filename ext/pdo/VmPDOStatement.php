@@ -11,6 +11,8 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\spl\InternalIteratorBuiltin;
+use PHPCompiler\ext\standard\VmExecNative;
 use PHPCompiler\ext\sqlite3\VmSqlite3Native;
 
 /**
@@ -35,7 +37,7 @@ final class VmPDOStatement
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('PDOStatement');
         $entry->isInternal = true;
-        foreach (['Traversable', 'Iterator'] as $iface) {
+        foreach (['Traversable', 'Iterator', 'IteratorAggregate'] as $iface) {
             if (isset($ctx->classes[strtolower($iface)])
                 && !\in_array($iface, $entry->interfaces, true)) {
                 $entry->interfaces[] = $iface;
@@ -51,6 +53,7 @@ final class VmPDOStatement
             'fetchobject' => new PDOStatementFetchObject(),
             'bindvalue' => new PDOStatementBindValue(),
             'bindparam' => new PDOStatementBindParam(),
+            'bindcolumn' => new PDOStatementBindColumn(),
             'rowcount' => new PDOStatementRowCount(),
             'columncount' => new PDOStatementColumnCount(),
             'closecursor' => new PDOStatementCloseCursor(),
@@ -58,6 +61,11 @@ final class VmPDOStatement
             'errorcode' => new PDOStatementErrorCode(),
             'errorinfo' => new PDOStatementErrorInfo(),
             'getcolumnmeta' => new PDOStatementGetColumnMeta(),
+            'getattribute' => new PDOStatementGetAttribute(),
+            'setattribute' => new PDOStatementSetAttribute(),
+            'nextrowset' => new PDOStatementNextRowset(),
+            'debugdumpparams' => new PDOStatementDebugDumpParams(),
+            'getiterator' => new PDOStatementGetIterator(),
             'rewind' => new PDOStatementRewind(),
             'valid' => new PDOStatementValid(),
             'current' => new PDOStatementCurrent(),
@@ -72,6 +80,7 @@ final class VmPDOStatement
         $entry->methodNames['fetchobject'] = 'fetchObject';
         $entry->methodNames['bindvalue'] = 'bindValue';
         $entry->methodNames['bindparam'] = 'bindParam';
+        $entry->methodNames['bindcolumn'] = 'bindColumn';
         $entry->methodNames['rowcount'] = 'rowCount';
         $entry->methodNames['columncount'] = 'columnCount';
         $entry->methodNames['closecursor'] = 'closeCursor';
@@ -79,6 +88,11 @@ final class VmPDOStatement
         $entry->methodNames['errorcode'] = 'errorCode';
         $entry->methodNames['errorinfo'] = 'errorInfo';
         $entry->methodNames['getcolumnmeta'] = 'getColumnMeta';
+        $entry->methodNames['getattribute'] = 'getAttribute';
+        $entry->methodNames['setattribute'] = 'setAttribute';
+        $entry->methodNames['nextrowset'] = 'nextRowset';
+        $entry->methodNames['debugdumpparams'] = 'debugDumpParams';
+        $entry->methodNames['getiterator'] = 'getIterator';
 
         self::$classEntry = $entry;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -166,12 +180,103 @@ final class VmPDOStatement
         $row = match ($mode) {
             PdoConstants::FETCH_ASSOC => $assoc,
             PdoConstants::FETCH_NUM => $num,
+            PdoConstants::FETCH_BOUND => $assoc + $num,
             default => $assoc + $num,
         };
         $st->current = $row;
         ++$st->key;
+        if (PdoConstants::FETCH_BOUND === $mode || [] !== $st->boundColumns) {
+            self::applyBoundColumns($st, $assoc, $num);
+        }
 
         return $row;
+    }
+
+    /**
+     * Write fetched column values into bindColumn Variable slots (php-src FETCH_BOUND).
+     *
+     * @param array<string, mixed> $assoc
+     * @param array<int, mixed>    $num
+     */
+    public static function applyBoundColumns(PdoStatementState $st, array $assoc, array $num): void
+    {
+        foreach ($st->boundColumns as $key => $var) {
+            $value = null;
+            $found = false;
+            if (\is_int($key)) {
+                // bindColumn 1-based column numbers.
+                $idx = $key - 1;
+                if (\array_key_exists($idx, $num)) {
+                    $value = $num[$idx];
+                    $found = true;
+                }
+            } else {
+                if (\array_key_exists($key, $assoc)) {
+                    $value = $assoc[$key];
+                    $found = true;
+                } else {
+                    foreach ($assoc as $name => $cell) {
+                        if (0 === \strcasecmp((string) $name, $key)) {
+                            $value = $cell;
+                            $found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if ($found) {
+                VmPDO::assignScalar($var->resolveIndirect(), $value);
+            }
+        }
+    }
+
+    /**
+     * Resolve bindColumn column: 1-based int or column name string.
+     *
+     * @return int|string|null int 1-based index or string name
+     */
+    public static function resolveColumn(PdoStatementState $st, Variable $columnVar, string $label): int|string|null
+    {
+        $resolved = $columnVar->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            $n = $resolved->toInt();
+
+            return $n >= 1 ? $n : null;
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            $n = (int) $resolved->toFloat();
+
+            return $n >= 1 ? $n : null;
+        }
+        if (Variable::TYPE_STRING === $resolved->type) {
+            $name = $resolved->toString();
+
+            return '' !== $name ? $name : null;
+        }
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            return $resolved->toBool() ? 1 : null;
+        }
+
+        throw new \TypeError(
+            \sprintf('%s(): Argument #1 ($column) must be of type string|int', $label)
+        );
+    }
+
+    /** Dump bound params to php://output (php-src zim_PDOStatement_debugDumpParams; #22274). */
+    public static function debugDumpParamsText(PdoStatementState $st): string
+    {
+        $sql = $st->sql;
+        $out = 'SQL: ['.\strlen($sql).'] '.$sql."\n";
+        $out .= 'Params: '.\count($st->bound)."\n";
+        foreach ($st->bound as $paramno => $entry) {
+            $out .= 'Key: Position #'.$paramno.":\n";
+            $out .= 'paramno='.$paramno."\n";
+            $out .= "name=[0] \"\"\n";
+            $out .= 'is_param='.('param' === $entry['kind'] ? '1' : '0')."\n";
+            $out .= 'param_type='.PdoConstants::PARAM_STR."\n";
+        }
+
+        return $out;
     }
 
     public static function clearError(PdoStatementState $st): void
@@ -334,6 +439,13 @@ final class PdoStatementState
      */
     public array $bound = [];
 
+    /**
+     * Column key (1-based int or name) => Variable slot (php-src bound_columns; #22274).
+     *
+     * @var array<int|string, Variable>
+     */
+    public array $boundColumns = [];
+
     public string $errorCode = '00000';
 
     public ?int $errorDriverCode = null;
@@ -439,6 +551,11 @@ final class PDOStatementFetch extends PdoClassMethod
         }
         if (false === $row) {
             $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (PdoConstants::FETCH_BOUND === $mode) {
+            $frame->returnVar->bool(true);
 
             return;
         }
@@ -902,5 +1019,215 @@ final class PDOStatementGetColumnMeta extends PdoClassMethod
             $ht->add((string) $key, $slot);
         }
         $frame->returnVar->array($ht);
+    }
+}
+
+/** PDOStatement::bindColumn — php-src zim_PDOStatement_bindColumn (#22274). */
+final class PDOStatementBindColumn extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('bindColumn');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::bindColumn()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'PDOStatement::bindColumn() expects at least 2 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $st = VmPDOStatement::state($receiver);
+        $column = VmPDOStatement::resolveColumn($st, $frame->calledArgs[1], 'PDOStatement::bindColumn');
+        if (null === $column) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $st->boundColumns[$column] = $frame->calledArgs[2];
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/**
+ * PDOStatement::getAttribute — php-src zim_PDOStatement_getAttribute (#22274).
+ * Sqlite: ATTR_EMULATE_PREPARES=false; other attrs → IM001.
+ */
+final class PDOStatementGetAttribute extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getAttribute');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::getAttribute()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('PDOStatement::getAttribute() expects exactly 1 argument, 0 given');
+        }
+        $attr = $this->intArg($frame->calledArgs[1], 'PDOStatement::getAttribute', 0, 'attribute');
+        $st = VmPDOStatement::state($receiver);
+        $pdoState = VmPDO::stateById($st->pdoId);
+        if (PdoConstants::ATTR_EMULATE_PREPARES === $attr) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        VmPDO::raiseImplError($pdoState, 'IM001', "driver doesn't support getting that attribute");
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(false);
+        }
+    }
+}
+
+/**
+ * PDOStatement::setAttribute — php-src zim_PDOStatement_setAttribute (#22274).
+ * Sqlite generic attrs unsupported → false (explain-mode attrs deferred).
+ */
+final class PDOStatementSetAttribute extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setAttribute');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $this->receiver($frame, 'PDOStatement::setAttribute()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'PDOStatement::setAttribute() expects exactly 2 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(false);
+        }
+    }
+}
+
+/**
+ * PDOStatement::nextRowset — sqlite has no next_rowset (#22274).
+ * php-src: IM001 "driver does not support multiple rowsets".
+ */
+final class PDOStatementNextRowset extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('nextRowset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::nextRowset()');
+        $st = VmPDOStatement::state($receiver);
+        $pdoState = VmPDO::stateById($st->pdoId);
+        VmPDO::raiseImplError($pdoState, 'IM001', 'driver does not support multiple rowsets');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(false);
+        }
+    }
+}
+
+/** PDOStatement::debugDumpParams — php://output dump (#22274). */
+final class PDOStatementDebugDumpParams extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('debugDumpParams');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::debugDumpParams()');
+        $st = VmPDOStatement::state($receiver);
+        VmExecNative::echoToStdout(VmPDOStatement::debugDumpParamsText($st));
+    }
+}
+
+/**
+ * PDOStatement::getIterator — InternalIterator over rows (#22274).
+ * php-src: zend_create_internal_iterator_zval.
+ */
+final class PDOStatementGetIterator extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIterator');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::getIterator()');
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('PDOStatement::getIterator() requires VM context');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->object(
+            InternalIteratorBuiltin::fromLiveHandler($ctx, new PdoStatementInternalIterator($receiver))
+        );
+    }
+}
+
+/**
+ * Live InternalIterator backing for PDOStatement (#22274).
+ */
+final class PdoStatementInternalIterator implements \PHPCompiler\ext\spl\InternalIteratorLiveHandler
+{
+    public function __construct(private ObjectEntry $statement)
+    {
+    }
+
+    public function rewind(): void
+    {
+        $st = VmPDOStatement::state($this->statement);
+        if (null !== $st->stmt && $st->executed) {
+            VmSqlite3Native::reset($st->stmt);
+            $st->exhausted = false;
+            $st->key = -1;
+            $st->current = null;
+            VmPDOStatement::fetchRow($st, PdoConstants::FETCH_ASSOC);
+        }
+    }
+
+    public function next(): void
+    {
+        VmPDOStatement::fetchRow(VmPDOStatement::state($this->statement), PdoConstants::FETCH_ASSOC);
+    }
+
+    public function valid(): bool
+    {
+        $st = VmPDOStatement::state($this->statement);
+
+        return null !== $st->current && !$st->exhausted;
+    }
+
+    public function current(): Variable
+    {
+        $var = new Variable();
+        $st = VmPDOStatement::state($this->statement);
+        if (null === $st->current) {
+            $var->null();
+
+            return $var;
+        }
+        VmPDO::assignRow($var, $st->current);
+
+        return $var;
+    }
+
+    public function key(): int|string|Variable
+    {
+        return VmPDOStatement::state($this->statement)->key;
     }
 }
