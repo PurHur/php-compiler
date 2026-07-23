@@ -10,7 +10,7 @@ use PHPCompiler\VM\ReflectionPropertyTypeSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\ReflectionTypeSupport;
 
-/** ReflectionProperty::getType() — VM (#4384, ext/reflection/php_reflection.c). */
+/** ReflectionProperty::getType() — VM (#4384, #22481, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyGetType extends VmClassMethod
 {
     public function __construct()
@@ -35,7 +35,8 @@ final class ReflectionPropertyGetType extends VmClassMethod
             );
         }
         if (null !== $frame->returnVar) {
-            $declared = ReflectionPropertyTypeSupport::readableType($entry, $property, $meta, $ctx);
+            // php-src: ref->prop->type — not the get-hook return type (#22481).
+            $declared = ReflectionPropertyTypeSupport::declaredType($entry, $property, $meta, $ctx);
             if (null === $declared) {
                 $frame->returnVar->null();
             } else {

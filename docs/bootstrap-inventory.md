@@ -51467,9 +51467,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReflectionPropertyTypeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new CfgType\Never_ (line 56)
-- new CfgType\Never_ (line 70)
-- 9 class method(s)
+- new CfgType\Never_ (line 76)
+- new CfgType\Never_ (line 90)
+- 10 class method(s)
 
 ### `lib/VM/ReflectionReferenceSupport.php`
 
