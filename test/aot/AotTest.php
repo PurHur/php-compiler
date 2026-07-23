@@ -240,7 +240,10 @@ class AotTest extends BaseTest
             if (CompilerVersion::supportsCrc32c() && str_contains($name, 'crc32c')) {
                 continue;
             }
-            if (!CompilerVersion::supportsMbStrPad() && str_contains($name, 'mb_str_pad')) {
+            // AOT mb_str_pad_*_forward* fixtures set PROFILE via --ENV--; always include (#22373).
+            if (!CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             if (!CompilerVersion::supportsGetHandlerIntrospection()
