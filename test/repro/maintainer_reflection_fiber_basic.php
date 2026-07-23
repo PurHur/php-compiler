@@ -8,10 +8,10 @@ $fiber = new Fiber(function (): void {
 });
 
 $rf = new ReflectionFiber($fiber);
-var_export($rf->isStarted());
+var_export($fiber->isStarted());
 echo "\n";
 $fiber->start();
-var_export($rf->isSuspended());
+var_export($fiber->isSuspended());
 echo "\n";
 var_export($rf->getFiber() === $fiber);
 echo "\n";

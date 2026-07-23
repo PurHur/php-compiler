@@ -251,10 +251,6 @@ use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFile;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingLine;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetFiber;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetTrace;
-use PHPCompiler\VM\Builtin\ReflectionFiberIsRunning;
-use PHPCompiler\VM\Builtin\ReflectionFiberIsStarted;
-use PHPCompiler\VM\Builtin\ReflectionFiberIsSuspended;
-use PHPCompiler\VM\Builtin\ReflectionFiberIsTerminated;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorConstruct;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingFile;
 use PHPCompiler\VM\Builtin\ReflectionGeneratorGetExecutingGenerator;
@@ -1490,13 +1486,11 @@ final class BuiltinClasses
         $rfiber->constructor = new ReflectionFiberConstruct();
         $rfiber->methods['__construct'] = $rfiber->constructor;
         $rfiber->methodVisibility['__construct'] = $pub;
+        // Fiber state probes (isStarted/isSuspended/isRunning/isTerminated) live on Fiber
+        // only — php-src ReflectionFiber does not advertise them (#22422).
         foreach (
             [
                 'getfiber' => new ReflectionFiberGetFiber(),
-                'isstarted' => new ReflectionFiberIsStarted(),
-                'issuspended' => new ReflectionFiberIsSuspended(),
-                'isterminated' => new ReflectionFiberIsTerminated(),
-                'isrunning' => new ReflectionFiberIsRunning(),
                 'getexecutingline' => new ReflectionFiberGetExecutingLine(),
                 'getexecutingfile' => new ReflectionFiberGetExecutingFile(),
                 'gettrace' => new ReflectionFiberGetTrace(),

@@ -1,5 +1,5 @@
 --TEST--
-ReflectionFiber instance API — construct, state, getFiber (#4609, ext/reflection/php_reflection.c)
+ReflectionFiber instance API — construct, getFiber; state on Fiber (#4609, #22422, ext/reflection/php_reflection.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -11,10 +11,10 @@ $fiber = new Fiber(function (): void {
 });
 
 $rf = new ReflectionFiber($fiber);
-var_export($rf->isStarted());
+var_export($fiber->isStarted());
 echo "\n";
 $fiber->start();
-var_export($rf->isSuspended());
+var_export($fiber->isSuspended());
 echo "\n";
 var_export($rf->getFiber() === $fiber);
 echo "\n";
