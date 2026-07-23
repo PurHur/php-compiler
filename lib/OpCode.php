@@ -364,6 +364,15 @@ class OpCode {
             || self::destSlotUsedAsInPlaceCompoundAssign($op, $destSlot);
     }
 
+    /**
+     * True when {@see $destSlot} is the RHS of ASSIGN_REF (`$r = &$obj->prop`, #22475).
+     * Defer get-only / `&get` checks to TYPE_ASSIGN_REF — do not treat as write-only lvalue.
+     */
+    public static function destSlotUsedAsAssignRefSource(self $op, int $destSlot): bool
+    {
+        return self::TYPE_ASSIGN_REF === $op->type && $op->arg2 === $destSlot;
+    }
+
     /** True when this opcode uses {@see $destSlot} as the container for dim write ([]/key assign, #6775). */
     public static function destSlotUsedAsDimWriteContainer(self $op, int $destSlot): bool
     {
