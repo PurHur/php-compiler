@@ -14,6 +14,7 @@ use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\CompileTimeEnumCase;
 use PHPCompiler\Compiler\CompileTimeNew;
+use PHPCompiler\Compiler\ParameterMetadata;
 use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\ext\standard\VmReflection;
@@ -2923,10 +2924,10 @@ final class ReflectionSupport
     }
 
     /**
-     * ReflectionMethod::__toString() — php-src _function_string for methods (#22173).
+     * ReflectionMethod::__toString() — php-src _function_string for methods (#22173, #22522).
      *
      * Covers user/internal header, visibility/static/abstract/final, by-ref name, file/line,
-     * and a simplified parameters section (names only).
+     * parameters (types / optional / defaults / variadic), and return type section.
      */
     public static function methodReflectionToString(Context $ctx, ObjectEntry $reflection): string
     {
@@ -2971,17 +2972,15 @@ final class ReflectionSupport
         }
 
         $className = self::classNameFromReflection($reflection);
-        $paramNames = self::reflectedMethodParameterNames($ctx, $className, $name);
-        $paramCount = \count($paramNames);
-        if ($paramCount > 0) {
-            $out .= "\n  - Parameters [{$paramCount}] {\n";
-            $required = self::reflectedMethodRequiredParameterCount($ctx, $className, $name);
-            for ($i = 0; $i < $paramCount; ++$i) {
-                $kind = $i < $required ? 'required' : 'optional';
-                $out .= "    Parameter #{$i} [ <{$kind}> \${$paramNames[$i]} ]\n";
-            }
-            $out .= "  }\n";
+        $paramMetas = $declaring->methodParameterMetadata[$methodLc] ?? [];
+        if ([] === $paramMetas) {
+            $paramMetas = self::synthesizeParameterMetadataFromNames(
+                self::reflectedMethodParameterNames($ctx, $className, $name),
+                self::reflectedMethodRequiredParameterCount($ctx, $className, $name)
+            );
         }
+        $returnTypeStr = self::methodReturnTypeDumpString($declaring, $methodLc);
+        $out .= self::formatFunctionParametersAndReturnSections($paramMetas, $returnTypeStr);
 
         $out .= "}\n";
 
@@ -3169,7 +3168,7 @@ final class ReflectionSupport
     }
 
     /**
-     * ReflectionFunction::__toString() — php-src _function_string for free functions (#22379).
+     * ReflectionFunction::__toString() — php-src _function_string for free functions (#22379, #22522).
      *
      * Must start with `Function [` and be non-empty.
      */
@@ -3197,17 +3196,26 @@ final class ReflectionSupport
             }
         }
 
-        $paramNames = self::reflectedFunctionParameterNames($ctx, $reflection);
-        $paramCount = \count($paramNames);
-        if ($paramCount > 0) {
-            $out .= "\n  - Parameters [{$paramCount}] {\n";
-            $required = self::reflectedFunctionRequiredParameterCount($ctx, $reflection);
-            for ($i = 0; $i < $paramCount; ++$i) {
-                $kind = $i < $required ? 'required' : 'optional';
-                $out .= "    Parameter #{$i} [ <{$kind}> \${$paramNames[$i]} ]\n";
+        $paramMetas = [];
+        $returnTypeStr = null;
+        if ($isInternal) {
+            $paramMetas = self::synthesizeParameterMetadataFromNames(
+                self::reflectedFunctionParameterNames($ctx, $reflection),
+                self::reflectedFunctionRequiredParameterCount($ctx, $reflection)
+            );
+            $returnTypeStr = self::internalFunctionReturnTypeDumpString($ctx, $reflection);
+        } else {
+            $func = self::resolveFunctionFromReflection($ctx, $reflection);
+            $paramMetas = $func->parameterMetadata;
+            if ([] === $paramMetas) {
+                $paramMetas = self::synthesizeParameterMetadataFromNames(
+                    self::reflectedFunctionParameterNames($ctx, $reflection),
+                    self::reflectedFunctionRequiredParameterCount($ctx, $reflection)
+                );
             }
-            $out .= "  }\n";
+            $returnTypeStr = self::blockReturnTypeDumpString($func->block);
         }
+        $out .= self::formatFunctionParametersAndReturnSections($paramMetas, $returnTypeStr);
 
         $out .= "}\n";
 
@@ -3262,6 +3270,95 @@ final class ReflectionSupport
         }
 
         return ' = '.$printed;
+    }
+
+    /**
+     * @param list<ParameterMetadata> $paramMetas
+     */
+    private static function formatFunctionParametersAndReturnSections(array $paramMetas, ?string $returnTypeStr): string
+    {
+        $paramCount = \count($paramMetas);
+        $showParams = $paramCount > 0 || null !== $returnTypeStr;
+        if (!$showParams) {
+            return '';
+        }
+
+        $out = "\n  - Parameters [{$paramCount}] {\n";
+        foreach ($paramMetas as $i => $meta) {
+            $out .= self::formatParameterDumpLine($i, $meta);
+        }
+        $out .= "  }\n";
+        if (null !== $returnTypeStr) {
+            $out .= "  - Return [ {$returnTypeStr} ]\n";
+        }
+
+        return $out;
+    }
+
+    private static function formatParameterDumpLine(int $index, ParameterMetadata $meta): string
+    {
+        $kind = ($meta->isOptional || $meta->isVariadic) ? 'optional' : 'required';
+        $typePrefix = (null !== $meta->typeString && '' !== $meta->typeString)
+            ? $meta->typeString.' '
+            : '';
+        $amp = $meta->byRef ? '&' : '';
+        $dots = $meta->isVariadic ? '...' : '';
+        $default = '';
+        if (!$meta->isVariadic && null !== $meta->defaultExport && '' !== $meta->defaultExport) {
+            $default = ' = '.$meta->defaultExport;
+        }
+
+        return "    Parameter #{$index} [ <{$kind}> {$typePrefix}{$amp}{$dots}\${$meta->name}{$default} ]\n";
+    }
+
+    /**
+     * @param list<string> $names
+     *
+     * @return list<ParameterMetadata>
+     */
+    private static function synthesizeParameterMetadataFromNames(array $names, int $required): array
+    {
+        $out = [];
+        foreach ($names as $i => $name) {
+            $out[] = new ParameterMetadata(
+                $name,
+                [],
+                false,
+                $i >= $required,
+                false,
+                false,
+                null,
+                null,
+            );
+        }
+
+        return $out;
+    }
+
+    private static function methodReturnTypeDumpString(ClassEntry $declaring, string $methodLc): ?string
+    {
+        $func = $declaring->methods[$methodLc] ?? null;
+        if (!$func instanceof PhpFunc) {
+            return null;
+        }
+
+        return self::blockReturnTypeDumpString($func->block);
+    }
+
+    private static function blockReturnTypeDumpString(Block $block): ?string
+    {
+        $declared = $block->returnDeclaredType;
+        if (!self::hasDeclaredReturnType($declared)) {
+            return null;
+        }
+
+        return ReflectionTypeSupport::cfgTypeStringForDump($declared);
+    }
+
+    private static function internalFunctionReturnTypeDumpString(Context $ctx, ObjectEntry $reflection): ?string
+    {
+        // Internal arginfo return types are not yet modeled for dumps; omit section.
+        return null;
     }
 
     private static function formatReflectionScalar(Variable $value): ?string

@@ -76,6 +76,7 @@ use PHPCompiler\Compiler\FinalMethodOverrideCheck;
 use PHPCompiler\Compiler\FinalPropertyOverrideCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
+use PHPCompiler\VM\ReflectionTypeSupport;
 use PHPCompiler\Compiler\GeneratorNeverReturnCompileCheck;
 use PHPCompiler\Compiler\GeneratorStaticMethodCompileCheck;
 use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
@@ -6216,14 +6217,86 @@ class Compiler {
             if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
                 continue;
             }
+            $isVariadic = (bool) $param->variadic;
+            $hasDefault = null !== $param->defaultVar || null !== $param->defaultBlock;
             $metadata[] = new ParameterMetadata(
                 $param->name->value,
                 AttributeMetadata::fromOp($param),
                 $this->isPromotedParam($param),
+                $isVariadic || $hasDefault,
+                $isVariadic,
+                (bool) $param->byRef,
+                $this->parameterTypeStringForDump($param),
+                $this->parameterDefaultExportForDump($param),
             );
         }
 
         return $metadata;
+    }
+
+    /**
+     * Zend _function_string / parameter dump type label (#22522).
+     */
+    protected function parameterTypeStringForDump(Op\Expr\Param $param): ?string
+    {
+        $type = $param->declaredType ?? null;
+        if (null === $type || $type instanceof Op\Type\Mixed_) {
+            return null;
+        }
+
+        return ReflectionTypeSupport::cfgTypeStringForDump($type);
+    }
+
+    /**
+     * Zend parameter default literal for Reflection*::__toString (#22522).
+     */
+    protected function parameterDefaultExportForDump(Op\Expr\Param $param): ?string
+    {
+        if ($param->variadic || (null === $param->defaultVar && null === $param->defaultBlock)) {
+            return null;
+        }
+        if ($param->defaultVar instanceof NullOperand) {
+            return 'NULL';
+        }
+        if (null === $param->defaultVar) {
+            return null;
+        }
+        $vm = $this->vmVariableFromCfgLiteralOperand($param->defaultVar);
+        if (null === $vm) {
+            $unwrapped = $this->unwrapOperandChain($param->defaultVar);
+            if ($unwrapped instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($unwrapped->name);
+                if (null !== $name) {
+                    $lc = strtolower(ltrim($name, '\\'));
+                    if ('null' === $lc) {
+                        return 'NULL';
+                    }
+                    if ('true' === $lc) {
+                        return 'true';
+                    }
+                    if ('false' === $lc) {
+                        return 'false';
+                    }
+                }
+            }
+
+            return null;
+        }
+        $vm = $vm->resolveIndirect();
+        switch ($vm->type) {
+            case Variable::TYPE_NULL:
+                return 'NULL';
+            case Variable::TYPE_BOOLEAN:
+                return $vm->toBool() ? 'true' : 'false';
+            case Variable::TYPE_INTEGER:
+                return (string) $vm->toInt();
+            case Variable::TYPE_FLOAT:
+                return (string) $vm->toFloat();
+            case Variable::TYPE_STRING:
+                return var_export($vm->toString(), true);
+            default:
+                return null;
+        }
     }
 
     protected function assignAttributeMetadata(OpCode $op, Op $cfgOp): void
