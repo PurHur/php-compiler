@@ -34,7 +34,8 @@ final class ReflectionPropertyHasType extends VmClassMethod
             );
         }
         if (null !== $frame->returnVar) {
-            $declared = ReflectionPropertyTypeSupport::readableType($entry, $property, $meta, $ctx);
+            // php-src: prop->type presence — same source as getType() (#22063, #22481).
+            $declared = ReflectionPropertyTypeSupport::declaredType($entry, $property, $meta, $ctx);
             $frame->returnVar->bool(null !== $declared);
         }
     }

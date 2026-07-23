@@ -8,10 +8,30 @@ use PHPCfg\Op\Type as CfgType;
 use PHPCompiler\Func;
 
 /**
- * ReflectionProperty::{getReadableType,getSettableType} helpers (#7053, ext/reflection/php_reflection.c).
+ * ReflectionProperty::{getType,getReadableType,getSettableType} helpers
+ * (#4384, #7053, #22481, ext/reflection/php_reflection.c).
  */
 final class ReflectionPropertyTypeSupport
 {
+    /**
+     * Declared property ZEND_TYPE — ReflectionProperty::getType() (#22481).
+     * Must not substitute the get-hook return type (that path is getReadableType).
+     */
+    public static function declaredType(
+        ClassEntry $entry,
+        string $property,
+        ?ClassProperty $instanceProp,
+        Context $ctx
+    ): ?CfgType {
+        if (null !== $instanceProp) {
+            return self::cfgTypeFromVariable($instanceProp->prototype);
+        }
+        $propLc = strtolower($property);
+        $storage = self::findStaticPropertyStorage($entry, $propLc, $ctx);
+
+        return null !== $storage ? self::cfgTypeFromVariable($storage) : null;
+    }
+
     public static function readableType(
         ClassEntry $entry,
         string $property,
