@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6432 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20562 |
+| Source constructs flagged (warnings) | 20561 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6253,7 +6253,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/ScalarDimFetchJitHelper.php` | 0 | 1 |
 | `lib/VM/ScriptStack.php` | 0 | 1 |
 | `lib/VM/SensitiveParamJitHelper.php` | 0 | 1 |
-| `lib/VM/SensitiveParamSupport.php` | 0 | 19 |
+| `lib/VM/SensitiveParamSupport.php` | 0 | 18 |
 | `lib/VM/ShutdownQueue.php` | 0 | 1 |
 | `lib/VM/SplArrayCastJitHelper.php` | 1 | 0 |
 | `lib/VM/StringOffsetJitHelper.php` | 0 | 1 |
@@ -15923,18 +15923,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 297)
 - new HashTable (line 555)
 - new Variable (line 558)
-- new ArgumentCountError (line 1630)
-- new ArgumentCountError (line 1638)
-- new Error (line 2935)
-- new Error (line 2939)
-- new Variable (line 3055)
-- new HashTable (line 3114)
-- new Variable (line 3116)
-- new HashTable (line 3133)
-- new Variable (line 3135)
-- new ArgumentCountError (line 3150)
-- new MailBuiltin (line 3364)
-- new Variable (line 3369)
+- new ArgumentCountError (line 1631)
+- new ArgumentCountError (line 1639)
+- new Error (line 2936)
+- new Error (line 2940)
+- new Variable (line 3056)
+- new HashTable (line 3115)
+- new Variable (line 3117)
+- new HashTable (line 3134)
+- new Variable (line 3136)
+- new ArgumentCountError (line 3151)
+- new MailBuiltin (line 3365)
+- new Variable (line 3370)
 - 157 class method(s)
 - 1 closure(s)
 
@@ -29746,11 +29746,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmExit.php`
 
 **Warnings** (review for bootstrap subset):
-- new ScriptExit (line 29)
-- new Error (line 74)
-- new Error (line 89)
-- new Error (line 128)
-- new Error (line 133)
+- new ScriptExit (line 31)
+- new Error (line 78)
+- new Error (line 93)
+- new Error (line 146)
+- new Error (line 151)
 - 6 class method(s)
 
 ### `ext/standard/VmFastCgi.php`
@@ -31467,8 +31467,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1819)
-- new Error (line 1830)
+- new Error (line 1820)
+- new Error (line 1831)
 - 218 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -42955,8 +42955,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SensitiveParamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 81)
-- 7 class method(s)
+- new Variable (line 93)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/SessionAbort.php`
 
@@ -44568,25 +44568,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2394)
 - new Variable (line 2407)
 - new Variable (line 2566)
-- new VMVariable (line 3363)
-- new VMVariable (line 3381)
-- new VMVariable (line 3389)
-- new VMVariable (line 3407)
-- new ReflectionClassConstant (line 4616)
-- new Variable (line 4996)
-- new Variable (line 5022)
-- new Variable (line 5030)
-- new Variable (line 5053)
-- new Variable (line 5079)
-- new Variable (line 5087)
-- new Variable (line 5161)
-- new Literal (line 5178)
+- new VMVariable (line 3368)
+- new VMVariable (line 3386)
+- new VMVariable (line 3394)
+- new VMVariable (line 3412)
+- new ReflectionClassConstant (line 4621)
+- new Variable (line 5001)
+- new Variable (line 5027)
+- new Variable (line 5035)
+- new Variable (line 5058)
+- new Variable (line 5084)
+- new Variable (line 5092)
+- new Variable (line 5166)
 - new Literal (line 5183)
 - new Literal (line 5188)
-- new Variable (line 5199)
-- new Variable (line 5232)
-- new Variable (line 5255)
-- new Variable (line 5619)
+- new Literal (line 5193)
+- new Variable (line 5204)
+- new Variable (line 5237)
+- new Variable (line 5260)
+- new Variable (line 5624)
 - 265 class method(s)
 - 8 closure(s)
 
@@ -51574,25 +51574,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/SensitiveParamSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 34)
-- new ClassEntry (line 37)
-- new ClassProperty (line 38)
-- new SensitiveParameterValueConstruct (line 39)
-- new SensitiveParameterValueGetValue (line 42)
-- new SensitiveParameterValueDebugInfo (line 44)
-- new ObjectEntry (line 66)
-- new Variable (line 69)
-- new Variable (line 80)
-- new Variable (line 88)
-- new Variable (line 93)
-- new Variable (line 101)
-- new ObjectEntry (line 102)
-- new Variable (line 138)
-- new Variable (line 152)
-- new Variable (line 254)
-- new Variable (line 258)
-- new ClassEntry (line 283)
-- 14 class method(s)
+- new ObjectEntry (line 59)
+- new Variable (line 62)
+- new Variable (line 73)
+- new Variable (line 81)
+- new Variable (line 86)
+- new Variable (line 94)
+- new ObjectEntry (line 95)
+- new Variable (line 131)
+- new Variable (line 146)
+- new Variable (line 248)
+- new Variable (line 252)
+- new Variable (line 286)
+- new ClassEntry (line 288)
+- new ClassProperty (line 289)
+- new SensitiveParameterValueConstruct (line 290)
+- new SensitiveParameterValueGetValue (line 293)
+- new SensitiveParameterValueDebugInfo (line 295)
+- 15 class method(s)
 
 ### `lib/VM/ShutdownQueue.php`
 
