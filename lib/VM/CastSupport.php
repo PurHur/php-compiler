@@ -59,6 +59,13 @@ final class CastSupport
             if (SimpleXmlJsonExport::handles($obj)) {
                 return SimpleXmlJsonExport::exportZendArrayCast($obj);
             }
+            // DateTime*/DateTimeZone: Zend date/timezone wire keys (#22424).
+            $dateCast = self::tryDateObjectArrayCast($obj);
+            if (null !== $dateCast) {
+                $result->array($dateCast);
+
+                return $result;
+            }
             $result->newArray();
             self::objectToArray($obj, $result->toArray(), $classesByLc ?? []);
 
@@ -128,6 +135,33 @@ final class CastSupport
             $valueVar->copyFrom($obj->enumCaseValue);
             $ht->add('value', $valueVar);
         }
+    }
+
+    /**
+     * php-src ext/date/php_date.c — date_object_get_properties / (array) cast (#22424).
+     *
+     * Reuses the same Zend wire as serialize/var_export ({@see DateTimeSupport::varExportPropertyMap}).
+     */
+    public static function tryDateObjectArrayCast(ObjectEntry $obj): ?HashTable
+    {
+        $lc = strtolower($obj->class->name);
+        $map = null;
+        if (DateTimeSupport::CLASS_DATETIME === $lc || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lc) {
+            $map = DateTimeSupport::varExportPropertyMap($obj);
+        } elseif (DateTimeSupport::CLASS_DATETIMEZONE === $lc) {
+            $map = DateTimeSupport::varExportTimezonePropertyMap($obj);
+        }
+        if (null === $map) {
+            return null;
+        }
+        $ht = new HashTable();
+        foreach ($map as $name => $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $ht->add((string) $name, $copy);
+        }
+
+        return $ht;
     }
 
     /**
