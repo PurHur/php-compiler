@@ -527,7 +527,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $entry = self::$root.'/test/selfhost/compiler_minimal/main.php';
         $this->assertFileExists($entry);
         $count = substr_count((string) file_get_contents($entry), 'require_once __DIR__');
-        $this->assertSame(6431, $count);
+        $this->assertSame(6432, $count);
     }
 
     public function testCompilerLibSpineSmokeBundleUnitCountAndKeyUnits(): void
@@ -537,7 +537,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
-        $this->assertSame(6431, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550)');
+        $this->assertSame(6432, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
