@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6447 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20622 |
+| Source constructs flagged (warnings) | 20620 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4901,7 +4901,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathFloor.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFmod.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFpow.php` | 0 | 1 |
-| `lib/JIT/Builtin/MathFrexp.php` | 0 | 3 |
+| `lib/JIT/Builtin/MathFrexp.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathHypot.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathIsFinite.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathIsInfinite.php` | 0 | 1 |
@@ -42481,9 +42481,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MathFrexp.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 150)
 - 6 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/MathHypot.php`
 
