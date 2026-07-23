@@ -13,6 +13,8 @@ use PHPCompiler\VM\Variable;
  * Reflected Dom\Element / Dom\HTMLElement IDL attributes
  * (php-src element.c / inner_outer_html_mixin.c; #20418, #20532)
  * plus legacy DOMElement::$id / $className (php_dom.stub.php PHP 8.3+; #22457).
+ *
+ * Dom\Element::$outerHTML is gated to PHP 8.5+ ({@see CompilerVersion::supportsDomElementOuterHtmlProperty()}; #22482).
  */
 final class DomHtmlElementPropertySupport
 {
@@ -34,10 +36,14 @@ final class DomHtmlElementPropertySupport
         }
         $lc = strtolower($name);
         if (VmDomLiving::isLivingElement($object)) {
+            if ('outerhtml' === $lc) {
+                // Dom\Element::$outerHTML — PHP 8.5+ only (Zend 8.4 undefined; #22482).
+                return CompilerVersion::supportsDomElementOuterHtmlProperty();
+            }
+
             return 'id' === $lc
                 || 'classname' === $lc
                 || 'innerhtml' === $lc
-                || 'outerhtml' === $lc
                 || 'substitutednodevalue' === $lc;
         }
         // Legacy DOMElement::$id / $className (PHP 8.3+; #22457).

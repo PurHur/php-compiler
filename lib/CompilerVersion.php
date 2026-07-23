@@ -2910,6 +2910,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ Dom\Element::$outerHTML living string property
+     * (php-src PHP-8.5+ ext/dom/php_dom.stub.php; #22482, re-#20532).
+     *
+     * PHP-8.4 stubs advertise Dom\Element::$innerHTML only; `$outerHTML` arrives on
+     * master / 8.5+. Withheld on PROFILE=8.4 — `$el->outerHTML` is undefined
+     * (E_WARNING + null). Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsDomElementOuterHtmlProperty(): bool
+    {
+        return self::supportsDomApiSince('8.5.0');
+    }
+
+    /**
      * PHP 8.4+ DOMXPath::quote() static XPath literal escaper (ext/dom/xpath.c, #18650).
      */
     public static function supportsDomXPathQuote(): bool
