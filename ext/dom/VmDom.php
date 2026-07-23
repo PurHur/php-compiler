@@ -10593,13 +10593,12 @@ final class VmDom
         // php-src dom_node_textContent_write / node_value_write — unlink all children before
         // inserting replacement text (#20646). Clearing childIds alone left held element
         // wrappers still parented (live-tree desync vs Zend).
+        // Empty string still inserts one empty DOMText (DOM Living / php-src; #22657).
         self::removeAllLiveStandardChildren($ctx, $node);
         $ownerDoc = self::ownerDocumentEntry($node);
-        if ('' !== $value) {
-            $text = self::createTextNode($ctx, $value, $ownerDoc);
-            $state->childIds[] = $text->id;
-            self::linkChildToParent($text, $node);
-        }
+        $text = self::createTextNode($ctx, $value, $ownerDoc);
+        $state->childIds[] = $text->id;
+        self::linkChildToParent($text, $node);
         self::syncSubtree($ctx, $node);
         // Live SimpleXML peer — same libxml node in php-src (#20137).
         VmDomSimpleXmlBridge::syncSimpleXmlTextFromDom($node, $value);
