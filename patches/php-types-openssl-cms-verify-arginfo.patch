@@ -1,0 +1,12 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -5339,6 +5339,8 @@
+         'openssl_pkcs7_decrypt' => ['bool', 'infilename' => 'string', 'outfilename' => 'string', 'recipcert' => '', 'recipkey=' => ''],
+         'openssl_pkcs7_encrypt' => ['bool', 'infile' => 'string', 'outfile' => 'string', 'recipcerts' => '', 'headers' => 'array', 'flags=' => 'int', 'cipher=' => 'int'],
+         'openssl_pkcs7_sign' => ['bool', 'infile' => 'string', 'outfile' => 'string', 'signcert' => '', 'signkey' => '', 'headers' => 'array', 'flags=' => 'int', 'extracertsfilename=' => 'string'],
+         'openssl_pkcs7_verify' => ['bool', 'filename' => 'string', 'flags' => 'int', 'signerscerts=' => 'string', 'cainfo=' => 'array', 'extracerts=' => 'string', 'content=' => 'string'],
++        'openssl_cms_verify' => ['bool', 'input_filename' => 'string', 'flags=' => 'int', 'certificates=' => '?string', 'ca_info=' => 'array', 'untrusted_certificates_filename=' => '?string', 'content=' => '?string', 'pk7=' => '?string', 'sigfile=' => '?string', 'encoding=' => 'int'],
++        'openssl_cms_sign' => ['bool', 'input_filename' => 'string', 'output_filename' => 'string', 'certificate' => '', 'private_key' => '', 'headers' => 'array', 'flags=' => 'int', 'encoding=' => 'int', 'untrusted_certificates_filename=' => '?string'],
+         'openssl_pkey_export' => ['bool', 'key' => '', '&out' => '', 'passphrase=' => 'string', 'config_args=' => 'array'],
+         'openssl_pkey_export_to_file' => ['bool', 'key' => '', 'outfilename' => 'string', 'passphrase=' => 'string', 'config_args=' => 'array'],
+         'openssl_pkey_free' => ['', 'key' => 'int'],
