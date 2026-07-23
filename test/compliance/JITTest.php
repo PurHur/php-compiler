@@ -901,11 +901,18 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'die_named_message_reference_profile'))) {
                 continue;
             }
+            // Pre-8.4 construct soft-coerces array status (#5441); 8.4+ TypeError (#22492).
+            if (CompilerVersion::supportsExitFunctionForm()
+                && str_contains($name, 'exit_array_status')
+                && !str_contains($name, 'exit_array_status_type_error')) {
+                continue;
+            }
             if (!CompilerVersion::supportsExitFunctionForm()
                 && (str_contains($name, 'exit_function_php84')
                     || str_contains($name, 'exit_function_strict_types')
                     || str_contains($name, 'exit_die_two_args')
                     || str_contains($name, 'exit_type_error')
+                    || str_contains($name, 'exit_array_status_type_error')
                     || str_contains($name, 'exit_status_named')
                     || (str_contains($name, 'exit_named_status')
                         && !str_contains($name, 'exit_named_status_reference_profile'))
@@ -1817,7 +1824,9 @@ class JITTest extends BaseTest {
                 continue;
             }
             // exit([]) array-to-string warning — VM (#5441); JIT TYPE_EXIT deferred.
-            if (str_contains($name, 'exit_array_status')) {
+            // 8.4+ array TypeError case (exit_array_status_type_error) stays on JIT (#22492).
+            if (str_contains($name, 'exit_array_status')
+                && !str_contains($name, 'exit_array_status_type_error')) {
                 continue;
             }
             // exit()/die() enum case Error + uncaught reporting — VM TYPE_EXIT (#6358).

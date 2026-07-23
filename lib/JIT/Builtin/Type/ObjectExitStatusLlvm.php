@@ -96,9 +96,20 @@ final class ObjectExitStatusLlvm
         $asString = MagicMethodDispatch::coerceObjectToString($context, $objectVar);
         if (null !== $asString) {
             ValueEchoHelper::echoStringVariable($context, $asString);
-        } else {
-            ValueEchoHelper::echoObjectVariable($context, $objectVar);
+            ScriptExit::emitLibcExitWithStatus(
+                $context,
+                $context->getTypeFromString('int64')->constInt(0, false)
+            );
+
+            return;
         }
+        // PHP 8.4+ ZPP string|int: non-Stringable object → TypeError (#22492 / #4704).
+        if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+            ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
+
+            return;
+        }
+        ValueEchoHelper::echoObjectVariable($context, $objectVar);
         ScriptExit::emitLibcExitWithStatus(
             $context,
             $context->getTypeFromString('int64')->constInt(0, false)

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\ScriptExit;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\VM\TypeCheck;
@@ -58,7 +60,9 @@ final class VmExit
             return 0;
         }
         if (Variable::TYPE_ARRAY === $v->type) {
-            if ($twoArgForm) {
+            // PHP 8.4+ exit()/die() are typed string|int — arrays TypeError (#22492 / #4704).
+            // Pre-8.4 construct form soft-coerces with Array-to-string warning (#5441).
+            if ($twoArgForm || CompilerVersion::supportsExitFunctionForm()) {
                 throw self::typeErrorForStatus($v);
             }
             $vm = VM::running();
@@ -92,6 +96,20 @@ final class VmExit
             }
             if ($twoArgForm) {
                 throw self::typeErrorForStatus($v);
+            }
+            // PHP 8.4+ ZPP string|int: resources and non-Stringable objects → TypeError (#22492).
+            // Stringable / __toString still accepted (#18469).
+            if (CompilerVersion::supportsExitFunctionForm()) {
+                if (ResourceSupport::isResourceObject($obj)) {
+                    throw self::typeErrorForStatus($v);
+                }
+                $vm = VM::running();
+                if (null === $vm || !$vm->hasInstanceMethod($obj->class, '__tostring')) {
+                    throw self::typeErrorForStatus($v);
+                }
+                echo $vm->coerceVariableToString($v, $frame);
+
+                return 0;
             }
             $vm = VM::running();
             echo null !== $vm ? $vm->coerceVariableToString($v, $frame) : 'Object';
