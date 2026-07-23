@@ -3781,6 +3781,23 @@ restart:
                     ) {
                         $writeTarget = $lhs;
                     }
+                    // Zend ASSIGN_REF: named CV `$a =& $x` rebinds the local symbol only —
+                    // disconnects by-ref params from the caller, local aliases from their prior
+                    // referent, and `global $g` inside functions (#22546). Main-script globals
+                    // still peel into the symbol-table cell so `$GLOBALS` stays linked.
+                    // Unnamed dim/$GLOBALS fetch temps keep peeling into live storage (#5349).
+                    if (
+                        $lhs->isIndirect()
+                        && $writeTarget === $lhsPeel
+                        && null !== $lhsPeel
+                        && null !== $this->resolveScopeSlotVariableName($frame, (int) $op->arg1)
+                        && (
+                            !$this->context->isGlobalStorage($lhsPeel)
+                            || !$frame->block->isMainScript()
+                        )
+                    ) {
+                        $writeTarget = $lhs;
+                    }
                     if (
                         null !== $op->arg3
                         && OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK === (int) $op->arg3
