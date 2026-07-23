@@ -624,6 +624,9 @@ final class TypeCheck
     /** Zend zend_execute.c FETCH_DIM_W on scalars (#6325, #4713). */
     public const SCALAR_USED_AS_ARRAY_MESSAGE = 'Cannot use a scalar value as an array';
 
+    /** Zend zend_execute.c empty-dim append on string (#22651). */
+    public const STRING_APPEND_UNSUPPORTED_MESSAGE = '[] operator not supported for strings';
+
     /**
      * True when FETCH_DIM_W / []= must auto-vivify an empty array (zend_execute.c, #21992).
      *
