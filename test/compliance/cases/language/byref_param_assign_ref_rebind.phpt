@@ -42,6 +42,23 @@ function loc() {
     echo $c, ",", $a, "\n";
 }
 loc();
+
+// `global $g` then `$g =& $x` rebinds the function CV only (outer symbol unchanged).
+function glob_rebind() {
+    global $g;
+    $x = 5;
+    $g =& $x;
+    echo "inner=", $g, "\n";
+}
+$g = 1;
+glob_rebind();
+echo "outer=", $g, "\n";
+
+// Main-script `$a =& $b` must keep `$GLOBALS['a']` linked.
+$ga = 10;
+$gb = 20;
+$ga =& $gb;
+echo "GLOBALS=", $GLOBALS['ga'], ",", $ga, ",", $gb, "\n";
 --EXPECT--
 NULL
 NULL
@@ -49,3 +66,6 @@ NULL
 7,1
 1,2
 1,99
+inner=5
+outer=1
+GLOBALS=20,20,20
