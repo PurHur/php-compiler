@@ -358,17 +358,29 @@ class JIT {
                 // runQueue copies the previous item's className; after DECLARE_CLASS popScope it is
                 // empty, and after another helper's method it is stale — both break NestedJIT
                 // self::$props (#22037). Traits keep composing-class binding from above (#18878).
+                // Prefer activeFunction's "Class::method" prefix as SSOT — func->class can lag the
+                // queued scoped name in large spine bundles (IniJitHelper vs InArrayJitHelper, #22642).
+                $declaring = '';
                 if (null !== $cfgBlock->func->class) {
                     $declaring = (string) $cfgBlock->func->class->value;
+                }
+                $active = $this->context->activeFunction;
+                $activeSep = strpos($active, '::');
+                if (false !== $activeSep) {
+                    $fromActive = substr($active, 0, $activeSep);
+                    if ('' !== $fromActive) {
+                        $declaring = $fromActive;
+                    }
+                }
+                if ('' !== $declaring) {
                     $declLc = strtolower(ltrim($declaring, '\\'));
                     if (!$this->context->type->object->isTraitClass($declLc)) {
                         $this->context->scope->className = $declLc;
-                        if ($this->context->type->object->hasDeclaredClass($declaring)) {
-                            $this->context->scope->classId = $this->context->type->object->lookup($declaring);
-                        }
+                        $this->context->scope->classId = $this->context->type->object->lookup($declaring);
                         $this->context->scope->calledClassName = $declLc;
                     }
                 }
+
             } else {
                 foreach ($this->context->functions as $name => $candidate) {
                     if ($candidate === $llvmFunc) {

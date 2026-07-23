@@ -109,4 +109,51 @@ final class BootstrapGen0ManifestRefreshTest extends TestCase
             }
         }
     }
+
+    public function testStampLiveFingerprintRequiresBuildStamp(): void
+    {
+        require_once self::$root.'/script/bootstrap-gen0-manifest-lib.php';
+
+        $manifestPath = bootstrap_gen0_manifest_path(self::$root);
+        $stampPath = self::$root.'/prelinked/bootstrap-gen0/.bootstrap_lowering_source.sha';
+        $buildStamp = self::$root.'/build/.bootstrap_lowering_source.sha';
+        $origManifest = (string) file_get_contents($manifestPath);
+        $origStamp = is_readable($stampPath) ? (string) file_get_contents($stampPath) : null;
+        $origBuild = is_readable($buildStamp) ? (string) file_get_contents($buildStamp) : null;
+
+        try {
+            @unlink($buildStamp);
+            try {
+                bootstrap_gen0_manifest_stamp_lowering_fingerprint(self::$root);
+                $this->fail('expected RuntimeException for restamp without build stamp');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('refusing to stamp live lowering_source_fingerprint', $e->getMessage());
+            }
+        } finally {
+            file_put_contents($manifestPath, $origManifest);
+            if (null === $origStamp) {
+                @unlink($stampPath);
+            } else {
+                file_put_contents($stampPath, $origStamp);
+            }
+            if (null === $origBuild) {
+                @unlink($buildStamp);
+            } else {
+                if (!is_dir(dirname($buildStamp))) {
+                    mkdir(dirname($buildStamp), 0777, true);
+                }
+                file_put_contents($buildStamp, $origBuild);
+            }
+        }
+    }
+
+    public function testRefreshScriptAllowsStaleSeedForLink(): void
+    {
+        $body = (string) file_get_contents(self::$root.'/script/bootstrap-refresh-gen0-sidecar.sh');
+        $this->assertStringContainsString('BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER=1', $body);
+        $this->assertStringContainsString('stale gen-0 seed allowed for refresh', $body);
+        $this->assertStringContainsString('bootstrap_compiler_lib_honest_zend_compile', $body);
+        $this->assertStringContainsString('refusing restamp-only fingerprint update', $body);
+        $this->assertStringContainsString('#22642', $body);
+    }
 }

@@ -279,6 +279,10 @@ function bootstrap_gen0_manifest_refresh_from_disk(string $root): array
 /**
  * Record lowering provenance after a verified-fresh copy into prelinked/bootstrap-gen0/ (#21905).
  *
+ * When stamping the live fingerprint (null $fingerprint), requires build/.bootstrap_lowering_source.sha
+ * to already match — written by script/bootstrap-refresh-gen0-sidecar.sh after spine link.
+ * That rejects restamp-only edits that invent provenance without a verified-fresh build (#22642).
+ *
  * @return array<string, mixed>
  */
 function bootstrap_gen0_manifest_stamp_lowering_fingerprint(string $root, ?string $fingerprint = null): array
@@ -288,12 +292,24 @@ function bootstrap_gen0_manifest_stamp_lowering_fingerprint(string $root, ?strin
         throw new \RuntimeException('missing or invalid '.bootstrap_gen0_manifest_path($root));
     }
     $fp = $fingerprint;
-    if (null === $fp || '' === $fp) {
+    $stampingLive = null === $fp || '' === $fp;
+    if ($stampingLive) {
         $fp = bootstrap_gen0_manifest_live_lowering_fingerprint($root);
     }
     $fp = strtolower(trim($fp));
     if (!preg_match('/^[a-f0-9]{64}$/', $fp)) {
         throw new \RuntimeException('invalid lowering_source_fingerprint (want 64 hex chars)');
+    }
+    if ($stampingLive) {
+        $buildStamp = rtrim($root, '/').'/build/.bootstrap_lowering_source.sha';
+        $have = is_readable($buildStamp) ? strtolower(trim((string) file_get_contents($buildStamp))) : '';
+        if ($have !== $fp) {
+            throw new \RuntimeException(
+                'refusing to stamp live lowering_source_fingerprint without a matching build/'.
+                '.bootstrap_lowering_source.sha (run script/bootstrap-refresh-gen0-sidecar.sh,'.
+                ' not a restamp-only edit — #22642/#21905)'
+            );
+        }
     }
     $manifest['lowering_source_fingerprint'] = $fp;
     $manifest['generated_at'] = gmdate('c');

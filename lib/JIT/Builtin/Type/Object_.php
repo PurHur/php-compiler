@@ -4503,6 +4503,16 @@ class Object_ extends Type {
         $name = strtolower($classOp->value);
         if ('self' === $name) {
             $declaringClass = $this->context->scope->className;
+            // Prefer activeFunction "Class::method" when scope className is stale from a prior
+            // queue item (large spine: IniJitHelper::iniGet saw InArrayJitHelper — #22642 / #22037).
+            $active = strtolower((string) ($this->context->activeFunction ?? ''));
+            $activeSep = strpos($active, '::');
+            if (false !== $activeSep) {
+                $fromActive = substr($active, 0, $activeSep);
+                if ('' !== $fromActive && !$this->isTraitClass($fromActive)) {
+                    $declaringClass = $fromActive;
+                }
+            }
             if ('' === $declaringClass) {
                 PseudoClassScope::fatalInGlobalScope('self');
             }
