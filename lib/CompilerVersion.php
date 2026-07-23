@@ -2146,33 +2146,36 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ Closure::getCurrent() (Zend/zend_closures.c, issue #13981, #14061, #14188, #14221, #14371, #14433, #14515, #14533, #15167, #15197, #15239, #15674).
+     * PHP 8.5+ Closure::getCurrent() (Zend/zend_closures.stub.php, #22583; re-#16989).
      *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * php-src adds getCurrent() on the PHP-8.5 stub only — not on 8.4. Gated on stable 8.5.0 /
+     * PHP_COMPILER_PROFILE=8.5 so PROFILE=8.4 matches Zend 8.4 (method undefined).
      */
     public static function supportsClosureGetCurrent(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
-     * PHP 8.4+ Closure::fromStatic() (Zend/zend_closures.c, issue #9992, #16666).
+     * Closure::fromStatic() — never shipped by Zend/php-src (Zend/zend_closures.stub.php, #22583).
      *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Prior 8.4 forward-profile enable (#9992 / #16666) was wrong-direction vs php-src-strict.
+     * Always withheld until present in php-src stubs.
      */
     public static function supportsClosureFromStatic(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
-     * PHP 8.4+ Closure::getUsedVariables() (Zend/zend_closures.c zif_closure_get_used_vars, #6067, #16735).
+     * Closure::getUsedVariables() — never shipped by Zend/php-src (Zend/zend_closures.stub.php, #22583).
      *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Prior 8.4 forward-profile enable (#6067 / #16735) was wrong-direction vs php-src-strict.
+     * Always withheld until present in php-src stubs.
      */
     public static function supportsClosureGetUsedVariables(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

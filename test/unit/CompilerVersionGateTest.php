@@ -2146,10 +2146,25 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClosureGetCurrent());
     }
 
-    public function testSupportsClosureGetCurrentTrueOnForwardProfile(): void
+    public function testSupportsClosureGetCurrentFalseOn84ForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsClosureGetCurrent());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsClosureGetCurrentTrueOn85ForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $this->assertTrue(CompilerVersion::supportsClosureGetCurrent());
         } finally {
@@ -2166,18 +2181,20 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClosureFromStatic());
     }
 
-    public function testSupportsClosureFromStaticTrueOnForwardProfile(): void
+    public function testSupportsClosureFromStaticFalseOn84And85Profiles(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            $this->assertTrue(CompilerVersion::supportsClosureFromStatic());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
+        foreach (['8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(
+                CompilerVersion::supportsClosureFromStatic(),
+                'fromStatic withheld on PROFILE='.$profile.' (#22583)'
+            );
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
         }
     }
 
@@ -2189,17 +2206,15 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($closure->methods['fromstatic']));
     }
 
-    public function testSupportsClosureGetUsedVariablesFalseOnReferenceProfile(): void
-    {
-        $this->assertFalse(CompilerVersion::supportsClosureGetUsedVariables());
-    }
-
-    public function testSupportsClosureGetUsedVariablesTrueOnForwardProfile(): void
+    public function testVmDoesNotRegisterClosureFromStaticOn84Profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsClosureGetUsedVariables());
+            $runtime = new Runtime();
+            $closure = $runtime->vmContext->classes['closure'] ?? null;
+            $this->assertNotNull($closure);
+            $this->assertFalse(isset($closure->methods['fromstatic']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2209,12 +2224,52 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsClosureGetUsedVariablesFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClosureGetUsedVariables());
+    }
+
+    public function testSupportsClosureGetUsedVariablesFalseOn84And85Profiles(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        foreach (['8.4', '8.5'] as $profile) {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+            $this->assertFalse(
+                CompilerVersion::supportsClosureGetUsedVariables(),
+                'getUsedVariables withheld on PROFILE='.$profile.' (#22583)'
+            );
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
+    }
+
     public function testVmDoesNotRegisterClosureGetUsedVariablesOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $closure = $runtime->vmContext->classes['closure'] ?? null;
         $this->assertNotNull($closure);
         $this->assertFalse(isset($closure->methods['getusedvariables']));
+    }
+
+    public function testVmDoesNotRegisterClosureGetUsedVariablesOn84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $closure = $runtime->vmContext->classes['closure'] ?? null;
+            $this->assertNotNull($closure);
+            $this->assertFalse(isset($closure->methods['getusedvariables']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsBareRethrowFalseOnReferenceProfile(): void
@@ -2270,10 +2325,28 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($closure->methods['getcurrent']));
     }
 
-    public function testVmRegistersClosureGetCurrentOnForwardProfile(): void
+    public function testVmDoesNotRegisterClosureGetCurrentOn84Profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $closure = $runtime->vmContext->classes['closure'] ?? null;
+            $this->assertNotNull($closure);
+            $this->assertFalse(isset($closure->methods['getcurrent']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersClosureGetCurrentOn85ForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $runtime = new Runtime();
             $closure = $runtime->vmContext->classes['closure'] ?? null;
