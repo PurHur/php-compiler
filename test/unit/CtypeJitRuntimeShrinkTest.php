@@ -6,7 +6,9 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** ctype JIT helpers route through VmCtype PHP, not hand-written LLVM (#9234). */
+/**
+ * ctype JIT helpers route through VmCtype PHP; NestedJIT via JitVmHelperLink (#9234, #22626).
+ */
 final class CtypeJitRuntimeShrinkTest extends TestCase
 {
     public function testCtypeJitHelperDelegatesToVmCtype(): void
@@ -27,6 +29,13 @@ final class CtypeJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CtypeRuntime.php');
         $this->assertStringContainsString('CtypeJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('emitFromValueBridge', $source);
         $this->assertStringNotContainsString('emitIsDigit', $source);
         $this->assertStringNotContainsString('emitCheckChar', $source);
