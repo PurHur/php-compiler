@@ -16,6 +16,7 @@ final class XsltInstanceMethodJit
         'xsltprocessor::setsecurityprefs' => true,
         'xsltprocessor::getsecurityprefs' => true,
         'xsltprocessor::setprofiling' => true,
+        'xsltprocessor::importstylesheet' => true,
     ];
 
     public static function isXsltInstanceMethodProxy(string $proxyName): bool

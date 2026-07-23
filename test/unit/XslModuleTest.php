@@ -42,7 +42,8 @@ $dom = new DOMDocument();
 $dom->loadXML($xml);
 $xslDom = new DOMDocument();
 $xslDom->loadXML($xsl);
-$proc->importStylesheet($xslDom);
+$imported = $proc->importStylesheet($xslDom);
+echo (int) (true === $imported), "\n";
 $result = $proc->transformToXML($dom);
 echo (int) str_contains($result, '<h1>Hi</h1>'), "\n";
 $docResult = $proc->transformToDoc($dom);
@@ -56,6 +57,6 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'xsl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("1\nHi\n1\n1\n", ob_get_clean());
+        self::assertSame("1\n1\nHi\n1\n1\n", ob_get_clean());
     }
 }

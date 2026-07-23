@@ -111,10 +111,16 @@ final class VmXsl
         XsltRegistry::attach($entry, XsltHostBridge::createProcessor());
     }
 
-    public static function importStylesheet(ObjectEntry $entry, ObjectEntry $stylesheet): void
+    /**
+     * XSLTProcessor::importStylesheet() — php-src xsltprocessor.c (#22367).
+     *
+     * @return bool Success of stylesheet import (Zend returns true/false, never null).
+     */
+    public static function importStylesheet(ObjectEntry $entry, ObjectEntry $stylesheet): bool
     {
         $hostStylesheet = VmXslDomBridge::vmDocumentToHost($stylesheet);
-        XsltHostBridge::importStylesheet(XsltRegistry::processor($entry), $hostStylesheet);
+
+        return XsltHostBridge::importStylesheet(XsltRegistry::processor($entry), $hostStylesheet);
     }
 
     /** @return string|false */
