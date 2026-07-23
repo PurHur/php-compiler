@@ -1,24 +1,11 @@
 <?php
-
-declare(strict_types=1);
-
-class HookedBox {
-    public string $label {
-        get => strtoupper($this->__label);
-        set (string $v) { $this->__label = $v; }
+// Repro for #22494 — setHook must stay absent (Zend 8.4+/8.5 have getHook/getHooks only).
+class T {
+    public string $x {
+        get => 'a';
+        set {}
     }
-
-    private string $__label = 'hi';
 }
-
-$rp = new ReflectionProperty(HookedBox::class, 'label');
-if (!method_exists($rp, 'setHook')) {
-    echo "fail: setHook missing\n";
-    exit(1);
-}
-
-$rp->setHook(PropertyHookType::Get, static fn () => 'replaced');
-$obj = new HookedBox();
-echo $obj->label, "\n";
-$hooks = $rp->getHooks();
-echo isset($hooks['get']) && $hooks['get'] instanceof Closure ? "runtime-get-closure\n" : "fail-hooks\n";
+$rp = new ReflectionProperty(T::class, 'x');
+echo method_exists($rp, 'setHook') ? "setHook yes\n" : "setHook no\n";
+echo method_exists($rp, 'getHook') ? "getHook yes\n" : "getHook no\n";

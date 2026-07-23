@@ -94,7 +94,8 @@ class Context {
     public array $propertyHookRegistry = [];
 
     /**
-     * Runtime property hooks installed via ReflectionProperty::setHook() (#22116).
+     * Reserved map for runtime property-hook overrides (never populated: ReflectionProperty::setHook
+     * is a phantom vs php-src — removed in #22494 / re-#22116).
      *
      * @var array<string, array<string, array<string, ClosureState>>>
      */

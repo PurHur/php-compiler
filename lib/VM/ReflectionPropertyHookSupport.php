@@ -214,34 +214,6 @@ final class ReflectionPropertyHookSupport
         return $ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc][$hookKind] ?? null;
     }
 
-    public static function installRuntimeHook(
-        Context $ctx,
-        ClassEntry $entry,
-        ClassProperty $meta,
-        string $property,
-        string $hookKind,
-        ClosureState $state
-    ): void {
-        $classLc = strtolower($entry->name);
-        $propLc = strtolower($property);
-        if (!isset($ctx->reflectionPropertyRuntimeHooks[$classLc])) {
-            $ctx->reflectionPropertyRuntimeHooks[$classLc] = [];
-        }
-        if (!isset($ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc])) {
-            $ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc] = [];
-        }
-        $ctx->reflectionPropertyRuntimeHooks[$classLc][$propLc][$hookKind] = $state;
-        if ('set' === $hookKind) {
-            $meta->setHookMethodLc = strtolower(
-                \PHPCompiler\SourcePreprocessor\PropertyHooks::setHookMethodName($property)
-            );
-        } else {
-            $meta->getHookMethodLc = strtolower(
-                \PHPCompiler\SourcePreprocessor\PropertyHooks::getHookMethodName($property)
-            );
-        }
-    }
-
     public static function parsePropertyHookTypeArg(Variable $arg, string $function): string
     {
         $arg = $arg->resolveIndirect();
