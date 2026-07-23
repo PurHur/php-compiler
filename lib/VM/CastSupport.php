@@ -59,7 +59,7 @@ final class CastSupport
             if (SimpleXmlJsonExport::handles($obj)) {
                 return SimpleXmlJsonExport::exportZendArrayCast($obj);
             }
-            // DateTime*/DateTimeZone/DateInterval: Zend date wire keys (#22424, #22425).
+            // DateTime*/DateTimeZone/DateInterval/DatePeriod: Zend date wire (#22424, #22425, #22435).
             $dateCast = self::tryDateObjectArrayCast($obj);
             if (null !== $dateCast) {
                 $result->array($dateCast);
@@ -138,10 +138,11 @@ final class CastSupport
     }
 
     /**
-     * php-src ext/date/php_date.c — date_object_get_properties / (array) cast (#22424, #22425).
+     * php-src ext/date/php_date.c — date_object_get_properties / (array) cast (#22424, #22425, #22435).
      *
      * Reuses the same Zend wire as serialize/var_export
-     * ({@see DateTimeSupport::varExportPropertyMap}, {@see DateIntervalSupport::varExportPropertyMap}).
+     * ({@see DateTimeSupport::varExportPropertyMap}, {@see DateIntervalSupport::varExportPropertyMap},
+     * {@see DatePeriodSupport::varExportPropertyMap}).
      */
     public static function tryDateObjectArrayCast(ObjectEntry $obj): ?HashTable
     {
@@ -153,6 +154,8 @@ final class CastSupport
             $map = DateTimeSupport::varExportTimezonePropertyMap($obj);
         } elseif (DateIntervalSupport::CLASS_DATEINTERVAL === $lc) {
             $map = DateIntervalSupport::varExportPropertyMap($obj);
+        } elseif (DatePeriodSupport::CLASS_DATEPERIOD === $lc) {
+            $map = DatePeriodSupport::varExportPropertyMap($obj);
         }
         if (null === $map) {
             return null;
