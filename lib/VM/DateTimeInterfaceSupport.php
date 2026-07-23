@@ -41,6 +41,17 @@ final class DateTimeInterfaceSupport
         $entry = new ClassEntry(self::INTERFACE_NAME);
         $entry->isInterface = true;
         self::registerClassConstants($entry);
+        // php-src ext/date/php_date.stub.php — interface method table (#22609).
+        BuiltinClasses::registerBuiltinInterfaceMethods($entry, [
+            'format',
+            'getTimezone',
+            'getOffset',
+            'getTimestamp',
+            'diff',
+            '__wakeup',
+            '__serialize',
+            '__unserialize',
+        ]);
         $ctx->classes[self::INTERFACE_LC] = $entry;
     }
 
