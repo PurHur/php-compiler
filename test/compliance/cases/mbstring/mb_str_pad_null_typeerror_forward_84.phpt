@@ -1,5 +1,5 @@
 --TEST--
-mbstring mb_str_pad() null $string — TypeError on 8.4 profile (#19184, ext/mbstring/mbstring.c)
+mbstring mb_str_pad() null $string — TypeError on 8.4 profile (#19184, #22373, ext/mbstring/mbstring.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--

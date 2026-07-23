@@ -202,9 +202,15 @@ class JITTest extends BaseTest {
             }
             // hebrevc removed in php-src 8.0 (#20354): functional cases use PROFILE=7.4 via --ENV--;
             // phantom_* cases assert absence on 8.2/8.4 — always include (do not gate on supportsHebrevc()).
+            // Functional mb_str_pad_*_forward* cases set PROFILE via --ENV--; always include (#22373).
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
-                && !str_contains($name, 'mb_str_pad_phantom')) {
+                && !str_contains($name, 'mb_str_pad_phantom')
+                && !str_contains($name, 'forward')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsMbUcfirstLcfirst()

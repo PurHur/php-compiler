@@ -345,9 +345,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
                 continue;
             }
+            // Functional mb_str_pad_*_forward* cases set PROFILE via --ENV--; always include (#22373).
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
-                && !str_contains($name, 'mb_str_pad_phantom')) {
+                && !str_contains($name, 'mb_str_pad_phantom')
+                && !str_contains($name, 'forward')) {
+                continue;
+            }
+            if (CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsMbUcfirstLcfirst()

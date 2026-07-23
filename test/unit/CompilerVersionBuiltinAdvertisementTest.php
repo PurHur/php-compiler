@@ -75,10 +75,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testMbStrPadEnabledOnDefault84Dev(): void
+    public function testMbStrPadWithheldOnDefault84DevReference(): void
     {
-        $this->assertTrue(CompilerVersion::supportsMbStrPad());
-        $this->assertTrue(CompilerVersion::advertisesMbStrPad());
+        $this->assertFalse(CompilerVersion::supportsMbStrPad());
+        $this->assertFalse(CompilerVersion::advertisesMbStrPad());
     }
 
     public function testMbStrPadWithheldOn82Profile(): void
@@ -1213,10 +1213,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersMbStrPadOnDefault84Dev(): void
+    public function testVmDoesNotRegisterMbStrPadOnDefault84DevReference(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
+        $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
     public function testVmDoesNotRegisterMbStrPadOn82Profile(): void

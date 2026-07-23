@@ -1,5 +1,7 @@
 --TEST--
-stdlib mb_str_pad() JIT/AOT — multibyte padding (#6081)
+AOT: mb_str_pad() — multibyte padding on PROFILE=8.4 (#6081, #22373)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo mb_str_pad('hi', 5), "\n";

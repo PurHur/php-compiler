@@ -299,9 +299,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsMbStrPadTrueOnDefault84Dev(): void
+    public function testSupportsMbStrPadFalseOnDefault84DevReference(): void
     {
-        $this->assertTrue(CompilerVersion::supportsMbStrPad());
+        $this->assertFalse(CompilerVersion::supportsMbStrPad());
     }
 
     public function testSupportsMbStrPadFalseOn82Profile(): void
@@ -1636,10 +1636,10 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersMbStrPadOnDefault84Dev(): void
+    public function testVmDoesNotRegisterMbStrPadOnDefault84DevReference(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
+        $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
     public function testVmDoesNotRegisterGraphemeStrSplitOnReferenceOr82Profile(): void

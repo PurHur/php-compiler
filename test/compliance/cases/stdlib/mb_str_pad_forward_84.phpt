@@ -1,5 +1,7 @@
 --TEST--
-stdlib mb_str_pad() — multibyte padding (php-src ext/mbstring/mbstring.c, #6081)
+stdlib mb_str_pad() — multibyte padding on PROFILE=8.4 (php-src ext/mbstring/mbstring.c, #6081, #22373)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo function_exists('mb_str_pad') ? "exists\n" : "missing\n";
