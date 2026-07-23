@@ -1,14 +1,15 @@
 --TEST--
-isset()/empty() on write-only virtual property hook throws Error (issue #6484, zend_property_hooks.c)
+isset()/empty() on write-only virtual property hook throws Error (issue #6484, #22452, zend_property_hooks.c)
 --FILE--
 <?php
 class C {
-    public string $x {
-        set => $this->x = strtoupper($value);
+    public int $x {
+        set { $this->v = $value; }
+        private int $v = 0;
     }
 }
 $c = new C();
-$c->x = 'hi';
+$c->x = 5;
 try {
     var_dump(isset($c->x));
 } catch (Error $e) {

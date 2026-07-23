@@ -1,10 +1,10 @@
 --TEST--
-AOT set-only property hook — read returns backing value (#19163)
+AOT set-only property hook — read returns backing value (#22452, re-#19163)
 --FILE--
 <?php
 class Counter {
     public int $x {
-        set { $this->x = $value < 0 ? 0 : $value; }
+        set(int $v) => $this->x = $v < 0 ? 0 : $v;
     }
 }
 $c = new Counter();

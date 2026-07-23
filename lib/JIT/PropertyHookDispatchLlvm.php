@@ -520,7 +520,8 @@ final class PropertyHookDispatchLlvm
         }
         if (!\PHPCompiler\VM\AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
             is_array($meta) ? $meta : null,
-            $classPropertyVirtual || $staticHookVirtual
+            $classPropertyVirtual || $staticHookVirtual,
+            $propertyName
         )) {
             return false;
         }

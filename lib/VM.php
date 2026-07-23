@@ -12237,7 +12237,11 @@ restart:
             ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
             ?? null;
 
-        return VM\AbstractPropertyHookCheck::isWriteOnlyVirtualHook($propMeta, $meta->propertyHookVirtual);
+        return VM\AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
+            $propMeta,
+            $meta->propertyHookVirtual,
+            $propName
+        );
     }
 
     /**
@@ -12249,7 +12253,11 @@ restart:
             ?? $this->context->propertyHookRegistry[$classLc][strtolower($propName)]
             ?? null;
 
-        return VM\AbstractPropertyHookCheck::isWriteOnlyVirtualHook($propMeta, !empty($hooks['virtual']));
+        return VM\AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
+            $propMeta,
+            !empty($hooks['virtual']),
+            $propName
+        );
     }
 
     private function raiseVirtualPropertyHookRawAccessError(
