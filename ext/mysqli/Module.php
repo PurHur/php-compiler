@@ -49,6 +49,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_affected_rows.php';
         require_once __DIR__.'/mysqli_error.php';
         require_once __DIR__.'/mysqli_errno.php';
+        require_once __DIR__.'/mysqli_error_list.php';
         require_once __DIR__.'/VmMysqliStmt.php';
         require_once __DIR__.'/mysqli_prepare.php';
         require_once __DIR__.'/mysqli_stmt_bind_param.php';
@@ -143,6 +144,7 @@ class Module extends ModuleAbstract
             new mysqli_affected_rows(),
             new mysqli_error(),
             new mysqli_errno(),
+            new mysqli_error_list(),
             new mysqli_report(),
             new mysqli_prepare(),
             new mysqli_stmt_bind_param(),
@@ -155,6 +157,7 @@ class Module extends ModuleAbstract
             new mysqli_stmt_sqlstate(),
             new mysqli_stmt_errno(),
             new mysqli_stmt_error(),
+            new mysqli_stmt_error_list(),
             new mysqli_stmt_insert_id(),
             new mysqli_stmt_num_rows(),
             new mysqli_stmt_affected_rows(),

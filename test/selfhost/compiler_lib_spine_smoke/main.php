@@ -6491,6 +6491,7 @@ require_once __DIR__.'/../../../ext/mysqli/mysqli_connect_errno.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_connect_error.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_errno.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_error.php';
+require_once __DIR__.'/../../../ext/mysqli/mysqli_error_list.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_fetch_array.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_fetch_assoc.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_fetch_row.php';

@@ -797,6 +797,49 @@ final class VmMysqli
         return (string) $native->sqlstate;
     }
 
+    /**
+     * mysqli_error_list() — rows of {errno,sqlstate,error} (#22225).
+     *
+     * @return list<array{errno: int, sqlstate: string, error: string}>
+     */
+    public static function errorListOnLink(ObjectEntry $entry, Context $ctx): array
+    {
+        if (!isset(self::$store[$entry->id])) {
+            return [];
+        }
+        $native = self::$store[$entry->id]->native;
+        if (null === $native) {
+            return [];
+        }
+        $list = $native->error_list;
+        if (!\is_array($list)) {
+            return [];
+        }
+
+        return self::normalizeErrorList($list);
+    }
+
+    /**
+     * @param array<int|string, mixed> $list
+     * @return list<array{errno: int, sqlstate: string, error: string}>
+     */
+    public static function normalizeErrorList(array $list): array
+    {
+        $out = [];
+        foreach ($list as $row) {
+            if (!\is_array($row)) {
+                continue;
+            }
+            $out[] = [
+                'errno' => (int) ($row['errno'] ?? 0),
+                'sqlstate' => (string) ($row['sqlstate'] ?? '00000'),
+                'error' => (string) ($row['error'] ?? ''),
+            ];
+        }
+
+        return $out;
+    }
+
     public static function warningCountOnLink(ObjectEntry $entry, Context $ctx): int
     {
         $native = self::requireNative($entry, $ctx);
