@@ -48,9 +48,6 @@ exclude:
   - phpc
   - phpunit.xml.dist
   - pre.lock
-  - repro_fiber_basic.php
-  - repro_globals_alias.php
-  - repro_match_guard_falsy.php
   - docs/GETTING-STARTED.md
   - docs/README.md
   - docs/bootstrap-generations.md
