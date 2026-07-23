@@ -290,11 +290,14 @@ final class DomLivingBuiltinClasses
             $element->properties[] = new ClassProperty(VmDom::PROP_CHILDREN, $nullProto, $objProto);
         }
         // Living Standard string props (php-src php_dom.stub.php Dom\Element; #20532).
+        // $outerHTML is PHP 8.5+ only (Zend 8.4.x undefined; #22482, re-#20532).
         $strProto = new Variable(Variable::TYPE_STRING);
         $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_ID, $nullProto, $strProto);
         $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_CLASS_NAME, $nullProto, $strProto);
         $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_INNER_HTML, $nullProto, $strProto);
-        $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_OUTER_HTML, $nullProto, $strProto);
+        if (CompilerVersion::supportsDomElementOuterHtmlProperty()) {
+            $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_OUTER_HTML, $nullProto, $strProto);
+        }
         // php-src Dom\Element::$substitutedNodeValue (ext/dom/element.c; #21034).
         $element->properties[] = new ClassProperty(
             DomHtmlElementPropertySupport::PROP_SUBSTITUTED_NODE_VALUE,
