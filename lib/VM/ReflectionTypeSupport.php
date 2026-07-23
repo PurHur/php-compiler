@@ -367,6 +367,12 @@ final class ReflectionTypeSupport
         return in_array(strtolower($name), self::BUILTIN_NAMES, true);
     }
 
+    /** Public for ReflectionParameter::getClass() name filtering (#22408). */
+    public static function isBuiltinTypeNamePublic(string $name): bool
+    {
+        return self::isBuiltinTypeName($name);
+    }
+
     private static function requireClass(Context $ctx, string $lcName): ClassEntry
     {
         $entry = $ctx->classes[$lcName] ?? null;

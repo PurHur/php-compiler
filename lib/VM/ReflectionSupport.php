@@ -1947,6 +1947,341 @@ final class ReflectionSupport
         return '' !== self::paramNameFromReflection($reflection);
     }
 
+    /**
+     * E_DEPRECATED for legacy ReflectionParameter type probes (php-src ZEND_ACC_DEPRECATED; #22408).
+     */
+    public static function emitLegacyParameterTypeApiDeprecation(Frame $frame, string $method): void
+    {
+        $vm = VmEngine::running();
+        if (null === $vm) {
+            return;
+        }
+        $vm->context->errors->internalDeprecated(
+            'Method ReflectionParameter::'.$method.'() is deprecated',
+            $vm->context,
+            $frame
+        );
+    }
+
+    /**
+     * ReflectionParameter::isArray() — pure array/?array only (php-src zim_ReflectionParameter_isArray; #22408).
+     */
+    public static function parameterIsArray(Context $ctx, ObjectEntry $reflection): bool
+    {
+        return 'array' === self::pureBuiltinTypeNameWithoutNull(
+            self::declaredParamTypeForReflection($ctx, $reflection)
+        );
+    }
+
+    /**
+     * ReflectionParameter::isCallable() — pure callable/?callable only (#22408).
+     */
+    public static function parameterIsCallable(Context $ctx, ObjectEntry $reflection): bool
+    {
+        return 'callable' === self::pureBuiltinTypeNameWithoutNull(
+            self::declaredParamTypeForReflection($ctx, $reflection)
+        );
+    }
+
+    /**
+     * ReflectionParameter::getClass() — single class-name type → ReflectionClass or null (#22408).
+     */
+    public static function parameterGetClass(Context $ctx, ObjectEntry $reflection): ?ObjectEntry
+    {
+        $className = self::singleClassNameFromParamType(
+            $ctx,
+            $reflection,
+            self::declaredParamTypeForReflection($ctx, $reflection)
+        );
+        if (null === $className) {
+            return null;
+        }
+
+        return self::newReflectionClassObjectForName($ctx, $className);
+    }
+
+    /**
+     * ReflectionParameter::getDeclaringFunction() — ReflectionMethod or ReflectionFunction (#22408).
+     */
+    public static function parameterDeclaringFunction(Context $ctx, ObjectEntry $reflection): ObjectEntry
+    {
+        $className = self::parameterDeclaringClassNameOrNull($reflection);
+        if (null !== $className) {
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                self::throwReflectionException(self::classNotFoundMessage($className));
+            }
+            $methodName = self::methodNameFromReflection($reflection);
+
+            return self::newReflectionMethodObject($ctx, $entry, $methodName);
+        }
+        $closure = $reflection->reflectionClosureState;
+        if (null !== $closure) {
+            return self::reflectionFunctionFromClosureState($ctx, $closure);
+        }
+
+        return self::reflectionFunctionFromFunctionName(
+            $ctx,
+            self::functionNameFromReflection($reflection)
+        );
+    }
+
+    /**
+     * ReflectionParameter::getDeclaringClass() — declaring class or null for free functions (#22408).
+     */
+    public static function parameterDeclaringClass(Context $ctx, ObjectEntry $reflection): ?ObjectEntry
+    {
+        $className = self::parameterDeclaringClassNameOrNull($reflection);
+        if (null === $className) {
+            return null;
+        }
+
+        return self::newReflectionClassObjectForName($ctx, $className);
+    }
+
+    /**
+     * ReflectionParameter::__toString() — php-src _parameter_string with empty indent (#22408).
+     */
+    public static function parameterReflectionToString(Context $ctx, ObjectEntry $reflection): string
+    {
+        $meta = self::parameterMetadataForReflection($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+        $line = self::formatParameterDumpLine($index, $meta);
+
+        return trim($line);
+    }
+
+    /** @return ?string Declaring class name when this parameter belongs to a method. */
+    private static function parameterDeclaringClassNameOrNull(ObjectEntry $reflection): ?string
+    {
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $classNameVar->type) {
+            return null;
+        }
+        $name = $classNameVar->toString();
+
+        return '' !== $name ? $name : null;
+    }
+
+    /**
+     * Pure builtin type name after stripping null (MAY_BE_* without null); null if not a single builtin.
+     */
+    private static function pureBuiltinTypeNameWithoutNull(?CfgType $type): ?string
+    {
+        if (null === $type) {
+            return null;
+        }
+        if ($type instanceof CfgType\Nullable) {
+            return self::pureBuiltinTypeNameWithoutNull($type->subtype);
+        }
+        if ($type instanceof CfgType\Union_) {
+            $nonNull = [];
+            foreach ($type->types as $member) {
+                if ($member instanceof CfgType\Literal && 'null' === strtolower($member->name)) {
+                    continue;
+                }
+                if ($member instanceof CfgType\Nullable) {
+                    $inner = self::pureBuiltinTypeNameWithoutNull($member->subtype);
+                    if (null === $inner) {
+                        return null;
+                    }
+                    $nonNull[] = $inner;
+                    continue;
+                }
+                if (!($member instanceof CfgType\Literal)) {
+                    return null;
+                }
+                $nonNull[] = strtolower($member->name);
+            }
+            if (1 !== \count($nonNull)) {
+                return null;
+            }
+
+            return $nonNull[0];
+        }
+        if ($type instanceof CfgType\Literal) {
+            $name = strtolower($type->name);
+            if ('null' === $name) {
+                return null;
+            }
+
+            return $name;
+        }
+
+        return null;
+    }
+
+    /**
+     * Single class-name hint for getClass() (ZEND_TYPE_HAS_NAME semantics; #22408).
+     */
+    private static function singleClassNameFromParamType(
+        Context $ctx,
+        ObjectEntry $reflection,
+        ?CfgType $type
+    ): ?string {
+        if (null === $type) {
+            return null;
+        }
+        if ($type instanceof CfgType\Nullable) {
+            return self::singleClassNameFromParamType($ctx, $reflection, $type->subtype);
+        }
+        if ($type instanceof CfgType\Union_) {
+            $classNames = [];
+            foreach ($type->types as $member) {
+                if ($member instanceof CfgType\Literal && 'null' === strtolower($member->name)) {
+                    continue;
+                }
+                if ($member instanceof CfgType\Nullable) {
+                    $inner = self::singleClassNameFromParamType($ctx, $reflection, $member->subtype);
+                    if (null === $inner) {
+                        return null;
+                    }
+                    $classNames[] = $inner;
+                    continue;
+                }
+                if ($member instanceof CfgType\Reference) {
+                    $classNames[] = self::resolveParamClassTypeName(
+                        $ctx,
+                        $reflection,
+                        ReflectionTypeSupport::cfgTypeString($member)
+                    );
+                    continue;
+                }
+                if ($member instanceof CfgType\Literal) {
+                    $lit = strtolower($member->name);
+                    if ('iterable' === $lit) {
+                        $classNames[] = 'Traversable';
+                        continue;
+                    }
+                    // Builtin masks (int, string, …) are ignored for ZEND_TYPE_HAS_NAME.
+                    if (ReflectionTypeSupport::isBuiltinTypeNamePublic($lit)) {
+                        continue;
+                    }
+                    $classNames[] = self::resolveParamClassTypeName($ctx, $reflection, $member->name);
+                    continue;
+                }
+
+                return null;
+            }
+            $unique = array_values(array_unique($classNames));
+            if (1 !== \count($unique)) {
+                return null;
+            }
+
+            return $unique[0];
+        }
+        if ($type instanceof CfgType\Reference) {
+            return self::resolveParamClassTypeName(
+                $ctx,
+                $reflection,
+                ReflectionTypeSupport::cfgTypeString($type)
+            );
+        }
+        if ($type instanceof CfgType\Literal) {
+            $lit = strtolower($type->name);
+            if ('iterable' === $lit) {
+                return 'Traversable';
+            }
+            if (ReflectionTypeSupport::isBuiltinTypeNamePublic($lit)) {
+                return null;
+            }
+
+            return self::resolveParamClassTypeName($ctx, $reflection, $type->name);
+        }
+
+        return null;
+    }
+
+    /** Resolve self/parent relative to the parameter's declaring method scope. */
+    private static function resolveParamClassTypeName(
+        Context $ctx,
+        ObjectEntry $reflection,
+        string $className
+    ): string {
+        $lc = strtolower(ltrim($className, '\\'));
+        if ('self' === $lc || 'parent' === $lc) {
+            $scopeName = self::parameterDeclaringClassNameOrNull($reflection);
+            if (null === $scopeName) {
+                self::throwReflectionException(
+                    'self' === $lc
+                        ? 'Parameter uses "self" as type but function is not a class member'
+                        : 'Parameter uses "parent" as type but function is not a class member'
+                );
+            }
+            $entry = VmReflection::resolveClassEntry($ctx, $scopeName);
+            if (null === $entry) {
+                self::throwReflectionException(self::classNotFoundMessage($scopeName));
+            }
+            if ('self' === $lc) {
+                return $entry->name;
+            }
+            if (null === $entry->parentLc) {
+                self::throwReflectionException(
+                    'Parameter uses "parent" as type although class does not have a parent'
+                );
+            }
+            $parent = $ctx->classes[$entry->parentLc] ?? null;
+            if (null === $parent) {
+                self::throwReflectionException(self::classNotFoundMessage($entry->parentLc));
+            }
+
+            return $parent->name;
+        }
+
+        return ltrim($className, '\\');
+    }
+
+    private static function parameterMetadataForReflection(
+        Context $ctx,
+        ObjectEntry $reflection
+    ): ParameterMetadata {
+        $index = self::parameterIndexForReflection($reflection);
+        $className = self::parameterDeclaringClassNameOrNull($reflection);
+        if (null !== $className) {
+            $entry = VmReflection::resolveClassEntry($ctx, $className);
+            if (null !== $entry) {
+                $methodLc = strtolower(self::methodNameFromReflection($reflection));
+                $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+                if (isset($params[$index])) {
+                    return $params[$index];
+                }
+            }
+        } elseif (!self::parameterIsInternal($ctx, $reflection)) {
+            $func = self::resolveFunctionForReflectionParameter($ctx, $reflection);
+            if (isset($func->parameterMetadata[$index])) {
+                return $func->parameterMetadata[$index];
+            }
+        }
+
+        $type = self::declaredParamTypeForReflection($ctx, $reflection);
+        $typeString = null !== $type ? ReflectionTypeSupport::cfgTypeStringForDump($type) : null;
+        $isVariadic = false;
+        $byRef = self::parameterIsPassedByReference($ctx, $reflection);
+        $isOptional = self::parameterIsOptional($ctx, $reflection);
+        if (!self::parameterIsInternal($ctx, $reflection)) {
+            $block = self::resolveParameterBlock($ctx, $reflection);
+            $isVariadic = self::parameterIsVariadic($block, $index);
+        }
+        $defaultExport = null;
+        if ($isOptional && !$isVariadic && self::parameterDefaultValueIsAvailableForReflection($ctx, $reflection)) {
+            $tmp = new Variable();
+            if (self::copyParameterDefaultValueForReflection($tmp, $ctx, $reflection)) {
+                $defaultExport = self::formatReflectionScalar($tmp->resolveIndirect());
+            }
+        }
+
+        return new ParameterMetadata(
+            self::paramNameFromReflection($reflection),
+            [],
+            false,
+            $isOptional,
+            $isVariadic,
+            $byRef,
+            $typeString,
+            $defaultExport
+        );
+    }
+
     /** Declared parameter type for ReflectionParameter::getType()/hasType() (#18337, #22064). */
     public static function declaredParamTypeForReflection(Context $ctx, ObjectEntry $reflection): ?CfgType
     {
@@ -3909,7 +4244,7 @@ final class ReflectionSupport
     {
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {
-            self::throwReflectionException('Class '.$className.' does not exist');
+            self::throwReflectionException(self::classNotFoundMessage($className));
         }
         $rcClass = $ctx->classes[self::REFLECTION_CLASS] ?? null;
         if (null === $rcClass) {
