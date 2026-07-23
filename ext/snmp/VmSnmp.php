@@ -15,7 +15,7 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 
 /**
- * SNMP VM class + shared snmpget/snmpwalk semantics (php-src ext/snmp; #6070).
+ * SNMP VM class + shared snmpget/walk/set/getnext/realwalk semantics (php-src ext/snmp; #6070, #22244).
  *
  * v1 stubs: no Net-SNMP FFI yet — queries warn and return false like an unreachable agent.
  */
@@ -50,7 +50,9 @@ final class VmSnmp
 
         $methods = [
             'get' => new SNMPGetMethod(),
+            'getnext' => new SNMPGetNextMethod(),
             'walk' => new SNMPWalkMethod(),
+            'set' => new SNMPSetMethod(),
             'close' => new SNMPClose(),
             'geterror' => new SNMPGetError(),
             'geterrno' => new SNMPGetErrno(),
@@ -138,6 +140,45 @@ final class VmSnmp
         return false;
     }
 
+    public static function proceduralGetNext(
+        Context $ctx,
+        ?Frame $frame,
+        string $function,
+        string $hostname,
+        string $community,
+        string $objectId
+    ): false {
+        self::warnUnavailable($ctx, $frame, $function, $hostname, $objectId);
+
+        return false;
+    }
+
+    public static function proceduralRealWalk(
+        Context $ctx,
+        ?Frame $frame,
+        string $function,
+        string $hostname,
+        string $community,
+        string $objectId
+    ): false {
+        self::warnUnavailable($ctx, $frame, $function, $hostname, $objectId);
+
+        return false;
+    }
+
+    public static function proceduralSet(
+        Context $ctx,
+        ?Frame $frame,
+        string $function,
+        string $hostname,
+        string $community,
+        string $objectId
+    ): false {
+        self::warnUnavailable($ctx, $frame, $function, $hostname, $objectId);
+
+        return false;
+    }
+
     public static function instanceGet(ObjectEntry $receiver, Context $ctx, ?Frame $frame, string $objectId): false
     {
         $state = self::state($receiver);
@@ -168,6 +209,40 @@ final class VmSnmp
         $state->errno = SnmpConstants::ERRNO_GENERIC;
         $state->error = 'No response from '.$state->hostname;
         self::warnUnavailable($ctx, $frame, 'SNMP::walk', $state->hostname, $objectId);
+
+        return false;
+    }
+
+    public static function instanceGetNext(ObjectEntry $receiver, Context $ctx, ?Frame $frame, string $objectId): false
+    {
+        $state = self::state($receiver);
+        if ($state->closed) {
+            $state->errno = SnmpConstants::ERRNO_GENERIC;
+            $state->error = 'SNMP session is closed';
+            self::warn($ctx, $frame, 'SNMP::getnext(): SNMP session is closed');
+
+            return false;
+        }
+        $state->errno = SnmpConstants::ERRNO_GENERIC;
+        $state->error = 'No response from '.$state->hostname;
+        self::warnUnavailable($ctx, $frame, 'SNMP::getnext', $state->hostname, $objectId);
+
+        return false;
+    }
+
+    public static function instanceSet(ObjectEntry $receiver, Context $ctx, ?Frame $frame, string $objectId): false
+    {
+        $state = self::state($receiver);
+        if ($state->closed) {
+            $state->errno = SnmpConstants::ERRNO_GENERIC;
+            $state->error = 'SNMP session is closed';
+            self::warn($ctx, $frame, 'SNMP::set(): SNMP session is closed');
+
+            return false;
+        }
+        $state->errno = SnmpConstants::ERRNO_GENERIC;
+        $state->error = 'No response from '.$state->hostname;
+        self::warnUnavailable($ctx, $frame, 'SNMP::set', $state->hostname, $objectId);
 
         return false;
     }
@@ -205,6 +280,27 @@ final class VmSnmp
         }
 
         return VmString::coerceStringBuiltinArg($resolved, $function, $argIndex, 'object_id');
+    }
+
+    /**
+     * Coerce snmpset type/value (php-src: array|string) for arity validation.
+     * Arrays are accepted without joining — unreachable-agent stubs only need type acceptance.
+     *
+     * @return string|list<string>
+     */
+    public static function coerceTypeOrValue(Variable $var, string $function, int $argIndex, string $paramName): string|array
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $resolved->type) {
+            $parts = [];
+            foreach ($resolved->toArray()->iterate(true) as $partVar) {
+                $parts[] = VmString::coerceStringBuiltinArg($partVar, $function, $argIndex, $paramName);
+            }
+
+            return $parts;
+        }
+
+        return VmString::coerceStringBuiltinArg($resolved, $function, $argIndex, $paramName);
     }
 
     public static function coerceStringArg(Variable $var, string $label, int $index, string $paramName): string
