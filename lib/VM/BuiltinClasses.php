@@ -187,6 +187,7 @@ use PHPCompiler\VM\Builtin\ReflectionConstantToString;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetFileName;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetExtension;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetExtensionName;
+use PHPCompiler\VM\Builtin\ReflectionConstantInNamespace;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionConstantGetValue;
 use PHPCompiler\VM\Builtin\ReflectionConstantHasType;
@@ -1310,6 +1311,10 @@ final class BuiltinClasses
                 $rconst->methodVisibility['getextension'] = $pub;
                 $rconst->methods['getextensionname'] = new ReflectionConstantGetExtensionName();
                 $rconst->methodVisibility['getextensionname'] = $pub;
+            }
+            if (CompilerVersion::advertisesReflectionConstantInNamespace()) {
+                $rconst->methods['innamespace'] = new ReflectionConstantInNamespace();
+                $rconst->methodVisibility['innamespace'] = $pub;
             }
             $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
             $rconst->methodVisibility['getvalue'] = $pub;

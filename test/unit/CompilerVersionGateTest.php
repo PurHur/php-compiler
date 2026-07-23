@@ -776,6 +776,40 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::advertisesReflectionConstantClass());
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantFileExtensionApis());
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantInNamespace());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAdvertisesReflectionConstantFileExtensionApisOnProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesReflectionConstantFileExtensionApis());
+            $this->assertFalse(CompilerVersion::advertisesReflectionConstantInNamespace());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testAdvertisesReflectionConstantInNamespaceOnProfile86(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.6');
+        try {
+            $this->assertTrue(CompilerVersion::advertisesReflectionConstantInNamespace());
+            $this->assertTrue(CompilerVersion::advertisesReflectionConstantFileExtensionApis());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
