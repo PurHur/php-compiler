@@ -12,6 +12,16 @@ use PHPCompiler\MethodVisibility;
 final class PropertyMangle
 {
     /**
+     * Shadow-map key for an ancestor private when the primary slot holds a more-derived private (#22521).
+     */
+    public static function shadowedPrivateKey(ClassProperty $meta): string
+    {
+        $decl = '' !== $meta->declaringClassLc ? $meta->declaringClassLc : '';
+
+        return $decl."\0".$meta->name;
+    }
+
+    /**
      * @param array<string, ClassEntry> $classesByLc
      */
     public static function propertyKey(ClassProperty $meta, array $classesByLc = []): string
