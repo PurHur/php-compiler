@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for bz2 stream ABI via Bz2StreamJitHelper PHP (#17301).
+ * JIT/AOT link for bz2 stream ABI via Bz2StreamJitHelper PHP (#17301, #22416).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer SysGetloadavgRuntime #22399).
  * SSOT: {@see \PHPCompiler\ext\bz2\VmBz2Stream}
  * php-src: ext/bz2/bz2.c
  */
@@ -314,38 +315,18 @@ final class Bz2StreamRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after Bz2StreamJitHelper compile (#17301)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#22416');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'Bz2StreamJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('Bz2StreamJitHelper.php parseAndCompile failed (#17301)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22416'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
