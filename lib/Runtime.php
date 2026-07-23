@@ -273,6 +273,7 @@ class Runtime {
         $this->load(new ext\snmp\Module);
         $this->load(new ext\zstd\Module);
         $this->load(new ext\lzf\Module);
+        $this->load(new ext\lz4\Module);
         $this->load(new ext\bz2\Module);
         $this->load(new ext\brotli\Module);
         $this->load(new ext\sodium\Module);
