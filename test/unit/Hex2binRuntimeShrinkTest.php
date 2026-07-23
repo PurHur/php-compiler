@@ -8,13 +8,23 @@ use PHPCompiler\ext\standard\Hex2binJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** hex2bin() JIT routes through Hex2binJitHelper PHP not inline LLVM (#14627). */
+/**
+ * hex2bin() JIT: Hex2binJitHelper via JitVmHelperLink::ensureCompiled (#22746 / peer #22701).
+ * Not inline LLVM (#14627).
+ */
 final class Hex2binRuntimeShrinkTest extends TestCase
 {
-    public function testStringHex2binUsesJitHelperNotInlineLlvm(): void
+    public function testStringHex2binUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHex2bin.php');
         $this->assertStringContainsString('Hex2binJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitHex2bin.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/hex2bin.php');
