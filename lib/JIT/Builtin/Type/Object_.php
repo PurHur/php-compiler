@@ -3086,13 +3086,14 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
         }
         if ('reflectionenumunitcase' === $lcname) {
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'enumClass', Variable::TYPE_STRING);
+            // Zend public surface: $name then $class (#22505; was internal-only enumClass).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CLASS_NAME, Variable::TYPE_STRING);
         }
         if ('reflectionenumbackedcase' === $lcname) {
             $this->setClassParentName('ReflectionEnumBackedCase', 'ReflectionEnumUnitCase');
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'enumClass', Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_ENUM_CLASS_NAME, Variable::TYPE_STRING);
         }
         // HashContext JIT handle slot must exist before allocate() (ext/hash/JitHashContext.php, #3357).
         if ('hashcontext' === $lcname) {
