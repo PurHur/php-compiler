@@ -93,6 +93,32 @@ PHP;
         );
     }
 
+    /** Idle default: C.UTF-8 / C / POSIX → en_US_POSIX like Zend/ICU (#22578). */
+    public function test_idle_default_maps_c_locale_to_en_us_posix(): void
+    {
+        if (!IntlExtensionPolicy::advertisesLocale()) {
+            self::markTestSkipped('locale_* withheld until extension_loaded(\'intl\') (#19670)');
+        }
+        $prevLang = getenv('LANG');
+        $prevLcAll = getenv('LC_ALL');
+        putenv('LC_ALL=');
+        putenv('LANG=C.UTF-8');
+        VmLocale::resetDefaultForTests();
+        try {
+            self::assertSame('en_US_POSIX', VmLocale::getDefault());
+            putenv('LANG=C');
+            VmLocale::resetDefaultForTests();
+            self::assertSame('en_US_POSIX', VmLocale::getDefault());
+            putenv('LANG=POSIX');
+            VmLocale::resetDefaultForTests();
+            self::assertSame('en_US_POSIX', VmLocale::getDefault());
+        } finally {
+            false === $prevLang ? putenv('LANG') : putenv('LANG='.$prevLang);
+            false === $prevLcAll ? putenv('LC_ALL') : putenv('LC_ALL='.$prevLcAll);
+            VmLocale::resetDefaultForTests();
+        }
+    }
+
     public function test_locale_get_primary_language_and_display_name(): void
     {
         if (!IntlExtensionPolicy::advertisesLocale()) {

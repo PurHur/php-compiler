@@ -1127,8 +1127,22 @@ C;
         return strtoupper($lower[0]).substr($lower, 1);
     }
 
+    /**
+     * Idle Locale::getDefault() / locale_get_default() (php-src locale_methods.c + ICU).
+     *
+     * Prefer non-empty intl.default_locale; else env LC_ALL / LANG / LC_MESSAGES with charset stripped.
+     * Bare C / POSIX (including C.UTF-8 → C) map to en_US_POSIX like Zend/ICU (#22578).
+     */
     private static function detectSystemDefault(): string
     {
+        $ini = \ini_get('intl.default_locale');
+        if (\is_string($ini) && '' !== $ini) {
+            $fromIni = str_replace('-', '_', $ini);
+            if (self::isValidLocaleId($fromIni)) {
+                return $fromIni;
+            }
+        }
+
         foreach (['LC_ALL', 'LANG', 'LC_MESSAGES'] as $var) {
             $val = getenv($var);
             if (!\is_string($val) || '' === $val) {
@@ -1139,6 +1153,10 @@ C;
             }
             $tag = explode('.', $val, 2)[0];
             $tag = str_replace('-', '_', $tag);
+            // C.UTF-8 / POSIX.UTF-8 strip to C/POSIX — Zend maps these to en_US_POSIX (#22578).
+            if ('C' === $tag || 'POSIX' === $tag) {
+                return 'en_US_POSIX';
+            }
             if (self::isValidLocaleId($tag)) {
                 return $tag;
             }
