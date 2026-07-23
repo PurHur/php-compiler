@@ -2037,6 +2037,40 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ IntlDateFormatter::PATTERN (UDAT_PATTERN = -2; ext/intl/dateformat.stub.php, #22623).
+     *
+     * Withheld on 8.4.0-dev reference profile and PROFILE=8.2 (matches Zend 8.2 ReflectionClass
+     * hasConstant gate). Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     */
+    public static function supportsIntlDateFormatterPatternConst(): bool
+    {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** IntlDateFormatter::PATTERN visible to ReflectionClass/defined() — stable or forward 8.4+ (#22623). */
+    public static function advertisesIntlDateFormatterPatternConst(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return self::supportsIntlDateFormatterPatternConst();
+    }
+
+    /**
      * PHP 8.3+ array_first_key()/array_last_key() (ext/standard/array.c, issue #15539, #15675).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via

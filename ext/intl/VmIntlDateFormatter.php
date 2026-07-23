@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
 use PHPCompiler\ext\standard\VmString;
@@ -34,6 +35,8 @@ final class VmIntlDateFormatter
     public const CLASS_LC = 'intldateformatter';
 
     public const NONE = -1;
+    /** ICU UDAT_PATTERN — PHP 8.4+ class constant (#22623; dateformat.stub.php). */
+    public const PATTERN = -2;
     public const FULL = 0;
     public const LONG = 1;
     public const MEDIUM = 2;
@@ -81,6 +84,10 @@ final class VmIntlDateFormatter
     {
         return [
             'NONE' => self::NONE,
+            // PHP 8.4+ only — withheld on reference / PROFILE=8.2 (#22623)
+            ...(CompilerVersion::supportsIntlDateFormatterPatternConst() ? [
+                'PATTERN' => self::PATTERN,
+            ] : []),
             'FULL' => self::FULL,
             'LONG' => self::LONG,
             'MEDIUM' => self::MEDIUM,
