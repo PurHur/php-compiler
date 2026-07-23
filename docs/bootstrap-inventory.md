@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6479 |
-| Phase A inventory files (M2 ratio SSOT) | 6479 |
+| PHP files on vm.php path | 6489 |
+| Phase A inventory files (M2 ratio SSOT) | 6489 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20732 |
+| Source constructs flagged (warnings) | 20763 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1202,14 +1202,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/lzf/lzf_compress.php` | 0 | 1 |
 | `ext/lzf/lzf_decompress.php` | 0 | 1 |
 | `ext/mailparse/MailparseExtensionPolicy.php` | 0 | 1 |
+| `ext/mailparse/MailparseExtract.php` | 0 | 4 |
 | `ext/mailparse/MailparseFunction.php` | 0 | 1 |
-| `ext/mailparse/Module.php` | 0 | 6 |
-| `ext/mailparse/VmMailparse.php` | 0 | 4 |
+| `ext/mailparse/Module.php` | 0 | 15 |
+| `ext/mailparse/VmMailparse.php` | 0 | 6 |
+| `ext/mailparse/mailparse_determine_best_xfer_encoding.php` | 0 | 2 |
 | `ext/mailparse/mailparse_msg_create.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_extract_part.php` | 0 | 1 |
+| `ext/mailparse/mailparse_msg_extract_part_file.php` | 0 | 1 |
+| `ext/mailparse/mailparse_msg_extract_whole_part_file.php` | 0 | 1 |
 | `ext/mailparse/mailparse_msg_free.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_get_part.php` | 0 | 3 |
 | `ext/mailparse/mailparse_msg_get_part_data.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_get_structure.php` | 0 | 2 |
 | `ext/mailparse/mailparse_msg_parse.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_parse_file.php` | 0 | 2 |
 | `ext/mailparse/mailparse_rfc822_parse_addresses.php` | 0 | 2 |
+| `ext/mailparse/mailparse_stream_encode.php` | 0 | 2 |
+| `ext/mailparse/mailparse_uudecode_all.php` | 0 | 2 |
 | `ext/mbstring/EastAsianWidthTable.php` | 0 | 1 |
 | `ext/mbstring/JitMbCheckEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
@@ -8791,7 +8801,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomReplaceChild.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 57)
+- new JITVariable (line 59)
 - 4 class method(s)
 
 ### `ext/dom/JitDomSaveHTML.php`
@@ -9524,67 +9534,67 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 5798)
 - new DOMException (line 5814)
 - new Variable (line 5832)
-- new DOMException (line 5878)
-- new Error (line 5927)
-- new DOMException (line 5933)
-- new DOMException (line 6152)
-- new DOMException (line 6442)
-- new DOMException (line 6446)
-- new DOMException (line 6521)
-- new DOMException (line 6553)
-- new DOMException (line 6595)
-- new ObjectEntry (line 7344)
-- new DomNodeState (line 7346)
-- new DOMException (line 7947)
-- new Variable (line 8020)
-- new DOMException (line 8311)
-- new DOMException (line 8477)
-- new DOMException (line 8522)
-- new ObjectEntry (line 8626)
-- new DomNodeState (line 8630)
-- new Variable (line 8637)
-- new ObjectEntry (line 8655)
-- new DomNodeState (line 8659)
-- new Variable (line 8666)
-- new ObjectEntry (line 8684)
-- new DomNodeState (line 8688)
-- new Variable (line 8695)
-- new DOMException (line 8778)
-- new ObjectEntry (line 9096)
-- new DomNodeState (line 9100)
-- new Variable (line 9109)
-- new ObjectEntry (line 9159)
-- new DomNodeState (line 9162)
-- new Variable (line 9170)
-- new Variable (line 9375)
-- new DOMException (line 9512)
-- new DOMException (line 9519)
-- new DOMException (line 9554)
-- new Variable (line 9664)
-- new DOMException (line 10758)
-- new Variable (line 10817)
-- new Variable (line 10840)
-- new Variable (line 10869)
-- new Variable (line 10907)
-- new DOMException (line 10918)
-- new Variable (line 10920)
-- new DOMException (line 11094)
-- new DOMException (line 11121)
-- new DOMException (line 11157)
-- new DOMException (line 11253)
-- new DOMException (line 11261)
-- new DOMException (line 11274)
-- new DOMException (line 11285)
+- new DOMException (line 5883)
+- new Error (line 5932)
+- new DOMException (line 5938)
+- new DOMException (line 6157)
+- new DOMException (line 6447)
+- new DOMException (line 6451)
+- new DOMException (line 6526)
+- new DOMException (line 6558)
+- new DOMException (line 6600)
+- new ObjectEntry (line 7349)
+- new DomNodeState (line 7351)
+- new DOMException (line 7952)
+- new Variable (line 8025)
+- new DOMException (line 8316)
+- new DOMException (line 8482)
+- new DOMException (line 8527)
+- new ObjectEntry (line 8631)
+- new DomNodeState (line 8635)
+- new Variable (line 8642)
+- new ObjectEntry (line 8660)
+- new DomNodeState (line 8664)
+- new Variable (line 8671)
+- new ObjectEntry (line 8689)
+- new DomNodeState (line 8693)
+- new Variable (line 8700)
+- new DOMException (line 8783)
+- new ObjectEntry (line 9101)
+- new DomNodeState (line 9105)
+- new Variable (line 9114)
+- new ObjectEntry (line 9164)
+- new DomNodeState (line 9167)
+- new Variable (line 9175)
+- new Variable (line 9380)
+- new DOMException (line 9517)
+- new DOMException (line 9524)
+- new DOMException (line 9559)
+- new Variable (line 9669)
+- new DOMException (line 10763)
+- new Variable (line 10822)
+- new Variable (line 10845)
+- new Variable (line 10874)
+- new Variable (line 10912)
+- new DOMException (line 10923)
+- new Variable (line 10925)
+- new DOMException (line 11099)
+- new DOMException (line 11126)
+- new DOMException (line 11162)
+- new DOMException (line 11258)
+- new DOMException (line 11266)
+- new DOMException (line 11279)
 - new DOMException (line 11290)
-- new DOMException (line 11316)
-- new DOMException (line 11337)
-- new DOMException (line 11395)
+- new DOMException (line 11295)
+- new DOMException (line 11321)
+- new DOMException (line 11342)
 - new DOMException (line 11400)
-- new DOMException (line 11403)
-- new DOMException (line 11406)
-- new DOMException (line 11435)
-- new Error (line 12633)
-- new Error (line 12637)
+- new DOMException (line 11405)
+- new DOMException (line 11408)
+- new DOMException (line 11411)
+- new DOMException (line 11440)
+- new Error (line 12638)
+- new Error (line 12642)
 - 484 class method(s)
 - 4 closure(s)
 
@@ -15774,6 +15784,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/mailparse/MailparseExtract.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Variable (line 54)
+- 1 class method(s)
+- 2 closure(s)
+
 ### `ext/mailparse/MailparseFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15784,23 +15802,55 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new mailparse_msg_create (line 32)
 - new mailparse_msg_parse (line 33)
-- new mailparse_msg_get_part_data (line 34)
-- new mailparse_msg_free (line 35)
-- new mailparse_rfc822_parse_addresses (line 36)
+- new mailparse_msg_parse_file (line 34)
+- new mailparse_msg_get_part_data (line 35)
+- new mailparse_msg_get_part (line 36)
+- new mailparse_msg_get_structure (line 37)
+- new mailparse_msg_extract_part (line 38)
+- new mailparse_msg_extract_part_file (line 39)
+- new mailparse_msg_extract_whole_part_file (line 40)
+- new mailparse_msg_free (line 41)
+- new mailparse_rfc822_parse_addresses (line 42)
+- new mailparse_determine_best_xfer_encoding (line 43)
+- new mailparse_stream_encode (line 44)
+- new mailparse_uudecode_all (line 45)
 - 2 class method(s)
 
 ### `ext/mailparse/VmMailparse.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 40)
-- new ObjectEntry (line 48)
-- new Variable (line 57)
-- 17 class method(s)
+- new ClassEntry (line 41)
+- new ObjectEntry (line 49)
+- new Variable (line 53)
+- new ObjectEntry (line 124)
+- new ObjectEntry (line 527)
+- 36 class method(s)
+
+### `ext/mailparse/mailparse_determine_best_xfer_encoding.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
 
 ### `ext/mailparse/mailparse_msg_create.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_extract_part.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_extract_part_file.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_extract_whole_part_file.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/mailparse/mailparse_msg_free.php`
@@ -15809,7 +15859,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/mailparse/mailparse_msg_get_part.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- new Variable (line 44)
+- 1 class method(s)
+
 ### `ext/mailparse/mailparse_msg_get_part_data.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_get_structure.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -15821,7 +15884,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/mailparse/mailparse_msg_parse_file.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
 ### `ext/mailparse/mailparse_rfc822_parse_addresses.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_stream_encode.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_uudecode_all.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
@@ -30000,13 +30081,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDnsMx.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 42)
-- new HashTable (line 44)
-- new HashTable (line 50)
-- new HashTable (line 51)
-- new Variable (line 53)
-- new Variable (line 57)
-- new Variable (line 72)
+- new HashTable (line 45)
+- new HashTable (line 47)
+- new HashTable (line 53)
+- new HashTable (line 54)
+- new Variable (line 56)
+- new Variable (line 60)
+- new Variable (line 75)
 - 3 class method(s)
 
 ### `ext/standard/VmDnsUdpNative.php`
@@ -30629,26 +30710,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmJson.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 100)
-- new Variable (line 153)
-- new ObjectEntry (line 203)
-- new VmJsonExportException (line 241)
-- new VmJsonExportException (line 257)
-- new VmJsonExportException (line 261)
-- new VmJsonExportException (line 304)
-- new VmJsonExportException (line 313)
-- new stdClass (line 331)
-- new Variable (line 337)
-- new EnumCaseEntry (line 345)
-- new Error (line 370)
-- new stdClass (line 378)
-- new VmJsonExportException (line 394)
-- new stdClass (line 412)
-- new Variable (line 450)
-- new Variable (line 472)
-- new Variable (line 502)
-- new Error (line 506)
-- new stdClass (line 513)
+- new Variable (line 103)
+- new Variable (line 156)
+- new ObjectEntry (line 206)
+- new VmJsonExportException (line 244)
+- new VmJsonExportException (line 260)
+- new VmJsonExportException (line 264)
+- new VmJsonExportException (line 307)
+- new VmJsonExportException (line 316)
+- new stdClass (line 334)
+- new Variable (line 340)
+- new EnumCaseEntry (line 348)
+- new Error (line 373)
+- new stdClass (line 381)
+- new VmJsonExportException (line 397)
+- new stdClass (line 415)
+- new Variable (line 453)
+- new Variable (line 475)
+- new Variable (line 505)
+- new Error (line 509)
+- new stdClass (line 516)
 - new VmJsonExportException (line 533)
 - 13 class method(s)
 
@@ -31531,13 +31612,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 247)
-- new Variable (line 251)
-- new HashTable (line 257)
-- new Variable (line 259)
-- new Variable (line 918)
-- new Variable (line 925)
-- new Variable (line 932)
+- new HashTable (line 250)
+- new Variable (line 254)
+- new HashTable (line 260)
+- new Variable (line 262)
+- new Variable (line 921)
+- new Variable (line 928)
+- new Variable (line 935)
 - 29 class method(s)
 - 1 closure(s)
 
@@ -31978,7 +32059,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 51)
 - new Variable (line 55)
 - new HashTable (line 70)
-- new Variable (line 72)
+- new Variable (line 73)
 - 7 class method(s)
 
 ### `ext/standard/VmVprintf.php`
@@ -41401,62 +41482,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 11967)
 - new Variable (line 11988)
 - new CompileError (line 12731)
-- new CompileError (line 12835)
-- new Variable (line 12892)
-- new Variable (line 13275)
-- new Variable (line 13295)
-- new Variable (line 13316)
-- new Variable (line 13350)
-- new Variable (line 13385)
-- new Variable (line 13479)
-- new Variable (line 13503)
-- new Variable (line 13513)
-- new Variable (line 13687)
-- new Variable (line 13705)
-- new Variable (line 13755)
-- new Variable (line 13782)
-- new Variable (line 13808)
-- new Variable (line 14137)
-- new Variable (line 14505)
-- new Variable (line 14535)
-- new Variable (line 14554)
-- new Variable (line 14584)
-- new Variable (line 14621)
-- new Variable (line 14669)
-- new Variable (line 14712)
-- new VM\Variable (line 15057)
-- new Variable (line 15091)
-- new Variable (line 15142)
-- new Variable (line 15158)
-- new Variable (line 15177)
-- new Variable (line 15184)
-- new OpCode (line 15204)
-- new Variable (line 15205)
-- new Variable (line 15377)
-- new Variable (line 15415)
-- new OpCode (line 15429)
-- new Variable (line 15430)
-- new Variable (line 15489)
-- new OpCode (line 15510)
-- new Variable (line 15511)
-- new Variable (line 15608)
-- new Variable (line 15630)
-- new Variable (line 15698)
-- new Operand\Literal (line 15707)
-- new Variable (line 15722)
-- new Variable (line 15906)
-- new VM\PropertyIsInitializedHandler (line 15988)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16028)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16210)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16315)
-- new JIT\Call\VmCoerceVariableToString (line 16439)
-- new JIT\Call\IncludePathResolverResolve (line 16706)
-- new Variable (line 17764)
-- new VM (line 17808)
-- new VM\Variable (line 17817)
-- new Variable (line 17838)
-- new Variable (line 17884)
-- new Variable (line 18378)
+- new CompileError (line 12833)
+- new Variable (line 12890)
+- new Variable (line 13273)
+- new Variable (line 13293)
+- new Variable (line 13314)
+- new Variable (line 13348)
+- new Variable (line 13383)
+- new Variable (line 13477)
+- new Variable (line 13501)
+- new Variable (line 13511)
+- new Variable (line 13685)
+- new Variable (line 13703)
+- new Variable (line 13753)
+- new Variable (line 13780)
+- new Variable (line 13806)
+- new Variable (line 14135)
+- new Variable (line 14503)
+- new Variable (line 14533)
+- new Variable (line 14552)
+- new Variable (line 14582)
+- new Variable (line 14619)
+- new Variable (line 14667)
+- new Variable (line 14710)
+- new VM\Variable (line 15055)
+- new Variable (line 15089)
+- new Variable (line 15140)
+- new Variable (line 15156)
+- new Variable (line 15175)
+- new Variable (line 15182)
+- new OpCode (line 15202)
+- new Variable (line 15203)
+- new Variable (line 15375)
+- new Variable (line 15413)
+- new OpCode (line 15427)
+- new Variable (line 15428)
+- new Variable (line 15487)
+- new OpCode (line 15508)
+- new Variable (line 15509)
+- new Variable (line 15606)
+- new Variable (line 15628)
+- new Variable (line 15696)
+- new Operand\Literal (line 15705)
+- new Variable (line 15720)
+- new Variable (line 15904)
+- new VM\PropertyIsInitializedHandler (line 15986)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16026)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16211)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16316)
+- new JIT\Call\VmCoerceVariableToString (line 16440)
+- new JIT\Call\IncludePathResolverResolve (line 16710)
+- new Variable (line 17768)
+- new VM (line 17812)
+- new VM\Variable (line 17821)
+- new Variable (line 17842)
+- new Variable (line 17888)
+- new Variable (line 18382)
 - 370 class method(s)
 - 7 closure(s)
 
@@ -47654,50 +47735,50 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\PropertyIsInitializedHandler (line 15190)
 - new Error (line 15322)
 - new VM\EnumFromHandler (line 15348)
-- new CompileError (line 16077)
-- new VM\ClassProperty (line 16242)
-- new Variable (line 16558)
-- new CompileError (line 16576)
+- new CompileError (line 16075)
+- new VM\ClassProperty (line 16240)
+- new Variable (line 16556)
+- new CompileError (line 16574)
+- new Variable (line 16779)
 - new Variable (line 16781)
-- new Variable (line 16783)
-- new ClassEntry (line 16826)
-- new Func\PHP (line 16833)
-- new VM\ClassProperty (line 16961)
-- new Func\PHP (line 17109)
-- new Variable (line 17185)
-- new Variable (line 17192)
-- new Variable (line 17198)
-- new Variable (line 17235)
-- new Variable (line 17264)
-- new Variable (line 17452)
-- new Variable (line 17498)
-- new VM\ClassProperty (line 17563)
-- new Error (line 17610)
-- new Error (line 17645)
-- new Error (line 17648)
-- new Error (line 17651)
-- new Error (line 17654)
-- new ObjectEntry (line 17656)
-- new Error (line 17669)
-- new Error (line 17672)
-- new Error (line 17675)
-- new Error (line 17694)
-- new ObjectEntry (line 17698)
-- new Variable (line 17700)
-- new Variable (line 17718)
-- new Variable (line 17731)
-- new Variable (line 17752)
-- new Variable (line 17765)
-- new Error (line 17895)
-- new Error (line 17900)
-- new VM\ObjectEntry (line 17904)
-- new Variable (line 18048)
-- new Variable (line 18066)
-- new NoDiscardMetadata (line 18235)
+- new ClassEntry (line 16824)
+- new Func\PHP (line 16831)
+- new VM\ClassProperty (line 16959)
+- new Func\PHP (line 17107)
+- new Variable (line 17183)
+- new Variable (line 17190)
+- new Variable (line 17196)
+- new Variable (line 17233)
+- new Variable (line 17262)
+- new Variable (line 17450)
+- new Variable (line 17496)
+- new VM\ClassProperty (line 17561)
+- new Error (line 17608)
+- new Error (line 17643)
+- new Error (line 17646)
+- new Error (line 17649)
+- new Error (line 17652)
+- new ObjectEntry (line 17654)
+- new Error (line 17667)
+- new Error (line 17670)
+- new Error (line 17673)
+- new Error (line 17692)
+- new ObjectEntry (line 17696)
+- new Variable (line 17698)
+- new Variable (line 17716)
+- new Variable (line 17729)
+- new Variable (line 17750)
+- new Variable (line 17763)
+- new Error (line 17893)
+- new Error (line 17898)
+- new VM\ObjectEntry (line 17902)
+- new Variable (line 18046)
+- new Variable (line 18064)
+- new NoDiscardMetadata (line 18233)
+- new Variable (line 18402)
 - new Variable (line 18404)
-- new Variable (line 18406)
-- new CompileError (line 18434)
-- new Variable (line 18537)
+- new CompileError (line 18432)
+- new Variable (line 18535)
 - 515 class method(s)
 - 25 closure(s)
 
@@ -50947,11 +51028,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 140)
 - new Variable (line 157)
 - new Variable (line 178)
-- new Variable (line 224)
-- new ObjectEntry (line 237)
-- new ClassEntry (line 304)
-- new ObjectEntry (line 305)
-- new Variable (line 313)
+- new Variable (line 225)
+- new ObjectEntry (line 238)
+- new ClassEntry (line 305)
+- new ObjectEntry (line 306)
+- new Variable (line 314)
 - 12 class method(s)
 
 ### `lib/VM/ClassEntry.php`
@@ -52097,38 +52178,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Variable.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 235)
-- new HashTable (line 277)
-- new HashTable (line 281)
-- new Error (line 880)
-- new Error (line 891)
-- new self (line 1159)
-- new Error (line 1196)
-- new Variable (line 1321)
-- new EnumCaseEntry (line 1323)
-- new self (line 1814)
-- new self (line 1832)
-- new self (line 1997)
+- new HashTable (line 241)
+- new HashTable (line 283)
+- new HashTable (line 287)
+- new Error (line 887)
+- new Error (line 898)
+- new self (line 1167)
+- new Error (line 1204)
+- new Variable (line 1329)
+- new EnumCaseEntry (line 1331)
+- new self (line 1822)
+- new self (line 1840)
 - new self (line 2005)
 - new self (line 2013)
-- new self (line 2015)
-- new self (line 2251)
-- new ArithmeticError (line 2356)
-- new self (line 2375)
-- new self (line 2469)
-- new Error (line 2476)
-- new DivisionByZeroError (line 2581)
-- new DivisionByZeroError (line 2588)
-- new self (line 2609)
-- new Error (line 2638)
-- new self (line 2659)
-- new self (line 2671)
-- new Error (line 2698)
-- new self (line 2719)
+- new self (line 2021)
+- new self (line 2023)
+- new self (line 2259)
+- new ArithmeticError (line 2364)
+- new self (line 2383)
+- new self (line 2477)
+- new Error (line 2484)
+- new DivisionByZeroError (line 2589)
+- new DivisionByZeroError (line 2596)
+- new self (line 2617)
+- new Error (line 2646)
+- new self (line 2667)
+- new self (line 2679)
+- new Error (line 2706)
 - new self (line 2727)
-- new Error (line 2912)
-- new Error (line 2918)
-- new Error (line 2928)
+- new self (line 2735)
+- new Error (line 2920)
+- new Error (line 2926)
+- new Error (line 2936)
 - 125 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`
