@@ -44,8 +44,14 @@ final class ReflectionClassGetReflectionConstant extends VmClassMethod
         }
         $rc = new ObjectEntry($rcClass);
         $rc->constructed = true;
-        $rc->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
-        $rc->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
+        // Prefer Zend ReflectionClassConstant::$class / $name when that class is registered (#22503).
+        if (ReflectionSupport::REFLECTION_CLASS_CONSTANT === strtolower($rcClass->name)) {
+            $rc->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->string($entry->name);
+            $rc->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME)->string($constant);
+        } else {
+            $rc->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+            $rc->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
+        }
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($rc);

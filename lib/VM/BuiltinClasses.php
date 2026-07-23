@@ -1323,8 +1323,10 @@ final class BuiltinClasses
         }
 
         $rcc = new ClassEntry('ReflectionClassConstant');
-        $rcc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $rcc->properties[] = new ClassProperty(ReflectionSupport::PROP_CONSTANT_NAME, null, $strProto);
+        // Zend dump/public surface: $name = constant, $class = declaring class (#22503).
+        // Property registration order matches Zend print_r/var_dump (name then class).
+        $rcc->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME, null, $strProto);
+        $rcc->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS, null, $strProto);
         $rcc->constructor = new ReflectionConstantConstruct();
         $rcc->methods['__construct'] = $rcc->constructor;
         $rcc->methodVisibility['__construct'] = $pub;

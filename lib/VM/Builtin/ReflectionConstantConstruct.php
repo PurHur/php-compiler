@@ -55,8 +55,14 @@ final class ReflectionConstantConstruct extends VmClassMethod
                 ReflectionSupport::constantNotFoundMessage($entry->name, $constant)
             );
         }
-        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
-        $receiver->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
+        if ($isReflectionConstant) {
+            $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+            $receiver->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
+        } else {
+            // Zend ReflectionClassConstant::$class / $name (#22503).
+            $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->string($entry->name);
+            $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME)->string($constant);
+        }
         $receiver->constructed = true;
         // Do not touch returnVar: it may alias the `new ReflectionClassConstant()` result slot (#1885, #5954).
     }
