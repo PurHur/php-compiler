@@ -1363,7 +1363,10 @@ final class BuiltinClasses
         // php-src: class ReflectionObject extends ReflectionClass (ext/reflection/php_reflection.stub.php, #20098).
         $ro->parentLc = ReflectionSupport::REFLECTION_CLASS;
         $ro->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $ro->properties[] = new ClassProperty(ReflectionSupport::PROP_OBJECT_TARGET, null, $objProto);
+        // Wrapped instance handle — C storage only; get_object_vars exports name (#22515).
+        $roTarget = new ClassProperty(ReflectionSupport::PROP_OBJECT_TARGET, null, $objProto);
+        $roTarget->phpInvisible = true;
+        $ro->properties[] = $roTarget;
         $ro->constructor = new ReflectionObjectConstruct();
         $ro->methods['__construct'] = $ro->constructor;
         $ro->methodVisibility['__construct'] = $pub;
