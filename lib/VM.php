@@ -1941,19 +1941,16 @@ class VM {
      */
     public function collectMangledObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
     {
-<<<<<<< HEAD
         // DateInterval: Zend date_interval_get_properties wire (not raw slots / uninit date_string) (#22446).
         $dateMap = $this->dateIntervalObjectVarsPropertyMap($object);
         if (null !== $dateMap) {
             return $dateMap;
         }
 
-        return $this->collectDebugPropertiesForBuiltin($object, $frame);
-=======
+        // DateTime / DateTimeImmutable / DateTimeZone: Zend raw property table is empty (#22445).
         return DateTimeSupport::filterInternalStorageFromMangledVars(
             $this->collectDebugPropertiesForBuiltin($object, $frame)
         );
->>>>>>> 18e8e4221 (Stdlib: hide DateTime __dt_* from get_mangled_object_vars (#22445))
     }
 
     /**
