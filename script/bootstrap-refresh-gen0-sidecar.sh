@@ -38,6 +38,11 @@ prelinked/bootstrap-gen0/manifest.json (never via size/sha-only refresh).
 Refuses fingerprint restamp when compiler_lib blob bytes did not move (#22642).
 
 See docs/bootstrap-m5-fast-path.md and GETTING-STARTED §7b (#8704, #21905).
+
+On Runforge harness hosts, long Zend full-spine refreshes must run in a Docker
+container whose *name* matches HARNESS_SPAWNED_CLEANUP_PROTECT_NAMES (e.g.
+contains agent-harness) or the harness kills the job at 30 minutes (#22642).
+Use: ./script/bootstrap-gen0-refresh-exclusive-docker.sh
 EOF
       exit 0
       ;;
