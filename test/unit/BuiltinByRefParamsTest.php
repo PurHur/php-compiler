@@ -262,4 +262,15 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([3], BuiltinByRefParams::forFunction('NumberFormatter::parse'));
         $this->assertSame([3], BuiltinByRefParams::forFunction('numberformatter::parse'));
     }
+
+    public function testIntlDateFormatterParseOffsetByRef(): void
+    {
+        // &$offset — php-src dateformat.stub.php (#20729, #22622)
+        $this->assertSame([2], BuiltinByRefParams::forFunction('IntlDateFormatter::parse'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('IntlDateFormatter::parseToCalendar'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('intldateformatter::parsetocalendar'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('IntlDateFormatter::localtime'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('datefmt_parse'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('datefmt_localtime'));
+    }
 }
