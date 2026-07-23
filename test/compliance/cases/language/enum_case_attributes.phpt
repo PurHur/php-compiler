@@ -1,9 +1,10 @@
 --TEST--
-Language: enum case attributes introspect via ReflectionEnumUnitCase (#5699, zend_attributes.c)
+Language: enum case attributes introspect via ReflectionEnumUnitCase (#5699, #22693, zend_attributes.c)
 --FILE--
 <?php
+declare(strict_types=1);
 enum E {
-    #[\Deprecated]
+    #[\Deprecated(message: 'gone')]
     case A;
 }
 $ref = new ReflectionEnumUnitCase(E::class, 'A');

@@ -5720,6 +5720,64 @@ PHP;
         self::assertSame("1\n", ob_get_clean());
     }
 
+    /** Issue #22693 — count($ref->getAttributes()) with no filter arg must wire MethodCall EXEC_RETURN (re-#21867 bare form). */
+    public function testCountNestedMethodCallBareGetAttributesUsesExecReturnSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+enum E {
+    #[\Deprecated(message: 'gone')]
+    case A;
+}
+$case = (new ReflectionEnum(E::class))->getCase('A');
+echo count($case->getAttributes()), "\n";
+echo $case->getAttributes()[0]->getName(), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'count_enum_case_bare_get_attributes.php');
+
+        $getAttributesExecSlot = null;
+        $countArgSendSlot = null;
+        $awaitingGetAttributesExec = false;
+        $awaitingCountArgSend = false;
+        foreach ($block->opCodes as $op) {
+            if (
+                OpCode::TYPE_METHODCALL_INIT === $op->type
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'getAttributes' === $block->constants[$op->arg2]->toString()
+            ) {
+                $awaitingGetAttributesExec = true;
+            }
+            if ($awaitingGetAttributesExec && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                $getAttributesExecSlot = $op->arg1;
+                $awaitingGetAttributesExec = false;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_INIT === $op->type
+                && null !== $op->arg1
+                && isset($block->constants[$op->arg1])
+                && 'count' === $block->constants[$op->arg1]->toString()
+            ) {
+                $awaitingCountArgSend = true;
+            }
+            if ($awaitingCountArgSend && OpCode::TYPE_ARG_SEND === $op->type) {
+                $countArgSendSlot = $op->arg1;
+                break;
+            }
+        }
+
+        self::assertNotNull($getAttributesExecSlot, 'getAttributes must FUNCCALL_EXEC_RETURN');
+        self::assertNotNull($countArgSendSlot, 'count() must emit ARG_SEND');
+        self::assertSame($getAttributesExecSlot, $countArgSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\nDeprecated\n", ob_get_clean());
+    }
+
     /** Issue #11304 — array_map(fn, [new C()]) wires closure + outer Array_, not embedded New_. */
     public function testArrayMapClosureInlineObjectArrayUsesClosureAndArraySlots(): void
     {

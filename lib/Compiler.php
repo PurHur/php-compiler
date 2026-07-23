@@ -50745,7 +50745,11 @@ class Compiler {
     }
 
     /**
-     * count($ref->getAttributes(EnumCases::class)) — hoisted ClassConstFetch feeds the MethodCall, not the outer callee (#21867).
+     * count($ref->getAttributes(...)) — wire MethodCall EXEC_RETURN into the outer ARG_SEND (#21867, #22693).
+     *
+     * Covers filtered getAttributes(Foo::class) (hoisted ClassConstFetch prelude) and bare
+     * getAttributes() (no prelude). Without this, ARG_SEND keeps an earlier dead temp (often a
+     * prior ::class string / null) and count() TypeErrors on null.
      *
      * @param list<OpCode> $outerArgSends
      * @param list<OpCode> $pendingNestedProducerOps
@@ -50767,7 +50771,7 @@ class Compiler {
             return;
         }
         $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
-        if (!\is_int($callIndex) || $callIndex < 2) {
+        if (!\is_int($callIndex) || $callIndex < 1) {
             return;
         }
         $producer = $block->orig->children[$callIndex - 1] ?? null;
@@ -50777,15 +50781,17 @@ class Compiler {
         ) {
             return;
         }
-        $prelude = $block->orig->children[$callIndex - 2] ?? null;
-        if (!$prelude instanceof Op\Expr\ClassConstFetch) {
-            return;
-        }
-        if (
-            $callArg instanceof Operand
-            && $this->operandsReferToSameVariable($prelude->result, $callArg)
-        ) {
-            return;
+        // Filtered form: ClassConstFetch immediately before MethodCall feeds the method arg.
+        // If the outer dead temp is that ClassConstFetch result, wiring is already correct.
+        if ($callIndex >= 2) {
+            $prelude = $block->orig->children[$callIndex - 2] ?? null;
+            if (
+                $prelude instanceof Op\Expr\ClassConstFetch
+                && $callArg instanceof Operand
+                && $this->operandsReferToSameVariable($prelude->result, $callArg)
+            ) {
+                return;
+            }
         }
         $execSlot = $this->slotForMethodOrStaticCallInitFollowingExecReturn(
             $block,
