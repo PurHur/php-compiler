@@ -21,7 +21,8 @@ final class OpensslEncryptRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/runtime/openssl_cipher.c');
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/OpensslEncryptRuntime.php');
         $this->assertStringContainsString('OpensslEncryptJitHelper', $runtime);
-        $this->assertStringContainsString('NestedJitCompileScope', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
     }
 
     /**
