@@ -215,6 +215,16 @@ $fresh = 0;
 $emitted = 0;
 $failedNow = 0;
 $knownBroken = 0;
+
+/**
+ * Units still needing a child lowering run, as slug => [path, dir, fingerprint].
+ *
+ * Cache triage stays serial (it is pure filesystem stat work, microseconds per
+ * unit); only the expensive child lowerings below are fanned out.
+ *
+ * @var array<string, array{path: string, dir: string, fingerprint: string}>
+ */
+$pendingUnits = [];
 foreach ($sites as $path => $names) {
     $slug = HelperRuntimeCache::slugFor($path);
     $dir = HelperRuntimeCache::unitDir($slug);
@@ -242,25 +252,105 @@ foreach ($sites as $path => $names) {
         }
     }
 
-    $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__).' --unit='.escapeshellarg($path);
-    exec($cmd.' 2>/dev/null', $ignored, $rc);
-    if (0 !== $rc || null === HelperRuntimeCache::unitManifest($slug)) {
-        ++$failedNow;
-        fwrite(STDERR, "helper-runtime-emit: FAILED {$path} (rc={$rc}) — marker written, nested-lowering fallback (#15642)\n");
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        @unlink($dir.'/manifest.json');
-        @unlink($dir.'/unit.o');
-        @unlink($dir.'/unit.bc');
-        file_put_contents($dir.'/failed.json', json_encode([
-            'fingerprint' => $fingerprint,
-            'rc' => $rc,
-        ])."\n");
+    $pendingUnits[$slug] = ['path' => $path, 'dir' => $dir, 'fingerprint' => $fingerprint];
+}
 
+/**
+ * Record a child lowering outcome (identical bookkeeping for serial and parallel).
+ */
+$recordUnitResult = static function (array $unit, int $rc, string $slug) use (&$emitted, &$failedNow): void {
+    $dir = $unit['dir'];
+    if (0 === $rc && null !== HelperRuntimeCache::unitManifest($slug)) {
+        ++$emitted;
+        @unlink($dir.'/emit.log');
+
+        return;
+    }
+    ++$failedNow;
+    $reason = '';
+    $log = @file_get_contents($dir.'/emit.log');
+    if (\is_string($log) && '' !== $log
+        && 1 === preg_match('/^.*?(?:Uncaught\s+)?\w*(?:Exception|Error):\s*(.+)$/m', $log, $m)) {
+        $reason = ' — '.rtrim(substr(trim($m[1]), 0, 120));
+    }
+    fwrite(STDERR, "helper-runtime-emit: FAILED {$unit['path']} (rc={$rc}){$reason} — marker written, nested-lowering fallback (#15642)\n");
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    @unlink($dir.'/manifest.json');
+    @unlink($dir.'/unit.o');
+    @unlink($dir.'/unit.bc');
+    file_put_contents($dir.'/failed.json', json_encode([
+        'fingerprint' => $unit['fingerprint'],
+        'rc' => $rc,
+    ])."\n");
+};
+
+// Fan out the child lowerings. Every unit already runs in its own `--unit=` child
+// writing only to build/helper-runtime-cache/units/<slug>/, so there is no shared
+// mutable state between them (#22638). Default nproc-2 mirrors bin/lint.php's
+// PHP_COMPILER_LINT_JOBS; PHP_COMPILER_EMIT_JOBS=1 restores the serial sweep.
+$emitJobs = (int) (getenv('PHP_COMPILER_EMIT_JOBS') ?: 0);
+if ($emitJobs < 1) {
+    $nproc = (int) shell_exec('nproc 2>/dev/null');
+    $emitJobs = $nproc > 2 ? $nproc - 2 : 1;
+}
+$emitJobs = max(1, min($emitJobs, count($pendingUnits)));
+if ([] !== $pendingUnits) {
+    fwrite(STDOUT, sprintf(
+        "helper-runtime-emit: lowering %d unit(s) with %d job(s)\n",
+        count($pendingUnits),
+        $emitJobs
+    ));
+}
+
+$running = [];
+$queue = $pendingUnits;
+while ([] !== $queue || [] !== $running) {
+    while ([] !== $queue && count($running) < $emitJobs) {
+        $slug = array_key_first($queue);
+        $unit = $queue[$slug];
+        unset($queue[$slug]);
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__)
+            .' --unit='.escapeshellarg($unit['path']);
+        // Child stderr lands in the unit dir instead of /dev/null: a unit that fails
+        // module verification is otherwise invisible behind the nested-lowering
+        // fallback, which is how 257/257 units failed unobserved (#22638).
+        if (!is_dir($unit['dir'])) {
+            @mkdir($unit['dir'], 0755, true);
+        }
+        $proc = proc_open($cmd, [
+            1 => ['file', '/dev/null', 'w'],
+            2 => ['file', $unit['dir'].'/emit.log', 'w'],
+        ], $pipes);
+        if (!\is_resource($proc)) {
+            $recordUnitResult($unit, 1, $slug);
+
+            continue;
+        }
+        $running[$slug] = ['proc' => $proc, 'unit' => $unit];
+    }
+
+    if ([] === $running) {
         continue;
     }
-    ++$emitted;
+
+    // Reap whatever finished; sleep only when every slot is still busy.
+    $reaped = false;
+    foreach ($running as $slug => $entry) {
+        $status = proc_get_status($entry['proc']);
+        if ($status['running']) {
+            continue;
+        }
+        $rc = proc_close($entry['proc']);
+        // proc_close returns -1 once proc_get_status already reaped the exit code.
+        $recordUnitResult($entry['unit'], -1 === $rc ? (int) $status['exitcode'] : $rc, $slug);
+        unset($running[$slug]);
+        $reaped = true;
+    }
+    if (!$reaped) {
+        usleep(20000);
+    }
 }
 
 fwrite(STDOUT, sprintf(
