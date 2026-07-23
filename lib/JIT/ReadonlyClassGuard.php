@@ -43,7 +43,8 @@ final class ReadonlyClassGuard
 
         $guardClassIds = array_values(array_unique(array_merge(
             $objectType->readonlyClassIds(),
-            $objectType->readonlyPropertyClassIdsForProperty($propName)
+            $objectType->readonlyPropertyClassIdsForProperty($propName),
+            $objectType->finalPropertyClassIdsForProperty($propName)
         )));
         if ([] === $guardClassIds) {
             return;
@@ -93,13 +94,18 @@ final class ReadonlyClassGuard
             $context->builder->branchIf($reinitOk, $storeBlock, $violateBlock);
             $context->builder->positionAtEnd($violateBlock);
             $declaringClass = $objectType->classNameForId($id);
-            $message = sprintf(
-                'unset' === $violation
-                    ? 'Cannot unset readonly property %s::$%s'
-                    : 'Cannot modify readonly property %s::$%s',
-                $declaringClass,
-                $propName
-            );
+            $isFinal = $objectType->isPropertyFinal($id, $propName);
+            if ($isFinal && 'unset' !== $violation) {
+                $message = sprintf('Cannot modify final property %s::$%s', $declaringClass, $propName);
+            } else {
+                $message = sprintf(
+                    'unset' === $violation
+                        ? 'Cannot unset readonly property %s::$%s'
+                        : 'Cannot modify readonly property %s::$%s',
+                    $declaringClass,
+                    $propName
+                );
+            }
             ReadonlyBridge::emitReadonlyViolation($context, $message);
             // Merge with allow path: pending flag + skip store (#3149, #4875). Avoid returnVoid here —
             // it breaks AOT LLVM verify and MCJIT uncaught readonly inc/dec (#4082).

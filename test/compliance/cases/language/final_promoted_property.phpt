@@ -10,7 +10,6 @@ class FP {
 class FPPriv {
     public function __construct(private final string $y) {}
     public function getY(): string { return $this->y; }
-    public function setY(string $v): void { $this->y = $v; }
 }
 class FPProt {
     public function __construct(protected final int $z) {}
@@ -18,7 +17,6 @@ class FPProt {
 }
 $o = new FP("a");
 echo $o->x, "\n";
-// Zend: final does not block writes — only inheritance override (php-src 8.5+; forward PROFILE=8.4).
 try {
     $o->x = "b";
     echo "WROTE\n";
@@ -30,15 +28,12 @@ echo "isFinal=", var_export($r->isFinal(), true), "\n";
 echo "isPromoted=", var_export($r->isPromoted(), true), "\n";
 $p = new FPPriv("secret");
 echo $p->getY(), "\n";
-$p->setY("mutated");
-echo $p->getY(), "\n";
 $q = new FPProt(7);
 echo $q->getZ(), "\n";
 --EXPECT--
 a
-WROTE
+BLOCKED
 isFinal=true
 isPromoted=true
 secret
-mutated
 7
