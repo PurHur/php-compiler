@@ -12814,9 +12814,7 @@ class JIT {
             }
             $data['sourceMethodLc'] = $methodLc;
             $data['methodLc'] = $newNameLc;
-            if (null === $traitLcFilter) {
-                unset($merged[$methodLc]);
-            }
+            // Zend zend_traits.c: `as` aliases — original method stays callable (#22718).
             $merged[$newNameLc] = $data;
         }
 
