@@ -8,7 +8,9 @@ use PHPCompiler\ext\standard\ModfJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** modf() JIT routes through ModfJitHelper PHP not libc LLVM (#15200). */
+/**
+ * modf() NestedJIT via JitVmHelperLink::ensureCompiled (#22519 / peer #22495).
+ */
 final class ModfRuntimeShrinkTest extends TestCase
 {
     public function testModfUsesJitHelperNotLibcLookup(): void
@@ -20,6 +22,13 @@ final class ModfRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathModf.php');
         $this->assertStringContainsString('ModfJitHelper', $bridge);
         $this->assertStringContainsString('phpc_modf', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
+        $this->assertStringNotContainsString('parseAndCompile', $bridge);
+        $this->assertStringNotContainsString('new JIT(', $bridge);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
     public function testModfJitHelperDelegatesToVmMath(): void
