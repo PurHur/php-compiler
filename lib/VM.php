@@ -10557,7 +10557,7 @@ restart:
                 if ($handler->fiberState !== $fiber && $this->findFiberState($handler) !== $fiber) {
                     break;
                 }
-                $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+                $catchFrame = $this->dispatchCatchForHandlerFrame($handler, $frame);
                 if (null !== $catchFrame) {
                     $catchFrame->fiberState = $fiber;
                     $fiber->frame = $catchFrame;
@@ -10615,7 +10615,7 @@ restart:
         $handlers = $this->context->activeTryHandlerFrames;
         for ($i = \count($handlers) - 1; $i >= 0; --$i) {
             $handler = $handlers[$i];
-            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler, $frame);
             if (null !== $catchFrame) {
                 \array_splice($this->context->activeTryHandlerFrames, $i);
                 if ($this->context->coercingObjectToString) {
@@ -10634,7 +10634,7 @@ restart:
             if (!\in_array($handler, $this->context->activeTryHandlerFrames, true)) {
                 continue;
             }
-            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler, $frame);
             if (null !== $catchFrame) {
                 if ($this->context->coercingObjectToString) {
                     $this->context->magicMethodThrowHandled = true;
@@ -10650,15 +10650,26 @@ restart:
         return null;
     }
 
-    private function dispatchCatchForHandlerFrame(Frame $handler): ?Frame
+    /**
+     * Enter catch or finally for a try handler. Abandoned callee CVs are released before the
+     * handler runs (Zend CV undef on exception leave) so __destruct runs before catch / before
+     * finally when leaving nested calls (#22541).
+     */
+    private function dispatchCatchForHandlerFrame(Frame $handler, Frame $throwFrame): ?Frame
     {
         $this->rewindHandlerToCatchChain($handler);
         $catchFrame = $this->enterMatchingCatchHandler($handler);
         if (null !== $catchFrame) {
+            $this->releaseCalleeObjectRefsBeforeExceptionHandler($throwFrame, $handler);
+
             return $catchFrame;
         }
         $finallyFrame = $this->enterFinallyHandlerForUnwind($handler, true);
         if (null !== $finallyFrame) {
+            // Nested callees die before finally; handler-function locals stay until after finally.
+            $this->releaseCalleeObjectRefsBeforeExceptionHandler($throwFrame, $handler);
+            $this->context->pendingFinallyUnwindThrowFrame = $throwFrame;
+
             return $finallyFrame;
         }
 
@@ -10942,6 +10953,10 @@ restart:
         if (null === $thrown) {
             return null;
         }
+        // Leaving this try/finally function scope: destroy locals before outer catch (#22541).
+        $throwFrame = $this->context->pendingFinallyUnwindThrowFrame;
+        $this->context->pendingFinallyUnwindThrowFrame = null;
+        $this->releaseHandlerScopeObjectRefsOnExceptionLeave($handler, $throwFrame);
         $outerCatch = $this->findCatchFrameForThrow($handler->parent ?? $handler, $thrown);
         if (null !== $outerCatch) {
             return $outerCatch;
@@ -10953,6 +10968,7 @@ restart:
     {
         $this->context->pendingException = null;
         $this->context->pendingCatchResumeHandler = null;
+        $this->context->pendingFinallyUnwindThrowFrame = null;
         $this->context->completedFinallyHandlers = [];
     }
 
@@ -11084,9 +11100,19 @@ restart:
             && null !== $this->resolveActiveCatchException($from)
             && $this->hasPendingFinally($this->context->activeCatchHandlerFrame)
         ) {
-            return $this->context->activeCatchHandlerFrame;
+            $catchHandler = $this->context->activeCatchHandlerFrame;
+            // Do not run a caller's finally when a nested call (e.g. __construct) returns (#22541).
+            if (($catchHandler->block->func ?? null) === ($from->block->func ?? null)) {
+                return $catchHandler;
+            }
         }
+        // Only finally blocks in the returning function — nested callees must not trigger the
+        // caller's try/finally (Zend; premature finally after `new` broke exception dtor order #22541).
+        $fromFunc = $from->block->func ?? null;
         for ($handler = $from->parent; null !== $handler; $handler = $handler->parent) {
+            if (($handler->block->func ?? null) !== $fromFunc) {
+                break;
+            }
             if ($this->hasPendingFinally($handler)) {
                 return $handler;
             }
@@ -14096,11 +14122,12 @@ restart:
     private function findCatchFrameForGeneratorThrow(GeneratorState $gen, Variable $thrown): ?Frame
     {
         $this->stashPendingException($thrown);
+        $throwFrame = $gen->frame;
         for ($handler = $gen->frame; null !== $handler; $handler = $handler->parent) {
             if ($handler->generatorState !== $gen && $this->findGeneratorState($handler) !== $gen) {
                 break;
             }
-            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler, $throwFrame ?? $handler);
             if (null !== $catchFrame) {
                 return $catchFrame;
             }
@@ -14114,11 +14141,12 @@ restart:
     private function findCatchFrameForFiberThrow(FiberState $fiber, Variable $thrown): ?Frame
     {
         $this->stashPendingException($thrown);
+        $throwFrame = $fiber->frame;
         for ($handler = $fiber->frame; null !== $handler; $handler = $handler->parent) {
             if ($handler->fiberState !== $fiber && $this->findFiberState($handler) !== $fiber) {
                 break;
             }
-            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler, $throwFrame ?? $handler);
             if (null !== $catchFrame) {
                 return $catchFrame;
             }
@@ -18450,6 +18478,93 @@ restart:
             ObjectLifetime::releaseDirectObject($slot);
         }
         foreach ($frame->iterators as $iter) {
+            ObjectLifetime::releaseDirectObject($iter);
+        }
+    }
+
+    /**
+     * Release object CVs for abandoned callee activations before catch/finally (Zend leave, #22541).
+     *
+     * Same-function locals as the handler stay alive (catch may still read them). Nested call
+     * frames are released innermost-first; within a frame, scope slot order matches normal return.
+     */
+    private function releaseCalleeObjectRefsBeforeExceptionHandler(Frame $throwFrame, Frame $handler): void
+    {
+        $handlerFunc = $handler->block->func ?? null;
+        $pendingOuter = null;
+        $pendingFunc = null;
+        $toRelease = [];
+        for ($f = $throwFrame; null !== $f && $f !== $handler; $f = $f->parent) {
+            $frameFunc = $f->block->func ?? null;
+            if ($frameFunc === $handlerFunc) {
+                break;
+            }
+            if ($pendingFunc !== $frameFunc) {
+                if (null !== $pendingOuter) {
+                    $toRelease[] = $pendingOuter;
+                }
+                $pendingFunc = $frameFunc;
+                $pendingOuter = $f;
+            } else {
+                $pendingOuter = $f;
+            }
+        }
+        if (null !== $pendingOuter) {
+            $toRelease[] = $pendingOuter;
+        }
+        foreach ($toRelease as $frame) {
+            $this->releaseFrameObjectRefs($frame);
+        }
+    }
+
+    /**
+     * After throw-path finally completes with no local catch, undef CVs of that function (#22541).
+     *
+     * Try-body locals may live only on the throw-site CFG frame (not the TYPE_TRY handler frame),
+     * so walk from $throwFrame through $handler and release each same-function scope once.
+     */
+    private function releaseHandlerScopeObjectRefsOnExceptionLeave(Frame $handler, ?Frame $throwFrame = null): void
+    {
+        $func = $handler->block->func ?? null;
+        $seenVars = [];
+        for ($f = $throwFrame ?? $handler; null !== $f; $f = $f->parent) {
+            if (($f->block->func ?? null) === $func) {
+                $this->releaseFrameObjectRefsOnce($f, $seenVars);
+            }
+            if ($f === $handler) {
+                for ($p = $handler->parent; null !== $p; $p = $p->parent) {
+                    if (($p->block->func ?? null) !== $func) {
+                        break;
+                    }
+                    $this->releaseFrameObjectRefsOnce($p, $seenVars);
+                }
+                break;
+            }
+        }
+    }
+
+    /**
+     * @param array<int, true> $seenVars
+     */
+    private function releaseFrameObjectRefsOnce(Frame $frame, array &$seenVars): void
+    {
+        foreach ($frame->scope as $slotIndex => $slot) {
+            if ($this->frameScopeSlotIsClosureByRefCapture($frame, (int) $slotIndex)) {
+                continue;
+            }
+            $id = spl_object_id($slot);
+            if (isset($seenVars[$id])) {
+                continue;
+            }
+            $seenVars[$id] = true;
+            ObjectLifetime::releaseDirectObject($slot);
+        }
+        foreach ($frame->iterators as $iter) {
+            $id = spl_object_id($iter);
+            if (isset($seenVars[$id])) {
+                continue;
+            }
+            $seenVars[$id] = true;
             ObjectLifetime::releaseDirectObject($iter);
         }
     }

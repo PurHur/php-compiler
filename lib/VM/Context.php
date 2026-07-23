@@ -169,6 +169,12 @@ class Context {
     /** Handler frame whose catch chain resumes after a throw-path finally (issue #2114). */
     public ?Frame $pendingCatchResumeHandler = null;
 
+    /**
+     * Throw-site frame when entering throw-path finally — used to release same-function CVs
+     * (including try-body locals) after finally before outer catch (#22541).
+     */
+    public ?Frame $pendingFinallyUnwindThrowFrame = null;
+
     /** Try handler for the innermost catch body exiting to merge (issue #195). */
     public ?Frame $activeCatchHandlerFrame = null;
 
