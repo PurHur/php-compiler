@@ -1592,8 +1592,11 @@ final class HashTableWriteLlvm
         if ($result->type & Variable::IS_NATIVE_ARRAY) {
             return;
         }
-        if (Variable::TYPE_NULL === $result->type) {
-            // FETCH_DIM_W / []= on null auto-vivifies (#21992, zend_execute.c).
+        if (
+            Variable::TYPE_NULL === $result->type
+            || Variable::TYPE_NATIVE_BOOL === $result->type
+        ) {
+            // FETCH_DIM_W / []= on null/false auto-vivifies (#21992, #22650, zend_execute.c).
             $slot = BasicBlockHelper::entryAlloca(
                 $context,
                 $context->getTypeFromString('__hashtable__*')

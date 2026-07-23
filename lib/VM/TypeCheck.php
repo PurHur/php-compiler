@@ -628,31 +628,41 @@ final class TypeCheck
     public const STRING_APPEND_UNSUPPORTED_MESSAGE = '[] operator not supported for strings';
 
     /**
-     * True when FETCH_DIM_W / []= must auto-vivify an empty array (zend_execute.c, #21992).
+     * True when FETCH_DIM_W / []= must auto-vivify an empty array (zend_execute.c, #21992, #22650).
      *
-     * Zend promotes null and undefined containers; bool/int/float still Error
+     * Zend promotes null, undefined, and false containers; true/int/float still Error
      * ({@see isScalarUsedAsArray()}).
      */
     public static function isNullContainerForDimAutovivify(Variable $value): bool
     {
         $resolved = $value->resolveIndirect();
 
-        return Variable::TYPE_NULL === $resolved->type
-            || Variable::TYPE_UNDEFINED === $resolved->type;
+        if (
+            Variable::TYPE_NULL === $resolved->type
+            || Variable::TYPE_UNDEFINED === $resolved->type
+        ) {
+            return true;
+        }
+
+        // Legacy Zend: false→[] on dim write, same as null (zend_execute.c / #22650).
+        return Variable::TYPE_BOOLEAN === $resolved->type && !$resolved->toBool();
     }
 
     /**
-     * True when []= / dim-write targets a true scalar (bool/int/float).
+     * True when []= / dim-write targets a true scalar (true/int/float).
      *
-     * Null/undefined are not included — Zend auto-vivifies them (#21992); see
+     * Null/undefined/false are not included — Zend auto-vivifies them (#21992, #22650); see
      * {@see isNullContainerForDimAutovivify()}.
      */
     public static function isScalarUsedAsArray(Variable $value): bool
     {
         $resolved = $value->resolveIndirect();
 
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            return $resolved->toBool();
+        }
+
         return \in_array($resolved->type, [
-            Variable::TYPE_BOOLEAN,
             Variable::TYPE_INTEGER,
             Variable::TYPE_FLOAT,
         ], true);
