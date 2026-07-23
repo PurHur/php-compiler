@@ -1,7 +1,7 @@
 --TEST--
-ext/pgsql PHP 8.4 helpers exist without live Postgres (#7083, #22543)
+ext/pgsql PHP 8.4 helpers withheld on PROFILE=8.2 (#22543, re-#7083)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
 declare(strict_types=1);
@@ -19,14 +19,14 @@ foreach ([
     'pg_set_chunked_rows_size',
     'pg_socket_poll',
 ] as $fn) {
-    echo $fn, '=', (int) function_exists($fn), "\n";
+    echo $fn, '=', function_exists($fn) ? 'Y' : 'N', "\n";
 }
 ?>
 --EXPECT--
-pg_change_password=1
-pg_jit=1
-pg_put_copy_data=1
-pg_put_copy_end=1
-pg_result_memory_size=1
-pg_set_chunked_rows_size=1
-pg_socket_poll=1
+pg_change_password=N
+pg_jit=N
+pg_put_copy_data=N
+pg_put_copy_end=N
+pg_result_memory_size=N
+pg_set_chunked_rows_size=N
+pg_socket_poll=N
