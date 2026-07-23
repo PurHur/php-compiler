@@ -4363,6 +4363,7 @@ require_once __DIR__.'/../../../lib/Ast/EnumCaseImportRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/EnumCaseMatchSwitchRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/EnumPropertyCompileCheck.php';
 require_once __DIR__.'/../../../lib/Ast/ExitFunctionDesugar.php';
+require_once __DIR__.'/../../../lib/Ast/FinalPromotedPropertyRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/GeneratorYieldSourceMarker.php';
 require_once __DIR__.'/../../../lib/Ast/GlobalDeprecatedConstRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/GlobalTypedConstRewriter.php';
