@@ -123,6 +123,56 @@ final class ReflectionTypeSupport
         throw new \LogicException('Unsupported declared type for reflection: '.get_class($type));
     }
 
+    /**
+     * Zend _function_string / _parameter_string type label (#22522).
+     *
+     * Simple nullables and T|null unions render as "?T" (php-src zend_type pretty-print).
+     */
+    public static function cfgTypeStringForDump(CfgType $type): string
+    {
+        if ($type instanceof CfgType\Nullable) {
+            $subtype = $type->subtype;
+            if (
+                $subtype instanceof CfgType\Literal
+                || $subtype instanceof CfgType\Reference
+                || $subtype instanceof CfgType\Mixed_
+            ) {
+                return '?'.self::cfgTypeString($subtype);
+            }
+
+            return self::cfgTypeString($type);
+        }
+        if ($type instanceof CfgType\Union_) {
+            $nonNull = [];
+            $sawNull = false;
+            foreach ($type->types as $member) {
+                if (
+                    ($member instanceof CfgType\Literal && 'null' === strtolower($member->name))
+                    || $member instanceof CfgType\Nullable
+                ) {
+                    if ($member instanceof CfgType\Nullable) {
+                        $nonNull[] = $member->subtype;
+                    }
+                    $sawNull = true;
+                    continue;
+                }
+                $nonNull[] = $member;
+            }
+            if ($sawNull && 1 === \count($nonNull)) {
+                $only = $nonNull[0];
+                if (
+                    $only instanceof CfgType\Literal
+                    || $only instanceof CfgType\Reference
+                    || $only instanceof CfgType\Mixed_
+                ) {
+                    return '?'.self::cfgTypeString($only);
+                }
+            }
+        }
+
+        return self::cfgTypeString($type);
+    }
+
     public static function cfgTypeFromLabel(string $label): ?CfgType
     {
         $label = trim($label);
