@@ -4374,6 +4374,19 @@ final class ReflectionSupport
         return sprintf("Constant [ public %s %s ] { Object }\n", $enumName, $caseName);
     }
 
+    /**
+     * ReflectionAttribute::__toString() — php-src ZEND_METHOD(ReflectionAttribute, __toString) (#22420).
+     */
+    public static function attributeReflectionToString(ObjectEntry $reflection): string
+    {
+        $nameVar = $reflection->getProperty(self::PROP_ATTR_NAME)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \LogicException('ReflectionAttribute missing name');
+        }
+
+        return sprintf("Attribute [ %s ]\n", $nameVar->toString());
+    }
+
     /** php-src: closure_func->common.scope (definition site). */
     public static function closureDefinitionScopeClassName(ClosureState $state): ?string
     {

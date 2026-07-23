@@ -5604,6 +5604,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeGetTarget.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeIsRepeated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeNewInstance.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDeprecatedMessage.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDeprecatedVersion.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDocComment.php';
