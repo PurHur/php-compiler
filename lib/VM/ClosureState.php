@@ -38,7 +38,7 @@ final class ClosureState
     /** Class scope name for private/protected access (bindTo / fromCallable). */
     public ?string $boundScopeClass = null;
 
-    /** Definition site for var_dump / Closure::__debugInfo (issue #7069). */
+    /** Definition site for var_dump via get_debug_info handler (issue #7069, #22565). */
     public string $definitionFile = '';
 
     public int $definitionLine = 0;
@@ -181,12 +181,19 @@ final class ClosureState
     }
 
     /**
+     * Zend zend_closure_get_debug_info handler bag — not a user-visible Closure method (#22565).
+     *
      * @return array<string, Variable>
      */
     public function debugInfoEntries(): array
     {
         if (!$this->isUserClosure()) {
             return $this->fakeClosureDebugInfoEntries();
+        }
+
+        // PHP 8.2: plain user closures dump empty; name/file/line arrived in 8.4.
+        if (!CompilerVersion::supportsClosureRichDebugInfo()) {
+            return [];
         }
 
         $entries = [];
@@ -291,9 +298,7 @@ final class ClosureState
         // Instance-only in Zend (zend_closures.stub.php); static Closure::call() must Error (#7144).
         $entry->methodVisibility['call'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['call'] = 'call';
-        $entry->methods['__debuginfo'] = new Builtin\ClosureDebugInfo();
-        $entry->methodVisibility['__debuginfo'] = \PHPCfg\Func::FLAG_PUBLIC;
-        $entry->methodNames['__debuginfo'] = '__debugInfo';
+        // No Closure::__debugInfo method — Zend uses get_debug_info handler only (#22565, re-#7069).
         if (CompilerVersion::supportsClosureGetUsedVariables()) {
             $entry->methods['getusedvariables'] = new Builtin\ClosureGetUsedVariables();
             $entry->methodVisibility['getusedvariables'] = \PHPCfg\Func::FLAG_PUBLIC;

@@ -1877,6 +1877,17 @@ class VM {
      */
     public function getObjectDebugProperties(ObjectEntry $object, ?Frame $frame = null): array
     {
+        // Closure: Zend zend_closure_get_debug_info handler — not a __debugInfo method (#22565).
+        if (null !== $object->closureState) {
+            $props = [];
+            foreach ($object->closureState->debugInfoEntries() as $name => $value) {
+                $copy = new Variable();
+                $copy->copyFrom($value->resolveIndirect());
+                $props[$name] = $copy;
+            }
+
+            return $props;
+        }
         if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
             $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
             if (Variable::TYPE_NULL === $result->type) {

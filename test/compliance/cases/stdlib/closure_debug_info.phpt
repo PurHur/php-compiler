@@ -1,16 +1,12 @@
 --TEST--
-Stdlib: Closure::__debugInfo() — var_dump shows name/file/line (#7069)
+Closure var_dump — handler dump; no __debugInfo method on reference profile (#22565, re-#7069)
 --FILE--
 <?php
 declare(strict_types=1);
 $c = function () { return 1; };
+echo 'method_exists=', method_exists($c, '__debugInfo') ? '1' : '0', "\n";
 var_dump($c);
 --EXPECTF--
-object(Closure)#%d (3) {
-  ["name"]=>
-  string(9) "{closure}"
-  ["file"]=>
-  string(1) "-"
-  ["line"]=>
-  int(%d)
+method_exists=0
+object(Closure)#%d (0) {
 }

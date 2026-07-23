@@ -2150,6 +2150,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ Closure var_dump name/file/line via zend_closure_get_debug_info (#7069, #22565).
+     *
+     * Not a Closure method — Zend uses the object get_debug_info handler only
+     * (Zend/zend_closures.c). Gated so 8.4.0-dev / PROFILE=8.2 match Zend 8.2 empty dumps.
+     */
+    public static function supportsClosureRichDebugInfo(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ bare `throw;` catch rethrow on the forward profile (Zend/zend_compile.c, #3508, #15299, #15630).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
