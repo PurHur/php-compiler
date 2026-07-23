@@ -1,5 +1,7 @@
 --TEST--
-Stdlib: HashContext — no __debugInfo on reference profile (Zend 8.2; #22563, re-#7084)
+Stdlib: HashContext — no __debugInfo on PROFILE=8.2 (#22563, ext/hash/hash.stub.php)
+--ENV--
+PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
 declare(strict_types=1);

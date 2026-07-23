@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\hash;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\ext\standard\VmStreamArg;
@@ -31,8 +32,11 @@ final class VmHashContext
         }
         $entry = new \PHPCompiler\VM\ClassEntry('HashContext');
         $entry->isInternal = true;
-        $entry->methods['__debuginfo'] = new HashContextDebugInfo();
-        $entry->methodNames['__debuginfo'] = '__debugInfo';
+        // PHP 8.4+ only — Zend 8.2/8.3 stubs omit HashContext::__debugInfo (#22563, re-#7084).
+        if (CompilerVersion::supportsHashContextDebugInfo()) {
+            $entry->methods['__debuginfo'] = new HashContextDebugInfo();
+            $entry->methodNames['__debuginfo'] = '__debugInfo';
+        }
         HashContextSerializeSupport::registerMagicMethods($entry);
         $ctx->classes[self::CLASS_LC] = $entry;
     }

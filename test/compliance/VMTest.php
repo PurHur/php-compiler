@@ -344,6 +344,13 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'closure_debuginfo_phantom')) {
                 continue;
             }
+            // HashContext::__debugInfo withheld on reference; forward_84 / profile82 use --ENV-- (#22563).
+            if (CompilerVersion::supportsHashContextDebugInfo()
+                && str_contains($name, 'hash_context_debug_info')
+                && !str_contains($name, 'hash_context_debug_info_forward_84')
+                && !str_contains($name, 'hash_context_debug_info_profile82')) {
+                continue;
+            }
             if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter')
                 && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {

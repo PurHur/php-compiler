@@ -12110,8 +12110,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/HashContextDebugInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 36)
-- new Variable (line 37)
+- new HashTable (line 39)
+- new Variable (line 40)
 - 1 class method(s)
 
 ### `ext/hash/HashContextJitHelper.php`
@@ -12209,11 +12209,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/VmHashContext.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashContextDebugInfo (line 34)
-- new ObjectEntry (line 95)
-- new Variable (line 102)
-- new ObjectEntry (line 181)
-- new Variable (line 188)
+- new HashContextDebugInfo (line 37)
+- new ObjectEntry (line 99)
+- new Variable (line 106)
+- new ObjectEntry (line 185)
+- new Variable (line 192)
 - 12 class method(s)
 
 ### `ext/hash/VmMhash.php`
@@ -40987,7 +40987,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 233 class method(s)
+- 234 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -50976,7 +50976,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 41)
-- new Variable (line 55)
+- new Variable (line 66)
 - 6 class method(s)
 
 ### `lib/VM/DateTimeSupport.php`

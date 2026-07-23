@@ -105,19 +105,43 @@ PHP;
         );
     }
 
-    public function test_hash_context_debug_info(): void
+    public function test_hash_context_debug_info_withheld_on_reference_profile(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
+<?php
+$ctx = hash_init('sha256');
+echo method_exists($ctx, '__debugInfo') ? '1' : '0';
+PHP;
+        $block = $runtime->parseAndCompile($code, 'hash_context_debug_info_ref.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('0', ob_get_clean());
+    }
+
+    public function test_hash_context_debug_info_on_forward_profile_84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 $ctx = hash_init('sha256');
 $info = $ctx->__debugInfo();
 echo (int) is_array($info);
 echo isset($info['algo']) ? $info['algo'] : '';
 PHP;
-        $block = $runtime->parseAndCompile($code, 'hash_context_debug_info.php');
-        ob_start();
-        $runtime->run($block);
-        self::assertSame('1sha256', ob_get_clean());
+            $block = $runtime->parseAndCompile($code, 'hash_context_debug_info.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame('1sha256', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }
