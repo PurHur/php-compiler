@@ -23,4 +23,17 @@ final class JitValueBoxNativeKindValueTest extends TestCase
             $source
         );
     }
+
+    /** By-ref NestedJIT args typed NATIVE_LONG but stored as __value__* (#22642). */
+    public function testValuePtrFromVariableShortCircuitsValueBoxPointerBeforeNativeBox(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/JitValueBox.php');
+        $this->assertStringContainsString('#22642', $source);
+        $this->assertStringContainsString(
+            'By-ref NestedJIT formals / caller args are often',
+            $source
+        );
+        $this->assertStringContainsString("'__value__*' === \$llvmType", $source);
+        $this->assertStringContainsString("'__value__*' === \$storageTy", $source);
+    }
 }

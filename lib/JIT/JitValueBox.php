@@ -119,6 +119,20 @@ final class JitValueBox
             return self::normalizeValuePtr($context, self::pointer($context, $storage));
         }
         if (Variable::TYPE_VALUE !== $var->type) {
+            // By-ref NestedJIT formals / caller args are often `__value__*` KIND_VALUE while
+            // the CFG type still says NATIVE_LONG (or similar). Boxing via writeLong then
+            // passes the pointer as i64 and fails module verify (#22642).
+            $llvmType = $context->getStringFromType($var->value->typeOf());
+            if ('__value__*' === $llvmType) {
+                return self::normalizeValuePtr($context, $var->value);
+            }
+            if ('__value__**' === $llvmType) {
+                return self::normalizeValuePtr($context, $context->builder->load($var->value));
+            }
+            if ('__value__' === $llvmType && Variable::KIND_VARIABLE === $var->kind) {
+                return self::normalizeValuePtr($context, self::pointer($context, $var->value));
+            }
+
             return self::valuePtrFromNativeVariable($context, $var);
         }
         if (Variable::KIND_VALUE === $var->kind && $var->functionStaticGlobal) {
@@ -225,6 +239,30 @@ final class JitValueBox
 
     public static function writeLong(Context $context, Value $slot, Value $long): void
     {
+        // Surface TYPE_VALUE/NATIVE_LONG confusion at emit time (#22642 module verify).
+        $assert = getenv('PHP_COMPILER_LLVM_ASSERT');
+        if ('1' === $assert || 'true' === strtolower((string) $assert)) {
+            $longTy = $context->getStringFromType($long->typeOf());
+            if ('int64' !== $longTy && 'long long' !== $longTy) {
+                $frames = [];
+                foreach (\debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 12) as $frame) {
+                    $file = isset($frame['file']) ? \basename((string) $frame['file']) : '?';
+                    $line = $frame['line'] ?? '?';
+                    $fn = ($frame['class'] ?? '').($frame['type'] ?? '').($frame['function'] ?? '');
+                    $frames[] = $file.':'.$line.' '.$fn;
+                }
+                throw new \LogicException(
+                    'JitValueBox::writeLong: second arg type '.$longTy.' (want int64) — #22642'
+                    ."\n  via ".implode("\n  via ", $frames)
+                );
+            }
+            $slotTy = $context->getStringFromType($slot->typeOf());
+            if ('int64*' === $slotTy || 'long long*' === $slotTy) {
+                throw new \LogicException(
+                    'JitValueBox::writeLong: slot is '.$slotTy.' (want __value__*) — #22642'
+                );
+            }
+        }
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             self::pointer($context, $slot),
@@ -631,6 +669,16 @@ final class JitValueBox
      */
     public static function valuePtrFromNativeVariable(Context $context, Variable $var): Value
     {
+        // By-ref capture / param formals may keep a scalar inferred type while LLVM storage
+        // is already a boxed {@see __value__*} (module verify: writeLong gets __value__* — #22642).
+        $storageTy = $context->getStringFromType($var->value->typeOf());
+        if ('__value__*' === $storageTy) {
+            return self::normalizeValuePtr($context, $var->value);
+        }
+        if ('__value__' === $storageTy) {
+            return self::normalizeValuePtr($context, self::pointer($context, $var->value));
+        }
+
         $slot = self::alloc($context);
         $native = Variable::KIND_VALUE === $var->kind
             ? $var->value

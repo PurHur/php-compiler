@@ -150,9 +150,13 @@ final class VmClosure
         JitVariable $captureSlot,
         JitVariable $captureArg
     ): void {
-        $captureSlot->valueBoxAliasPtr = JitValueBox::valuePtrFromVariable($context, $captureArg);
+        $ptr = JitValueBox::valuePtrFromVariable($context, $captureArg);
+        $captureSlot->valueBoxAliasPtr = $ptr;
         $captureSlot->type = JitVariable::TYPE_VALUE;
         $captureSlot->kind = JitVariable::KIND_VARIABLE;
+        // Point storage at the aliased box; do not valueDelref the old native alloca (#22642).
+        $captureSlot->value = $ptr;
+        $captureSlot->borrowedValueEntry = true;
     }
 
     /**
