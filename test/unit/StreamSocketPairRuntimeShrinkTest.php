@@ -10,8 +10,8 @@ use PHPCompiler\ext\standard\VmStreamSocketPairNative;
 use PHPUnit\Framework\TestCase;
 
 /**
- * StreamSocketPairJit routes through StreamSocketPairJitHelper PHP not libc LLVM (#13710).
- * No inventory null-stub fork — always NestedJIT (#21082, peer #20943 / #20966).
+ * StreamSocketPairRuntime NestedJIT via JitVmHelperLink::ensureCompiled (#22468 / peer #22431).
+ * Routes through StreamSocketPairJitHelper PHP not libc LLVM (#13710, #21082).
  */
 final class StreamSocketPairRuntimeShrinkTest extends TestCase
 {
@@ -24,12 +24,17 @@ final class StreamSocketPairRuntimeShrinkTest extends TestCase
         $this->assertLessThan(25, \substr_count($source, "\n") + 1);
     }
 
-    public function testStreamSocketPairRuntimeUsesJitHelperAlwaysNoInventoryStub(): void
+    public function testStreamSocketPairRuntimeUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamSocketPairRuntime.php');
         $this->assertStringContainsString('StreamSocketPairJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('lookupFunction(\'socketpair\')', $source);
         $this->assertStringNotContainsString('emitStreamSocketPair(', $source);
         $this->assertStringNotContainsString('shouldDeferInventoryEmit', $source);
