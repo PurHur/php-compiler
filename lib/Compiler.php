@@ -19344,6 +19344,81 @@ class Compiler {
 
             return null;
         }
+        // f(cond ? a : b, true) / f(true, cond ? a : b) — Phi-written ?: temps + hoisted
+        // true/false/null ConstFetch as sibling dead temps (#22732, re-#15816).
+        // php-cfg leaves distinct empty arg Vars; without Phi vs ConstFetch discrimination both
+        // ARG_SENDs bind the ConstFetch (or both the ternary phi).
+        if (
+            null !== $callArg
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            $phiWrittenIndexes = [];
+            $constFetchWrittenIndexes = [];
+            foreach ($callArgs as $i => $candidate) {
+                if (
+                    !($candidate instanceof Operand)
+                    || !$this->callArgIsDeadInlineTemporary($candidate)
+                    || $this->isEmbeddedCallLiteralArg($candidate)
+                ) {
+                    continue;
+                }
+                if ($this->callArgTemporaryIsPhiWritten($candidate)) {
+                    $phiWrittenIndexes[] = (int) $i;
+                } elseif ($this->callArgTemporaryIsScalarConstFetchWritten($candidate)) {
+                    $constFetchWrittenIndexes[] = (int) $i;
+                }
+            }
+            if ([] !== $phiWrittenIndexes && [] !== $constFetchWrittenIndexes) {
+                if (\in_array($argIndex, $constFetchWrittenIndexes, true)) {
+                    // Prefer the ConstFetch embedded on the Temporary — preceding producer
+                    // lists are often empty for leading true/false/null before ?: (#22732).
+                    foreach ($callArg->ops ?? [] as $embedded) {
+                        if (!$embedded instanceof Op\Expr\ConstFetch) {
+                            continue;
+                        }
+                        $embeddedName = $this->staticNameFromOperand($embedded->name);
+                        if (
+                            null !== $embeddedName
+                            && \in_array(strtolower($embeddedName), ['true', 'false', 'null'], true)
+                        ) {
+                            return $embedded;
+                        }
+                    }
+                    $scalarConsts = [];
+                    foreach ($producers as $producer) {
+                        if (!$producer instanceof Op\Expr\ConstFetch) {
+                            continue;
+                        }
+                        $name = $this->staticNameFromOperand($producer->name);
+                        if (null === $name || !\in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                            continue;
+                        }
+                        if (
+                            (
+                                null !== $producer->result
+                                && $this->operandsReferToSameVariable($producer->result, $callArg)
+                            )
+                            || (
+                                isset($callArg->ops)
+                                && \is_array($callArg->ops)
+                                && \in_array($producer, $callArg->ops, true)
+                            )
+                        ) {
+                            return $producer;
+                        }
+                        $scalarConsts[] = $producer;
+                    }
+                    $constOrdinal = \array_search($argIndex, $constFetchWrittenIndexes, true);
+                    if (false !== $constOrdinal && isset($scalarConsts[$constOrdinal])) {
+                        return $scalarConsts[$constOrdinal];
+                    }
+                }
+                if (\in_array($argIndex, $phiWrittenIndexes, true)) {
+                    // Leave for resolveNestedTernaryMergeCallArgSlot — do not steal ConstFetch.
+                    return null;
+                }
+            }
+        }
         // f($x + 1, …, true) — Plus/arith + ConstFetch true/false/null as sibling dead temps (#19515).
         // php-cfg leaves distinct empty arg Vars; without ordinal wiring both ARG_SENDs bind the ConstFetch.
         if (
@@ -32536,7 +32611,11 @@ class Compiler {
     }
 
     /**
-     * Map dead inline ?: call-arg temps to the innermost ?: merge phi slots for this call (#15816).
+     * Map dead inline ?: call-arg temps to the innermost ?: merge phi slots for this call (#15816, #22732).
+     *
+     * php-cfg writes Phi into Temporary->ops for ?: args and ConstFetch for trailing true/false/null.
+     * Only Phi-written args consume ternary merge phi slots — counting all dead temps made
+     * `f(cond ? a : b, true)` fail the phiSlots>=deadTempCount guard (#22732).
      */
     private function resolveNestedTernaryMergeCallArgSlot(
         Block $block,
@@ -32547,17 +32626,39 @@ class Compiler {
         if (null === $cfgCallOp || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
             return null;
         }
-        if (!$this->callArgIsDeadInlineTemporary($arg)) {
+        if (!$this->callArgIsDeadInlineTemporary($arg) || !$this->callArgTemporaryIsPhiWritten($arg)) {
             return null;
         }
-        $deadTempCount = 0;
-        foreach ($cfgCallOp->args as $callArg) {
-            if ($callArg instanceof Operand && $this->callArgIsDeadInlineTemporary($callArg)) {
-                ++$deadTempCount;
+        $phiArgIndexes = [];
+        foreach ($cfgCallOp->args as $i => $callArg) {
+            if (
+                $callArg instanceof Operand
+                && $this->callArgIsDeadInlineTemporary($callArg)
+                && $this->callArgTemporaryIsPhiWritten($callArg)
+            ) {
+                $phiArgIndexes[] = (int) $i;
             }
         }
-        if ($deadTempCount < 2) {
+        if ([] === $phiArgIndexes) {
             return null;
+        }
+        // Multi-?: call args (#15816) or mixed ?: + scalar ConstFetch (#22732) both need remapping.
+        // Lone single-arg ?: already wires via compileOperand — only engage when a sibling dead temp
+        // (ConstFetch / another Phi) shares the call, matching the historic deadTempCount>=2 gate.
+        if (1 === \count($phiArgIndexes)) {
+            $siblingDeadTemp = false;
+            foreach ($cfgCallOp->args as $i => $callArg) {
+                if ((int) $i === $phiArgIndexes[0]) {
+                    continue;
+                }
+                if ($callArg instanceof Operand && $this->callArgIsDeadInlineTemporary($callArg)) {
+                    $siblingDeadTemp = true;
+                    break;
+                }
+            }
+            if (!$siblingDeadTemp) {
+                return null;
+            }
         }
         $phiSlots = [];
         foreach ($this->ternaryMergePhiRhsSlots as $mergeCfg) {
@@ -32567,21 +32668,51 @@ class Compiler {
             }
         }
         $phiSlots = array_values(array_unique($phiSlots));
-        if (\count($phiSlots) < $deadTempCount) {
+        $phiArgCount = \count($phiArgIndexes);
+        if (\count($phiSlots) < $phiArgCount) {
             return null;
         }
-        $phiSlots = \array_slice($phiSlots, -$deadTempCount);
-        $ordinal = $this->inlineHoistedProducerSlotIndexForCallArg(
-            $cfgCallOp->args,
-            $argIndex,
-            $block,
-            $cfgCallOp
-        );
-        if (null === $ordinal || $ordinal >= \count($phiSlots)) {
+        $phiSlots = \array_slice($phiSlots, -$phiArgCount);
+        $ordinal = \array_search($argIndex, $phiArgIndexes, true);
+        if (false === $ordinal || $ordinal >= \count($phiSlots)) {
             return null;
         }
 
         return (string) $phiSlots[$ordinal];
+    }
+
+    /** php-cfg Temporary written by a Phi — ?: / short-circuit merge result (#22732). */
+    private function callArgTemporaryIsPhiWritten(?Operand $arg): bool
+    {
+        if (null === $arg) {
+            return false;
+        }
+        foreach ($arg->ops ?? [] as $embedded) {
+            if ($embedded instanceof Op\Phi) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** php-cfg Temporary written by a hoisted true/false/null ConstFetch (#22732). */
+    private function callArgTemporaryIsScalarConstFetchWritten(?Operand $arg): bool
+    {
+        if (null === $arg) {
+            return false;
+        }
+        foreach ($arg->ops ?? [] as $embedded) {
+            if (!$embedded instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            $name = $this->staticNameFromOperand($embedded->name);
+            if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -46890,7 +47021,14 @@ class Compiler {
                                 $cfgCallOp->args ?? [],
                                 (int) $argIndex
                             );
-                            if ($trailingConst instanceof Op\Expr) {
+                            // ?: Phi-written / scalar ConstFetch-written args keep specialized wiring —
+                            // do not rebind via ordinal preceding producers (#22732, #14419).
+                            $keepSpecializedCallArgSlot = $this->callArgTemporaryIsPhiWritten($finalArgProbe)
+                                || $this->callArgTemporaryIsScalarConstFetchWritten($finalArgProbe);
+                            if (
+                                $trailingConst instanceof Op\Expr
+                                && !$keepSpecializedCallArgSlot
+                            ) {
                                 if (null === $block->slotForOperand($trailingConst->result)) {
                                     foreach ($this->compileExpr($trailingConst, $block) as $op) {
                                         $sends[] = $op;
@@ -46908,7 +47046,11 @@ class Compiler {
                                     $block->orig->children,
                                     $block
                                 );
-                                if ($finalProducer instanceof Op\Expr && null !== $finalProducer->result) {
+                                if (
+                                    $finalProducer instanceof Op\Expr
+                                    && null !== $finalProducer->result
+                                    && !$keepSpecializedCallArgSlot
+                                ) {
                                     if (null === $block->slotForOperand($finalProducer->result)) {
                                         foreach ($this->compileExpr($finalProducer, $block) as $op) {
                                             $sends[] = $op;
