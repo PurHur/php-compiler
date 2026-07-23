@@ -10048,16 +10048,21 @@ restart:
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
-    /** Bridge native mysqli_sql_exception from ext/mysqli builtins (#21803, #21815). */
+    /** Bridge native mysqli_sql_exception from ext/mysqli builtins (#21803, #21815, #22456). */
     private function dispatchVmMysqliSqlException(\mysqli_sql_exception $error, Frame $frame): ?Frame
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $sqlstate = '00000';
+        if (\method_exists($error, 'getSqlState')) {
+            $sqlstate = (string) $error->getSqlState();
+        }
         $thrown = VM\BuiltinExceptionSupport::materializeMysqliSqlException(
             $this->context,
             $error->getMessage(),
             $file,
             $line,
-            (int) $error->getCode()
+            (int) $error->getCode(),
+            $sqlstate
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);

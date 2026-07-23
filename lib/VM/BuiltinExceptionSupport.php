@@ -703,18 +703,27 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, self::CLASS_ARITHMETIC_ERROR, $message);
     }
 
+    /**
+     * Bridge native mysqli_sql_exception — copies protected $sqlstate (#22456).
+     * php-src: ext/mysqli/mysqli_exception.c — default SQLSTATE "00000".
+     */
     public static function materializeMysqliSqlException(
         Context $ctx,
         string $message,
         string $file = '',
         int $line = 0,
-        int $code = 0
+        int $code = 0,
+        string $sqlstate = '00000'
     ): Variable {
         if (!isset($ctx->classes[self::CLASS_MYSQLI_SQL_EXCEPTION])) {
             return self::materializeException($ctx, $message, $file, $line);
         }
         $var = self::materializeThrowable($ctx, self::CLASS_MYSQLI_SQL_EXCEPTION, $message, $file, $line);
-        $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+        $obj = $var->toObject();
+        $obj->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+        if ($obj->hasProperty('sqlstate')) {
+            $obj->getProperty('sqlstate')->string('' !== $sqlstate ? $sqlstate : '00000');
+        }
 
         return $var;
     }

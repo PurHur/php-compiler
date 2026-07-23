@@ -6469,6 +6469,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetShortName.ph
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantToString.php';
 require_once __DIR__.'/../../../ext/phar/VmPharManifest.php';
 require_once __DIR__.'/../../../ext/mysqli/bootstrap_mysqli_sql_exception.php';
+require_once __DIR__.'/../../../ext/mysqli/MysqliSqlExceptionGetSqlState.php';
 require_once __DIR__.'/../../../ext/mysqli/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/mysqli/Module.php';
 require_once __DIR__.'/../../../ext/mysqli/MysqliClassMethod.php';
