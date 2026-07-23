@@ -1851,6 +1851,10 @@ final class PropertyHooks
         $expr = trim($expr);
         if ($isStatic) {
             if (preg_match('/^self::\$(\w+)\s*(?:=\s*|$)/', $expr, $m)) {
+                // Same-name self::$prop is implicit backing, not separate setBacking (#22452).
+                if ('set' === $kind && 0 === strcasecmp($m[1], $prop)) {
+                    return;
+                }
                 $key = 'get' === $kind ? 'getBacking' : 'setBacking';
                 $this->registry[$lcClass][$prop][$key] = $m[1];
             }
@@ -1862,7 +1866,10 @@ final class PropertyHooks
 
             return;
         }
-        if ('set' === $kind && preg_match('/^\$this->(\w+)\s*=/', $expr, $m)) {
+        // Distinct `$this->other =` only — same-name is backed storage (#22452 / #19163).
+        if ('set' === $kind && preg_match('/^\$this->(\w+)\s*=/', $expr, $m)
+            && 0 !== strcasecmp($m[1], $prop)
+        ) {
             $this->registry[$lcClass][$prop]['setBacking'] = $m[1];
         }
     }

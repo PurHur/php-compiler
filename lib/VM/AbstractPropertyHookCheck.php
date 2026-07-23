@@ -199,20 +199,38 @@ final class AbstractPropertyHookCheck
     }
 
     /**
-     * Set-only hook with virtual modifier, short `set =>` backing, or explicit separate backing — external reads forbidden (#6484, #19163).
+     * Set-only virtual / separate-backing hooks reject external reads (#6484, #19163, #22452).
+     *
+     * Same-name `$this->prop =` (arrow or block) is real backing storage — Zend returns it
+     * without a get hook. Only `virtual` or a *distinct* setBacking field is write-only.
      *
      * @param array<string, mixed>|null $registryMeta
      */
-    public static function isWriteOnlyVirtualHook(?array $registryMeta, bool $classPropertyVirtual = false): bool
-    {
+    public static function isWriteOnlyVirtualHook(
+        ?array $registryMeta,
+        bool $classPropertyVirtual = false,
+        ?string $propName = null
+    ): bool {
         if ($classPropertyVirtual) {
             return true;
         }
         if (!is_array($registryMeta)) {
             return false;
         }
+        if (!empty($registryMeta['virtual'])) {
+            return true;
+        }
+        $setBacking = $registryMeta['setBacking'] ?? null;
+        if (!is_string($setBacking) || '' === $setBacking) {
+            return false;
+        }
+        // Arrow `set(int $v) => $this->x = …` used to record same-name setBacking; that is
+        // backed storage, not virtual (#22452 / re-#19163, zend_object_handlers.c).
+        if (null !== $propName && 0 === strcasecmp($setBacking, $propName)) {
+            return false;
+        }
 
-        return !empty($registryMeta['virtual']) || !empty($registryMeta['setBacking']);
+        return true;
     }
 
     /**

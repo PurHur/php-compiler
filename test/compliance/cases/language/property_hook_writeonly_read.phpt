@@ -1,14 +1,15 @@
 --TEST--
-Write-only virtual property hook rejects reads (issue #6484, zend_property_hooks.c)
+Write-only virtual property hook rejects reads (issue #6484, #22452, zend_property_hooks.c)
 --FILE--
 <?php
 class C {
-    public string $x {
-        set => $this->x = strtoupper($value);
+    public int $x {
+        set { $this->v = $value; }
+        private int $v = 0;
     }
 }
 $c = new C();
-$c->x = 'hi';
+$c->x = 5;
 try {
     echo $c->x, "\n";
 } catch (Error $e) {

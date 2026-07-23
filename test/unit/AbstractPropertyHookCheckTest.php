@@ -23,7 +23,41 @@ final class AbstractPropertyHookCheckTest extends TestCase
 
 
 
-public function testIsAbstractHookPropertyOnDeclaringClass(): void
+    public function testIsWriteOnlyVirtualHookSameNameBackingIsNotVirtual(): void
+    {
+        // Arrow set that assigns `$this->x` must allow external reads (#22452).
+        self::assertFalse(AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
+            ['set' => '__phpc_property_set_x', 'setBacking' => 'x'],
+            false,
+            'x'
+        ));
+        self::assertFalse(AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
+            ['set' => '__phpc_property_set_x'],
+            false,
+            'x'
+        ));
+    }
+
+    public function testIsWriteOnlyVirtualHookDistinctBackingOrVirtualFlag(): void
+    {
+        self::assertTrue(AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
+            ['set' => '__phpc_property_set_x', 'setBacking' => 'v'],
+            false,
+            'x'
+        ));
+        self::assertTrue(AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
+            ['set' => '__phpc_property_set_x', 'virtual' => true],
+            false,
+            'x'
+        ));
+        self::assertTrue(AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
+            ['set' => '__phpc_property_set_x'],
+            true,
+            'x'
+        ));
+    }
+
+    public function testIsAbstractHookPropertyOnDeclaringClass(): void
     {
         $ctx = (new Runtime())->vmContext;
         $a = new ClassEntry('A');

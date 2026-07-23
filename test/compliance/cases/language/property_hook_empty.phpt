@@ -39,11 +39,7 @@ class WriteOnly {
 }
 $w = new WriteOnly();
 $w->x = 'hi';
-try {
-    var_dump(empty($w->x));
-} catch (Error $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+var_dump(empty($w->x));
 --EXPECT--
 get runs for empty()
 bool(true)
@@ -52,4 +48,4 @@ get runs for empty()
 bool(false)
 ok
 bool(true)
-Error: Cannot read property WriteOnly::$x without get hook
+bool(false)
