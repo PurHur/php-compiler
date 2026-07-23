@@ -95,4 +95,115 @@ PHP;
         $runtime->run($block);
         self::assertSame('ok', ob_get_clean());
     }
+
+    /** @covers issue #22474 */
+    public function testChildCannotOverrideFinalSetHook(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks disabled');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class P {
+    public string $x {
+        get => 'p';
+        final set(string $v) {}
+    }
+}
+class C extends P {
+    public string $x {
+        get => 'c';
+        set(string $v) {}
+    }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot override final property hook P::$x::set()');
+        $runtime->parseAndCompile($code, 'final_hook_set_override.php');
+    }
+
+    /** @covers issue #22474 */
+    public function testChildCannotOverrideFinalGetHook(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks disabled');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class P {
+    public string $x {
+        final get => 'p';
+        set(string $v) {}
+    }
+}
+class C extends P {
+    public string $x {
+        get => 'c';
+        set(string $v) {}
+    }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot override final property hook P::$x::get()');
+        $runtime->parseAndCompile($code, 'final_hook_get_override.php');
+    }
+
+    /** @covers issue #22474 */
+    public function testNonFinalHookOverrideStillWorks(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks disabled');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class P {
+    public string $x {
+        get => 'p';
+        set(string $v) { $this->x = $v; }
+    }
+}
+class C extends P {
+    public string $x {
+        get => 'c';
+        set(string $v) { $this->x = $v; }
+    }
+}
+echo (new C)->x;
+PHP;
+        $block = $runtime->parseAndCompile($code, 'nonfinal_hook_override.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('c', ob_get_clean());
+    }
+
+    /** @covers issue #22474 — final set does not block overriding get alone */
+    public function testOverrideGetWhenOnlySetIsFinal(): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks disabled');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class P {
+    public string $x {
+        get => 'p';
+        final set(string $v) { $this->x = $v; }
+    }
+}
+class C extends P {
+    public string $x {
+        get => 'c';
+    }
+}
+echo (new C)->x;
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_set_override_get_only.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('c', ob_get_clean());
+    }
 }

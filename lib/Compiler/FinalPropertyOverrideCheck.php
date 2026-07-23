@@ -11,10 +11,12 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ClassFinal;
 
 /**
- * Compile-time checks for PHP 8.4 final properties (#22241, #22308).
+ * Compile-time checks for PHP 8.4 final properties (#22241, #22308)
+ * and final property hooks (#22474).
  *
- * php-src: Zend/zend_compile.c — final property flags / pre-8.4 reject;
- * Zend/zend_inheritance.c — "Cannot override final property %s::$%s".
+ * php-src: Zend/zend_compile.c — final property / hook flags / pre-8.4 reject;
+ * Zend/zend_inheritance.c — "Cannot override final property %s::$%s",
+ * "Cannot override final property hook %s::$%s::%s()".
  */
 final class FinalPropertyOverrideCheck
 {
@@ -30,6 +32,7 @@ final class FinalPropertyOverrideCheck
         $check->collect($script);
         $check->verifyUnsupportedFinals();
         $check->verifyOverrides();
+        $check->verifyHookOverrides();
     }
 
     /**
@@ -219,6 +222,154 @@ final class FinalPropertyOverrideCheck
         }
 
         return null;
+    }
+
+    /**
+     * Per-hook finality: child must not redeclare a parent `final get` / `final set` / `final unset`
+     * (#22474, Zend/zend_inheritance.c — Cannot override final property hook).
+     */
+    private function verifyHookOverrides(): void
+    {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            return;
+        }
+        foreach ($this->classes as $childLc => $class) {
+            $parentLc = $class['extends'];
+            if (null === $parentLc || '' === $parentLc) {
+                continue;
+            }
+            foreach ($this->hooksDeclaredOnClass($childLc) as $propLc => $childDecl) {
+                $parentHook = $this->findInheritedFinalHooks($parentLc, $propLc);
+                if (null === $parentHook) {
+                    continue;
+                }
+                foreach (['get', 'set', 'unset'] as $kind) {
+                    if (!$this->hookIsFinal($parentHook['hooks'], $kind)) {
+                        continue;
+                    }
+                    if (!$this->childDeclaresHook($childDecl['hooks'], $kind)) {
+                        continue;
+                    }
+                    throw new \CompileError(sprintf(
+                        'Cannot override final property hook %s::$%s::%s()',
+                        $parentHook['ownerDisplay'],
+                        $parentHook['display'],
+                        $kind
+                    ));
+                }
+            }
+        }
+    }
+
+    /**
+     * @return array<string, array{hooks: array<string, mixed>, display: string}> propLc => meta
+     */
+    private function hooksDeclaredOnClass(string $classLc): array
+    {
+        $byClass = $this->propertyHookRegistry[$classLc] ?? null;
+        if (!is_array($byClass)) {
+            return [];
+        }
+        $out = [];
+        foreach ($byClass as $propKey => $hooks) {
+            if (!is_array($hooks)) {
+                continue;
+            }
+            $display = (string) $propKey;
+            $out[strtolower($display)] = [
+                'hooks' => $hooks,
+                'display' => $display,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{hooks: array<string, mixed>, display: string, ownerDisplay: string}|null
+     */
+    private function findInheritedFinalHooks(string $startParentLc, string $propLc): ?array
+    {
+        $current = $startParentLc;
+        $visited = [];
+        $guard = 0;
+        while (null !== $current && '' !== $current && !isset($visited[$current])) {
+            if (++$guard > 256) {
+                break;
+            }
+            $visited[$current] = true;
+            $found = $this->lookupHooksWithDisplay($current, $propLc);
+            if (null !== $found) {
+                $type = $this->classes[$current] ?? null;
+                if ($this->hooksHaveAnyFinal($found['hooks'])) {
+                    return [
+                        'hooks' => $found['hooks'],
+                        'display' => $found['display'],
+                        'ownerDisplay' => $type['display'] ?? $current,
+                    ];
+                }
+                // Parent declared hooks but none final — stop (child overrides non-final).
+                return null;
+            }
+            $type = $this->classes[$current] ?? null;
+            $current = $type['extends'] ?? null;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{hooks: array<string, mixed>, display: string}|null
+     */
+    private function lookupHooksWithDisplay(string $classLc, string $propLc): ?array
+    {
+        $byClass = $this->propertyHookRegistry[$classLc] ?? null;
+        if (!is_array($byClass)) {
+            return null;
+        }
+        if (isset($byClass[$propLc]) && is_array($byClass[$propLc])) {
+            return ['hooks' => $byClass[$propLc], 'display' => $propLc];
+        }
+        foreach ($byClass as $propKey => $hooks) {
+            if (is_array($hooks) && 0 === strcasecmp((string) $propKey, $propLc)) {
+                return ['hooks' => $hooks, 'display' => (string) $propKey];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $hooks
+     */
+    private function hooksHaveAnyFinal(array $hooks): bool
+    {
+        return !empty($hooks['finalGet'])
+            || !empty($hooks['finalSet'])
+            || !empty($hooks['finalUnset']);
+    }
+
+    /**
+     * @param array<string, mixed> $hooks
+     * @param 'get'|'set'|'unset' $kind
+     */
+    private function hookIsFinal(array $hooks, string $kind): bool
+    {
+        return !empty($hooks['final'.ucfirst($kind)]);
+    }
+
+    /**
+     * @param array<string, mixed> $hooks
+     * @param 'get'|'set'|'unset' $kind
+     */
+    private function childDeclaresHook(array $hooks, string $kind): bool
+    {
+        if (isset($hooks[$kind]) && (is_string($hooks[$kind]) || true === $hooks[$kind])) {
+            return true;
+        }
+        $requires = 'requires'.ucfirst($kind);
+
+        return !empty($hooks[$requires]);
     }
 
     private function propertyDisplayName(Operand $op): string
