@@ -39,10 +39,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
     }
 
-    public function testJsonValidateEnabledOnDefault84Dev(): void
+    public function testJsonValidateWithheldOnDefault84DevReference(): void
     {
-        $this->assertTrue(CompilerVersion::supportsJsonValidate());
-        $this->assertTrue(CompilerVersion::advertisesJsonValidate());
+        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+        $this->assertFalse(CompilerVersion::advertisesJsonValidate());
     }
 
     public function testJsonValidateWithheldOn82Profile(): void
@@ -51,6 +51,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.2');
         try {
             $this->assertFalse(CompilerVersion::supportsJsonValidate());
+            $this->assertFalse(CompilerVersion::advertisesJsonValidate());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -66,6 +67,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsJsonValidate());
+            $this->assertTrue(CompilerVersion::advertisesJsonValidate());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -921,10 +923,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmRegistersJsonValidateOnDefault84Dev(): void
+    public function testVmDoesNotRegisterJsonValidateOnDefault84DevReference(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testVmRegistersJsonValidateOnForwardProfile(): void

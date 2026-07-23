@@ -1,5 +1,7 @@
 --TEST--
-stdlib json_validate() — valid and invalid JSON (issue #3101)
+stdlib json_validate() — valid and invalid JSON (issue #3101, #22544)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 echo json_validate('{"a":1}') ? '1' : '0';

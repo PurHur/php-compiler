@@ -564,9 +564,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
     }
 
-    public function testSupportsJsonValidateTrueOnDefault84Dev(): void
+    public function testSupportsJsonValidateFalseOnDefault84DevReference(): void
     {
-        $this->assertTrue(CompilerVersion::supportsJsonValidate());
+        $this->assertFalse(CompilerVersion::supportsJsonValidate());
     }
 
     public function testSupportsJsonValidateFalseOn82Profile(): void
@@ -1896,10 +1896,10 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersJsonValidateOnDefault84Dev(): void
+    public function testVmDoesNotRegisterJsonValidateOnDefault84DevReference(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testVmDoesNotRegisterJsonValidateOn82Profile(): void

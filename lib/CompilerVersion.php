@@ -291,8 +291,9 @@ final class CompilerVersion
      * Version profile for builtin advertisement / function_exists parity (#11842).
      *
      * On the 8.4 development line, advertise implemented forward-compat builtins
-     * (json_validate, array_find family, str_increment, …) even while VERSION is
-     * 8.4.0-dev — version_compare treats -dev below stable (#12327, #12328).
+     * (array_find family, …) even while VERSION is 8.4.0-dev — version_compare treats
+     * -dev below stable (#12327, #12328). Profile-gated 8.3+ surfaces such as
+     * json_validate / str_increment still withhold on the unset-PROFILE reference harness (#22544).
      */
     public static function builtinAdvertisementVersion(): string
     {
@@ -1573,10 +1574,11 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15026, #15196, #15241, #16091).
+     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15026, #15196, #15241, #16091, #22544).
      *
-     * Withheld when {@see languageProfileVersion()} is below 8.3 (e.g. `PHP_COMPILER_PROFILE=8.2`).
-     * Default `8.4.0-dev` runtime enables json_validate like Zend 8.3+ (#19951).
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate when reported
+     * PHP_VERSION is the 8.2 reference string). Enable via stable 8.4.0+ or explicit
+     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#16091, #17007).
      */
     public static function supportsJsonValidate(): bool
     {
@@ -1584,15 +1586,39 @@ final class CompilerVersion
             return false;
         }
 
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
-     * json_validate() visible to function_exists() — stable runtime or forward 8.3+ (#17007, #19951).
+     * json_validate() visible to function_exists() — stable runtime or forward 8.3+ (#17007, #22544).
+     *
+     * Withheld on 8.4.0-dev reference harness (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
      */
     public static function advertisesJsonValidate(): bool
     {
-        return self::supportsJsonValidate();
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        if (!self::supportsJsonValidate()) {
+            return false;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
