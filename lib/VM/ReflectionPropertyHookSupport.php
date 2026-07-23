@@ -138,22 +138,17 @@ final class ReflectionPropertyHookSupport
     }
 
     /**
-     * @return array<string, Variable> hook kind (get/set) => Closure
+     * php-src ReflectionProperty::getHooks — map of hook name => ReflectionMethod (#22491).
+     *
+     * @return array<string, Variable> hook kind (get/set) => ReflectionMethod
      */
     public static function getHooks(ClassEntry $entry, ?ClassProperty $meta, string $property, Context $ctx): array
     {
         $result = [];
         foreach (['get', 'set'] as $hookKind) {
-            $runtime = self::runtimeHookClosure($ctx, $entry, $property, $hookKind);
-            if (null !== $runtime) {
-                $out = new Variable(Variable::TYPE_OBJECT);
-                $out->object(ClosureSupport::wrapState($ctx, $runtime));
-                $result[$hookKind] = $out;
-                continue;
-            }
-            $methodLc = self::hookMethodLc($entry, $meta, $property, $hookKind);
-            if (null !== $methodLc) {
-                $result[$hookKind] = self::hookClosure($ctx, $entry, $methodLc);
+            $rm = self::hookReflectionMethod($ctx, $entry, $meta, $property, $hookKind);
+            if (null !== $rm) {
+                $result[$hookKind] = $rm;
             }
         }
 
@@ -285,19 +280,5 @@ final class ReflectionPropertyHookSupport
             $function.'(): Argument #1 ($type) must be of type PropertyHookType, '
             .EnumCaseSupport::typeNameForVariable($arg).' given'
         );
-    }
-
-    private static function hookClosure(Context $ctx, ClassEntry $entry, string $methodLc): Variable
-    {
-        if (!isset($entry->methods[$methodLc])) {
-            throw new \LogicException('Property hook method missing from class entry');
-        }
-        $func = $entry->methods[$methodLc];
-        $state = ClosureState::fromWrappedFunc($func);
-        $state->boundScopeClass = $entry->name;
-        $out = new Variable(Variable::TYPE_OBJECT);
-        $out->object(ClosureSupport::wrapState($ctx, $state));
-
-        return $out;
     }
 }

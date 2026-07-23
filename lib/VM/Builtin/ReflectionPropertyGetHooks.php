@@ -7,7 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionPropertyHookSupport;
 
-/** ReflectionProperty::getHooks() — VM (#7295, ext/reflection/php_reflection.c). */
+/** ReflectionProperty::getHooks() — VM (#7295/#22491, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyGetHooks extends VmClassMethod
 {
     public function __construct()
@@ -27,8 +27,8 @@ final class ReflectionPropertyGetHooks extends VmClassMethod
         $hooks = ReflectionPropertyHookSupport::getHooks($entry, $meta, $property, $ctx);
         $frame->returnVar->newArray();
         $ht = $frame->returnVar->toArray();
-        foreach ($hooks as $hookKind => $closureVar) {
-            $ht->add($hookKind, $closureVar);
+        foreach ($hooks as $hookKind => $methodVar) {
+            $ht->add($hookKind, $methodVar);
         }
     }
 }
