@@ -249,13 +249,8 @@ final class VmSimpleXml
                 return null;
             }
 
-            // Same shape as attributes() foreach (#19351): name + text value node.
-            return self::wrapNode(
-                $ctx,
-                $entry->class,
-                new SimpleXmlNodeState($name, [], [], $map[$name]),
-                $docKey
-            );
+            // Same shape as attributes() foreach / $sxe['attr'] (#19351, #22733).
+            return self::wrapAttributeNode($ctx, $entry, $name, $map[$name]);
         }
         // Property access is always a live named-sibling selection under the context
         // parent (php-src sxe.c; #20483) — never a frozen snapshot or bare single node.
@@ -481,15 +476,18 @@ final class VmSimpleXml
         if (Variable::TYPE_INTEGER === $offset->type) {
             $index = $offset->toInt();
             if (SimpleXmlRegistry::isAttributesView($entry)) {
-                $values = array_values(self::attributesMap($entry));
-                if ($index < 0 || $index >= \count($values)) {
+                // php-src sxe_prop_dim_read: attribute dimension returns SXE attr node (#22733).
+                $map = self::attributesMap($entry);
+                $names = array_keys($map);
+                if ($index < 0 || $index >= \count($names)) {
                     $result = new Variable();
                     $result->null();
 
                     return $result;
                 }
+                $name = $names[$index];
                 $result = new Variable();
-                $result->string($values[$index]);
+                $result->object(self::wrapAttributeNode($ctx, $entry, $name, $map[$name]));
 
                 return $result;
             }
@@ -520,7 +518,8 @@ final class VmSimpleXml
             if (null === $value) {
                 $result->null();
             } else {
-                $result->string($value);
+                // php-src sxe_prop_dim_read: $sxe['attr'] is SimpleXMLElement, not string (#22733).
+                $result->object(self::wrapAttributeNode($ctx, $entry, $name, $value));
             }
 
             return $result;
@@ -1286,6 +1285,24 @@ final class VmSimpleXml
         SimpleXmlRegistry::attach($entry, $node, $docKey);
 
         return $entry;
+    }
+
+    /**
+     * Attribute dimension / property handle — php-src sxe_prop_dim_read returns SXE wrapping
+     * the attr local name + text value (not a bare string; #19351, #22733).
+     */
+    private static function wrapAttributeNode(
+        Context $ctx,
+        ObjectEntry $parent,
+        string $name,
+        string $value
+    ): ObjectEntry {
+        return self::wrapNode(
+            $ctx,
+            $parent->class,
+            new SimpleXmlNodeState($name, [], [], $value),
+            SimpleXmlRegistry::documentKey($parent)
+        );
     }
 
     /** @param list<SimpleXmlNodeState> $elements */

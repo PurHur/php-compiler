@@ -27,36 +27,37 @@ final class SimpleXmlJsonExport
     }
 
     /**
-     * @return array<string, mixed>
+     * Zend always json_encodes SimpleXMLElement as a JSON object (php_json_encoder object path).
+     * PHP arrays with key 0 alone are lists and become JSON arrays — use stdClass (#22733, #22730).
      */
-    public static function exportZendJsonWire(ObjectEntry $object): array
+    public static function exportZendJsonWire(ObjectEntry $object): \stdClass
     {
         VmSimpleXml::requireElement($object, 'json_encode');
         if (SimpleXmlRegistry::isAttributesView($object)) {
             $attrs = VmSimpleXml::attributesMap($object);
 
-            return [] === $attrs ? [] : ['@attributes' => $attrs];
+            return [] === $attrs ? new \stdClass() : self::toJsonObject(['@attributes' => $attrs]);
         }
         if (SimpleXmlRegistry::isChildrenView($object)) {
-            return self::childrenGroupedJson(SimpleXmlRegistry::state($object));
+            return self::toJsonObject(self::childrenGroupedJson(SimpleXmlRegistry::state($object)));
         }
         if (SimpleXmlRegistry::isView($object)) {
             $elements = VmSimpleXml::viewElements($object);
             if ([] === $elements) {
-                return [];
+                return new \stdClass();
             }
             if (1 === \count($elements)) {
-                return self::nodeToWireArray($elements[0]);
+                return self::toJsonObject(self::nodeToWireArray($elements[0]));
             }
             $out = [];
             foreach ($elements as $index => $element) {
                 $out[(string) $index] = self::elementJsonValue($element);
             }
 
-            return $out;
+            return self::toJsonObject($out);
         }
 
-        return self::nodeToWireArray(SimpleXmlRegistry::state($object));
+        return self::toJsonObject(self::nodeToWireArray(SimpleXmlRegistry::state($object)));
     }
 
     /**
@@ -151,10 +152,18 @@ final class SimpleXmlJsonExport
                 return new \stdClass();
             }
 
-            return self::nodeToWireArray($node);
+            return self::toJsonObject(self::nodeToWireArray($node));
         }
 
-        return self::nodeToWireArray($node);
+        return self::toJsonObject(self::nodeToWireArray($node));
+    }
+
+    /**
+     * @param array<array-key, mixed> $wire
+     */
+    private static function toJsonObject(array $wire): \stdClass
+    {
+        return (object) $wire;
     }
 
     private static function nodeToPropertiesVariable(
