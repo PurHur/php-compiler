@@ -68,9 +68,10 @@ final class ReflectionParameterConstruct extends VmClassMethod
             );
         }
         $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($functionName);
-        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->null();
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_CLASS)->null();
         $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int($index);
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($index);
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($func->block->paramNames[$index]);
         $receiver->constructed = true;
     }
@@ -111,10 +112,11 @@ final class ReflectionParameterConstruct extends VmClassMethod
                 'Parameter '.$position.' does not exist on method '.$entry->name.'::'.$method.'()'
             );
         }
-        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_CLASS)->string($entry->name);
         $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
         $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->null();
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($position);
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int($position);
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$position]);
         $receiver->constructed = true;
     }
@@ -135,9 +137,10 @@ final class ReflectionParameterConstruct extends VmClassMethod
             );
         }
         $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($functionName);
-        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->null();
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_CLASS)->null();
         $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int($index);
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($index);
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$index]);
         $receiver->constructed = true;
     }

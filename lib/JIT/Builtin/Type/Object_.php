@@ -3058,6 +3058,15 @@ class Object_ extends Type {
             $this->setClassParentName('ReflectionFunction', 'ReflectionFunctionAbstract');
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_FUNC_NAME, Variable::TYPE_STRING);
         }
+        if ('reflectionparameter' === $lcname) {
+            // Public Zend surface: `$name` only; other slots are engine storage (#22528).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_NAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_CLASS, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_METHOD_NAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_FUNC_NAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_INDEX, Variable::TYPE_NATIVE_LONG);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_POSITION, Variable::TYPE_NATIVE_LONG);
+        }
         if ('reflectionproperty' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'property', Variable::TYPE_STRING);

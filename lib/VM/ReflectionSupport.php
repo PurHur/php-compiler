@@ -108,6 +108,12 @@ final class ReflectionSupport
     /** Declaring class name on ReflectionProperty instances (#9878). */
     public const PROP_DECLARING_CLASS_NAME = 'declaringClass';
 
+    /**
+     * Declaring class on ReflectionParameter (engine storage only).
+     * Zend public surface is only `$name` (parameter name); do not reuse PROP_CLASS_NAME (#22528).
+     */
+    public const PROP_PARAM_CLASS = 'paramClass';
+
     /** Runtime dynamic property introspection (#15540, ext/reflection/php_reflection.c). */
     public const PROP_IS_DYNAMIC = 'isDynamicFlag';
 
@@ -153,7 +159,8 @@ final class ReflectionSupport
 
     public const PROP_PARAM_INDEX = 'paramIndex';
 
-    public const PROP_PARAM_NAME = 'paramName';
+    /** Zend ReflectionParameter::$name — parameter name string (#22528, re-#22488). */
+    public const PROP_PARAM_NAME = 'name';
 
     public const PROP_PARAM_POSITION = 'position';
 
@@ -951,6 +958,15 @@ final class ReflectionSupport
         if (self::isReflectionEnumCaseObject($reflection)) {
             return self::enumClassNameFromReflection($reflection);
         }
+        // ReflectionParameter: declaring class is PROP_PARAM_CLASS (not public `$name`, #22528).
+        if (strtolower($reflection->class->name) === self::REFLECTION_PARAMETER) {
+            $nameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
+            if (Variable::TYPE_STRING !== $nameVar->type) {
+                throw new \LogicException('ReflectionParameter missing declaring class name');
+            }
+
+            return $nameVar->toString();
+        }
         $propName = self::isReflectionMethodObject($reflection)
             ? self::PROP_REFLECTION_METHOD_CLASS
             : self::PROP_CLASS_NAME;
@@ -1637,7 +1653,7 @@ final class ReflectionSupport
      */
     public static function parameterAttributeEntries(Context $ctx, ObjectEntry $reflection): array
     {
-        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
         if (Variable::TYPE_STRING === $classNameVar->type) {
             $className = $classNameVar->toString();
             $method = self::methodNameFromReflection($reflection);
@@ -1694,7 +1710,7 @@ final class ReflectionSupport
 
     public static function parameterIsPromoted(Context $ctx, ObjectEntry $reflection): bool
     {
-        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
         if (Variable::TYPE_STRING !== $classNameVar->type) {
             return false;
         }
@@ -1714,7 +1730,7 @@ final class ReflectionSupport
 
     public static function resolveParameterBlock(Context $ctx, ObjectEntry $reflection): \PHPCompiler\Block
     {
-        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
         if (Variable::TYPE_STRING === $classNameVar->type) {
             $className = $classNameVar->toString();
             $method = self::methodNameFromReflection($reflection);
@@ -1736,7 +1752,7 @@ final class ReflectionSupport
 
     public static function parameterIndexForReflection(ObjectEntry $reflection): int
     {
-        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
         if (Variable::TYPE_STRING === $classNameVar->type) {
             return self::paramPositionFromReflection($reflection);
         }
@@ -1927,7 +1943,7 @@ final class ReflectionSupport
     private static function internalDeclaredParamType(ObjectEntry $reflection): ?CfgType
     {
         $index = self::parameterIndexForReflection($reflection);
-        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
         if (Variable::TYPE_STRING === $classNameVar->type) {
             $info = BuiltinInternalArgInfo::paramInfoForClassMethod(
                 $classNameVar->toString(),
@@ -1949,7 +1965,7 @@ final class ReflectionSupport
 
     public static function parameterIsInternal(Context $ctx, ObjectEntry $reflection): bool
     {
-        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
         if (Variable::TYPE_STRING === $classNameVar->type) {
             $entry = VmReflection::resolveClassEntry($ctx, $classNameVar->toString());
 
@@ -2052,7 +2068,7 @@ final class ReflectionSupport
     public static function internalParameterInfoForReflection(Context $ctx, ObjectEntry $reflection): ?array
     {
         $index = self::parameterIndexForReflection($reflection);
-        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
         if (Variable::TYPE_STRING === $classNameVar->type) {
             $className = $classNameVar->toString();
             $methodName = self::methodNameFromReflection($reflection);
@@ -2168,7 +2184,7 @@ final class ReflectionSupport
 
     private static function internalCallableName(Context $ctx, ObjectEntry $reflection): string
     {
-        $classNameVar = $reflection->getProperty(self::PROP_CLASS_NAME)->resolveIndirect();
+        $classNameVar = $reflection->getProperty(self::PROP_PARAM_CLASS)->resolveIndirect();
         if (Variable::TYPE_STRING === $classNameVar->type) {
             return $classNameVar->toString().'::'.self::methodNameFromReflection($reflection);
         }

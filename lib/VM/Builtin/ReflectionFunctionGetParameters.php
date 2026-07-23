@@ -42,9 +42,10 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
             $param = new ObjectEntry($paramClass);
             $param->constructed = true;
             $param->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($funcName);
-            $param->getProperty(ReflectionSupport::PROP_CLASS_NAME)->null();
+            $param->getProperty(ReflectionSupport::PROP_PARAM_CLASS)->null();
             $param->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
             $param->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int((int) $index);
+            $param->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int((int) $index);
             $param->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$index]);
             if (null !== $closureState) {
                 $param->reflectionClosureState = $closureState;

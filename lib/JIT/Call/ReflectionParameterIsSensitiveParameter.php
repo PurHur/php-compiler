@@ -27,7 +27,7 @@ final class ReflectionParameterIsSensitiveParameter implements Call
             $context,
             $obj,
             'ReflectionParameter',
-            ReflectionSupport::PROP_CLASS_NAME
+            ReflectionSupport::PROP_PARAM_CLASS
         );
         $sizeT = $context->getTypeFromString('size_t');
         $hasClass = $context->builder->icmp(

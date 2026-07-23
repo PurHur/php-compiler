@@ -728,12 +728,24 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_ZEND_EXTENSION] = $rzext;
 
         $rparam = new ClassEntry('ReflectionParameter');
-        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
-        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
-        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_INDEX, null, $intProto);
-        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_NAME, null, $strProto);
-        $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_PARAM_POSITION, null, $intProto);
+        // Zend public dump surface is only `$name` (parameter name) (#22528, re-#22488).
+        $rparamName = new ClassProperty(ReflectionSupport::PROP_PARAM_NAME, null, $strProto);
+        $rparam->properties[] = $rparamName;
+        $rparamClass = new ClassProperty(ReflectionSupport::PROP_PARAM_CLASS, null, $strProto);
+        $rparamClass->phpInvisible = true;
+        $rparam->properties[] = $rparamClass;
+        $rparamMethod = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
+        $rparamMethod->phpInvisible = true;
+        $rparam->properties[] = $rparamMethod;
+        $rparamFunc = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
+        $rparamFunc->phpInvisible = true;
+        $rparam->properties[] = $rparamFunc;
+        $rparamIndex = new ClassProperty(ReflectionSupport::PROP_PARAM_INDEX, null, $intProto);
+        $rparamIndex->phpInvisible = true;
+        $rparam->properties[] = $rparamIndex;
+        $rparamPos = new ClassProperty(ReflectionSupport::PROP_PARAM_POSITION, null, $intProto);
+        $rparamPos->phpInvisible = true;
+        $rparam->properties[] = $rparamPos;
         $rparam->constructor = new ReflectionParameterConstruct();
         $rparam->methods['__construct'] = $rparam->constructor;
         $rparam->methodVisibility['__construct'] = $pub;
