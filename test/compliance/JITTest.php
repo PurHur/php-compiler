@@ -1822,7 +1822,7 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'generator_get_return')) {
                 continue;
             }
-            // Fiber::getTrace()/getTraceAsString() — VM FiberState suspend capture (#6470).
+            // Fiber getTrace phantom guard + ReflectionFiber::getTrace — VM FiberState (#22562).
             if (str_contains($name, 'fiber_get_trace')) {
                 continue;
             }
