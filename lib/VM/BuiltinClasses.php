@@ -85,12 +85,8 @@ use PHPCompiler\VM\Builtin\FiberSuspend;
 use PHPCompiler\VM\Builtin\FiberThrow;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
 use PHPCompiler\VM\Builtin\ReflectionGetModifierNames;
-use PHPCompiler\VM\Builtin\ReflectionFunctionIsAccessible;
-use PHPCompiler\VM\Builtin\ReflectionFunctionSetAccessible;
 use PHPCompiler\VM\Builtin\ReflectionFunctionToString;
-use PHPCompiler\VM\Builtin\ReflectionMethodIsAccessible;
 use PHPCompiler\VM\Builtin\ReflectionMethodSetAccessible;
-use PHPCompiler\VM\Builtin\ReflectionPropertyIsAccessible;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetAccessible;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetTarget;
@@ -872,10 +868,10 @@ final class BuiltinClasses
         $rm->methodVisibility['isprotected'] = $pub;
         $rm->methods['isprivate'] = new ReflectionMethodIsPrivate();
         $rm->methodVisibility['isprivate'] = $pub;
+        // setAccessible exists on Method/Property (deprecated no-op since 8.1 for
+        // invoke/getValue); isAccessible is C-internal only in php-src (#22512).
         $rm->methods['setaccessible'] = new ReflectionMethodSetAccessible();
         $rm->methodVisibility['setaccessible'] = $pub;
-        $rm->methods['isaccessible'] = new ReflectionMethodIsAccessible();
-        $rm->methodVisibility['isaccessible'] = $pub;
         $rm->methods['isfinal'] = new ReflectionMethodIsFinal();
         $rm->methodVisibility['isfinal'] = $pub;
         $rm->methods['isgenerator'] = new ReflectionMethodIsGenerator();
@@ -1084,8 +1080,6 @@ final class BuiltinClasses
         $rp->methodVisibility['setvalue'] = $pub;
         $rp->methods['setaccessible'] = new ReflectionPropertySetAccessible();
         $rp->methodVisibility['setaccessible'] = $pub;
-        $rp->methods['isaccessible'] = new ReflectionPropertyIsAccessible();
-        $rp->methodVisibility['isaccessible'] = $pub;
         $rp->methods['setrawvalue'] = new ReflectionPropertySetRawValue();
         $rp->methodVisibility['setrawvalue'] = $pub;
         $rp->methods['getrawvalue'] = new ReflectionPropertyGetRawValue();
@@ -1218,8 +1212,7 @@ final class BuiltinClasses
                 'getstaticvariables' => new ReflectionFunctionGetStaticVariables(),
                 'invoke' => new ReflectionFunctionInvoke(),
                 'invokeargs' => new ReflectionFunctionInvokeArgs(),
-                'setaccessible' => new ReflectionFunctionSetAccessible(),
-                'isaccessible' => new ReflectionFunctionIsAccessible(),
+                // ReflectionFunction has no setAccessible/isAccessible in php-src (#22512).
             ] as $name => $method
         ) {
             $rf->methods[$name] = $method;
