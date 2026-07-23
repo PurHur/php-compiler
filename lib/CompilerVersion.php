@@ -2213,6 +2213,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ PDO::connect() driver-specific factory (ext/pdo/pdo_dbh.stub.php, #20529, #22600).
+     *
+     * Withheld on 8.4.0-dev reference / PROFILE=8.2 so method_exists matches Zend 8.2
+     * (undefined method). Enable via stable 8.4.0+ or `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsPdoConnect(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ bare `throw;` catch rethrow on the forward profile (Zend/zend_compile.c, #3508, #15299, #15630).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
