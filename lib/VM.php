@@ -1938,6 +1938,12 @@ class VM {
      */
     public function collectMangledObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
     {
+        // DateInterval: Zend date_interval_get_properties wire (not raw slots / uninit date_string) (#22446).
+        $dateMap = $this->dateIntervalObjectVarsPropertyMap($object);
+        if (null !== $dateMap) {
+            return $dateMap;
+        }
+
         return $this->collectDebugPropertiesForBuiltin($object, $frame);
     }
 
@@ -2043,7 +2049,30 @@ class VM {
      */
     public function collectObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
     {
+        // DateInterval: Zend date_interval_get_properties — public wire despite isInternal (#22446).
+        $dateMap = $this->dateIntervalObjectVarsPropertyMap($object);
+        if (null !== $dateMap) {
+            return $dateMap;
+        }
+
         return $this->collectObjectPropertiesForBuiltin($object, $frame, false);
+    }
+
+    /**
+     * php-src ext/date/php_date.c — date_interval_get_properties for get_object_vars / mangled (#22446).
+     *
+     * Reuses the same Zend wire as var_export / (array) cast ({@see DateIntervalSupport::varExportPropertyMap}).
+     * DateTime* stay empty from global scope (#10719); only DateInterval exposes this bag.
+     *
+     * @return array<string, Variable>|null
+     */
+    private function dateIntervalObjectVarsPropertyMap(ObjectEntry $object): ?array
+    {
+        if (DateIntervalSupport::CLASS_DATEINTERVAL !== strtolower($object->class->name)) {
+            return null;
+        }
+
+        return DateIntervalSupport::varExportPropertyMap($object);
     }
 
     /**
