@@ -28,6 +28,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/MysqliExtensionPolicy.php';
         require_once __DIR__.'/MysqliConstants.php';
         require_once __DIR__.'/MysqliClassMethod.php';
+        require_once __DIR__.'/MysqliSqlExceptionGetSqlState.php';
         require_once __DIR__.'/BuiltinClasses.php';
         require_once __DIR__.'/VmMysqli.php';
         require_once __DIR__.'/mysqli_connect.php';
@@ -71,6 +72,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_options.php';
         require_once __DIR__.'/mysqli_set_charset.php';
         require_once __DIR__.'/mysqli_multi_query.php';
+        require_once __DIR__.'/mysqli_real_query.php';
         require_once __DIR__.'/mysqli_next_result.php';
         require_once __DIR__.'/mysqli_store_result.php';
         require_once __DIR__.'/mysqli_multi_result_api.php';
@@ -171,8 +173,10 @@ class Module extends ModuleAbstract
             new mysqli_get_connection_stats(),
             new mysqli_real_connect(),
             new mysqli_options(),
+            new mysqli_options('mysqli_set_opt'),
             new mysqli_set_charset(),
             new mysqli_multi_query(),
+            new mysqli_real_query(),
             new mysqli_next_result(),
             new mysqli_store_result(),
             new mysqli_use_result(),
