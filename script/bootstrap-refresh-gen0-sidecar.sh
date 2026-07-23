@@ -87,6 +87,21 @@ if [[ "${SKIP_LINK}" -eq 0 ]]; then
   if [[ -n "${live_fp}" && -n "${old_fp}" && "${live_fp}" != "${old_fp}" ]] \
     || [[ "${BOOTSTRAP_GEN0_FORCE_ZEND_SPINE:-0}" == "1" ]]; then
     echo "==> Zend honest full-spine compile (lowering fingerprint stale or BOOTSTRAP_GEN0_FORCE_ZEND_SPINE=1 — #22642)"
+    # Default CI ulimit -v is 8 GiB (#436); full-spine Zend AOT needs far more (#22642).
+    if [[ "${PHP_COMPILER_CI_RAM_GB:-8}" -lt 32 ]]; then
+      export PHP_COMPILER_CI_RAM_GB=32
+      if command -v ci_apply_resource_limits >/dev/null 2>&1; then
+        ci_apply_resource_limits || true
+      else
+        ulimit -v $((32 * 1024 * 1024)) 2>/dev/null || true
+      fi
+      echo "bootstrap-refresh-gen0-sidecar: raised PHP_COMPILER_CI_RAM_GB=32 for Zend spine (#22642)"
+    fi
+    # Prefer at least 16G PHP heap for TypeReconstructor on the full spine.
+    if [[ -z "${PHP_COMPILER_MEMORY_LIMIT:-}" ]] || [[ "${PHP_COMPILER_MEMORY_LIMIT}" == "1536M" ]] \
+      || [[ "${PHP_COMPILER_MEMORY_LIMIT}" == "8192M" ]]; then
+      export PHP_COMPILER_MEMORY_LIMIT=16384M
+    fi
     mkdir -p "${ROOT}/build"
     rm -f "${SPINE_OUT}" "${LIB_BLOB}"
     if ! bootstrap_compiler_lib_honest_zend_compile "${SPINE_OUT}" "${SPINE_ENTRY}" full; then
