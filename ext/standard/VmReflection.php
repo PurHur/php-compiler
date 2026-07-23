@@ -4140,7 +4140,7 @@ final class VmReflection
             $obj = new \PHPCompiler\VM\ObjectEntry($rfClass);
             $obj->constructed = true;
             $obj->reflectionIsInternalFunction = $func instanceof FuncInternal;
-            $obj->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($name);
+            $obj->getProperty(ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME)->string($name);
             $slot = new Variable();
             $slot->object($obj);
             $key = new Variable();

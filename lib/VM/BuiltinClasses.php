@@ -1197,7 +1197,8 @@ final class BuiltinClasses
 
         $rf = new ClassEntry('ReflectionFunction');
         $rf->parentLc = ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT;
-        $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
+        // Zend public dump surface is `$name` (#22488); do not expose internal `funcName`.
+        $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME, null, $strProto);
         // ref->accessible is C-only in php-src — not a PHP property (#22514).
         $rfAccess = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rfAccess->phpInvisible = true;

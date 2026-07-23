@@ -156,7 +156,14 @@ final class ReflectionSupport
     /** @deprecated Use PROP_CLASS_NAME (`name`) for case name + PROP_ENUM_CLASS_NAME for enum type. */
     public const PROP_ENUM_CASE_NAME = 'case';
 
+    /**
+     * Internal function name on ReflectionParameter (phpInvisible).
+     * Not the Zend public dump key for ReflectionFunction — use PROP_REFLECTION_FUNCTION_NAME (#22488).
+     */
     public const PROP_FUNC_NAME = 'funcName';
+
+    /** Zend ReflectionFunction::$name — function/closure display name (#22488). */
+    public const PROP_REFLECTION_FUNCTION_NAME = 'name';
 
     /** Wrapped Fiber object on ReflectionFiber instances (#6793). */
     public const PROP_FIBER_TARGET = 'fiber';
@@ -1358,6 +1365,15 @@ final class ReflectionSupport
 
     public static function functionNameFromReflection(ObjectEntry $reflection): string
     {
+        // ReflectionFunction public surface is `$name` (#22488); Parameter keeps internal `funcName`.
+        if (strtolower($reflection->class->name) === self::REFLECTION_FUNCTION) {
+            $nameVar = $reflection->getProperty(self::PROP_REFLECTION_FUNCTION_NAME)->resolveIndirect();
+            if (Variable::TYPE_STRING !== $nameVar->type) {
+                throw new \LogicException('ReflectionFunction missing function name');
+            }
+
+            return $nameVar->toString();
+        }
         $nameVar = $reflection->getProperty(self::PROP_FUNC_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             $nameVar = $reflection->getProperty(self::PROP_FUNCTION_NAME)->resolveIndirect();
@@ -3698,7 +3714,7 @@ final class ReflectionSupport
         $func = self::resolveFunctionForReflection($ctx, $functionName);
         $rf = self::newReflectionFunctionObject($ctx);
         $rf->reflectionIsInternalFunction = $func instanceof Func\Internal;
-        $rf->getProperty(self::PROP_FUNC_NAME)->string($functionName);
+        $rf->getProperty(self::PROP_REFLECTION_FUNCTION_NAME)->string($functionName);
 
         return $rf;
     }
@@ -3823,7 +3839,7 @@ final class ReflectionSupport
     {
         $rf = self::newReflectionFunctionObject($ctx);
         $rf->reflectionClosureState = $state;
-        $rf->getProperty(self::PROP_FUNC_NAME)->string(self::displayNameForClosureState($state));
+        $rf->getProperty(self::PROP_REFLECTION_FUNCTION_NAME)->string(self::displayNameForClosureState($state));
 
         return $rf;
     }

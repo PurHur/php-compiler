@@ -28,7 +28,7 @@ final class ReflectionFunctionGetNamedArguments implements Call
             $context,
             $obj,
             'ReflectionFunction',
-            ReflectionSupport::PROP_FUNC_NAME
+            ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME
         );
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
