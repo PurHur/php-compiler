@@ -794,7 +794,10 @@ final class BuiltinClasses
         $rm->parentLc = ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT;
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS, null, $strProto);
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC, null, $strProto);
-        $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
+        // ref->accessible is C-only in php-src — not a PHP property (#22514).
+        $rmAccess = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
+        $rmAccess->phpInvisible = true;
+        $rm->properties[] = $rmAccess;
         $rm->constructor = new ReflectionMethodConstruct();
         $rm->methods['__construct'] = $rm->constructor;
         $rm->methodVisibility['__construct'] = $pub;
@@ -1069,7 +1072,10 @@ final class BuiltinClasses
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PROPERTY_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_IS_DYNAMIC, null, $boolProto);
-        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
+        // ref->accessible is C-only in php-src — not a PHP property (#22514).
+        $rpAccess = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
+        $rpAccess->phpInvisible = true;
+        $rp->properties[] = $rpAccess;
         \PHPCompiler\ext\standard\VmReflection::registerReflectionPropertyClassConstants($rp);
         $rp->constructor = new ReflectionPropertyConstruct();
         $rp->methods['__construct'] = $rp->constructor;
@@ -1180,7 +1186,10 @@ final class BuiltinClasses
         $rf = new ClassEntry('ReflectionFunction');
         $rf->parentLc = ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT;
         $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
-        $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
+        // ref->accessible is C-only in php-src — not a PHP property (#22514).
+        $rfAccess = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
+        $rfAccess->phpInvisible = true;
+        $rf->properties[] = $rfAccess;
         $rf->constructor = new ReflectionFunctionConstruct();
         $rf->methods['__construct'] = $rf->constructor;
         $rf->methodVisibility['__construct'] = $pub;
