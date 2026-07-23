@@ -6525,12 +6525,14 @@ PHP;
         self::assertNotSame(1, $iifeInitRecv, 'IIFE __invoke must not target $gen closure slot');
     }
 
-    /** Issue #11321 — iterator_to_array(new ArrayObject([...]), false) uses New_ slot, not ctor Array_. */
+    /** Issue #11321 / #22702 — iterator_to_array(new ArrayObject([...]), false) uses New_ + ConstFetch slots. */
     public function testIteratorToArrayInlineNewWithFalsePreserveKeysUsesNewSlot(): void
     {
         $code = <<<'PHP'
 <?php
-echo json_encode(array_values(iterator_to_array(new ArrayObject(['a' => 1, 'b' => 2]), false)), JSON_THROW_ON_ERROR), "\n";
+$a = iterator_to_array(new ArrayObject(['a' => 1, 'b' => 2]), false);
+echo implode(',', array_keys($a)), "\n";
+echo json_encode(array_values($a), JSON_THROW_ON_ERROR), "\n";
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'iterator_to_array_preserve_false.php');
@@ -6538,11 +6540,15 @@ PHP;
         $newSlot = null;
         $sendSlots = [];
         $capture = false;
+        $sawNewExec = false;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_NEW === $op->type) {
                 $newSlot = $op->arg1;
             }
-            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $newSlot && (string) $op->arg1 === (string) $newSlot) {
+                $sawNewExec = true;
+            }
+            if ($sawNewExec && OpCode::TYPE_FUNCCALL_INIT === $op->type) {
                 $capture = true;
                 $sendSlots = [];
                 continue;
@@ -6557,11 +6563,28 @@ PHP;
         }
 
         self::assertNotNull($newSlot);
-        self::assertSame($newSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertCount(2, $sendSlots, 'iterator_to_array should send New_ + preserve_keys; sends='.json_encode($sendSlots));
+        self::assertSame($newSlot, $sendSlots[0] ?? null, 'arg0 must be New_ slot; sends='.json_encode($sendSlots));
+        self::assertNotSame($newSlot, $sendSlots[1] ?? null, 'arg1 must not reuse New_ slot; sends='.json_encode($sendSlots));
 
         ob_start();
         $runtime->run($block);
-        self::assertSame("[1,2]\n", ob_get_clean());
+        self::assertSame("0,1\n[1,2]\n", ob_get_clean());
+    }
+
+    /** Issue #22702 — iterator_to_array(new ArrayIterator([...]), false) reindexes string keys. */
+    public function testIteratorToArrayInlineArrayIteratorPreserveFalseReindexesKeys(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = iterator_to_array(new ArrayIterator(['a' => 1, 'b' => 2]), false);
+echo implode(',', array_keys($a)), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'iterator_to_array_arrayiterator_preserve_false.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("0,1\n", ob_get_clean());
     }
 
     /** Issue #11694 — call_user_func_array(C::class.'::ok', []) wires Concat slot to arg #0. */

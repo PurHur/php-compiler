@@ -8,6 +8,7 @@ var_export($ao);
 echo "\n";
 
 $packed = iterator_to_array(new ArrayObject(['a' => 1, 'b' => 2]), false);
+echo implode(',', array_keys($packed)), "\n";
 echo json_encode(array_values($packed)), "\n";
 
 $ai = iterator_to_array(new ArrayIterator(['x' => 3]));
@@ -17,5 +18,6 @@ array (
   'a' => 1,
   'b' => 2,
 )
+0,1
 [1,2]
 3
