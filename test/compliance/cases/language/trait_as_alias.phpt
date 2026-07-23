@@ -1,5 +1,5 @@
 --TEST--
-trait method alias via `as` (issue #3238)
+trait method alias via `as` keeps original name (issue #22718 / #3238)
 --FILE--
 <?php
 trait T {
@@ -16,6 +16,12 @@ class C {
     }
 }
 $c = new C();
-echo $c->renamed(), $c->g();
+var_export(method_exists($c, 'f'));
+echo "\n";
+var_export(method_exists($c, 'renamed'));
+echo "\n";
+echo $c->f(), $c->renamed(), $c->g();
 --EXPECT--
-12
+true
+true
+112

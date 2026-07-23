@@ -16054,10 +16054,8 @@ restart:
                 $data['vis'] = (int) $newModifier;
             }
             $data['methodNames'] = (string) $newName;
-            // Trait-qualified `TB::f as g` adds an alias without renaming the merged winner `f`.
-            if (null === $traitLcFilter) {
-                unset($merged[$methodLc]);
-            }
+            // Zend zend_traits.c: `as` aliases — original method stays callable (#22718).
+            // Trait-qualified `TB::f as g` likewise keeps the merged winner `f`.
             $merged[$newNameLc] = $data;
             $entry->traitAliases[(string) $newName] = $data['traitName'] . '::' . (string) $adaptation['method'];
         }

@@ -9,16 +9,31 @@ use PHPUnit\Framework\TestCase;
 /** Trait use adaptations: `as` alias and `insteadof` precedence (#3238). */
 final class TraitAdaptationTest extends TestCase
 {
-    public function testTraitMethodAliasAsRename(): void
+    public function testTraitMethodAliasAsKeepsOriginal(): void
     {
         $code = <<<'PHP'
 <?php
 trait T { public function f(): int { return 1; } public function g(): int { return 2; } }
 class C { use T { f as renamed; } }
 $c = new C();
-echo $c->renamed(), $c->g();
+echo (int) method_exists($c, 'f'), (int) method_exists($c, 'renamed'), $c->f(), $c->renamed(), $c->g();
 PHP;
-        $this->assertSame('12', $this->runVm($code));
+        $this->assertSame('11112', $this->runVm($code));
+    }
+
+    public function testTraitMethodAsVisibilityPlusAliasKeepsOriginal(): void
+    {
+        $code = <<<'PHP'
+<?php
+trait T { public function foo() { return 1; } }
+class C {
+    use T { foo as protected foo2; }
+    public function call() { return $this->foo() + $this->foo2(); }
+}
+$c = new C();
+echo $c->call(), (int) method_exists($c, 'foo'), (int) method_exists($c, 'foo2');
+PHP;
+        $this->assertSame('211', $this->runVm($code));
     }
 
     public function testTraitInsteadofResolvesConflict(): void

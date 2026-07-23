@@ -144,9 +144,7 @@ final class TraitComposedMethodResolver
             $newName = null !== $adaptation->newName
                 ? strtolower($adaptation->newName->name)
                 : $methodLc;
-            if (null === $traitLcFilter) {
-                unset($merged[$methodLc]);
-            }
+            // Zend zend_traits.c: `as` aliases — original method stays in the table (#22718).
             $merged[$newName] = $source;
             if ($newName !== $methodLc) {
                 $aliasedOrigins[$methodLc] = $source;
