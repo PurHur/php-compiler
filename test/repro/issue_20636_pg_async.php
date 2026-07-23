@@ -9,6 +9,7 @@ if (!function_exists('pg_connect')) {
     exit(0);
 }
 
-foreach (['pg_socket', 'pg_consume_input', 'pg_flush', 'pg_socket_poll'] as $f) {
+// pg_socket_poll is PHP 8.4-only (#22543); covered by issue_22543 / pgsql_php84_* tests.
+foreach (['pg_socket', 'pg_consume_input', 'pg_flush'] as $f) {
     echo $f, '=', function_exists($f) ? '1' : '0', PHP_EOL;
 }

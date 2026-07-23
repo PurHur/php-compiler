@@ -27,13 +27,20 @@ final class PgsqlExtensionPolicy
     }
 
     /**
-     * PHP 8.4 libpq helpers (pg_jit, pg_put_copy_*, …) — #7083.
+     * PHP 8.4 libpq helpers (pg_jit, pg_put_copy_*, …) — #7083 / #22543.
      *
-     * Gated on compiler VERSION_ID ≥ 80400 (ships with 8.4.0-dev) + libpq FFI.
+     * Gated on {@see \PHPCompiler\CompilerVersion::languageProfileVersion()} ≥ 8.4
+     * (not bare {@see \PHPCompiler\CompilerVersion::VERSION_ID}) so 8.4.0-dev /
+     * {@code PHP_COMPILER_PROFILE=8.2} match Zend 8.2 {@code function_exists} phantoms.
+     * Enable via stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4}.
      */
     public static function advertisesPhp84Helpers(): bool
     {
         return self::advertisesBuiltins()
-            && \PHPCompiler\CompilerVersion::VERSION_ID >= 80400;
+            && version_compare(
+                \PHPCompiler\CompilerVersion::languageProfileVersion(),
+                '8.4.0',
+                '>='
+            );
     }
 }
