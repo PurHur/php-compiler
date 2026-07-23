@@ -30,9 +30,13 @@ final class mysqli_query extends Internal
         }
         $obj = $link->toObject();
         $sql = $frame->calledArgs[1]->resolveIndirect()->toString();
+        $resultMode = MysqliConstants::MYSQLI_STORE_RESULT;
+        if (\count($frame->calledArgs) >= 3) {
+            $resultMode = MysqliProceduralLink::optionalIntArg($frame, 2, MysqliConstants::MYSQLI_STORE_RESULT);
+        }
         $ctx = $frame->vmContext ?? throw new \LogicException('mysqli_query() requires VM context');
         $native = VmMysqli::requireNative($obj, $ctx);
-        $result = $native->query($sql);
+        $result = $native->query($sql, $resultMode);
         if (null === $frame->returnVar) {
             return;
         }

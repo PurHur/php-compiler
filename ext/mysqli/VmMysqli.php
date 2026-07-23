@@ -70,6 +70,8 @@ final class VmMysqli
             'more_results' => new MysqliMoreResults(),
             'store_result' => new MysqliStoreResult(),
             'use_result' => new MysqliUseResult(),
+            'poll' => new MysqliPoll(),
+            'reap_async_query' => new MysqliReapAsyncQuery(),
             'insert_id' => new MysqliInsertId(),
             'field_count' => new MysqliFieldCountMethod(),
             'sqlstate' => new MysqliSqlstateMethod(),
@@ -91,6 +93,8 @@ final class VmMysqli
                 $entry->methodNames[$lcName] = $name;
             }
         }
+        // mysqli::poll is static (php-src mysqli.stub.php; #22163).
+        $entry->methodVisibility['poll'] = CfgFunc::FLAG_STATIC | $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -566,6 +570,177 @@ final class VmMysqli
     {
         $native = self::requireNative($entry, $ctx);
         $result = $native->use_result();
+        if (false === $result) {
+            return false;
+        }
+
+        return VmMysqliResult::wrap($ctx, $result);
+    }
+
+    /**
+     * mysqli_poll / mysqli::poll — php-src mysqli_poll (#22163).
+     *
+     * Host bridge when ext/mysqli provides mysqli_poll; otherwise returns false.
+     */
+    public static function executePoll(Frame $frame, string $label, int $argBase): void
+    {
+        $argc = \count($frame->calledArgs);
+        $needed = $argBase + 4;
+        if ($argc < $needed) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects at least %d arguments, %d given',
+                $label,
+                4,
+                max(0, $argc - $argBase)
+            ));
+        }
+        $ctx = $frame->vmContext ?? throw new \LogicException($label.'() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
+
+        $readVar = $frame->calledArgs[$argBase];
+        $errorVar = $frame->calledArgs[$argBase + 1];
+        $rejectVar = $frame->calledArgs[$argBase + 2];
+        $sec = MysqliProceduralLink::optionalIntArg($frame, $argBase + 3, 0);
+        $usec = $argc > $argBase + 4
+            ? MysqliProceduralLink::optionalIntArg($frame, $argBase + 4, 0)
+            : 0;
+
+        $readResolved = $readVar->resolveIndirect();
+        $errorResolved = $errorVar->resolveIndirect();
+        $rejectResolved = $rejectVar->resolveIndirect();
+
+        $readNull = Variable::TYPE_NULL === $readResolved->type;
+        $errorNull = Variable::TYPE_NULL === $errorResolved->type;
+
+        if (!$readNull && Variable::TYPE_ARRAY !== $readResolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($read) must be of type ?array, %s given',
+                $label,
+                MysqliClassMethod::typeLabelPublic($readResolved)
+            ));
+        }
+        if (!$errorNull && Variable::TYPE_ARRAY !== $errorResolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #2 ($error) must be of type ?array, %s given',
+                $label,
+                MysqliClassMethod::typeLabelPublic($errorResolved)
+            ));
+        }
+        if (Variable::TYPE_ARRAY !== $rejectResolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #3 ($reject) must be of type array, %s given',
+                $label,
+                MysqliClassMethod::typeLabelPublic($rejectResolved)
+            ));
+        }
+
+        if (!MysqliExtensionPolicy::hasNativeDriver() || !\function_exists('\\mysqli_poll')) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+
+        $readMap = $readNull ? null : self::nativeLinksFromArrayVar($readResolved, $label, 1);
+        $errorMap = $errorNull ? null : self::nativeLinksFromArrayVar($errorResolved, $label, 2);
+        $rejectMap = self::nativeLinksFromArrayVar($rejectResolved, $label, 3);
+
+        $readNatives = null === $readMap ? null : $readMap['natives'];
+        $errorNatives = null === $errorMap ? null : $errorMap['natives'];
+        $rejectNatives = $rejectMap['natives'];
+
+        $ready = \mysqli_poll($readNatives, $errorNatives, $rejectNatives, $sec, $usec);
+        if (false === $ready) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+
+        if (null !== $readMap) {
+            self::writeBackLinkArray($readVar, $readNatives ?? [], $readMap['byId']);
+        }
+        if (null !== $errorMap) {
+            self::writeBackLinkArray($errorVar, $errorNatives ?? [], $errorMap['byId']);
+        }
+        self::writeBackLinkArray($rejectVar, $rejectNatives, $rejectMap['byId']);
+
+        $frame->returnVar->int((int) $ready);
+    }
+
+    /**
+     * @return array{natives: list<\mysqli>, byId: array<int, ObjectEntry>}
+     */
+    private static function nativeLinksFromArrayVar(Variable $arrayVar, string $label, int $argNum): array
+    {
+        $natives = [];
+        $byId = [];
+        foreach ($arrayVar->toArray()->iterateKeyed(true) as $pair) {
+            [, $itemVar] = $pair;
+            $item = $itemVar->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $item->type) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d must contain only mysqli objects, %s given',
+                    $label,
+                    $argNum,
+                    MysqliClassMethod::typeLabelPublic($item)
+                ));
+            }
+            $entry = $item->toObject();
+            if (strtolower($entry->class->name) !== self::CLASS_LC) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d must contain only mysqli objects, %s given',
+                    $label,
+                    $argNum,
+                    $entry->class->name
+                ));
+            }
+            $ctx = self::state($entry)->ctx ?? throw new \LogicException('No VM context');
+            $native = self::requireNative($entry, $ctx);
+            $natives[] = $native;
+            $byId[spl_object_id($native)] = $entry;
+        }
+
+        return ['natives' => $natives, 'byId' => $byId];
+    }
+
+    /**
+     * @param list<\mysqli> $natives
+     * @param array<int, ObjectEntry> $byId
+     */
+    private static function writeBackLinkArray(Variable $targetVar, array $natives, array $byId): void
+    {
+        $targetVar = $targetVar->resolveIndirect();
+        $ht = new HashTable();
+        $index = 0;
+        foreach ($natives as $native) {
+            if (!$native instanceof \mysqli) {
+                continue;
+            }
+            $id = spl_object_id($native);
+            if (!isset($byId[$id])) {
+                continue;
+            }
+            $slot = new Variable();
+            $slot->object($byId[$id]);
+            $ht->addIndex($index, $slot);
+            ++$index;
+        }
+        $replacement = new Variable();
+        $replacement->array($ht);
+        $targetVar->copyFrom($replacement);
+    }
+
+    public static function reapAsyncQueryOnLink(ObjectEntry $entry, Context $ctx): ObjectEntry|bool
+    {
+        $native = self::requireNative($entry, $ctx);
+        if (!\method_exists($native, 'reap_async_query')) {
+            return false;
+        }
+        $result = $native->reap_async_query();
+        if (true === $result) {
+            return true;
+        }
         if (false === $result) {
             return false;
         }
@@ -1069,9 +1244,12 @@ final class MysqliQuery extends MysqliClassMethod
             throw new \ArgumentCountError('mysqli::query() expects at least 1 argument, 0 given');
         }
         $sql = $this->stringArg($frame->calledArgs[1], 'mysqli::query', 0, 'query');
+        $resultMode = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'mysqli::query', 1, 'result_mode', MysqliConstants::MYSQLI_STORE_RESULT)
+            : MysqliConstants::MYSQLI_STORE_RESULT;
         $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::query() requires VM context');
         $native = VmMysqli::requireNative($receiver, $ctx);
-        $result = $native->query($sql);
+        $result = $native->query($sql, $resultMode);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1595,6 +1773,47 @@ final class MysqliUseResult extends MysqliClassMethod
         }
         $result = VmMysqli::useResultOnLink($receiver, $ctx);
         if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($result);
+        }
+    }
+}
+
+/** mysqli::poll() — static; php-src mysqli.stub.php (#22163). */
+final class MysqliPoll extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('poll');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        // Static: user args start at calledArgs[0] (lib/VM.php FLAG_STATIC; #22288).
+        VmMysqli::executePoll($frame, 'mysqli::poll', 0);
+    }
+}
+
+/** mysqli::reap_async_query() — php-src mysqli.stub.php (#22163). */
+final class MysqliReapAsyncQuery extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('reap_async_query');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::reap_async_query()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::reap_async_query() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmMysqli::reapAsyncQueryOnLink($receiver, $ctx);
+        if (true === $result) {
+            $frame->returnVar->bool(true);
+        } elseif (false === $result) {
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->object($result);
