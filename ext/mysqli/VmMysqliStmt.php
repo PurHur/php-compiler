@@ -243,6 +243,28 @@ final class VmMysqliStmt
         return (string) self::requireNative($stmt)->error;
     }
 
+    /**
+     * mysqli_stmt_error_list() — rows of {errno,sqlstate,error} (#22225).
+     *
+     * @return list<array{errno: int, sqlstate: string, error: string}>
+     */
+    public static function errorList(ObjectEntry $stmt): array
+    {
+        if (!isset(self::$store[$stmt->id])) {
+            return [];
+        }
+        $native = self::$store[$stmt->id]->native;
+        if (null === $native) {
+            return [];
+        }
+        $list = $native->error_list;
+        if (!\is_array($list)) {
+            return [];
+        }
+
+        return VmMysqli::normalizeErrorList($list);
+    }
+
     /** @return int|string */
     public static function insertId(ObjectEntry $stmt)
     {
