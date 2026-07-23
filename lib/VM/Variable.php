@@ -100,6 +100,12 @@ final class Variable {
     /** Function-local typed static variable name for TypeError messages (#9998). */
     public ?string $functionStaticVarName = null;
 
+    /**
+     * Zend ZSTR_IS_INTERNED — compile-time string literals / interned table entries (#22716).
+     * Used by debug_zval_dump(); cleared on fresh {@see string()} allocations.
+     */
+    public bool $stringInterned = false;
+
     /** Stream handle from fopen()/similar; distinguishes handle ints from plain integers (#3519). */
     public bool $streamResource = false;
 
@@ -813,10 +819,11 @@ final class Variable {
         throw new \LogicException("Cannot convert type {$this->type} to bool");
     }
 
-    public function string(string $value): void {
+    public function string(string $value, bool $interned = false): void {
         $this->reset();
         $this->type = self::TYPE_STRING;
         $this->string = $value;
+        $this->stringInterned = $interned;
         MemoryAccounting::noteBytes(strlen($value));
     }
 
@@ -975,6 +982,7 @@ final class Variable {
         $this->releaseArrayRef();
         $this->resetScalars();
         $this->type = self::TYPE_NULL;
+        $this->stringInterned = false;
         $this->streamResource = false;
         $this->dirResource = false;
         $this->brigadeResource = false;
@@ -1285,7 +1293,7 @@ final class Variable {
                 $this->null();
                 break;
             case self::TYPE_STRING:
-                $this->string($var->string);
+                $this->string($var->string, $var->stringInterned);
                 break;
             case self::TYPE_STRING_OFFSET:
                 $this->string($var->toString());

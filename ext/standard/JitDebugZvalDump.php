@@ -11,8 +11,8 @@ use PHPLLVM\Value;
 /**
  * LLVM lowering for debug_zval_dump() (#6084).
  *
- * Scalar output matches var_dump(); array/object refcount formatting stays VM-only
- * until a dedicated debug_zval_dump emitter is needed (issue defers to #4010 pattern).
+ * Scalar output matches var_dump(); array/object refcount + interned markers stay
+ * on the VM {@see VmDebugZval} path until a dedicated emitter lands (#22716 AOT).
  */
 final class JitDebugZvalDump
 {

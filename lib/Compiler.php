@@ -14345,7 +14345,7 @@ class Compiler {
         $return = new Variable($mappedType);
         switch ($mappedType) {
             case Variable::TYPE_STRING:
-                $return->string($literal->value);
+                $return->string($literal->value, true);
                 break;
             case Variable::TYPE_INTEGER:
                 $return->int($literal->value);
@@ -36950,7 +36950,7 @@ class Compiler {
         $const = new Variable($mappedType);
         switch ($mappedType) {
             case Variable::TYPE_STRING:
-                $const->string($operand->value);
+                $const->string($operand->value, true);
                 break;
             case Variable::TYPE_INTEGER:
                 $const->int($operand->value);
@@ -37004,7 +37004,7 @@ class Compiler {
             $return = new Variable($mappedType);
             switch ($mappedType) {
                 case Variable::TYPE_STRING:
-                    $return->string($operand->value);
+                    $return->string($operand->value, true);
                     break;
                 case Variable::TYPE_INTEGER:
                     $return->int($operand->value);
@@ -38910,7 +38910,7 @@ class Compiler {
     private function compileStringLiteralSlot(string $value, Block $block): int
     {
         $var = new Variable(Variable::TYPE_STRING);
-        $var->string($value);
+        $var->string($value, true);
         $operand = new Temporary();
         $operand->type = Type::string();
 

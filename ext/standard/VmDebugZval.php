@@ -62,7 +62,9 @@ final class VmDebugZval
             return;
         }
         if (Variable::TYPE_STRING === $var->type) {
-            self::write('string('.\strlen($var->toString()).') "'.$var->toString()."\"\n");
+            // php-src Zend/zend_builtin_functions.c / ext/standard/var.c — ZSTR_IS_INTERNED (#22716)
+            $suffix = $var->stringInterned ? ' interned' : '';
+            self::write('string('.\strlen($var->toString()).') "'.$var->toString().'"'.$suffix."\n");
 
             return;
         }
