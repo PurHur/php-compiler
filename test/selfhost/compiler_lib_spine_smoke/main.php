@@ -6506,6 +6506,7 @@ require_once __DIR__.'/../../../ext/mysqli/mysqli_prepare.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_query.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_real_connect.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_real_escape_string.php';
+require_once __DIR__.'/../../../ext/mysqli/mysqli_real_query.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_refresh.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_release_savepoint.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_report.php';

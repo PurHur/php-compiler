@@ -66,6 +66,7 @@ final class VmMysqli
             'options' => new MysqliOptions(),
             'set_charset' => new MysqliSetCharset(),
             'multi_query' => new MysqliMultiQuery(),
+            'real_query' => new MysqliRealQuery(),
             'next_result' => new MysqliNextResult(),
             'more_results' => new MysqliMoreResults(),
             'store_result' => new MysqliStoreResult(),
@@ -535,6 +536,13 @@ final class VmMysqli
         $native = self::requireNative($entry, $ctx);
 
         return $native->multi_query($query);
+    }
+
+    public static function realQueryOnLink(ObjectEntry $entry, Context $ctx, string $query): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->real_query($query);
     }
 
     public static function nextResultOnLink(ObjectEntry $entry, Context $ctx): bool
@@ -1515,6 +1523,27 @@ final class MysqliMultiQuery extends MysqliClassMethod
         $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::multi_query() requires VM context');
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmMysqli::multiQueryOnLink($receiver, $ctx, $query));
+        }
+    }
+}
+
+final class MysqliRealQuery extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('real_query');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::real_query()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::real_query() expects exactly 1 argument, 0 given');
+        }
+        $query = $this->stringArg($frame->calledArgs[1], 'mysqli::real_query', 0, 'query');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::real_query() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::realQueryOnLink($receiver, $ctx, $query));
         }
     }
 }
