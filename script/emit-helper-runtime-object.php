@@ -215,6 +215,8 @@ $fresh = 0;
 $emitted = 0;
 $failedNow = 0;
 $knownBroken = 0;
+/** @var array<string, array{path: string, dir: string, fingerprint: string}> */
+$pendingUnits = [];
 foreach ($sites as $path => $names) {
     $slug = HelperRuntimeCache::slugFor($path);
     $dir = HelperRuntimeCache::unitDir($slug);
@@ -242,42 +244,104 @@ foreach ($sites as $path => $names) {
         }
     }
 
-    $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__).' --unit='.escapeshellarg($path);
+    $pendingUnits[$slug] = ['path' => $path, 'dir' => $dir, 'fingerprint' => $fingerprint];
+}
+
+/**
+ * Record one child lowering outcome. Identical bookkeeping whatever the job count.
+ */
+$recordUnitResult = static function (string $slug, array $unit, int $rc) use (&$emitted, &$failedNow): void {
+    $dir = $unit['dir'];
     $stderrFile = $dir.'/.emit-stderr.txt';
+    $childStderr = is_file($stderrFile) ? (string) file_get_contents($stderrFile) : '';
+    @unlink($stderrFile);
+    if (0 === $rc && null !== HelperRuntimeCache::unitManifest($slug)) {
+        ++$emitted;
+
+        return;
+    }
+    ++$failedNow;
+    // Capture child stderr so unit failures name the lowering defect (#22638).
+    $cause = trim($childStderr);
+    if ('' === $cause) {
+        $cause = '(no stderr)';
+    } else {
+        $cause = preg_replace('/\s+/', ' ', $cause) ?? $cause;
+        if (strlen($cause) > 400) {
+            $cause = substr($cause, 0, 400).'…';
+        }
+    }
+    fwrite(STDERR, "helper-runtime-emit: FAILED {$unit['path']} (rc={$rc}) — {$cause} — nested-lowering fallback (#15642)\n");
     if (!is_dir($dir)) {
         @mkdir($dir, 0755, true);
     }
-    // Capture child stderr so unit failures name the lowering defect (#22638).
-    exec($cmd.' 2>'.escapeshellarg($stderrFile), $ignored, $rc);
-    $childStderr = is_file($stderrFile) ? (string) file_get_contents($stderrFile) : '';
-    @unlink($stderrFile);
-    if (0 !== $rc || null === HelperRuntimeCache::unitManifest($slug)) {
-        ++$failedNow;
-        $cause = trim($childStderr);
-        if ('' === $cause) {
-            $cause = '(no stderr)';
-        } else {
-            $cause = preg_replace('/\s+/', ' ', $cause) ?? $cause;
-            if (strlen($cause) > 400) {
-                $cause = substr($cause, 0, 400).'…';
-            }
-        }
-        fwrite(STDERR, "helper-runtime-emit: FAILED {$path} (rc={$rc}) — {$cause} — nested-lowering fallback (#15642)\n");
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        @unlink($dir.'/manifest.json');
-        @unlink($dir.'/unit.o');
-        @unlink($dir.'/unit.bc');
-        file_put_contents($dir.'/failed.json', json_encode([
-            'fingerprint' => $fingerprint,
-            'rc' => $rc,
-            'stderr' => $childStderr,
-        ])."\n");
+    @unlink($dir.'/manifest.json');
+    @unlink($dir.'/unit.o');
+    @unlink($dir.'/unit.bc');
+    file_put_contents($dir.'/failed.json', json_encode([
+        'fingerprint' => $unit['fingerprint'],
+        'rc' => $rc,
+        'stderr' => $childStderr,
+    ])."\n");
+};
 
-        continue;
+// Fan the child lowerings out. Every unit already runs in its own `--unit=` child
+// writing only to build/helper-runtime-cache/units/<slug>/, so there is no shared
+// mutable state between them. Default nproc-2 mirrors bin/lint.php's
+// PHP_COMPILER_LINT_JOBS; PHP_COMPILER_EMIT_JOBS=1 restores the serial sweep.
+$emitJobs = (int) (getenv('PHP_COMPILER_EMIT_JOBS') ?: 0);
+if ($emitJobs < 1) {
+    $nproc = (int) shell_exec('nproc 2>/dev/null');
+    $emitJobs = $nproc > 2 ? $nproc - 2 : 1;
+}
+$emitJobs = max(1, min($emitJobs, max(1, count($pendingUnits))));
+if ([] !== $pendingUnits) {
+    fwrite(STDOUT, sprintf(
+        "helper-runtime-emit: lowering %d unit(s) across %d job(s)\n",
+        count($pendingUnits),
+        $emitJobs
+    ));
+}
+
+$running = [];
+$queue = $pendingUnits;
+while ([] !== $queue || [] !== $running) {
+    while ([] !== $queue && count($running) < $emitJobs) {
+        $slug = array_key_first($queue);
+        $unit = $queue[$slug];
+        unset($queue[$slug]);
+        if (!is_dir($unit['dir'])) {
+            @mkdir($unit['dir'], 0755, true);
+        }
+        $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__)
+            .' --unit='.escapeshellarg($unit['path']);
+        $proc = proc_open($cmd, [
+            1 => ['file', '/dev/null', 'w'],
+            2 => ['file', $unit['dir'].'/.emit-stderr.txt', 'w'],
+        ], $pipes);
+        if (!\is_resource($proc)) {
+            $recordUnitResult($slug, $unit, -1);
+
+            continue;
+        }
+        $running[$slug] = ['proc' => $proc, 'unit' => $unit];
     }
-    ++$emitted;
+
+    $reaped = false;
+    foreach ($running as $slug => $entry) {
+        $status = proc_get_status($entry['proc']);
+        if ($status['running']) {
+            continue;
+        }
+        $rc = proc_close($entry['proc']);
+        // proc_close returns -1 once proc_get_status has already reaped the exit code.
+        $recordUnitResult($slug, $entry['unit'], -1 === $rc ? (int) $status['exitcode'] : $rc);
+        unset($running[$slug]);
+        $reaped = true;
+    }
+    if (!$reaped && [] !== $running) {
+        usleep(20000);
+    }
 }
 
 fwrite(STDOUT, sprintf(
