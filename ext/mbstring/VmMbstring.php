@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
+use PHPCompiler\ext\standard\HtmlEntityTable;
 use PHPCompiler\ext\standard\mail as MailBuiltin;
 use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmMath;
@@ -518,7 +519,10 @@ final class VmMbstring
     }
 
     /**
-     * mb_convert_encoding() core — charset + HTML-ENTITIES pseudo-encoding (#11212).
+     * mb_convert_encoding() core — charset + HTML-ENTITIES pseudo-encoding (#11212, #22631).
+     *
+     * php-src / libmbfl HTML-ENTITIES is not htmlentities(): ASCII (incl. <>&) stays literal;
+     * named HTML entities for mapped non-ASCII; numeric &#N; for everything else (e.g. あ → &#12354;).
      */
     public static function convertEncoding(string $source, string $to, string $from): string|false
     {
@@ -538,10 +542,41 @@ final class VmMbstring
                 return false;
             }
 
-            return VmString::htmlentities($utf8, ENT_COMPAT, 'UTF-8', true);
+            return self::encodeToHtmlEntities($utf8);
         }
 
         return CharsetEngine::convert($from, $to, $source);
+    }
+
+    /**
+     * libmbfl HTML-ENTITIES output for a UTF-8 string (php-src ext/mbstring; #22631).
+     */
+    public static function encodeToHtmlEntities(string $utf8): string
+    {
+        /** @var array<string, string> $named */
+        static $named = null;
+        if (null === $named) {
+            $named = HtmlEntityTable::entitiesEntQuotes();
+        }
+
+        $out = '';
+        $len = VmString::byteLength($utf8);
+        for ($i = 0; $i < $len; ) {
+            $width = VmString::utf8CharByteWidth($utf8, $i);
+            $char = VmString::byteSlice($utf8, $i, $width);
+            $i += $width;
+            if (1 === $width && \ord($char) < 0x80) {
+                $out .= $char;
+                continue;
+            }
+            if (isset($named[$char])) {
+                $out .= $named[$char];
+                continue;
+            }
+            $out .= '&#'.self::utf8CharToCodepoint($char).';';
+        }
+
+        return $out;
     }
 
     /**
