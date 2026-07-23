@@ -7,6 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\DateIntervalSupport;
+use PHPCompiler\VM\DatePeriodSupport;
+use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -608,6 +611,20 @@ final class VmUnserializeFormat
             if ($class->isInterface || $class->isTrait || $class->isEnum || $class->isAbstract) {
                 throw new \LogicException('unserialize(): invalid object class in this compiler build');
             }
+            // ext/date wire objects: nested O: must use restore helpers, not raw property copy (#22447).
+            // Top-level DateTime/DateInterval already special-cased in VmSerialize::unserializePayload.
+            $dateRestored = self::tryRestoreDateExtensionObject(
+                $ctx,
+                $lc,
+                $payload,
+                $canonical,
+                $slotForCell,
+                $frame,
+                $id
+            );
+            if (null !== $dateRestored) {
+                return $dateRestored;
+            }
             if (isset($class->methods['__unserialize'])) {
                 $ht = new HashTable();
                 foreach ($payload->properties as $name => $child) {
@@ -675,6 +692,120 @@ final class VmUnserializeFormat
         }
 
         return self::cellToVariable($cell, $canonical, $slotForCell);
+    }
+
+    /**
+     * php-src ext/date — nested DateTime / DateInterval / DateTimeZone / DatePeriod O: bags (#22447).
+     *
+     * Generic property copy leaves Zend wire keys (`date`, `timezone_type`, …) on the object
+     * without {@see DateTimeSupport::markDateTimeLikeInitialized}, so format()/foreach fatals.
+     *
+     * @param array<int, Variable> $canonical
+     * @param array<int, Variable> $slotForCell
+     */
+    private static function tryRestoreDateExtensionObject(
+        Context $ctx,
+        string $lc,
+        VmUnserializeObjectPayload $payload,
+        array &$canonical,
+        array &$slotForCell,
+        ?Frame $frame,
+        int $id
+    ): ?Variable {
+        if (DateTimeSupport::CLASS_DATETIME === $lc || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lc) {
+            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame);
+            $restored = DateTimeSupport::restoreFromZendSerialize($ctx, $lc, $data);
+
+            return self::registerRestoredObject($restored, $canonical, $slotForCell, $id);
+        }
+        if (DateTimeSupport::CLASS_DATETIMEZONE === $lc) {
+            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame);
+            $restored = DateTimeSupport::restoreTimezoneFromZendSerialize($ctx, $data);
+
+            return self::registerRestoredObject($restored, $canonical, $slotForCell, $id);
+        }
+        if (DateIntervalSupport::CLASS_DATEINTERVAL === $lc) {
+            $data = self::objectPayloadToPhpArray($ctx, $payload, $canonical, $slotForCell, $frame);
+            $restored = DateIntervalSupport::restoreFromZendSerialize($ctx, $data);
+            if (null === $restored) {
+                throw new \Error('Invalid serialization data for DateInterval object');
+            }
+
+            return self::registerRestoredObject($restored, $canonical, $slotForCell, $id);
+        }
+        if (DatePeriodSupport::CLASS_DATEPERIOD === $lc) {
+            $ht = new HashTable();
+            foreach ($payload->properties as $name => $child) {
+                \assert($child instanceof VmUnserializeCell);
+                $slot = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+                if (\is_int($name)) {
+                    $ht->addIndex($name, $slot);
+                } else {
+                    $ht->add((string) $name, $slot);
+                }
+            }
+            $bag = new Variable();
+            $bag->array($ht);
+            $restored = DatePeriodSupport::restoreFromSetStateHash($ctx, $bag);
+
+            return self::registerRestoredObject($restored, $canonical, $slotForCell, $id);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, Variable> $canonical
+     * @param array<int, Variable> $slotForCell
+     * @return array<string, mixed>
+     */
+    private static function objectPayloadToPhpArray(
+        Context $ctx,
+        VmUnserializeObjectPayload $payload,
+        array &$canonical,
+        array &$slotForCell,
+        ?Frame $frame
+    ): array {
+        $data = [];
+        foreach ($payload->properties as $name => $child) {
+            \assert($child instanceof VmUnserializeCell);
+            $slot = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+            $data[(string) $name] = self::variableToPhpScalar($slot->resolveIndirect());
+        }
+
+        return $data;
+    }
+
+    private static function variableToPhpScalar(Variable $var): mixed
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => null,
+            Variable::TYPE_BOOLEAN => $var->toBool(),
+            Variable::TYPE_INTEGER => $var->toInt(),
+            Variable::TYPE_FLOAT => $var->toFloat(),
+            Variable::TYPE_STRING => $var->toString(),
+            default => throw new \LogicException(
+                'unserialize() date wire property type not supported in this compiler build'
+            ),
+        };
+    }
+
+    /**
+     * @param array<int, Variable> $canonical
+     * @param array<int, Variable> $slotForCell
+     */
+    private static function registerRestoredObject(
+        ObjectEntry $restored,
+        array &$canonical,
+        array &$slotForCell,
+        int $id
+    ): Variable {
+        $objectVar = new Variable();
+        $objectVar->object($restored);
+        $canonical[$id] = $objectVar;
+        $slotForCell[$id] = $objectVar;
+
+        return $objectVar;
     }
 
     /**
