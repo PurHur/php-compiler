@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\TriggerErrorJitHelper;
 /**
  * socket_export_stream() for compiled JIT/AOT modules (#6349, php-in-PHP).
  *
- * SSOT: {@see VmSocket::streamHandleForLookupKey()}.
+ * SSOT: {@see VmSocket::streamHandleForLookupKey()} (creates fd stream for socket_create; #22542).
  * php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_export_stream)
  */
 final class SocketExportStreamJitHelper
