@@ -1235,12 +1235,25 @@ class VM {
 
     /**
      * ?? / ??= left branch on property hooks — read backing without get hook (#6472, #8902).
+     * ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys (spl_array.c; #22649, re-#22576).
      */
     public function fetchObjectPropertyForCoalesce(ObjectEntry $object, string $propName, Variable $dst): void
     {
         $backing = $this->hookedPropertyBackingValue($object, $propName);
         if (false !== $backing) {
             $dst->copyFrom($backing);
+
+            return;
+        }
+        // ARRAY_AS_PROPS storage is not declarative object properties — mirror PROPERTY_FETCH read.
+        if (SplArrayStorage::hasArrayAsProps($object)) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string($propName);
+            if (SplArrayStorage::offsetExists($object, $key)) {
+                $dst->copyFrom(SplArrayStorage::offsetGet($object, $key));
+            } else {
+                $dst->null();
+            }
 
             return;
         }
