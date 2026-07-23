@@ -2214,25 +2214,45 @@ class VM {
         $hookBackingLc = $forVarExport ? $this->separatePropertyHookBackingNameSet($object) : [];
         /** @var array<string, Variable> $result */
         $result = [];
-        /** @var array<string, true> $seenLc */
+        /** @var array<string, true> $seenLc — unmangled result keys already taken (first-wins; #22547) */
         $seenLc = [];
+        /** @var array<string, true> $seenPrivate — declaring-class private slots (#22521 / #22547) */
+        $seenPrivate = [];
+        /** @var array<string, true> $seenDeclaredLc — skip raw re-add of declared slots */
+        $seenDeclaredLc = [];
         foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
             foreach ($class->properties as $meta) {
                 $lc = strtolower($meta->name);
-                if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
+                $isPrivate = ($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
+                $seenDeclaredLc[$lc] = true;
+                if ($isPrivate) {
+                    $privKey = ($meta->declaringClassLc !== '' ? $meta->declaringClassLc : strtolower($class->name))."\0".$lc;
+                    if (isset($seenPrivate[$privKey]) || isset($hookBackingLc[$lc])) {
+                        continue;
+                    }
+                    $seenPrivate[$privKey] = true;
+                    // Parent private must not claim the result key when inaccessible — child
+                    // private/public with the same name may still be visible (#22547).
+                    if (isset($seenLc[$lc])) {
+                        continue;
+                    }
+                } elseif (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
                     continue;
                 }
                 if (JitMcjitEmbed::isEmbedClassPadProperty($meta->name)) {
                     continue;
                 }
                 if ($meta->phpInvisible) {
-                    $seenLc[$lc] = true;
+                    if (!$isPrivate) {
+                        $seenLc[$lc] = true;
+                    }
                     continue;
                 }
-                $seenLc[$lc] = true;
                 if (!$forVarExport && !$this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
                     continue;
                 }
+                // Accessible (or var_export): claim unmangled key — first-wins vs later same name.
+                $seenLc[$lc] = true;
                 if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
                     continue;
                 }
@@ -2255,18 +2275,16 @@ class VM {
 
                     continue;
                 }
-                if (!$object->hasProperty($meta->name)) {
+                if (!$object->hasPropertyForMeta($meta)) {
                     if (!$forVarExport && !$meta->prototype->hasDeclaredTypeConstraint()) {
-                        if ($this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
-                            $copy = new Variable();
-                            $copy->null();
-                            $result[$meta->name] = $copy;
-                        }
+                        $copy = new Variable();
+                        $copy->null();
+                        $result[$meta->name] = $copy;
                     }
 
                     continue;
                 }
-                $value = $object->getProperty($meta->name)->resolveIndirect();
+                $value = $object->getPropertyForMeta($meta)->resolveIndirect();
                 if ($forVarExport) {
                     if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
                         continue;
@@ -2286,9 +2304,6 @@ class VM {
                     if ($meta->prototype->hasDeclaredTypeConstraint()) {
                         continue;
                     }
-                    if (!$this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
-                        continue;
-                    }
                     $copy = new Variable();
                     $copy->null();
                     $result[$meta->name] = $copy;
@@ -2302,7 +2317,7 @@ class VM {
         }
         foreach ($object->getRawProperties() as $name => $prop) {
             $nameLc = strtolower($name);
-            if (isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
+            if (isset($seenDeclaredLc[$nameLc]) || isset($seenLc[$nameLc]) || isset($hookBackingLc[$nameLc])) {
                 continue;
             }
             if (JitMcjitEmbed::isEmbedClassPadProperty($name)) {
@@ -2320,11 +2335,6 @@ class VM {
         return $result;
     }
 
-    /**
-     * Public properties for plain-object serialize() — get hooks invoked (#6474, zend_property_hooks.c / var.c).
-     *
-     * @return array<string, Variable>
-     */
     public function collectPublicPropertiesForSerialize(ObjectEntry $object, Frame $frame): array
     {
         if (SplArrayStorage::hasState($object)) {

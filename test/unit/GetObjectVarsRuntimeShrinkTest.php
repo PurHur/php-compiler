@@ -31,7 +31,7 @@ final class GetObjectVarsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GetObjectVarsJitHelper.php');
         $this->assertStringContainsString('VmReflection::getObjectVars', $source);
         $this->assertStringContainsString('VmReflection::getMangledObjectVars', $source);
-        $this->assertStringContainsString('Superglobals::getActiveContext', $source);
+        $this->assertStringContainsString('VmExecutingFrame::requireFromActiveContext', $source);
     }
 
     public function testSpineBundleIncludesGetObjectVarsJitHelper(): void
