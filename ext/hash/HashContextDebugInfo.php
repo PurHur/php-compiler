@@ -10,7 +10,10 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * HashContext::__debugInfo() — expose algorithm name only (php-src ext/hash/hash.c; #7084).
+ * HashContext::__debugInfo() — expose algorithm name only (php-src ext/hash/hash.c; #7084, #22563).
+ *
+ * Registered only when {@see \PHPCompiler\CompilerVersion::supportsHashContextDebugInfo()} —
+ * PHP 8.4+ stub; absent on Zend 8.2/8.3.
  */
 final class HashContextDebugInfo extends VmClassMethod
 {
