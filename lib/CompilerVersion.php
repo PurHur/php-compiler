@@ -2842,6 +2842,17 @@ final class CompilerVersion
         return self::supportsDomApiSince('8.3.0');
     }
 
+    /**
+     * PHP 8.3+ legacy DOMElement::$id / $className virtual HTML attributes
+     * (php-src ext/dom/php_dom.stub.php / php_dom.c prop handlers; #22457).
+     *
+     * Living Dom\Element already exposes these under 8.4+; this gate is for classic DOMElement.
+     */
+    public static function supportsDomElementIdClassNameProperties(): bool
+    {
+        return self::supportsDomApiSince('8.3.0');
+    }
+
     /** PHP 8.4+ DOMElement::$classList / DOMTokenList and Dom\TokenList (#16876, #16974, #20512). */
     public static function supportsDomTokenList(): bool
     {
