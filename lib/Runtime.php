@@ -266,6 +266,7 @@ class Runtime {
         $this->load(new ext\random\Module);
         $this->load(new ext\igbinary\Module);
         $this->load(new ext\msgpack\Module);
+        $this->load(new ext\simdjson\Module);
         $this->load(new ext\yaml\Module);
         $this->load(new ext\redis\Module);
         $this->load(new ext\mongodb\Module);

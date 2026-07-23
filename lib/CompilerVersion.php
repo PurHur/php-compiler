@@ -2539,6 +2539,17 @@ final class CompilerVersion
     }
 
     /**
+     * ext/simdjson via pure PHP {@see \PHPCompiler\ext\simdjson\VmSimdjson} — withheld on reference profile (#22530).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host pecl-simdjson absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsSimdjson(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/igbinary via pure PHP {@see \PHPCompiler\ext\igbinary\VmIgbinary} — withheld on reference profile (#6573).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2

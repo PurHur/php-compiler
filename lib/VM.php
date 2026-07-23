@@ -9669,6 +9669,8 @@ restart:
             return $this->dispatchVmSodiumException($e, $callerFrame);
         } catch (\RedisException $e) {
             return $this->dispatchVmRedisException($e, $callerFrame);
+        } catch (\PHPCompiler\ext\simdjson\SimdJsonException $e) {
+            return $this->dispatchVmSimdJsonException($e, $callerFrame);
         } catch (\FFI\ParserException $e) {
             return $this->dispatchVmFfiException($e, $callerFrame, true);
         } catch (\FFI\Exception $e) {
@@ -10366,6 +10368,22 @@ restart:
             $error->getMessage(),
             $file,
             $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    private function dispatchVmSimdJsonException(
+        \PHPCompiler\ext\simdjson\SimdJsonException $error,
+        Frame $frame
+    ): ?Frame {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeSimdJsonException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line,
+            $error->getCode()
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);

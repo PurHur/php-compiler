@@ -439,6 +439,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsSimdjsonFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsSimdjson());
+    }
+
+    public function testSupportsSimdjsonTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsSimdjson());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsYamlFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsYaml());

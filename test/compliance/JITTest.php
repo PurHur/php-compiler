@@ -774,6 +774,17 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'extension_loaded_msgpack')) {
                 continue;
             }
+            if (!CompilerVersion::supportsSimdjson()
+                && str_contains($name, 'simdjson')
+                && !str_contains($name, 'extension_loaded_simdjson')
+                && !str_contains($name, 'simdjson_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsSimdjson()
+                && (str_contains($name, 'simdjson_phantom')
+                    || str_contains($name, 'extension_loaded_simdjson'))) {
+                continue;
+            }
             if (!CompilerVersion::supportsXmlrpc()
                 && str_contains($name, 'xmlrpc')
                 && !str_contains($name, 'extension_loaded_xmlrpc')) {

@@ -249,6 +249,9 @@ final class BuiltinIntrospectionPolicy
         if ('msgpack' === $ext) {
             return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
         }
+        if ('simdjson' === $ext) {
+            return \PHPCompiler\ext\simdjson\SimdjsonExtensionPolicy::advertisesExtension();
+        }
         if ('xmlrpc' === $ext) {
             return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
         }
