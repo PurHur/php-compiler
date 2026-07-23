@@ -712,6 +712,11 @@ final class VmDom
         $element->properties[] = new ClassProperty(self::PROP_CHILD_ELEMENT_COUNT, null, $intProto);
         $element->properties[] = new ClassProperty(self::PROP_NEXT_ELEMENT_SIBLING, $nullProto, $objProto);
         $element->properties[] = new ClassProperty(self::PROP_PREVIOUS_ELEMENT_SIBLING, $nullProto, $objProto);
+        // php-src ext/dom/element.c — DOMElement::__construct orphaned element (#22598).
+        $elementConstruct = new ElementConstruct();
+        $element->constructor = $elementConstruct;
+        $element->methods['__construct'] = $elementConstruct;
+        $element->methodVisibility['__construct'] = $pub;
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
         $element->methods['getattribute'] = new ElementGetAttribute();
@@ -1131,6 +1136,66 @@ final class VmDom
             $state->documentId = $ownerDocument->id;
         }
         DomRegistry::attach($entry, $state);
+        if (CompilerVersion::supportsDomTokenList()) {
+            self::syncElementClassList($ctx, $entry);
+        }
+        self::ensureChildNodesList($ctx, $entry);
+        self::ensureElementAttributesMap($ctx, $entry);
+    }
+
+    /**
+     * DOMElement::__construct — initialize an already-allocated orphaned element
+     * (php-src ext/dom/element.c php_dom_create_element; #22598).
+     *
+     * Empty $namespaceURI matches the stub default and means no namespace (unlike createElementNS("")).
+     */
+    public static function constructElement(
+        Context $ctx,
+        ObjectEntry $entry,
+        string $qualifiedName,
+        ?string $value = null,
+        string $namespaceURI = ''
+    ): void {
+        if (self::CLASS_ELEMENT !== strtolower($entry->class->name)
+            && !VmDomLiving::isLivingElement($entry)
+        ) {
+            throw new \LogicException('constructElement() expects a DOMElement in this compiler build');
+        }
+        $text = null !== $value ? $value : '';
+        if ('' === $namespaceURI) {
+            // Prefixed QName without URI → Namespace Error; bare / leading-colon names use xmlValidateName
+            // (php-src dom_element_document_fragment_or_element_new; #22598).
+            $colon = strpos($qualifiedName, ':');
+            if (false !== $colon && $colon > 0) {
+                self::assertValidElementNSName('', $qualifiedName);
+            }
+            self::assertValidXmlName($qualifiedName);
+            self::writeElementNameSlots($entry, $qualifiedName);
+            self::initElementPropertySlots($entry);
+            $state = new DomNodeState();
+            $state->nodeType = DomConstants::XML_ELEMENT_NODE;
+            $state->nodeName = $qualifiedName;
+            $state->localName = $qualifiedName;
+            $state->prefix = null;
+            $state->namespaceUri = null;
+            DomRegistry::attach($entry, $state);
+        } else {
+            self::assertValidElementNSName($namespaceURI, $qualifiedName);
+            [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+            self::writeElementNameSlots($entry, $qualifiedName);
+            self::initElementPropertySlots($entry);
+            $state = new DomNodeState();
+            $state->nodeType = DomConstants::XML_ELEMENT_NODE;
+            $state->nodeName = $qualifiedName;
+            $state->localName = $localName;
+            $state->prefix = '' !== $prefix ? $prefix : null;
+            $state->namespaceUri = $namespaceURI;
+            $state->namespaceDeclarations['' !== $prefix ? $prefix : ''] = $namespaceURI;
+            DomRegistry::attach($entry, $state);
+        }
+        if ('' !== $text) {
+            self::writeTextContent($ctx, $entry, $text);
+        }
         if (CompilerVersion::supportsDomTokenList()) {
             self::syncElementClassList($ctx, $entry);
         }
