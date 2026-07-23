@@ -77,6 +77,44 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testIntlDateFormatterPatternConstWithheldOnDefault84DevReference(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsIntlDateFormatterPatternConst());
+        $this->assertFalse(CompilerVersion::advertisesIntlDateFormatterPatternConst());
+    }
+
+    public function testIntlDateFormatterPatternConstWithheldOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsIntlDateFormatterPatternConst());
+            $this->assertFalse(CompilerVersion::advertisesIntlDateFormatterPatternConst());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testIntlDateFormatterPatternConstAdvertisedOnForward84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsIntlDateFormatterPatternConst());
+            $this->assertTrue(CompilerVersion::advertisesIntlDateFormatterPatternConst());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testJsonValidateWithheldOnDefault84DevReference(): void
     {
         $this->assertFalse(CompilerVersion::supportsJsonValidate());
@@ -1013,6 +1051,39 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
             foreach (['posix_sysconf', 'posix_pathconf', 'posix_fpathconf', 'posix_eaccess'] as $fn) {
                 $this->assertTrue(isset($ctx->functions[$fn]), $fn);
             }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterIntlDateFormatterPatternOnReferenceProfile(): void
+    {
+        if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesIntlDateFormatter()) {
+            $this->markTestSkipped('IntlDateFormatter withheld until extension_loaded(\'intl\')');
+        }
+        $runtime = new Runtime();
+        $entry = $runtime->vmContext->classes['intldateformatter'] ?? null;
+        $this->assertNotNull($entry);
+        $this->assertFalse(isset($entry->constants['pattern']));
+    }
+
+    public function testVmRegistersIntlDateFormatterPatternOnForward84Profile(): void
+    {
+        if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesIntlDateFormatter()) {
+            $this->markTestSkipped('IntlDateFormatter withheld until extension_loaded(\'intl\')');
+        }
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $entry = $runtime->vmContext->classes['intldateformatter'] ?? null;
+            $this->assertNotNull($entry);
+            $this->assertTrue(isset($entry->constants['pattern']));
+            $this->assertSame(-2, $entry->constants['pattern']->toInt());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
