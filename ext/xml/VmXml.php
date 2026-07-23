@@ -26,6 +26,9 @@ final class VmXml
     /** libxml/xmlerror.h — XML_ERR_TAG_NAME_MISMATCH (php-src ext/xml/xml.c; #18120). */
     private const XML_ERR_TAG_NAME_MISMATCH = 76;
 
+    /** libxml/xmlerror.h — XML_ERR_NAME_REQUIRED (php-src ext/libxml / libxml2; #22655, re-#14467). */
+    private const XML_ERR_NAME_REQUIRED = 68;
+
     /** @var array<int, array<string, mixed>> */
     private static array $parsers = [];
 
@@ -321,6 +324,12 @@ final class VmXml
             return self::errorRecord(1, 1, 'Start tag expected, \'<\' not found', 4, LibxmlConstants::LIBXML_ERR_FATAL, 0);
         }
 
+        // Bare '<' / '< ' / '<>' / '<9' — libxml XML_ERR_NAME_REQUIRED before generic code 4 (#22655).
+        $nameRequired = self::detectInvalidStartTagName($trimmed);
+        if (null !== $nameRequired) {
+            return $nameRequired;
+        }
+
         $unclosed = self::detectUnclosedStartTag($trimmed);
         if (null !== $unclosed) {
             return $unclosed;
@@ -531,6 +540,41 @@ final class VmXml
         $error['column'] = $error['byteIndex'] + 1;
 
         return $error;
+    }
+
+    /**
+     * Match libxml "StartTag: invalid element name" (XML_ERR_NAME_REQUIRED / 68; #22655).
+     *
+     * Fired when a start-tag opener has no NameStartChar (EOF, whitespace, digit, `>`, `-`, `.`, …).
+     * Leaves `</`, `<?`, `<!`, `<:`, and letter/`_`/non-ASCII names to sibling diagnostics.
+     *
+     * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
+     */
+    private static function detectInvalidStartTagName(string $data): ?array
+    {
+        $len = \strlen($data);
+        if ($len < 1 || '<' !== $data[0]) {
+            return null;
+        }
+        if ($len >= 2) {
+            $next = $data[1];
+            if ('/' === $next || '?' === $next || '!' === $next || ':' === $next) {
+                return null;
+            }
+            // ASCII NameStartChar or non-ASCII (libxml accepts some Unicode names) → not this error.
+            if (preg_match('/^[A-Za-z_]/', $next) || \ord($next) >= 0x80) {
+                return null;
+            }
+        }
+
+        // Column 2: libxml points at the missing/invalid name byte after '<' (#22655).
+        return self::errorRecord(
+            1,
+            2,
+            'StartTag: invalid element name',
+            self::XML_ERR_NAME_REQUIRED,
+            LibxmlConstants::LIBXML_ERR_FATAL
+        );
     }
 
     /**
