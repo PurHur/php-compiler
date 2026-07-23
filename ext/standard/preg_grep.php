@@ -6,8 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -33,10 +33,8 @@ final class preg_grep extends Internal
         // Soft-null $pattern on 8.4 — Zend DEP+empty-pattern warn+false (#21479, reverts #20226; ext/pcre/php_pcre.c).
         $pattern = VmString::trimFamilyStringArgForFrame($frame, 0, 'preg_grep', 0, 'pattern');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_grep', $pattern);
-        $array = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('preg_grep() second argument must be an array in this compiler build');
-        }
+        // php-src Z_PARAM_ARRAY — TypeError on null (not LogicException); #22679.
+        $src = VmArray::requireArrayParam($frame->calledArgs[1], 'preg_grep', 2, 'array');
         $invert = false;
         if (3 === $argc) {
             $flags = $frame->calledArgs[2]->resolveIndirect();
@@ -50,7 +48,6 @@ final class preg_grep extends Internal
             }
             $invert = 1 === $flags->toInt();
         }
-        $src = $array->toArray();
         $out = new HashTable();
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
             $value = $value->resolveIndirect();
@@ -115,6 +112,12 @@ final class preg_grep extends Internal
         $pattern = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_grep', 0, 'pattern')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'preg_grep', 0, 'pattern');
+
+        // php-src Z_PARAM_ARRAY — TypeError on null (#22679); avoid loadHashTable LogicException.
+        JitArrayElem::requireArrayParam($context, $args[1], 'preg_grep', 2, 'array');
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return HashTableHelper::emptyVariable($context)->value;
+        }
 
         return JitPregGrep::invoke(
             $context,
