@@ -40,6 +40,7 @@ use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\VM\ClassFinal;
 use PHPCompiler\JIT\OperandName;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\Ast\FinalPromotedPropertyRewriter;
 use PHPCompiler\Ast\LazyPropertyRewriter;
 use PHPCompiler\Ast\GeneratorYieldSourceMarker;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
@@ -7967,6 +7968,20 @@ class Compiler {
             $typeSlot
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
+        $declare->propertyFinal = FinalPromotedPropertyRewriter::isFinalFromAttributes($param->getAttributes())
+            || (property_exists($param, 'promotionFinal') && $param->promotionFinal);
+        if ($declare->propertyFinal && !CompilerVersion::supportsFinalProperties()) {
+            // php-src Zend/zend_compile.c — pre-8.4 (#22451, re-#22308).
+            $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
+            $propName = $param->name instanceof Operand\Literal && is_string($param->name->value)
+                ? $param->name->value
+                : 'property';
+            $this->throwCompileError(sprintf(
+                'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
+                $classDisplay,
+                $propName
+            ));
+        }
         $declare->propertyFromConstructorPromotion = true;
         $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
         $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
