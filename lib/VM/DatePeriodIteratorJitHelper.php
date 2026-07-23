@@ -64,17 +64,22 @@ final class DatePeriodIteratorJitHelper
         $recurrences = self::loadLongProperty($context, $obj, 'recurrences');
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
+        $i8 = $context->getTypeFromString('int8');
+        // php-src date_period_it_has_more — end!=NULL selects end-date form (#22463).
+        $endSlot = $objectType->propertyFetch($obj, self::CLASS_PERIOD, 'end');
+        $endPtr = JitValueBox::valuePtrFromVariable($context, $endSlot);
+        $map = $context->structFieldMap['__value__'];
+        $endType = $context->builder->load($context->builder->structGep($endPtr, $map['type']));
         $isEndForm = $context->builder->icmp(
             Builder::INT_EQ,
-            $recurrences,
-            $i64->constInt(DatePeriodSupport::RECURRENCES_END_DATE, false)
+            $endType,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_OBJECT, false)
         );
         $endBb = BasicBlockHelper::append($context, 'dp_valid_end');
         $countBb = BasicBlockHelper::append($context, 'dp_valid_count');
         $context->builder->branchIf($isEndForm, $endBb, $countBb);
 
         $context->builder->positionAtEnd($endBb);
-        $endSlot = $objectType->propertyFetch($obj, self::CLASS_PERIOD, 'end');
         $cmp = self::compareDateTimeSlots($context, $currentSlot, $endSlot);
         $includeEnd = self::loadBoolProperty($context, $obj, 'include_end_date');
         $le = $context->builder->icmp(Builder::INT_SLE, $cmp, $i64->constInt(0, false));

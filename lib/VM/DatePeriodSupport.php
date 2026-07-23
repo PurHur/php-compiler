@@ -19,7 +19,11 @@ final class DatePeriodSupport
         'DatePeriod::__construct() accepts (DateTimeInterface, DateInterval, int [, int]), '
         .'or (DateTimeInterface, DateInterval, DateTime [, int]), or (string [, int]) as arguments';
 
-    /** php-src PHP_DATE_PERIOD_INCLUDE_END_DATE — end-date ctor overload sentinel. */
+    /**
+     * Legacy internal sentinel formerly used for end-date form (#22463).
+     * php-src stores include_start+include_end (typically 1) and discriminates via end!=NULL.
+     * Kept for reading older VM-serialized blobs that still emit i:2147483648.
+     */
     public const RECURRENCES_END_DATE = 2147483648;
 
     public const OPTION_EXCLUDE_START_DATE = 1;
@@ -145,13 +149,17 @@ final class DatePeriodSupport
         int $options = 0,
         ?Context $ctx = null
     ): void {
+        $includeStart = 0 === ($options & self::OPTION_EXCLUDE_START_DATE);
+        $includeEnd = 0 !== ($options & self::OPTION_INCLUDE_END_DATE);
+        // php-src date_period_init_finish: recurrences starts at 0, then += include_start + include_end.
+        $recurrences = ($includeStart ? 1 : 0) + ($includeEnd ? 1 : 0);
         self::setObjectProperty($period, 'start', self::cloneDateTimeForStorage($start, $ctx));
         self::setNullProperty($period, 'current');
         self::setObjectProperty($period, 'end', self::cloneDateTimeForStorage($end, $ctx));
         self::setObjectProperty($period, 'interval', self::cloneIntervalForStorage($interval, $ctx));
-        self::requireIntProperty($period, 'recurrences')->int(self::RECURRENCES_END_DATE);
-        self::requireBoolProperty($period, 'include_start_date')->bool(0 === ($options & self::OPTION_EXCLUDE_START_DATE));
-        self::requireBoolProperty($period, 'include_end_date')->bool(0 !== ($options & self::OPTION_INCLUDE_END_DATE));
+        self::requireIntProperty($period, 'recurrences')->int($recurrences);
+        self::requireBoolProperty($period, 'include_start_date')->bool($includeStart);
+        self::requireBoolProperty($period, 'include_end_date')->bool($includeEnd);
         $period->constructed = true;
         $period->datePeriodIterator = null;
     }
@@ -186,9 +194,9 @@ final class DatePeriodSupport
             return false;
         }
 
-        $recurrences = self::requireIntProperty($period, 'recurrences')->toInt();
-        if (self::RECURRENCES_END_DATE === $recurrences) {
-            $end = self::objectProperty($period, 'end');
+        // php-src date_period_it_has_more — end!=NULL selects end-date form (#22463).
+        $end = self::objectProperty($period, 'end');
+        if (null !== $end || self::RECURRENCES_END_DATE === self::requireIntProperty($period, 'recurrences')->toInt()) {
             if (null === $end) {
                 return false;
             }
@@ -200,6 +208,7 @@ final class DatePeriodSupport
             return $cmp < 0;
         }
 
+        $recurrences = self::requireIntProperty($period, 'recurrences')->toInt();
         // Stored count is userRecurrences+1 (includes start slot). When start is
         // excluded, php-src still yields exactly userRecurrences dates (#21939).
         $limit = $recurrences;
@@ -258,10 +267,7 @@ final class DatePeriodSupport
     public static function getEndDate(ObjectEntry $period, ?Context $ctx = null): ?ObjectEntry
     {
         self::requireConstructedPeriod($period);
-        $recurrences = self::requireIntProperty($period, 'recurrences')->toInt();
-        if (self::RECURRENCES_END_DATE !== $recurrences) {
-            return null;
-        }
+        // php-src: if (!dpobj->end) return; — end pointer is the discriminator (#22463).
         $end = self::objectProperty($period, 'end');
         if (null === $end) {
             return null;
@@ -283,12 +289,13 @@ final class DatePeriodSupport
     public static function getRecurrences(ObjectEntry $period): ?int
     {
         self::requireConstructedPeriod($period);
-        $recurrences = self::requireIntProperty($period, 'recurrences')->toInt();
-        if (self::RECURRENCES_END_DATE === $recurrences) {
+        // End-date form (end set) and legacy sentinel → null like php-src (#22463).
+        if (null !== self::objectProperty($period, 'end')
+            || self::RECURRENCES_END_DATE === self::requireIntProperty($period, 'recurrences')->toInt()) {
             return null;
         }
 
-        return $recurrences - 1;
+        return self::requireIntProperty($period, 'recurrences')->toInt() - 1;
     }
 
     /**
@@ -551,7 +558,9 @@ final class DatePeriodSupport
             $out[$name] = $copy;
         }
         $rec = new Variable(Variable::TYPE_INTEGER);
-        $rec->int(self::requireIntProperty($period, 'recurrences')->toInt());
+        // php-src date_period_object_to_hash exports the stored int; end-date form is
+        // include_start+include_end (not the legacy VM sentinel) (#22463).
+        $rec->int(self::exportRecurrencesWire($period));
         $out['recurrences'] = $rec;
         $includeStart = new Variable(Variable::TYPE_BOOLEAN);
         $includeStart->bool(self::requireBoolProperty($period, 'include_start_date')->toBool());
@@ -633,6 +642,10 @@ final class DatePeriodSupport
             self::setObjectProperty($period, 'end', self::cloneDateTimeForStorage($end, $ctx));
         }
         self::setObjectProperty($period, 'interval', self::cloneIntervalForStorage($interval, $ctx));
+        // Legacy VM wire used RECURRENCES_END_DATE with end set; normalize to php-src shape (#22463).
+        if (null !== $end && self::RECURRENCES_END_DATE === $recurrences) {
+            $recurrences = ($includeStart->toBool() ? 1 : 0) + ($includeEnd->toBool() ? 1 : 0);
+        }
         self::requireIntProperty($period, 'recurrences')->int($recurrences);
         self::requireBoolProperty($period, 'include_start_date')->bool($includeStart->toBool());
         self::requireBoolProperty($period, 'include_end_date')->bool($includeEnd->toBool());
@@ -699,15 +712,36 @@ final class DatePeriodSupport
             throw new \LogicException('DatePeriod interval property is missing in this compiler build');
         }
 
+        $endVar = self::requireProperty($period, 'end')->resolveIndirect();
+        $endWire = null;
+        if (Variable::TYPE_OBJECT === $endVar->type) {
+            $endWire = DateTimeSupport::exportZendJsonWireDateTimeLike($endVar->toObject());
+        }
+
         return [
             'start' => DateTimeSupport::exportZendJsonWireDateTimeLike($start),
             'current' => null,
-            'end' => null,
+            'end' => $endWire,
             'interval' => DateIntervalSupport::exportZendJsonWireDateInterval($intervalVar->toObject()),
-            'recurrences' => self::requireIntProperty($period, 'recurrences')->toInt(),
+            'recurrences' => self::exportRecurrencesWire($period),
             'include_start_date' => self::requireBoolProperty($period, 'include_start_date')->toBool(),
             'include_end_date' => self::requireBoolProperty($period, 'include_end_date')->toBool(),
         ];
+    }
+
+    /**
+     * php-src date_period_object_to_hash / serialize bag — remap legacy sentinel (#22463).
+     */
+    private static function exportRecurrencesWire(ObjectEntry $period): int
+    {
+        $recurrences = self::requireIntProperty($period, 'recurrences')->toInt();
+        if (self::RECURRENCES_END_DATE !== $recurrences) {
+            return $recurrences;
+        }
+        $includeStart = self::requireBoolProperty($period, 'include_start_date')->toBool();
+        $includeEnd = self::requireBoolProperty($period, 'include_end_date')->toBool();
+
+        return ($includeStart ? 1 : 0) + ($includeEnd ? 1 : 0);
     }
 
     private static function setObjectProperty(ObjectEntry $period, string $name, ObjectEntry $value): void
