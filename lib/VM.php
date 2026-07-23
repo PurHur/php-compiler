@@ -18571,6 +18571,12 @@ restart:
             if ($this->frameScopeSlotIsClosureByRefCapture($frame, (int) $slotIndex)) {
                 continue;
             }
+            // PROPERTY_FETCH_WRITE leaves INDIRECT aliases into instance property cells.
+            // Releasing through those aliases drops the property's object refcount (Closures
+            // stored via $this->prop) even though the cell still holds the ObjectEntry (#22656, #6041).
+            if ($this->variableAliasesObjectPropertyCell($slot)) {
+                continue;
+            }
             ObjectLifetime::releaseDirectObject($slot);
         }
         foreach ($frame->iterators as $iter) {
@@ -18646,6 +18652,9 @@ restart:
     {
         foreach ($frame->scope as $slotIndex => $slot) {
             if ($this->frameScopeSlotIsClosureByRefCapture($frame, (int) $slotIndex)) {
+                continue;
+            }
+            if ($this->variableAliasesObjectPropertyCell($slot)) {
                 continue;
             }
             $id = spl_object_id($slot);
@@ -18891,7 +18900,12 @@ restart:
         return false;
     }
 
-    /** True when a scope/call-arg cell resolves to a live object property backing store (#6041). */
+    /**
+     * True when a scope/call-arg cell resolves to a live object property backing store (#6041, #22656).
+     *
+     * Used by dead-temp cleanup and frame object-ref release so INDIRECT write aliases do not
+     * releaseRef() objects still owned by the instance property Variable.
+     */
     private function variableAliasesObjectPropertyCell(Variable $var): bool
     {
         if (null !== $var->objectPropertyOwner) {
