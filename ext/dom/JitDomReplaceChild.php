@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMNode::replaceChild() (#19240). */
+/** LLVM lowering for DOMNode::replaceChild() (#19240, #22678). */
 final class JitDomReplaceChild
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -33,6 +33,8 @@ final class JitDomReplaceChild
             $newChild,
             $oldChild
         );
+        // Null AOT property slots on the replaced node (#19240). Identity no-op still hits this
+        // path today (pointer compare unreliable); VmDom short-circuit keeps the live tree (#22678).
         self::clearDetachedLinkSlots($context, $oldChild);
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_replace_child_post');
