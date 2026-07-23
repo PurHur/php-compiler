@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_stream_socket_pair via StreamSocketPairJitHelper PHP (#13710, #21082).
+ * JIT/AOT link for __compiler_stream_socket_pair via StreamSocketPairJitHelper PHP (#13710, #21082, #22468).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GzStreamRuntime #22431).
  * Embed + inventory/standalone AOT: always NestedJIT the same PHP bridge — no inventory
  * null-stub fork (StreamIo #20943 / StreamLifecycle #20966 shape). No libc socketpair LLVM.
  * SSOT: {@see \PHPCompiler\ext\standard\VmStreamSocketPairNative}
- * php-src: ext/standard/streams.c — PHP_FUNCTION(stream_socket_pair)
+ * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_pair)
  */
 final class StreamSocketPairRuntime
 {
@@ -73,13 +74,8 @@ final class StreamSocketPairRuntime
     public static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamSocketPairJitHelper compile (#13710)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#22468');
     }
 
     /**
@@ -151,33 +147,12 @@ final class StreamSocketPairRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamSocketPairJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StreamSocketPairJitHelper.php parseAndCompile failed (#13710)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT stream_socket_pair (#13710)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22468'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
