@@ -19384,6 +19384,46 @@ class Compiler {
                 }
             }
         }
+        // iterator_to_array(new ArrayIterator([...]), false) — Array_ ctor prelude + New_ + trailing
+        // true/false/null ConstFetch as sibling dead temps (#22702, re-#11321). Without ordinal wiring,
+        // both ARG_SENDs bind the New_ slot and preserve_keys becomes object-truthy (always true).
+        if (
+            null !== $callArg
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            $inlineNew = null;
+            $scalarConst = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\New_ && null === $inlineNew) {
+                    $inlineNew = $producer;
+                } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                    $name = $this->staticNameFromOperand($producer->name);
+                    if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                        $scalarConst = $producer;
+                    }
+                }
+            }
+            if (null !== $inlineNew && null !== $scalarConst) {
+                $deadTempIndexes = [];
+                foreach ($callArgs as $i => $candidate) {
+                    if (
+                        $candidate instanceof Operand
+                        && $this->callArgIsDeadInlineTemporary($candidate)
+                        && !$this->isEmbeddedCallLiteralArg($candidate)
+                    ) {
+                        $deadTempIndexes[] = (int) $i;
+                    }
+                }
+                if (2 === \count($deadTempIndexes)) {
+                    if ($argIndex === $deadTempIndexes[0]) {
+                        return $inlineNew;
+                    }
+                    if ($argIndex === $deadTempIndexes[1]) {
+                        return $scalarConst;
+                    }
+                }
+            }
+        }
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
@@ -33018,6 +33058,124 @@ class Compiler {
     }
 
     /**
+     * iterator_to_array(new ArrayIterator|ArrayObject([...]), false) — Array_ ctor prelude + New_
+     * + trailing preserve_keys ConstFetch (#22702, re-#11321). General dead-temp matching binds both
+     * ARG_SENDs to the New_ slot; wire New_ → arg0 and ConstFetch → arg1 explicitly.
+     *
+     * @return list<OpCode>|null
+     */
+    private function compileIteratorToArrayInlineNewPreserveKeysCallArgSends(
+        array $args,
+        Block $block,
+        Op $cfgCallOp
+    ): ?array {
+        $blockOpsAtEntry = \count($block->opCodes);
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        if ('iterator_to_array' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (2 !== \count($cfgCallOp->args)) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 2) {
+            return null;
+        }
+        $constProducer = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$constProducer instanceof Op\Expr\ConstFetch) {
+            return null;
+        }
+        $constName = strtolower($this->staticNameFromOperand($constProducer->name) ?? '');
+        if (!\in_array($constName, ['true', 'false'], true)) {
+            return null;
+        }
+        $newProducer = null;
+        for ($i = $callIndex - 2; $i >= 0; --$i) {
+            $candidate = $block->orig->children[$i] ?? null;
+            if ($candidate instanceof Op\Expr\New_) {
+                $newProducer = $candidate;
+                break;
+            }
+            if ($candidate instanceof Op\Expr\Array_) {
+                continue;
+            }
+            break;
+        }
+        if (!$newProducer instanceof Op\Expr\New_) {
+            return null;
+        }
+        $arg0 = $cfgCallOp->args[0] ?? null;
+        $arg1 = $cfgCallOp->args[1] ?? null;
+        if (
+            !$arg0 instanceof Operand
+            || !$arg1 instanceof Operand
+            || !$this->callArgIsDeadInlineTemporary($arg0)
+            || !$this->callArgIsDeadInlineTemporary($arg1)
+        ) {
+            return null;
+        }
+
+        $producerOps = [];
+        if (null === $block->slotForOperand($newProducer->result)) {
+            $blockOpsBeforeNew = \count($block->opCodes);
+            foreach ($this->compileExpr($newProducer, $block) as $op) {
+                $producerOps[] = $op;
+            }
+            $producerOps = array_merge(
+                $this->drainBlockOpcodesAppendedSince($block, $blockOpsBeforeNew),
+                $producerOps
+            );
+        }
+        $newSlot = $this->slotForInlineNewProducer($block, $newProducer, $producerOps);
+        if (null === $newSlot) {
+            return null;
+        }
+
+        $blockOpsBeforeConst = \count($block->opCodes);
+        $preserveKeysSlot = $this->slotForHoistedScalarConstFetchCallArg($constProducer, $block);
+        $producerOps = array_merge(
+            $producerOps,
+            $this->drainBlockOpcodesAppendedSince($block, $blockOpsBeforeConst)
+        );
+        if (null === $preserveKeysSlot) {
+            return null;
+        }
+
+        $sends = [];
+        foreach ($args as $argIndex => $arg) {
+            $valueSlot = match ((int) $argIndex) {
+                0 => (string) $newSlot,
+                1 => (string) $preserveKeysSlot,
+                default => null,
+            };
+            if (null === $valueSlot) {
+                $valueSlot = $this->compileOperand($arg, $block, true);
+            }
+            $sends[] = new OpCode(
+                OpCode::TYPE_ARG_SEND,
+                $valueSlot,
+                $this->callArgNameSlot($arg, $block),
+                null
+            );
+        }
+
+        $strayBlockOps = $this->drainBlockOpcodesAppendedSince($block, $blockOpsAtEntry);
+        if ([] !== $strayBlockOps) {
+            $producerOps = array_merge($strayBlockOps, $producerOps);
+        }
+
+        return array_merge($producerOps, $sends);
+    }
+
+    /**
      * array_chunk(range(1,5), 2, true) — hoisted FuncCall haystack + ConstFetch preserve_keys (#11767).
      *
      * @return list<OpCode>|null
@@ -36143,7 +36301,17 @@ class Compiler {
         if (\count($producers) === $argCount && isset($producers[$argIndex])) {
             $positional = $producers[$argIndex];
             if ($positional instanceof Op\Expr\New_) {
-                return true;
+                // Array_ ctor prelude + New_ aligned 1:1 with (iterator, preserve_keys) is wrong —
+                // New_ feeds arg #0 only; trailing bool is a separate ConstFetch (#22702).
+                if (
+                    0 === $argIndex
+                    || !(
+                        ($producers[0] ?? null) instanceof Op\Expr\Array_
+                        && ($producers[1] ?? null) instanceof Op\Expr\New_
+                    )
+                ) {
+                    return true;
+                }
             }
             // attachIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude, New_ feeds arg #0 (#13342).
             if (
@@ -41983,6 +42151,14 @@ class Compiler {
             if (null !== $arrayChunkSends) {
                 return $arrayChunkSends;
             }
+            $iteratorToArraySends = $this->compileIteratorToArrayInlineNewPreserveKeysCallArgSends(
+                $args,
+                $block,
+                $cfgCallOp
+            );
+            if (null !== $iteratorToArraySends) {
+                return $iteratorToArraySends;
+            }
             $arrayChunkEnumLengthSends = $this->compileArrayChunkInlineArrayClassConstArgSends($args, $block, $cfgCallOp);
             if (null !== $arrayChunkEnumLengthSends) {
                 return $arrayChunkEnumLengthSends;
@@ -44457,7 +44633,13 @@ class Compiler {
                         $block,
                         $calleeName
                     );
-                    if ($newProducer instanceof Op\Expr\New_) {
+                    if (
+                        $newProducer instanceof Op\Expr\New_
+                        && $this->inlineNewProducerFeedsCallArg(
+                            $newProducer,
+                            $cfgCallOp->args[(int) $argIndex] ?? $arg
+                        )
+                    ) {
                         if (null === $block->slotForOperand($newProducer->result)) {
                             foreach ($this->compileExpr($newProducer, $block) as $op) {
                                 $sends[] = $op;
