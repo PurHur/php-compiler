@@ -8,7 +8,10 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * Shared dns_get_mx() / getmxrr() by-ref array population (#4125, #3662).
+ * Shared dns_get_mx() / getmxrr() by-ref array population (#4125, #3662, #22707).
+ *
+ * php-src overwrites &$mxhosts / &$weight regardless of incoming type for weight (#22707);
+ * mxhosts still uses {@see validateArrayByRefArg} where callers opt in.
  */
 final class VmDnsMx
 {

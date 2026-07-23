@@ -42,7 +42,7 @@ final class dns_get_mx extends Internal
         VmDnsMx::validateArrayByRefArg($frame->calledArgs[1], 'dns_get_mx', 1, 'mxhosts');
         $weightsArg = null;
         if ($argc >= 3) {
-            VmDnsMx::validateArrayByRefArg($frame->calledArgs[2], 'dns_get_mx', 2, 'weight');
+            // php-src dns.c — &$weight is overwritten; non-arrays are not TypeError (#22707).
             $weightsArg = $frame->calledArgs[2];
         }
 
