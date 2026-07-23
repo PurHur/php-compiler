@@ -496,6 +496,8 @@ final class ModuleRegistry
             'zip' => str_starts_with($lc, 'zip_'),
             'exif' => str_starts_with($lc, 'exif_'),
             'fileinfo' => 'mime_content_type' === $lc,
+            // php-src ext/shmop/shmop.c — separate from sysvshm (#22426)
+            'shmop' => str_starts_with($lc, 'shmop_'),
             default => false,
         };
     }

@@ -10,6 +10,11 @@ use PHPCompiler\VM\Context;
 
 /**
  * sysvshm extension module entry (php-src ext/sysvshm/sysvshm.c; #6436).
+ *
+ * php-src keeps {@code shmop} as a separate zend_module_entry (ext/shmop/shmop.c).
+ * This tree hosts both APIs under one Module for bootstrap; advertise logical
+ * {@code shmop} via {@see getAdditionalExtensionNames()} so extension_loaded /
+ * get_extension_funcs match Zend dual advertisement (#22426).
  */
 class Module extends ModuleAbstract
 {
@@ -17,6 +22,14 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         self::registerClasses($runtime->vmContext);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        return ['shmop'];
     }
 
     public static function registerClasses(Context $ctx): void
