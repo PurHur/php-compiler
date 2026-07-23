@@ -45,6 +45,40 @@ final class DomExceptionConstants
 
     public const VALIDATION_ERR = 16;
 
+    /**
+     * Raise DOMException with Zend message + W3C/DOM error code (php-src
+     * ext/dom/php_dom.c dom_get_domexception; #22658 / #22694).
+     *
+     * @throws \DOMException
+     * @return never
+     */
+    public static function raise(string $message, int $code): void
+    {
+        throw new \DOMException($message, $code);
+    }
+
+    /**
+     * Wrong Document Error (WRONG_DOCUMENT_ERR = 4).
+     *
+     * @throws \DOMException
+     * @return never
+     */
+    public static function raiseWrongDocument(): void
+    {
+        self::raise('Wrong Document Error', self::WRONG_DOCUMENT_ERR);
+    }
+
+    /**
+     * Not Found Error (NOT_FOUND_ERR = 8) — Zend title-case message.
+     *
+     * @throws \DOMException
+     * @return never
+     */
+    public static function raiseNotFound(): void
+    {
+        self::raise('Not Found Error', self::NOT_FOUND_ERR);
+    }
+
     /** @return array<string, int> */
     public static function globalConstants(): array
     {

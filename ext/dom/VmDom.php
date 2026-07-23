@@ -1619,7 +1619,7 @@ final class VmDom
             || $attrState->ownerElementId !== $element->id
             || (null !== $cachedId && $cachedId !== $attr->id)
         ) {
-            throw new \DOMException('Not Found Error', 8);
+            DomExceptionConstants::raiseNotFound();
         }
         $previousIdValue = $elementState->attributes[$name] ?? null;
         $idBearing = self::elementAttributeIsIdBearing($element, $name);
@@ -2328,7 +2328,7 @@ final class VmDom
         }
         $state = DomRegistry::state($element);
         if (!\array_key_exists($name, $state->attributes)) {
-            throw new \DOMException('Not Found Error', 8);
+            DomExceptionConstants::raiseNotFound();
         }
         self::applyIdAttributeRegistration($element, $name, $isId);
     }
@@ -2345,7 +2345,7 @@ final class VmDom
         }
         $qName = self::findAttributeQNameByNsAndLocal($element, $namespace, $localName);
         if (null === $qName) {
-            throw new \DOMException('Not Found Error', 8);
+            DomExceptionConstants::raiseNotFound();
         }
         self::applyIdAttributeRegistration($element, $qName, $isId);
     }
@@ -2370,7 +2370,7 @@ final class VmDom
             || $attrState->ownerElementId !== $element->id
             || (null !== $cachedId && $cachedId !== $attr->id)
         ) {
-            throw new \DOMException('Not Found Error', 8);
+            DomExceptionConstants::raiseNotFound();
         }
         self::applyIdAttributeRegistration($element, $name, $isId);
     }
@@ -2380,7 +2380,7 @@ final class VmDom
         $state = DomRegistry::state($element);
         $document = self::ownerDocumentEntry($element);
         if (null === $document) {
-            throw new \DOMException('Not Found Error', 8);
+            DomExceptionConstants::raiseNotFound();
         }
         self::unregisterElementId($document, $element);
         if ($isId) {
@@ -5848,7 +5848,7 @@ final class VmDom
             $parentState = DomRegistry::state($parent);
             $index = self::childIndex($parentState->childIds, $oldChild->id);
             if (null === $index) {
-                throw new \DOMException('Not found error');
+                DomExceptionConstants::raiseNotFound();
             }
             $refChild = null;
             if (isset($parentState->childIds[$index + 1])) {
@@ -5887,7 +5887,7 @@ final class VmDom
         $parentState = DomRegistry::state($parent);
         $index = self::childIndex($parentState->childIds, $oldChild->id);
         if (null === $index) {
-            throw new \DOMException('Not found error');
+            DomExceptionConstants::raiseNotFound();
         }
         $parentState->childIds[$index] = $newChild->id;
         self::linkChildToParent($oldChild, null);
@@ -5944,7 +5944,7 @@ final class VmDom
         } else {
             $index = self::childIndex($parentState->childIds, $refChild->id);
             if (null === $index) {
-                throw new \DOMException('Not found error');
+                DomExceptionConstants::raiseNotFound();
             }
             \array_splice($parentState->childIds, $index, 0, [$newChild->id]);
         }
@@ -6346,11 +6346,11 @@ final class VmDom
     {
         $state = DomRegistry::state($node);
         if (null === $state->parentId) {
-            throw new \DOMException('Not Found Error');
+            DomExceptionConstants::raiseNotFound();
         }
         $parent = DomRegistry::entry($state->parentId);
         if (null === $parent) {
-            throw new \DOMException('Not Found Error');
+            DomExceptionConstants::raiseNotFound();
         }
         self::removeChild($ctx, $parent, $node);
     }
@@ -6501,7 +6501,7 @@ final class VmDom
         $parentState = DomRegistry::state($parent);
         $index = self::childIndex($parentState->childIds, $refNode->id);
         if (null === $index) {
-            throw new \DOMException('Not found error');
+            DomExceptionConstants::raiseNotFound();
         }
         $nextIndex = $index + 1;
         $refChild = isset($parentState->childIds[$nextIndex])
@@ -6619,7 +6619,7 @@ final class VmDom
         } else {
             $index = self::childIndex($parentState->childIds, $refChild->id);
             if (null === $index) {
-                throw new \DOMException('Not found error');
+                DomExceptionConstants::raiseNotFound();
             }
             \array_splice($parentState->childIds, $index, 0, [$newChild->id]);
         }
@@ -9523,14 +9523,14 @@ final class VmDom
     private static function assertChildOfParent(ObjectEntry $parent, ObjectEntry $child, string $label): void
     {
         if (!DomRegistry::has($child)) {
-            throw new \DOMException('Not found error');
+            DomExceptionConstants::raiseNotFound();
         }
         $childState = DomRegistry::state($child);
         if ($childState->parentId !== $parent->id) {
-            throw new \DOMException('Not found error');
+            DomExceptionConstants::raiseNotFound();
         }
         if (!\in_array($child->id, DomRegistry::state($parent)->childIds, true)) {
-            throw new \DOMException('Not found error');
+            DomExceptionConstants::raiseNotFound();
         }
     }
 
@@ -9539,7 +9539,7 @@ final class VmDom
         $parentDocId = self::resolveDocumentId($parent);
         $childDocId = self::resolveDocumentId($child);
         if (null !== $parentDocId && null !== $childDocId && $parentDocId !== $childDocId) {
-            throw new \DOMException('Wrong Document Error');
+            DomExceptionConstants::raiseWrongDocument();
         }
     }
 
