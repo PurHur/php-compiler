@@ -654,10 +654,18 @@ final class BuiltinClasses
 
         $attr = new ClassEntry('ReflectionAttribute');
         \PHPCompiler\ext\standard\VmReflection::registerReflectionAttributeClassConstants($attr);
-        $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto);
-        $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto);
-        $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_IS_REPEATED, null, $boolProto);
-        $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_TARGET, null, $intProto);
+        // Engine storage only — php-src ReflectionAttribute has no PHP-visible props (#22513).
+        foreach (
+            [
+                new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto),
+                new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto),
+                new ClassProperty(ReflectionSupport::PROP_ATTR_IS_REPEATED, null, $boolProto),
+                new ClassProperty(ReflectionSupport::PROP_ATTR_TARGET, null, $intProto),
+            ] as $attrProp
+        ) {
+            $attrProp->phpInvisible = true;
+            $attr->properties[] = $attrProp;
+        }
         $attr->methods['getname'] = new ReflectionAttributeGetName();
         $attr->methodVisibility['getname'] = $pub;
         $attr->methods['getarguments'] = new ReflectionAttributeGetArguments();

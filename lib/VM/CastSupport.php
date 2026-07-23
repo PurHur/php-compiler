@@ -183,6 +183,11 @@ final class CastSupport
 
         $declared = [];
         foreach ($obj->class->properties as $meta) {
+            if ($meta->phpInvisible) {
+                // Still skip raw append so (array) does not leak C-only slots (#22513).
+                $declared[$meta->name] = true;
+                continue;
+            }
             if (!$obj->hasProperty($meta->name)) {
                 continue;
             }
