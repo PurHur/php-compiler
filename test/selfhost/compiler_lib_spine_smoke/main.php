@@ -6480,6 +6480,7 @@ require_once __DIR__.'/../../../ext/mysqli/MysqliReportMode.php';
 require_once __DIR__.'/../../../ext/mysqli/VmMysqli.php';
 require_once __DIR__.'/../../../ext/mysqli/VmMysqliStmt.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_affected_rows.php';
+require_once __DIR__.'/../../../ext/mysqli/mysqli_async_api.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_autocommit.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_begin_transaction.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_close.php';
