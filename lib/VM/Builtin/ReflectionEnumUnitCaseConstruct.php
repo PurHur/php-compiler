@@ -19,8 +19,9 @@ final class ReflectionEnumUnitCaseConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('ReflectionEnumUnitCase::__construct() expects exactly 2 arguments');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 2) {
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionEnumUnitCase', 2, $argc);
         }
         $ctx = VmReflection::requireContext($frame);
         $enumEntry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);

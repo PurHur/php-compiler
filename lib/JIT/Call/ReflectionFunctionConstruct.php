@@ -18,7 +18,11 @@ final class ReflectionFunctionConstruct implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         if (\count($args) < 2) {
-            throw new \LogicException('ReflectionFunction::__construct() expects a function name');
+            \PHPCompiler\VM\ReflectionSupport::throwConstructArgumentCountError(
+                'ReflectionFunction',
+                1,
+                max(0, \max(0, count($args) - 1))
+            );
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         ReflectionSetup::emitSetStringPropertyFromVar(

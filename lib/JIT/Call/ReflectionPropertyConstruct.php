@@ -21,7 +21,11 @@ final class ReflectionPropertyConstruct implements Call
         ReflectionRuntime::ensureLinked($context);
         ReflectionNative::registerDeclarations($context);
         if (\count($args) < 3) {
-            throw new \LogicException('ReflectionProperty::__construct() expects class and property name');
+            \PHPCompiler\VM\ReflectionSupport::throwConstructArgumentCountError(
+                'ReflectionProperty',
+                2,
+                max(0, \max(0, count($args) - 1))
+            );
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         // Zend ReflectionProperty::$name = property name; $class = class arg (declaring when same) (#22504).

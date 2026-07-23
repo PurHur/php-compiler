@@ -21,10 +21,7 @@ final class ReflectionEnumConstruct extends VmClassMethod
     {
         $argc = \count($frame->calledArgs) - 1;
         if ($argc !== 1) {
-            throw new \ArgumentCountError(sprintf(
-                'ReflectionEnum::__construct() expects exactly 1 argument, %d given',
-                $argc
-            ));
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionEnum', 1, $argc);
         }
         $ctx = VmReflection::requireContext($frame);
         $target = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);

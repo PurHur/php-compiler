@@ -23,8 +23,9 @@ final class ReflectionParameterConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('ReflectionParameter::__construct() expects function and parameter');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 2) {
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionParameter', 2, $argc);
         }
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);

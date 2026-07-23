@@ -19,8 +19,9 @@ final class ReflectionPropertyConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 3) {
-            throw new \LogicException('ReflectionProperty::__construct() expects class and property name');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 2) {
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionProperty', 2, $argc);
         }
         $ctx = VmReflection::requireContext($frame);
         $classArg = $frame->calledArgs[1]->resolveIndirect();

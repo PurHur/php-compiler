@@ -25,10 +25,7 @@ final class ReflectionObjectConstruct extends VmClassMethod
     {
         $argc = \count($frame->calledArgs) - 1;
         if ($argc !== 1) {
-            throw new \ArgumentCountError(sprintf(
-                'ReflectionObject::__construct() expects exactly 1 argument, %d given',
-                $argc
-            ));
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionObject', 1, $argc);
         }
         $objectArg = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $objectArg->type) {

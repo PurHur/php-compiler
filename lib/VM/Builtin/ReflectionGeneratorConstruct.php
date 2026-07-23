@@ -19,8 +19,9 @@ final class ReflectionGeneratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionGenerator::__construct() expects a Generator instance');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 1) {
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionGenerator', 1, $argc);
         }
         $receiver = ReflectionSupport::requireReflectionGenerator($frame, $frame->calledArgs[0]);
         $generator = GeneratorTrace::requireGeneratorObject(

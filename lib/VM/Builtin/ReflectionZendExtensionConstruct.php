@@ -19,8 +19,9 @@ final class ReflectionZendExtensionConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionZendExtension::__construct() expects extension name');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 1) {
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionZendExtension', 1, $argc);
         }
         $name = VmReflection::stringArg(
             $frame->calledArgs[1],
