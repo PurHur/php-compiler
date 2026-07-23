@@ -5849,6 +5849,9 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterAllowsNull.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterCanBePassedByValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetAttributes.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetClass.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetDeclaringClass.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetDeclaringFunction.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetDefaultValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetDefaultValueConstantName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetName.php';
@@ -5856,6 +5859,8 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetPosition.ph
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterHasType.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsArray.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsCallable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDefaultValueAvailable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDefaultValueConstant.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsDeprecated.php';
@@ -5866,6 +5871,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsPromoted.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitive.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitiveParameter.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsVariadic.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyAccessProbe.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyAsymmetricProbe.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyConstruct.php';
