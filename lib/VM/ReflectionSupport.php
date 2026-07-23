@@ -157,10 +157,14 @@ final class ReflectionSupport
     /** Public `$name` on ReflectionZendExtension (php-src, #22248). */
     public const PROP_ZEND_EXTENSION_NAME = 'name';
 
-    /** Internal enum class name on ReflectionEnumUnitCase / ReflectionEnumBackedCase (#10000). */
-    public const PROP_ENUM_CLASS_NAME = 'enumClass';
+    /**
+     * Zend ReflectionEnumUnitCase / ReflectionEnumBackedCase::$class — enum class name (#22505).
+     * Same public key as ReflectionClassConstant::$class (php-src php_reflection.c).
+     * Was internal-only `enumClass` (#10000), which leaked in dumps / property_exists.
+     */
+    public const PROP_ENUM_CLASS_NAME = 'class';
 
-    /** @deprecated Use PROP_CLASS_NAME (`name`) for case name + PROP_ENUM_CLASS_NAME for enum type. */
+    /** @deprecated Use PROP_CLASS_NAME (`name`) for case name + PROP_ENUM_CLASS_NAME (`class`) for enum type. */
     public const PROP_ENUM_CASE_NAME = 'case';
 
     /**
@@ -978,7 +982,7 @@ final class ReflectionSupport
 
     public static function classNameFromReflection(ObjectEntry $reflection): string
     {
-        // Enum case wrappers store the case name on PROP_CLASS_NAME (#10000); class is PROP_ENUM_CLASS_NAME.
+        // Enum case wrappers: case name on PROP_CLASS_NAME (`name`); enum on PROP_ENUM_CLASS_NAME (`class`, #22505).
         if (self::isReflectionEnumCaseObject($reflection)) {
             return self::enumClassNameFromReflection($reflection);
         }
