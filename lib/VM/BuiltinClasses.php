@@ -90,6 +90,7 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetTarget;
 use PHPCompiler\VM\Builtin\ReflectionAttributeIsRepeated;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
+use PHPCompiler\VM\Builtin\ReflectionAttributeToString;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedVersion;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDocComment;
@@ -679,6 +680,8 @@ final class BuiltinClasses
         $attr->methodVisibility['gettarget'] = $pub;
         $attr->methods['newinstance'] = new ReflectionAttributeNewInstance();
         $attr->methodVisibility['newinstance'] = $pub;
+        $attr->methods['__tostring'] = new ReflectionAttributeToString();
+        $attr->methodVisibility['__tostring'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ATTRIBUTE] = $attr;
 
         $rext = new ClassEntry('ReflectionExtension');
