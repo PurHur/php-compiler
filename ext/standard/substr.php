@@ -192,9 +192,14 @@ final class substr extends Internal
     private static function maybeEmitJitTruncationWarning(Context $context, Value $adjustedLen, Value $remaining): void
     {
         $zero = JitStringIndex::zero($context);
+        // remaining == 0 (start at/past end): Zend-silent empty result — no warn (#22489)
+        $hasRemaining = $context->builder->icmp(Builder::INT_SGT, $remaining, $zero);
         $positiveLen = $context->builder->icmp(Builder::INT_SGT, $adjustedLen, $zero);
         $wouldClip = $context->builder->icmp(Builder::INT_SGT, $adjustedLen, $remaining);
-        $warnCond = $context->builder->and($positiveLen, $wouldClip);
+        $warnCond = $context->builder->and(
+            $hasRemaining,
+            $context->builder->and($positiveLen, $wouldClip)
+        );
 
         $warnBb = BasicBlockHelper::append($context, 'substr_trunc_warn');
         $contBb = BasicBlockHelper::append($context, 'substr_trunc_cont');

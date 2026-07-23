@@ -810,7 +810,8 @@ final class VmMbstring
         if ($start < 0) {
             $start = 0;
         }
-        if ($start > $charLen) {
+        // start >= charLen: empty remainder — no truncate warning (#22489, peers byte substr)
+        if ($start >= $charLen) {
             return '';
         }
         if (null === $length) {
