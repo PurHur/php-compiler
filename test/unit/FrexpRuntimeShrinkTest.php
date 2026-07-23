@@ -8,7 +8,9 @@ use PHPCompiler\ext\standard\FrexpJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** frexp() JIT routes through FrexpJitHelper PHP not libc LLVM (#15201). */
+/**
+ * frexp() NestedJIT via JitVmHelperLink::ensureCompiled (#22575 / peer #22519).
+ */
 final class FrexpRuntimeShrinkTest extends TestCase
 {
     public function testFrexpUsesJitHelperNotLibcLookup(): void
@@ -20,6 +22,13 @@ final class FrexpRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFrexp.php');
         $this->assertStringContainsString('FrexpJitHelper', $bridge);
         $this->assertStringContainsString('phpc_frexp', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $bridge);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
+        $this->assertStringNotContainsString('parseAndCompile', $bridge);
+        $this->assertStringNotContainsString('new JIT(', $bridge);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
     public function testFrexpJitHelperDelegatesToVmMath(): void
