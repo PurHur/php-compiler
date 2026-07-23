@@ -1357,6 +1357,48 @@ final class ReflectionSupport
         return VmReflection::declaringClassNameForPropertyLookup($entry, $property, $ctx);
     }
 
+    /**
+     * php-src ext/reflection/php_reflection.c — declaring class for a method on $entry (#15658, #22582).
+     *
+     * Zend ReflectionMethod::$class / getDeclaringClass() use the method's scope ce:
+     * inherited methods → parent declarer; trait imports → composing class (not the trait),
+     * including when reflected via a subclass that inherited the imported method.
+     */
+    public static function declaringClassNameForMethod(Context $ctx, ClassEntry $entry, string $methodName): string
+    {
+        $methodLc = strtolower($methodName);
+        // Walk parents: subclass may inherit a trait method without copying traitMethodSources.
+        foreach (VmReflection::classHierarchyChain($entry, $ctx) as $class) {
+            if (isset($class->traitMethodSources[$methodLc])) {
+                return $class->name;
+            }
+        }
+        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? null;
+        if (null !== $declLc && isset($ctx->classes[$declLc])) {
+            $decl = $ctx->classes[$declLc];
+            // methodDeclaringClassLc may name the trait; Zend scope is never the trait (#15658).
+            if (!$decl->isTrait) {
+                return $decl->name;
+            }
+        }
+        foreach (VmReflection::classHierarchyChain($entry, $ctx) as $class) {
+            if ($class->isTrait) {
+                continue;
+            }
+            if (!isset($class->methods[$methodLc]) && !isset($class->abstractMethods[$methodLc])) {
+                continue;
+            }
+            $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $class !== $entry) {
+                continue;
+            }
+
+            return $class->name;
+        }
+
+        return $entry->name;
+    }
+
     /** php-src ext/reflection/php_reflection.c — ReflectionMethod::getDeclaringClass() (#15658). */
     public static function declaringClassNameFromReflectionMethod(ObjectEntry $reflection, Context $ctx): string
     {
@@ -1366,17 +1408,8 @@ final class ReflectionSupport
         if (null === $entry) {
             throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
         }
-        $methodLc = strtolower($methodName);
-        // Trait-imported methods (incl. aliases) report the composing class, not the trait (#15658).
-        if (isset($entry->traitMethodSources[$methodLc])) {
-            return $entry->name;
-        }
-        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? strtolower($entry->name);
-        if (isset($ctx->classes[$declLc])) {
-            return $ctx->classes[$declLc]->name;
-        }
 
-        return $entry->name;
+        return self::declaringClassNameForMethod($ctx, $entry, $methodName);
     }
 
     public static function functionNameFromReflection(ObjectEntry $reflection): string
@@ -3197,10 +3230,12 @@ final class ReflectionSupport
                 self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
             }
         }
-        // php-src ext/reflection/php_reflection.c — store the requested class (composing
-        // class for trait imports/aliases), matching ReflectionClass::getMethod().
+        // php-src: ReflectionMethod::$class is the declaring scope ce (#22582), not the
+        // class name passed to __construct / ReflectionClass::getMethod().
+        $declName = self::declaringClassNameForMethod($ctx, $entry, $methodName);
+        $declEntry = $ctx->classes[strtolower($declName)] ?? $declaring;
         // Canonicalize method casing like Zend (DOM appendchild → appendChild; #21283).
-        return [$entry, VmReflection::canonicalMethodDisplayName($declaring, $methodLc)];
+        return [$declEntry, VmReflection::canonicalMethodDisplayName($declaring, $methodLc)];
     }
 
     /**
@@ -3229,7 +3264,10 @@ final class ReflectionSupport
         }
         $rm = new ObjectEntry($rmClass);
         $rm->constructed = true;
-        $rm->getProperty(self::PROP_REFLECTION_METHOD_CLASS)->string($entry->name);
+        // Zend public $class = declaring class (#18298, #22582).
+        $rm->getProperty(self::PROP_REFLECTION_METHOD_CLASS)->string(
+            self::declaringClassNameForMethod($ctx, $entry, $methodName)
+        );
         $rm->getProperty(self::PROP_REFLECTION_METHOD_FUNC)->string($methodName);
 
         return $rm;

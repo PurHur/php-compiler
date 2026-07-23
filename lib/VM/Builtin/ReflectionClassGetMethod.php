@@ -41,7 +41,7 @@ final class ReflectionClassGetMethod extends VmClassMethod
         }
         $rm = new ObjectEntry($rmClass);
         $rm->constructed = true;
-        // php-src: composing class name on the ReflectionMethod (requested class).
+        // php-src: declaring scope ce on ReflectionMethod::$class (#22582).
         $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS)->string($declEntry->name);
         $rm->getProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC)->string($canonical);
         if (null !== $frame->returnVar) {

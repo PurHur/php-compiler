@@ -3540,7 +3540,13 @@ final class VmReflection
         foreach (self::collectClassMethodsForReflection($entry, $ctx, $filter) as $spec) {
             $obj = new \PHPCompiler\VM\ObjectEntry($rmClass);
             $obj->constructed = true;
-            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_METHOD_CLASS)->string($reflectedClassName);
+            // Zend ReflectionMethod::$class = declaring scope, not the reflected class (#22582).
+            $declName = \PHPCompiler\VM\ReflectionSupport::declaringClassNameForMethod(
+                $ctx,
+                $entry,
+                $spec['display']
+            );
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_METHOD_CLASS)->string($declName);
             $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_METHOD_FUNC)->string($spec['display']);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
