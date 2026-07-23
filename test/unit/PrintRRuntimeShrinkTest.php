@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringPrintR: embed + standalone php-in-PHP bridge (#9190, #13240, #16565). */
+/**
+ * StringPrintR: embed + standalone php-in-PHP bridge via JitVmHelperLink (#9190, #13240, #16565, #22668).
+ */
 final class PrintRRuntimeShrinkTest extends TestCase
 {
     public function testStringPrintRUsesPrintRJitHelperForEmbedAndStandalone(): void
@@ -15,6 +17,12 @@ final class PrintRRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PrintRJitHelper', $source);
         $this->assertStringNotContainsString('StringPrintRJit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPrintRJit.php');
     }
 
