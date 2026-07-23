@@ -55,6 +55,8 @@ class Module extends ModuleAbstract
             new enchant_dict_add_to_session(),
             new enchant_dict_remove_from_session(),
             new enchant_dict_is_added(),
+            // php-src @alias enchant_dict_is_added + #[\Deprecated(since: '8.0')] (#22251)
+            new enchant_dict_is_added('enchant_dict_is_in_session'),
             new enchant_dict_store_replacement(),
             new enchant_dict_get_error(),
             new enchant_dict_describe(),
