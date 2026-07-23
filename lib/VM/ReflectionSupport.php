@@ -103,10 +103,17 @@ final class ReflectionSupport
     /** Zend ReflectionMethod::$name — method name string (#18298). */
     public const PROP_REFLECTION_METHOD_FUNC = 'name';
 
-    public const PROP_PROPERTY_NAME = 'property';
+    /**
+     * Zend ReflectionProperty::$name — property name string (#22504).
+     * Was engine-only key `property` (leaked in dumps; conflicted with public `$name` = class).
+     */
+    public const PROP_PROPERTY_NAME = 'name';
 
-    /** Declaring class name on ReflectionProperty instances (#9878). */
-    public const PROP_DECLARING_CLASS_NAME = 'declaringClass';
+    /**
+     * Zend ReflectionProperty::$class — declaring class name string (#22504, #9878).
+     * Was engine-only key `declaringClass`.
+     */
+    public const PROP_DECLARING_CLASS_NAME = 'class';
 
     /**
      * Declaring class on ReflectionParameter (engine storage only).
@@ -989,6 +996,15 @@ final class ReflectionSupport
             $nameVar = $reflection->getProperty(self::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->resolveIndirect();
             if (Variable::TYPE_STRING !== $nameVar->type) {
                 throw new \LogicException('ReflectionClassConstant missing declaring class name');
+            }
+
+            return $nameVar->toString();
+        }
+        // ReflectionProperty: declaring class is public `$class` (not `$name`, #22504).
+        if (strtolower($reflection->class->name) === self::REFLECTION_PROPERTY) {
+            $nameVar = $reflection->getProperty(self::PROP_DECLARING_CLASS_NAME)->resolveIndirect();
+            if (Variable::TYPE_STRING !== $nameVar->type) {
+                throw new \LogicException('ReflectionProperty missing declaring class name');
             }
 
             return $nameVar->toString();
@@ -3451,7 +3467,7 @@ final class ReflectionSupport
         }
         $obj = new ObjectEntry($propClass);
         $obj->constructed = true;
-        $obj->getProperty(self::PROP_CLASS_NAME)->string($className);
+        // Zend public surface: $name = property, $class = declaring class (#22504).
         $obj->getProperty(self::PROP_PROPERTY_NAME)->string($property);
         $obj->getProperty(self::PROP_DECLARING_CLASS_NAME)->string($className);
         $obj->getProperty(self::PROP_IS_DYNAMIC)->bool(false);

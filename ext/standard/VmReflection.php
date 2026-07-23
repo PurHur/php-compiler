@@ -1154,7 +1154,8 @@ final class VmReflection
         string $declaringClassName,
         bool $isDynamic = false
     ): void {
-        $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
+        // Zend public surface: $name = property, $class = declaring class (#22504).
+        // Reflected class is not a public Zend property (same as ReflectionMethod).
         $obj->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($propertyName);
         $obj->getProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME)->string($declaringClassName);
         $obj->getProperty(ReflectionSupport::PROP_IS_DYNAMIC)->bool($isDynamic);
@@ -3328,8 +3329,11 @@ final class VmReflection
         foreach (self::collectReadOnlyClassPropertiesForReflection($entry, $ctx) as $prop) {
             $obj = new \PHPCompiler\VM\ObjectEntry($rpClass);
             $obj->constructed = true;
-            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
+            // Zend public surface: $name / $class (#22504).
             $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME)->string($prop->name);
+            $declaring = self::declaringClassNameForPropertyLookup($entry, $prop->name, $ctx);
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_DECLARING_CLASS_NAME)->string($declaring);
+            $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_IS_DYNAMIC)->bool(false);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);
