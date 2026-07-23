@@ -12149,6 +12149,10 @@ restart:
      * Inside a property hook, re-entrant $this->prop skips the hook (zend_should_call_hook).
      * Virtual: "Must not read/write virtual property" (#10005).
      * Backed typed, uninitialized: typed-property Error (#21467, php-src-strict).
+     *
+     * Virtuality is judged for the **hook-declaring class** on this frame, not the leaf
+     * object's override — parent::$prop::set()/get() must still touch the parent's backing
+     * when the child marks the property virtual (#22476, zend_property_hooks.c).
      */
     private function enforceVirtualPropertyHookRawAccess(
         ObjectEntry $object,
@@ -12165,8 +12169,11 @@ restart:
         if (!$isRead && !$this->frameIsPropertySetHook($frame)) {
             return null;
         }
-        $className = $this->resolveHookedPropertyClassName($object, $propName);
-        if ($this->instancePropertyIsVirtualHook($object, $propName)) {
+        $hookClassLc = $this->propertyHookFrameDeclaringClassLc($frame);
+        $className = null !== $hookClassLc && isset($this->context->classes[$hookClassLc])
+            ? $this->context->classes[$hookClassLc]->name
+            : $this->resolveHookedPropertyClassName($object, $propName);
+        if ($this->instancePropertyIsVirtualHookForHookFrame($object, $propName, $hookClassLc)) {
             return $this->raiseVirtualPropertyHookRawAccessError($className, $propName, $isRead, $frame);
         }
         if (!$isRead) {
@@ -12179,12 +12186,73 @@ restart:
         if ($this->hookedPropertyUsesDistinctBacking($object, $propName)) {
             return null;
         }
+        // Parent hook with same-name backing on a child that overrode as virtual: probe the
+        // declaring class registry, not the child's virtual leaf meta (#22476).
+        if (null !== $hookClassLc && $this->hookedPropertyUsesDistinctBackingForClass($hookClassLc, $propName)) {
+            return null;
+        }
         $backing = $this->hookedPropertyBackingValue($object, $propName);
         if (false !== $backing && ($backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing))) {
             return $this->dispatchVmError(VM\TypedPropertyCheck::errorMessage($backing), $frame);
         }
 
         return null;
+    }
+
+    /** Declaring class lc of the __phpc_property_* method on this frame, if any. */
+    private function propertyHookFrameDeclaringClassLc(Frame $frame): ?string
+    {
+        $func = $frame->block->func ?? null;
+        if (null === $func || null === $func->class) {
+            return null;
+        }
+        $className = $func->class->value ?? null;
+        if (!is_string($className) || '' === $className) {
+            return null;
+        }
+
+        return strtolower(ltrim($className, '\\'));
+    }
+
+    /**
+     * Virtual check scoped to the running hook's class (#22476 parent::$prop::set/get).
+     */
+    private function instancePropertyIsVirtualHookForHookFrame(
+        ObjectEntry $object,
+        string $propName,
+        ?string $hookClassLc
+    ): bool {
+        if (null !== $hookClassLc) {
+            $propMeta = $this->context->propertyHookRegistry[$hookClassLc][$propName]
+                ?? $this->context->propertyHookRegistry[$hookClassLc][strtolower($propName)]
+                ?? null;
+            if (is_array($propMeta)) {
+                return !empty($propMeta['virtual']);
+            }
+            if (isset($this->context->classes[$hookClassLc])) {
+                foreach ($this->context->classes[$hookClassLc]->properties as $prop) {
+                    if ($prop->name === $propName || 0 === strcasecmp($prop->name, $propName)) {
+                        return $prop->propertyHookVirtual;
+                    }
+                }
+            }
+        }
+
+        return $this->instancePropertyIsVirtualHook($object, $propName);
+    }
+
+    /** Distinct backing declared on a specific class's hook registry. */
+    private function hookedPropertyUsesDistinctBackingForClass(string $classLc, string $propName): bool
+    {
+        $propMeta = $this->context->propertyHookRegistry[$classLc][$propName]
+            ?? $this->context->propertyHookRegistry[$classLc][strtolower($propName)]
+            ?? null;
+        if (!is_array($propMeta)) {
+            return false;
+        }
+        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+
+        return null !== $backingName && 0 !== strcasecmp($backingName, $propName);
     }
 
     private function resolveHookedPropertyClassName(ObjectEntry $object, string $propName): string
