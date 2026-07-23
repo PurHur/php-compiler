@@ -1342,6 +1342,7 @@ require_once __DIR__.'/../../../ext/pdo/PdoMysqlConstants.php';
 require_once __DIR__.'/../../../ext/pdo/PdoPgsqlConstants.php';
 require_once __DIR__.'/../../../ext/pdo/PdoExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/pdo/VmPDO.php';
+require_once __DIR__.'/../../../ext/pdo/VmPDORow.php';
 require_once __DIR__.'/../../../ext/pdo/VmPDOStatement.php';
 require_once __DIR__.'/../../../ext/pdo/bootstrap_pdoexception.php';
 require_once __DIR__.'/../../../ext/pdo/pdo_drivers.php';
