@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6489 |
-| Phase A inventory files (M2 ratio SSOT) | 6489 |
+| PHP files on vm.php path | 6506 |
+| Phase A inventory files (M2 ratio SSOT) | 6506 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20763 |
+| Source constructs flagged (warnings) | 20820 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1671,15 +1671,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/posix_ttyname.php` | 0 | 2 |
 | `ext/posix/posix_uname.php` | 0 | 4 |
 | `ext/pspell/BuiltinClasses.php` | 0 | 1 |
-| `ext/pspell/Module.php` | 0 | 5 |
+| `ext/pspell/Module.php` | 0 | 21 |
 | `ext/pspell/PspellConstants.php` | 0 | 1 |
 | `ext/pspell/PspellExtensionPolicy.php` | 0 | 1 |
 | `ext/pspell/VmPspellArg.php` | 0 | 1 |
+| `ext/pspell/VmPspellConfig.php` | 0 | 4 |
 | `ext/pspell/VmPspellCore.php` | 0 | 3 |
 | `ext/pspell/VmPspellDictionary.php` | 0 | 4 |
 | `ext/pspell/VmPspellNative.php` | 0 | 1 |
+| `ext/pspell/pspell_add_to_personal.php` | 0 | 2 |
+| `ext/pspell/pspell_add_to_session.php` | 0 | 2 |
 | `ext/pspell/pspell_check.php` | 0 | 2 |
+| `ext/pspell/pspell_clear_session.php` | 0 | 2 |
+| `ext/pspell/pspell_config_create.php` | 0 | 4 |
+| `ext/pspell/pspell_config_data_dir.php` | 0 | 2 |
+| `ext/pspell/pspell_config_dict_dir.php` | 0 | 2 |
+| `ext/pspell/pspell_config_ignore.php` | 0 | 2 |
+| `ext/pspell/pspell_config_mode.php` | 0 | 2 |
+| `ext/pspell/pspell_config_personal.php` | 0 | 2 |
+| `ext/pspell/pspell_config_repl.php` | 0 | 2 |
+| `ext/pspell/pspell_config_runtogether.php` | 0 | 2 |
+| `ext/pspell/pspell_config_save_repl.php` | 0 | 2 |
 | `ext/pspell/pspell_new.php` | 0 | 3 |
+| `ext/pspell/pspell_new_config.php` | 0 | 2 |
+| `ext/pspell/pspell_new_personal.php` | 0 | 3 |
+| `ext/pspell/pspell_save_wordlist.php` | 0 | 2 |
+| `ext/pspell/pspell_store_replacement.php` | 0 | 2 |
 | `ext/pspell/pspell_suggest.php` | 0 | 2 |
 | `ext/random/AdditionalEnginesBuiltin.php` | 0 | 25 |
 | `ext/random/BuiltinClasses.php` | 0 | 4 |
@@ -1757,7 +1774,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlElementUnset.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementXpath.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlIteratorStorage.php` | 0 | 1 |
-| `ext/simplexml/SimpleXmlJsonExport.php` | 0 | 15 |
+| `ext/simplexml/SimpleXmlJsonExport.php` | 0 | 17 |
 | `ext/simplexml/SimpleXmlNodeState.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlRegistry.php` | 0 | 1 |
 | `ext/simplexml/VmSimpleXml.php` | 0 | 60 |
@@ -19902,8 +19919,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 31)
 - new pspell_new (line 44)
-- new pspell_check (line 45)
-- new pspell_suggest (line 46)
+- new pspell_new_personal (line 45)
+- new pspell_new_config (line 46)
+- new pspell_check (line 47)
+- new pspell_suggest (line 48)
+- new pspell_store_replacement (line 49)
+- new pspell_add_to_personal (line 50)
+- new pspell_add_to_session (line 51)
+- new pspell_clear_session (line 52)
+- new pspell_save_wordlist (line 53)
+- new pspell_config_create (line 54)
+- new pspell_config_runtogether (line 55)
+- new pspell_config_mode (line 56)
+- new pspell_config_ignore (line 57)
+- new pspell_config_personal (line 58)
+- new pspell_config_dict_dir (line 59)
+- new pspell_config_data_dir (line 60)
+- new pspell_config_repl (line 61)
+- new pspell_config_save_repl (line 62)
 - 3 class method(s)
 
 ### `ext/pspell/PspellConstants.php`
@@ -19919,14 +19952,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pspell/VmPspellArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
+
+### `ext/pspell/VmPspellConfig.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 29)
+- new ObjectEntry (line 37)
+- new Variable (line 43)
+- 5 class method(s)
 
 ### `ext/pspell/VmPspellCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 68)
-- new Variable (line 70)
-- 4 class method(s)
+- new HashTable (line 173)
+- new Variable (line 175)
+- 14 class method(s)
 
 ### `ext/pspell/VmPspellDictionary.php`
 
@@ -19939,7 +19980,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pspell/VmPspellNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 20 class method(s)
+
+### `ext/pspell/pspell_add_to_personal.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/pspell/pspell_add_to_session.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
 
 ### `ext/pspell/pspell_check.php`
 
@@ -19947,11 +20000,98 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 28)
 - 2 class method(s)
 
+### `ext/pspell/pspell_clear_session.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 32)
+- new Error (line 49)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_data_dir.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_dict_dir.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_ignore.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_mode.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_personal.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_repl.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_runtogether.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/pspell/pspell_config_save_repl.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
 ### `ext/pspell/pspell_new.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 32)
 - new ArgumentCountError (line 38)
+- 2 class method(s)
+
+### `ext/pspell/pspell_new_config.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/pspell/pspell_new_personal.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 33)
+- 2 class method(s)
+
+### `ext/pspell/pspell_save_wordlist.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/pspell/pspell_store_replacement.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/pspell/pspell_suggest.php`
@@ -20696,20 +20836,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlJsonExport.php`
 
 **Warnings** (review for bootstrap subset):
-- new stdClass (line 151)
-- new HashTable (line 165)
-- new Variable (line 170)
-- new Variable (line 181)
-- new HashTable (line 192)
-- new Variable (line 200)
-- new HashTable (line 214)
-- new Variable (line 218)
-- new Variable (line 231)
-- new Variable (line 237)
-- new HashTable (line 251)
-- new Variable (line 253)
-- new Variable (line 261)
-- 13 class method(s)
+- new stdClass (line 39)
+- new stdClass (line 47)
+- new stdClass (line 152)
+- new HashTable (line 174)
+- new Variable (line 179)
+- new Variable (line 190)
+- new HashTable (line 201)
+- new Variable (line 209)
+- new HashTable (line 223)
+- new Variable (line 227)
+- new Variable (line 240)
+- new Variable (line 246)
+- new HashTable (line 260)
+- new Variable (line 262)
+- new Variable (line 270)
+- 14 class method(s)
 - 2 closure(s)
 
 ### `ext/simplexml/SimpleXmlNodeState.php`
@@ -20751,39 +20893,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 182)
 - new Exception (line 186)
 - new Exception (line 193)
-- new SimpleXmlNodeState (line 256)
-- new SimpleXmlNodeState (line 395)
-- new Variable (line 486)
-- new Variable (line 491)
-- new Variable (line 498)
-- new Variable (line 504)
-- new Variable (line 519)
-- new SimpleXmlNodeState (line 822)
-- new SimpleXmlNodeState (line 827)
-- new SimpleXmlNodeState (line 840)
-- new SimpleXmlNodeState (line 921)
-- new HashTable (line 1002)
-- new Variable (line 1025)
-- new Variable (line 1034)
-- new Variable (line 1081)
-- new Variable (line 1102)
-- new SimpleXmlNodeState (line 1139)
-- new ObjectEntry (line 1163)
-- new SimpleXmlNodeState (line 1249)
-- new SimpleXmlNodeState (line 1259)
-- new SimpleXmlNodeState (line 1262)
-- new ObjectEntry (line 1283)
-- new ObjectEntry (line 1294)
-- new SimpleXmlNodeState (line 1298)
-- new ObjectEntry (line 1315)
-- new ObjectEntry (line 1331)
-- new Error (line 1407)
-- new ObjectEntry (line 1419)
-- new HashTable (line 1778)
-- new Variable (line 1780)
-- new SimpleXmlNodeState (line 1839)
-- new SimpleXmlNodeState (line 1848)
-- 71 class method(s)
+- new SimpleXmlNodeState (line 390)
+- new Variable (line 483)
+- new Variable (line 489)
+- new Variable (line 496)
+- new Variable (line 502)
+- new Variable (line 517)
+- new SimpleXmlNodeState (line 821)
+- new SimpleXmlNodeState (line 826)
+- new SimpleXmlNodeState (line 839)
+- new SimpleXmlNodeState (line 920)
+- new HashTable (line 1001)
+- new Variable (line 1024)
+- new Variable (line 1033)
+- new Variable (line 1080)
+- new Variable (line 1101)
+- new SimpleXmlNodeState (line 1138)
+- new ObjectEntry (line 1162)
+- new SimpleXmlNodeState (line 1248)
+- new SimpleXmlNodeState (line 1258)
+- new SimpleXmlNodeState (line 1261)
+- new ObjectEntry (line 1282)
+- new SimpleXmlNodeState (line 1303)
+- new ObjectEntry (line 1311)
+- new SimpleXmlNodeState (line 1315)
+- new ObjectEntry (line 1332)
+- new ObjectEntry (line 1348)
+- new Error (line 1424)
+- new ObjectEntry (line 1436)
+- new HashTable (line 1795)
+- new Variable (line 1797)
+- new SimpleXmlNodeState (line 1856)
+- new SimpleXmlNodeState (line 1865)
+- 72 class method(s)
 - 4 closure(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
@@ -40771,161 +40913,161 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 18025)
 - new Operand\Temporary (line 18076)
 - new Temporary (line 18285)
-- new Operand\Temporary (line 32805)
-- new Operand\Temporary (line 32810)
-- new Operand\Temporary (line 32883)
-- new Operand\Temporary (line 32888)
-- new OpCode (line 33044)
-- new OpCode (line 33162)
-- new OpCode (line 33294)
-- new OpCode (line 33366)
-- new OpCode (line 33469)
-- new OpCode (line 33543)
-- new OpCode (line 33686)
-- new OpCode (line 33789)
-- new OpCode (line 33883)
-- new OpCode (line 33964)
-- new OpCode (line 34049)
-- new OpCode (line 34139)
-- new Variable (line 34190)
-- new Operand\Temporary (line 34197)
-- new Operand\Temporary (line 34202)
-- new OpCode (line 34262)
-- new CfgVariable (line 36918)
-- new Literal (line 36918)
-- new Variable (line 36950)
-- new Variable (line 37004)
-- new OpCode (line 37033)
-- new Operand\Temporary (line 37956)
-- new OpCode (line 37958)
-- new OpCode (line 37986)
-- new OpCode (line 38002)
-- new OpCode (line 38010)
-- new OpCode (line 38017)
-- new OpCode (line 38029)
-- new OpCode (line 38046)
-- new OpCode (line 38052)
-- new OpCode (line 38058)
-- new OpCode (line 38063)
-- new OpCode (line 38079)
-- new OpCode (line 38092)
-- new Variable (line 38105)
-- new Operand\Literal (line 38107)
-- new OpCode (line 38110)
-- new OpCode (line 38136)
-- new OpCode (line 38139)
-- new OpCode (line 38200)
-- new OpCode (line 38211)
-- new OpCode (line 38224)
-- new OpCode (line 38401)
-- new CompileFatal (line 38463)
-- new Operand\Variable (line 38814)
-- new Operand\Literal (line 38814)
-- new OpCode (line 38846)
-- new OpCode (line 38868)
-- new OpCode (line 38876)
-- new OpCode (line 38882)
-- new Variable (line 38912)
-- new Temporary (line 38914)
-- new Variable (line 38922)
-- new Temporary (line 38924)
-- new OpCode (line 38972)
-- new Operand\Temporary (line 38993)
-- new Operand\Temporary (line 38999)
-- new Operand\Temporary (line 39005)
-- new Operand\Temporary (line 39011)
-- new Operand\Temporary (line 39028)
-- new Operand\Temporary (line 39037)
-- new Operand\Temporary (line 41288)
-- new Variable (line 41830)
-- new Variable (line 41834)
-- new Variable (line 41842)
-- new Variable (line 41846)
-- new Variable (line 42130)
-- new OpCode (line 42232)
-- new OpCode (line 42268)
-- new OpCode (line 42462)
-- new OpCode (line 42485)
-- new OpCode (line 42518)
-- new OpCode (line 42578)
-- new OpCode (line 42608)
-- new OpCode (line 42639)
-- new OpCode (line 42687)
-- new OpCode (line 42704)
-- new OpCode (line 42723)
-- new OpCode (line 42743)
-- new OpCode (line 42757)
-- new Operand\Temporary (line 42779)
-- new OpCode (line 42813)
-- new OpCode (line 42840)
-- new Operand\Temporary (line 42844)
-- new OpCode (line 42860)
-- new OpCode (line 42893)
-- new OpCode (line 42934)
-- new OpCode (line 42950)
-- new OpCode (line 42973)
-- new OpCode (line 42990)
-- new OpCode (line 43004)
-- new OpCode (line 43026)
-- new OpCode (line 43048)
-- new OpCode (line 43057)
-- new OpCode (line 43077)
-- new OpCode (line 43176)
-- new OpCode (line 43189)
-- new OpCode (line 43202)
-- new OpCode (line 43207)
-- new OpCode (line 43224)
-- new OpCode (line 43270)
-- new OpCode (line 43319)
-- new OpCode (line 43442)
-- new OpCode (line 43481)
-- new OpCode (line 43559)
-- new OpCode (line 43580)
-- new OpCode (line 43615)
-- new OpCode (line 43648)
-- new OpCode (line 43740)
-- new OpCode (line 43794)
-- new OpCode (line 43816)
-- new Operand\Temporary (line 45587)
-- new Operand\Temporary (line 46118)
-- new Operand\Temporary (line 46304)
-- new Operand\Temporary (line 46336)
-- new Operand\Temporary (line 46439)
-- new Operand\Temporary (line 46568)
-- new OpCode (line 46570)
-- new OpCode (line 48153)
-- new Operand\Temporary (line 48624)
-- new OpCode (line 49229)
-- new Operand\Literal (line 49594)
-- new Variable (line 49596)
-- new OpCode (line 49642)
-- new OpCode (line 49857)
-- new OpCode (line 49867)
-- new OpCode (line 49870)
-- new Operand\Temporary (line 49897)
-- new Operand\Temporary (line 49934)
-- new OpCode (line 49936)
-- new OpCode (line 49947)
-- new Operand\Temporary (line 49950)
-- new OpCode (line 49952)
-- new OpCode (line 49960)
-- new OpCode (line 49970)
-- new OpCode (line 49978)
-- new OpCode (line 49981)
-- new OpCode (line 50006)
-- new OpCode (line 50032)
-- new OpCode (line 50050)
-- new OpCode (line 50057)
-- new Operand\Literal (line 50845)
-- new OpCode (line 52388)
-- new Literal (line 52549)
-- new OpCode (line 52648)
-- new Variable (line 52655)
-- new Temporary (line 52657)
-- new OpCode (line 52660)
-- new CompileFatal (line 52995)
-- new CompileFatal (line 53250)
-- 1082 class method(s)
+- new Operand\Temporary (line 32936)
+- new Operand\Temporary (line 32941)
+- new Operand\Temporary (line 33014)
+- new Operand\Temporary (line 33019)
+- new OpCode (line 33175)
+- new OpCode (line 33293)
+- new OpCode (line 33425)
+- new OpCode (line 33497)
+- new OpCode (line 33600)
+- new OpCode (line 33674)
+- new OpCode (line 33817)
+- new OpCode (line 33920)
+- new OpCode (line 34014)
+- new OpCode (line 34095)
+- new OpCode (line 34180)
+- new OpCode (line 34270)
+- new Variable (line 34321)
+- new Operand\Temporary (line 34328)
+- new Operand\Temporary (line 34333)
+- new OpCode (line 34393)
+- new CfgVariable (line 37049)
+- new Literal (line 37049)
+- new Variable (line 37081)
+- new Variable (line 37135)
+- new OpCode (line 37164)
+- new Operand\Temporary (line 38087)
+- new OpCode (line 38089)
+- new OpCode (line 38117)
+- new OpCode (line 38133)
+- new OpCode (line 38141)
+- new OpCode (line 38148)
+- new OpCode (line 38160)
+- new OpCode (line 38177)
+- new OpCode (line 38183)
+- new OpCode (line 38189)
+- new OpCode (line 38194)
+- new OpCode (line 38210)
+- new OpCode (line 38223)
+- new Variable (line 38236)
+- new Operand\Literal (line 38238)
+- new OpCode (line 38241)
+- new OpCode (line 38267)
+- new OpCode (line 38270)
+- new OpCode (line 38331)
+- new OpCode (line 38342)
+- new OpCode (line 38355)
+- new OpCode (line 38532)
+- new CompileFatal (line 38594)
+- new Operand\Variable (line 38945)
+- new Operand\Literal (line 38945)
+- new OpCode (line 38977)
+- new OpCode (line 38999)
+- new OpCode (line 39007)
+- new OpCode (line 39013)
+- new Variable (line 39043)
+- new Temporary (line 39045)
+- new Variable (line 39053)
+- new Temporary (line 39055)
+- new OpCode (line 39103)
+- new Operand\Temporary (line 39124)
+- new Operand\Temporary (line 39130)
+- new Operand\Temporary (line 39136)
+- new Operand\Temporary (line 39142)
+- new Operand\Temporary (line 39159)
+- new Operand\Temporary (line 39168)
+- new Operand\Temporary (line 41419)
+- new Variable (line 41961)
+- new Variable (line 41965)
+- new Variable (line 41973)
+- new Variable (line 41977)
+- new Variable (line 42261)
+- new OpCode (line 42363)
+- new OpCode (line 42399)
+- new OpCode (line 42593)
+- new OpCode (line 42616)
+- new OpCode (line 42649)
+- new OpCode (line 42709)
+- new OpCode (line 42739)
+- new OpCode (line 42770)
+- new OpCode (line 42818)
+- new OpCode (line 42835)
+- new OpCode (line 42854)
+- new OpCode (line 42874)
+- new OpCode (line 42888)
+- new Operand\Temporary (line 42910)
+- new OpCode (line 42944)
+- new OpCode (line 42971)
+- new Operand\Temporary (line 42975)
+- new OpCode (line 42991)
+- new OpCode (line 43024)
+- new OpCode (line 43065)
+- new OpCode (line 43081)
+- new OpCode (line 43104)
+- new OpCode (line 43121)
+- new OpCode (line 43135)
+- new OpCode (line 43157)
+- new OpCode (line 43179)
+- new OpCode (line 43188)
+- new OpCode (line 43208)
+- new OpCode (line 43307)
+- new OpCode (line 43320)
+- new OpCode (line 43333)
+- new OpCode (line 43338)
+- new OpCode (line 43355)
+- new OpCode (line 43401)
+- new OpCode (line 43450)
+- new OpCode (line 43573)
+- new OpCode (line 43612)
+- new OpCode (line 43690)
+- new OpCode (line 43711)
+- new OpCode (line 43746)
+- new OpCode (line 43779)
+- new OpCode (line 43871)
+- new OpCode (line 43925)
+- new OpCode (line 43947)
+- new Operand\Temporary (line 45718)
+- new Operand\Temporary (line 46249)
+- new Operand\Temporary (line 46435)
+- new Operand\Temporary (line 46467)
+- new Operand\Temporary (line 46570)
+- new Operand\Temporary (line 46699)
+- new OpCode (line 46701)
+- new OpCode (line 48295)
+- new Operand\Temporary (line 48766)
+- new OpCode (line 49371)
+- new Operand\Literal (line 49736)
+- new Variable (line 49738)
+- new OpCode (line 49784)
+- new OpCode (line 49999)
+- new OpCode (line 50009)
+- new OpCode (line 50012)
+- new Operand\Temporary (line 50039)
+- new Operand\Temporary (line 50076)
+- new OpCode (line 50078)
+- new OpCode (line 50089)
+- new Operand\Temporary (line 50092)
+- new OpCode (line 50094)
+- new OpCode (line 50102)
+- new OpCode (line 50112)
+- new OpCode (line 50120)
+- new OpCode (line 50123)
+- new OpCode (line 50148)
+- new OpCode (line 50174)
+- new OpCode (line 50192)
+- new OpCode (line 50199)
+- new Operand\Literal (line 50987)
+- new OpCode (line 52530)
+- new Literal (line 52691)
+- new OpCode (line 52790)
+- new Variable (line 52797)
+- new Temporary (line 52799)
+- new OpCode (line 52802)
+- new CompileFatal (line 53137)
+- new CompileFatal (line 53392)
+- 1084 class method(s)
 - 50 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
