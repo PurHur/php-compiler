@@ -149,6 +149,7 @@ final class ThrowableManifest
         'SQLite3Exception' => 'Exception',
         'PDOException' => 'RuntimeException',
         'RedisException' => 'Exception',
+        'SimdJsonException' => 'RuntimeException',
         'SoapFault' => 'Exception',
         'mysqli_sql_exception' => 'RuntimeException',
     ];
@@ -191,6 +192,7 @@ final class ThrowableManifest
         'SQLite3Exception' => 'SQLite3Exception',
         'PDOException' => 'PDOException',
         'RedisException' => 'RedisException',
+        'SimdJsonException' => \PHPCompiler\ext\simdjson\SimdJsonException::class,
         'SoapFault' => 'SoapFault',
         'mysqli_sql_exception' => 'mysqli_sql_exception',
     ];
@@ -223,6 +225,7 @@ final class ThrowableManifest
             'SQLite3Exception' => \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass(),
             'PDOException' => \PHPCompiler\ext\pdo\PdoExtensionPolicy::advertisesExceptionClass(),
             'RedisException' => \PHPCompiler\ext\redis\RedisExtensionPolicy::advertisesExtension(),
+            'SimdJsonException' => \PHPCompiler\ext\simdjson\SimdjsonExtensionPolicy::advertisesExtension(),
             'SoapFault' => \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExceptionClass(),
             'mysqli_sql_exception' => \PHPCompiler\ext\mysqli\MysqliExtensionPolicy::advertisesExtension(),
             default => true,
