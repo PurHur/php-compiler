@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
  * Reflected Dom\Element / Dom\HTMLElement IDL attributes
- * (php-src element.c / inner_outer_html_mixin.c; #20418, #20532).
+ * (php-src element.c / inner_outer_html_mixin.c; #20418, #20532)
+ * plus legacy DOMElement::$id / $className (php_dom.stub.php PHP 8.3+; #22457).
  */
 final class DomHtmlElementPropertySupport
 {
@@ -27,21 +29,28 @@ final class DomHtmlElementPropertySupport
 
     public static function isManagedProperty(ObjectEntry $object, string $name): bool
     {
-        if (!VmDomLiving::isLivingElement($object) || !VmDom::isElement($object)) {
+        if (!VmDom::isElement($object)) {
             return false;
         }
         $lc = strtolower($name);
+        if (VmDomLiving::isLivingElement($object)) {
+            return 'id' === $lc
+                || 'classname' === $lc
+                || 'innerhtml' === $lc
+                || 'outerhtml' === $lc
+                || 'substitutednodevalue' === $lc;
+        }
+        // Legacy DOMElement::$id / $className (PHP 8.3+; #22457).
+        if (!CompilerVersion::supportsDomElementIdClassNameProperties()) {
+            return false;
+        }
 
-        return 'id' === $lc
-            || 'classname' === $lc
-            || 'innerhtml' === $lc
-            || 'outerhtml' === $lc
-            || 'substitutednodevalue' === $lc;
+        return 'id' === $lc || 'classname' === $lc;
     }
 
     /**
      * isset($el->id|/className|/innerHTML|/outerHTML|/substitutedNodeValue) — typed string props,
-     * not the null ClassProperty slot (#20532, #21034).
+     * not the null ClassProperty slot (#20532, #21034, #22457).
      *
      * @return bool|null null when this support does not own the property
      */
@@ -134,10 +143,12 @@ final class DomHtmlElementPropertySupport
             'substitutednodevalue' => 'substitutedNodeValue',
             default => 'outerHTML',
         };
+        $classLabel = VmDomLiving::isLivingElement($owner) ? 'Dom\\Element' : 'DOMElement';
         if (Variable::TYPE_STRING !== $resolved->type) {
             throw new \TypeError(sprintf(
-                'Cannot assign %s to property Dom\\Element::$%s of type string',
+                'Cannot assign %s to property %s::$%s of type string',
                 VmDom::typeLabel($resolved),
+                $classLabel,
                 $propLabel
             ));
         }

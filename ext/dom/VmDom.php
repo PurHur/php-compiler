@@ -700,6 +700,11 @@ final class VmDom
         $element->interfaces[] = 'domchildnode';
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $element->properties[] = new ClassProperty(self::PROP_TAG_NAME, null, $strProto);
+        // PHP 8.3+ virtual HTML id/className (php_dom.stub.php; #22457).
+        if (CompilerVersion::supportsDomElementIdClassNameProperties()) {
+            $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_ID, $nullProto, $strProto);
+            $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_CLASS_NAME, $nullProto, $strProto);
+        }
         $element->properties[] = new ClassProperty(self::PROP_ATTRIBUTES, $nullProto, $objProto);
         // ParentNode + NonDocumentTypeChildNode on Element (#19431).
         $element->properties[] = new ClassProperty(self::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
