@@ -344,6 +344,10 @@ patch_already_applied() {
         && grep -A3 'parseListAssignment' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
           | grep -q 'AssignRef'
       ;;
+    php-cfg-list-assignment-attr.patch)
+      grep -q "attributes\['listAssignment'\] = true" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        || grep -q '\$attributes\['\''listAssignment'\''\] = true' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-empty-list-assignment.patch)
       grep -q 'isEmptyListExpr' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -q "Cannot use empty list" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
@@ -6356,6 +6360,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_php_cfg_compiler_halt_offset_overlay
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-list-destruct-byref.patch"
+  apply_patch "$PATCH_DIR/php-cfg-list-assignment-attr.patch"
   apply_patch "$PATCH_DIR/php-cfg-empty-list-assignment.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-mix-keyed-unkeyed.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-skip-slot.patch" || true

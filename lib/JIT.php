@@ -7872,15 +7872,19 @@ class JIT {
                     }
                     if ($value->type === Variable::TYPE_STRING) {
                         $str = $this->context->helper->loadValue($value);
-                        $charPtr = JIT\StringOffsetHelper::dimFetch(
-                            $this->context,
-                            $str,
-                            $dim
-                        );
                         if ($forWrite) {
+                            $charPtr = JIT\StringOffsetHelper::dimFetch(
+                                $this->context,
+                                $str,
+                                $dim
+                            );
                             $this->context->makeVariableFromValueOp($charPtr, $resultOp);
                         } else {
-                            $str = JIT\StringOffsetHelper::readAsString($this->context, $charPtr);
+                            $str = JIT\StringOffsetHelper::readDimAsString(
+                                $this->context,
+                                $str,
+                                $dim
+                            );
                             $this->context->makeVariableFromValueOp($str, $resultOp);
                         }
                         break;

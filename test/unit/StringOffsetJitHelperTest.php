@@ -38,4 +38,12 @@ final class StringOffsetJitHelperTest extends TestCase
     {
         $this->assertSame(122, StringOffsetJitHelper::byteFromStringFirstChar('z'));
     }
+
+    public function testReadOffsetPositiveAndOor(): void
+    {
+        $this->assertSame('A', StringOffsetJitHelper::readOffset('AOT', 0));
+        $this->assertSame('T', StringOffsetJitHelper::readOffset('AOT', -1));
+        @$empty = StringOffsetJitHelper::readOffset('AOT', 99);
+        $this->assertSame('', $empty);
+    }
 }

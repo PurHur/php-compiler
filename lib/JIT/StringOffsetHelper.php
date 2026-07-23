@@ -42,6 +42,14 @@ final class StringOffsetHelper
         return StringOffsetRuntime::dimFetch($context, $str, $dim);
     }
 
+    /**
+     * Bounds-checked offset read → {@see __string__*} (#22646).
+     */
+    public static function readDimAsString(Context $context, PHPLLVM\Value $str, Variable $dim): PHPLLVM\Value
+    {
+        return StringOffsetRuntime::readDimAsString($context, $str, $dim);
+    }
+
     public static function normalizeOffset(Context $context, PHPLLVM\Value $index, PHPLLVM\Value $len): PHPLLVM\Value
     {
         return StringOffsetRuntime::normalizeOffset($context, $index, $len);
