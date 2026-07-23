@@ -23,6 +23,8 @@ final class MysqliConstants
 
     public const MYSQLI_STORE_RESULT = 0;
     public const MYSQLI_USE_RESULT = 1;
+    /** Non-blocking query mode — php-src mysqli_mysqlnd.h MYSQLI_ASYNC (#22163). */
+    public const MYSQLI_ASYNC = 128;
 
     public const MYSQLI_CLIENT_COMPRESS = 32;
     public const MYSQLI_CLIENT_SSL = 2048;
@@ -67,6 +69,7 @@ final class MysqliConstants
             'MYSQLI_BOTH' => self::MYSQLI_BOTH,
             'MYSQLI_STORE_RESULT' => self::MYSQLI_STORE_RESULT,
             'MYSQLI_USE_RESULT' => self::MYSQLI_USE_RESULT,
+            'MYSQLI_ASYNC' => self::MYSQLI_ASYNC,
             'MYSQLI_CLIENT_COMPRESS' => self::MYSQLI_CLIENT_COMPRESS,
             'MYSQLI_CLIENT_SSL' => self::MYSQLI_CLIENT_SSL,
             'MYSQLI_CLIENT_INTERACTIVE' => self::MYSQLI_CLIENT_INTERACTIVE,
