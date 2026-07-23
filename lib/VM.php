@@ -4224,6 +4224,17 @@ restart:
                             break;
                         }
                         if ($container->type !== Variable::TYPE_ARRAY) {
+                            if (Variable::TYPE_STRING === $container->type) {
+                                $catchFrame = $this->dispatchVmError(
+                                    TypeCheck::STRING_APPEND_UNSUPPORTED_MESSAGE,
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
                             if (
                                 Variable::TYPE_OBJECT === $container->type
                                 && $this->objectImplementsArrayAccess($container->toObject())

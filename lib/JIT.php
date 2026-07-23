@@ -7787,7 +7787,13 @@ class JIT {
                             break;
                         }
                         if (Variable::TYPE_STRING === $value->type) {
-                            throw new \LogicException('[] is only supported for arrays');
+                            JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                            JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                            JIT\Builtin\ErrorRaise::emitRaise(
+                                $this->context,
+                                \PHPCompiler\VM\TypeCheck::STRING_APPEND_UNSUPPORTED_MESSAGE
+                            );
+                            break;
                         }
                         $this->context->setVariableOp(
                             $resultOp,
