@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6440 |
-| Phase A inventory files (M2 ratio SSOT) | 6440 |
+| PHP files on vm.php path | 6443 |
+| Phase A inventory files (M2 ratio SSOT) | 6443 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20580 |
+| Source constructs flagged (warnings) | 20616 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -482,6 +482,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/XmlDocumentCreateFromString.php` | 0 | 3 |
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
 | `ext/dom/ns_import_simplexml.php` | 0 | 2 |
+| `ext/ds/BuiltinClasses.php` | 0 | 19 |
+| `ext/ds/Module.php` | 0 | 1 |
+| `ext/ds/VmDsStorage.php` | 0 | 15 |
 | `ext/enchant/BuiltinClasses.php` | 0 | 1 |
 | `ext/enchant/EnchantExtensionPolicy.php` | 0 | 1 |
 | `ext/enchant/Module.php` | 0 | 23 |
@@ -5664,7 +5667,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 113 |
+| `lib/Runtime.php` | 0 | 114 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -9804,6 +9807,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
 - 2 class method(s)
+
+### `ext/ds/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 37)
+- new DsVectorConstruct (line 41)
+- new DsVectorCount (line 44)
+- new ClassEntry (line 56)
+- new DsMapConstruct (line 60)
+- new DsMapCount (line 63)
+- new DsMapGet (line 65)
+- new ClassEntry (line 77)
+- new DsSetConstruct (line 81)
+- new DsSetCount (line 84)
+- new DsSetAdd (line 86)
+- new DsSetContains (line 88)
+- new HashTable (line 104)
+- new HashTable (line 144)
+- new ArgumentCountError (line 186)
+- new HashTable (line 209)
+- new ArgumentCountError (line 251)
+- new ArgumentCountError (line 273)
+- 13 class method(s)
+
+### `ext/ds/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/ds/VmDsStorage.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 52)
+- new HashTable (line 57)
+- new HashTable (line 62)
+- new Error (line 92)
+- new Error (line 96)
+- new HashTable (line 108)
+- new Variable (line 110)
+- new HashTable (line 120)
+- new Variable (line 129)
+- new Variable (line 158)
+- new Variable (line 164)
+- new OutOfBoundsException (line 169)
+- new HashTable (line 190)
+- new Variable (line 192)
+- 14 class method(s)
 
 ### `ext/enchant/BuiltinClasses.php`
 
@@ -47003,89 +47053,90 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM (line 198)
 - new ext\types\Module (line 226)
 - new ext\spl\Module (line 227)
-- new ext\intl\Module (line 228)
-- new ext\zip\Module (line 229)
-- new ext\libxml\Module (line 230)
-- new ext\dom\Module (line 231)
-- new ext\xsl\Module (line 232)
-- new ext\simplexml\Module (line 233)
-- new ext\xml\Module (line 234)
-- new ext\xmlrpc\Module (line 235)
-- new ext\wddx\Module (line 236)
-- new ext\xmlreader\Module (line 237)
-- new ext\xmlwriter\Module (line 238)
-- new ext\gd\Module (line 239)
-- new ext\exif\Module (line 240)
-- new ext\fileinfo\Module (line 241)
-- new ext\iconv\Module (line 242)
-- new ext\gettext\Module (line 243)
-- new ext\mbstring\Module (line 244)
-- new ext\filter\Module (line 245)
-- new ext\calendar\Module (line 246)
-- new ext\ldap\Module (line 247)
-- new ext\session\Module (line 248)
-- new ext\bcmath\Module (line 249)
-- new ext\gmp\Module (line 250)
-- new ext\stats\Module (line 251)
-- new ext\opcache\Module (line 252)
-- new ext\openssl\Module (line 253)
-- new ext\curl\Module (line 254)
-- new ext\hash\Module (line 255)
-- new ext\posix\Module (line 256)
-- new ext\inotify\Module (line 257)
-- new ext\pcntl\Module (line 258)
-- new ext\sockets\Module (line 259)
-- new ext\zmq\Module (line 260)
-- new ext\ftp\Module (line 261)
-- new ext\soap\Module (line 262)
-- new ext\ffi\Module (line 263)
-- new ext\ctype\Module (line 264)
-- new ext\tokenizer\Module (line 265)
-- new ext\random\Module (line 266)
-- new ext\igbinary\Module (line 267)
-- new ext\msgpack\Module (line 268)
-- new ext\simdjson\Module (line 269)
-- new ext\yaml\Module (line 270)
-- new ext\redis\Module (line 271)
-- new ext\mongodb\Module (line 272)
-- new ext\snmp\Module (line 273)
-- new ext\zstd\Module (line 274)
-- new ext\lzf\Module (line 275)
-- new ext\lz4\Module (line 276)
-- new ext\bz2\Module (line 277)
-- new ext\brotli\Module (line 278)
-- new ext\sodium\Module (line 279)
-- new ext\sqlite3\Module (line 280)
-- new ext\pgsql\Module (line 281)
-- new ext\odbc\Module (line 282)
-- new ext\dba\Module (line 283)
-- new ext\mailparse\Module (line 284)
-- new ext\enchant\Module (line 285)
-- new ext\gnupg\Module (line 286)
-- new ext\pspell\Module (line 287)
-- new ext\mysqli\Module (line 288)
-- new ext\tidy\Module (line 289)
-- new ext\pdo\Module (line 290)
-- new ext\phar\Module (line 291)
-- new ext\uri\Module (line 292)
-- new ext\uuid\Module (line 293)
-- new ext\uploadprogress\Module (line 294)
-- new ext\apcu\Module (line 295)
-- new ext\sysvshm\Module (line 296)
-- new ext\sysvsem\Module (line 297)
-- new ext\sysvmsg\Module (line 298)
-- new ext\reflection\Module (line 299)
-- new ext\standard\Module (line 300)
-- new JIT (line 376)
-- new JITContext (line 390)
-- new SealedClassPreprocessor (line 456)
-- new StaticClassPreprocessor (line 459)
-- new SourcePreprocessor\PropertyHooks (line 462)
-- new State (line 606)
-- new ReflectionProperty (line 633)
-- new ReflectionProperty (line 636)
-- new LintCompiler (line 1047)
-- new Variable (line 1177)
+- new ext\ds\Module (line 228)
+- new ext\intl\Module (line 229)
+- new ext\zip\Module (line 230)
+- new ext\libxml\Module (line 231)
+- new ext\dom\Module (line 232)
+- new ext\xsl\Module (line 233)
+- new ext\simplexml\Module (line 234)
+- new ext\xml\Module (line 235)
+- new ext\xmlrpc\Module (line 236)
+- new ext\wddx\Module (line 237)
+- new ext\xmlreader\Module (line 238)
+- new ext\xmlwriter\Module (line 239)
+- new ext\gd\Module (line 240)
+- new ext\exif\Module (line 241)
+- new ext\fileinfo\Module (line 242)
+- new ext\iconv\Module (line 243)
+- new ext\gettext\Module (line 244)
+- new ext\mbstring\Module (line 245)
+- new ext\filter\Module (line 246)
+- new ext\calendar\Module (line 247)
+- new ext\ldap\Module (line 248)
+- new ext\session\Module (line 249)
+- new ext\bcmath\Module (line 250)
+- new ext\gmp\Module (line 251)
+- new ext\stats\Module (line 252)
+- new ext\opcache\Module (line 253)
+- new ext\openssl\Module (line 254)
+- new ext\curl\Module (line 255)
+- new ext\hash\Module (line 256)
+- new ext\posix\Module (line 257)
+- new ext\inotify\Module (line 258)
+- new ext\pcntl\Module (line 259)
+- new ext\sockets\Module (line 260)
+- new ext\zmq\Module (line 261)
+- new ext\ftp\Module (line 262)
+- new ext\soap\Module (line 263)
+- new ext\ffi\Module (line 264)
+- new ext\ctype\Module (line 265)
+- new ext\tokenizer\Module (line 266)
+- new ext\random\Module (line 267)
+- new ext\igbinary\Module (line 268)
+- new ext\msgpack\Module (line 269)
+- new ext\simdjson\Module (line 270)
+- new ext\yaml\Module (line 271)
+- new ext\redis\Module (line 272)
+- new ext\mongodb\Module (line 273)
+- new ext\snmp\Module (line 274)
+- new ext\zstd\Module (line 275)
+- new ext\lzf\Module (line 276)
+- new ext\lz4\Module (line 277)
+- new ext\bz2\Module (line 278)
+- new ext\brotli\Module (line 279)
+- new ext\sodium\Module (line 280)
+- new ext\sqlite3\Module (line 281)
+- new ext\pgsql\Module (line 282)
+- new ext\odbc\Module (line 283)
+- new ext\dba\Module (line 284)
+- new ext\mailparse\Module (line 285)
+- new ext\enchant\Module (line 286)
+- new ext\gnupg\Module (line 287)
+- new ext\pspell\Module (line 288)
+- new ext\mysqli\Module (line 289)
+- new ext\tidy\Module (line 290)
+- new ext\pdo\Module (line 291)
+- new ext\phar\Module (line 292)
+- new ext\uri\Module (line 293)
+- new ext\uuid\Module (line 294)
+- new ext\uploadprogress\Module (line 295)
+- new ext\apcu\Module (line 296)
+- new ext\sysvshm\Module (line 297)
+- new ext\sysvsem\Module (line 298)
+- new ext\sysvmsg\Module (line 299)
+- new ext\reflection\Module (line 300)
+- new ext\standard\Module (line 301)
+- new JIT (line 377)
+- new JITContext (line 391)
+- new SealedClassPreprocessor (line 457)
+- new StaticClassPreprocessor (line 460)
+- new SourcePreprocessor\PropertyHooks (line 463)
+- new State (line 607)
+- new ReflectionProperty (line 634)
+- new ReflectionProperty (line 637)
+- new LintCompiler (line 1048)
+- new Variable (line 1178)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
