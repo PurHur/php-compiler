@@ -2135,6 +2135,21 @@ class VM {
     }
 
     /**
+     * Internal classes that still publish PHP-visible CE properties via get_object_vars
+     * (php-src reflection_object handlers; #22515). DateTime* and similar stay empty.
+     */
+    private function internalClassExportsGetObjectVars(ObjectEntry $object): bool
+    {
+        $lc = strtolower($object->class->name);
+        return match ($lc) {
+            VM\ReflectionSupport::REFLECTION_CLASS,
+            VM\ReflectionSupport::REFLECTION_OBJECT,
+            VM\ReflectionSupport::REFLECTION_METHOD => true,
+            default => false,
+        };
+    }
+
+    /**
      * All set instance properties for var_export() — ignores caller visibility (#3594).
      *
      * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_VAR_EXPORT)
@@ -2179,6 +2194,7 @@ class VM {
             && null === $callerClassLc
             && $object->class->isInternal
             && !$object->class->allowsDynamicProperties
+            && !$this->internalClassExportsGetObjectVars($object)
         ) {
             return [];
         }
