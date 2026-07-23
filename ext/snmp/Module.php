@@ -9,10 +9,10 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * snmp extension module entry (php-src ext/snmp/snmp.c; #6070).
+ * snmp extension module entry (php-src ext/snmp/snmp.c; #6070, #22244).
  *
- * v1: snmpget/snmpwalk + SNMP class registration. Without Net-SNMP wire,
- * get/walk return false + warning (php-src-strict unreachable-agent shape).
+ * v1: snmpget/getnext/walk/realwalk/set + SNMP class registration. Without
+ * Net-SNMP wire, ops return false + warning (php-src-strict unreachable-agent).
  * PHP-in-PHP only — no runtime/*.c growth.
  */
 class Module extends ModuleAbstract
@@ -51,7 +51,10 @@ class Module extends ModuleAbstract
 
         return [
             new snmpget(),
+            new snmpgetnext(),
             new snmpwalk(),
+            new snmprealwalk(),
+            new snmpset(),
         ];
     }
 }

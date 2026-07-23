@@ -727,11 +727,13 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'redis_phantom')) {
                 continue;
             }
-            // snmp_exists sets PROFILE=8.4 via --ENV--; always include. Other snmp_* need forward profile.
+            // snmp_exists / snmp_set_getnext_realwalk set PROFILE=8.4 via --ENV--; always include.
+            // Other snmp_* need forward profile.
             if (!CompilerVersion::supportsSnmp()
                 && str_contains($name, 'snmp')
                 && !str_contains($name, 'snmp_phantom')
-                && !str_contains($name, 'snmp_exists')) {
+                && !str_contains($name, 'snmp_exists')
+                && !str_contains($name, 'snmp_set_getnext_realwalk')) {
                 continue;
             }
             if (CompilerVersion::supportsSnmp()
