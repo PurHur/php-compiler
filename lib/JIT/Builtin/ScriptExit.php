@@ -60,6 +60,14 @@ final class ScriptExit
             case Variable::TYPE_OBJECT:
                 self::emitObjectStatus($context, $context->helper->loadValue($arg), $arg);
                 break;
+            case Variable::TYPE_HASHTABLE:
+                // PHP 8.4+ exit()/die() string|int — array status TypeError (#22492).
+                if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+                    self::emitStatusTypeErrorAndAbort($context, 'array');
+
+                    return;
+                }
+                throw new \LogicException('exit() only supports string or integer status in this compiler build');
             default:
                 throw new \LogicException('exit() only supports string or integer status in this compiler build');
         }
@@ -317,7 +325,8 @@ final class ScriptExit
             $i8->constInt(Variable::TYPE_OBJECT, false)
         );
         $objectBlock = BasicBlockHelper::append($context, 'exit_boxed_object');
-        $context->builder->branchIf($isObject, $objectBlock, $badBlock);
+        $afterObject = BasicBlockHelper::append($context, 'exit_boxed_after_object');
+        $context->builder->branchIf($isObject, $objectBlock, $afterObject);
 
         $context->builder->positionAtEnd($objectBlock);
         $objPtr = $context->builder->call(
@@ -325,6 +334,26 @@ final class ScriptExit
             $boxedPtr
         );
         self::emitObjectStatus($context, $objPtr);
+
+        $context->builder->positionAtEnd($afterObject);
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $arrayBlock = BasicBlockHelper::append($context, 'exit_boxed_array');
+        $context->builder->branchIf($isArray, $arrayBlock, $badBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        // PHP 8.4+ exit()/die() string|int — boxed array TypeError (#22492).
+        if (\PHPCompiler\CompilerVersion::supportsExitFunctionForm()) {
+            self::emitStatusTypeErrorAndAbort($context, 'array');
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('exit'),
+                $i32->constInt(1, false)
+            );
+        }
 
         $context->builder->positionAtEnd($badBlock);
         $context->builder->call(
