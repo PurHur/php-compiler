@@ -236,8 +236,12 @@ final class ReflectionTypeSupport
         if ($type instanceof CfgType\Nullable) {
             return true;
         }
-        if ($type instanceof CfgType\Literal && 'null' === strtolower($type->name)) {
-            return true;
+        // Explicit `mixed` includes null (php-src ReflectionNamedType::allowsNull).
+        // Absent types are Mixed_ and stripped before this helper (#22064 / #22524).
+        if ($type instanceof CfgType\Literal) {
+            $name = strtolower($type->name);
+
+            return 'null' === $name || 'mixed' === $name;
         }
         if ($type instanceof CfgType\Union_) {
             foreach ($type->types as $member) {
