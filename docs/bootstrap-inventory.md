@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6432 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20539 |
+| Source constructs flagged (warnings) | 20541 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4454,7 +4454,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/xmlwriter_write_raw.php` | 0 | 2 |
 | `ext/xsl/BuiltinClasses.php` | 0 | 1 |
 | `ext/xsl/JitXsltMethod.php` | 0 | 1 |
-| `ext/xsl/JitXsltUserScript.php` | 0 | 1 |
+| `ext/xsl/JitXsltUserScript.php` | 0 | 2 |
 | `ext/xsl/Module.php` | 0 | 2 |
 | `ext/xsl/VmXsl.php` | 0 | 16 |
 | `ext/xsl/VmXslDomBridge.php` | 0 | 3 |
@@ -4465,7 +4465,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltProcessorGetParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorGetSecurityPrefs.php` | 0 | 2 |
 | `ext/xsl/XsltProcessorHasExsltSupport.php` | 0 | 2 |
-| `ext/xsl/XsltProcessorImportStylesheet.php` | 0 | 2 |
+| `ext/xsl/XsltProcessorImportStylesheet.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorRegisterPhpFunctionNS.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorRegisterPhpFunctions.php` | 0 | 1 |
 | `ext/xsl/XsltProcessorRemoveParameter.php` | 0 | 3 |
@@ -38976,7 +38976,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xsl/JitXsltUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- new DOMDocument (line 103)
+- 15 class method(s)
 
 ### `ext/xsl/Module.php`
 
@@ -39054,8 +39055,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xsl/XsltProcessorImportStylesheet.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 27)
 - 1 class method(s)
+- 1 closure(s)
 
 ### `ext/xsl/XsltProcessorRegisterPhpFunctionNS.php`
 
@@ -46687,7 +46689,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/XsltInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\XsltMethod (line 44)
+- new Call\XsltMethod (line 45)
 - 3 class method(s)
 
 ### `lib/JitMcjitEmbed.php`

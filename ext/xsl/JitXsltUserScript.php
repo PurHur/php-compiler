@@ -10,14 +10,16 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
+use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\ext\standard\XslConstants;
 use PHPLLVM\Value;
 
 /**
- * User-script AOT: compile-time XSLTProcessor security/EXSLT methods via host ext/xsl (#20392).
+ * User-script AOT: compile-time XSLTProcessor methods via host ext/xsl (#20392).
  *
  * Tracks processors allocated in the user script so hasExsltSupport / setSecurityPrefs /
- * getSecurityPrefs / setProfiling can fold to constants matching VM/Zend. No runtime/*.c growth.
+ * getSecurityPrefs / setProfiling / importStylesheet can fold to constants matching VM/Zend.
+ * No runtime/*.c growth.
  */
 final class JitXsltUserScript
 {
@@ -80,6 +82,36 @@ final class JitXsltUserScript
         }
 
         return self::intValue($context, XsltHostBridge::getSecurityPrefs($proc));
+    }
+
+    /**
+     * XSLTProcessor::importStylesheet(DOMDocument $stylesheet): bool — user-script AOT (#22367).
+     *
+     * Uses the most recent compile-time DOMDocument::loadXML() literal (same pattern as
+     * other DOM user-script folds) to drive the host bridge and fold the Zend bool return.
+     */
+    public static function tryImportStylesheet(Context $context, JITVariable ...$args): ?Value
+    {
+        $proc = self::requireProcessor($args[0] ?? null);
+        if (null === $proc || !isset($args[1])) {
+            return null;
+        }
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null === $xml || '' === $xml) {
+            return null;
+        }
+        $hostDoc = new \DOMDocument();
+        // Suppress parse noise for intentional non-stylesheet fixtures (Zend still returns false).
+        $prev = libxml_use_internal_errors(true);
+        $loaded = @$hostDoc->loadXML($xml);
+        libxml_clear_errors();
+        libxml_use_internal_errors($prev);
+        if (!$loaded) {
+            return self::boolValue($context, false);
+        }
+        $ok = @XsltHostBridge::importStylesheet($proc, $hostDoc);
+
+        return self::boolValue($context, $ok);
     }
 
     /**

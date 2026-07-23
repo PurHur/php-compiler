@@ -18,6 +18,7 @@ final class JitXsltMethod
             'setsecurityprefs' => JitXsltUserScript::trySetSecurityPrefs($context, ...$args),
             'getsecurityprefs' => JitXsltUserScript::tryGetSecurityPrefs($context, ...$args),
             'setprofiling' => JitXsltUserScript::trySetProfiling($context, ...$args),
+            'importstylesheet' => JitXsltUserScript::tryImportStylesheet($context, ...$args),
             default => null,
         };
         if (null === $result) {
@@ -25,7 +26,8 @@ final class JitXsltMethod
                 'XSLTProcessor::'.$methodLc.'() user-script AOT requires a tracked host processor'
                 .(('setsecurityprefs' === $methodLc) ? ' and compile-time int prefs' : '')
                 .(('setprofiling' === $methodLc) ? ' and compile-time ?string filename' : '')
-                .' (#20392/#22272)'
+                .(('importstylesheet' === $methodLc) ? ' and compile-time stylesheet XML' : '')
+                .' (#20392/#22272/#22367)'
             );
         }
 

@@ -26,9 +26,12 @@ final class XsltHostBridge
         return new \XSLTProcessor();
     }
 
-    public static function importStylesheet(\XSLTProcessor $proc, \DOMDocument $stylesheet): void
+    /**
+     * Host importStylesheet(): bool — php-src xsltprocessor.c RETURN_TRUE/FALSE (#22367).
+     */
+    public static function importStylesheet(\XSLTProcessor $proc, \DOMDocument $stylesheet): bool
     {
-        $proc->importStylesheet($stylesheet);
+        return $proc->importStylesheet($stylesheet);
     }
 
     /** @return string|false */
