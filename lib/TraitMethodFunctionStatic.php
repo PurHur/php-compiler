@@ -119,7 +119,7 @@ final class TraitMethodFunctionStatic
                 $str = $newConst->toString();
                 if (str_starts_with($str, $fromPrefix)) {
                     $patched = new Variable(Variable::TYPE_STRING);
-                    $patched->string($toPrefix.substr($str, strlen($fromPrefix)));
+                    $patched->string($toPrefix.substr($str, strlen($fromPrefix)), $newConst->stringInterned);
                     $newConst = $patched;
                 }
             }

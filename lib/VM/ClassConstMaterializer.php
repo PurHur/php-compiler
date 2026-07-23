@@ -186,7 +186,8 @@ final class ClassConstMaterializer
                     $stored->undefined();
                     break;
                 }
-                $stored->string($str);
+                // Preserve ZSTR_IS_INTERNED through global/const materialize (#22716).
+                $stored->string($str, $src->stringInterned);
                 break;
             case Variable::TYPE_INTEGER:
                 if ($src->isStreamResource()) {
