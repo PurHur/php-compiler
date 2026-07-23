@@ -8,13 +8,24 @@ use PHPCompiler\ext\standard\Utf8Latin1JitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** StringUtf8Latin1 routes through Utf8Latin1JitHelper PHP not StringUtf8Latin1Jit LLVM (#9912). */
+/**
+ * StringUtf8Latin1 NestedJIT via JitVmHelperLink::ensureCompiled (#22701 / peer #22683).
+ * Routes through Utf8Latin1JitHelper PHP not StringUtf8Latin1Jit LLVM (#9912).
+ */
 final class Utf8Latin1RuntimeShrinkTest extends TestCase
 {
-    public function testStringUtf8Latin1RoutesThroughJitHelper(): void
+    public function testStringUtf8Latin1UsesJitVmHelperLink(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUtf8Latin1.php');
         $this->assertStringContainsString('Utf8Latin1JitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringUtf8Latin1Jit::', $source);
         $this->assertLessThan(150, \substr_count($source, "\n") + 1);
     }
