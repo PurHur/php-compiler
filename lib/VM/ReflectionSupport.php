@@ -1108,7 +1108,10 @@ final class ReflectionSupport
     }
 
     /**
-     * ReflectionClass::newLazyGhost/Proxy — class name string or ReflectionClass receiver (#6399).
+     * ReflectionClass lazy factory arg — ReflectionClass receiver (instance ABI) or class-name string.
+     *
+     * Used by JIT Call\ReflectionClassNewLazy* and legacy static factory helpers (#6399, #22527).
+     * Zend newLazyGhost/newLazyProxy are instance methods; prefer requireReflectedClassEntry on VM.
      */
     public static function classNameFromLazyFactoryArg(Variable $arg, string $method = 'newLazyGhost'): string
     {
@@ -1830,19 +1833,22 @@ final class ReflectionSupport
         return $block->paramDefaultConstantNames[$index] ?? null;
     }
 
+    /**
+     * php-src zim_reflection_parameter_allowsNull — no declared type (incl. untyped
+     * variadic) ⇒ true; otherwise follow the ReflectionType nullability rules (#22524).
+     * php-cfg stores absent types as {@see CfgType\Mixed_}; use {@see declaredParamTypeForReflection}.
+     */
     public static function parameterAllowsNull(Context $ctx, ObjectEntry $reflection): bool
     {
         if (self::parameterIsInternal($ctx, $reflection)) {
             return self::internalParameterAllowsNull($ctx, $reflection);
         }
-        $block = self::resolveParameterBlock($ctx, $reflection);
-        $index = self::parameterIndexForReflection($reflection);
-        $slot = self::parameterScopeSlot($block, $index);
-        if (null === $slot || !isset($block->paramDeclaredTypes[$slot])) {
+        $type = self::declaredParamTypeForReflection($ctx, $reflection);
+        if (null === $type) {
             return true;
         }
 
-        return ReflectionTypeSupport::allowsNullFromCfg($block->paramDeclaredTypes[$slot]);
+        return ReflectionTypeSupport::allowsNullFromCfg($type);
     }
 
     public static function parameterIsPassedByReference(Context $ctx, ObjectEntry $reflection): bool

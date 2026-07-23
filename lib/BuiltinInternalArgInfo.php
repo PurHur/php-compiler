@@ -209,9 +209,14 @@ final class BuiltinInternalArgInfo
         if (str_starts_with($type, '?')) {
             return true;
         }
+        // Explicit `mixed` includes null (php-src ReflectionNamedType::allowsNull).
+        if ('mixed' === strtolower($type)) {
+            return true;
+        }
         if (str_contains($type, '|')) {
             foreach (explode('|', $type) as $member) {
-                if ('null' === strtolower(trim($member))) {
+                $member = strtolower(trim($member));
+                if ('null' === $member || 'mixed' === $member) {
                     return true;
                 }
             }
