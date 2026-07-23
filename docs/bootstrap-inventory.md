@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6432 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20542 |
+| Source constructs flagged (warnings) | 20541 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4825,7 +4825,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/GlobalIntrospectionNameRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GraphemeStrSplitRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GzStreamIo.php` | 0 | 1 |
-| `lib/JIT/Builtin/GzStreamRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/GzStreamRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/HashContextEmbedBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/HashContextRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/HashTableDuplicateRuntime.php` | 0 | 1 |
@@ -41999,9 +41999,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GzStreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 353)
 - 12 class method(s)
-- 13 closure(s)
+- 12 closure(s)
 
 ### `lib/JIT/Builtin/HashContextEmbedBridge.php`
 
@@ -50611,12 +50610,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ClosureFromStatic (line 277)
 - new Builtin\ClosureBind (line 281)
 - new Builtin\ClosureBindTo (line 284)
-- new Builtin\ClosureCall (line 287)
-- new Builtin\ClosureDebugInfo (line 291)
-- new Builtin\ClosureGetUsedVariables (line 295)
-- new Builtin\ClosureGetCurrent (line 300)
-- new ObjectEntry (line 309)
-- new Variable (line 319)
+- new Builtin\ClosureCall (line 290)
+- new Builtin\ClosureDebugInfo (line 294)
+- new Builtin\ClosureGetUsedVariables (line 298)
+- new Builtin\ClosureGetCurrent (line 303)
+- new ObjectEntry (line 312)
+- new Variable (line 322)
 - 18 class method(s)
 
 ### `lib/VM/ClosureSupport.php`
