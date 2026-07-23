@@ -17917,6 +17917,13 @@ class Compiler {
         if ($this->callArgIsNewExpression($callArg)) {
             return null;
         }
+        // Foldable class consts (ArrayIterator::ARRAY_AS_PROPS, …) must not reuse an
+        // existing operand slot — echo `?:` merge temps often share SSA identity with
+        // later ClassConstFetch results and would pass "0"/"1" into `new` (#22576, #5506).
+        $folded = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+        if (null !== $folded) {
+            return (string) $block->registerConstant(new Operand\Temporary(), $folded);
+        }
         $slot = $block->slotForOperand($fetch->result);
         if (null === $slot) {
             foreach ($this->compileExpr($fetch, $block) as $op) {
@@ -17926,6 +17933,47 @@ class Compiler {
         }
 
         return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * `new C(..., Class::CONST)` — materialize foldable ClassConstFetch on a fresh slot so
+     * echo `?:` merge temps cannot supply the ctor arg (#22576).
+     */
+    private function slotForFoldedClassConstFetchNewArg(
+        Op\Expr\New_ $new,
+        int $argIndex,
+        Block $block
+    ): ?string {
+        if (null === $block->orig || !\is_array($new->args) || !isset($new->args[$argIndex])) {
+            return null;
+        }
+        $fetch = $this->precedingClassConstFetchForCallArgIndex(
+            $new,
+            $argIndex,
+            $this->precedingCallArgClassConstFetchesBeforeCfgOp($block->orig->children, $new, $block)
+        );
+        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
+            $callArg = $new->args[$argIndex];
+            foreach ($block->orig->children as $child) {
+                if (
+                    $child instanceof Op\Expr\ClassConstFetch
+                    && null !== $child->result
+                    && $this->operandsReferToSameVariable($child->result, $callArg)
+                ) {
+                    $fetch = $child;
+                    break;
+                }
+            }
+        }
+        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
+            return null;
+        }
+        $folded = $this->tryFoldClassConstFetchDefault($fetch, $block, true);
+        if (null === $folded) {
+            return null;
+        }
+
+        return (string) $block->registerConstant(new Operand\Temporary(), $folded);
     }
 
     /**
@@ -41892,6 +41940,28 @@ class Compiler {
         foreach ($args as $argIndex => $arg) {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            // new C(..., Class::CONST) — fold ClassConstFetch onto a fresh constant slot before
+            // dead-temp / echo-?: matchers steal a merge phi ("0"/"1") (#22576, #5506).
+            if (
+                null === $unpackFlag
+                && $cfgCallOp instanceof Op\Expr\New_
+                && null !== $block->orig
+            ) {
+                $foldedNewConstSlot = $this->slotForFoldedClassConstFetchNewArg(
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $block
+                );
+                if (null !== $foldedNewConstSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $foldedNewConstSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             // new Outer(new Inner(...), fn() => …) — wire by php-cfg arg ops before legacy
             // positional New_ matchers steal the inner New_ for the Closure arg (#19771).
             if (
