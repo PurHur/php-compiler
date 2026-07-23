@@ -14,13 +14,16 @@ use PHPCompiler\JIT\LazyObjectHelper;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** ReflectionClass::newLazyGhost(callable) — MCJIT (#4940, #5318). */
+/** ReflectionClass::newLazyGhost(callable) — MCJIT instance ABI (#4940, #5318, #22527). */
 final class ReflectionClassNewLazyGhost implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
+        // Instance: [ReflectionClass $this, callable $initializer, ?int $options]
         if (\count($args) < 2) {
-            throw new \LogicException('ReflectionClass::newLazyGhost() expects an initializer callable');
+            throw new \ArgumentCountError(
+                'ReflectionClass::newLazyGhost() expects at least 1 argument, 0 given'
+            );
         }
         ReflectionRuntime::ensureLinked($context);
         ReflectionNative::registerDeclarations($context);

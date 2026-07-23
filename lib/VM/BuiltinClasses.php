@@ -1008,10 +1008,11 @@ final class BuiltinClasses
         $rc->methodVisibility['hasconstant'] = $pub;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         if (CompilerVersion::supportsLazyObjectFactories()) {
+            // Zend instance methods — not FLAG_STATIC (#22527; static dropped $this, #22288).
             $rc->methods['newlazyproxy'] = new ReflectionClassNewLazyProxy();
-            $rc->methodVisibility['newlazyproxy'] = $pubStatic;
+            $rc->methodVisibility['newlazyproxy'] = $pub;
             $rc->methods['newlazyghost'] = new ReflectionClassNewLazyGhost();
-            $rc->methodVisibility['newlazyghost'] = $pubStatic;
+            $rc->methodVisibility['newlazyghost'] = $pub;
             $rc->methods['createlazyghost'] = new ReflectionClassCreateLazyGhost();
             $rc->methodVisibility['createlazyghost'] = $pubStatic;
             $rc->methods['createlazyproxy'] = new ReflectionClassCreateLazyProxy();

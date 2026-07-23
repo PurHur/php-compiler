@@ -15,13 +15,16 @@ use PHPCompiler\JIT\LazyObjectHelper;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** ReflectionClass::newLazyProxy(callable) — MCJIT (#4940, #5318). */
+/** ReflectionClass::newLazyProxy(callable) — MCJIT instance ABI (#4940, #5318, #22527). */
 final class ReflectionClassNewLazyProxy implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
+        // Instance: [ReflectionClass $this, callable $factory, ?int $options]
         if (\count($args) < 2) {
-            throw new \LogicException('ReflectionClass::newLazyProxy() expects an initializer callable');
+            throw new \ArgumentCountError(
+                'ReflectionClass::newLazyProxy() expects at least 1 argument, 0 given'
+            );
         }
         ReflectionRuntime::ensureLinked($context);
         ReflectionNative::registerDeclarations($context);

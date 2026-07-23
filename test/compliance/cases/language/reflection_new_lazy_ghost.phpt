@@ -1,5 +1,5 @@
 --TEST--
-Language: ReflectionClass::newLazyGhost static invoke (#6399)
+Language: ReflectionClass::newLazyGhost instance invoke (#6399, #22527)
 --SKIPIF--
 <?php
 if (PHP_VERSION_ID < 80400) {
@@ -14,10 +14,10 @@ class Data {
 }
 var_export(method_exists(ReflectionClass::class, 'newLazyGhost'));
 echo "\n";
-$obj = ReflectionClass::newLazyGhost(Data::class, function (Data $o) {
+$rc = new ReflectionClass(Data::class);
+$obj = $rc->newLazyGhost(function (Data $o) {
     $o->name = 'lazy';
 });
-$rc = new ReflectionClass(Data::class);
 echo $rc->isUninitializedLazyObject($obj) ? 'uninit' : 'init', "\n";
 echo $obj->name, "\n";
 echo $rc->isUninitializedLazyObject($obj) ? 'uninit' : 'init', "\n";
