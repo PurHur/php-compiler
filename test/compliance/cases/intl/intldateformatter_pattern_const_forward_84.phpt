@@ -10,8 +10,7 @@ if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsIntlOopCompliance(basename(_
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-$r = new ReflectionClass(IntlDateFormatter::class);
-echo 'has=', $r->hasConstant('PATTERN') ? '1' : '0', "\n";
+echo 'defined=', defined('IntlDateFormatter::PATTERN') ? '1' : '0', "\n";
 echo 'val=', IntlDateFormatter::PATTERN, "\n";
 $ts = 1579046400; // 2020-01-15 00:00:00 UTC
 $f = new IntlDateFormatter(
@@ -26,7 +25,7 @@ echo 'format=', $f->format($ts), "\n";
 echo 'getPattern=', $f->getPattern(), "\n";
 ?>
 --EXPECT--
-has=1
+defined=1
 val=-2
 format=2020-01-15
 getPattern=yyyy-MM-dd

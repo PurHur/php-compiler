@@ -10,8 +10,7 @@ if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsIntlOopCompliance(basename(_
 PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
-$r = new ReflectionClass(IntlDateFormatter::class);
-echo 'has=', $r->hasConstant('PATTERN') ? '1' : '0', "\n";
+echo 'defined=', defined('IntlDateFormatter::PATTERN') ? '1' : '0', "\n";
 ?>
 --EXPECT--
-has=0
+defined=0
