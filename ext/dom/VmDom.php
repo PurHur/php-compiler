@@ -7857,6 +7857,10 @@ final class VmDom
 
             return '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
         }
+        // DocumentFragment: libxml dumps children only (php-src document.c; #22453).
+        if (self::isDocumentFragment($entry)) {
+            return self::serializeDocumentFragmentChildrenHtml($entry, $emptySelfClosing);
+        }
         if (self::isElement($entry)) {
             return self::serializeHtmlElement($entry, $emptySelfClosing);
         }
@@ -7871,6 +7875,24 @@ final class VmDom
         }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
+    }
+
+    /**
+     * saveHTML(DocumentFragment) — concatenate child dumps; empty → '' (libxml; #22453).
+     */
+    private static function serializeDocumentFragmentChildrenHtml(
+        ObjectEntry $fragment,
+        bool $emptySelfClosing
+    ): string {
+        $parts = [];
+        foreach (DomRegistry::state($fragment)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                $parts[] = self::serializeHtmlNode($child, $emptySelfClosing);
+            }
+        }
+
+        return implode('', $parts);
     }
 
     /**
@@ -8181,6 +8203,10 @@ final class VmDom
                 $dt->internalSubset
             );
         }
+        // DocumentFragment: libxml dumps children only (php-src document.c; #22453).
+        if (self::isDocumentFragment($entry)) {
+            return self::serializeDocumentFragmentChildrenXml($entry, $format, $noEmptyTag);
+        }
         if (self::isElement($entry)) {
             return self::serializeElement($entry, $depth, $format, $noEmptyTag);
         }
@@ -8213,6 +8239,33 @@ final class VmDom
         }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
+    }
+
+    /**
+     * saveXML(DocumentFragment) — concatenate child dumps; formatOutput joins with "\n" + trailing
+     * newline; empty → '' (libxml xmlNodeDump; #22453).
+     */
+    private static function serializeDocumentFragmentChildrenXml(
+        ObjectEntry $fragment,
+        bool $format,
+        bool $noEmptyTag
+    ): string {
+        $parts = [];
+        foreach (DomRegistry::state($fragment)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                // Fragment children are dumped at depth 0 (no wrapper indent).
+                $parts[] = self::serializeNode($child, 0, false, $noEmptyTag);
+            }
+        }
+        if ([] === $parts) {
+            return '';
+        }
+        if ($format) {
+            return implode("\n", $parts)."\n";
+        }
+
+        return implode('', $parts);
     }
 
     /**
