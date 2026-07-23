@@ -28,6 +28,8 @@ final class GetObjectVarsBuiltinTest extends BaseTest
             'get_object_vars_uninit_typed_jit.phpt',
             'get_object_vars_visibility.phpt',
             'get_object_vars_visibility_jit.phpt',
+            'get_object_vars_shadowed_private.phpt',
+            'get_object_vars_shadowed_private_jit.phpt',
         ] as $file) {
             $path = __DIR__.'/../compliance/cases/stdlib/'.$file;
             yield $file => self::parsePHPT($path, $file);

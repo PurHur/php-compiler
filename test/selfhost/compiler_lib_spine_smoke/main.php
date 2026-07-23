@@ -2053,6 +2053,7 @@ require_once __DIR__.'/../../../ext/standard/GetDefinedConstantsParity.php';
 require_once __DIR__.'/../../../ext/standard/GetDefinedExcludeDisabledJit.php';
 require_once __DIR__.'/../../../ext/standard/GetHeadersJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetObjectVarsJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/VmExecutingFrame.php';
 require_once __DIR__.'/../../../ext/standard/GetParentClassJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetcwdJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostnameJitHelper.php';
