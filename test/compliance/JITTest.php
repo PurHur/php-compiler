@@ -364,6 +364,13 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'closure_get_used_variables_phantom')) {
                 continue;
             }
+            // Empty Closure dump on reference profile; forward_84 uses --ENV-- (#22565).
+            if (CompilerVersion::supportsClosureRichDebugInfo()
+                && str_contains($name, 'closure_debug_info')
+                && !str_contains($name, 'closure_debug_info_forward_84')
+                && !str_contains($name, 'closure_debuginfo_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter')
                 && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
@@ -375,7 +382,9 @@ class JITTest extends BaseTest {
             }
             // JIT: method_exists(Closure::class, …) segfaults; phantom/profile introspection is VM-only (#14504, #16989).
             if (str_contains($name, 'closure_get_current_phantom')
-                || str_contains($name, 'closure_get_current_profile')) {
+                || str_contains($name, 'closure_get_current_profile')
+                || str_contains($name, 'closure_debuginfo_phantom')
+                || str_contains($name, 'closure_debug_info')) {
                 continue;
             }
             // JIT: method_exists(ReflectionParameter::class, …) segfaults; phantom is VM-only (#16130).

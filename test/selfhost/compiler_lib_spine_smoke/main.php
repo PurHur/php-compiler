@@ -5503,7 +5503,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/AttributeConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureBind.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureBindTo.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureCall.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ClosureDebugInfo.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureFromCallable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureFromStatic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureGetCurrent.php';

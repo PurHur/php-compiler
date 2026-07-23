@@ -5762,7 +5762,6 @@
         "lib/VM/Builtin/ClosureBind.php",
         "lib/VM/Builtin/ClosureBindTo.php",
         "lib/VM/Builtin/ClosureCall.php",
-        "lib/VM/Builtin/ClosureDebugInfo.php",
         "lib/VM/Builtin/ClosureFromCallable.php",
         "lib/VM/Builtin/ClosureFromStatic.php",
         "lib/VM/Builtin/ClosureGetCurrent.php",
@@ -6677,9 +6676,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6442,
+        "inventory_files": 6441,
         "excluded": 1,
-        "eligible": 6441,
+        "eligible": 6440,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
