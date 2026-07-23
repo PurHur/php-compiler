@@ -5547,6 +5547,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeModify.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeSetDate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeSetISODate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeSetMicrosecond.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/DateSerializeMethods.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeSetState.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeSetTime.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeSetTimestamp.php';
