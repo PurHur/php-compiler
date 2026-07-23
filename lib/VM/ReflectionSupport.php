@@ -122,7 +122,17 @@ final class ReflectionSupport
 
     public const PROP_FUNCTION_NAME = 'function';
 
+    /**
+     * Engine storage for ReflectionConstant (global) constant name (#17341).
+     * Not the Zend dump key for ReflectionClassConstant — use PROP_REFLECTION_CLASS_CONSTANT_NAME (#22503).
+     */
     public const PROP_CONSTANT_NAME = 'constant';
+
+    /** Zend ReflectionClassConstant::$class — declaring class name string (#22503). */
+    public const PROP_REFLECTION_CLASS_CONSTANT_CLASS = 'class';
+
+    /** Zend ReflectionClassConstant::$name — constant name string (#22503). */
+    public const PROP_REFLECTION_CLASS_CONSTANT_NAME = 'name';
 
     public const PROP_ATTR_NAME = 'name';
 
@@ -967,6 +977,15 @@ final class ReflectionSupport
 
             return $nameVar->toString();
         }
+        // ReflectionClassConstant: declaring class is public `$class` (not `$name`, #22503).
+        if (strtolower($reflection->class->name) === self::REFLECTION_CLASS_CONSTANT) {
+            $nameVar = $reflection->getProperty(self::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->resolveIndirect();
+            if (Variable::TYPE_STRING !== $nameVar->type) {
+                throw new \LogicException('ReflectionClassConstant missing declaring class name');
+            }
+
+            return $nameVar->toString();
+        }
         $propName = self::isReflectionMethodObject($reflection)
             ? self::PROP_REFLECTION_METHOD_CLASS
             : self::PROP_CLASS_NAME;
@@ -1501,7 +1520,11 @@ final class ReflectionSupport
         if (self::isReflectionEnumCaseObject($reflection)) {
             return self::enumCaseNameFromReflection($reflection);
         }
-        $nameVar = $reflection->getProperty(self::PROP_CONSTANT_NAME)->resolveIndirect();
+        // ReflectionClassConstant public `$name` is the constant name (#22503).
+        $propName = strtolower($reflection->class->name) === self::REFLECTION_CLASS_CONSTANT
+            ? self::PROP_REFLECTION_CLASS_CONSTANT_NAME
+            : self::PROP_CONSTANT_NAME;
+        $nameVar = $reflection->getProperty($propName)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionConstant missing constant name');
         }

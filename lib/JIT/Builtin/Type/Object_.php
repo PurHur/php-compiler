@@ -3071,6 +3071,11 @@ class Object_ extends Type {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'property', Variable::TYPE_STRING);
         }
+        if ('reflectionclassconstant' === $lcname) {
+            // Zend public surface: $name then $class (#22503).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS, Variable::TYPE_STRING);
+        }
         if ('reflectionconstant' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_STRING);
             $this->defineProperty($id, 'constant', Variable::TYPE_STRING);

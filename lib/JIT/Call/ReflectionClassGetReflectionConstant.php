@@ -28,14 +28,14 @@ final class ReflectionClassGetReflectionConstant implements Call
         [$classSafe, $classLen] = ReflectionSetup::reflectionClassNameAsCstr($context, $obj);
 
         $constVar = JitNativeString::coerce($context, $args[1]);
-        $rcClassId = $context->type->object->lookup('ReflectionConstant');
+        $rcClassId = $context->type->object->lookup('ReflectionClassConstant');
         $rcObj = $context->type->object->allocate($rcClassId);
         ReflectionSetup::markConstructed($context, $rcObj);
         ReflectionSetup::emitSetStringPropertyFromCstr(
             $context,
             $rcObj,
-            'ReflectionConstant',
-            'name',
+            'ReflectionClassConstant',
+            \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS,
             $classSafe,
             $classLen
         );
@@ -50,8 +50,8 @@ final class ReflectionClassGetReflectionConstant implements Call
         ReflectionSetup::emitSetStringPropertyFromCstr(
             $context,
             $rcObj,
-            'ReflectionConstant',
-            'constant',
+            'ReflectionClassConstant',
+            \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME,
             $context->builder->pointerCast($data, $i8p),
             $context->builder->zExt($len, $sizeT)
         );
