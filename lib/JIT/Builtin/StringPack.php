@@ -84,7 +84,6 @@ final class StringPack
 
         $entry = $fn->appendBasicBlock('pack_bridge_entry');
         $fmtNull = $fn->appendBasicBlock('pack_bridge_fmt_null');
-        $emptyFmt = $fn->appendBasicBlock('pack_bridge_empty_fmt');
         $packBody = $fn->appendBasicBlock('pack_bridge_body');
 
         $context->builder->positionAtEnd($entry);
@@ -114,27 +113,9 @@ final class StringPack
         );
         $context->builder->returnValue($empty);
 
-        $serializeBb = $fn->appendBasicBlock('pack_bridge_serialize');
-
+        // Always run PackJitHelper — empty format must still warn on unused args (#22687).
         $context->builder->positionAtEnd($packBody);
         $fmtSep = $context->builder->call($context->lookupFunction('__string__separate'), $fmt);
-        $stringMap = $context->structFieldMap['__string__'];
-        $formatLen = $context->builder->load($context->builder->structGep($fmtSep, $stringMap['length']));
-        $zeroI64 = $i64->constInt(0, false);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $formatLen, $zeroI64),
-            $emptyFmt,
-            $serializeBb
-        );
-
-        $context->builder->positionAtEnd($emptyFmt);
-        $context->builder->returnValue($context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $zeroI64,
-            $context->builder->pointerCast($context->constantFromString(''), $i8p)
-        ));
-
-        $context->builder->positionAtEnd($serializeBb);
         $blob = $context->builder->call(
             $context->lookupFunction('phpc_pack_argv_serialize'),
             $argc,

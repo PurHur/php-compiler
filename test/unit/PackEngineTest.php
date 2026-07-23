@@ -47,6 +47,29 @@ final class PackEngineTest extends TestCase
         PackEngine::pack('cc', [1]);
     }
 
+    /** php-src pack.c leftover argc → `pack(): N arguments unused` (#22687). */
+    public function testUnusedArgumentsEmitWarning(): void
+    {
+        $seen = [];
+        set_error_handler(static function (int $errno, string $message) use (&$seen): bool {
+            $seen[] = [$errno, $message];
+
+            return true;
+        });
+        try {
+            $this->assertSame('1', PackEngine::pack('a', [1, 2]));
+            $this->assertSame('', PackEngine::pack('', [1]));
+            $this->assertSame(\pack('x2'), PackEngine::pack('x2', [1]));
+        } finally {
+            restore_error_handler();
+        }
+        $this->assertCount(3, $seen);
+        $this->assertSame('pack(): 1 arguments unused', $seen[0][1]);
+        $this->assertSame('pack(): 1 arguments unused', $seen[1][1]);
+        $this->assertSame('pack(): 1 arguments unused', $seen[2][1]);
+        $this->assertSame(\E_USER_WARNING, $seen[0][0]);
+    }
+
     public function testFloatFormatsMatchZend(): void
     {
         foreach ([0.0, 1.5, -2.25, 3.14159] as $value) {
