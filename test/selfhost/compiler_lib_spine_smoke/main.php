@@ -6464,6 +6464,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionConstantGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetExtension.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetExtensionName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetFileName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantInNamespace.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetNamespaceName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantGetShortName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionConstantToString.php';

@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionConstant::getExtensionName() — VM PHP 8.5+ (#21551, ext/reflection/php_reflection.c). */
+/** ReflectionConstant::getExtensionName() — VM PHP 8.5+ (#21551, #22662, ext/reflection/php_reflection.c). */
 final class ReflectionConstantGetExtensionName extends VmClassMethod
 {
     public function __construct()

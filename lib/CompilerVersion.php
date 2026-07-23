@@ -590,7 +590,10 @@ final class CompilerVersion
 
     /**
      * PHP 8.5+ ReflectionConstant::getFileName()/getExtension()/getExtensionName()
-     * (ext/reflection/php_reflection.stub.php, #21551).
+     * (ext/reflection/php_reflection.stub.php — absent on PHP-8.4.x stubs; #21551, #22662).
+     *
+     * Withheld on ≤8.4 profiles (php-src-strict phantom gate). getDocComment()/getStartLine()/
+     * getEndLine() are never on ReflectionConstant in php-src — do not advertise them.
      */
     public static function advertisesReflectionConstantFileExtensionApis(): bool
     {
@@ -599,6 +602,20 @@ final class CompilerVersion
         }
 
         return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
+     * PHP 8.6+ ReflectionConstant::inNamespace() (php/php-src#20902, master 2026-02-17).
+     *
+     * Absent on PHP-8.4 / PHP-8.5 stubs — withhold on ≤8.5 profiles (#22662).
+     */
+    public static function advertisesReflectionConstantInNamespace(): bool
+    {
+        if (version_compare(self::VERSION, '8.6.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.6.0', '>=');
     }
 
     /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class advertisement (#11902). */
