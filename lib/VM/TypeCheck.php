@@ -713,13 +713,22 @@ final class TypeCheck
                 return;
             case Variable::TYPE_STRING:
                 // Zend weak mode: null is not a valid string (zend_API.c / zend_execute.c, #19695).
-                // int/float/bool still coerce via toString(); arrays/objects stay TypeError.
+                // int/float/bool still coerce via toString(); arrays stay TypeError.
+                // Objects: Stringable / public __toString coerce (zend_verify_arg_type, #22548).
                 if (
                     Variable::TYPE_NULL === $value->type
                     || Variable::TYPE_ARRAY === $value->type
-                    || Variable::TYPE_OBJECT === $value->type
                 ) {
                     throw new \TypeError(self::strictMessage($constraint, $value, $kind));
+                }
+                if (Variable::TYPE_OBJECT === $value->type) {
+                    $coerced = self::tryCoerceStringableObjectToString($value);
+                    if (null === $coerced) {
+                        throw new \TypeError(self::strictMessage($constraint, $value, $kind));
+                    }
+                    $dest->string($coerced);
+
+                    return;
                 }
                 $dest->string($value->toString());
                 return;
@@ -735,6 +744,37 @@ final class TypeCheck
                 break;
         }
         throw new \TypeError(self::strictMessage($constraint, $value, $kind));
+    }
+
+    /**
+     * Weak string type check: coerce Stringable (explicit or implicit public __toString).
+     *
+     * php-src: Zend/zend_execute_API.c zend_verify_arg_type / zend_parse_arg_impl
+     * (#22548; related #7198). Non-Stringable objects stay TypeError.
+     */
+    private static function tryCoerceStringableObjectToString(Variable $value): ?string
+    {
+        $resolved = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return null;
+        }
+        $object = $resolved->toObject();
+        if (EnumCaseSupport::isEnumCase($object) || ResourceSupport::isResourceObject($object)) {
+            return null;
+        }
+        $vm = \PHPCompiler\VM::running();
+        if (null === $vm) {
+            return null;
+        }
+        if (!InterfaceCheck::entryIsInstanceOf(
+            $object->class,
+            StringableSupport::INTERFACE_LC,
+            $vm->context
+        )) {
+            return null;
+        }
+
+        return $vm->coerceVariableToString($resolved);
     }
 
     private static function coerceToInt(Variable $value, string $kind = 'Argument'): int
