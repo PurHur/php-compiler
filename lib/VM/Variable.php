@@ -1418,6 +1418,14 @@ final class Variable {
 
             return $self->object === $other->object;
         }
+        // Same HashTable → identical (self-ref `$a[0]=&$a` / unserialize R:; #22652).
+        if (self::TYPE_ARRAY === $self->type) {
+            if ($self->array === $other->array) {
+                return true;
+            }
+
+            return $self->toArray()->compareLooseEqual($other->toArray());
+        }
         if (self::TYPE_STRING === $self->type) {
             return $self->string === $other->string;
         }
