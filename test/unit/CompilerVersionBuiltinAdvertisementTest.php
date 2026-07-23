@@ -389,12 +389,36 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testPhp84ReflectionProbeBuiltinsAdvertisedOnForwardProfile(): void
+    public function testPhp84ReflectionProbeBuiltinsNeverOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+            $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+            $this->assertFalse(CompilerVersion::advertisesPhp84ReflectionProbeBuiltins());
+            $runtime = new Runtime();
+            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
+                $this->assertFalse(isset($runtime->vmContext->functions[$fn]), $fn);
+                $this->assertFalse(\PHPCompiler\ext\standard\BuiltinIntrospectionPolicy::functionIsAdvertised($fn), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testIsAnonymousClassAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsIsAnonymousClass());
+            $this->assertTrue(CompilerVersion::advertisesIsAnonymousClass());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['isanonymousclass']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -444,9 +468,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'stream_supports', 'attribute_exists'] as $fn) {
+            foreach (['fpow', 'fmin', 'fmax', 'fadd', 'fsub', 'fmul', 'stream_supports'] as $fn) {
                 $this->assertTrue(isset($ctx->functions[$fn]), $fn);
             }
+            $this->assertFalse(isset($ctx->functions['attribute_exists']));
             $this->assertTrue(isset($ctx->classes['roundingmode']));
         } finally {
             if (false === $prev) {
@@ -861,9 +886,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists', 'isAnonymousClass'] as $fn) {
+            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
                 $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
+            $this->assertFalse(isset($ctx->functions['isanonymousclass']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -880,9 +906,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists', 'isAnonymousClass'] as $fn) {
+            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
                 $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
+            $this->assertFalse(isset($ctx->functions['isanonymousclass']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -1116,13 +1143,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     }
 
 
-    public function testVmRegistersCrc32cOnForwardProfile(): void
+    public function testVmDoesNotRegisterCrc32cOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
+            $this->assertFalse(CompilerVersion::supportsCrc32c());
+            $this->assertFalse(CompilerVersion::advertisesCrc32c());
             $runtime = new Runtime();
-            $this->assertTrue(isset($runtime->vmContext->functions['crc32c']));
+            $this->assertFalse(isset($runtime->vmContext->functions['crc32c']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

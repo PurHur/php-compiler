@@ -1375,13 +1375,30 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ attribute_exists(), class_meth_exists(), unitenum_exists(), isAnonymousClass()
-     * (ext/reflection/php_reflection.c, ext/standard/basic_functions.c; #14995, #15692, #17138, #19969).
+     * attribute_exists() / class_meth_exists() / unitenum_exists() — absent from php-src
+     * (ext/standard/basic_functions.stub.php; #14995, #17138, #22584).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * Never register or advertise on php-src-strict profiles (including PROFILE=8.4/8.5).
+     * Prior mistaken 8.4 forward-profile enable (#17138) is retired.
      */
     public static function supportsPhp84ReflectionProbeBuiltins(): bool
+    {
+        return false;
+    }
+
+    /** attribute_exists()/class_meth_exists()/unitenum_exists() visible to function_exists() — never (php-src absent, #22584). */
+    public static function advertisesPhp84ReflectionProbeBuiltins(): bool
+    {
+        return false;
+    }
+
+    /**
+     * isAnonymousClass() global probe (#19969) — kept on forward 8.4+ until a dedicated phantom issue.
+     *
+     * Not part of php-src basic_functions / reflection stubs as a free function (ReflectionClass::isAnonymous
+     * is the Zend API); gated separately from the #22584 trio so PROFILE=8.4 still exercises the helper.
+     */
+    public static function supportsIsAnonymousClass(): bool
     {
         if (version_compare(self::VERSION, '8.4', '<')) {
             return false;
@@ -1399,8 +1416,8 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
-    /** attribute_exists()/class_meth_exists()/unitenum_exists()/isAnonymousClass() visible to function_exists() — stable runtime or forward 8.4+ (#17206). */
-    public static function advertisesPhp84ReflectionProbeBuiltins(): bool
+    /** isAnonymousClass() visible to function_exists() — stable runtime or forward 8.4+ (#19969). */
+    public static function advertisesIsAnonymousClass(): bool
     {
         if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
@@ -2547,44 +2564,20 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ crc32c() (ext/standard/crc32.c, issue #3270, #17139).
+     * crc32c() — absent from php-src (only crc32(); ext/standard/crc32.c / basic_functions.stub.php).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Never register or advertise on php-src-strict profiles (including PROFILE=8.3/8.4/8.5). #3270/#17139
+     * forward-profile enable retired by #22584.
      */
     public static function supportsCrc32c(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
-    /**
-     * crc32c() visible to function_exists() — stable runtime or forward 8.3+ (#17206).
-     */
+    /** crc32c() visible to function_exists() — never (php-src absent, #22584). */
     public static function advertisesCrc32c(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
     /**

@@ -14,7 +14,7 @@ class Module extends ModuleAbstract
 {
     public function getFunctions(): array
     {
-        if (!CompilerVersion::supportsPhp84ReflectionProbeBuiltins()) {
+        if (!CompilerVersion::supportsIsAnonymousClass()) {
             return [];
         }
 

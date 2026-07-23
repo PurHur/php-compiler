@@ -1,5 +1,7 @@
 --TEST--
 Language: builtin NoDiscard attribute class exists and is internal (#6992)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 var_export(class_exists('NoDiscard', false));
@@ -8,7 +10,7 @@ var_export(class_exists('Attribute', false));
 echo "\n";
 var_export((new ReflectionClass('NoDiscard'))->isInternal());
 echo "\n";
-var_export(attribute_exists(Attribute::class, NoDiscard::class));
+var_export([] !== (new ReflectionClass(NoDiscard::class))->getAttributes(Attribute::class));
 echo "\n";
 #[\NoDiscard]
 function f(): int {
