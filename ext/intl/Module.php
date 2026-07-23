@@ -346,7 +346,8 @@ class Module extends ModuleAbstract
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),
-            new grapheme_str_contains(),
+            // PHP 8.4+ only — withhold on PROFILE=8.2 like str_split/strimwidth (#22564)
+            ...(CompilerVersion::supportsGraphemeStrContains() ? [new grapheme_str_contains()] : []),
             new grapheme_strstr(),
             new grapheme_stristr(),
             new grapheme_stripos(),

@@ -293,16 +293,25 @@ final class IntlExtensionPolicy
         return self::advertisesBuiltins();
     }
 
-    /** grapheme_str_contains — require loaded ext/intl (#17694). */
+    /**
+     * grapheme_str_contains — PHP 8.4+ and loaded ext/intl (#17694, #22564).
+     *
+     * Match {@see advertisesGraphemeStrSplit()}: withhold on PROFILE=8.2 even when ICU is present
+     * (php-src PHP-8.2 has no grapheme_str_contains).
+     */
     public static function advertisesGraphemeStrContains(): bool
     {
-        return self::advertisesBuiltins();
+        return self::advertisesBuiltins() && CompilerVersion::supportsGraphemeStrContains();
     }
 
-    /** grapheme_strimwidth — require loaded ext/intl (#17694). */
+    /**
+     * grapheme_strimwidth — PHP 8.4+ and loaded ext/intl (#17694, #22564).
+     *
+     * Same VERSION_ID gate as registration in {@see Module::getFunctions()}.
+     */
     public static function advertisesGraphemeStrimwidth(): bool
     {
-        return self::advertisesBuiltins();
+        return self::advertisesBuiltins() && CompilerVersion::supportsGraphemeStrimwidth();
     }
 
     /** grapheme_str_split — PHP 8.4+ and loaded ext/intl (#17694, #22340). */
