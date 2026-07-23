@@ -174,6 +174,9 @@ final class IntlExtensionPolicyTest extends TestCase
 
             self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
             self::assertTrue(IntlExtensionPolicy::advertisesBuiltins());
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeStrContains());
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeStrimwidth());
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeStrSplit());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
@@ -183,11 +186,59 @@ final class IntlExtensionPolicyTest extends TestCase
                 'grapheme_strpos',
                 'grapheme_extract',
                 'grapheme_str_split',
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
             ] as $fn) {
                 self::assertTrue(isset($ctx->functions[$fn]), $fn.' must register with ICU-backed intl');
                 self::assertTrue(
                     ext\standard\VmReflection::functionExists($ctx, $fn),
                     $fn.' must be visible when ext/intl advertises (#20630)'
+                );
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** PROFILE=8.2: withhold PHP 8.4 grapheme APIs even when ICU advertises intl (#22564). */
+    public function testGraphemeStrContainsWithheldOnProfile82WithIntl(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            self::assertFalse(CompilerVersion::supportsGraphemeStrContains());
+            self::assertFalse(CompilerVersion::supportsGraphemeStrimwidth());
+            self::assertFalse(CompilerVersion::supportsGraphemeStrSplit());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrContains());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrimwidth());
+            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrSplit());
+
+            if (!IntlExtensionPolicy::icuAvailable()) {
+                return;
+            }
+
+            self::assertTrue(IntlExtensionPolicy::advertisesBuiltins());
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            self::assertTrue(
+                ext\standard\VmReflection::functionExists($ctx, 'grapheme_strlen'),
+                'grapheme_strlen remains on 8.2 with intl'
+            );
+            foreach ([
+                'grapheme_str_contains',
+                'grapheme_strimwidth',
+                'grapheme_str_split',
+            ] as $fn) {
+                self::assertFalse(isset($ctx->functions[$fn]), $fn.' must not register on PROFILE=8.2');
+                self::assertFalse(
+                    ext\standard\VmReflection::functionExists($ctx, $fn),
+                    $fn.' must not be visible on PROFILE=8.2 (#22564)'
                 );
             }
         } finally {
