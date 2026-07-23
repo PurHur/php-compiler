@@ -8,17 +8,12 @@ use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DatePeriodConstruct;
 use PHPCompiler\VM\Builtin\DatePeriodCreateFromISO8601String;
-use PHPCompiler\VM\Builtin\DatePeriodCurrent;
 use PHPCompiler\VM\Builtin\DatePeriodGetDateInterval;
 use PHPCompiler\VM\Builtin\DatePeriodGetEndDate;
 use PHPCompiler\VM\Builtin\DatePeriodGetIterator;
 use PHPCompiler\VM\Builtin\DatePeriodGetRecurrences;
 use PHPCompiler\VM\Builtin\DatePeriodGetStartDate;
-use PHPCompiler\VM\Builtin\DatePeriodKey;
-use PHPCompiler\VM\Builtin\DatePeriodNext;
-use PHPCompiler\VM\Builtin\DatePeriodRewind;
 use PHPCompiler\VM\Builtin\DatePeriodSetState;
-use PHPCompiler\VM\Builtin\DatePeriodValid;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
@@ -1805,17 +1800,9 @@ final class BuiltinClasses
         $dp->constructor = new DatePeriodConstruct();
         $dp->methods['__construct'] = $dp->constructor;
         $dp->methodVisibility['__construct'] = $pub;
-        // Keep Iterator protocol handlers for InternalIterator snapshot / JIT helpers (#14228).
-        $dp->methods['rewind'] = new DatePeriodRewind();
-        $dp->methodVisibility['rewind'] = $pub;
-        $dp->methods['valid'] = new DatePeriodValid();
-        $dp->methodVisibility['valid'] = $pub;
-        $dp->methods['current'] = new DatePeriodCurrent();
-        $dp->methodVisibility['current'] = $pub;
-        $dp->methods['key'] = new DatePeriodKey();
-        $dp->methodVisibility['key'] = $pub;
-        $dp->methods['next'] = new DatePeriodNext();
-        $dp->methodVisibility['next'] = $pub;
+        // php-src DatePeriod is IteratorAggregate only — do not advertise Iterator
+        // rewind/valid/current/key/next on the method table (#22608). Walk helpers
+        // live in DatePeriodSupport / getIterator() InternalIterator snapshot (#22263).
         $dp->methods['getiterator'] = new DatePeriodGetIterator();
         $dp->methodVisibility['getiterator'] = $pub;
         $dp->methodNames['getiterator'] = 'getIterator';

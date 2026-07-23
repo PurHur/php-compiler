@@ -3178,7 +3178,7 @@ class Object_ extends Type {
         }
         if ('dateperiod' === $lcname) {
             $this->ensureTraversableBuiltinInterfaces();
-            // php-src date.stub.php — IteratorAggregate (#22263); Iterator methods retained for helpers.
+            // php-src date.stub.php — IteratorAggregate only (#22263, #22608).
             $this->setClassInterfaces($displayName, ['IteratorAggregate']);
             // php-src REGISTER_DATEPERIOD_CLASS_CONST_LONG (#20071, ext/date/php_date.c).
             $this->seedExternalClassConstants($id, [
@@ -3203,7 +3203,7 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, 'createfromiso8601string', $pubStatic);
             }
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
-            foreach (['rewind', 'valid', 'current', 'key', 'next', 'getstartdate', 'getenddate', 'getdateinterval', 'getrecurrences'] as $method) {
+            foreach (['getiterator', 'getstartdate', 'getenddate', 'getdateinterval', 'getrecurrences'] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
