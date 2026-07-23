@@ -9,9 +9,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** simplexml_load_string() — parse XML into SimpleXMLElement tree (#3338). */
+/** simplexml_load_string() — parse XML into SimpleXMLElement tree (#3338, #22406). */
 final class simplexml_load_string extends Internal
 {
     public function __construct()
@@ -36,7 +37,20 @@ final class simplexml_load_string extends Internal
             0,
             'data'
         );
-        $entry = VmSimpleXml::loadString($frame->vmContext, $data, $frame);
+        $className = null;
+        if (isset($frame->calledArgs[1])) {
+            $classArg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $classArg->type) {
+                $className = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[1],
+                    'simplexml_load_string',
+                    1,
+                    'class_name'
+                );
+            }
+        }
+        $class = VmSimpleXml::resolveClass($frame->vmContext, $className, 'simplexml_load_string');
+        $entry = VmSimpleXml::loadString($frame->vmContext, $data, $frame, $class);
         if (null !== $frame->returnVar) {
             if (null === $entry) {
                 $frame->returnVar->bool(false);

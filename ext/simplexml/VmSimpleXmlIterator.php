@@ -105,22 +105,17 @@ final class SimpleXmlIteratorConstruct extends VmClassMethod
         if (VmSimpleXmlIterator::CLASS_LC !== strtolower($iterator->class->name)) {
             throw new \LogicException('SimpleXMLIterator::__construct() called on invalid receiver');
         }
-        $sourceVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $sourceVar->type) {
-            throw new \TypeError('SimpleXMLIterator::__construct(): Argument #1 ($data) must be of type SimpleXMLElement');
+        $dataVar = $frame->calledArgs[1]->resolveIndirect();
+        // php-src: SimpleXMLIterator inherits SimpleXMLElement::__construct(string $data, …) (#22406 / sxe.c).
+        if (Variable::TYPE_STRING !== $dataVar->type) {
+            throw new \TypeError('SimpleXMLIterator::__construct(): Argument #1 ($data) must be of type string');
         }
-        $source = $sourceVar->toObject();
-        $sourceClass = strtolower($source->class->name);
-        if (VmSimpleXml::CLASS_LC !== $sourceClass && VmSimpleXmlIterator::CLASS_LC !== $sourceClass) {
-            throw new \TypeError('SimpleXMLIterator::__construct(): Argument #1 ($data) must be of type SimpleXMLElement');
-        }
-        VmSimpleXml::requireElement($source, 'SimpleXMLIterator::__construct()');
-        SimpleXmlRegistry::attach(
+        VmSimpleXml::constructFromData(
+            $frame->vmContext,
             $iterator,
-            SimpleXmlRegistry::state($source),
-            SimpleXmlRegistry::documentKey($source)
+            $dataVar->toString(),
+            $frame
         );
-        SimpleXmlIteratorStorage::init($iterator);
     }
 }
 

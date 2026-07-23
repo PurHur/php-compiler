@@ -106,8 +106,34 @@ final class VmSimpleXml
         $ctx->classes[self::CLASS_LC]->isInternal = true;
     }
 
-    public static function loadString(Context $ctx, string $data, ?Frame $frame = null): ?ObjectEntry
+    /**
+     * Resolve class_name for simplexml_load_* / construct (php-src sxe_object_new; #22406).
+     *
+     * @throws \TypeError when class is missing or not derived from SimpleXMLElement
+     */
+    public static function resolveClass(Context $ctx, ?string $className, string $func): ClassEntry
     {
+        $className = null === $className || '' === $className ? 'SimpleXMLElement' : $className;
+        $class = $ctx->classes[strtolower($className)] ?? null;
+        if (null === $class
+            || (self::CLASS_LC !== strtolower($class->name)
+                && self::CLASS_LC !== strtolower($class->parentLc ?? ''))) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #2 ($class_name) must be a class name derived from SimpleXMLElement or null, %s given',
+                $func,
+                $className
+            ));
+        }
+
+        return $class;
+    }
+
+    public static function loadString(
+        Context $ctx,
+        string $data,
+        ?Frame $frame = null,
+        ?ClassEntry $class = null
+    ): ?ObjectEntry {
         $trimmed = trim($data);
         // php-src: empty/whitespace-only after Z_PARAM_STR coerce → false with no warning
         // (Zend 8.2+/8.4; null→'' soft path for #21502). Whitespace that is not empty still
@@ -127,12 +153,18 @@ final class VmSimpleXml
             return null;
         }
 
-        $class = $ctx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            $class = $ctx->classes[self::CLASS_LC] ?? null;
+        }
         if (null === $class) {
             throw new \LogicException('SimpleXMLElement is not registered in this compiler build');
         }
 
-        return self::wrapNode($ctx, $class, $root);
+        $entry = self::wrapNode($ctx, $class, $root);
+        // php-src: iter.data UNDEF until rewind — mark uninitialized for SXE / SimpleXMLIterator (#22406).
+        SimpleXmlIteratorStorage::init($entry);
+
+        return $entry;
     }
 
     /**
@@ -163,10 +195,15 @@ final class VmSimpleXml
 
         SimpleXmlRegistry::attach($entry, $root, $entry->id);
         $entry->constructed = true;
+        SimpleXmlIteratorStorage::init($entry);
     }
 
-    public static function loadFile(Context $ctx, string $filename, ?Frame $frame = null): ?ObjectEntry
-    {
+    public static function loadFile(
+        Context $ctx,
+        string $filename,
+        ?Frame $frame = null,
+        ?ClassEntry $class = null
+    ): ?ObjectEntry {
         if ('' === $filename) {
             self::warn($ctx, 'simplexml_load_file(): failed to load external entity ""', $frame);
 
@@ -179,7 +216,7 @@ final class VmSimpleXml
             return null;
         }
 
-        return self::loadString($ctx, $contents, $frame);
+        return self::loadString($ctx, $contents, $frame, $class);
     }
 
     public static function requireElement(ObjectEntry $entry, string $label): ObjectEntry
