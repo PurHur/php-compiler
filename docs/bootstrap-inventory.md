@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6506 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20820 |
+| Source constructs flagged (warnings) | 20821 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -488,7 +488,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ds/VmDsStorage.php` | 0 | 15 |
 | `ext/enchant/BuiltinClasses.php` | 0 | 1 |
 | `ext/enchant/EnchantExtensionPolicy.php` | 0 | 1 |
-| `ext/enchant/Module.php` | 0 | 23 |
+| `ext/enchant/Module.php` | 0 | 24 |
 | `ext/enchant/VmEnchantArg.php` | 0 | 1 |
 | `ext/enchant/VmEnchantBroker.php` | 0 | 5 |
 | `ext/enchant/VmEnchantCore.php` | 0 | 13 |
@@ -9945,9 +9945,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new enchant_dict_add_to_session (line 55)
 - new enchant_dict_remove_from_session (line 56)
 - new enchant_dict_is_added (line 57)
-- new enchant_dict_store_replacement (line 58)
-- new enchant_dict_get_error (line 59)
-- new enchant_dict_describe (line 60)
+- new enchant_dict_is_added (line 59)
+- new enchant_dict_store_replacement (line 60)
+- new enchant_dict_get_error (line 61)
+- new enchant_dict_describe (line 62)
 - 3 class method(s)
 
 ### `ext/enchant/VmEnchantArg.php`
@@ -10088,7 +10089,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/enchant/enchant_dict_is_added.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/enchant/enchant_dict_quick_check.php`
