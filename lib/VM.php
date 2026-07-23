@@ -1897,6 +1897,13 @@ class VM {
 
             return $props;
         }
+        // DateInterval: Zend date_interval_get_properties DEBUG wire (#22473).
+        // Same bag as get_object_vars / (array) cast (#22446) — never walk raw slots
+        // (uninit date_string prototype is TYPE_STRING without $string → Variable::$string Error).
+        $intervalMap = $this->dateIntervalObjectVarsPropertyMap($object);
+        if (null !== $intervalMap) {
+            return $intervalMap;
+        }
         // php-src ext/date/php_date.c — date_object_get_properties_for(DEBUG) (#22462).
         // User props first, then Zend date/timezone wire; never leak __dt_* storage.
         $dateWire = DateTimeSupport::tryDebugWirePropertyMap($object, $this->context);
@@ -2102,7 +2109,7 @@ class VM {
     }
 
     /**
-     * php-src ext/date/php_date.c — date_interval_get_properties for get_object_vars / mangled (#22446).
+     * php-src ext/date/php_date.c — date_interval_get_properties for get_object_vars / mangled / DEBUG (#22446, #22473).
      *
      * Reuses the same Zend wire as var_export / (array) cast ({@see DateIntervalSupport::varExportPropertyMap}).
      * DateTime* stay empty from global scope (#10719); only DateInterval exposes this bag.
