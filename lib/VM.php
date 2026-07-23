@@ -1897,11 +1897,47 @@ class VM {
 
             return $props;
         }
+        // php-src ext/date/php_date.c — date_object_get_properties_for(DEBUG) (#22462).
+        // User props first, then Zend date/timezone wire; never leak __dt_* storage.
+        $dateWire = DateTimeSupport::tryDebugWirePropertyMap($object, $this->context);
+        if (null !== $dateWire) {
+            $user = null !== $frame
+                ? DateTimeSupport::filterInternalStorageFromMangledVars(
+                    $this->collectDebugPropertiesForBuiltin($object, $frame)
+                )
+                : DateTimeSupport::filterInternalStorageFromMangledVars(
+                    $this->rawPropertiesAsDebugMap($object)
+                );
+
+            return $user + $dateWire;
+        }
         if (null !== $frame) {
             return $this->collectDebugPropertiesForBuiltin($object, $frame);
         }
 
         return $object->class->getProperties($object->getRawProperties(), ClassEntry::PROP_PURPOSE_DEBUG);
+    }
+
+    /**
+     * Raw instance slots as a debug property map (no hooks) — DateTime DEBUG fallback without Frame.
+     *
+     * @return array<string, Variable>
+     */
+    private function rawPropertiesAsDebugMap(ObjectEntry $object): array
+    {
+        /** @var array<string, Variable> $result */
+        $result = [];
+        foreach ($object->getRawProperties() as $name => $prop) {
+            $value = $prop->resolveIndirect();
+            if (VM\TypedPropertyCheck::isUninitialized($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $result[$name] = $copy;
+        }
+
+        return $result;
     }
 
     /**

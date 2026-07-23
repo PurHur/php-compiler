@@ -1323,6 +1323,49 @@ final class DateTimeSupport
     }
 
     /**
+     * php-src date_object_get_properties_for(ZEND_PROP_PURPOSE_DEBUG) — Zend date/timezone wire (#22462).
+     *
+     * Same hash as VAR_EXPORT / (array) cast. Subclasses of DateTime* / DateTimeZone included.
+     * Caller merges user-declared properties in front; do not use for get_mangled_object_vars (#22445).
+     *
+     * @return array<string, Variable>|null
+     */
+    public static function tryDebugWirePropertyMap(ObjectEntry $obj, ?Context $ctx = null): ?array
+    {
+        $lc = strtolower($obj->class->name);
+        if (self::CLASS_DATETIME === $lc || self::CLASS_DATETIMEIMMUTABLE === $lc) {
+            return self::varExportPropertyMap($obj);
+        }
+        if (self::CLASS_DATETIMEZONE === $lc) {
+            return self::varExportTimezonePropertyMap($obj);
+        }
+        if (null !== $ctx) {
+            if (InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIME, $ctx)
+                || InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEIMMUTABLE, $ctx)) {
+                return self::varExportPropertyMap($obj);
+            }
+            if (InterfaceCheck::entryIsInstanceOf($obj->class, self::CLASS_DATETIMEZONE, $ctx)) {
+                return self::varExportTimezonePropertyMap($obj);
+            }
+
+            return null;
+        }
+        $parent = $obj->class->parentLc;
+        while (null !== $parent) {
+            if (self::CLASS_DATETIME === $parent || self::CLASS_DATETIMEIMMUTABLE === $parent) {
+                return self::varExportPropertyMap($obj);
+            }
+            if (self::CLASS_DATETIMEZONE === $parent) {
+                return self::varExportTimezonePropertyMap($obj);
+            }
+            // Walk one level via known parentLc only (no Context class table).
+            break;
+        }
+
+        return null;
+    }
+
+    /**
      * @param array<string, mixed> $data Zend DateTime unserialize payload
      */
     public static function restoreFromZendSerialize(Context $ctx, string $classKey, array $data): ObjectEntry
