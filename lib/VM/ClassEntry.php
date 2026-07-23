@@ -149,6 +149,8 @@ class ClassEntry {
     public array $methodSourceLocations = [];
     /** @var array<string, \PHPCompiler\Compiler\SourceLocation> property lc => source metadata (#11464) */
     public array $propertySourceLocations = [];
+    /** @var array<string, \PHPCompiler\Compiler\SourceLocation> class constant lc => source metadata (#22419) */
+    public array $constSourceLocations = [];
     /**
      * Internal clone_obj handler — deep-copy extension storage after shallow property clone
      * (php-src zend_object_handlers.clone_obj; #19803, #19805).

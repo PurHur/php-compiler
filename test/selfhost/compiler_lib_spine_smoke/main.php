@@ -5590,6 +5590,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeIsRepeated.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionAttributeNewInstance.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDeprecatedMessage.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDeprecatedVersion.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetDocComment.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetModifiers.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantHasType.php';
@@ -5599,6 +5600,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsFinal.ph
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsPrivate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsProtected.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantIsPublic.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstantVisibility.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassCreateLazyGhost.php';

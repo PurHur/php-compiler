@@ -7389,6 +7389,7 @@ class Compiler {
         }
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);
+        $this->assignSourceMetadata($constOp, $child);
         AttributeNames::assertCompileTimeConstTargetOnly($constOp->attributeNames, 'class constant');
         AttributeNames::assertSensitiveParameterParamTargetOnly($constOp->attributeNames, 'class constant');
         $result->addOpCode($constOp);
