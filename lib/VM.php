@@ -9794,16 +9794,21 @@ restart:
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
-    /** Bridge native PDOException from ext/pdo builtins into user catch handlers (#19830, re-#3367). */
+    /** Bridge native PDOException from ext/pdo builtins into user catch handlers (#19830, re-#3367, #22455). */
     private function dispatchVmPDOException(\PDOException $error, Frame $frame): ?Frame
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $errorInfo = null;
+        if (isset($error->errorInfo) && \is_array($error->errorInfo)) {
+            $errorInfo = $error->errorInfo;
+        }
         $thrown = VM\BuiltinExceptionSupport::materializePDOException(
             $this->context,
             $error->getMessage(),
             $file,
             $line,
-            $error->getCode()
+            (int) $error->getCode(),
+            $errorInfo
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
