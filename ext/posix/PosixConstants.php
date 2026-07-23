@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\posix;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * POSIX access/mknod constants (php-src ext/posix/posix.stub.php; #7376).
  */
@@ -87,23 +89,25 @@ final class PosixConstants
             'POSIX_S_IFBLK' => self::S_IFBLK,
             'POSIX_S_IFREG' => self::S_IFREG,
             'POSIX_S_IFSOCK' => self::S_IFSOCK,
-            // php-src POSIX_SC_* / POSIX_PC_* (#20509)
-            'POSIX_SC_ARG_MAX' => self::SC_ARG_MAX,
-            'POSIX_SC_CHILD_MAX' => self::SC_CHILD_MAX,
-            'POSIX_SC_CLK_TCK' => self::SC_CLK_TCK,
-            'POSIX_SC_PAGESIZE' => self::SC_PAGESIZE,
-            'POSIX_SC_NPROCESSORS_CONF' => self::SC_NPROCESSORS_CONF,
-            'POSIX_SC_NPROCESSORS_ONLN' => self::SC_NPROCESSORS_ONLN,
-            'POSIX_PC_LINK_MAX' => self::PC_LINK_MAX,
-            'POSIX_PC_MAX_CANON' => self::PC_MAX_CANON,
-            'POSIX_PC_MAX_INPUT' => self::PC_MAX_INPUT,
-            'POSIX_PC_NAME_MAX' => self::PC_NAME_MAX,
-            'POSIX_PC_PATH_MAX' => self::PC_PATH_MAX,
-            'POSIX_PC_PIPE_BUF' => self::PC_PIPE_BUF,
-            'POSIX_PC_CHOWN_RESTRICTED' => self::PC_CHOWN_RESTRICTED,
-            'POSIX_PC_NO_TRUNC' => self::PC_NO_TRUNC,
-            'POSIX_PC_ALLOC_SIZE_MIN' => self::PC_ALLOC_SIZE_MIN,
-            'POSIX_PC_SYMLINK_MAX' => self::PC_SYMLINK_MAX,
+            // php-src POSIX_SC_* / POSIX_PC_* — PHP 8.3+ (#20509, #22483)
+            ...(CompilerVersion::supportsPosixSysconfApis() ? [
+                'POSIX_SC_ARG_MAX' => self::SC_ARG_MAX,
+                'POSIX_SC_CHILD_MAX' => self::SC_CHILD_MAX,
+                'POSIX_SC_CLK_TCK' => self::SC_CLK_TCK,
+                'POSIX_SC_PAGESIZE' => self::SC_PAGESIZE,
+                'POSIX_SC_NPROCESSORS_CONF' => self::SC_NPROCESSORS_CONF,
+                'POSIX_SC_NPROCESSORS_ONLN' => self::SC_NPROCESSORS_ONLN,
+                'POSIX_PC_LINK_MAX' => self::PC_LINK_MAX,
+                'POSIX_PC_MAX_CANON' => self::PC_MAX_CANON,
+                'POSIX_PC_MAX_INPUT' => self::PC_MAX_INPUT,
+                'POSIX_PC_NAME_MAX' => self::PC_NAME_MAX,
+                'POSIX_PC_PATH_MAX' => self::PC_PATH_MAX,
+                'POSIX_PC_PIPE_BUF' => self::PC_PIPE_BUF,
+                'POSIX_PC_CHOWN_RESTRICTED' => self::PC_CHOWN_RESTRICTED,
+                'POSIX_PC_NO_TRUNC' => self::PC_NO_TRUNC,
+                'POSIX_PC_ALLOC_SIZE_MIN' => self::PC_ALLOC_SIZE_MIN,
+                'POSIX_PC_SYMLINK_MAX' => self::PC_SYMLINK_MAX,
+            ] : []),
         ];
     }
 

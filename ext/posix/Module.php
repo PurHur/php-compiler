@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\posix;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -12,6 +13,7 @@ use PHPCompiler\VM;
  * posix extension module entry (php-src ext/posix/posix.c; issue #7105).
  *
  * v1 libc wrappers: #7271; access/mknod/set*: #7376; host delegation removed #7177; times/rlimit: #7173; euid/groups/uname: #6123.
+ * posix_sysconf/pathconf/fpathconf/eaccess + POSIX_SC_* / PC_*: PHP 8.3+ (#20509, #22483).
  */
 class Module extends ModuleAbstract
 {
@@ -42,10 +44,12 @@ class Module extends ModuleAbstract
             new posix_ctermid(),
             new posix_errno(),
             new posix_access(),
-            new posix_eaccess(),
-            new posix_sysconf(),
-            new posix_pathconf(),
-            new posix_fpathconf(),
+            ...(CompilerVersion::supportsPosixSysconfApis() ? [
+                new posix_eaccess(),
+                new posix_sysconf(),
+                new posix_pathconf(),
+                new posix_fpathconf(),
+            ] : []),
             new posix_mknod(),
             new posix_mkfifo(),
             new posix_setuid(),
