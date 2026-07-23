@@ -183,8 +183,9 @@ final class BuiltinByRefParams
                 // $formatter + $string + &$currency + optional &$offset — php-src formatter.stub.php (#20780, #21127)
                 return [2, 3];
             case 'intldateformatter::parse':
+            case 'intldateformatter::parsetocalendar':
             case 'intldateformatter::localtime':
-                // $this + $string + &$offset — php-src dateformat.stub.php (#20729)
+                // $this + $string + &$offset — php-src dateformat.stub.php (#20729, #22622)
                 return [2];
             case 'datefmt_parse':
             case 'datefmt_localtime':
