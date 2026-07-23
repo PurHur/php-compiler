@@ -28,6 +28,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/MysqliExtensionPolicy.php';
         require_once __DIR__.'/MysqliConstants.php';
         require_once __DIR__.'/MysqliClassMethod.php';
+        require_once __DIR__.'/MysqliSqlExceptionGetSqlState.php';
         require_once __DIR__.'/BuiltinClasses.php';
         require_once __DIR__.'/VmMysqli.php';
         require_once __DIR__.'/mysqli_connect.php';
