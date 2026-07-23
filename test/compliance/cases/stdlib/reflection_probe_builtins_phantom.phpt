@@ -1,5 +1,5 @@
 --TEST--
-stdlib attribute_exists()/class_meth_exists()/unitenum_exists() — not advertised on PHP 8.2 reference profile (#14995, #17138)
+stdlib attribute_exists()/class_meth_exists()/unitenum_exists() — not advertised on PHP 8.2 reference profile (#14995, #17138, #22584)
 --ENV--
 PHP_COMPILER_PROFILE=8.2
 --FILE--

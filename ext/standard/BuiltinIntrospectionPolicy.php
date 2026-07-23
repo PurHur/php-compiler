@@ -51,8 +51,11 @@ final class BuiltinIntrospectionPolicy
         if ('generator_to_array' === $lc) {
             return CompilerVersion::advertisesGeneratorToArray();
         }
-        if (\in_array($lc, ['attribute_exists', 'class_meth_exists', 'unitenum_exists', 'isanonymousclass'], true)) {
+        if (\in_array($lc, ['attribute_exists', 'class_meth_exists', 'unitenum_exists'], true)) {
             return CompilerVersion::advertisesPhp84ReflectionProbeBuiltins();
+        }
+        if ('isanonymousclass' === $lc) {
+            return CompilerVersion::advertisesIsAnonymousClass();
         }
         if ('class_uses_recursive' === $lc) {
             return CompilerVersion::advertisesClassUsesRecursive();
