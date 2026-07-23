@@ -16311,10 +16311,15 @@ class JIT {
         }
         $this->context->scope->toCall = $staticProxy;
         // Instance call of a static method: omit receiver from args (zend_execute.c; #22288).
+        // XMLReader::open/XML keep EX(This) (#22630, re-#19330).
         if (($visFlags & \PHPCfg\Func::FLAG_STATIC) !== 0) {
-            $this->context->scope->args = [];
+            $keepThis = ('xmlreader' === strtolower((string) $resolvedClassLc))
+                && ('open' === $methodLc || 'xml' === $methodLc);
+            if (!$keepThis) {
+                $this->context->scope->args = [];
 
-            return;
+                return;
+            }
         }
         $this->context->scope->args = [$splObjectStorageMethod ? $receiverVar : $dispatchReceiver];
     }
