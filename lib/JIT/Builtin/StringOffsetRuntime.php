@@ -6,6 +6,8 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JitVariable;
@@ -115,7 +117,10 @@ final class StringOffsetRuntime
         $len = $context->builder->load(
             $context->builder->structGep($str, $map['length'])
         );
-        $index = $context->helper->loadValue($dim);
+        // `$s[$i]` accepts int, bool, null, float and numeric-string offsets; JitLongArg
+        // applies those coercions and always hands back an i64. A raw loadValue() here
+        // returned the `%__value__` struct for a box-backed offset (#22638).
+        $index = JitLongArg::lower($context, $dim, 'string offset');
         $offset = self::normalizeOffset($context, $index, $len);
 
         return $context->builder->gep($chars, $offset);
@@ -125,15 +130,57 @@ final class StringOffsetRuntime
     {
         self::ensureLinked($context);
         $fn = $context->lookupFunction(self::ABI_NORMALIZE);
-        $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $normalized = $context->builder->call(
             $fn,
-            $context->builder->zext($index, $i64),
-            $context->builder->zext($len, $i64)
+            self::offsetToI64($context, $index),
+            self::offsetToI64($context, $len)
         );
 
         return $context->builder->truncOrBitCast($normalized, $sizeT);
+    }
+
+    /**
+     * Coerce an offset/length operand to the i64 {@see ABI_NORMALIZE} declares.
+     *
+     * Callers hand over whatever `loadValue()` produced: a box-backed offset is a
+     * `%__value__` struct, a native length is already i64. The blind `zext` this
+     * replaces emitted `zext %__value__ ... to i64`, which fails module verification
+     * — and since every JIT context builds the htmlspecialchars helper, and that
+     * helper indexes a string, the one bad instruction poisoned every helper unit
+     * and every user-script AOT module (#22638).
+     */
+    private static function offsetToI64(Context $context, Value $value): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $name = $context->getStringFromType($value->typeOf());
+        if (1 === preg_match('/^int(\d+)$/', $name, $match)) {
+            $width = (int) $match[1];
+            if (64 === $width) {
+                return $value;
+            }
+
+            return $width < 64
+                ? $context->builder->zext($value, $i64)
+                : $context->builder->truncOrBitCast($value, $i64);
+        }
+        if ('__value__' === $name || '__value__*' === $name) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                '__value__*' === $name ? $value : self::spillValueBox($context, $value)
+            );
+        }
+
+        throw new \LogicException("string offset operand must be an integer, got {$name}");
+    }
+
+    /** Address a `%__value__` operand that arrived by value rather than by pointer. */
+    private static function spillValueBox(Context $context, Value $value): Value
+    {
+        $slot = $context->builder->alloca($value->typeOf(), 1, 'string_offset_box');
+        $context->builder->store($value, $slot);
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     public static function dimAssign(Context $context, Value $charPtr, JitVariable $value): void

@@ -15827,6 +15827,13 @@ class JIT {
         if (null !== $block->func->class) {
             return true;
         }
+        // Script top-level never receives $this. Without this guard the #16075 scope
+        // fallback below hands `{main}` an `%__object__*` parameter whenever a class was
+        // compiled first, and standalone main's `call void @internal_N()` then fails
+        // verification with an argument-count mismatch (#22638).
+        if ('{main}' === $block->func->name) {
+            return false;
+        }
         // Nested file JIT: func->class may be unset while scope carries the declaring class (#16075).
         if ('' !== $this->context->scope->className) {
             return true;

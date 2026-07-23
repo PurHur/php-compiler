@@ -84,6 +84,25 @@ final class JitNestedHelperCoerce
         return self::isValueBoxType($context, $value->typeOf());
     }
 
+    /**
+     * Materialize a freshly boxed slot for the callee's parameter type.
+     *
+     * {@see isValueBoxType} accepts both `__value__*` and `__value__`, but a box
+     * slot is addressed by pointer. A helper whose parameter is `__value__` by
+     * value needs the slot loaded — passing the pointer instead emitted
+     * `call ...(%__value__* %slot)` against a by-value parameter and failed
+     * module verification for every helper unit (#22638).
+     */
+    private static function valueBoxAs(Context $context, Value $slot, Type $wantTy): Value
+    {
+        $ptr = JitValueBox::pointer($context, $slot);
+        if ('__value__' === $context->getStringFromType($wantTy)) {
+            return $context->builder->load($ptr);
+        }
+
+        return $ptr;
+    }
+
     public static function isHelperResultNull(Context $context, Value $raw): Value
     {
         if (self::isValueBox($context, $raw)) {
@@ -173,7 +192,7 @@ final class JitNestedHelperCoerce
                 $arg
             );
 
-            return JitValueBox::pointer($context, $slot);
+            return self::valueBoxAs($context, $slot, $wantTy);
         }
         if ('__value__*' === $haveStr && '__value__' === $wantStr) {
             return $context->builder->load($arg);
@@ -186,7 +205,7 @@ final class JitNestedHelperCoerce
                 $arg
             );
 
-            return JitValueBox::pointer($context, $slot);
+            return self::valueBoxAs($context, $slot, $wantTy);
         }
         if (('double' === $wantStr || 'float' === $wantStr) && self::isValueBoxType($context, $haveTy)) {
             $extracted = self::extractDoubleFromHelperResult($context, $arg);
@@ -205,7 +224,7 @@ final class JitNestedHelperCoerce
                 $asDouble
             );
 
-            return JitValueBox::pointer($context, $slot);
+            return self::valueBoxAs($context, $slot, $wantTy);
         }
         if (Type::KIND_INTEGER === $wantTy->getKind() && Type::KIND_INTEGER === $haveTy->getKind()) {
             if (('int8' === $haveStr || 'i8' === $haveStr) && ('int32' === $wantStr || 'int64' === $wantStr || 'long long' === $wantStr)) {

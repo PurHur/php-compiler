@@ -1,0 +1,24 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
+@@ -423,6 +423,21 @@
+     }
+ 
+     public function iCmp(int $op, CoreValue $left, CoreValue $right): CoreValue {
++        if ('1' === \getenv('PHP_COMPILER_LLVM_ASSERT')) {
++            $lt = $this->llvm->lib->LLVMTypeOf($left->value);
++            $rt = $this->llvm->lib->LLVMTypeOf($right->value);
++            $lk = $this->llvm->lib->LLVMGetTypeKind($lt);
++            $rk = $this->llvm->lib->LLVMGetTypeKind($rt);
++            if ($lk === $rk && \llvm\llvm::LLVMIntegerTypeKind === $lk) {
++                $lw = $this->llvm->lib->LLVMGetIntTypeWidth($lt);
++                $rw = $this->llvm->lib->LLVMGetIntTypeWidth($rt);
++                if ($lw !== $rw) {
++                    throw new \RuntimeException("iCmp: operand width mismatch (i{$lw} vs i{$rw})");
++                }
++            } elseif ($lk !== $rk) {
++                throw new \RuntimeException("iCmp: operand kind mismatch ({$lk} vs {$rk})");
++            }
++        }
+         switch ($op) {
+             case self::INT_EQ:
+                 $predicate = lib::LLVMIntEQ;

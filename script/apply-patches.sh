@@ -25,6 +25,9 @@ patch_already_applied() {
     php-llvm-structgep-assert.patch)
       grep -q 'PHP_COMPILER_LLVM_ASSERT' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
+    php-llvm-icmp-assert.patch)
+      grep -q 'iCmp: operand width mismatch' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
+      ;;
     php-llvm-builder-dispose-idempotent.patch)
       grep -q 'private bool \$disposed = false' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null \
         || grep -q 'private bool $disposed = false' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
@@ -6274,6 +6277,7 @@ apply_patch "$PATCH_DIR/php-llvm-llvmabstract-value-addincoming.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-and-or.patch"
 apply_patch "$PATCH_DIR/php-llvm-builder-xor.patch"
 apply_patch "$PATCH_DIR/php-llvm-structgep-assert.patch"
+apply_patch "$PATCH_DIR/php-llvm-icmp-assert.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-registry-interface.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-semicolon.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-typed-prop.patch"
