@@ -26,7 +26,7 @@ final class ReflectionFunctionIsVariadic implements Call
             $context,
             $obj,
             'ReflectionFunction',
-            ReflectionSupport::PROP_FUNC_NAME
+            ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME
         );
         $isVariadic = $context->builder->call(
             $context->lookupFunction('__compiler_refl_func_is_variadic'),

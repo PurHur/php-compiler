@@ -22,7 +22,7 @@ final class ReflectionFunctionGetName implements Call
             $context,
             $obj,
             'ReflectionFunction',
-            ReflectionSupport::PROP_FUNC_NAME
+            ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME
         );
         $len64 = $context->builder->zExt($len, $i64);
 

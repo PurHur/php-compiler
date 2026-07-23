@@ -25,7 +25,7 @@ final class ReflectionFunctionConstruct implements Call
             $context,
             $obj,
             'ReflectionFunction',
-            ReflectionSupport::PROP_FUNC_NAME,
+            ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME,
             $args[1]
         );
         ReflectionSetup::markConstructed($context, $obj);

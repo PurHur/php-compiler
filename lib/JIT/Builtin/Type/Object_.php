@@ -3056,7 +3056,8 @@ class Object_ extends Type {
         }
         if ('reflectionfunction' === $lcname) {
             $this->setClassParentName('ReflectionFunction', 'ReflectionFunctionAbstract');
-            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_FUNC_NAME, Variable::TYPE_STRING);
+            // Zend public `$name` (#22488).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME, Variable::TYPE_STRING);
         }
         if ('reflectionparameter' === $lcname) {
             // Public Zend surface: `$name` only; other slots are engine storage (#22528).

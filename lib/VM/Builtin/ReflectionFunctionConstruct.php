@@ -29,7 +29,7 @@ final class ReflectionFunctionConstruct extends VmClassMethod
             $state = VmClosureCall::resolve($target);
             $receiver->reflectionClosureState = $state;
             // fromCallable wrappers: report underlying name (strlen / createFromFormat), not {closure} (#22330).
-            $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string(
+            $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME)->string(
                 ReflectionSupport::displayNameForClosureState($state)
             );
         } else {
@@ -39,7 +39,7 @@ final class ReflectionFunctionConstruct extends VmClassMethod
             $func = ReflectionSupport::resolveFunctionForReflection($ctx, $name);
             $receiver->reflectionClosureState = null;
             $receiver->reflectionIsInternalFunction = $func instanceof \PHPCompiler\Func\Internal;
-            $receiver->getProperty(ReflectionSupport::PROP_FUNC_NAME)->string($name);
+            $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_FUNCTION_NAME)->string($name);
         }
         $receiver->constructed = true;
     }
