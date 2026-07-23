@@ -873,6 +873,11 @@ class VM {
         if (null !== $domChildrenIsset) {
             return $domChildrenIsset;
         }
+        // ReflectionAttribute / other C-only slots are not PHP-visible (#22513).
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null !== $meta && $meta->phpInvisible) {
+            return false;
+        }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
             return VmIsset::storedPropertyIsSet($props[$propName]);
@@ -2025,6 +2030,10 @@ class VM {
                 if (isset($seenLc[$lc]) || isset($hookBackingLc[$lc])) {
                     continue;
                 }
+                if ($meta->phpInvisible) {
+                    $seenLc[$lc] = true;
+                    continue;
+                }
                 $seenLc[$lc] = true;
                 if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
                     continue;
@@ -2185,6 +2194,10 @@ class VM {
                     continue;
                 }
                 if (JitMcjitEmbed::isEmbedClassPadProperty($meta->name)) {
+                    continue;
+                }
+                if ($meta->phpInvisible) {
+                    $seenLc[$lc] = true;
                     continue;
                 }
                 $seenLc[$lc] = true;
@@ -7022,7 +7035,10 @@ restart:
                         $invisibleParentPrivateMeta = $this->classPropertyMeta($propertyObject, $name);
                         if (
                             null !== $invisibleParentPrivateMeta
-                            && $this->isParentPrivatePropertyInvisibleFromCaller($invisibleParentPrivateMeta, $frame)
+                            && (
+                                $invisibleParentPrivateMeta->phpInvisible
+                                || $this->isParentPrivatePropertyInvisibleFromCaller($invisibleParentPrivateMeta, $frame)
+                            )
                         ) {
                             if ($op->nullsafeFetchPropertyRead) {
                                 $result->null();

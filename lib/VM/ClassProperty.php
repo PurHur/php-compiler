@@ -46,6 +46,11 @@ class ClassProperty {
     public int $getVisibility = 0;
     /** Source declared an explicit read modifier before asymmetric set (#15995). */
     public bool $asymmetricExplicitRead = false;
+    /**
+     * C-level / engine storage only — not in PHP property table
+     * (ReflectionAttribute slots, ref->accessible; #22513, #22514).
+     */
+    public bool $phpInvisible = false;
     /** Lowercase class that declared this property (issue #145). */
     public string $declaringClassLc;
 

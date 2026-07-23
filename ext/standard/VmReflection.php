@@ -960,6 +960,10 @@ final class VmReflection
     {
         $meta = self::findClassProperty($class, $property, $ctx);
         if (null !== $meta) {
+            // C-level reflection storage is not a PHP property (#22513, #22514).
+            if ($meta->phpInvisible) {
+                return false;
+            }
             $declaringLc = '' !== $meta->declaringClassLc
                 ? $meta->declaringClassLc
                 : strtolower(ltrim($class->name, '\\'));
@@ -1267,7 +1271,17 @@ final class VmReflection
                 return true;
             }
             // php-src zend_property_exists: dynamic instance properties (stdClass, etc.)
-            return $object->hasProperty($property);
+            // Declared phpInvisible slots still allocate storage — do not treat as dynamics (#22513).
+            if ($object->hasProperty($property)) {
+                $meta = self::findClassProperty($object->class, $property, $ctx);
+                if (null !== $meta && $meta->phpInvisible) {
+                    return false;
+                }
+
+                return true;
+            }
+
+            return false;
         }
         if (Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
             return EnumCaseSupport::propertyExistsOnCase(
