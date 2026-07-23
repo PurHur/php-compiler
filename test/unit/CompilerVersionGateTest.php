@@ -709,17 +709,14 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testJsonEncodeUnitEnumValueErrorFalseOnReferenceProfile(): void
+    public function testJsonEncodeUnitEnumValueErrorAlwaysFalse(): void
     {
+        // Zend never ValueError for unit enums (#22681/#22688) — gate retired to always-false.
         $this->assertFalse(CompilerVersion::jsonEncodeUnitEnumValueError());
-    }
-
-    public function testJsonEncodeUnitEnumValueErrorTrueOnForwardProfile(): void
-    {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::jsonEncodeUnitEnumValueError());
+            $this->assertFalse(CompilerVersion::jsonEncodeUnitEnumValueError());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\simplexml\SimpleXmlJsonExport;
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM;
@@ -32,6 +31,9 @@ final class VmJson
 
     /** JSON_ERROR_UNSUPPORTED_TYPE — object without JsonSerializable (Zend ext/json). */
     public const ERROR_UNSUPPORTED_TYPE = 8;
+
+    /** JSON_ERROR_NON_BACKED_ENUM — unit enum without JsonSerializable (Zend ext/json). */
+    public const ERROR_NON_BACKED_ENUM = 11;
 
     /** JSON_ERROR_RECURSION — circular array/object reference (Zend ext/json/php_json.c). */
     public const ERROR_RECURSION = 6;
@@ -67,6 +69,7 @@ final class VmJson
             self::ERROR_RECURSION => 'Recursion detected',
             self::ERROR_INF_OR_NAN => 'Inf and NaN cannot be JSON encoded',
             self::ERROR_UNSUPPORTED_TYPE => 'Type is not supported',
+            self::ERROR_NON_BACKED_ENUM => 'Non-backed enums have no default serialization',
             default => 'Unknown error',
         };
     }
@@ -525,12 +528,9 @@ final class VmJson
         }
 
         if (null === $case->enumClass->backedType) {
-            if (CompilerVersion::jsonEncodeUnitEnumValueError()) {
-                throw new \ValueError(
-                    'json_encode(): Argument #1 ($value) contains an invalid JSON type'
-                );
-            }
-            throw new VmJsonExportException(self::ERROR_UNSUPPORTED_TYPE);
+            // php-src ext/json/json_encoder.c — unit enum → JSON_ERROR_NON_BACKED_ENUM (#22681/#22688).
+            // Zend never ValueError here (8.2–8.4); only JsonException with JSON_THROW_ON_ERROR.
+            throw new VmJsonExportException(self::ERROR_NON_BACKED_ENUM);
         }
         $backing = $case->backingValue->resolveIndirect();
 

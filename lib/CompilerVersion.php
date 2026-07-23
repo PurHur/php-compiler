@@ -1660,27 +1660,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ json_encode() on unit enum cases — ValueError not silent false (ext/json/php_json.c, #5683).
+     * Formerly gated a mistaken ValueError for json_encode(unit enum) on forward profiles (#5683).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — returns false). Enable via stable
-     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * php-src (8.2–8.4) always returns false + JSON_ERROR_NON_BACKED_ENUM; never ValueError
+     * (#22681/#22688). Kept as a always-false probe so advertisement/gate tests stay stable.
      */
     public static function jsonEncodeUnitEnumValueError(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
     /**
