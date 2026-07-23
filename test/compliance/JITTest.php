@@ -337,8 +337,9 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'closure_get_current')
                 && !str_contains($name, 'closure_get_current_phantom')
                 && !str_contains($name, 'closure_get_current_profile')
-                && !str_contains($name, 'closure_get_current_forward_84')
-                && !str_contains($name, 'closure_get_current_nested_84')) {
+                && !str_contains($name, 'closure_get_current_forward_85')
+                && !str_contains($name, 'closure_get_current_nested_85')
+                && !str_contains($name, 'closure_get_current_method_exists_85')) {
                 continue;
             }
             if (CompilerVersion::supportsClosureGetCurrent()
@@ -380,9 +381,12 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
                 continue;
             }
-            // JIT: method_exists(Closure::class, …) segfaults; phantom/profile introspection is VM-only (#14504, #16989).
+            // JIT: method_exists(Closure::class, …) segfaults; phantom/profile introspection is VM-only (#14504, #16989, #22583).
             if (str_contains($name, 'closure_get_current_phantom')
                 || str_contains($name, 'closure_get_current_profile')
+                || str_contains($name, 'closure_get_current_method_exists')
+                || str_contains($name, 'closure_fwd_apis_phantom')
+                || str_contains($name, 'closure_from_static_profile')
                 || str_contains($name, 'closure_debuginfo_phantom')
                 || str_contains($name, 'closure_debug_info')) {
                 continue;

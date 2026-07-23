@@ -309,8 +309,9 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'closure_get_current')
                 && !str_contains($name, 'closure_get_current_phantom')
                 && !str_contains($name, 'closure_get_current_profile')
-                && !str_contains($name, 'closure_get_current_forward_84')
-                && !str_contains($name, 'closure_get_current_nested_84')) {
+                && !str_contains($name, 'closure_get_current_forward_85')
+                && !str_contains($name, 'closure_get_current_nested_85')
+                && !str_contains($name, 'closure_get_current_method_exists_85')) {
                 continue;
             }
             if (CompilerVersion::supportsClosureGetCurrent()

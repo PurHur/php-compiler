@@ -1,7 +1,7 @@
 --TEST--
-language Closure::getCurrent() forward 8.4 profile compliance (#16989, Zend/zend_closures.c)
+language Closure::getCurrent() forward 8.5 profile compliance (#22583, Zend/zend_closures.stub.php)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 declare(strict_types=1);

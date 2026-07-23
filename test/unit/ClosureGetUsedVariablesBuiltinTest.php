@@ -12,7 +12,7 @@ final class ClosureGetUsedVariablesBuiltinTest extends TestCase
     public function testClosureGetUsedVariablesReturnsCaptureMap(): void
     {
         if (!CompilerVersion::supportsClosureGetUsedVariables()) {
-            $this->markTestSkipped('Closure::getUsedVariables() requires PHP_COMPILER_PROFILE=8.4');
+            $this->markTestSkipped('Closure::getUsedVariables() withheld — not in php-src stubs (#22583)');
         }
         $rt = new Runtime();
         $code = <<<'PHP'
