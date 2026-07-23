@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6460 |
-| Phase A inventory files (M2 ratio SSOT) | 6460 |
+| PHP files on vm.php path | 6479 |
+| Phase A inventory files (M2 ratio SSOT) | 6479 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20709 |
+| Source constructs flagged (warnings) | 20748 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1756,7 +1756,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_string.php` | 0 | 2 |
 | `ext/snmp/BuiltinClasses.php` | 0 | 1 |
-| `ext/snmp/Module.php` | 0 | 7 |
+| `ext/snmp/Module.php` | 0 | 25 |
 | `ext/snmp/SNMPClose.php` | 0 | 2 |
 | `ext/snmp/SNMPConstruct.php` | 0 | 3 |
 | `ext/snmp/SNMPGetErrno.php` | 0 | 2 |
@@ -1764,12 +1764,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/snmp/SNMPGetMethod.php` | 0 | 3 |
 | `ext/snmp/SNMPGetNextMethod.php` | 0 | 3 |
 | `ext/snmp/SNMPSetMethod.php` | 0 | 3 |
+| `ext/snmp/SNMPSetSecurity.php` | 0 | 3 |
 | `ext/snmp/SNMPWalkMethod.php` | 0 | 3 |
 | `ext/snmp/SnmpClassMethod.php` | 0 | 1 |
 | `ext/snmp/SnmpConstants.php` | 0 | 1 |
 | `ext/snmp/SnmpExtensionPolicy.php` | 0 | 1 |
 | `ext/snmp/SnmpFunction.php` | 0 | 1 |
-| `ext/snmp/VmSnmp.php` | 0 | 12 |
+| `ext/snmp/VmSnmp.php` | 0 | 13 |
+| `ext/snmp/snmp2_get.php` | 0 | 1 |
+| `ext/snmp/snmp2_getnext.php` | 0 | 1 |
+| `ext/snmp/snmp2_real_walk.php` | 0 | 1 |
+| `ext/snmp/snmp2_set.php` | 0 | 1 |
+| `ext/snmp/snmp2_walk.php` | 0 | 1 |
+| `ext/snmp/snmp3_get.php` | 0 | 1 |
+| `ext/snmp/snmp3_getnext.php` | 0 | 1 |
+| `ext/snmp/snmp3_real_walk.php` | 0 | 1 |
+| `ext/snmp/snmp3_set.php` | 0 | 1 |
+| `ext/snmp/snmp3_walk.php` | 0 | 1 |
+| `ext/snmp/snmp_get_quick_print.php` | 0 | 1 |
+| `ext/snmp/snmp_get_valueretrieval.php` | 0 | 1 |
+| `ext/snmp/snmp_read_mib.php` | 0 | 1 |
+| `ext/snmp/snmp_set_enum_print.php` | 0 | 1 |
+| `ext/snmp/snmp_set_oid_numeric_print.php` | 0 | 1 |
+| `ext/snmp/snmp_set_oid_output_format.php` | 0 | 1 |
+| `ext/snmp/snmp_set_quick_print.php` | 0 | 1 |
+| `ext/snmp/snmp_set_valueretrieval.php` | 0 | 1 |
 | `ext/snmp/snmpget.php` | 0 | 1 |
 | `ext/snmp/snmpgetnext.php` | 0 | 1 |
 | `ext/snmp/snmprealwalk.php` | 0 | 1 |
@@ -4958,7 +4977,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/OpensslDigestCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslDigestRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslEncryptCrypto.php` | 0 | 1 |
-| `lib/JIT/Builtin/OpensslEncryptRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/OpensslEncryptRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/OpensslMethodsCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslMethodsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslSignCrypto.php` | 0 | 1 |
@@ -20741,6 +20760,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new snmpwalk (line 55)
 - new snmprealwalk (line 56)
 - new snmpset (line 57)
+- new snmp2_get (line 58)
+- new snmp2_getnext (line 59)
+- new snmp2_walk (line 60)
+- new snmp2_real_walk (line 61)
+- new snmp2_set (line 62)
+- new snmp3_get (line 63)
+- new snmp3_getnext (line 64)
+- new snmp3_walk (line 65)
+- new snmp3_real_walk (line 66)
+- new snmp3_set (line 67)
+- new snmp_get_quick_print (line 68)
+- new snmp_set_quick_print (line 69)
+- new snmp_set_enum_print (line 70)
+- new snmp_set_oid_output_format (line 71)
+- new snmp_set_oid_numeric_print (line 72)
+- new snmp_set_valueretrieval (line 73)
+- new snmp_get_valueretrieval (line 74)
+- new snmp_read_mib (line 75)
 - 4 class method(s)
 
 ### `ext/snmp/SNMPClose.php`
@@ -20789,6 +20826,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 24)
 - 1 class method(s)
 
+### `ext/snmp/SNMPSetSecurity.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+
 ### `ext/snmp/SNMPWalkMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -20819,18 +20863,109 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/snmp/VmSnmp.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 37)
-- new Variable (line 40)
-- new SNMPConstruct (line 47)
-- new SNMPGetMethod (line 52)
-- new SNMPGetNextMethod (line 53)
-- new SNMPWalkMethod (line 54)
-- new SNMPSetMethod (line 55)
-- new SNMPClose (line 56)
-- new SNMPGetError (line 57)
-- new SNMPGetErrno (line 58)
-- new SnmpState (line 81)
-- 20 class method(s)
+- new ClassEntry (line 42)
+- new Variable (line 45)
+- new SNMPConstruct (line 52)
+- new SNMPGetMethod (line 57)
+- new SNMPGetNextMethod (line 58)
+- new SNMPWalkMethod (line 59)
+- new SNMPSetMethod (line 60)
+- new SNMPSetSecurity (line 61)
+- new SNMPClose (line 62)
+- new SNMPGetError (line 63)
+- new SNMPGetErrno (line 64)
+- new SnmpState (line 88)
+- 29 class method(s)
+
+### `ext/snmp/snmp2_get.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp2_getnext.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp2_real_walk.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp2_set.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp2_walk.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp3_get.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp3_getnext.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp3_real_walk.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp3_set.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp3_walk.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp_get_quick_print.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp_get_valueretrieval.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp_read_mib.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp_set_enum_print.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp_set_oid_numeric_print.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp_set_oid_output_format.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp_set_quick_print.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/snmp/snmp_set_valueretrieval.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/snmp/snmpget.php`
 
@@ -35236,8 +35371,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_grep.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 54)
-- new Error (line 89)
+- new HashTable (line 51)
+- new Error (line 86)
 - 3 class method(s)
 
 ### `ext/standard/preg_last_error_.php`
@@ -42842,9 +42977,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/OpensslEncryptRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 248)
 - 12 class method(s)
-- 7 closure(s)
+- 6 closure(s)
 
 ### `lib/JIT/Builtin/OpensslMethodsCrypto.php`
 
