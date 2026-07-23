@@ -31,5 +31,8 @@ final class SysvShmBuiltinTest extends BaseTest
 
         $shmopPath = __DIR__.'/../compliance/cases/stdlib/shmop_roundtrip.phpt';
         yield 'shmop_roundtrip.phpt' => self::parsePHPT($shmopPath, 'shmop_roundtrip.phpt');
+
+        $loadedPath = __DIR__.'/../compliance/cases/stdlib/extension_loaded_shmop.phpt';
+        yield 'extension_loaded_shmop.phpt' => self::parsePHPT($loadedPath, 'extension_loaded_shmop.phpt');
     }
 }

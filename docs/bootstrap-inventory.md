@@ -36772,20 +36772,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sysvshm/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new shm_attach (line 31)
-- new shm_detach (line 32)
-- new shm_get_var (line 33)
-- new shm_has_var (line 34)
-- new shm_put_var (line 35)
-- new shm_remove (line 36)
-- new shm_remove_var (line 37)
-- new shmop_open (line 38)
-- new shmop_read (line 39)
-- new shmop_write (line 40)
-- new shmop_size (line 41)
-- new shmop_close (line 42)
-- new shmop_delete (line 43)
-- 3 class method(s)
+- new shm_attach (line 44)
+- new shm_detach (line 45)
+- new shm_get_var (line 46)
+- new shm_has_var (line 47)
+- new shm_put_var (line 48)
+- new shm_remove (line 49)
+- new shm_remove_var (line 50)
+- new shmop_open (line 51)
+- new shmop_read (line 52)
+- new shmop_write (line 53)
+- new shmop_size (line 54)
+- new shmop_close (line 55)
+- new shmop_delete (line 56)
+- 4 class method(s)
 
 ### `ext/sysvshm/ShmopArgs.php`
 
