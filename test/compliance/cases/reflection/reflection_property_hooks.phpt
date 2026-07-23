@@ -27,8 +27,10 @@ $hooks = $p->getHooks();
 var_export(count($hooks) >= 1);
 echo "\n";
 $first = array_values($hooks)[0] ?? null;
-$isClosure = $first instanceof Closure;
-var_export($isClosure);
+$isRm = $first instanceof ReflectionMethod;
+var_export($isRm);
+echo "\n";
+echo is_object($first) ? $first->getName() : 'missing';
 echo "\n";
 --EXPECT--
 true
@@ -39,3 +41,4 @@ true
 false
 true
 true
+$title::get
