@@ -3069,8 +3069,9 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PARAM_POSITION, Variable::TYPE_NATIVE_LONG);
         }
         if ('reflectionproperty' === $lcname) {
-            $this->defineProperty($id, 'name', Variable::TYPE_STRING);
-            $this->defineProperty($id, 'property', Variable::TYPE_STRING);
+            // Zend public surface: $name then $class (#22504).
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_PROPERTY_NAME, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\VM\ReflectionSupport::PROP_DECLARING_CLASS_NAME, Variable::TYPE_STRING);
         }
         if ('reflectionclassconstant' === $lcname) {
             // Zend public surface: $name then $class (#22503).

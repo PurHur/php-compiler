@@ -43,7 +43,7 @@ final class ReflectionPropertyConstruct extends VmClassMethod
         }
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
         $declaringClassName = VmReflection::declaringClassNameForPropertyLookup($entry, $property, $ctx);
-        $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+        // Zend ReflectionProperty::$name / $class (#22504) — not class-on-$name + internal `property`.
         $receiver->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($property);
         $receiver->getProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME)->string($declaringClassName);
         $receiver->getProperty(ReflectionSupport::PROP_IS_DYNAMIC)->bool($isDynamic);

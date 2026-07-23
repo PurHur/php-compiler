@@ -24,8 +24,9 @@ final class ReflectionPropertyConstruct implements Call
             throw new \LogicException('ReflectionProperty::__construct() expects class and property name');
         }
         $obj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
-        ReflectionSetup::emitSetStringPropertyFromVar($context, $obj, 'ReflectionProperty', 'name', $args[1]);
-        ReflectionSetup::emitSetStringPropertyFromVar($context, $obj, 'ReflectionProperty', 'property', $args[2]);
+        // Zend ReflectionProperty::$name = property name; $class = class arg (declaring when same) (#22504).
+        ReflectionSetup::emitSetStringPropertyFromVar($context, $obj, 'ReflectionProperty', 'name', $args[2]);
+        ReflectionSetup::emitSetStringPropertyFromVar($context, $obj, 'ReflectionProperty', 'class', $args[1]);
         ReflectionSetup::markConstructed($context, $obj);
 
         $slot = JitValueBox::alloc($context);

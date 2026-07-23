@@ -1080,10 +1080,13 @@ final class BuiltinClasses
         $rc->methodVisibility['__tostring'] = $pub;
 
         $rp = new ClassEntry('ReflectionProperty');
-        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+        // Zend dump/public surface: $name = property, $class = declaring class (#22504).
+        // Property registration order matches Zend print_r/var_dump (name then class).
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PROPERTY_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME, null, $strProto);
-        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_IS_DYNAMIC, null, $boolProto);
+        $rpIsDynamic = new ClassProperty(ReflectionSupport::PROP_IS_DYNAMIC, null, $boolProto);
+        $rpIsDynamic->phpInvisible = true;
+        $rp->properties[] = $rpIsDynamic;
         // ref->accessible is C-only in php-src — not a PHP property (#22514).
         $rpAccess = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rpAccess->phpInvisible = true;
