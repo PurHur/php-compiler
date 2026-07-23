@@ -123,6 +123,93 @@ final class StringOffsetRuntime
         return $context->builder->gep($chars, $offset);
     }
 
+    /**
+     * Bounds-checked string offset read → length-1 (or empty) {@see __string__*} (#22646).
+     *
+     * LLVM bounds check (mirrors {@see StringOffsetJitHelper::readOffset}); NestedJIT of
+     * trigger_error inside that helper is too heavy for every dim-fetch module.
+     */
+    public static function readDimAsString(Context $context, Value $str, JitVariable $dim): Value
+    {
+        self::ensureLinked($context);
+
+        return self::readDimAsStringNestedLeaf($context, $str, $dim);
+    }
+
+    /**
+     * Bounds-safe read + E_WARNING on OOR (#22646 / Zend uninitialized string offset).
+     */
+    private static function readDimAsStringNestedLeaf(Context $context, Value $str, JitVariable $dim): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $chars = $context->builder->structGep($str, $map['value']);
+        $len = $context->builder->load(
+            $context->builder->structGep($str, $map['length'])
+        );
+        $rawIndex = self::coerceOffsetOperandToI64($context, $context->helper->loadValue($dim));
+        $offset = self::normalizeOffset($context, $rawIndex, $len);
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $inRange = $context->builder->and(
+            $context->builder->icmp(Builder::INT_UGE, $offset, $zero),
+            $context->builder->icmp(Builder::INT_ULT, $offset, $len)
+        );
+        $okBlock = BasicBlockHelper::append($context, 'str_off_read_ok');
+        $oobBlock = BasicBlockHelper::append($context, 'str_off_read_oob');
+        $doneBlock = BasicBlockHelper::append($context, 'str_off_read_done');
+        $context->builder->branchIf($inRange, $okBlock, $oobBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $charPtr = $context->builder->gep($chars, $offset);
+        $okStr = self::readAsString($context, $charPtr);
+        $okEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($oobBlock);
+        self::emitUninitializedOffsetWarning($context, $dim);
+        $empty = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->getTypeFromString('int64')->constInt(0, false),
+            $context->getTypeFromString('char*')->constNull()
+        );
+        $oobEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($context->getTypeFromString('__string__*'));
+        $phi->addIncoming($okStr, $okEnd);
+        $phi->addIncoming($empty, $oobEnd);
+
+        return $phi;
+    }
+
+    /** E_WARNING for OOR string offset via {@see __compiler_trigger_error} (#22646). */
+    private static function emitUninitializedOffsetWarning(Context $context, JitVariable $dim): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringTriggerError::ensureLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+
+        $message = 'Uninitialized string offset';
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(\PHPCompiler\VM\ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
+
     public static function normalizeOffset(Context $context, Value $index, Value $len): Value
     {
         self::ensureLinked($context);

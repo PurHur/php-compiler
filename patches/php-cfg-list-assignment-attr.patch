@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1711,6 +1711,8 @@
+         $this->rejectMixedKeyedUnkeyedListAssignment($expr);
+ 
+         $attributes = $this->mapAttributes($expr);
++        // Marker for Compiler list-destruct detection — Runtime lexer omits startFilePos (#22646).
++        $attributes['listAssignment'] = true;
+         $logicalIndex = 0;
+         $excludedKeys = [];
+         foreach ($expr->items as $i => $item) {

@@ -36,6 +36,26 @@ final class StringOffsetJitHelper
         return $rawIndex;
     }
 
+    /**
+     * Read one byte as a length-1 string; OOR → empty (#22646).
+     *
+     * Warning is emitted by {@see \PHPCompiler\JIT\Builtin\StringOffsetRuntime} (LLVM), not here —
+     * NestedJIT of this helper must not pull in trigger_error.
+     *
+     * php-src: Zend/zend_operators.c — zend_fetch_dimension_address_read (IS_STRING)
+     * SSOT peer: {@see Variable::readStringOffset()}
+     */
+    public static function readOffset(string $str, int $rawIndex): string
+    {
+        $len = \strlen($str);
+        $index = self::normalizeByteIndex($rawIndex, $len);
+        if ($index < 0 || $index >= $len) {
+            return '';
+        }
+
+        return $str[$index];
+    }
+
     public static function incDecErrorMessage(): string
     {
         return self::INCDEC_ERROR;

@@ -2728,6 +2728,10 @@ class Compiler {
         if ($assign->expr !== $fetch->result) {
             return false;
         }
+        // Distinguish `["k" => $v] = $rhs` from `$v = $rhs["k"]` (#22646).
+        if (!$this->isListAssignmentLoweredDimFetch($fetch, $assign)) {
+            return false;
+        }
 
         return $this->assignIsListDestructSlotTarget($assign->var, $block);
     }
@@ -2845,6 +2849,12 @@ class Compiler {
             if ($assign->expr !== $fetch->result) {
                 return false;
             }
+            // `$c = $s[0]` and `[$c] = $s` share the same CFG shape; only list/array
+            // assignment lowering stamps shared attrs (or Array_ kind) onto the fetch (#22646).
+            if (!$fetch instanceof Op\Expr\ArrayDimFetch
+                || !$this->isListAssignmentLoweredDimFetch($fetch, $assign)) {
+                return false;
+            }
 
             return $this->assignIsListDestructSlotTarget($assign->var, $block);
         }
@@ -2853,6 +2863,36 @@ class Compiler {
         return $next instanceof Op\Expr\ArrayDimFetch
             && $next->var === $fetch->result
             && $this->isPlainListDestructDimFetch($ops, $index + 1, $block);
+    }
+
+    /**
+     * True when php-cfg emitted this dim fetch from `list()` / `[] =` assignment, not `$x = $y[$i]`.
+     *
+     * Short-array destruct carries PhpParser Array_ `kind`; both `list()` and `[]` stamp the same
+     * source span on the fetch and its slot assign. Ordinary `$c = $s[0]` uses a narrower fetch span.
+     *
+     * @see #22646
+     */
+    private function isListAssignmentLoweredDimFetch(Op\Expr\ArrayDimFetch $fetch, Op $assign): bool
+    {
+        // Explicit marker from php-cfg parseListAssignment (#22646). Prefer this: Runtime's
+        // ParserFactory lexer omits startFilePos/endFilePos, so span equality is unreliable.
+        if (true === $fetch->getAttribute('listAssignment') || true === $assign->getAttribute('listAssignment')) {
+            return true;
+        }
+        // Short-array `[$a] = $rhs` also carries PhpParser Array_ kind onto the fetch.
+        if (null !== $fetch->getAttribute('kind')) {
+            return true;
+        }
+        $fetchStart = $fetch->getAttribute('startFilePos');
+        $assignStart = $assign->getAttribute('startFilePos');
+        $fetchEnd = $fetch->getAttribute('endFilePos');
+        $assignEnd = $assign->getAttribute('endFilePos');
+        if (null === $fetchStart || null === $assignStart || null === $fetchEnd || null === $assignEnd) {
+            return false;
+        }
+
+        return $fetchStart === $assignStart && $fetchEnd === $assignEnd;
     }
 
     /**

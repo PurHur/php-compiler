@@ -852,12 +852,13 @@ final class Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
                 $str = $this->context->helper->loadValue($this);
-                $charPtr = StringOffsetHelper::dimFetch(
-                    $this->context,
-                    $str,
-                    $dim
-                );
                 if ($forWrite) {
+                    $charPtr = StringOffsetHelper::dimFetch(
+                        $this->context,
+                        $str,
+                        $dim
+                    );
+
                     return new Variable(
                         $this->context,
                         self::TYPE_STRING,
@@ -865,7 +866,7 @@ final class Variable {
                         $charPtr,
                     );
                 }
-                $str = StringOffsetHelper::readAsString($this->context, $charPtr);
+                $str = StringOffsetHelper::readDimAsString($this->context, $str, $dim);
 
                 return new Variable(
                     $this->context,
@@ -1040,6 +1041,9 @@ final class Variable {
 
                 return $boxed;
             case self::TYPE_VALUE:
+                if (!$forWrite) {
+                    return $this->dimFetchValueBoxRead($dim, $expectedType);
+                }
                 $childHt = HashTableHelper::loadHashtablePointer($this->context, $this);
                 $htVar = new Variable(
                     $this->context,
@@ -1101,6 +1105,91 @@ final class Variable {
         $context->builder->store($indexVal, $idxSlot);
 
         return $context->builder->load($idxSlot);
+    }
+
+    /**
+     * Read dim on a {@see TYPE_VALUE} box — string-tagged boxes use offset semantics (#22646).
+     *
+     * Must not call {@see HashTableHelper::ensureHashtablePointer} first: that allocates an empty
+     * hashtable and {@see __value__writeHashtable} clobbers the string, so `$s[0]` echoed empty.
+     *
+     * String/object keys stay on the hashtable arm only: emitting {@see StringOffsetHelper::dimFetch}
+     * with a string dim poisons the module (`normalize(%__string__*, i64)` vs `(i64, i64)`).
+     */
+    private function dimFetchValueBoxRead(self $dim, ?Type $expectedType): Variable
+    {
+        if (self::TYPE_STRING === $dim->type || self::TYPE_OBJECT === $dim->type) {
+            $childHt = HashTableHelper::loadHashtablePointer($this->context, $this);
+            $htVar = new Variable(
+                $this->context,
+                self::TYPE_HASHTABLE,
+                self::KIND_VALUE,
+                $childHt
+            );
+            $htVar->borrowedHashtable = true;
+
+            return $htVar->dimFetch($dim, $expectedType, false);
+        }
+
+        $ptr = JitValueBox::valuePtrFromVariable($this->context, $this);
+        $map = $this->context->structFieldMap['__value__'];
+        $i8 = $this->context->getTypeFromString('int8');
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($ptr, $map['type'])
+        );
+        $isString = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $this->context->builder->and($typeByte, $i8->constInt(0x7f, false)),
+            $i8->constInt(self::TYPE_STRING & 0x7f, false)
+        );
+
+        $resultSlot = JitValueBox::alloc($this->context);
+        $resultPtr = JitValueBox::pointer($this->context, $resultSlot);
+
+        $strBlock = BasicBlockHelper::append($this->context, 'value_dim_string');
+        $htBlock = BasicBlockHelper::append($this->context, 'value_dim_ht');
+        $doneBlock = BasicBlockHelper::append($this->context, 'value_dim_done');
+        $this->context->builder->branchIf($isString, $strBlock, $htBlock);
+
+        $this->context->builder->positionAtEnd($strBlock);
+        $str = $this->context->builder->call(
+            $this->context->lookupFunction('__value__readString'),
+            $ptr
+        );
+        // Numeric dim only (see guard above). VALUE dims keep their box — normalize coerces via readLong.
+        $dimLong = $dim;
+        if (self::TYPE_NATIVE_DOUBLE === $dim->type || self::TYPE_NATIVE_BOOL === $dim->type) {
+            $dimLong = $dim->castTo(self::TYPE_NATIVE_LONG);
+        }
+        $strResult = StringOffsetHelper::readDimAsString($this->context, $str, $dimLong);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeString'),
+            $resultPtr,
+            $strResult
+        );
+        $this->context->builder->branch($doneBlock);
+
+        $this->context->builder->positionAtEnd($htBlock);
+        $childHt = HashTableHelper::loadHashtablePointer($this->context, $this);
+        $htVar = new Variable(
+            $this->context,
+            self::TYPE_HASHTABLE,
+            self::KIND_VALUE,
+            $childHt
+        );
+        $htVar->borrowedHashtable = true;
+        $htFetched = $htVar->dimFetch($dim, $expectedType, false);
+        JitValueBox::assignToPointer($this->context, $resultPtr, $htFetched);
+        $this->context->builder->branch($doneBlock);
+
+        $this->context->builder->positionAtEnd($doneBlock);
+
+        return new Variable(
+            $this->context,
+            self::TYPE_VALUE,
+            self::KIND_VARIABLE,
+            $resultSlot
+        );
     }
 }
 
