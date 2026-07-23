@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -39,6 +40,9 @@ final class PackEngine
     public static function pack(string $format, array $args, ?Frame $frame = null): string
     {
         if ('' === $format) {
+            // php-src pack.c — leftover argc after empty format still warns (#22687).
+            self::warnUnusedArguments(0, \count($args), $frame);
+
             return '';
         }
 
@@ -232,7 +236,36 @@ final class PackEngine
             }
         }
 
+        // php-src ext/standard/pack.c — php_error_docref "%d arguments unused" (#22687).
+        self::warnUnusedArguments($currentArg, \count($args), $frame);
+
         return \substr($output, 0, $outputPos);
+    }
+
+    /**
+     * php-src pack.c leftover argc → E_WARNING `pack(): N arguments unused` (#22687).
+     *
+     * Shared by {@see PackJitEngine} (JIT/AOT nested helper; no Frame).
+     */
+    public static function warnUnusedArguments(int $consumed, int $argc, ?Frame $frame = null): void
+    {
+        if ($consumed >= $argc) {
+            return;
+        }
+        $message = \sprintf('pack(): %d arguments unused', $argc - $consumed);
+        if (null !== $frame && null !== $frame->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                $message,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+
+            return;
+        }
+        // Nested JIT/AOT PackJitHelper path — same text via host trigger_error (cf. UnpackEngine::fail).
+        @\trigger_error($message, \E_USER_WARNING);
     }
 
     /**

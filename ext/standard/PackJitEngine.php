@@ -24,6 +24,9 @@ final class PackJitEngine
     public static function pack(string $format, array $args): string
     {
         if ('' === $format) {
+            // php-src pack.c — leftover argc after empty format still warns (#22687).
+            self::warnUnusedArguments(0, \count($args));
+
             return '';
         }
 
@@ -48,7 +51,19 @@ final class PackJitEngine
             );
         }
 
+        // php-src ext/standard/pack.c — php_error_docref "%d arguments unused" (#22687).
+        self::warnUnusedArguments($currentArg, \count($args));
+
         return \substr($output, 0, $outputPos);
+    }
+
+    /** php-src pack.c leftover argc → warning text (nested JIT has no Frame; cf. UnpackEngine::fail). */
+    private static function warnUnusedArguments(int $consumed, int $argc): void
+    {
+        if ($consumed >= $argc) {
+            return;
+        }
+        @\trigger_error(\sprintf('pack(): %d arguments unused', $argc - $consumed), \E_USER_WARNING);
     }
 
     /**
