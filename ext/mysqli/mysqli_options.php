@@ -10,12 +10,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mysqli_options() — php-src ext/mysqli/mysqli_api.c (#21791). */
+/** mysqli_options() / mysqli_set_opt() — php-src ext/mysqli/mysqli_api.c (#21791, #22227). */
 final class mysqli_options extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'mysqli_options')
     {
-        parent::__construct('mysqli_options');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void

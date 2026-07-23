@@ -171,6 +171,7 @@ class Module extends ModuleAbstract
             new mysqli_get_connection_stats(),
             new mysqli_real_connect(),
             new mysqli_options(),
+            new mysqli_options('mysqli_set_opt'),
             new mysqli_set_charset(),
             new mysqli_multi_query(),
             new mysqli_next_result(),
