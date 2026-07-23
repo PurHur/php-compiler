@@ -76,6 +76,9 @@ final class VmSerialize
         }
 
         if (Variable::TYPE_ARRAY === $value->type) {
+            // php_add_var_hash: arrays bump n but are not stored for R: lookup (var.c).
+            $state->bumpIndex();
+
             return self::encodeWireArray($ctx, $value, $state, $frame);
         }
 
@@ -361,47 +364,63 @@ final class VmSerialize
         );
     }
 
+    /**
+     * php-src php_var_serialize_intern + php_add_var_hash (ext/standard/var.c).
+     *
+     * Counter n always advances per visit; only ISREF cells and objects are stored for
+     * R:/r: lookup. Scalars/arrays bump n but are never emitted as R: on re-visit — so
+     * `$a=[1]; $a[]=&$a` re-emits the scalar inside the nested self-ref walk (#22653).
+     * ISREF→object hashes as the object and still emits R: (not r:) on revisit.
+     */
     private static function encodeWireVariable(
         Context $ctx,
         Variable $value,
         VmSerializeRefState $state,
-        ?Frame $frame = null,
-        ?Variable $containerArray = null
+        ?Frame $frame = null
     ): string {
         if ($value->isIndirect()) {
-            $existingRef = $state->lookupRefCellIndex($value);
+            $target = $value->resolveIndirect();
+            // php_add_var_hash: ISREF to object is keyed by the object, emit R: on revisit.
+            if (Variable::TYPE_OBJECT === $target->type) {
+                $object = $target->toObject();
+                $existingObject = $state->lookupObjectIndex($object);
+                if (null !== $existingObject) {
+                    return 'R:'.$existingObject.';';
+                }
+
+                return self::encodeWireObject($ctx, $object, $state, $frame);
+            }
+            // php-src keys ISREF by zend_reference; VM shared-ref identity is the
+            // resolved target Variable (all aliases point at the same cell).
+            $existingRef = $state->lookupRefCellIndex($target);
             if (null !== $existingRef) {
                 return 'R:'.$existingRef.';';
             }
-            $target = $value->resolveIndirect();
-            $targetExisting = $state->lookupVariableIndex($target);
-            if (null !== $targetExisting
-                && null !== $containerArray
-                && Variable::TYPE_ARRAY === $target->type
-                && $target->resolveIndirect() === $containerArray->resolveIndirect()
-            ) {
-                $state->assignRefCellIndex($value);
+            // First sight of this ISREF set: store index, unwrap without a second n bump
+            // (php-src IS_REFERENCE → goto again skips php_add_var_hash).
+            $state->assignRefCellIndex($target);
 
-                return self::encodeWireArray($ctx, $target, $state, $frame, $containerArray);
-            }
-            if (null !== $targetExisting) {
-                $state->assignRefCellIndex($value, $targetExisting);
-
-                return 'R:'.$targetExisting.';';
-            }
-            $refIndex = $state->assignRefCellIndex($value);
-            $state->assignVariableIndexWithIndex($target, $refIndex);
-            $value = $target;
-        } else {
-            $value = $value->resolveIndirect();
-            if (Variable::TYPE_OBJECT !== $value->type) {
-                $existing = $state->lookupVariableIndex($value);
-                if (null !== $existing) {
-                    return 'R:'.$existing.';';
-                }
-                $state->assignVariableIndex($value);
-            }
+            return self::encodeWireValueAfterRefUnwrap($ctx, $target, $state, $frame);
         }
+
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type) {
+            return self::encodeWireObject($ctx, $value->toObject(), $state, $frame);
+        }
+        // Non-object, non-ref: bump n only (not hashed).
+        $state->bumpIndex();
+
+        return self::encodeWireValueAfterRefUnwrap($ctx, $value, $state, $frame);
+    }
+
+    /** Encode array/scalar/resource after n was already accounted for (var.c goto again / bump-only). */
+    private static function encodeWireValueAfterRefUnwrap(
+        Context $ctx,
+        Variable $value,
+        VmSerializeRefState $state,
+        ?Frame $frame = null
+    ): string {
+        $value = $value->resolveIndirect();
         $resourceWire = self::serializeResourceWire($value);
         if (null !== $resourceWire) {
             return $resourceWire;
@@ -434,18 +453,14 @@ final class VmSerialize
         Context $ctx,
         Variable $value,
         VmSerializeRefState $state,
-        ?Frame $frame = null,
-        ?Variable $containerArray = null
+        ?Frame $frame = null
     ): string {
         $value = $value->resolveIndirect();
-        if (null === $state->lookupVariableIndex($value)) {
-            $state->assignVariableIndex($value);
-        }
         $body = '';
         $count = 0;
         foreach ($value->toArray()->iterateKeyed(false) as [$key, $elem]) {
             $body .= self::encodeWireKey($key);
-            $body .= self::encodeWireVariable($ctx, $elem, $state, $frame, $value);
+            $body .= self::encodeWireVariable($ctx, $elem, $state, $frame);
             ++$count;
         }
 
@@ -1354,9 +1369,11 @@ final class VmSerialize
 }
 
 /**
- * Object reference indices for serialize() wire format (php-src var.c php_add_var_hash).
+ * Object / ISREF reference indices for serialize() wire format (php-src var.c php_add_var_hash).
  *
  * Root __serialize O: occupies stream index 1; nested object refs start at 2 (#11903).
+ * Scalars and arrays advance nextIndex but are not stored — only objects and ISREF cells
+ * participate in R:/r: lookup (#12825, #22653).
  */
 final class VmSerializeRefState
 {
@@ -1366,15 +1383,11 @@ final class VmSerializeRefState
     public \SplObjectStorage $objectIndex;
 
     /** @var \SplObjectStorage<Variable, int> */
-    public \SplObjectStorage $variableIndex;
-
-    /** @var \SplObjectStorage<Variable, int> */
     public \SplObjectStorage $refCellIndex;
 
     public function __construct()
     {
         $this->objectIndex = new \SplObjectStorage();
-        $this->variableIndex = new \SplObjectStorage();
         $this->refCellIndex = new \SplObjectStorage();
     }
 
@@ -1400,22 +1413,13 @@ final class VmSerializeRefState
         return $this->objectIndex[$object];
     }
 
-    /** php-src var_hash — shared scalar/array refs emit R: (var.c php_var_serialize). */
-    public function assignVariableIndex(Variable $variable): int
+    /**
+     * php_add_var_hash data->n += 1 for non-hashed visits (scalars/arrays).
+     * Index is consumed for numbering only — not stored for R: lookup (#22653).
+     */
+    public function bumpIndex(): int
     {
-        $index = $this->nextIndex++;
-        $this->variableIndex[$variable] = $index;
-
-        return $index;
-    }
-
-    public function lookupVariableIndex(Variable $variable): ?int
-    {
-        if (!$this->variableIndex->contains($variable)) {
-            return null;
-        }
-
-        return $this->variableIndex[$variable];
+        return $this->nextIndex++;
     }
 
     /** php-src ISREF zval identity — R: markers keyed by ref cell, not target (#12825). */
@@ -1439,14 +1443,6 @@ final class VmSerializeRefState
         }
 
         return $this->refCellIndex[$refCell];
-    }
-
-    public function assignVariableIndexWithIndex(Variable $variable, int $index): void
-    {
-        $this->variableIndex[$variable] = $index;
-        if ($index >= $this->nextIndex) {
-            $this->nextIndex = $index + 1;
-        }
     }
 }
 
