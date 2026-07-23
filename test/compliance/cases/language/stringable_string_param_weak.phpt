@@ -20,14 +20,28 @@ class NotStringable {
     }
 }
 
+class T {
+    public string $p;
+}
+
 function f(string $x): void {
     echo $x;
+}
+
+function g(): string {
+    return new Implicit();
 }
 
 f(new Explicit());
 echo " ";
 f(new Implicit());
 echo " ";
+
+$t = new T();
+$t->p = new Explicit();
+echo $t->p, " ";
+echo g(), " ";
+
 try {
     f(new NotStringable());
     echo "bad";
@@ -35,19 +49,5 @@ try {
     echo "reject";
 }
 echo "\n";
-
-class T {
-    public string $p;
-}
-$t = new T();
-$t->p = new Explicit();
-echo $t->p, "\n";
-
-function g(): string {
-    return new Implicit();
-}
-echo g(), "\n";
 --EXPECT--
-E I reject
-E
-I
+E I E I reject
