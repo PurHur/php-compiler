@@ -7,14 +7,14 @@ namespace PHPCompiler\ext\intl;
 use PHPCompiler\CompilerVersion;
 
 /**
- * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825, #20630).
+ * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825, #20630, #22691).
  *
  * Grapheme helpers, IDN converters, Normalizer / normalizer_*, Locale / locale_*, IntlDateFormatter,
  * IntlCalendar / IntlTimeZone, NumberFormatter, and intl_* error functions require a loaded intl
- * extension on Zend. Advertise the logical {@code intl} module once ICU (libicuuc) is available —
- * same pattern as curl/libcurl ({@see advertisesExtension()}); break the chicken-egg where
- * {@see ModuleRegistry::extensionLoaded}('intl') stayed false forever because Module registered
- * only under {@code standard} (#11472, #17694, #19593, #19594, #19670, #20630).
+ * extension on Zend. Advertise the logical {@code intl} module only when host Zend has php-intl
+ * ({@see advertisesExtension()}) — libicu-on-disk alone must not flip extension_loaded('intl')
+ * (#22691, re-#11472; #20630 disk-fallback regression). Module still registers under
+ * {@code standard} with {@see getAdditionalExtensionNames()} when host intl is present.
  *
  * Zend never splits classes from the module: when extension_loaded('intl') is true, grapheme /
  * idn / Normalizer / Locale / formatters advertise together. Deeper ICU formatter fidelity remains
@@ -24,18 +24,19 @@ final class IntlExtensionPolicy
 {
     private static ?bool $icuAvailable = null;
 
-    /** libicuuc major from the successfully opened FFI library (null if only disk fallback). */
+    /** libicuuc major from the successfully opened FFI library (null if unavailable). */
     private static ?int $icuMajorVersion = null;
 
     /**
-     * extension_loaded('intl') / CREDITS_MODULES — true once ICU libs are present (#20630).
+     * extension_loaded('intl') / CREDITS_MODULES — match host Zend php-intl (#22691, re-#11472).
      *
-     * Grapheme / Normalizer are pure-PHP; IDN prefers libidn2 FFI. Claiming the module matches
-     * host capability (libicuuc) rather than Zend's php-intl package load state.
+     * php-src-strict: CI images ship libicu without php-intl; do not treat ICU presence as a
+     * loaded module (#20630 disk-fallback regression). Same gate as intl_unicode_core_icu.phpt
+     * --SKIPIF.
      */
     public static function advertisesExtension(): bool
     {
-        return self::icuAvailable();
+        return \extension_loaded('intl');
     }
 
     /**
@@ -90,21 +91,8 @@ final class IntlExtensionPolicy
             }
         }
 
-        // Fallback: shared object on disk (CI images ship libicu without php-intl).
-        foreach ([
-            ['/lib/x86_64-linux-gnu/libicuuc.so.74', 74],
-            ['/usr/lib/x86_64-linux-gnu/libicuuc.so.74', 74],
-            ['/lib/x86_64-linux-gnu/libicuuc.so.70', 70],
-            ['/usr/lib/x86_64-linux-gnu/libicuuc.so.70', 70],
-            ['/usr/lib/libicuuc.so', 70],
-            ['/opt/homebrew/lib/libicuuc.dylib', 74],
-        ] as [$path, $major]) {
-            if (\is_file($path)) {
-                self::$icuMajorVersion = $major;
-
-                return self::$icuAvailable = true;
-            }
-        }
+        // No disk-only fallback: CI images ship libicu without php-intl (#22691).
+        // icuAvailable() is for ICU major gates once host intl advertises; require a live FFI open.
 
         return self::$icuAvailable = false;
     }

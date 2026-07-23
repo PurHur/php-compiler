@@ -10,9 +10,10 @@ use PHPUnit\Framework\TestCase;
 /** @group intl_extension_policy */
 final class IntlExtensionPolicyTest extends TestCase
 {
-    public function testUnicodeCoreAdvertisedWhenIcuAvailable(): void
+    public function testUnicodeCoreAdvertisedWhenHostIntlLoaded(): void
     {
-        if (!IntlExtensionPolicy::icuAvailable()) {
+        if (!\extension_loaded('intl')) {
+            self::assertFalse(IntlExtensionPolicy::advertisesExtension());
             self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
             self::assertFalse(IntlExtensionPolicy::advertisesIdn());
             self::assertFalse(IntlExtensionPolicy::advertisesNormalizer());
@@ -22,6 +23,9 @@ final class IntlExtensionPolicyTest extends TestCase
             $runtime = new Runtime();
             self::assertFalse(
                 ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
+            );
+            self::assertFalse(
+                ext\standard\ModuleRegistry::extensionLoaded('intl')
             );
 
             return;
@@ -41,6 +45,9 @@ final class IntlExtensionPolicyTest extends TestCase
         );
 
         $runtime = new Runtime();
+        self::assertTrue(
+            ext\standard\ModuleRegistry::extensionLoaded('intl')
+        );
         self::assertTrue(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
         );
@@ -72,7 +79,7 @@ final class IntlExtensionPolicyTest extends TestCase
     public function testLocaleParsersWithheldOnDefault84DevProfileWithoutForwardGate(): void
     {
         if (IntlExtensionPolicy::advertisesLocale()) {
-            self::markTestSkipped('Locale advertises with ICU-backed ext/intl (#20630)');
+            self::markTestSkipped('Locale advertises with host php-intl (#22691)');
         }
 
         $prev = getenv('PHP_COMPILER_PROFILE');
@@ -146,7 +153,7 @@ final class IntlExtensionPolicyTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             self::assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
-            if (!IntlExtensionPolicy::icuAvailable()) {
+            if (!\extension_loaded('intl')) {
                 self::assertFalse(CompilerVersion::advertisesGraphemeForwardProfileCore());
                 self::assertFalse(IntlExtensionPolicy::advertisesGraphemeCore());
                 self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
@@ -189,10 +196,10 @@ final class IntlExtensionPolicyTest extends TestCase
                 'grapheme_str_contains',
                 'grapheme_strimwidth',
             ] as $fn) {
-                self::assertTrue(isset($ctx->functions[$fn]), $fn.' must register with ICU-backed intl');
+                self::assertTrue(isset($ctx->functions[$fn]), $fn.' must register with host php-intl');
                 self::assertTrue(
                     ext\standard\VmReflection::functionExists($ctx, $fn),
-                    $fn.' must be visible when ext/intl advertises (#20630)'
+                    $fn.' must be visible when host php-intl advertises (#22691)'
                 );
             }
         } finally {
@@ -217,7 +224,7 @@ final class IntlExtensionPolicyTest extends TestCase
             self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrimwidth());
             self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrSplit());
 
-            if (!IntlExtensionPolicy::icuAvailable()) {
+            if (!\extension_loaded('intl')) {
                 return;
             }
 

@@ -14,10 +14,10 @@ use PHPCompiler\VM;
  *
  * Register under {@see standard}; advertise logical {@code intl} via
  * {@see getAdditionalExtensionNames()} when {@see IntlExtensionPolicy::advertisesExtension()}
- * (ICU libs present — curl/bz2 pattern). Grapheme / IDN / Normalizer / Locale / formatters /
- * Collator / MessageFormatter / Transliterator / ResourceBundle / IntlBreakIterator / IntlChar /
- * UConverter / Spoofchecker gate together — no phantom class_exists (#19670, #11768, #17694,
- * #19593, #19594, #6366, #6171, #6139, #6187, #6188, #20035, #20630).
+ * (host Zend php-intl loaded — #22691, re-#11472). Grapheme / IDN / Normalizer / Locale /
+ * formatters / Collator / MessageFormatter / Transliterator / ResourceBundle / IntlBreakIterator /
+ * IntlChar / UConverter / Spoofchecker gate together — no phantom class_exists (#19670, #11768,
+ * #17694, #19593, #19594, #6366, #6171, #6139, #6187, #6188, #20035, #20630, #22691).
  */
 class Module extends ModuleAbstract
 {

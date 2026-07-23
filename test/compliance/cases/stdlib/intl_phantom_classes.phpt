@@ -1,5 +1,5 @@
 --TEST--
-stdlib intl OOP + locale_* withheld without ext/intl (#19670, re-#16214, #6171, #6366)
+stdlib intl OOP + locale_* withheld without host php-intl (#19670, re-#16214, #6171, #6366, #22691)
 --FILE--
 <?php
 echo 'intl_loaded=', (int) extension_loaded('intl'), "\n";
