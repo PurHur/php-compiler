@@ -508,6 +508,16 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'mb_ucwords_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGraphemeLevenshtein()
+                && str_contains($name, 'grapheme_levenshtein')
+                && !str_contains($name, 'grapheme_levenshtein_phantom')
+                && !str_contains($name, 'grapheme_levenshtein_forward')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGraphemeLevenshtein()
+                && str_contains($name, 'grapheme_levenshtein_phantom')) {
+                continue;
+            }
             // convert_cyr_string / money_format removed in php-src 8.0 (#21481): functional cases use
             // PROFILE=7.4 via --ENV--; phantom_* cases assert absence on 8.2/8.4 — always include
             // (do not gate on supportsConvertCyrString()/supportsMoneyFormat()).

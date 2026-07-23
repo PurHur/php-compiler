@@ -1918,6 +1918,25 @@ final class CompilerVersion
     }
 
     /**
+     * grapheme_levenshtein() — never shipped by Zend/php-src (ext/intl/grapheme/grapheme.stub.php).
+     *
+     * Prior registration (#6998) was wrong-direction: ICU levenshtein RFC never landed in stubs
+     * (php/php-src#10180). Always withheld — #22661.
+     */
+    public static function supportsGraphemeLevenshtein(): bool
+    {
+        return false;
+    }
+
+    /**
+     * grapheme_levenshtein() visible to function_exists() — always false (Zend never ships it; #22661).
+     */
+    public static function advertisesGraphemeLevenshtein(): bool
+    {
+        return false;
+    }
+
+    /**
      * PHP 8.4+ grapheme_strimwidth() (ext/intl/grapheme/grapheme_string.c, issue #9793, #17010).
      *
      * Registered on stable 8.4.0+ when ext/intl is loaded; withheld from function_exists() until

@@ -13161,13 +13161,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new grapheme_strrpos (line 354)
 - new grapheme_strripos (line 355)
 - new grapheme_extract (line 356)
-- new grapheme_levenshtein (line 357)
-- new grapheme_str_split (line 358)
-- new grapheme_strimwidth (line 359)
-- new intl_get_error_code (line 360)
-- new intl_get_error_message (line 361)
-- new intl_is_failure (line 362)
-- new intl_error_name (line 363)
+- new grapheme_levenshtein (line 358)
+- new grapheme_str_split (line 359)
+- new grapheme_strimwidth (line 360)
+- new intl_get_error_code (line 361)
+- new intl_get_error_message (line 362)
+- new intl_is_failure (line 363)
+- new intl_error_name (line 364)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -41044,7 +41044,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 243 class method(s)
+- 245 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

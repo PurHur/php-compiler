@@ -431,6 +431,16 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'mb_ucwords_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGraphemeLevenshtein()
+                && str_contains($name, 'grapheme_levenshtein')
+                && !str_contains($name, 'grapheme_levenshtein_phantom')
+                && !str_contains($name, 'grapheme_levenshtein_forward')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGraphemeLevenshtein()
+                && str_contains($name, 'grapheme_levenshtein_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (('stdlib/stream_supports' === $name)
                     || str_contains($name, 'stream_support_constants')
