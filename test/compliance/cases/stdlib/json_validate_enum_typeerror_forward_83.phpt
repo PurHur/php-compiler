@@ -1,5 +1,7 @@
 --TEST--
-stdlib json_validate() — enum case json operand TypeError (#5999, ext/json/php_json.c)
+stdlib json_validate() — enum case json operand TypeError (#5999, ext/json/php_json.c, #22544)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 declare(strict_types=1);

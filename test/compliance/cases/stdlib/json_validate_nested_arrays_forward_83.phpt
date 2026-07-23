@@ -1,5 +1,7 @@
 --TEST--
-stdlib json_validate() — nested arrays and objects in arrays (issue #7459)
+stdlib json_validate() — nested arrays and objects in arrays (issue #7459, #22544)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 echo json_validate('[]') ? '1' : '0';

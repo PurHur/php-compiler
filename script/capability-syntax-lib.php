@@ -1360,6 +1360,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/crc32c.php',
         ],
         [
+            'names' => ['json_validate'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsJsonValidate'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/json_validate.php',
+        ],
+        [
             'names' => ['mb_str_pad'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbStrPad'],
             'since' => '8.3.0',

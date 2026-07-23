@@ -1,5 +1,7 @@
 --TEST--
-stdlib json_validate() — JSON_INVALID_UTF8_* flags (issue #4085)
+stdlib json_validate() — JSON_INVALID_UTF8_* flags (issue #4085, #22544)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 define('JSON_INVALID_UTF8_IGNORE', 1048576);
