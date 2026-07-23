@@ -5731,10 +5731,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingLine.p
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetFiber.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetCallable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetTrace.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberIsRunning.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberIsStarted.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberIsSuspended.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberIsTerminated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionCreateFromCallable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionCreateFromFunction.php';
