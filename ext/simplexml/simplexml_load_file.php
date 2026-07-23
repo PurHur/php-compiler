@@ -9,9 +9,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** simplexml_load_file() — load XML file into SimpleXMLElement tree (#3338). */
+/** simplexml_load_file() — load XML file into SimpleXMLElement tree (#3338, #22406). */
 final class simplexml_load_file extends Internal
 {
     public function __construct()
@@ -35,7 +36,20 @@ final class simplexml_load_file extends Internal
             0,
             'filename'
         );
-        $entry = VmSimpleXml::loadFile($frame->vmContext, $filename, $frame);
+        $className = null;
+        if (isset($frame->calledArgs[1])) {
+            $classArg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $classArg->type) {
+                $className = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[1],
+                    'simplexml_load_file',
+                    1,
+                    'class_name'
+                );
+            }
+        }
+        $class = VmSimpleXml::resolveClass($frame->vmContext, $className, 'simplexml_load_file');
+        $entry = VmSimpleXml::loadFile($frame->vmContext, $filename, $frame, $class);
         if (null !== $frame->returnVar) {
             if (null === $entry) {
                 $frame->returnVar->bool(false);
