@@ -1,5 +1,7 @@
 --TEST--
 ReflectionClass::getLazyPropertyNames() — lazy-eligible property names (issue #6606, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 var_export(method_exists(ReflectionClass::class, 'getLazyPropertyNames'));

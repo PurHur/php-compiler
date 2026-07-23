@@ -1,5 +1,7 @@
 --TEST--
 Language: ReflectionClass/Method/ClassConstant getDeprecatedMessage/Version (#6917)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 #[\Deprecated(message: 'Legacy API', since: '8.4')]

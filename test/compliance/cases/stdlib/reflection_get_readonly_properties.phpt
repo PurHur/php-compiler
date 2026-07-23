@@ -1,5 +1,7 @@
 --TEST--
 ReflectionClass::getReadOnlyProperties() — readonly property list (issue #7186, ext/reflection/php_reflection.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 readonly class R {
