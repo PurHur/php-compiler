@@ -3376,6 +3376,79 @@ final class ReflectionSupport
         }
     }
 
+    /**
+     * Class-constant declaration site (docblock + lines) (#22419).
+     */
+    public static function classConstantSourceLocation(Context $ctx, ObjectEntry $reflection): ?SourceLocation
+    {
+        $className = self::classNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            self::throwReflectionException(self::classNotFoundMessage($className));
+        }
+        $constant = self::constantNameFromReflection($reflection);
+        $decl = VmReflection::findClassConstantDecl($entry, $constant, $ctx);
+        if (null === $decl) {
+            self::throwReflectionException(self::constantNotFoundMessage($className, $constant));
+        }
+
+        return $decl['declaring']->constSourceLocations[$decl['constLc']] ?? null;
+    }
+
+    /**
+     * ReflectionClassConstant::__toString() — php-src _class_const_string (#22419).
+     *
+     * Shape: `Constant [ {final }{visibility} {type} {name} ] { {value} }\n`
+     */
+    public static function classConstantReflectionToString(Context $ctx, ObjectEntry $reflection): string
+    {
+        $className = self::classNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            self::throwReflectionException(self::classNotFoundMessage($className));
+        }
+        $constant = self::constantNameFromReflection($reflection);
+        $decl = VmReflection::findClassConstantDecl($entry, $constant, $ctx);
+        if (null === $decl) {
+            self::throwReflectionException(self::constantNotFoundMessage($className, $constant));
+        }
+        $declaring = $decl['declaring'];
+        $key = $decl['constLc'];
+        $canonical = $declaring->constNames[$key] ?? $constant;
+        $visFlags = MethodVisibility::mask(
+            $declaring->constVisibility[$key] ?? \PHPCfg\Func::FLAG_PUBLIC
+        );
+        if (($visFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            $visibility = 'private';
+        } elseif (($visFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            $visibility = 'protected';
+        } else {
+            $visibility = 'public';
+        }
+        $final = isset($declaring->constFinal[$key]) ? 'final ' : '';
+        $value = $declaring->constants[$key]->resolveIndirect();
+        $declared = $declaring->constDeclaredTypes[$key] ?? null;
+        $type = null !== $declared
+            ? ReflectionTypeSupport::cfgTypeString($declared)
+            : EnumCaseSupport::typeNameForVariable($value);
+        if (Variable::TYPE_ARRAY === $value->type) {
+            $printed = 'Array';
+        } elseif (Variable::TYPE_OBJECT === $value->type) {
+            $printed = 'Object';
+        } else {
+            $printed = $value->toString();
+        }
+
+        return sprintf(
+            "Constant [ %s%s %s %s ] { %s }\n",
+            $final,
+            $visibility,
+            $type,
+            $canonical,
+            $printed
+        );
+    }
+
     public static function returnDocComment(?Variable $returnVar, ?string $docComment): void
     {
         if (null === $returnVar) {

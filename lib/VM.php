@@ -15223,6 +15223,9 @@ restart:
                 if (isset($trait->constDeclaredTypes[$name])) {
                     $entry->constDeclaredTypes[$name] = $trait->constDeclaredTypes[$name];
                 }
+                if (isset($trait->constSourceLocations[$name])) {
+                    $entry->constSourceLocations[$name] = $trait->constSourceLocations[$name];
+                }
             }
         }
 
@@ -15996,6 +15999,12 @@ restart:
             if (isset($parent->constFinal[$name])) {
                 $entry->constFinal[$name] = true;
             }
+            if (isset($parent->constDeclaredTypes[$name])) {
+                $entry->constDeclaredTypes[$name] = $parent->constDeclaredTypes[$name];
+            }
+            if (isset($parent->constSourceLocations[$name])) {
+                $entry->constSourceLocations[$name] = $parent->constSourceLocations[$name];
+            }
         }
         foreach ($parent->propDeprecated as $name => $deprecated) {
             if (!isset($entry->propDeprecated[$name])) {
@@ -16598,6 +16607,9 @@ restart:
         }
         if (null !== $op->deprecatedMetadata) {
             $entry->constDeprecated[$name] = $op->deprecatedMetadata;
+        }
+        if (null !== $op->sourceLocation) {
+            $entry->constSourceLocations[$name] = $op->sourceLocation;
         }
         if (0 !== ($op->classConstVisibilityFlags & \PHPCfg\Func::FLAG_FINAL)) {
             $entry->constFinal[$name] = true;

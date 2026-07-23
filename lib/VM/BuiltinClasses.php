@@ -98,6 +98,7 @@ use PHPCompiler\VM\Builtin\ReflectionAttributeIsRepeated;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedMessage;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDeprecatedVersion;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetModifiers;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantGetType;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantHasType;
@@ -107,6 +108,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstantIsFinal;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsPublic;
+use PHPCompiler\VM\Builtin\ReflectionClassConstantToString;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionObjectConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
@@ -1318,6 +1320,10 @@ final class BuiltinClasses
         $rcc->methodVisibility['hastype'] = $pub;
         $rcc->methods['getmodifiers'] = new ReflectionClassConstantGetModifiers();
         $rcc->methodVisibility['getmodifiers'] = $pub;
+        $rcc->methods['getdoccomment'] = new ReflectionClassConstantGetDocComment();
+        $rcc->methodVisibility['getdoccomment'] = $pub;
+        $rcc->methods['__tostring'] = new ReflectionClassConstantToString();
+        $rcc->methodVisibility['__tostring'] = $pub;
         if (CompilerVersion::supportsReflectionClassConstantIsDeprecated()) {
             $rcc->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
             $rcc->methodVisibility['isdeprecated'] = $pub;

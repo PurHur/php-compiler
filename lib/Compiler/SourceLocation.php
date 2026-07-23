@@ -24,17 +24,58 @@ final class SourceLocation
 
     public static function fromOp(Op $op): self
     {
-        $doc = null;
-        if ($op->hasAttribute('doccomment')) {
-            $raw = $op->getAttribute('doccomment');
-            if ($raw instanceof Doc) {
-                $doc = $raw->getText();
-            }
-        }
+        $doc = self::docCommentFromOp($op);
         $start = max(0, $op->getLine());
         $end = max(0, (int) $op->getAttribute('endLine', 0));
         $file = (string) $op->getAttribute('filename', '');
 
         return new self($doc, $start, $end, $file);
+    }
+
+    /**
+     * Prefer dedicated doccomment attrs; fall back to the last Doc in comments
+     * (class constants often only carry `comments`, #22419).
+     */
+    private static function docCommentFromOp(Op $op): ?string
+    {
+        foreach (['doccomment', 'docComment'] as $key) {
+            if (!$op->hasAttribute($key)) {
+                continue;
+            }
+            $text = self::commentText($op->getAttribute($key));
+            if (null !== $text) {
+                return $text;
+            }
+        }
+        if ($op->hasAttribute('comments')) {
+            $comments = $op->getAttribute('comments');
+            if (\is_array($comments)) {
+                for ($i = \count($comments) - 1; $i >= 0; --$i) {
+                    $text = self::commentText($comments[$i]);
+                    if (null !== $text && str_starts_with(ltrim($text), '/**')) {
+                        return $text;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function commentText(mixed $comment): ?string
+    {
+        if ($comment instanceof Doc) {
+            return $comment->getText();
+        }
+        if (\is_object($comment) && method_exists($comment, 'getText')) {
+            $text = $comment->getText();
+
+            return \is_string($text) ? $text : null;
+        }
+        if (\is_string($comment) && '' !== $comment) {
+            return $comment;
+        }
+
+        return null;
     }
 }
