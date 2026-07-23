@@ -35,7 +35,13 @@ if (!is_dir($unitsDir)) {
 $fresh = 0;
 $stale = 0;
 $broken = 0;
-foreach (glob($unitsDir.'/*/manifest.json') ?: [] as $manifestPath) {
+$manifests = glob($unitsDir.'/*/manifest.json') ?: [];
+if ([] === $manifests) {
+    // Empty cache previously reported "0 fresh" and exited 0 even under --strict (#22638).
+    fwrite(STDOUT, "check-helper-runtime-prelink: {$arch} — 0 units (no manifest.json under {$unitsDir})\n");
+    exit($strict ? 1 : 0);
+}
+foreach ($manifests as $manifestPath) {
     $unitDir = dirname($manifestPath);
     $slug = basename($unitDir);
     $manifest = HelperRuntimeCache::unitManifest($slug, $unitDir);

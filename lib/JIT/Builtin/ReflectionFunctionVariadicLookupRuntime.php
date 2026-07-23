@@ -24,7 +24,7 @@ final class ReflectionFunctionVariadicLookupRuntime
         $names = self::decodeNames($variadicJson);
         $i1 = $context->getTypeFromString('int1');
         $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($i1, false, $i8p);
         $fn = $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('refl_func_is_variadic_entry');
@@ -60,7 +60,7 @@ final class ReflectionFunctionVariadicLookupRuntime
                 $funcCstr,
                 $context->builder->pointerCast($expected, $i8p)
             );
-            $nameOk = $context->builder->icmp(Builder::INT_EQ, $nameEq, $i64->constInt(0, false));
+            $nameOk = $context->builder->icmp(Builder::INT_EQ, $nameEq, $i32->constInt(0, false));
             $context->builder->branchIf($nameOk, $match, $merge);
 
             $context->builder->positionAtEnd($match);

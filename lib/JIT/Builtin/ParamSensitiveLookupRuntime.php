@@ -31,6 +31,7 @@ final class ParamSensitiveLookupRuntime
 
         $i1 = $context->getTypeFromString('int1');
         $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($i1, false, $i8p, $i64);
         $fn = $context->module->addFunction($abiName, $ft);
@@ -69,7 +70,7 @@ final class ParamSensitiveLookupRuntime
                     $funcCstr,
                     $context->builder->pointerCast($expected, $i8p)
                 );
-                $nameOk = $context->builder->icmp(Builder::INT_EQ, $nameEq, $i64->constInt(0, false));
+                $nameOk = $context->builder->icmp(Builder::INT_EQ, $nameEq, $i32->constInt(0, false));
                 $idxOk = $context->builder->icmp(Builder::INT_EQ, $idx, $i64->constInt((int) $paramIndex, false));
                 $both = $context->builder->and($nameOk, $idxOk);
                 $context->builder->branchIf($both, $match, $merge);
@@ -104,6 +105,7 @@ final class ParamSensitiveLookupRuntime
 
         $i1 = $context->getTypeFromString('int1');
         $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($i1, false, $i8p, $i8p, $i64);
         $fn = $context->module->addFunction($abiName, $ft);
@@ -144,7 +146,7 @@ final class ParamSensitiveLookupRuntime
                         $classCstr,
                         $context->builder->pointerCast($classExpected, $i8p)
                     );
-                    $classOk = $context->builder->icmp(Builder::INT_EQ, $classEq, $i64->constInt(0, false));
+                    $classOk = $context->builder->icmp(Builder::INT_EQ, $classEq, $i32->constInt(0, false));
 
                     $methodExpected = $context->constantFromString(strtolower($methodLc));
                     $methodEq = $context->builder->call(
@@ -152,7 +154,7 @@ final class ParamSensitiveLookupRuntime
                         $methodCstr,
                         $context->builder->pointerCast($methodExpected, $i8p)
                     );
-                    $methodOk = $context->builder->icmp(Builder::INT_EQ, $methodEq, $i64->constInt(0, false));
+                    $methodOk = $context->builder->icmp(Builder::INT_EQ, $methodEq, $i32->constInt(0, false));
 
                     $posOk = $context->builder->icmp(Builder::INT_EQ, $pos, $i64->constInt((int) $position, false));
                     $all = $context->builder->and($classOk, $methodOk);

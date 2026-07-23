@@ -15828,7 +15828,9 @@ class JIT {
             return true;
         }
         // Nested file JIT: func->class may be unset while scope carries the declaring class (#16075).
-        if ('' !== $this->context->scope->className) {
+        // Do not treat leftover scope->className as applying to {main} — that adds a spurious
+        // __object__* parameter while standalone main still emits call @internal_N() (#22638).
+        if ('' !== $this->context->scope->className && '{main}' !== $block->func->name) {
             return true;
         }
 

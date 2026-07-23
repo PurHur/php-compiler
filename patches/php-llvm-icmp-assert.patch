@@ -1,0 +1,33 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php
+@@ -423,6 +423,29 @@
+     }
+ 
+     public function iCmp(int $op, CoreValue $left, CoreValue $right): CoreValue {
++        if ('1' === \getenv('PHP_COMPILER_LLVM_ASSERT')) {
++            // Catch i32-vs-i64 mistakes (strcmp result vs i64 zero, #22638) without
++            // rejecting valid pointer icmp (kinds both LLVMPointerTypeKind).
++            $lib = $this->llvm->lib;
++            $leftTy = $lib->LLVMTypeOf($left->value);
++            $rightTy = $lib->LLVMTypeOf($right->value);
++            $leftKind = $lib->LLVMGetTypeKind($leftTy);
++            $rightKind = $lib->LLVMGetTypeKind($rightTy);
++            if ($leftKind !== $rightKind) {
++                throw new \RuntimeException(
++                    'iCmp: operands are not of the same type (kinds='.$leftKind.','.$rightKind.')'
++                );
++            }
++            if (\llvm\llvm::LLVMIntegerTypeKind === $leftKind) {
++                $leftWidth = $lib->LLVMGetIntTypeWidth($leftTy);
++                $rightWidth = $lib->LLVMGetIntTypeWidth($rightTy);
++                if ($leftWidth !== $rightWidth) {
++                    throw new \RuntimeException(
++                        'iCmp: operands are not of the same type (widths='.$leftWidth.','.$rightWidth.')'
++                    );
++                }
++            }
++        }
+         switch ($op) {
+             case self::INT_EQ:
+                 $predicate = lib::LLVMIntEQ;
+                 break;
