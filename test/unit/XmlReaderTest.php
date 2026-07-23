@@ -88,6 +88,19 @@ PHP;
         self::assertSame("1\nroot,a\n", ob_get_clean());
     }
 
+    public function test_xmlreader_xml_open_instance_bool_repro(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_xmlreader_xml_open.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_xml_open_bool_repro.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "true\nroot=1\ntrue\nroot=2\ntrue\nstatic=a=s\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_xmlreader_xml_memory_repro(): void
     {
         $runtime = new Runtime();

@@ -565,13 +565,14 @@ class VM {
         $func = $declaring->methods[$methodLc];
         $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $isStatic = (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) || $this->methodIsStatic($func);
+        // XMLReader::open/XML keep EX(This) under `$obj->static()` (#22630); others omit (#22288).
+        $omitThis = $isStatic && !$this->staticMethodKeepsInstanceThis($declaring, $methodLc);
         $thisVar = new Variable();
         $thisVar->object($object);
         if ($func instanceof Func\Internal) {
             $caller = $this->coercionCallerFrame();
             $result = new Variable();
-            // Static methods: do not prepend $this (#22288).
-            $catchFrame = $isStatic
+            $catchFrame = $omitThis
                 ? $this->invokeVmClassMethod($func, $caller, $result, ...$extraArgs)
                 : $this->invokeVmClassMethod($func, $caller, $result, $thisVar, ...$extraArgs);
             if (null !== $catchFrame) {
@@ -585,11 +586,25 @@ class VM {
         }
 
         // Isolated stack: nested user method must not resume the caller frame mid-builtin (#11452).
-        if ($isStatic) {
+        if ($omitThis) {
             return $this->invokePhpFunctionIsolated($func, ...$extraArgs);
         }
 
         return $this->invokePhpFunctionIsolated($func, $thisVar, ...$extraArgs);
+    }
+
+    /**
+     * php-src zim_xmlreader_open / zim_xmlreader_XML inspect EX(This) even though the methods
+     * are ZEND_ACC_STATIC — instance `$r->open()` / `$r->XML()` mutate $this and return bool
+     * (#22630, re-#19330/#19308). Other static-via-instance calls omit the receiver (#22288).
+     */
+    private function staticMethodKeepsInstanceThis(ClassEntry $declaring, string $methodLc): bool
+    {
+        if (ext\xmlreader\VmXmlReader::CLASS_LC !== strtolower($declaring->name)) {
+            return false;
+        }
+
+        return 'open' === $methodLc || 'xml' === $methodLc;
     }
 
     public function objectImplementsArrayAccess(ObjectEntry $object): bool
@@ -15204,11 +15219,14 @@ restart:
         // Zend: `$obj->staticMethod($arg)` does not bind $obj as argument #1 (zend_execute.c;
         // #22288 DOMXPath::quote, DateTime::createFromFormat, user static methods).
         // Keep LSB from the receiver class via staticCallClass (static::class === get_class($obj)).
+        // Exception: XMLReader::open/XML C methods still inspect EX(This) (#22630, re-#19330).
         $isStatic = (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0)
             || $this->methodIsStatic($frame->call);
         if ($isStatic) {
-            $frame->callArgs = [];
             $frame->staticCallClass = $object->class->name;
+            $frame->callArgs = $this->staticMethodKeepsInstanceThis($declaringClass, $methodLc)
+                ? [$receiver]
+                : [];
         } else {
             $frame->callArgs = [$receiver];
         }
