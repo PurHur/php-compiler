@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\pspell;
 use PHPCompiler\VM\Context;
 
 /**
- * Register PSpell\Dictionary (php-src ext/pspell; #6294).
+ * Register PSpell\Dictionary + PSpell\Config (php-src ext/pspell; #6294, #22229).
  */
 final class BuiltinClasses
 {
@@ -17,5 +17,6 @@ final class BuiltinClasses
             return;
         }
         VmPspellDictionary::registerClass($ctx);
+        VmPspellConfig::registerClass($ctx);
     }
 }

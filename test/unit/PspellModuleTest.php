@@ -28,12 +28,32 @@ final class PspellModuleTest extends TestCase
         self::assertTrue(VmReflection::functionExists($ctx, 'pspell_new'));
         self::assertTrue(VmReflection::functionExists($ctx, 'pspell_check'));
         self::assertTrue(VmReflection::functionExists($ctx, 'pspell_suggest'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'pspell_add_to_session'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'pspell_config_create'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'pspell_new_config'));
         self::assertTrue(ModuleRegistry::extensionLoaded('pspell'));
         self::assertTrue(isset($ctx->classes['pspell\\dictionary']));
+        self::assertTrue(isset($ctx->classes['pspell\\config']));
         self::assertSame(1, $ctx->constants['PSPELL_FAST']->toInt());
         self::assertSame(2, $ctx->constants['PSPELL_NORMAL']->toInt());
         self::assertSame(3, $ctx->constants['PSPELL_BAD_SPELLERS']->toInt());
         self::assertSame(8, $ctx->constants['PSPELL_RUN_TOGETHER']->toInt());
+    }
+
+    public function test_issue_22229_repro_existence(): void
+    {
+        if (!PspellExtensionPolicy::advertisesExtension()) {
+            $this->markTestSkipped('libaspell FFI unavailable');
+        }
+        $path = dirname(__DIR__) . '/repro/pspell_personal_session_config.php';
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(file_get_contents($path), $path);
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('pspell_add_to_session=Y', $out);
+        self::assertStringContainsString('pspell_config_create=Y', $out);
+        self::assertStringContainsString('pspell_new_config=Y', $out);
     }
 
     public function test_issue_repro_script(): void

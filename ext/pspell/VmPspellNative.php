@@ -116,6 +116,136 @@ final class VmPspellNative
         return null === $msg || false === $msg ? '' : (string) $msg;
     }
 
+    public static function spellerErrorNumber(\FFI\CData $speller): int
+    {
+        return (int) self::requireFfi()->aspell_speller_error_number($speller);
+    }
+
+    /** @return \FFI\CData AspellConfig* */
+    public static function newConfig(): \FFI\CData
+    {
+        return self::requireFfi()->new_aspell_config();
+    }
+
+    public static function deleteConfig(\FFI\CData $config): void
+    {
+        self::requireFfi()->delete_aspell_config($config);
+    }
+
+    public static function configReplace(\FFI\CData $config, string $key, string $value): void
+    {
+        self::requireFfi()->aspell_config_replace($config, $key, $value);
+    }
+
+    /**
+     * @return array{ok: true, speller: \FFI\CData}|array{ok: false, message: string}
+     */
+    public static function newSpellerFromConfig(\FFI\CData $config): array
+    {
+        $ffi = self::requireFfi();
+        $ret = $ffi->new_aspell_speller($config);
+        if (0 !== (int) $ffi->aspell_error_number($ret)) {
+            $message = (string) $ffi->aspell_error_message($ret);
+            $ffi->delete_aspell_can_have_error($ret);
+
+            return ['ok' => false, 'message' => $message];
+        }
+
+        return ['ok' => true, 'speller' => $ffi->to_aspell_speller($ret)];
+    }
+
+    public static function addToPersonal(\FFI\CData $speller, string $word): bool
+    {
+        $ffi = self::requireFfi();
+        $ffi->aspell_speller_add_to_personal($speller, $word, -1);
+
+        return 0 === self::spellerErrorNumber($speller);
+    }
+
+    public static function addToSession(\FFI\CData $speller, string $word): bool
+    {
+        $ffi = self::requireFfi();
+        $ffi->aspell_speller_add_to_session($speller, $word, -1);
+
+        return 0 === self::spellerErrorNumber($speller);
+    }
+
+    public static function clearSession(\FFI\CData $speller): bool
+    {
+        $ffi = self::requireFfi();
+        $ffi->aspell_speller_clear_session($speller);
+
+        return 0 === self::spellerErrorNumber($speller);
+    }
+
+    public static function saveWordlists(\FFI\CData $speller): bool
+    {
+        $ffi = self::requireFfi();
+        $ffi->aspell_speller_save_all_word_lists($speller);
+
+        return 0 === self::spellerErrorNumber($speller);
+    }
+
+    public static function storeReplacement(\FFI\CData $speller, string $miss, string $corr): bool
+    {
+        $ffi = self::requireFfi();
+        $ffi->aspell_speller_store_replacement($speller, $miss, -1, $corr, -1);
+
+        return 0 === self::spellerErrorNumber($speller);
+    }
+
+    /**
+     * Create speller with optional personal wordlist path (php-src pspell_new_personal).
+     *
+     * @return array{ok: true, speller: \FFI\CData}|array{ok: false, message: string}
+     */
+    public static function newSpellerPersonal(
+        string $personal,
+        string $language,
+        string $spelling,
+        string $jargon,
+        string $encoding,
+        int $mode
+    ): array {
+        $ffi = self::requireFfi();
+        $config = $ffi->new_aspell_config();
+        $ffi->aspell_config_replace($config, 'personal', $personal);
+        $ffi->aspell_config_replace($config, 'save-repl', 'false');
+        $ffi->aspell_config_replace($config, 'language-tag', $language);
+        if ('' !== $spelling) {
+            $ffi->aspell_config_replace($config, 'spelling', $spelling);
+        }
+        if ('' !== $jargon) {
+            $ffi->aspell_config_replace($config, 'jargon', $jargon);
+        }
+        if ('' !== $encoding) {
+            $ffi->aspell_config_replace($config, 'encoding', $encoding);
+        }
+        if (0 !== $mode) {
+            $speed = $mode & PspellConstants::SPEED_MASK;
+            if (PspellConstants::PSPELL_FAST === $speed) {
+                $ffi->aspell_config_replace($config, 'sug-mode', 'fast');
+            } elseif (PspellConstants::PSPELL_NORMAL === $speed) {
+                $ffi->aspell_config_replace($config, 'sug-mode', 'normal');
+            } elseif (PspellConstants::PSPELL_BAD_SPELLERS === $speed) {
+                $ffi->aspell_config_replace($config, 'sug-mode', 'bad-spellers');
+            }
+            if (0 !== ($mode & PspellConstants::PSPELL_RUN_TOGETHER)) {
+                $ffi->aspell_config_replace($config, 'run-together', 'true');
+            }
+        }
+        $ret = $ffi->new_aspell_speller($config);
+        $ffi->delete_aspell_config($config);
+        if (0 !== (int) $ffi->aspell_error_number($ret)) {
+            $message = (string) $ffi->aspell_error_message($ret);
+            $ffi->delete_aspell_can_have_error($ret);
+
+            return ['ok' => false, 'message' => $message];
+        }
+
+        return ['ok' => true, 'speller' => $ffi->to_aspell_speller($ret)];
+    }
+
     /** @return \FFI */
     private static function requireFfi()
     {
@@ -163,6 +293,12 @@ void delete_aspell_speller(AspellSpeller *ths);
 int aspell_speller_check(AspellSpeller *ths, const char *word, int word_size);
 const AspellWordList *aspell_speller_suggest(AspellSpeller *ths, const char *word, int word_size);
 const char *aspell_speller_error_message(const AspellSpeller *ths);
+unsigned int aspell_speller_error_number(const AspellSpeller *ths);
+int aspell_speller_add_to_personal(AspellSpeller *ths, const char *word, int word_size);
+int aspell_speller_add_to_session(AspellSpeller *ths, const char *word, int word_size);
+int aspell_speller_clear_session(AspellSpeller *ths);
+int aspell_speller_save_all_word_lists(AspellSpeller *ths);
+int aspell_speller_store_replacement(AspellSpeller *ths, const char *mis, int mis_size, const char *cor, int cor_size);
 AspellStringEnumeration *aspell_word_list_elements(const AspellWordList *ths);
 const char *aspell_string_enumeration_next(AspellStringEnumeration *ths);
 void delete_aspell_string_enumeration(AspellStringEnumeration *ths);
