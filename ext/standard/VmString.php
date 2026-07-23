@@ -985,7 +985,8 @@ final class VmString
                 $offset = 0;
             }
         }
-        if ($offset > $len) {
+        // offset >= len: empty remainder — Zend-silent (no Z_STR_TRUNCATED); #22489
+        if ($offset >= $len) {
             return '';
         }
         if (null === $length) {
