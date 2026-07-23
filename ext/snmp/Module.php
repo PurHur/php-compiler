@@ -9,10 +9,10 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * snmp extension module entry (php-src ext/snmp/snmp.c; #6070, #22244).
+ * snmp extension module entry (php-src ext/snmp/snmp.c; #6070, #22244, #22250).
  *
- * v1: snmpget/getnext/walk/realwalk/set + SNMP class registration. Without
- * Net-SNMP wire, ops return false + warning (php-src-strict unreachable-agent).
+ * SNMPv1/v2c/v3 procedural surface + SNMP class + print/MIB/valueretrieval helpers.
+ * Without Net-SNMP wire, query ops return false + warning (php-src-strict).
  * PHP-in-PHP only — no runtime/*.c growth.
  */
 class Module extends ModuleAbstract
@@ -55,6 +55,24 @@ class Module extends ModuleAbstract
             new snmpwalk(),
             new snmprealwalk(),
             new snmpset(),
+            new snmp2_get(),
+            new snmp2_getnext(),
+            new snmp2_walk(),
+            new snmp2_real_walk(),
+            new snmp2_set(),
+            new snmp3_get(),
+            new snmp3_getnext(),
+            new snmp3_walk(),
+            new snmp3_real_walk(),
+            new snmp3_set(),
+            new snmp_get_quick_print(),
+            new snmp_set_quick_print(),
+            new snmp_set_enum_print(),
+            new snmp_set_oid_output_format(),
+            new snmp_set_oid_numeric_print(),
+            new snmp_set_valueretrieval(),
+            new snmp_get_valueretrieval(),
+            new snmp_read_mib(),
         ];
     }
 }

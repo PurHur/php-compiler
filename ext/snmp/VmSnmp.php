@@ -26,9 +26,14 @@ final class VmSnmp
     /** @var array<int, SnmpState> */
     private static array $store = [];
 
+    private static bool $quickPrint = false;
+    private static bool $enumPrint = false;
+    private static int $oidOutputFormat = SnmpConstants::OID_OUTPUT_MODULE;
+    private static int $valueRetrieval = SnmpConstants::VALUE_LIBRARY;
+
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['geterrno'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['setsecurity'])) {
             return;
         }
 
@@ -53,6 +58,7 @@ final class VmSnmp
             'getnext' => new SNMPGetNextMethod(),
             'walk' => new SNMPWalkMethod(),
             'set' => new SNMPSetMethod(),
+            'setsecurity' => new SNMPSetSecurity(),
             'close' => new SNMPClose(),
             'geterror' => new SNMPGetError(),
             'geterrno' => new SNMPGetErrno(),
@@ -63,6 +69,7 @@ final class VmSnmp
             $entry->methodNames[$name] = match ($name) {
                 'geterror' => 'getError',
                 'geterrno' => 'getErrno',
+                'setsecurity' => 'setSecurity',
                 default => $name,
             };
         }
@@ -258,6 +265,101 @@ final class VmSnmp
         $state->error = '';
 
         return true;
+    }
+
+    public static function setSecurity(
+        ObjectEntry $receiver,
+        string $securityLevel,
+        string $authProtocol,
+        string $authPassphrase,
+        string $privacyProtocol,
+        string $privacyPassphrase,
+        string $contextName,
+        string $contextEngineId
+    ): bool {
+        $state = self::state($receiver);
+        if ($state->closed) {
+            $state->errno = SnmpConstants::ERRNO_GENERIC;
+            $state->error = 'SNMP session is closed';
+
+            return false;
+        }
+        $state->securityLevel = $securityLevel;
+        $state->authProtocol = $authProtocol;
+        $state->authPassphrase = $authPassphrase;
+        $state->privacyProtocol = $privacyProtocol;
+        $state->privacyPassphrase = $privacyPassphrase;
+        $state->contextName = $contextName;
+        $state->contextEngineId = $contextEngineId;
+        $state->errno = SnmpConstants::ERRNO_NOERROR;
+        $state->error = '';
+
+        return true;
+    }
+
+    public static function getQuickPrint(): bool
+    {
+        return self::$quickPrint;
+    }
+
+    public static function setQuickPrint(bool $enable): bool
+    {
+        self::$quickPrint = $enable;
+
+        return true;
+    }
+
+    public static function setEnumPrint(bool $enable): bool
+    {
+        self::$enumPrint = $enable;
+
+        return true;
+    }
+
+    public static function setOidOutputFormat(int $format): bool
+    {
+        self::$oidOutputFormat = $format;
+
+        return true;
+    }
+
+    public static function setValueRetrieval(int $method): bool
+    {
+        self::$valueRetrieval = $method;
+
+        return true;
+    }
+
+    public static function getValueRetrieval(): int
+    {
+        return self::$valueRetrieval;
+    }
+
+    public static function readMib(Context $ctx, ?Frame $frame, string $filename): bool
+    {
+        if ('' === $filename || (!is_file($filename) && !is_readable($filename))) {
+            self::warn($ctx, $frame, 'snmp_read_mib(): Unable to read MIB file: '.$filename);
+
+            return false;
+        }
+        // No Net-SNMP MIB loader — accept readable path like a successful stub load.
+        return true;
+    }
+
+    public static function coerceBoolArg(Variable $var, string $label, int $index, string $paramName): bool
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            return $resolved->toBool();
+        }
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return 0 !== $resolved->toInt();
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return false;
+        }
+
+        return '' !== VmString::coerceStringBuiltinArg($resolved, $label, $index, $paramName);
     }
 
     public static function coerceObjectId(Variable $var, string $function, int $argIndex): string
