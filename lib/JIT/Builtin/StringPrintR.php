@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240, #16565).
+ * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240, #16565, #22668).
  *
  * Embed and standalone AOT compile the same PHP bridge; no print_r LLVM monolith.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GcToggleRuntime #22644).
  * php-src: ext/standard/var.c — php_print_r_ex
  */
 final class StringPrintR
@@ -96,43 +97,18 @@ final class StringPrintR
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after PrintRJitHelper compile (#9190)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#22668');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'PrintRJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('PrintRJitHelper.php parseAndCompile failed (#9190)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9190)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22668'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
