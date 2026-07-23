@@ -15,6 +15,23 @@ try {
 } catch (Error $e) {
     echo "BLOCKED:", $e->getMessage(), "\n";
 }
+
+class D {
+    public final string $y;
+    public function __construct() {
+        $this->y = "c";
+    }
+}
+$d = new D;
+echo $d->y, "\n";
+try {
+    $d->y = "d";
+    echo "WROTE2\n";
+} catch (Error $e) {
+    echo "BLOCKED2:", $e->getMessage(), "\n";
+}
 --EXPECT--
 a
 BLOCKED:Cannot modify final property C::$x
+c
+BLOCKED2:Cannot modify final property D::$y
