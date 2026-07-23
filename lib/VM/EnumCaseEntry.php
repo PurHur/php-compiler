@@ -37,7 +37,8 @@ final class EnumCaseEntry
         }
         if ('value' === $lc) {
             if (null === $this->enumClass->backedType) {
-                // Unit enums: null without warning (#5731, zend_enum.c).
+                // Unit enums have no $value; Zend uses the undefined-property path (#22523, zend_enum.c).
+                EnumCaseSupport::warnUndefinedEnumProperty($this->enumClass, $name, $context, $frame);
                 $var = new Variable();
                 $var->null();
 
