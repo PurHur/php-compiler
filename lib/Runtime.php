@@ -27,6 +27,7 @@ use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\VM\HashTableRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\Ast\FinalPromotedPropertyRewriter;
 use PHPCompiler\Ast\LazyPropertyRewriter;
 use PHPCompiler\Ast\ReadonlyFunctionRewriter;
 use PHPCompiler\Ast\ReadonlyFunctionAnnotator;
@@ -568,6 +569,7 @@ class Runtime {
         $code = GlobalDeprecatedConstRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
+        $code = FinalPromotedPropertyRewriter::rewrite($code);
         $code = LazyPropertyRewriter::rewrite($code);
         $code = ReadonlyFunctionRewriter::rewrite($code);
         $code = TypedFunctionStaticRewriter::rewrite($code);

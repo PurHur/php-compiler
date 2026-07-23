@@ -73,18 +73,46 @@ final class FinalPropertyOverrideCheck
     {
         $properties = [];
         foreach ($class->stmts->children as $member) {
-            if (!$member instanceof Op\Stmt\Property || $member->static) {
+            if ($member instanceof Op\Stmt\Property && !$member->static) {
+                $propDisplay = $this->propertyDisplayName($member->name);
+                $propLc = strtolower($propDisplay);
+                $fromFlags = $this->isFinalFromFlags($member);
+                $fromRegistry = $this->isFinalFromHookRegistry($classLc, $propDisplay);
+                $properties[$propLc] = [
+                    'final' => $fromFlags || $fromRegistry,
+                    'fromFlags' => $fromFlags,
+                    'display' => $propDisplay,
+                ];
                 continue;
             }
-            $propDisplay = $this->propertyDisplayName($member->name);
-            $propLc = strtolower($propDisplay);
-            $fromFlags = $this->isFinalFromFlags($member);
-            $fromRegistry = $this->isFinalFromHookRegistry($classLc, $propDisplay);
-            $properties[$propLc] = [
-                'final' => $fromFlags || $fromRegistry,
-                'fromFlags' => $fromFlags,
-                'display' => $propDisplay,
-            ];
+            if (!$member instanceof Op\Stmt\ClassMethod || '__construct' !== $member->func->name) {
+                continue;
+            }
+            foreach ($member->func->params as $param) {
+                if (!($param instanceof Op\Expr\Param)) {
+                    continue;
+                }
+                if (!property_exists($param, 'promotionFlags') || 0 === (int) $param->promotionFlags) {
+                    continue;
+                }
+                if (!($param->name instanceof Operand\Literal) || !is_string($param->name->value)) {
+                    continue;
+                }
+                $propDisplay = $param->name->value;
+                $propLc = strtolower($propDisplay);
+                $fromMarker = \PHPCompiler\Ast\FinalPromotedPropertyRewriter::isFinalFromAttributes(
+                    $param->getAttributes()
+                );
+                $fromField = property_exists($param, 'promotionFinal') && $param->promotionFinal;
+                $isFinal = $fromMarker || $fromField;
+                // Always record promoted props so a non-final child redeclaration can
+                // trip "Cannot override final property" against a final parent (#22451).
+                $properties[$propLc] = [
+                    'final' => $isFinal,
+                    'fromFlags' => $isFinal,
+                    'display' => $propDisplay,
+                ];
+            }
         }
 
         return $properties;
