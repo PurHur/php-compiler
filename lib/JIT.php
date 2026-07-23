@@ -7770,8 +7770,31 @@ class JIT {
                     }
                     $resultOp = $block->getOperand($op->arg1);
                     $forceBranchMerge = $this->context->coalesceAssignTargets->contains($resultOp);
-                    // ZEND_FETCH_DIM_W: compile-time null container auto-vivifies (#21992).
+                    // ZEND_FETCH_DIM_W: null/false containers auto-vivify (#21992, #22650).
                     if ($forWrite && Variable::TYPE_NULL === $value->type) {
+                        JIT\HashTableHelper::initArray($this->context, $value);
+                        $this->context->setVariableOp($block->getOperand($op->arg2), $value);
+                    }
+                    if ($forWrite && Variable::TYPE_NATIVE_BOOL === $value->type) {
+                        // Runtime: false→[]; true→Error (zend_execute.c / #22650).
+                        $boolVal = $this->context->helper->loadValue($value);
+                        $isTrue = $this->context->builder->icmp(
+                            \PHPLLVM\Builder::INT_NE,
+                            $boolVal,
+                            $boolVal->typeOf()->constInt(0, false)
+                        );
+                        $errBb = JIT\BasicBlockHelper::append($this->context, 'dim_w_bool_true_err');
+                        $okBb = JIT\BasicBlockHelper::append($this->context, 'dim_w_bool_false_ok');
+                        $this->context->builder->branchIf($isTrue, $errBb, $okBb);
+                        $this->context->builder->positionAtEnd($errBb);
+                        JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                        JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                        JIT\Builtin\ErrorRaise::emitRaise(
+                            $this->context,
+                            \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
+                        );
+                        $this->context->builder->call($this->context->lookupFunction('abort'));
+                        $this->context->builder->positionAtEnd($okBb);
                         JIT\HashTableHelper::initArray($this->context, $value);
                         $this->context->setVariableOp($block->getOperand($op->arg2), $value);
                     }

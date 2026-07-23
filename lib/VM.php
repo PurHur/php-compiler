@@ -4201,7 +4201,7 @@ restart:
                             $container = $materialized;
                         }
                     }
-                    // ZEND_FETCH_DIM_W: null/undefined containers auto-vivify (#21992, zend_execute.c).
+                    // ZEND_FETCH_DIM_W: null/undefined/false containers auto-vivify (#21992, #22650).
                     if ($forWrite && TypeCheck::isNullContainerForDimAutovivify($container)) {
                         $container->array(new HashTable());
                     }
