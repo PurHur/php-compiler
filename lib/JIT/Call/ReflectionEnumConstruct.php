@@ -18,7 +18,11 @@ final class ReflectionEnumConstruct implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         if (\count($args) < 2) {
-            throw new \LogicException('ReflectionEnum::__construct() expects a class name argument');
+            \PHPCompiler\VM\ReflectionSupport::throwConstructArgumentCountError(
+                'ReflectionEnum',
+                1,
+                max(0, \max(0, count($args) - 1))
+            );
         }
         $literal = JitStringArg::compileTimeLiteral($args[1]);
         if (null !== $literal && !$context->type->object->isEnumClassLc($literal)) {

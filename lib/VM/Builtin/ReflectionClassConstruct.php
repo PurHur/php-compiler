@@ -19,8 +19,9 @@ final class ReflectionClassConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionClass::__construct() expects exactly 1 argument');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 1) {
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionClass', 1, $argc);
         }
         $ctx = VmReflection::requireContext($frame);
         $target = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);

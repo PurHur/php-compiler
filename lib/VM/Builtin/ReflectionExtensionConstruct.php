@@ -19,8 +19,9 @@ final class ReflectionExtensionConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionExtension::__construct() expects extension name');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 1) {
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionExtension', 1, $argc);
         }
         $name = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionExtension::__construct() name', 1);
         if (!ModuleRegistry::extensionLoaded($name)) {

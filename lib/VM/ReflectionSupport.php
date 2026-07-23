@@ -260,6 +260,31 @@ final class ReflectionSupport
     }
 
     /**
+     * Zend-shaped ArgumentCountError for Reflection*::__construct too-few/wrong argc (#22739).
+     *
+     * php-src: ext/reflection/php_reflection.c — ZEND_PARSE_PARAMETERS → ArgumentCountError
+     *
+     * @param 'exactly'|'at least'|'at most' $phrase
+     */
+    public static function throwConstructArgumentCountError(
+        string $className,
+        int $expected,
+        int $given,
+        string $phrase = 'exactly'
+    ): void {
+        $noun = 1 === $expected ? 'argument' : 'arguments';
+
+        throw new \ArgumentCountError(sprintf(
+            '%s::__construct() expects %s %d %s, %d given',
+            $className,
+            $phrase,
+            $expected,
+            $noun,
+            $given
+        ));
+    }
+
+    /**
      * @param list<string> $names
      */
     public static function attributesArray(Frame $frame, array $names, int $target = 0): Variable

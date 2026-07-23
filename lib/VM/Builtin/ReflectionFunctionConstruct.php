@@ -19,8 +19,9 @@ final class ReflectionFunctionConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionFunction::__construct() expects a function name');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc !== 1) {
+            ReflectionSupport::throwConstructArgumentCountError('ReflectionFunction', 1, $argc);
         }
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
