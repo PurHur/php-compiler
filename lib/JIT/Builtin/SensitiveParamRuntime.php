@@ -72,11 +72,23 @@ final class SensitiveParamRuntime
         $context->builder->clearInsertionPosition();
     }
 
-    /** Empty SensitiveParameterValue marker object (Zend SensitiveParameterValue). */
-    public static function createMarker(Context $context): Variable
+    /**
+     * SensitiveParameterValue marker with the original argument stored for getValue() (#22487).
+     * When $value is null, allocates an empty marker (legacy createMarker callers).
+     */
+    public static function wrapValue(Context $context, ?Variable $value = null): Variable
     {
-        $classId = $context->type->object->lookup(SensitiveParamJitHelper::markerClassName());
+        $className = SensitiveParamJitHelper::markerClassName();
+        $classId = $context->type->object->lookup($className);
         $obj = $context->type->object->allocate($classId);
+        if (null !== $value) {
+            $context->type->object->storeInstanceProperty(
+                $obj,
+                $className,
+                \PHPCompiler\VM\SensitiveParamSupport::PROP_VALUE,
+                $value
+            );
+        }
 
         return new Variable(
             $context,
@@ -84,6 +96,12 @@ final class SensitiveParamRuntime
             Variable::KIND_VALUE,
             $obj
         );
+    }
+
+    /** @deprecated Use wrapValue(); kept for call-site grep / shrink tests (#10394). */
+    public static function createMarker(Context $context): Variable
+    {
+        return self::wrapValue($context, null);
     }
 
     public static function ignoreArgsBit(Context $context, ?Variable $optionsArg): Value

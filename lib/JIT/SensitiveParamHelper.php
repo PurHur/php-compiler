@@ -33,12 +33,12 @@ final class SensitiveParamHelper
             }
             $slot = $context->constantFromInteger($index, 'size_t');
             ++$index;
+            $binding = VarFetchHelper::bindingByName($context, $block, $paramName);
             if (SensitiveParamSupport::compileTimeParamIsSensitive($sensitive, $paramIdx)) {
-                HashTableHelper::setAtIndex($context, $argsHt, $slot, SensitiveParamRuntime::createMarker($context));
+                HashTableHelper::setAtIndex($context, $argsHt, $slot, SensitiveParamRuntime::wrapValue($context, $binding));
 
                 continue;
             }
-            $binding = VarFetchHelper::bindingByName($context, $block, $paramName);
             if (null === $binding) {
                 continue;
             }
