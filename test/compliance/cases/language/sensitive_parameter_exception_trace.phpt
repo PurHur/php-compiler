@@ -1,5 +1,5 @@
 --TEST--
-Language: #[\SensitiveParameter] redacts Throwable::getTrace() args via SensitiveParameterValue (#21339/#21524, VM)
+Language: #[\SensitiveParameter] redacts Throwable::getTrace() args via SensitiveParameterValue (#21339/#21524/#22487, VM)
 --FILE--
 <?php
 ini_set('zend.exception_ignore_args', '0');
@@ -12,6 +12,10 @@ try {
     $args = $e->getTrace()[0]['args'] ?? [];
     echo 'argc=', count($args), "\n";
     echo isset($args[0]) && is_object($args[0]) ? get_class($args[0]) : 'missing', "\n";
+    $methods = isset($args[0]) && is_object($args[0]) ? get_class_methods($args[0]) : [];
+    sort($methods);
+    echo 'methods=', json_encode($methods), "\n";
+    echo isset($args[0]) && is_object($args[0]) ? var_export($args[0]->getValue(), true) : 'missing', "\n";
     echo isset($args[1]) ? var_export($args[1], true) : 'missing', "\n";
     $traceString = $e->getTraceAsString();
     echo str_contains($traceString, 'hunter2') ? 'leaked' : 'no_leak', "\n";
@@ -22,6 +26,8 @@ try {
 --EXPECT--
 argc=2
 SensitiveParameterValue
+methods=["__construct","__debugInfo","getValue"]
+'hunter2'
 'visible'
 no_leak
 object_form

@@ -29,20 +29,13 @@ final class SensitiveParamSupport
     /** Mirrors {@see \PHPCompiler\ext\standard\VmDebugBacktrace::PROVIDE_OBJECT}. */
     public const BACKTRACE_PROVIDE_OBJECT = 1;
 
+    /** Class entry from {@see register()} — shared by wrapValue/createMarker (#22487). */
+    private static ?ClassEntry $registeredEntry = null;
+
     public static function register(Context $ctx): void
     {
-        $mixedProto = new Variable();
-        $pub = \PHPCfg\Func::FLAG_PUBLIC;
-
-        $entry = new ClassEntry(self::CLASS_NAME);
-        $entry->properties[] = new ClassProperty(self::PROP_VALUE, null, $mixedProto);
-        $entry->constructor = new SensitiveParameterValueConstruct();
-        $entry->methods['__construct'] = $entry->constructor;
-        $entry->methodVisibility['__construct'] = $pub;
-        $entry->methods['getvalue'] = new SensitiveParameterValueGetValue();
-        $entry->methodVisibility['getvalue'] = $pub;
-        $entry->methods['__debuginfo'] = new SensitiveParameterValueDebugInfo();
-        $entry->methodVisibility['__debuginfo'] = $pub;
+        $entry = self::buildClassEntry();
+        self::$registeredEntry = $entry;
         $ctx->classes[strtolower(self::CLASS_NAME)] = $entry;
     }
 
@@ -145,7 +138,8 @@ final class SensitiveParamSupport
                 continue;
             }
             if (self::compileTimeParamIsSensitive($sensitive, $paramIdx)) {
-                $ht->append(self::createMarker());
+                // Zend: wrap the real arg in SensitiveParameterValue (methods + getValue) (#22487).
+                $ht->append(self::wrapValue($frame->calledArgs[$argIdx]));
 
                 continue;
             }
@@ -278,10 +272,28 @@ final class SensitiveParamSupport
 
     private static function markerClassEntry(): ClassEntry
     {
-        static $entry = null;
-        if (null === $entry) {
-            $entry = new ClassEntry(self::CLASS_NAME);
+        if (null !== self::$registeredEntry) {
+            return self::$registeredEntry;
         }
+        // Tests / early boot before BuiltinClasses::register (#22487).
+        self::$registeredEntry = self::buildClassEntry();
+
+        return self::$registeredEntry;
+    }
+
+    private static function buildClassEntry(): ClassEntry
+    {
+        $mixedProto = new Variable();
+        $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        $entry = new ClassEntry(self::CLASS_NAME);
+        $entry->properties[] = new ClassProperty(self::PROP_VALUE, null, $mixedProto);
+        $entry->constructor = new SensitiveParameterValueConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['getvalue'] = new SensitiveParameterValueGetValue();
+        $entry->methodVisibility['getvalue'] = $pub;
+        $entry->methods['__debuginfo'] = new SensitiveParameterValueDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = $pub;
 
         return $entry;
     }

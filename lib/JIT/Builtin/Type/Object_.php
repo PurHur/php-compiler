@@ -3200,7 +3200,12 @@ class Object_ extends Type {
             $this->defineProperty($id, '__spl_ht', Variable::TYPE_HASHTABLE);
         }
         if ('sensitiveparametervalue' === $lcname) {
-            // Empty marker class for #[\SensitiveParameter] trace redaction (#3351, #4621).
+            // Trace redaction marker — store wrapped arg for getValue() (#3351, #4621, #22487).
+            $this->defineProperty($id, 'value', Variable::TYPE_VALUE);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach (['__construct', 'getvalue', '__debuginfo'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
         }
         if ('weakreference' === $lcname) {
             $this->weakReferenceClassId = $id;

@@ -15,7 +15,7 @@ final class SensitiveParamRuntimeShrinkTest extends TestCase
     public function testSensitiveParamHelperDelegatesToSensitiveParamRuntime(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/SensitiveParamHelper.php');
-        $this->assertStringContainsString('SensitiveParamRuntime::createMarker', $source);
+        $this->assertStringContainsString('SensitiveParamRuntime::wrapValue', $source);
         $this->assertStringContainsString('SensitiveParamRuntime::ignoreArgsBit', $source);
         $this->assertStringNotContainsString('VmDebugBacktraceOptions', $source);
         $this->assertStringNotContainsString('readOptionsLong', $source);
