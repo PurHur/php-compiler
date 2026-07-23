@@ -402,6 +402,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
                 continue;
             }
+            // JIT: method_exists(ReflectionClass::class, …) fails (pcreJit); profile phantoms are VM-only (#22599).
+            if (str_contains($name, 'reflectionclass_84_phantoms_profile82')
+                || str_contains($name, 'reflectionclass_84_apis_forward_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
                 && !str_contains($name, 'mb_trim_phantom')) {

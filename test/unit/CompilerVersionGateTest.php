@@ -399,6 +399,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsLazyObjectFactories());
     }
 
+    public function testSupportsReflectionClassPhp84ApisFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionClassPhp84Apis());
+    }
+
+    public function testSupportsReflectionClassPhp84ApisTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionClassPhp84Apis());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsLazyObjectFactoriesTrueOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

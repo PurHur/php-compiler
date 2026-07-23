@@ -1691,6 +1691,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ ReflectionClass::{getDeprecatedMessage,getDeprecatedVersion,getLazyPropertyNames,
+     * getReadOnlyProperties,isStatic} (ext/reflection/php_reflection.stub.php, #22599; re-#6917/#6606).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev / PROFILE=8.2 matches Zend 8.2
+     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionClassPhp84Apis(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
  * PHP 8.4+ gc_status() schema (php-src 8.3+ 12-key table; Zend/zend_builtin_functions.c, #12780, #20627).
  *
  * Forward profile returns running/protected/full/buffer_size **and** legacy counters plus timing floats.

@@ -971,10 +971,12 @@ final class BuiltinClasses
         $rc->methodVisibility['getstaticpropertyvalue'] = $pub;
         $rc->methods['setstaticpropertyvalue'] = new ReflectionClassSetStaticPropertyValue();
         $rc->methodVisibility['setstaticpropertyvalue'] = $pub;
-        $rc->methods['getreadonlyproperties'] = new ReflectionClassGetReadOnlyProperties();
-        $rc->methodVisibility['getreadonlyproperties'] = $pub;
-        $rc->methods['getlazypropertynames'] = new ReflectionClassGetLazyPropertyNames();
-        $rc->methodVisibility['getlazypropertynames'] = $pub;
+        if (CompilerVersion::supportsReflectionClassPhp84Apis()) {
+            $rc->methods['getreadonlyproperties'] = new ReflectionClassGetReadOnlyProperties();
+            $rc->methodVisibility['getreadonlyproperties'] = $pub;
+            $rc->methods['getlazypropertynames'] = new ReflectionClassGetLazyPropertyNames();
+            $rc->methodVisibility['getlazypropertynames'] = $pub;
+        }
         $rc->methods['getmethods'] = new ReflectionClassGetMethods();
         $rc->methodVisibility['getmethods'] = $pub;
         $rc->methods['getreflectionconstant'] = new ReflectionClassGetReflectionConstant();
@@ -1071,12 +1073,14 @@ final class BuiltinClasses
         $rc->methodVisibility['isreadonly'] = $pub;
         $rc->methods['isanonymous'] = new ReflectionClassIsAnonymous();
         $rc->methodVisibility['isanonymous'] = $pub;
-        $rc->methods['isstatic'] = new ReflectionClassIsStatic();
-        $rc->methodVisibility['isstatic'] = $pub;
-        $rc->methods['getdeprecatedmessage'] = new ReflectionClassGetDeprecatedMessage();
-        $rc->methodVisibility['getdeprecatedmessage'] = $pub;
-        $rc->methods['getdeprecatedversion'] = new ReflectionClassGetDeprecatedVersion();
-        $rc->methodVisibility['getdeprecatedversion'] = $pub;
+        if (CompilerVersion::supportsReflectionClassPhp84Apis()) {
+            $rc->methods['isstatic'] = new ReflectionClassIsStatic();
+            $rc->methodVisibility['isstatic'] = $pub;
+            $rc->methods['getdeprecatedmessage'] = new ReflectionClassGetDeprecatedMessage();
+            $rc->methodVisibility['getdeprecatedmessage'] = $pub;
+            $rc->methods['getdeprecatedversion'] = new ReflectionClassGetDeprecatedVersion();
+            $rc->methodVisibility['getdeprecatedversion'] = $pub;
+        }
         foreach (
             [
                 'getdoccomment' => new ReflectionClassGetDocComment(),
