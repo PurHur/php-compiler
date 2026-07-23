@@ -1,11 +1,5 @@
 --TEST--
-stdlib grapheme_*/idn_to_*/Normalizer advertise with ICU-backed ext/intl (#20630)
---SKIPIF--
-<?php
-if (!extension_loaded('intl')) {
-    die('skip ICU-backed ext/intl not advertised');
-}
-?>
+stdlib grapheme_*/idn_to_*/Normalizer advertise with host php-intl (#20630, #22691)
 --FILE--
 <?php
 declare(strict_types=1);

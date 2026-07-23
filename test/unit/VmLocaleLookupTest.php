@@ -16,7 +16,7 @@ final class VmLocaleLookupTest extends TestCase
     public function test_withheld_without_intl(): void
     {
         if (IntlExtensionPolicy::advertisesLocale()) {
-            self::markTestSkipped('Locale advertises with ICU-backed ext/intl (#20630)');
+            self::markTestSkipped('Locale advertises with host php-intl (#22691)');
         }
         $runtime = new Runtime();
         self::assertFalse(IntlExtensionPolicy::advertisesLocale());

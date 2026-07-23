@@ -661,6 +661,11 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'locale_gated'))) {
                 continue;
             }
+            // Host without php-intl: withhold ICU unicode core advertisement case (#22691).
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'intl_unicode_core_icu')) {
+                continue;
+            }
             if (!CompilerVersion::supportsGraphemeStrimwidth()
                 && str_contains($name, 'grapheme_strimwidth')
                 && !str_contains($name, 'grapheme_phantom')) {
