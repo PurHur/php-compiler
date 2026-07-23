@@ -243,10 +243,26 @@ foreach ($sites as $path => $names) {
     }
 
     $cmd = escapeshellarg(PHP_BINARY).' '.escapeshellarg(__FILE__).' --unit='.escapeshellarg($path);
-    exec($cmd.' 2>/dev/null', $ignored, $rc);
+    $stderrFile = $dir.'/.emit-stderr.txt';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    // Capture child stderr so unit failures name the lowering defect (#22638).
+    exec($cmd.' 2>'.escapeshellarg($stderrFile), $ignored, $rc);
+    $childStderr = is_file($stderrFile) ? (string) file_get_contents($stderrFile) : '';
+    @unlink($stderrFile);
     if (0 !== $rc || null === HelperRuntimeCache::unitManifest($slug)) {
         ++$failedNow;
-        fwrite(STDERR, "helper-runtime-emit: FAILED {$path} (rc={$rc}) — marker written, nested-lowering fallback (#15642)\n");
+        $cause = trim($childStderr);
+        if ('' === $cause) {
+            $cause = '(no stderr)';
+        } else {
+            $cause = preg_replace('/\s+/', ' ', $cause) ?? $cause;
+            if (strlen($cause) > 400) {
+                $cause = substr($cause, 0, 400).'…';
+            }
+        }
+        fwrite(STDERR, "helper-runtime-emit: FAILED {$path} (rc={$rc}) — {$cause} — nested-lowering fallback (#15642)\n");
         if (!is_dir($dir)) {
             @mkdir($dir, 0755, true);
         }
@@ -256,6 +272,7 @@ foreach ($sites as $path => $names) {
         file_put_contents($dir.'/failed.json', json_encode([
             'fingerprint' => $fingerprint,
             'rc' => $rc,
+            'stderr' => $childStderr,
         ])."\n");
 
         continue;

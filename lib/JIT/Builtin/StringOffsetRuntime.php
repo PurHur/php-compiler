@@ -6,11 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\VM\StringOffsetJitHelper;
 use PHPLLVM\Builder;
+use PHPLLVM\Type;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -127,13 +129,32 @@ final class StringOffsetRuntime
         $fn = $context->lookupFunction(self::ABI_NORMALIZE);
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
+        // Box-backed dims arrive as %__value__ — never blind-zext a struct (#22638).
         $normalized = $context->builder->call(
             $fn,
-            $context->builder->zext($index, $i64),
-            $context->builder->zext($len, $i64)
+            self::coerceOffsetOperandToI64($context, $index),
+            self::coerceOffsetOperandToI64($context, $len)
         );
 
         return $context->builder->truncOrBitCast($normalized, $sizeT);
+    }
+
+    /** Widen integer offset/length operands to i64; extract from __value__ boxes first. */
+    private static function coerceOffsetOperandToI64(Context $context, Value $operand): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $ty = $operand->typeOf();
+        if ($ty === $i64) {
+            return $operand;
+        }
+        if (JitNestedHelperCoerce::isValueBoxType($context, $ty)) {
+            return JitNestedHelperCoerce::extractLongFromHelperResult($context, $operand, $i64);
+        }
+        if (Type::KIND_INTEGER === $ty->getKind()) {
+            return $context->builder->zext($operand, $i64);
+        }
+
+        return JitNestedHelperCoerce::extractLongFromHelperResult($context, $operand, $i64);
     }
 
     public static function dimAssign(Context $context, Value $charPtr, JitVariable $value): void

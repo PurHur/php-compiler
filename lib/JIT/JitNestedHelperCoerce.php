@@ -79,6 +79,16 @@ final class JitNestedHelperCoerce
         return '__value__*' === $name || '__value__' === $name;
     }
 
+    /** Pass a boxed slot as `__value__*` or load for by-value `__value__` params (#22638). */
+    private static function valueBoxArgAsWanted(Context $context, Value $valuePtr, string $wantStr): Value
+    {
+        if ('__value__' === $wantStr) {
+            return $context->builder->load($valuePtr);
+        }
+
+        return $valuePtr;
+    }
+
     public static function isValueBox(Context $context, Value $value): bool
     {
         return self::isValueBoxType($context, $value->typeOf());
@@ -167,26 +177,29 @@ final class JitNestedHelperCoerce
         }
         if ('__string__*' === $haveStr && self::isValueBoxType($context, $wantTy)) {
             $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
             $context->builder->call(
                 $context->lookupFunction('__value__writeString'),
-                JitValueBox::pointer($context, $slot),
+                $ptr,
                 $arg
             );
 
-            return JitValueBox::pointer($context, $slot);
+            // isValueBoxType matches both __value__* and by-value __value__ (#22638).
+            return self::valueBoxArgAsWanted($context, $ptr, $wantStr);
         }
         if ('__value__*' === $haveStr && '__value__' === $wantStr) {
             return $context->builder->load($arg);
         }
         if ('__hashtable__*' === $haveStr && self::isValueBoxType($context, $wantTy)) {
             $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
-                JitValueBox::pointer($context, $slot),
+                $ptr,
                 $arg
             );
 
-            return JitValueBox::pointer($context, $slot);
+            return self::valueBoxArgAsWanted($context, $ptr, $wantStr);
         }
         if (('double' === $wantStr || 'float' === $wantStr) && self::isValueBoxType($context, $haveTy)) {
             $extracted = self::extractDoubleFromHelperResult($context, $arg);
@@ -198,14 +211,15 @@ final class JitNestedHelperCoerce
         }
         if (self::isValueBoxType($context, $wantTy) && ('double' === $haveStr || 'float' === $haveStr)) {
             $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
             $asDouble = 'float' === $haveStr ? $context->builder->fpExt($arg, $context->getTypeFromString('double')) : $arg;
             $context->builder->call(
                 $context->lookupFunction('__value__writeDouble'),
-                JitValueBox::pointer($context, $slot),
+                $ptr,
                 $asDouble
             );
 
-            return JitValueBox::pointer($context, $slot);
+            return self::valueBoxArgAsWanted($context, $ptr, $wantStr);
         }
         if (Type::KIND_INTEGER === $wantTy->getKind() && Type::KIND_INTEGER === $haveTy->getKind()) {
             if (('int8' === $haveStr || 'i8' === $haveStr) && ('int32' === $wantStr || 'int64' === $wantStr || 'long long' === $wantStr)) {
