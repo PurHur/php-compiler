@@ -45,6 +45,19 @@ final class openssl_cms_verify extends Internal
         if ($argc >= 3) {
             $signersFile = self::optionalPathArg($frame->calledArgs[2], 'openssl_cms_verify', 2, 'certificates');
         }
+        // php-src openssl.stub.php — array $ca_info = [] (#22368); coerce for TypeError parity.
+        if ($argc >= 4) {
+            $caArg = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $caArg->type) {
+                throw new \TypeError(
+                    'openssl_cms_verify(): Argument #4 ($ca_info) must be of type array, '
+                    .\PHPCompiler\ext\standard\VmStreamArg::debugTypeName($caArg).' given'
+                );
+            }
+        }
+        if ($argc >= 5) {
+            self::optionalPathArg($frame->calledArgs[4], 'openssl_cms_verify', 4, 'untrusted_certificates_filename');
+        }
         $contentOut = null;
         if ($argc >= 6) {
             $contentOut = self::optionalPathArg($frame->calledArgs[5], 'openssl_cms_verify', 5, 'content');

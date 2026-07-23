@@ -21396,6 +21396,46 @@ class Compiler {
             }
             $nonEmbeddedArgIndices[] = $i;
         }
+        // f(CONST, null|false|true, [...]) — multiple leading ConstFetches + trailing Array_
+        // must map 1:1 to non-array dead-temp args (#22368; openssl_cms_verify null $certificates).
+        // filter_var FILTER_* + ['flags'=>FILTER_*] keeps element ConstFetches in producers but only
+        // one const call-arg — count mismatch skips this path.
+        $leadingConstArrayMulti = $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers);
+        if (null !== $leadingConstArrayMulti) {
+            /** @var list<Op\Expr\ConstFetch> $leadingConsts */
+            $leadingConsts = [];
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\ConstFetch) {
+                    $leadingConsts[] = $producer;
+                    continue;
+                }
+                if ($producer instanceof Op\Expr\Array_) {
+                    break;
+                }
+            }
+            if (\count($leadingConsts) >= 2) {
+                [, $arrayProducer] = $leadingConstArrayMulti;
+                $arrayArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+                $constArgIndices = [];
+                foreach ($nonEmbeddedArgIndices as $idx) {
+                    if ($idx !== $arrayArgIndex) {
+                        $constArgIndices[] = $idx;
+                    }
+                }
+                if (\count($leadingConsts) === \count($constArgIndices)) {
+                    if ($argIndex === $arrayArgIndex) {
+                        return $arrayProducer;
+                    }
+                    foreach ($constArgIndices as $ordinal => $idx) {
+                        if ($argIndex === $idx) {
+                            return $leadingConsts[$ordinal];
+                        }
+                    }
+
+                    return null;
+                }
+            }
+        }
         // substr(..., -N) / mb_substr(..., -N) — UnaryMinus maps to sole non-embedded offset/length (#13422, #13424).
         if (
             \in_array($inlineFuncName, ['substr', 'mb_substr', 'mb_strcut'], true)
@@ -21796,15 +21836,44 @@ class Compiler {
             }
         }
         // filter_var('x', FILTER_*, ['flags' => FILTER_*]) — embedded arg 0 + ConstFetch/Array_ (#12326).
+        // Single leading ConstFetch call-arg (element ConstFetches may also appear in producers).
         $leadingConstArray = $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers);
         if (null !== $leadingConstArray) {
             [$constFetch, $array] = $leadingConstArray;
+            /** @var list<Op\Expr\ConstFetch> $leadingConsts */
+            $leadingConsts = [];
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\ConstFetch) {
+                    $leadingConsts[] = $producer;
+                    continue;
+                }
+                if ($producer instanceof Op\Expr\Array_) {
+                    break;
+                }
+            }
             $arrayArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
             if ($argIndex === $arrayArgIndex) {
                 return $array;
             }
+            $constArgIndices = [];
             foreach ($nonEmbeddedArgIndices as $idx) {
-                if ($idx !== $arrayArgIndex && $argIndex === $idx) {
+                if ($idx !== $arrayArgIndex) {
+                    $constArgIndices[] = $idx;
+                }
+            }
+            // Multi ConstFetch call-args already handled above (#22368); keep first-const fallback
+            // when producers include array-element ConstFetches (filter_var flags-in-options).
+            if (\count($leadingConsts) === \count($constArgIndices)) {
+                foreach ($constArgIndices as $ordinal => $idx) {
+                    if ($argIndex === $idx) {
+                        return $leadingConsts[$ordinal];
+                    }
+                }
+
+                return null;
+            }
+            foreach ($constArgIndices as $idx) {
+                if ($argIndex === $idx) {
                     return $constFetch;
                 }
             }
@@ -24538,15 +24607,24 @@ class Compiler {
                     }
                 }
                 // php-cfg `var_export([NAN, INF], true)` — ConstFetch chain before sibling Array_ (#12824).
+                // Stop at true/false/null call-arg ConstFetch so a later sibling Array_ is not treated
+                // as an element consumer of earlier named consts (#22368).
                 for ($j = $i + 1; $j < $callIndex; ++$j) {
                     $scan = $cfgChildren[$j];
                     if (
                         $scan instanceof Op\Expr\Array_
+                        && null !== $child->result
                         && $this->cfgExprUsesOperand($scan, $child->result)
                     ) {
                         continue 2;
                     }
                     if ($scan instanceof Op\Expr\ConstFetch || $scan instanceof Op\Expr\ClassConstFetch) {
+                        if (
+                            $scan instanceof Op\Expr\ConstFetch
+                            && $this->isHoistedScalarConstFetchImmediatelyBeforeCall($scan)
+                        ) {
+                            break;
+                        }
                         continue;
                     }
                     break;
@@ -24949,6 +25027,7 @@ class Compiler {
                     break;
                 }
                 // password_hash(lit, PASSWORD_BCRYPT, [...]) — ConstFetch before trailing Array_ (#10453).
+                // openssl_cms_verify(..., FLAGS, null, [$ca]) — collect all leading ConstFetch call-args (#22368).
                 if ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\ClassConstFetch) {
                     if ($this->cfgExprUsesOperand($child, $prev->result)) {
                         $grandPrev = $cfgChildren[$i - 2] ?? null;
@@ -24958,8 +25037,18 @@ class Compiler {
                         // Element ConstFetch inside inline Array_ — keep walking for leading call-arg ConstFetch (#12326).
                         continue;
                     }
-                    if ($this->isInlineExprCallArgProducer($prev)) {
-                        array_unshift($producers, $prev);
+                    for ($k = $i - 1; $k >= 0; --$k) {
+                        $lead = $cfgChildren[$k];
+                        if (!($lead instanceof Op\Expr\ConstFetch || $lead instanceof Op\Expr\ClassConstFetch)) {
+                            break;
+                        }
+                        if (null !== $lead->result && $this->cfgExprUsesOperand($child, $lead->result)) {
+                            // Array-element ConstFetch — skip, keep scanning older call-arg consts (#12326).
+                            continue;
+                        }
+                        if ($this->isInlineExprCallArgProducer($lead)) {
+                            array_unshift($producers, $lead);
+                        }
                     }
                     break;
                 }

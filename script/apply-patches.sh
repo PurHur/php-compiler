@@ -175,6 +175,9 @@ patch_already_applied() {
     php-types-openssl-encrypt-aead-args.patch)
       grep -qF "'openssl_encrypt' => ['string|false', 'data' => 'string', 'cipher_algo' => 'string', 'passphrase' => 'string', 'options=' => 'int', 'iv=' => 'string', '&tag=' => 'string', 'aad=' => '?string', 'tag_length=' => 'int']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-openssl-cms-verify-arginfo.patch)
+      grep -qF "'openssl_cms_verify' => ['bool', 'input_filename' => 'string', 'flags=' => 'int', 'certificates=' => '?string'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-intltz-get-iana-id-arginfo.patch)
       grep -qF "'IntlTimeZone::getIanaID' => ['string|false', 'zoneId' => 'string']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null \
         && grep -qF "'intltz_get_iana_id' => ['string|false', 'zoneId' => 'string']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
@@ -6423,6 +6426,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-gc-enabled-bool.patch"
   apply_patch "$PATCH_DIR/php-types-sem-get-auto-release-bool.patch"
   apply_patch "$PATCH_DIR/php-types-openssl-encrypt-aead-args.patch"
+  apply_patch "$PATCH_DIR/php-types-openssl-cms-verify-arginfo.patch"
   apply_patch "$PATCH_DIR/php-types-intltz-get-iana-id-arginfo.patch"
   apply_patch "$PATCH_DIR/php-types-ldap-get-option-byref.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"

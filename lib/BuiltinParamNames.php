@@ -301,6 +301,30 @@ final class BuiltinParamNames
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad', 'tag_length'];
             case 'openssl_decrypt':
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad'];
+            case 'openssl_cms_verify':
+                // php-src ext/openssl/openssl.stub.php (#22368, re-#6592)
+                return [
+                    'input_filename',
+                    'flags',
+                    'certificates',
+                    'ca_info',
+                    'untrusted_certificates_filename',
+                    'content',
+                    'pk7',
+                    'sigfile',
+                    'encoding',
+                ];
+            case 'openssl_cms_sign':
+                return [
+                    'input_filename',
+                    'output_filename',
+                    'certificate',
+                    'private_key',
+                    'headers',
+                    'flags',
+                    'encoding',
+                    'untrusted_certificates_filename',
+                ];
             case 'hash':
                 return ['algo', 'data', 'binary', 'options'];
             case 'hash_hmac':
