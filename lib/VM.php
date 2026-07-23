@@ -882,6 +882,13 @@ class VM {
         if (isset($props[$propName])) {
             return VmIsset::storedPropertyIsSet($props[$propName]);
         }
+        // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys as properties (spl_array.c; #22576).
+        if (SplArrayStorage::hasArrayAsProps($object)) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string($propName);
+
+            return SplArrayStorage::offsetExists($object, $key);
+        }
         if ($this->hasInstanceMethod($object->class, '__isset')) {
             $key = new Variable();
             $key->string($propName);
@@ -1283,6 +1290,19 @@ class VM {
         } catch (VM\PropertyHookRefWriteSignal $signal) {
             return $signal->catchFrame;
         }
+        // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — empty mirrors offset value truthiness (#22576).
+        if (SplArrayStorage::hasArrayAsProps($object)) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string($propName);
+            if (!SplArrayStorage::offsetExists($object, $key)) {
+                $dst->bool(true);
+
+                return null;
+            }
+            $dst->bool(!ext\standard\boolval::isTruthy(SplArrayStorage::offsetGet($object, $key)));
+
+            return null;
+        }
         $meta = $this->classPropertyMeta($object, $propName);
         if (null === $meta || !$meta->prototype->isUndefined()) {
             $dst->bool(!$this->objectPropertyIsSet($object, $propName, $frame));
@@ -1322,6 +1342,14 @@ class VM {
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
             $object->unsetProperty($propName);
+
+            return;
+        }
+        // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — unset mirrors offsetUnset (spl_array.c; #22576).
+        if (SplArrayStorage::hasArrayAsProps($object)) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string($propName);
+            SplArrayStorage::offsetUnset($object, $key);
 
             return;
         }
