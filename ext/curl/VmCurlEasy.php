@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\curl;
 
-use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -16,6 +15,9 @@ use PHPCompiler\ext\standard\VmString;
 
 /**
  * CurlHandle easy API — libcurl FFI via {@see VmCurlNative} (php-src ext/curl/interface.c; #3325).
+ *
+ * php-src registers an opaque {@see CurlHandle} with no instance methods; pause/reset are
+ * procedural only (ext/curl/curl.stub.php; #22595 — revert mistaken OOP surface from #21837).
  */
 final class VmCurlEasy
 {
@@ -48,25 +50,12 @@ final class VmCurlEasy
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['reset'])) {
+        if (isset($ctx->classes[self::CLASS_LC])) {
             return;
         }
 
-        $entry = isset($ctx->classes[self::CLASS_LC])
-            ? $ctx->classes[self::CLASS_LC]
-            : new ClassEntry('CurlHandle');
+        $entry = new ClassEntry('CurlHandle');
         $entry->isInternal = true;
-
-        $pub = CfgFunc::FLAG_PUBLIC;
-        foreach ([
-            'reset' => new CurlHandleReset(),
-            'pause' => new CurlHandlePause(),
-        ] as $name => $method) {
-            $entry->methods[$name] = $method;
-            $entry->methodVisibility[$name] = $pub;
-            $entry->methodNames[$name] = $name;
-        }
-
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 

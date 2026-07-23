@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6506 |
-| Phase A inventory files (M2 ratio SSOT) | 6506 |
+| PHP files on vm.php path | 6503 |
+| Phase A inventory files (M2 ratio SSOT) | 6503 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20821 |
+| Source constructs flagged (warnings) | 20813 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -137,18 +137,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ctype/Module.php` | 0 | 12 |
 | `ext/ctype/VmCtype.php` | 0 | 1 |
 | `ext/curl/BuiltinClasses.php` | 0 | 1 |
-| `ext/curl/CurlClassMethod.php` | 0 | 1 |
 | `ext/curl/CurlConstants.php` | 0 | 1 |
 | `ext/curl/CurlExtensionPolicy.php` | 0 | 1 |
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
-| `ext/curl/CurlHandlePause.php` | 0 | 2 |
-| `ext/curl/CurlHandleReset.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
 | `ext/curl/Module.php` | 0 | 37 |
 | `ext/curl/VmCurlArg.php` | 0 | 1 |
 | `ext/curl/VmCurlCore.php` | 0 | 5 |
-| `ext/curl/VmCurlEasy.php` | 0 | 8 |
+| `ext/curl/VmCurlEasy.php` | 0 | 6 |
 | `ext/curl/VmCurlEscape.php` | 0 | 1 |
 | `ext/curl/VmCurlMulti.php` | 0 | 4 |
 | `ext/curl/VmCurlNative.php` | 0 | 2 |
@@ -5207,7 +5204,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHashCryptoPhp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashEquals.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashHmacAlgos.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringHex2bin.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringHex2bin.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHrtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHrtimeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
@@ -7146,11 +7143,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
-### `ext/curl/CurlClassMethod.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
 ### `ext/curl/CurlConstants.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7181,17 +7173,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
-
-### `ext/curl/CurlHandlePause.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 23)
-- 1 class method(s)
-
-### `ext/curl/CurlHandleReset.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
 
 ### `ext/curl/CurlStringFileBuiltin.php`
 
@@ -7263,12 +7244,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 57)
-- new CurlHandleReset (line 62)
-- new CurlHandlePause (line 63)
-- new Variable (line 80)
-- new ObjectEntry (line 81)
-- new Variable (line 520)
-- new ObjectEntry (line 521)
+- new Variable (line 69)
+- new ObjectEntry (line 70)
+- new Variable (line 509)
+- new ObjectEntry (line 510)
 - 34 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
@@ -12828,9 +12807,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 335)
-- new locale_get_region (line 336)
-- new locale_get_script (line 337)
+- new locale_get_primary_language (line 323)
+- new locale_get_region (line 324)
+- new locale_get_script (line 325)
 - 30 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
@@ -44302,9 +44281,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHex2bin.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 188)
 - 7 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringHrtime.php`
 
