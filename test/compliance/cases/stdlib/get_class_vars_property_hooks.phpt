@@ -1,5 +1,5 @@
 --TEST--
-get_class_vars() / get_object_vars() on property hooks (#6453, #5203, ext/standard/class.c)
+get_class_vars() / get_object_vars() on property hooks (#6453, #5203, #22493, Zend/zend_builtin_functions.c)
 --FILE--
 <?php
 class C {
@@ -9,6 +9,7 @@ class C {
     }
 }
 
+// Virtual hooked props are omitted from get_class_vars (ZEND_ACC_VIRTUAL).
 var_export(array_key_exists('title', get_class_vars(C::class)));
 echo "\n";
 print_r(get_class_vars(C::class));
@@ -31,13 +32,23 @@ echo "gcv_key:", array_key_exists('y', $vars) ? 'yes' : 'no', "\n";
 $og = get_object_vars($g);
 $yVal = $og['y'];
 echo "gov:", $yVal, "\n";
+
+// #22493: virtual omitted; ordinary + backed hooked present.
+class H {
+    public string $a { get => 'x'; set {} }
+    public $b = 2;
+    public string $c { get => $this->c; set => $this->c = $value; }
+}
+echo json_encode(get_class_vars(H::class)), "\n";
+echo array_key_exists('a', get_class_vars(H::class)) ? "a-yes\n" : "a-no\n";
 --EXPECT--
-true
+false
 Array
 (
-    [title] => 
 )
 false
 'hook:x'
-gcv_key:yes
+gcv_key:no
 gov:g_only
+{"b":2,"c":null}
+a-no
