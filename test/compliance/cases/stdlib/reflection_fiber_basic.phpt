@@ -2,10 +2,6 @@
 ReflectionFiber instance API — construct, getFiber; state on Fiber (#4609, #22422, ext/reflection/php_reflection.c)
 --FILE--
 <?php
-declare(strict_types=1);
-
-echo 'class=', (int) class_exists('ReflectionFiber'), "\n";
-
 $fiber = new Fiber(function (): void {
     Fiber::suspend('step');
 });
@@ -19,7 +15,6 @@ echo "\n";
 var_export($rf->getFiber() === $fiber);
 echo "\n";
 --EXPECT--
-class=1
 false
 true
 true

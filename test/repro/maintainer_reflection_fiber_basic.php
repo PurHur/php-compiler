@@ -1,8 +1,4 @@
 <?php
-declare(strict_types=1);
-
-echo 'class=', (int) class_exists('ReflectionFiber'), "\n";
-
 $fiber = new Fiber(function (): void {
     Fiber::suspend('step');
 });
