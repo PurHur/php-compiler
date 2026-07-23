@@ -1007,6 +1007,7 @@ class VM {
         Frame $frame
     ): void {
         $this->assertReadonlyPropertyWriteAllowedForReflection($object, $instanceName, $frame);
+        $this->assertFinalPropertyWriteAllowedForReflection($object, $instanceName);
         $setLc = $meta?->setHookMethodLc
             ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($instanceName));
         if (isset($object->class->methods[$setLc])) {
@@ -3445,6 +3446,11 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    $catchFrame = $this->enforceFinalPropertyWrite($arg2, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $catchFrame = $this->enforceAsymmetricPropertyWrite($arg2, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -3588,6 +3594,11 @@ restart:
                         goto restart;
                     }
                     $catchFrame = $this->enforceReadonlyPropertyWrite($lhs, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    $catchFrame = $this->enforceFinalPropertyWrite($lhs, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
@@ -8525,6 +8536,10 @@ restart:
         if (null !== $catchFrame) {
             return $catchFrame;
         }
+        $catchFrame = $this->enforceFinalPropertyWrite($write, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
         $catchFrame = $this->enforceAsymmetricPropertyWrite($write, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -9448,6 +9463,13 @@ restart:
                     continue;
                 }
                 $catchFrame = $this->enforceReadonlyPropertyWrite(
+                    $handlerFrame->calledArgs[$idx],
+                    $callerFrame
+                );
+                if (null !== $catchFrame) {
+                    return $catchFrame;
+                }
+                $catchFrame = $this->enforceFinalPropertyWrite(
                     $handlerFrame->calledArgs[$idx],
                     $callerFrame
                 );
@@ -12265,7 +12287,12 @@ restart:
             return $catchFrame;
         }
 
-        return $this->enforceReadonlyPropertyWrite($lvalue, $frame);
+        $catchFrame = $this->enforceReadonlyPropertyWrite($lvalue, $frame);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+
+        return $this->enforceFinalPropertyWrite($lvalue, $frame);
     }
 
     /**
@@ -12421,6 +12448,30 @@ restart:
         throw new \Error($this->readonlyPropertyWriteErrorMessage($object, $propName, $declaringClass, $frame));
     }
 
+    /**
+     * ReflectionProperty::setValue — PHP 8.4 final property write guard (#22450, #22451).
+     *
+     * @throws \Error
+     */
+    private function assertFinalPropertyWriteAllowedForReflection(
+        ObjectEntry $object,
+        string $propName
+    ): void {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || !$meta->propertyFinal) {
+            return;
+        }
+        if (!$object->constructed) {
+            return;
+        }
+        if (VM\CloneWithSupport::consumeReinit($object, $propName)) {
+            return;
+        }
+        $declaringClass = $this->context->classes[$meta->declaringClassLc]->name
+            ?? $meta->declaringClassLc;
+        throw new \Error(sprintf('Cannot modify final property %s::$%s', $declaringClass, $propName));
+    }
+
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */
     private function enforceReadonlyPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
@@ -12510,6 +12561,48 @@ restart:
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
             $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame)
+        );
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
+                return null;
+            }
+
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Reject PHP 8.4 final property writes after initialization (#22450, #22451).
+     *
+     * php-src: Zend/zend_object_handlers.c — "Cannot modify final property %s::$%s".
+     * Construction (including promoted ctor assignment) may still initialize the slot.
+     */
+    private function enforceFinalPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
+    {
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null === $owner) {
+            return null;
+        }
+        $prop = $this->resolvePropertyWriteName($lvalue) ?? 'property';
+        $meta = $this->classPropertyMeta($owner, $prop);
+        if (null === $meta || !$meta->propertyFinal) {
+            return null;
+        }
+        if (!$owner->constructed) {
+            return null;
+        }
+        if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
+            return null;
+        }
+        $declaringClass = $this->context->classes[$meta->declaringClassLc]->name
+            ?? $meta->declaringClassLc;
+        $thrown = VM\BuiltinExceptionSupport::materializeError(
+            $this->context,
+            sprintf('Cannot modify final property %s::$%s', $declaringClass, $prop)
         );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {

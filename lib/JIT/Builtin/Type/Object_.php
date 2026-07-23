@@ -191,6 +191,9 @@ class Object_ extends Type {
     /** @var array<int, array<string, true>> class id => property lc => true (#3149, #3432) */
     private array $readonlyPropertyNames = [];
 
+    /** @var array<int, array<string, true>> class id => property lc => true (#22451, #22450) */
+    private array $finalPropertyNames = [];
+
     /** @var array<int, PHPLLVM\Value> property slot handle => owning __object__* */
     private array $slotReceivers = [];
 
@@ -1189,6 +1192,11 @@ class Object_ extends Type {
                 $this->readonlyPropertyNames[$childId][$propLc] = true;
             }
         }
+        if (isset($this->finalPropertyNames[$parentId])) {
+            foreach ($this->finalPropertyNames[$parentId] as $propLc => $_) {
+                $this->finalPropertyNames[$childId][$propLc] = true;
+            }
+        }
     }
 
     public function hasReadonlyClasses(): bool
@@ -1214,6 +1222,32 @@ class Object_ extends Type {
         return isset($this->readonlyPropertyNames[$classId][strtolower($name)]);
     }
 
+    public function markPropertyFinal(int $classId, string $name): void
+    {
+        $this->finalPropertyNames[$classId][strtolower($name)] = true;
+    }
+
+    public function isPropertyFinal(int $classId, string $name): bool
+    {
+        return isset($this->finalPropertyNames[$classId][strtolower($name)]);
+    }
+
+    /**
+     * @return list<int> class ids declaring $name as a final instance property (#22451)
+     */
+    public function finalPropertyClassIdsForProperty(string $name): array
+    {
+        $lc = strtolower($name);
+        $ids = [];
+        foreach ($this->finalPropertyNames as $classId => $props) {
+            if (isset($props[$lc])) {
+                $ids[] = $classId;
+            }
+        }
+
+        return $ids;
+    }
+
     /**
      * @return list<int> class ids declaring $name as a readonly instance property
      */
@@ -1232,7 +1266,9 @@ class Object_ extends Type {
 
     public function hasReadonlyPropertyGuards(): bool
     {
-        return [] !== $this->readonlyClassIds || [] !== $this->readonlyPropertyNames;
+        return [] !== $this->readonlyClassIds
+            || [] !== $this->readonlyPropertyNames
+            || [] !== $this->finalPropertyNames;
     }
 
     public function markObjectConstructed(PHPLLVM\Value $obj): void

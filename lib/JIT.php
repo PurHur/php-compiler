@@ -12264,6 +12264,9 @@ class JIT {
                     if ($op->propertyReadonly || $this->context->scope->classIsReadonly) {
                         $this->context->type->object->markPropertyReadonly($classId, $name->value);
                     }
+                    if ($op->propertyFinal ?? false) {
+                        $this->context->type->object->markPropertyFinal($classId, $name->value);
+                    }
                     if (
                         null !== $op->arg2
                         && isset($block->constants[$op->arg2])
