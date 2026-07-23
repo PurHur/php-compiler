@@ -40,10 +40,12 @@ final class ReflectionMethodGetParameters extends VmClassMethod
         foreach ($paramNames as $position => $name) {
             $rp = new ObjectEntry($rpClass);
             $rp->constructed = true;
-            $rp->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+            $rp->getProperty(ReflectionSupport::PROP_PARAM_CLASS)->string($entry->name);
             $rp->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
+            $rp->getProperty(ReflectionSupport::PROP_FUNC_NAME)->null();
             $rp->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($name);
             $rp->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($position);
+            $rp->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int($position);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($rp);
             $ht->append($slot);
