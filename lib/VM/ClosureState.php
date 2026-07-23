@@ -282,7 +282,10 @@ final class ClosureState
         $entry->methodVisibility['bind'] = $pubStatic;
         $entry->methodNames['bind'] = 'bind';
         $entry->methods['bindto'] = new Builtin\ClosureBindTo();
-        $entry->methodVisibility['bindto'] = $pubStatic;
+        // Instance method in Zend (zend_closures.stub.php). Must not be FLAG_STATIC: after
+        // #22288, instance calls of static methods omit the receiver from callArgs, which
+        // made $c->bindTo(...) throw LogicException (#22423, regression of #22089).
+        $entry->methodVisibility['bindto'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['bindto'] = 'bindTo';
         $entry->methods['call'] = new Builtin\ClosureCall();
         // Instance-only in Zend (zend_closures.stub.php); static Closure::call() must Error (#7144).
