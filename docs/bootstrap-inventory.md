@@ -37923,7 +37923,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 37 class method(s)
+- 38 class method(s)
 
 ### `ext/xml/VmXmlSaxDispatcher.php`
 
@@ -47878,7 +47878,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/DateTimeModify.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `lib/VM/Builtin/DateTimeSetDate.php`
 
