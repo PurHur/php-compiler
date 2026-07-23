@@ -3760,20 +3760,45 @@ restart:
                         $writeTarget->null();
                         break;
                     }
+                    // Zend: `$obj->hooked =& $v` — get_property_ptr_ptr fails for hooked props (#22475).
+                    $lhsHookAssignLvalue = $this->resolvePropertyHookRefWriteLvalue($lhs, $frame);
+                    if (null === $lhsHookAssignLvalue) {
+                        $lhsHookAssignLvalue = $this->resolvePropertyHookRefWriteLvalue($writeTarget, $frame);
+                    }
+                    if (null !== $lhsHookAssignLvalue) {
+                        $catchFrame = $this->dispatchVmError(
+                            'Cannot assign by reference to overloaded object',
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
+                    // Zend: `$r = &$obj->hooked` requires `&get` (#22475, zend_object_handlers.c).
                     $hookRefLvalue = $this->resolvePropertyHookRefWriteLvalue($rhsSlot, $frame);
                     if (null !== $hookRefLvalue) {
-                        if (!$this->propertyWriteHasSetHook($hookRefLvalue)) {
-                            $catchFrame = $this->enforceVirtualPropertyHookWrite($hookRefLvalue, $frame);
+                        if (!$this->propertyHookGetIsByRef($hookRefLvalue)) {
+                            $catchFrame = $this->dispatchVmError(
+                                $this->indirectModificationOfHookedPropertyMessage($hookRefLvalue),
+                                $frame
+                            );
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;
                             }
                             break;
                         }
-                        $stableLvalue = $this->stablePropertyHookRefWriteLvalue($hookRefLvalue);
-                        $hookRefVar = new Variable();
-                        $hookRefVar->propertyHookRef(new VM\PropertyHookRef($this, $stableLvalue));
-                        $writeTarget->indirect($hookRefVar);
+                        $catchFrame = $this->bindAssignRefToByRefGetHook(
+                            $writeTarget,
+                            $hookRefLvalue,
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         break;
                     }
                     // Object property / static / nested ref slots are live storage (Zend FE_FETCH_R,
@@ -7034,10 +7059,14 @@ restart:
                             $writeProxy = new Variable();
                             $writeProxy->objectPropertyOwner = $propertyObject;
                             $writeProxy->objectPropertyName = $name;
-                            $catchFrame = $this->enforceVirtualPropertyHookWrite($writeProxy, $frame);
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
+                            // `$r = &$obj->hooked` — PROPERTY_FETCH_WRITE feeds ASSIGN_REF; Zend rejects
+                            // without `&get` at get_ptr time, not as write-only (#22475).
+                            if (!$this->propertyFetchDestUsedAsAssignRefSource($frame, $op)) {
+                                $catchFrame = $this->enforceVirtualPropertyHookWrite($writeProxy, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
                             }
                             $readBeforeAssign = $this->propertyFetchDestUsedAsReadBeforeAssign($frame, $op);
                             if ($readBeforeAssign) {
@@ -9210,6 +9239,23 @@ restart:
                 continue;
             }
             if (OpCode::destSlotUsedAsAssignLvalue($candidate, $destSlot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** True when fetch dest is the RHS of a following ASSIGN_REF (#22475). */
+    private function propertyFetchDestUsedAsAssignRefSource(Frame $frame, OpCode $op): bool
+    {
+        $destSlot = (int) $op->arg1;
+        for ($j = $frame->pos, $n = $frame->block->nOpCodes; $j < $n; $j++) {
+            $candidate = $frame->block->opCodes[$j] ?? null;
+            if (null === $candidate) {
+                continue;
+            }
+            if (OpCode::destSlotUsedAsAssignRefSource($candidate, $destSlot)) {
                 return true;
             }
         }
@@ -11566,7 +11612,7 @@ restart:
     }
 
     /**
-     * Property lvalue for assign-by-ref when rhs is a hooked property (#6426).
+     * Property lvalue for assign-by-ref when rhs is a hooked property (#6426, #22475).
      */
     private function resolvePropertyHookRefWriteLvalue(Variable $operand, Frame $frame): ?Variable
     {
@@ -11600,6 +11646,121 @@ restart:
         }
 
         return null;
+    }
+
+    /**
+     * True when the hooked property declares `&get` (ZEND_ACC_RETURN_REFERENCE, #21098 / #22475).
+     */
+    private function propertyHookGetIsByRef(Variable $lvalue): bool
+    {
+        $propName = $this->resolvePropertyWriteName($lvalue);
+        if (null === $propName) {
+            return false;
+        }
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null !== $owner) {
+            $meta = $this->classPropertyMeta($owner, $propName);
+
+            return (bool) ($meta?->getHookByRef);
+        }
+        $target = $lvalue->resolveIndirect();
+        $classLc = $lvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        $staticPropName = $lvalue->objectPropertyName ?? $target->objectPropertyName;
+        if (is_string($classLc) && is_string($staticPropName) && '' !== $staticPropName) {
+            $propMeta = $this->context->propertyHookRegistry[$classLc][$staticPropName]
+                ?? $this->context->propertyHookRegistry[$classLc][strtolower($staticPropName)]
+                ?? null;
+
+            return is_array($propMeta) && !empty($propMeta['getByRef']);
+        }
+
+        return false;
+    }
+
+    /**
+     * php-src zend_object_handlers.c — assign-ref / get_ptr without `&get` (#22475).
+     */
+    private function indirectModificationOfHookedPropertyMessage(Variable $lvalue): string
+    {
+        $propName = $this->resolvePropertyWriteName($lvalue) ?? '?';
+        $owner = $this->resolvePropertyWriteOwner($lvalue);
+        if (null !== $owner) {
+            return sprintf('Indirect modification of %s::$%s is not allowed', $owner->class->name, $propName);
+        }
+        $target = $lvalue->resolveIndirect();
+        $classLc = $lvalue->staticPropertyClassLc ?? $target->staticPropertyClassLc;
+        if (is_string($classLc) && isset($this->context->classes[$classLc])) {
+            return sprintf(
+                'Indirect modification of %s::$%s is not allowed',
+                $this->context->classes[$classLc]->name,
+                $propName
+            );
+        }
+
+        return sprintf('Indirect modification of $%s is not allowed', $propName);
+    }
+
+    /**
+     * Bind `$r = &$obj->prop` when `&get` is declared (zend_property_hooks.c, #22475).
+     *
+     * Prefer the live `&get` return so writes alias backing storage. When a set hook is
+     * also present, PropertyHookRef write-through stays valid for private backing cells.
+     *
+     * @return ?Frame catch frame when hook throws
+     */
+    private function bindAssignRefToByRefGetHook(Variable $writeTarget, Variable $hookLvalue, Frame $frame): ?Frame
+    {
+        $owner = $this->resolvePropertyWriteOwner($hookLvalue);
+        $propName = $this->resolvePropertyWriteName($hookLvalue);
+        if (null !== $owner && null !== $propName) {
+            $meta = $this->classPropertyMeta($owner, $propName);
+            // `&get`+`set` (virtual): Prefer PropertyHookRef so writes stay in-hook scope (#22475).
+            if (null !== $meta && null !== $meta->setHookMethodLc) {
+                $stableLvalue = $this->stablePropertyHookRefWriteLvalue($hookLvalue);
+                $hookRefVar = new Variable();
+                $hookRefVar->propertyHookRef(new VM\PropertyHookRef($this, $stableLvalue));
+                $writeTarget->indirect($hookRefVar);
+
+                return null;
+            }
+            try {
+                $byRef = $this->fetchPropertyWithHooksByRef($owner, $propName, $frame);
+            } catch (VM\PropertyHookRefWriteSignal $signal) {
+                return $signal->catchFrame;
+            }
+            if (null === $byRef) {
+                return $this->dispatchVmError(
+                    $this->indirectModificationOfHookedPropertyMessage($hookLvalue),
+                    $frame
+                );
+            }
+            // Promote to a shared IS_REFERENCE-style cell so outer writes alias backing
+            // without re-checking private visibility on the property storage (#22475).
+            $cell = $byRef->isIndirect()
+                ? ($byRef->directIndirectTarget() ?? $byRef->resolveIndirect())
+                : $byRef;
+            if (Variable::TYPE_INDIRECT !== $cell->type) {
+                $shared = new Variable();
+                $shared->copyFrom($cell);
+                $cell->indirect($shared);
+            }
+            $writeTarget->indirect($cell->resolveIndirect());
+
+            return null;
+        }
+        if ($this->propertyWriteHasSetHook($hookLvalue)) {
+            $stableLvalue = $this->stablePropertyHookRefWriteLvalue($hookLvalue);
+            $hookRefVar = new Variable();
+            $hookRefVar->propertyHookRef(new VM\PropertyHookRef($this, $stableLvalue));
+            $writeTarget->indirect($hookRefVar);
+
+            return null;
+        }
+
+        return $this->dispatchVmError(
+            $this->indirectModificationOfHookedPropertyMessage($hookLvalue),
+            $frame
+        );
     }
 
     /** Live property storage cell for hooked ref bindings (#6426). */
