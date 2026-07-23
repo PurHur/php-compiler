@@ -1368,25 +1368,37 @@ final class DateTimeSupport
     /**
      * @param array<string, mixed> $data Zend DateTime unserialize payload
      */
-    public static function restoreFromZendSerialize(Context $ctx, string $classKey, array $data): ObjectEntry
-    {
+    public static function restoreFromZendSerialize(
+        Context $ctx,
+        string $classKey,
+        array $data,
+        ?ObjectEntry $target = null
+    ): ObjectEntry {
         $dateWire = $data['date'] ?? null;
         $timezoneType = $data['timezone_type'] ?? null;
         $timezone = $data['timezone'] ?? null;
+        $label = self::CLASS_DATETIMEIMMUTABLE === $classKey ? 'DateTimeImmutable' : 'DateTime';
         if (!\is_string($dateWire)
             || !\is_int($timezoneType)
             || !\is_string($timezone)) {
-            throw new \Error('Invalid serialization data for DateTime object');
+            throw new \Error('Invalid serialization data for '.$label.' object');
         }
         try {
             VmDateTimeNative::validateTimezoneId($timezone);
             $parsed = VmDateTimeNative::parseDateTime($dateWire, $timezone);
         } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
-            throw new \Error('Invalid serialization data for DateTime object');
+            throw new \Error('Invalid serialization data for '.$label.' object');
+        }
+        if (null !== $target) {
+            self::applyParsedState($target, $parsed, $timezone);
+            $target->constructed = true;
+            self::markDateTimeLikeInitialized($target);
+
+            return $target;
         }
         $class = $ctx->classes[$classKey] ?? null;
         if (null === $class) {
-            throw new \Error('Invalid serialization data for DateTime object');
+            throw new \Error('Invalid serialization data for '.$label.' object');
         }
         $entry = new ObjectEntry($class);
         self::applyParsedState($entry, $parsed, $timezone);
@@ -1401,8 +1413,12 @@ final class DateTimeSupport
      *
      * @param array<string, mixed> $data
      */
-    public static function restoreTimezoneFromZendSerialize(Context $ctx, array $data): ObjectEntry
-    {
+    public static function restoreTimezoneFromZendSerialize(
+        Context $ctx,
+        array $data,
+        ?ObjectEntry $target = null,
+        bool $wakeupMode = false
+    ): ObjectEntry {
         $timezoneType = $data['timezone_type'] ?? null;
         $timezone = $data['timezone'] ?? null;
         if (!\is_int($timezoneType)
@@ -1410,12 +1426,45 @@ final class DateTimeSupport
             || $timezoneType > 3
             || !\is_string($timezone)
             || str_contains($timezone, "\0")) {
-            throw new \Error('Invalid serialization data for DateTimeZone object');
+            throw new \Error(
+                $wakeupMode
+                    ? 'Timezone initialization failed'
+                    : 'Invalid serialization data for DateTimeZone object'
+            );
         }
         try {
+            if (null !== $target) {
+                self::initDateTimeZone($target, $timezone);
+
+                return $target;
+            }
+
             return self::newDateTimeZoneVariable($ctx, $timezone)->toObject();
         } catch (NativeDateInvalidTimeZoneException) {
-            throw new \Error('Invalid serialization data for DateTimeZone object');
+            throw new \Error(
+                $wakeupMode
+                    ? 'Timezone initialization failed'
+                    : 'Invalid serialization data for DateTimeZone object'
+            );
         }
+    }
+
+    /** php-src DATE_CHECK_INITIALIZED — DateTime*::__serialize (#22596). */
+    public static function requireInitializedForSerialize(ObjectEntry $obj, string $classLabel): void
+    {
+        if (self::CLASS_DATETIMEZONE === strtolower($obj->class->name)) {
+            if ($obj->constructed) {
+                return;
+            }
+            throw new \Error(
+                'The '.$classLabel.' object has not been correctly initialized by its constructor'
+            );
+        }
+        if (isset(self::$dateTimeLikeInitialized[$obj->id])) {
+            return;
+        }
+        throw new \Error(
+            'The '.$classLabel.' object has not been correctly initialized by its constructor'
+        );
     }
 }

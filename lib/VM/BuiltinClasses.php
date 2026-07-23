@@ -23,6 +23,7 @@ use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
 use PHPCompiler\VM\Builtin\DateIntervalSetState;
+use PHPCompiler\VM\Builtin\DateSerializeMethods;
 use PHPCompiler\VM\Builtin\DateTimeAdd;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeDiff;
@@ -1655,6 +1656,7 @@ final class BuiltinClasses
         $tz->methods['__set_state'] = new DateTimeZoneSetState();
         $tz->methodVisibility['__set_state'] = $pubStatic;
         $tz->methodNames['__set_state'] = '__set_state';
+        DateSerializeMethods::registerOnDateTimeZone($tz, $pub);
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEZONE] = $tz;
 
         $dateTimeMethods = [
@@ -1710,6 +1712,12 @@ final class BuiltinClasses
         );
         $dt->methodVisibility['__set_state'] = $pubStatic;
         $dt->methodNames['__set_state'] = '__set_state';
+        DateSerializeMethods::registerOnDateTimeLike(
+            $dt,
+            DateTimeSupport::CLASS_DATETIME,
+            'DateTime',
+            $pub
+        );
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
 
         $dti = new ClassEntry('DateTimeImmutable');
@@ -1743,6 +1751,12 @@ final class BuiltinClasses
         );
         $dti->methodVisibility['__set_state'] = $pubStatic;
         $dti->methodNames['__set_state'] = '__set_state';
+        DateSerializeMethods::registerOnDateTimeLike(
+            $dti,
+            DateTimeSupport::CLASS_DATETIMEIMMUTABLE,
+            'DateTimeImmutable',
+            $pub
+        );
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
 
         $floatProto = new Variable(Variable::TYPE_FLOAT);
@@ -1769,6 +1783,7 @@ final class BuiltinClasses
         $di->methods['__set_state'] = new DateIntervalSetState();
         $di->methodVisibility['__set_state'] = $pubStatic;
         $di->methodNames['__set_state'] = '__set_state';
+        DateSerializeMethods::registerOnDateInterval($di, $pub);
         $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] = $di;
 
         $objProto = new Variable(Variable::TYPE_OBJECT);
@@ -1821,6 +1836,7 @@ final class BuiltinClasses
         $dp->methods['__set_state'] = new DatePeriodSetState();
         $dp->methodVisibility['__set_state'] = $pubStatic;
         $dp->methodNames['__set_state'] = '__set_state';
+        DateSerializeMethods::registerOnDatePeriod($dp, $pub);
         $ctx->classes[DatePeriodSupport::CLASS_DATEPERIOD] = $dp;
     }
 

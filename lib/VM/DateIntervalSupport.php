@@ -340,14 +340,23 @@ final class DateIntervalSupport
     /**
      * @param array<string, mixed> $data
      */
-    public static function restoreFromZendSerialize(Context $ctx, array $data): ?ObjectEntry
-    {
+    public static function restoreFromZendSerialize(
+        Context $ctx,
+        array $data,
+        ?ObjectEntry $target = null
+    ): ?ObjectEntry {
         if (isset($data['from_string']) && true === $data['from_string']
             && isset($data['date_string']) && \is_string($data['date_string'])) {
             $warning = null;
             $parsed = VmDateInterval::parseFromDateString($data['date_string'], $warning);
             if (null === $parsed) {
                 return null;
+            }
+            if (null !== $target) {
+                self::writeState($target, [...$parsed, 'days' => false]);
+                self::markFromDateString($target, $data['date_string']);
+
+                return $target;
             }
 
             return self::createFromDateString($ctx, $data['date_string'], $parsed);
@@ -364,6 +373,17 @@ final class DateIntervalSupport
             'invert' => isset($data['invert']) && \is_int($data['invert']) ? $data['invert'] : 0,
             'days' => $data['days'] ?? false,
         ];
+        if (null !== $target) {
+            self::writeState($target, $state);
+            if ($target->hasProperty('from_string')) {
+                $fs = $target->getProperty('from_string')->resolveIndirect();
+                if (Variable::TYPE_BOOLEAN === $fs->type) {
+                    $fs->bool(isset($data['from_string']) && true === $data['from_string']);
+                }
+            }
+
+            return $target;
+        }
         $interval = self::createFromState($ctx, $state);
         if ($interval->hasProperty('from_string')) {
             $fs = $interval->getProperty('from_string')->resolveIndirect();
@@ -373,5 +393,16 @@ final class DateIntervalSupport
         }
 
         return $interval;
+    }
+
+    /** php-src DATE_CHECK_INITIALIZED — DateInterval::__serialize (#22596). */
+    public static function requireInitializedForSerialize(ObjectEntry $interval): void
+    {
+        if ($interval->constructed) {
+            return;
+        }
+        throw new \Error(
+            'The DateInterval object has not been correctly initialized by its constructor'
+        );
     }
 }

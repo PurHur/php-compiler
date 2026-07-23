@@ -575,8 +575,11 @@ final class DatePeriodSupport
     /**
      * php-src php_date_period_initialize_from_hash — DatePeriod::__set_state (#22407).
      */
-    public static function restoreFromSetStateHash(Context $ctx, Variable $bag): ObjectEntry
-    {
+    public static function restoreFromSetStateHash(
+        Context $ctx,
+        Variable $bag,
+        ?ObjectEntry $target = null
+    ): ObjectEntry {
         $bag = $bag->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $bag->type) {
             throw new \Error('Invalid serialization data for DatePeriod object');
@@ -625,11 +628,15 @@ final class DatePeriodSupport
             throw new \Error('Invalid serialization data for DatePeriod object');
         }
 
-        $class = $ctx->classes[self::CLASS_DATEPERIOD] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DatePeriod is not registered in this compiler build');
+        if (null !== $target) {
+            $period = $target;
+        } else {
+            $class = $ctx->classes[self::CLASS_DATEPERIOD] ?? null;
+            if (null === $class) {
+                throw new \LogicException('DatePeriod is not registered in this compiler build');
+            }
+            $period = new ObjectEntry($class);
         }
-        $period = new ObjectEntry($class);
         self::setObjectProperty($period, 'start', self::cloneDateTimeForStorage($start, $ctx));
         if (null === $current) {
             self::setNullProperty($period, 'current');
@@ -653,6 +660,17 @@ final class DatePeriodSupport
         $period->datePeriodIterator = null;
 
         return $period;
+    }
+
+    /** php-src DATE_CHECK_INITIALIZED — DatePeriod::__serialize (#22596). */
+    public static function requireInitializedForSerialize(ObjectEntry $period): void
+    {
+        if ($period->constructed) {
+            return;
+        }
+        throw new \Error(
+            'The DatePeriod object has not been correctly initialized by its constructor'
+        );
     }
 
     private static function hashEntryScalar(HashTable $ht, string $key): ?Variable
