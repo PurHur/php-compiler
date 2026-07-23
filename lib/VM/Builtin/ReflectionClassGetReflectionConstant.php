@@ -31,7 +31,8 @@ final class ReflectionClassGetReflectionConstant extends VmClassMethod
             throw new \LogicException('ReflectionClass refers to unknown class in this compiler build');
         }
         $constant = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionClass::getReflectionConstant() name', 1);
-        if (null === VmReflection::findClassConstantKey($entry, $constant, $ctx)) {
+        $decl = VmReflection::findClassConstantDecl($entry, $constant, $ctx);
+        if (null === $decl) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::constantNotFoundMessage($className, $constant)
             );
@@ -44,12 +45,13 @@ final class ReflectionClassGetReflectionConstant extends VmClassMethod
         }
         $rc = new ObjectEntry($rcClass);
         $rc->constructed = true;
-        // Prefer Zend ReflectionClassConstant::$class / $name when that class is registered (#22503).
+        // Zend ReflectionClassConstant::$class is the declaring class (#22503, #22581).
+        $declaringName = $decl['declaring']->name;
         if (ReflectionSupport::REFLECTION_CLASS_CONSTANT === strtolower($rcClass->name)) {
-            $rc->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->string($entry->name);
+            $rc->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->string($declaringName);
             $rc->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME)->string($constant);
         } else {
-            $rc->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+            $rc->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($declaringName);
             $rc->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
         }
         if (null !== $frame->returnVar) {

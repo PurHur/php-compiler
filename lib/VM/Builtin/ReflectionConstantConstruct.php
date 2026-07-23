@@ -50,17 +50,20 @@ final class ReflectionConstantConstruct extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $entry = VmReflection::resolveClassFromArg($ctx, $frame->calledArgs[1]);
         $constant = VmReflection::stringArg($frame->calledArgs[2], 'ReflectionConstant::__construct() name', 2);
-        if (null === VmReflection::findClassConstantKey($entry, $constant, $ctx)) {
+        $decl = VmReflection::findClassConstantDecl($entry, $constant, $ctx);
+        if (null === $decl) {
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::constantNotFoundMessage($entry->name, $constant)
             );
         }
+        // Zend stores the declaring class (ce of the constant), not the lookup class (#22581).
+        $declaringName = $decl['declaring']->name;
         if ($isReflectionConstant) {
-            $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
+            $receiver->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($declaringName);
             $receiver->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constant);
         } else {
-            // Zend ReflectionClassConstant::$class / $name (#22503).
-            $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->string($entry->name);
+            // Zend ReflectionClassConstant::$class / $name (#22503, #22581).
+            $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->string($declaringName);
             $receiver->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME)->string($constant);
         }
         $receiver->constructed = true;

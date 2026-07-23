@@ -1221,7 +1221,10 @@ final class VmReflection
     }
 
     /**
-     * Declaring class + storage key for a class constant on $class or an ancestor (#6950).
+     * Declaring class + storage key for a class constant on $class or an ancestor (#6950, #22581).
+     *
+     * Inherited constants are merged onto the child ClassEntry; use constDeclaringClassLc
+     * (same as collectClassConstantsForReflection) so Reflection reports the declaring ce.
      *
      * @return array{declaring: ClassEntry, constLc: string}|null
      */
@@ -1231,7 +1234,11 @@ final class VmReflection
         $current = $class;
         while (true) {
             if (isset($current->constants[$lc])) {
-                return ['declaring' => $current, 'constLc' => $lc];
+                $declLc = $current->constDeclaringClassLc[$lc]
+                    ?? strtolower(ltrim($current->name, '\\'));
+                $declaring = $ctx->classes[$declLc] ?? $current;
+
+                return ['declaring' => $declaring, 'constLc' => $lc];
             }
             if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
                 return null;
@@ -3850,8 +3857,14 @@ final class VmReflection
         }
         $rc = new \PHPCompiler\VM\ObjectEntry($rcClass);
         $rc->constructed = true;
-        $rc->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($declaringClassName);
-        $rc->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constantName);
+        // Zend public surface: $class / $name (#22503); $class is declaring class (#22581).
+        if (ReflectionSupport::REFLECTION_CLASS_CONSTANT === strtolower($rcClass->name)) {
+            $rc->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_CLASS)->string($declaringClassName);
+            $rc->getProperty(ReflectionSupport::PROP_REFLECTION_CLASS_CONSTANT_NAME)->string($constantName);
+        } else {
+            $rc->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($declaringClassName);
+            $rc->getProperty(ReflectionSupport::PROP_CONSTANT_NAME)->string($constantName);
+        }
 
         return $rc;
     }
