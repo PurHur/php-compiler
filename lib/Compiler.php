@@ -6052,6 +6052,7 @@ class Compiler {
             $backedTypeSlot
         );
         $this->assignAttributeMetadata($return, $enum);
+        $this->assignSourceMetadata($return, $enum);
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($enum);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
