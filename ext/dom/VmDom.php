@@ -5843,6 +5843,11 @@ final class VmDom
     ): ObjectEntry {
         self::assertMutationParent($parent);
         self::assertChildOfParent($parent, $oldChild, 'DOMNode::replaceChild()');
+        // php-src ext/dom/node.c dom_node_replace_child — replacing a node with itself is a no-op (#22678).
+        // Without this guard, detachNodeIfAttached() removes oldChild then childIndex() raises NOT_FOUND.
+        if ($newChild->id === $oldChild->id) {
+            return $oldChild;
+        }
         // php-src ext/dom/node.c dom_node_replace_child — DocumentFragment expands in place (#21976).
         if (self::isDocumentFragment($newChild)) {
             $parentState = DomRegistry::state($parent);

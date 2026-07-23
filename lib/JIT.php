@@ -16159,12 +16159,15 @@ class JIT {
         $xsltUserScript = JIT\XsltInstanceMethodJit::isXsltInstanceMethodProxy($proxyName)
             && JIT\XsltInstanceMethodJit::isUserScriptAot();
         // NestedJIT VM\Variable params are `__value__*` (#16565) — never run object lazy-init on them (#20785).
+        // When the operand lacks a Variable userType, className falls back to the NestedJIT helper
+        // class (e.g. DomCreateElementJitHelper) — still route known Variable methods (#22678 AOT).
         $nestedVmVariableReceiver = JIT\NestedJitCompileScope::isActive()
             && Variable::TYPE_VALUE === $receiverVar->type
             && (
                 'phpcompiler\\vm\\variable' === $declaringClassLc
                 || 'variable' === $declaringClassLc
                 || str_ends_with($declaringClassLc, '\\vm\\variable')
+                || JIT\NestedVmVariableMethodLlvm::isNestedVariableMethod($methodLc)
             );
         if (
             !$nestedVmVariableReceiver
@@ -16447,11 +16450,14 @@ class JIT {
             return false;
         }
         // Bare `Variable` (use-import) must match FQCN — same as isCfgVmVariableParamType (#20785).
+        // NestedJIT helper className fallback (DomCreateElementJitHelper etc.): still accept
+        // when the receiver is a value-box Variable param (#22678 AOT append/replaceChild).
         if (
             'phpcompiler\\vm\\variable' !== $declaringClassLc
             && 'object' !== $declaringClassLc
             && 'variable' !== $declaringClassLc
             && !str_ends_with($declaringClassLc, '\\vm\\variable')
+            && !(Variable::TYPE_VALUE === $receiverVar->type)
         ) {
             return false;
         }

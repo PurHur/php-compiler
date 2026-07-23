@@ -331,6 +331,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_node_replacechild_live_childnodes_temps.phpt',
             'dom_node_replacechild_live_childnodes_temps.phpt'
         );
+        yield 'dom_node_replacechild_identity.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_node_replacechild_identity.phpt',
+            'dom_node_replacechild_identity.phpt'
+        );
         yield 'dom_node_replacewith_middle_string_literal.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_node_replacewith_middle_string_literal.phpt',
             'dom_node_replacewith_middle_string_literal.phpt'

@@ -42,7 +42,7 @@ final class DomCreateElementJitHelper
         }
     }
 
-    /** DOMNode::replaceChild() — user-script AOT (#19240, php-src ext/dom/node.c). */
+    /** DOMNode::replaceChild() — user-script AOT (#19240, #22678, php-src ext/dom/node.c). */
     public static function replaceChildObjectArgv2(
         ObjectEntry $parent,
         ObjectEntry $newChild,
