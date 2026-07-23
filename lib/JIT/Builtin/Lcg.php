@@ -4,53 +4,52 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
-/** JIT/AOT link hook for lcg_value() — compiles LcgJitHelper (#3295). */
+/**
+ * JIT/AOT link hook for lcg_value() — compiles LcgJitHelper (#3295, #22495).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StreamSocketPairRuntime #22468).
+ * SSOT: {@see \PHPCompiler\ext\standard\LcgJitHelper}
+ * php-src: ext/random/random.c — php_combined_lcg / lcg_value
+ */
 final class Lcg
 {
+    private const HELPER_PATH = '/ext/standard/LcgJitHelper.php';
+
     private const VALUE = 'PHPCompiler\\ext\\standard\\LcgJitHelper::value';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::VALUE,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
-        self::ensureHelper($context, self::VALUE);
+        self::ensureJitHelperCompiled($context);
     }
 
-    public static function value(Context $context): \PHPLLVM\Value\Function_
+    public static function value(Context $context): LlvmFunction
     {
         return self::helperFunction($context, self::VALUE);
     }
 
-    private static function helperFunction(Context $context, string $logical): \PHPLLVM\Value\Function_
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureHelper($context, $logical);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after compile (#3295)');
-        }
+        self::ensureJitHelperCompiled($context);
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#22495');
     }
 
-    private static function ensureHelper(Context $context, string $logical): void
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = \strtolower($logical);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).'/ext/standard/LcgJitHelper.php';
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'LcgJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('LcgJitHelper.php parseAndCompile failed (#3295)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException('LcgJitHelper was not compiled for JIT (#3295)');
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22495'
+        );
     }
 }
