@@ -17485,11 +17485,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 92)
 - new Variable (line 1014)
-- new HashTable (line 2285)
-- new Variable (line 2287)
-- new HashTable (line 2298)
-- new Variable (line 2300)
-- 68 class method(s)
+- new HashTable (line 2418)
+- new Variable (line 2420)
+- new HashTable (line 2431)
+- new Variable (line 2433)
+- 70 class method(s)
 
 ### `ext/openssl/VmOpensslCipherNative.php`
 
@@ -17561,7 +17561,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/VmOpensslPkeyNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 20 class method(s)
+- 27 class method(s)
 
 ### `ext/openssl/VmOpensslSealNative.php`
 
