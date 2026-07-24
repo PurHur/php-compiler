@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 
 /** @internal AOT standalone must not call unresolved __hashtable__* decls — use struct helpers (#4462). */
 
-/** LLVM JIT helpers for array_key_first()/array_key_last()/array_first_key()/array_last_key(). */
+/** LLVM JIT helpers for array_key_first()/array_key_last(). */
 final class JitArrayKey
 {
     private const TYPE_ERROR = '%s(): Argument #1 ($array) must be of type array, %s given';
