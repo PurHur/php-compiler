@@ -8,7 +8,10 @@ use PHPCompiler\ext\standard\PasswordJitHelper;
 use PHPCompiler\ext\standard\VmPassword;
 use PHPUnit\Framework\TestCase;
 
-/** StringPasswordCrypto routes through PasswordJitHelper PHP, not libcrypt LLVM (#9908, #12869). */
+/**
+ * StringPasswordCrypto / PasswordCryptoRuntime via PasswordJitHelper PHP (#9908, #12869, #22934).
+ * NestedJIT helper compile: JitVmHelperLink::ensureCompiled (peer Libcrypt #22886).
+ */
 final class PasswordCryptoRuntimeShrinkTest extends TestCase
 {
     public function testStringPasswordCryptoUsesPasswordCryptoRuntimeNotLlvmJit(): void
@@ -20,11 +23,18 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLlvm.php');
     }
 
-    public function testPasswordCryptoRuntimeRoutesThroughPasswordJitHelper(): void
+    public function testPasswordCryptoRuntimeUsesJitVmHelperLinkNotHandRolledNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PasswordCryptoRuntime.php');
         $this->assertStringContainsString('PasswordJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringPasswordCryptoStandaloneLlvm', $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('emitPasswordHash', $source);
