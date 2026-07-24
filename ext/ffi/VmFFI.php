@@ -46,6 +46,9 @@ final class VmFFI
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['memcpy'])) {
+            // Refresh CData dim handlers when only FFI statics were registered earlier (#22761).
+            self::registerCDataClass($ctx);
+
             return;
         }
 
@@ -101,6 +104,13 @@ final class VmFFI
     {
         $cdata = $ctx->classes[self::CLASS_CDATA_LC] ?? new ClassEntry('FFI\\CData');
         $cdata->isInternal = true;
+        // Dim handlers via ArrayAccess methods (php-src uses custom object handlers, not
+        // ArrayAccess; VM requires the interface for $cdata[$i] — #22761).
+        if (isset($ctx->classes['arrayaccess'])
+            && !\in_array('arrayaccess', $cdata->interfaces, true)
+        ) {
+            $cdata->interfaces[] = 'arrayaccess';
+        }
         $pub = CfgFunc::FLAG_PUBLIC;
         $cdata->methods['__get'] = new FfiCDataGet();
         $cdata->methodVisibility['__get'] = $pub;
@@ -108,6 +118,18 @@ final class VmFFI
         $cdata->methods['__set'] = new FfiCDataSet();
         $cdata->methodVisibility['__set'] = $pub;
         $cdata->methodNames['__set'] = '__set';
+        $cdata->methods['offsetget'] = new FfiCDataOffsetGet();
+        $cdata->methodVisibility['offsetget'] = $pub;
+        $cdata->methodNames['offsetget'] = 'offsetGet';
+        $cdata->methods['offsetset'] = new FfiCDataOffsetSet();
+        $cdata->methodVisibility['offsetset'] = $pub;
+        $cdata->methodNames['offsetset'] = 'offsetSet';
+        $cdata->methods['offsetexists'] = new FfiCDataOffsetExists();
+        $cdata->methodVisibility['offsetexists'] = $pub;
+        $cdata->methodNames['offsetexists'] = 'offsetExists';
+        $cdata->methods['offsetunset'] = new FfiCDataOffsetUnset();
+        $cdata->methodVisibility['offsetunset'] = $pub;
+        $cdata->methodNames['offsetunset'] = 'offsetUnset';
         $ctx->classes[self::CLASS_CDATA_LC] = $cdata;
     }
 
@@ -1076,5 +1098,98 @@ final class FfiCDataSet extends FfiClassMethod
         } catch (\TypeError $e) {
             throw $e;
         }
+    }
+}
+
+/** FFI\CData::offsetGet — C array dim read (php-src zend_ffi_cdata_read_dim; #22761). */
+final class FfiCDataOffsetGet extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetGet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'FFI\\CData::offsetGet() expects exactly 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'FFI\\CData::offsetGet()');
+        $offset = VmFFI::coerceIntArg($frame->calledArgs[1], 'FFI\\CData::offsetGet', 0, 'offset');
+        $host = VmFFI::hostCData($receiver);
+        try {
+            $result = $host[$offset];
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        } catch (\Error $e) {
+            throw $e;
+        }
+        $this->returnImported($frame, VmFFI::importResult($frame->vmContext, $result));
+    }
+}
+
+/** FFI\CData::offsetSet — C array dim write (php-src zend_ffi_cdata_write_dim; #22761). */
+final class FfiCDataOffsetSet extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetSet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                'FFI\\CData::offsetSet() expects exactly 2 arguments, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'FFI\\CData::offsetSet()');
+        $offset = VmFFI::coerceIntArg($frame->calledArgs[1], 'FFI\\CData::offsetSet', 0, 'offset');
+        $value = VmFFI::exportValue($frame->calledArgs[2], $frame);
+        $host = VmFFI::hostCData($receiver);
+        try {
+            $host[$offset] = $value;
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        } catch (\Error $e) {
+            throw $e;
+        } catch (\TypeError $e) {
+            throw $e;
+        }
+    }
+}
+
+/**
+ * FFI\CData::offsetExists — Zend rejects isset($cdata[$i]) with "Cannot use object … as array"
+ * (no ArrayAccess in php-src; custom handlers only cover read/write dim).
+ */
+final class FfiCDataOffsetExists extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetExists');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        throw new \Error('Cannot use object of type FFI\\CData as array');
+    }
+}
+
+/** FFI\CData::offsetUnset — same Zend rejection as isset (#22761). */
+final class FfiCDataOffsetUnset extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetUnset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        throw new \Error('Cannot use object of type FFI\\CData as array');
     }
 }
