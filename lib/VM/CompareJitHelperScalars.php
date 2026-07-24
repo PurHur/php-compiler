@@ -46,7 +46,7 @@ final class CompareJitHelperScalars
     /** Match Variable::looseNumericFromString for whole-string is_numeric operands. */
     private static function numericFromString(string $s): int|float
     {
-        if (((string) (int) $s) === $s) {
+        if (Variable::isIntegralNumericString($s)) {
             return (int) $s;
         }
 
@@ -60,7 +60,7 @@ final class CompareJitHelperScalars
             return 0 !== $numOnLeft ? 1 : -1;
         }
         if (is_numeric($str)) {
-            $parsed = str_contains($str, '.') ? (float) $str : (int) $str;
+            $parsed = Variable::isIntegralNumericString($str) ? (int) $str : (float) $str;
             $cmp = self::spaceshipNumeric($num, $parsed);
 
             return 0 !== $numOnLeft ? $cmp : -$cmp;
