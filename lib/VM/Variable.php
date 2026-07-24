@@ -1240,7 +1240,36 @@ final class Variable {
 
             return;
         }
+        // Prototype stamped TYPE_STRING/INTEGER/… without a payload (e.g. DateInterval::$date_string
+        // before createFromDateString) — treat like uninitialized for zend_objects_clone_obj (#22893).
+        if ($this->cloneSourceMissingScalarPayload($var)) {
+            $owner = $this->objectPropertyOwner;
+            $name = $this->objectPropertyName;
+            $this->reset();
+            $this->type = self::TYPE_UNDEFINED;
+            $this->objectPropertyOwner = $owner;
+            $this->objectPropertyName = $name;
+
+            return;
+        }
         $this->copyFrom($var);
+    }
+
+    /** True when type tag is set but the typed PHP property payload was never written. */
+    private function cloneSourceMissingScalarPayload(self $var): bool
+    {
+        switch ($var->type) {
+            case self::TYPE_STRING:
+                return !isset($var->string);
+            case self::TYPE_INTEGER:
+                return !isset($var->integer);
+            case self::TYPE_FLOAT:
+                return !isset($var->float);
+            case self::TYPE_BOOLEAN:
+                return !isset($var->bool);
+            default:
+                return false;
+        }
     }
 
     /**

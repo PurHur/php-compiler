@@ -1777,7 +1777,12 @@ final class BuiltinClasses
         $di->properties[] = new ClassProperty('f', null, $floatProto);
         $di->properties[] = new ClassProperty('days', null, $boolProto);
         $di->properties[] = new ClassProperty('from_string', null, $boolProto);
-        $di->properties[] = new ClassProperty('date_string', null, $strProto);
+        // Typed string slot stays uninitialized until createFromDateString / from_string wire (#22893).
+        // TYPE_STRING prototype without payload made cloneShallow read Variable::$string uninit.
+        $dateStringProto = new Variable(Variable::TYPE_UNDEFINED);
+        $dateStringProto->typeConstraint = Variable::TYPE_STRING;
+        $dateStringProto->declaredTypeLabel = 'string';
+        $di->properties[] = new ClassProperty('date_string', null, $dateStringProto);
         foreach ($di->properties as $prop) {
             $prop->visibility = $pub;
         }
