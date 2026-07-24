@@ -4749,6 +4749,7 @@
         "lib/Compiler/ClassCompileRegistry.php",
         "lib/Compiler/ClassConstDuplicateCheck.php",
         "lib/Compiler/ClassConstValueFold.php",
+        "lib/Compiler/ClassConstVisibilityInheritCheck.php",
         "lib/Compiler/CompileFatal.php",
         "lib/Compiler/CompileTimeEnumCase.php",
         "lib/Compiler/CompileTimeNew.php",
@@ -6751,9 +6752,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6516,
+        "inventory_files": 6517,
         "excluded": 1,
-        "eligible": 6515,
+        "eligible": 6516,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
