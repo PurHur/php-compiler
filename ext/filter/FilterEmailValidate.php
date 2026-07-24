@@ -102,8 +102,9 @@ final class FilterEmailValidate
                 return false;
             }
         } elseif ($isTld) {
-            $c = $label[0];
-            if (!($c >= 'a' && $c <= 'z')) {
+            // NestedJIT: compare via ord() — string >=/'a' is TYPE_GREATER_OR_EQUAL unsupported.
+            $o = \ord($label[0]);
+            if ($o < 97 || $o > 122) {
                 return false;
             }
         }
@@ -111,13 +112,13 @@ final class FilterEmailValidate
         $sawAlnum = false;
         $needAlnumAfterHyphen = false;
         for (; $i < $len; ++$i) {
-            $c = $label[$i];
-            if (($c >= 'a' && $c <= 'z') || ($c >= '0' && $c <= '9')) {
+            $o = \ord($label[$i]);
+            if (($o >= 97 && $o <= 122) || ($o >= 48 && $o <= 57)) {
                 $sawAlnum = true;
                 $needAlnumAfterHyphen = false;
                 continue;
             }
-            if ('-' === $c) {
+            if (45 === $o) { // '-'
                 if (!$sawAlnum || $i === $len - 1) {
                     return false;
                 }
@@ -133,9 +134,11 @@ final class FilterEmailValidate
 
     private static function isLocalChar(string $ch): bool
     {
-        return ($ch >= 'a' && $ch <= 'z')
-            || ($ch >= 'A' && $ch <= 'Z')
-            || ($ch >= '0' && $ch <= '9')
-            || \str_contains('.!#$%&\'*+/=?^_`{|}~-', $ch);
+        $o = \ord($ch);
+        if (($o >= 97 && $o <= 122) || ($o >= 65 && $o <= 90) || ($o >= 48 && $o <= 57)) {
+            return true;
+        }
+
+        return \str_contains('.!#$%&\'*+/=?^_`{|}~-', $ch);
     }
 }
