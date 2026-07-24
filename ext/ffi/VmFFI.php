@@ -10,6 +10,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -18,9 +19,10 @@ use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmString;
 
 /**
- * FFI VM class — host {@see \FFI} delegation (php-src ext/ffi/ffi.c; #4420).
+ * FFI VM class — host {@see \FFI} delegation (php-src ext/ffi/ffi.c; #4420, #22369).
  *
- * v1 surface: {@see FFI::cdef} + {@see __call} for declared C symbols (e.g. puts).
+ * Surface: {@see FFI::cdef} + {@see __call} + {@see FFI::new}/{@see cast}/{@see typeof}/
+ * {@see sizeof}/{@see addr}/{@see isNull}/{@see free}. CData property access via __get/__set.
  * JIT/AOT: VM-only (VmClassMethod::call throws).
  */
 final class VmFFI
@@ -34,13 +36,21 @@ final class VmFFI
     /** @var array<int, \FFI> */
     private static array $store = [];
 
+    /** @var array<int, \FFI\CData> */
+    private static array $cdataStore = [];
+
+    /** @var array<int, \FFI\CType> */
+    private static array $ctypeStore = [];
+
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['cdef'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['new'])) {
             return;
         }
 
         self::registerExceptions($ctx);
+        self::registerCDataClass($ctx);
+        self::registerCTypeClass($ctx);
 
         $entry = $ctx->classes[self::CLASS_LC] ?? new ClassEntry('FFI');
         $entry->isInternal = true;
@@ -48,13 +58,22 @@ final class VmFFI
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
-        $entry->methods['cdef'] = new FfiCdef();
-        $entry->methodVisibility['cdef'] = $pubStatic;
-        $entry->methodNames['cdef'] = 'cdef';
-
-        $entry->methods['__call'] = new FfiCall();
-        $entry->methodVisibility['__call'] = $pub;
-        $entry->methodNames['__call'] = '__call';
+        $methods = [
+            'cdef' => [new FfiCdef(), 'cdef', $pubStatic],
+            '__call' => [new FfiCall(), '__call', $pub],
+            'new' => [new FfiNew(), 'new', $pubStatic],
+            'cast' => [new FfiCast(), 'cast', $pubStatic],
+            'typeof' => [new FfiTypeof(), 'typeof', $pubStatic],
+            'sizeof' => [new FfiSizeof(), 'sizeof', $pubStatic],
+            'addr' => [new FfiAddr(), 'addr', $pubStatic],
+            'isnull' => [new FfiIsNull(), 'isNull', $pubStatic],
+            'free' => [new FfiFree(), 'free', $pubStatic],
+        ];
+        foreach ($methods as $lc => [$handler, $name, $vis]) {
+            $entry->methods[$lc] = $handler;
+            $entry->methodVisibility[$lc] = $vis;
+            $entry->methodNames[$lc] = $name;
+        }
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -69,11 +88,24 @@ final class VmFFI
             $parser = self::newErrorFamilyEntry($ctx, 'FFI\\ParserException', self::CLASS_EXCEPTION_LC);
             $ctx->classes[self::CLASS_PARSER_EXCEPTION_LC] = $parser;
         }
-        if (!isset($ctx->classes[self::CLASS_CDATA_LC])) {
-            $cdata = new ClassEntry('FFI\\CData');
-            $cdata->isInternal = true;
-            $ctx->classes[self::CLASS_CDATA_LC] = $cdata;
-        }
+    }
+
+    private static function registerCDataClass(Context $ctx): void
+    {
+        $cdata = $ctx->classes[self::CLASS_CDATA_LC] ?? new ClassEntry('FFI\\CData');
+        $cdata->isInternal = true;
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $cdata->methods['__get'] = new FfiCDataGet();
+        $cdata->methodVisibility['__get'] = $pub;
+        $cdata->methodNames['__get'] = '__get';
+        $cdata->methods['__set'] = new FfiCDataSet();
+        $cdata->methodVisibility['__set'] = $pub;
+        $cdata->methodNames['__set'] = '__set';
+        $ctx->classes[self::CLASS_CDATA_LC] = $cdata;
+    }
+
+    private static function registerCTypeClass(Context $ctx): void
+    {
         if (!isset($ctx->classes[self::CLASS_CTYPE_LC])) {
             $ctype = new ClassEntry('FFI\\CType');
             $ctype->isInternal = true;
@@ -143,6 +175,34 @@ final class VmFFI
         return $var;
     }
 
+    public static function wrapCData(Context $ctx, \FFI\CData $host): Variable
+    {
+        if (!isset($ctx->classes[self::CLASS_CDATA_LC])) {
+            throw new \LogicException('FFI\\CData builtin class is not registered');
+        }
+        $obj = new ObjectEntry($ctx->classes[self::CLASS_CDATA_LC]);
+        $obj->constructed = true;
+        self::$cdataStore[$obj->id] = $host;
+        $var = new Variable();
+        $var->object($obj);
+
+        return $var;
+    }
+
+    public static function wrapCType(Context $ctx, \FFI\CType $host): Variable
+    {
+        if (!isset($ctx->classes[self::CLASS_CTYPE_LC])) {
+            throw new \LogicException('FFI\\CType builtin class is not registered');
+        }
+        $obj = new ObjectEntry($ctx->classes[self::CLASS_CTYPE_LC]);
+        $obj->constructed = true;
+        self::$ctypeStore[$obj->id] = $host;
+        $var = new Variable();
+        $var->object($obj);
+
+        return $var;
+    }
+
     public static function host(ObjectEntry $object): \FFI
     {
         if (!isset(self::$store[$object->id])) {
@@ -150,6 +210,34 @@ final class VmFFI
         }
 
         return self::$store[$object->id];
+    }
+
+    public static function hostCData(ObjectEntry $object): \FFI\CData
+    {
+        if (!isset(self::$cdataStore[$object->id])) {
+            throw new \Error('FFI\\CData object has no backing host handle');
+        }
+
+        return self::$cdataStore[$object->id];
+    }
+
+    public static function hostCType(ObjectEntry $object): \FFI\CType
+    {
+        if (!isset(self::$ctypeStore[$object->id])) {
+            throw new \Error('FFI\\CType object has no backing host handle');
+        }
+
+        return self::$ctypeStore[$object->id];
+    }
+
+    public static function isCDataObject(ObjectEntry $object): bool
+    {
+        return isset(self::$cdataStore[$object->id]);
+    }
+
+    public static function isCTypeObject(ObjectEntry $object): bool
+    {
+        return isset(self::$ctypeStore[$object->id]);
     }
 
     public static function cdef(Context $ctx, string $code, ?string $lib): Variable
@@ -171,9 +259,9 @@ final class VmFFI
     }
 
     /**
-     * @param list<mixed> $args host PHP scalars
+     * @param list<mixed> $args host PHP scalars / CData
      */
-    public static function invoke(ObjectEntry $receiver, string $name, array $args): Variable
+    public static function invoke(Context $ctx, ObjectEntry $receiver, string $name, array $args): Variable
     {
         $host = self::host($receiver);
         try {
@@ -182,17 +270,31 @@ final class VmFFI
             throw $e;
         }
 
-        return self::importResult($result);
+        return self::importResult($ctx, $result);
     }
 
-    private static function importResult(mixed $result): Variable
+    public static function importResult(?Context $ctx, mixed $result): Variable
     {
         if ($result instanceof \FFI\CData) {
-            // v1: CData return not materialized as VM FFI\CData — scalar path only (#4420).
-            throw new \Error('FFI\\CData return values are not supported in this compiler build');
+            if (null === $ctx) {
+                throw new \Error('FFI\\CData return values require a VM context');
+            }
+
+            return self::wrapCData($ctx, $result);
+        }
+        if ($result instanceof \FFI\CType) {
+            if (null === $ctx) {
+                throw new \Error('FFI\\CType return values require a VM context');
+            }
+
+            return self::wrapCType($ctx, $result);
         }
         if (\is_object($result) && $result instanceof \FFI) {
-            throw new \Error('Nested FFI returns are not supported in this compiler build');
+            if (null === $ctx) {
+                throw new \Error('Nested FFI returns require a VM context');
+            }
+
+            return self::wrapHost($ctx, $result);
         }
 
         return VmJson::import($result);
@@ -209,14 +311,127 @@ final class VmFFI
         }
         $out = [];
         foreach ($argsVar->toArray()->iterateKeyed(true) as [$key, $value]) {
-            $out[] = VmHttpBuildQuery::export($value, $frame);
+            $out[] = self::exportValue($value, $frame);
         }
 
         return $out;
     }
+
+    public static function exportValue(Variable $value, ?Frame $frame = null): mixed
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type) {
+            $obj = $value->toObject();
+            if (self::isCDataObject($obj)) {
+                return self::hostCData($obj);
+            }
+            if (self::isCTypeObject($obj)) {
+                return self::hostCType($obj);
+            }
+            if (isset(self::$store[$obj->id])) {
+                return self::host($obj);
+            }
+        }
+        if (null === $frame) {
+            return VmHttpBuildQuery::export($value, null);
+        }
+
+        return VmHttpBuildQuery::export($value, $frame);
+    }
+
+    /** @return string|\FFI\CType */
+    public static function resolveTypeArg(Variable $var, string $label, int $index, string $paramName): string|\FFI\CType
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $obj = $var->toObject();
+            if (self::isCTypeObject($obj)) {
+                return self::hostCType($obj);
+            }
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+
+        // Soft-coerce scalars that look like type strings (Zend accepts string|CType).
+        try {
+            return VmString::coerceStringBuiltinArg($var, $label, $index, $paramName);
+        } catch (\TypeError $e) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type FFI\\CType|string, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+    }
+
+    public static function requireCDataArg(Variable $var, string $label, int $index, string $paramName): \FFI\CData
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type || !self::isCDataObject($var->toObject())) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type FFI\\CData, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+
+        return self::hostCData($var->toObject());
+    }
+
+    /** @return \FFI\CData|\FFI\CType */
+    public static function requireCDataOrCTypeArg(
+        Variable $var,
+        string $label,
+        int $index,
+        string $paramName
+    ): \FFI\CData|\FFI\CType {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $obj = $var->toObject();
+            if (self::isCDataObject($obj)) {
+                return self::hostCData($obj);
+            }
+            if (self::isCTypeObject($obj)) {
+                return self::hostCType($obj);
+            }
+        }
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type FFI\\CData|FFI\\CType, %s given',
+            $label,
+            $index + 1,
+            $paramName,
+            EnumCaseSupport::typeNameForVariable($var)
+        ));
+    }
+
+    public static function coerceBoolArg(Variable $var, string $label, int $index, string $paramName): bool
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool();
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return 0 !== $var->toInt();
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return false;
+        }
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type bool, %s given',
+            $label,
+            $index + 1,
+            $paramName,
+            EnumCaseSupport::typeNameForVariable($var)
+        ));
+    }
 }
 
-/** Shared wiring for ext/ffi class methods (#4420). */
+/** Shared wiring for ext/ffi class methods (#4420, #22369). */
 abstract class FfiClassMethod extends VmClassMethod
 {
     protected function receiver(Frame $frame, string $label): ObjectEntry
@@ -230,6 +445,13 @@ abstract class FfiClassMethod extends VmClassMethod
         }
 
         return $var->toObject();
+    }
+
+    protected function returnImported(Frame $frame, Variable $result): void
+    {
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->copyFrom($result);
+        }
     }
 }
 
@@ -268,10 +490,7 @@ final class FfiCdef extends FfiClassMethod
                 );
             }
         }
-        $result = VmFFI::cdef($frame->vmContext, $code, $lib);
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom($result);
-        }
+        $this->returnImported($frame, VmFFI::cdef($frame->vmContext, $code, $lib));
     }
 }
 
@@ -299,9 +518,310 @@ final class FfiCall extends FfiClassMethod
             'name'
         );
         $args = VmFFI::exportArgs($frame->calledArgs[2], $frame);
-        $result = VmFFI::invoke($receiver, $name, $args);
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom($result);
+        $result = VmFFI::invoke($frame->vmContext, $receiver, $name, $args);
+        $this->returnImported($frame, $result);
+    }
+}
+
+/** FFI::new(FFI\CType|string $type, bool $owned = true, bool $persistent = false): ?FFI\CData */
+final class FfiNew extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('new');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'FFI::new() expects at least 1 argument and at most 3, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $type = VmFFI::resolveTypeArg($frame->calledArgs[0], 'FFI::new', 0, 'type');
+        $owned = true;
+        $persistent = false;
+        if ($argc >= 2) {
+            $owned = VmFFI::coerceBoolArg($frame->calledArgs[1], 'FFI::new', 1, 'owned');
+        }
+        if ($argc >= 3) {
+            $persistent = VmFFI::coerceBoolArg($frame->calledArgs[2], 'FFI::new', 2, 'persistent');
+        }
+        try {
+            $host = \FFI::new($type, $owned, $persistent);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        if (null === $host) {
+            $null = new Variable();
+            $null->null();
+            $this->returnImported($frame, $null);
+
+            return;
+        }
+        $this->returnImported($frame, VmFFI::wrapCData($frame->vmContext, $host));
+    }
+}
+
+/** FFI::cast(FFI\CType|string $type, FFI\CData|int|float|bool|null $ptr): ?FFI\CData */
+final class FfiCast extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('cast');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::cast() expects exactly 2 arguments, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $type = VmFFI::resolveTypeArg($frame->calledArgs[0], 'FFI::cast', 0, 'type');
+        $ptr = VmFFI::exportValue($frame->calledArgs[1], $frame);
+        try {
+            $host = \FFI::cast($type, $ptr);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        } catch (\TypeError $e) {
+            throw $e;
+        }
+        if (null === $host) {
+            $null = new Variable();
+            $null->null();
+            $this->returnImported($frame, $null);
+
+            return;
+        }
+        $this->returnImported($frame, VmFFI::wrapCData($frame->vmContext, $host));
+    }
+}
+
+/** FFI::typeof(FFI\CData $ptr): FFI\CType */
+final class FfiTypeof extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('typeof');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::typeof() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr = VmFFI::requireCDataArg($frame->calledArgs[0], 'FFI::typeof', 0, 'ptr');
+        try {
+            $host = \FFI::typeof($ptr);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        $this->returnImported($frame, VmFFI::wrapCType($frame->vmContext, $host));
+    }
+}
+
+/** FFI::sizeof(FFI\CData|FFI\CType $ptr): int */
+final class FfiSizeof extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('sizeof');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::sizeof() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr = VmFFI::requireCDataOrCTypeArg($frame->calledArgs[0], 'FFI::sizeof', 0, 'ptr');
+        try {
+            $size = \FFI::sizeof($ptr);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        $result = new Variable();
+        $result->int($size);
+        $this->returnImported($frame, $result);
+    }
+}
+
+/** FFI::addr(FFI\CData $ptr): FFI\CData */
+final class FfiAddr extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('addr');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::addr() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr = VmFFI::requireCDataArg($frame->calledArgs[0], 'FFI::addr', 0, 'ptr');
+        try {
+            $host = \FFI::addr($ptr);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        $this->returnImported($frame, VmFFI::wrapCData($frame->vmContext, $host));
+    }
+}
+
+/** FFI::isNull(FFI\CData $ptr): bool */
+final class FfiIsNull extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isNull');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::isNull() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr = VmFFI::requireCDataArg($frame->calledArgs[0], 'FFI::isNull', 0, 'ptr');
+        try {
+            $isNull = \FFI::isNull($ptr);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        $result = new Variable();
+        $result->bool($isNull);
+        $this->returnImported($frame, $result);
+    }
+}
+
+/** FFI::free(FFI\CData $ptr): void */
+final class FfiFree extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('free');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::free() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr = VmFFI::requireCDataArg($frame->calledArgs[0], 'FFI::free', 0, 'ptr');
+        try {
+            \FFI::free($ptr);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+    }
+}
+
+/** FFI\CData::__get — scalar/struct field read (php-src zend_ffi_cdata_read). */
+final class FfiCDataGet extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__get');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'FFI\\CData::__get() expects exactly 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'FFI\\CData::__get()');
+        $name = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'FFI\\CData::__get',
+            0,
+            'name'
+        );
+        $host = VmFFI::hostCData($receiver);
+        try {
+            $result = $host->$name;
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        } catch (\Error $e) {
+            throw $e;
+        }
+        $this->returnImported($frame, VmFFI::importResult($frame->vmContext, $result));
+    }
+}
+
+/** FFI\CData::__set — scalar/struct field write (php-src zend_ffi_cdata_write). */
+final class FfiCDataSet extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__set');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                'FFI\\CData::__set() expects exactly 2 arguments, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'FFI\\CData::__set()');
+        $name = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'FFI\\CData::__set',
+            0,
+            'name'
+        );
+        $value = VmFFI::exportValue($frame->calledArgs[2], $frame);
+        $host = VmFFI::hostCData($receiver);
+        try {
+            $host->$name = $value;
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        } catch (\Error $e) {
+            throw $e;
+        } catch (\TypeError $e) {
+            throw $e;
         }
     }
 }
