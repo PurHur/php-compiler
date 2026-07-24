@@ -1487,6 +1487,8 @@ final class VmDom
         if (!self::isAttr($attr)) {
             throw new \TypeError('DOMElement::setAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
         }
+        // php-src ext/dom/element.c — WRONG_DOCUMENT_ERR before adopt/move (#22709).
+        self::assertSameDocument($element, $attr);
         $attrState = DomRegistry::state($attr);
         $name = $attrState->nodeName;
         $value = $attrState->textContent ?? '';
@@ -1567,6 +1569,8 @@ final class VmDom
         if (!self::isAttr($attr)) {
             throw new \TypeError('DOMElement::setAttributeNodeNS(): Argument #1 ($attr) must be of type DOMAttr');
         }
+        // Guard before cross-name detach so foreign Attr cannot mutate the element (#22709).
+        self::assertSameDocument($element, $attr);
         $attrState = DomRegistry::state($attr);
         $localName = $attrState->localName ?? $attrState->nodeName;
         $namespace = $attrState->namespaceUri;
