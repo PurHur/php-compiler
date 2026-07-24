@@ -3,4 +3,4 @@
 declare(strict_types=1);
 
 /** @var string $appName */
-echo $appName, "Partial\n";
+echo 'H1=', $appName, "\n";

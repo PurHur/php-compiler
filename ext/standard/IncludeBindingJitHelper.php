@@ -187,6 +187,17 @@ final class IncludeBindingJitHelper
 
     public static function includeCallerBindingScore(Variable $candidate): int
     {
+        // Nested partials (layout → home): live include-bound strings from the outer TU
+        // must beat defining-TU __value__ slots. Preferring VALUE (score 4) re-read the
+        // method alloca and could surface a sibling local (e.g. $title "Home" for
+        // $appName) after ?? / htmlspecialchars in the layout (#22845, #764).
+        if (
+            $candidate->includeBinding
+            && Variable::TYPE_STRING === $candidate->type
+            && Variable::KIND_VARIABLE === $candidate->kind
+        ) {
+            return 5;
+        }
         if (Variable::TYPE_VALUE === $candidate->type) {
             if (Variable::KIND_VARIABLE === $candidate->kind) {
                 return 4;
