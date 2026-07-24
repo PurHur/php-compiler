@@ -506,6 +506,7 @@ function syntaxRowDefinitions(): array
                 'Compile-time literal init (int/string/array) plus runtime constant init (`new`, etc.) — VM + JIT + AOT (#4352, #4027)',
                 'Uninitialized `static $x;` with isset guard — Zend parity (#3533); `static &$x` is not valid PHP syntax (php-src `static_var` grammar)',
                 'PHP 8.3+ typed function-local static (`static int $n = 0`) — marker rewrite + runtime TypeCheck (#9998)',
+                'PHP < 8.3 rejects non-constant static init (`static $a = $param`) like Zend (#22923); PROFILE≥8.3 arbitrary static initializers',
             ],
             'probe' => 'function f(){static $n=0; $n++; return $n;} echo f().f().f();',
         ],

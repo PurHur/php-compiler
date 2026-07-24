@@ -1299,6 +1299,12 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'typed_function_static_reference_profile')) {
                 continue;
             }
+            // 8.2 reject gate; skipped when arbitrary static initializers enabled (#22923).
+            // static_var_param_init_83 sets PROFILE via --ENV--; always include.
+            if (CompilerVersion::supportsArbitraryStaticVariableInitializers()
+                && str_contains($name, 'static_var_param_init_fatal')) {
+                continue;
+            }
             // 8.3-target reject gate; skipped when file/namespace typed constants enabled (#16651, #7081).
             if (CompilerVersion::supportsGlobalTypedConstants()
                 && str_contains($name, 'typed_top_level_const_82')) {

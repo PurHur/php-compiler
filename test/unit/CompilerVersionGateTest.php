@@ -334,6 +334,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsArbitraryStaticVariableInitializersFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsArbitraryStaticVariableInitializers());
+    }
+
+    public function testSupportsArbitraryStaticVariableInitializersTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsArbitraryStaticVariableInitializers());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsProcGetStatusPendingSignalsFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsProcGetStatusPendingSignals());

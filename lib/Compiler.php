@@ -14160,10 +14160,28 @@ class Compiler {
     }
 
     /**
+     * Reject non-constant function-static initializers on PHP &lt; 8.3 (#22923, #4352, #5478).
+     *
+     * php-cfg often places a bare `$param` on {@see Op\Terminal\StaticVar::$defaultVar} with an
+     * empty {@see $defaultBlock}; walking children alone missed that shape and accepted it as a
+     * runtime init (undefined-constant → string) on the 8.2 reference profile.
+     *
      * @param Op\Terminal\StaticVar $terminal
      */
     protected function assertFunctionStaticRuntimeInitAllowed(Op\Terminal $terminal): void
     {
+        // PHP 8.3+ RFC: arbitrary static variable initializers (Zend/zend_compile.c).
+        if (CompilerVersion::supportsArbitraryStaticVariableInitializers()) {
+            return;
+        }
+        if (
+            null !== $terminal->defaultVar
+            && $this->functionStaticInitOperandReferencesLocal($terminal->defaultVar)
+        ) {
+            $this->throwCompileLogic(
+                'Constant expression contains invalid operations'
+            );
+        }
         if (null === $terminal->defaultBlock) {
             return;
         }
@@ -14280,6 +14298,11 @@ class Compiler {
     protected function tryFoldFunctionStaticDefaultSlot(Op\Terminal $terminal, Block $block): ?int
     {
         if (null === $terminal->defaultVar) {
+            return null;
+        }
+        // Operand\Variable must not fold via unwrapCfgLiteralOperand (name → string "x") —
+        // that mis-accepted `static $a = $param` as compile-time string on 8.2 (#22923).
+        if ($this->functionStaticInitOperandReferencesLocal($terminal->defaultVar)) {
             return null;
         }
         // Share param-default folding (scalar/array literals, const fetch, unary, …) — Zend
