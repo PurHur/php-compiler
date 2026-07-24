@@ -6611,16 +6611,14 @@ if (is_string($vmSpineSmoke) && ('1' === $vmSpineSmoke || 'true' === strtolower(
 }
 
 // M2 spine unit: mb_encode/decode_mimeheader Vm + JIT inventory (#8697).
-$__spineMimeSample = 'Hello 世界';
-$__spineMimeEnc = \PHPCompiler\ext\mbstring\VmMbstring::encodeMimeheader(
-    $__spineMimeSample,
-    'UTF-8',
-    true,
-    "\r\n",
-    0
-);
-$__spineMimeDec = \PHPCompiler\ext\mbstring\VmMbstring::decodeMimeheader($__spineMimeEnc);
-unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
+// Use builtins so JitMbMimeheader const-folds via Zend → VmMbstring::encodeMimeheader
+// / decodeMimeheader. Direct top-level VmMbstring::encodeMimeheader() STATICCALL_INIT
+// fails honest full-spine AOT when late methods on the large VmMbstring class are not
+// registered in the module (#22642 r13). String anchors below keep the VM smoke test.
+$__spineMimeEnc = mb_encode_mimeheader('Hello 世界', 'UTF-8');
+$__spineMimeDec = mb_decode_mimeheader($__spineMimeEnc);
+unset($__spineMimeEnc, $__spineMimeDec);
+// VmMbstring::encodeMimeheader VmMbstring::decodeMimeheader
 
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
