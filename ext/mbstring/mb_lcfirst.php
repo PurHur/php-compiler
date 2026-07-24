@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * mb_lcfirst() — multibyte lower-case first character (php-src ext/mbstring/mbstring.c; PHP 8.3, #17609).
+ * mb_lcfirst() — multibyte lower-case first character (php-src ext/mbstring/mbstring.c; PHP 8.4+, #17609, #22794).
  */
 final class mb_lcfirst extends Internal
 {

@@ -1376,7 +1376,7 @@ function withheldBuiltinGateDefinitions(): array
         [
             'names' => ['mb_ucfirst', 'mb_lcfirst'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbUcfirstLcfirst'],
-            'since' => '8.3.0',
+            'since' => '8.4.0',
             'module' => 'mbstring',
             'relPath' => 'ext/mbstring/mb_ucfirst.php',
         ],

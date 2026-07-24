@@ -417,6 +417,22 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testMbUcfirstLcfirstWithheldOnPhp83Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertFalse(CompilerVersion::supportsMbUcfirstLcfirst());
+            $this->assertFalse(CompilerVersion::advertisesMbUcfirstLcfirst());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testMbUcfirstLcfirstAdvertisedOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
