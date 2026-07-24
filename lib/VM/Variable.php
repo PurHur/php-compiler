@@ -629,7 +629,7 @@ final class Variable {
                 if (!is_numeric($this->string)) {
                     throw new \LogicException("Cannot convert string to numeric");
                 }
-                if (((string)(int) $this->string) === $this->string) {
+                if (self::isIntegralNumericString($this->string)) {
                     return (int) $this->string;
                 }
                 return (float) $this->string;
@@ -1580,11 +1580,51 @@ restart:
         if (!is_numeric($s)) {
             return 0;
         }
-        if (((string) (int) $s) === $s) {
+        if (self::isIntegralNumericString($s)) {
             return (int) $s;
         }
 
         return (float) $s;
+    }
+
+    /**
+     * Zend _is_numeric_string_ex IS_LONG branch — leading zeros stay int when in long range (#22823).
+     *
+     * Decimal point or exponent → double. Out-of-range digit strings → double.
+     * Canonical form is not required ("010" is int 10, not float).
+     *
+     * @see php-src Zend/zend_operators.c _is_numeric_string_ex
+     */
+    public static function isIntegralNumericString(string $s): bool
+    {
+        if (str_contains($s, '.') || false !== stripos($s, 'e')) {
+            return false;
+        }
+        $t = trim($s);
+        if ('' === $t || '+' === $t || '-' === $t) {
+            return false;
+        }
+        $neg = false;
+        $c0 = $t[0];
+        if ('+' === $c0 || '-' === $c0) {
+            $neg = '-' === $c0;
+            $t = substr($t, 1);
+        }
+        if ('' === $t || !ctype_digit($t)) {
+            return false;
+        }
+        $digits = ltrim($t, '0');
+        if ('' === $digits) {
+            return true;
+        }
+        $limit = $neg ? substr((string) \PHP_INT_MIN, 1) : (string) \PHP_INT_MAX;
+        $len = strlen($digits);
+        $limitLen = strlen($limit);
+        if ($len !== $limitLen) {
+            return $len < $limitLen;
+        }
+
+        return $digits <= $limit;
     }
 
     /**
@@ -1595,7 +1635,7 @@ restart:
     private static function parseStringForArithmetic(string $s): array
     {
         if (is_numeric($s)) {
-            if (((string) (int) $s) === $s) {
+            if (self::isIntegralNumericString($s)) {
                 return [(int) $s, false];
             }
 
@@ -1609,9 +1649,7 @@ restart:
             throw new \LogicException('no_numeric_prefix');
         }
         $numPart = ltrim($matched, " \t\n\r\0\x0B");
-        if (((string) (int) $numPart) === $numPart
-            && !str_contains($numPart, '.')
-            && !str_contains(strtolower($numPart), 'e')) {
+        if (self::isIntegralNumericString($numPart)) {
             return [(int) $numPart, true];
         }
 
