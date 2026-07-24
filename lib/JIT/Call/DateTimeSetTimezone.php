@@ -13,13 +13,13 @@ use PHPCompiler\VM\DateTimeSupport;
 use PHPLLVM\Value;
 
 /**
- * DateTime::setTimezone() / DateTimeImmutable::setTimezone() — JIT (#3072, #22824).
+ * DateTime::setTimezone() / DateTimeImmutable::setTimezone() — JIT/AOT (#3072, #22824).
  *
  * php-src: ext/date/php_date.c — zim_date_timezone_set / zim_DateTimeImmutable_setTimezone
  *
- * Mutable: in-place TZ property write. Immutable: cloneObject + TZ write (MCJIT / full-init).
- * Thin user-script AOT skips registering the immutable proxy — Object_::cloneObject loses the
- * insert-block parent there (same as PHP `clone` on DateTimeImmutable under AOT).
+ * Mutable: in-place TZ property write. Immutable: allocate + copy props (not cloneObject —
+ * thin user-script AOT loses insert-block parent on cloneObject; same pattern as
+ * DatePeriodIteratorJitHelper::cloneDateTimeObject).
  */
 final class DateTimeSetTimezone implements Call
 {
@@ -46,10 +46,21 @@ final class DateTimeSetTimezone implements Call
         );
 
         if ($this->immutable) {
-            $target = $objectType->cloneObject($receiver);
+            $layout = 'DateTimeImmutable';
+            $classId = $objectType->lookup($layout);
+            $target = $objectType->allocate($classId);
             ReflectionSetup::markConstructed($context, $target);
+            foreach ([DateTimeSupport::TS_PROPERTY, DateTimeSupport::MICROSECOND_PROPERTY] as $prop) {
+                $val = $objectType->propertyFetch($receiver, $layout, $prop);
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($target, $layout, $prop),
+                    $val,
+                    Variable::TYPE_NATIVE_LONG
+                );
+            }
+            // Wall-clock instant unchanged; store the new zone name (#22824).
             $objectType->propertyStore(
-                $objectType->propertySlotFor($target, self::LAYOUT, DateTimeSupport::TZ_PROPERTY),
+                $objectType->propertySlotFor($target, $layout, DateTimeSupport::TZ_PROPERTY),
                 $tzNameVar,
                 Variable::TYPE_STRING
             );

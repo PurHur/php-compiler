@@ -978,14 +978,9 @@ class Context {
         }
         $this->functionProxies['datetime::format'] = new Call\DateTimeFormat();
         $this->functionProxies['datetimeimmutable::format'] = new Call\DateTimeFormat();
-        // Mutable setTimezone — thin user-script AOT property write (#22824).
+        // setTimezone — mutable in-place; immutable allocate+copy (AOT-safe, #22824).
         $this->functionProxies['datetime::settimezone'] = new Call\DateTimeSetTimezone(false);
-        // Immutable needs Object_::cloneObject; that path loses the insert-block parent under
-        // thin user-script AOT (same as PHP `clone $dateTimeImmutable`). Register for MCJIT
-        // / full-init only — VM Builtin covers php bin/vm.php (#22824).
-        if (!UserScriptAotEnv::isActive()) {
-            $this->functionProxies['datetimeimmutable::settimezone'] = new Call\DateTimeSetTimezone(true);
-        }
+        $this->functionProxies['datetimeimmutable::settimezone'] = new Call\DateTimeSetTimezone(true);
         // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
         $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
         if (CompilerVersion::supportsDomTokenList()) {
