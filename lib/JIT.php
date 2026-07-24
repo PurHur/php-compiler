@@ -12370,6 +12370,10 @@ class JIT {
                         );
                         $pendingPropertyNewClassName = null;
                     }
+                    $this->context->type->object->assertClassTraitInstancePropertyMerge(
+                        $classId,
+                        $name->value
+                    );
                     if ([] !== $op->attributeNames) {
                         $classLc = '' !== $this->context->scope->className
                             ? strtolower(ltrim($this->context->scope->className, '\\'))

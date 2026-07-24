@@ -66,6 +66,55 @@ PHP;
         $runtime->run($block, false);
     }
 
+    public function testIdenticalClassTraitInstancePropertiesMerge(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public $x = 1; }
+class C { use T; public $x = 1; }
+echo (new C)->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_class_identical_instance_properties.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block, false);
+        $this->assertSame("1\n", ob_get_clean());
+    }
+
+    public function testIdenticalTwoTraitInstancePropertiesMerge(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public $x = 1; }
+trait U { public $x = 1; }
+class C { use T, U; }
+echo (new C)->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_trait_identical_instance_properties.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block, false);
+        $this->assertSame("1\n", ob_get_clean());
+    }
+
+    public function testIdenticalClassTraitStaticPropertiesMerge(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public static $x = 1; }
+class C { use T; public static $x = 1; }
+echo C::$x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_class_identical_static_properties.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block, false);
+        $this->assertSame("1\n", ob_get_clean());
+    }
+
     public function testIncompatibleClassTraitStaticPropertiesZendMessage(): void
     {
         $runtime = new Runtime();
