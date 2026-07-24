@@ -4567,6 +4567,57 @@ PHP;
         self::assertNotSame($walkSends[0], $walkSends[1], 'walk sends='.json_encode($walkSends));
     }
 
+    /**
+     * Issue #22894 — stmt-level (string)$obj must not steal ARG_SEND for a later $obj($arg) invoke.
+     * (Hoisted Cast→arg0 is only for allowlisted array_* inline casts — #15858.)
+     */
+    public function testStmtStringCastDoesNotStealInvokeArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+class M {
+    public function __toString() { return 'M'; }
+    public function __invoke($x) { return $x; }
+}
+$m = new M;
+(string) $m;
+$m(21);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'tostring_then_invoke_arg.php');
+
+        $castSlot = null;
+        $invokeArgSlot = null;
+        $seenCast = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_STRING === $op->type) {
+                $castSlot = $op->arg1;
+                $seenCast = true;
+                continue;
+            }
+            if (!$seenCast) {
+                continue;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type && null === $invokeArgSlot) {
+                $invokeArgSlot = $op->arg1;
+                break;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertNotNull($invokeArgSlot);
+        self::assertNotSame(
+            $castSlot,
+            $invokeArgSlot,
+            'invoke ARG_SEND must not reuse stmt (string) cast slot'
+        );
+        self::assertTrue(
+            isset($block->constants[$invokeArgSlot]),
+            'invoke arg should be literal 21 constant slot'
+        );
+        self::assertSame(21, $block->constants[$invokeArgSlot]->toInt());
+    }
+
     /** Issue #15858 — array_merge((object)[...], [...]) wires hoisted Cast to arg #0, not trailing Array_. */
     public function testArrayMergeObjectCastInlineCallArgZeroSlot(): void
     {
