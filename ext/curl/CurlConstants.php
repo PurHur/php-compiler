@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\curl;
 
 /**
- * curl extension constants (php-src ext/curl/curl.stub.php; issue #6999, #3325, #21137, #21336).
+ * curl extension constants (php-src ext/curl/curl.stub.php; issue #6999, #3325, #21137, #21336, #22837).
  *
  * CURLOPT_RETURNTRANSFER / CURLOPT_BINARYTRANSFER / CURLOPT_SAFE_UPLOAD are PHP-level
  * options (not forwarded to libcurl). Values match Zend/php-src + libcurl curl.h.
+ *
+ * PHP 8.4-only option/info names are gated via {@see CurlExtensionPolicy::advertisesPhp84OptionConstants()}
+ * so defined() matches Zend 8.2 on the reference profile (#22837).
  */
 final class CurlConstants
 {
@@ -27,6 +30,7 @@ final class CurlConstants
     public const CURLINFO_LOCAL_IP = 1048617;
     public const CURLINFO_LOCAL_PORT = 2097194;
     public const CURLINFO_NAMELOOKUP_TIME = 3145732;
+    /** CURLINFO_POSTTRANSFER_TIME_T — PHP 8.4+ (php-src curl.stub.php; #21336, #22837). */
     public const CURLINFO_POSTTRANSFER_TIME_T = 6291523;
     public const CURLINFO_PRETRANSFER_TIME = 3145734;
     public const CURLINFO_PRIMARY_IP = 1048608;
@@ -34,8 +38,12 @@ final class CurlConstants
     public const CURLINFO_REDIRECT_COUNT = 2097172;
     public const CURLINFO_REDIRECT_TIME = 3145747;
     public const CURLINFO_REDIRECT_URL = 1048607;
+    /** CURLINFO_REFERER — libcurl CURLINFO_STRING+60 / php-src 8.2+ curl.stub.php (#22837). */
+    public const CURLINFO_REFERER = 1048636;
     public const CURLINFO_REQUEST_SIZE = 2097164;
     public const CURLINFO_RESPONSE_CODE = 2097154;
+    /** CURLINFO_RETRY_AFTER — libcurl CURLINFO_OFF_T+57 / php-src 8.2+ curl.stub.php (#22837). */
+    public const CURLINFO_RETRY_AFTER = 6291513;
     public const CURLINFO_SIZE_DOWNLOAD = 3145736;
     public const CURLINFO_SIZE_UPLOAD = 3145735;
     public const CURLINFO_SPEED_DOWNLOAD = 3145737;
@@ -63,11 +71,19 @@ final class CurlConstants
     /** libcurl CURLM_UNKNOWN_OPTION — php-src SAVE_CURLM_ERROR on bad setopt (#20495). */
     public const CURLM_UNKNOWN_OPTION = 6;
     public const CURLOPT_ACCEPT_ENCODING = 10102;
+    /** CURLOPT_ALTSVC — libcurl STRINGPOINT+287 / php-src 8.2+ curl.stub.php (#22837). */
+    public const CURLOPT_ALTSVC = 10287;
+    /** CURLOPT_ALTSVC_CTRL — libcurl LONG+286 (#22837). */
+    public const CURLOPT_ALTSVC_CTRL = 286;
     public const CURLOPT_AUTOREFERER = 58;
+    /** CURLOPT_AWS_SIGV4 — libcurl STRINGPOINT+305 / php-src 8.2+ (#22837). */
+    public const CURLOPT_AWS_SIGV4 = 10305;
     /** PHP-only */
     public const CURLOPT_BINARYTRANSFER = 19914;
     public const CURLOPT_BUFFERSIZE = 98;
     public const CURLOPT_CAINFO = 10065;
+    /** CURLOPT_CAINFO_BLOB — libcurl BLOB+309 / php-src 8.2+ (#22837). */
+    public const CURLOPT_CAINFO_BLOB = 40309;
     public const CURLOPT_CAPATH = 10097;
     public const CURLOPT_CERTINFO = 172;
     public const CURLOPT_CONNECTTIMEOUT = 78;
@@ -80,7 +96,7 @@ final class CurlConstants
     public const CURLOPT_COOKIELIST = 10135;
     public const CURLOPT_COOKIESESSION = 96;
     public const CURLOPT_CUSTOMREQUEST = 10036;
-    /** libcurl CURLOPT_DEBUGFUNCTION (curl.h; php-src curl.stub.php; #21336). */
+    /** libcurl CURLOPT_DEBUGFUNCTION — PHP 8.4+ (curl.h; php-src curl.stub.php; #21336, #22837). */
     public const CURLOPT_DEBUGFUNCTION = 20094;
     public const CURLOPT_DEFAULT_PROTOCOL = 10238;
     public const CURLOPT_DNS_CACHE_TIMEOUT = 92;
@@ -93,8 +109,19 @@ final class CurlConstants
     public const CURLOPT_FOLLOWLOCATION = 52;
     public const CURLOPT_FORBID_REUSE = 75;
     public const CURLOPT_FRESH_CONNECT = 74;
+    /**
+     * CURLOPT_FTP_RESPONSE_TIMEOUT — libcurl LONG+112; Zend 8.2 name
+     * (CURLOPT_SERVER_RESPONSE_TIMEOUT is the PHP 8.4 alias; #22837).
+     */
+    public const CURLOPT_FTP_RESPONSE_TIMEOUT = 112;
     public const CURLOPT_HEADER = 42;
     public const CURLOPT_HEADERFUNCTION = 20079;
+    /** CURLOPT_HAPROXYPROTOCOL — libcurl LONG+274 / php-src 8.2+ (#22837). */
+    public const CURLOPT_HAPROXYPROTOCOL = 274;
+    /** CURLOPT_HSTS — libcurl STRINGPOINT+300 / php-src 8.2+ (#22837). */
+    public const CURLOPT_HSTS = 10300;
+    /** CURLOPT_HSTS_CTRL — libcurl LONG+299 (#22837). */
+    public const CURLOPT_HSTS_CTRL = 299;
     public const CURLOPT_HTTPAUTH = 107;
     public const CURLOPT_HTTPGET = 80;
     public const CURLOPT_HTTPHEADER = 10023;
@@ -109,6 +136,10 @@ final class CurlConstants
     public const CURLOPT_LOW_SPEED_LIMIT = 19;
     public const CURLOPT_LOW_SPEED_TIME = 20;
     public const CURLOPT_MAXCONNECTS = 71;
+    /** CURLOPT_MAXFILESIZE — libcurl LONG+114 / php-src 8.2+ (#22837). */
+    public const CURLOPT_MAXFILESIZE = 114;
+    /** CURLOPT_MAXFILESIZE_LARGE — libcurl OFF_T+117 (#22837). */
+    public const CURLOPT_MAXFILESIZE_LARGE = 30117;
     public const CURLOPT_MAXREDIRS = 68;
     public const CURLOPT_NOBODY = 44;
     public const CURLOPT_NOPROGRESS = 43;
@@ -120,7 +151,7 @@ final class CurlConstants
     public const CURLOPT_POSTFIELDS = 10015;
     public const CURLOPT_POSTREDIR = 161;
     public const CURLOPT_PRIVATE = 10103;
-    /** libcurl CURLOPT_PREREQFUNCTION (curl.h; php-src curl.stub.php; #21336). */
+    /** libcurl CURLOPT_PREREQFUNCTION — PHP 8.4+ (curl.h; php-src curl.stub.php; #21336, #22837). */
     public const CURLOPT_PREREQFUNCTION = 20312;
     public const CURLOPT_PROGRESSFUNCTION = 20056;
     public const CURLOPT_PROTOCOLS = 181;
@@ -134,7 +165,7 @@ final class CurlConstants
     public const CURLOPT_READFUNCTION = 20012;
     public const CURLOPT_REDIR_PROTOCOLS = 182;
     public const CURLOPT_REFERER = 10016;
-    /** libcurl CURLOPT_SERVER_RESPONSE_TIMEOUT (curl.h; php-src curl.stub.php; #21336). */
+    /** libcurl CURLOPT_SERVER_RESPONSE_TIMEOUT — PHP 8.4+ alias of FTP_RESPONSE_TIMEOUT (#21336, #22837). */
     public const CURLOPT_SERVER_RESPONSE_TIMEOUT = 112;
     public const CURLOPT_RESUME_FROM = 21;
     /** PHP-only — see php-src ext/curl/interface.c */
@@ -154,7 +185,7 @@ final class CurlConstants
     public const CURLOPT_TCP_KEEPALIVE = 213;
     public const CURLOPT_TCP_KEEPIDLE = 214;
     public const CURLOPT_TCP_KEEPINTVL = 215;
-    /** libcurl CURLOPT_TCP_KEEPCNT (curl.h; php-src curl.stub.php; #21336). */
+    /** libcurl CURLOPT_TCP_KEEPCNT — PHP 8.4+ (curl.h; php-src curl.stub.php; #21336, #22837). */
     public const CURLOPT_TCP_KEEPCNT = 326;
     public const CURLOPT_TCP_NODELAY = 121;
     public const CURLOPT_TIMEOUT = 13;
@@ -178,6 +209,7 @@ final class CurlConstants
     public const CURL_HTTP_VERSION_2_0 = 3;
     public const CURL_HTTP_VERSION_2TLS = 4;
     public const CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE = 5;
+    /** CURL_HTTP_VERSION_3 / 3ONLY — PHP 8.4+ (php-src curl.stub.php; #21336, #22837). */
     public const CURL_HTTP_VERSION_3 = 30;
     public const CURL_HTTP_VERSION_3ONLY = 31;
     public const CURLPAUSE_ALL = 5;
@@ -350,9 +382,19 @@ final class CurlConstants
         self::CURLOPT_TCP_KEEPIDLE => true,
         self::CURLOPT_TCP_KEEPINTVL => true,
         self::CURLOPT_TCP_KEEPCNT => true,
+        self::CURLOPT_FTP_RESPONSE_TIMEOUT => true,
         self::CURLOPT_SERVER_RESPONSE_TIMEOUT => true,
         self::CURLOPT_PREREQFUNCTION => true,
         self::CURLOPT_DEBUGFUNCTION => true,
+        self::CURLOPT_MAXFILESIZE => true,
+        self::CURLOPT_MAXFILESIZE_LARGE => true,
+        self::CURLOPT_HSTS => true,
+        self::CURLOPT_HSTS_CTRL => true,
+        self::CURLOPT_ALTSVC => true,
+        self::CURLOPT_ALTSVC_CTRL => true,
+        self::CURLOPT_AWS_SIGV4 => true,
+        self::CURLOPT_CAINFO_BLOB => true,
+        self::CURLOPT_HAPROXYPROTOCOL => true,
         self::CURLOPT_EXPECT_100_TIMEOUT_MS => true,
         self::CURLOPT_CONNECT_TO => true,
         self::CURLOPT_TLS13_CIPHERS => true,
@@ -464,11 +506,15 @@ final class CurlConstants
     /**
      * CURLOPT_* / CURLINFO_* used by common HTTP clients (Guzzle, Symfony HttpClient, …).
      *
+     * PHP 8.4-only names are appended only when {@see CurlExtensionPolicy::advertisesPhp84OptionConstants()}
+     * (#22837 — withhold phantoms on the 8.2 reference profile).
+     *
      * @return array<string, int>
      */
     private static function httpClientConstants(): array
     {
-        return [            'CURLOPT_TIMEOUT' => self::CURLOPT_TIMEOUT,
+        $constants = [
+            'CURLOPT_TIMEOUT' => self::CURLOPT_TIMEOUT,
             'CURLOPT_TIMEOUT_MS' => self::CURLOPT_TIMEOUT_MS,
             'CURLOPT_CONNECTTIMEOUT' => self::CURLOPT_CONNECTTIMEOUT,
             'CURLOPT_CONNECTTIMEOUT_MS' => self::CURLOPT_CONNECTTIMEOUT_MS,
@@ -516,13 +562,6 @@ final class CurlConstants
             'CURL_HTTP_VERSION_2_0' => self::CURL_HTTP_VERSION_2_0,
             'CURL_HTTP_VERSION_2TLS' => self::CURL_HTTP_VERSION_2TLS,
             'CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE' => self::CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE,
-            'CURL_HTTP_VERSION_3' => self::CURL_HTTP_VERSION_3,
-            'CURL_HTTP_VERSION_3ONLY' => self::CURL_HTTP_VERSION_3ONLY,
-            'CURLINFO_POSTTRANSFER_TIME_T' => self::CURLINFO_POSTTRANSFER_TIME_T,
-            'CURLOPT_TCP_KEEPCNT' => self::CURLOPT_TCP_KEEPCNT,
-            'CURLOPT_SERVER_RESPONSE_TIMEOUT' => self::CURLOPT_SERVER_RESPONSE_TIMEOUT,
-            'CURLOPT_PREREQFUNCTION' => self::CURLOPT_PREREQFUNCTION,
-            'CURLOPT_DEBUGFUNCTION' => self::CURLOPT_DEBUGFUNCTION,
             'CURLOPT_PROTOCOLS' => self::CURLOPT_PROTOCOLS,
             'CURLOPT_REDIR_PROTOCOLS' => self::CURLOPT_REDIR_PROTOCOLS,
             'CURLOPT_FRESH_CONNECT' => self::CURLOPT_FRESH_CONNECT,
@@ -572,6 +611,17 @@ final class CurlConstants
             'CURLOPT_READFUNCTION' => self::CURLOPT_READFUNCTION,
             'CURLOPT_PROGRESSFUNCTION' => self::CURLOPT_PROGRESSFUNCTION,
             'CURLOPT_HEADERFUNCTION' => self::CURLOPT_HEADERFUNCTION,
+            // Zend 8.2 surface missing from earlier registration (#22837 / re-#21336).
+            'CURLOPT_MAXFILESIZE' => self::CURLOPT_MAXFILESIZE,
+            'CURLOPT_MAXFILESIZE_LARGE' => self::CURLOPT_MAXFILESIZE_LARGE,
+            'CURLOPT_HSTS' => self::CURLOPT_HSTS,
+            'CURLOPT_HSTS_CTRL' => self::CURLOPT_HSTS_CTRL,
+            'CURLOPT_ALTSVC' => self::CURLOPT_ALTSVC,
+            'CURLOPT_ALTSVC_CTRL' => self::CURLOPT_ALTSVC_CTRL,
+            'CURLOPT_AWS_SIGV4' => self::CURLOPT_AWS_SIGV4,
+            'CURLOPT_CAINFO_BLOB' => self::CURLOPT_CAINFO_BLOB,
+            'CURLOPT_HAPROXYPROTOCOL' => self::CURLOPT_HAPROXYPROTOCOL,
+            'CURLOPT_FTP_RESPONSE_TIMEOUT' => self::CURLOPT_FTP_RESPONSE_TIMEOUT,
             'CURLINFO_RESPONSE_CODE' => self::CURLINFO_RESPONSE_CODE,
             'CURLINFO_TOTAL_TIME' => self::CURLINFO_TOTAL_TIME,
             'CURLINFO_CONTENT_TYPE' => self::CURLINFO_CONTENT_TYPE,
@@ -598,6 +648,19 @@ final class CurlConstants
             'CURLINFO_CONTENT_LENGTH_UPLOAD' => self::CURLINFO_CONTENT_LENGTH_UPLOAD,
             'CURLINFO_HEADER_OUT' => self::CURLINFO_HEADER_OUT,
             'CURLINFO_REDIRECT_TIME' => self::CURLINFO_REDIRECT_TIME,
+            'CURLINFO_REFERER' => self::CURLINFO_REFERER,
+            'CURLINFO_RETRY_AFTER' => self::CURLINFO_RETRY_AFTER,
         ];
+        if (CurlExtensionPolicy::advertisesPhp84OptionConstants()) {
+            $constants['CURL_HTTP_VERSION_3'] = self::CURL_HTTP_VERSION_3;
+            $constants['CURL_HTTP_VERSION_3ONLY'] = self::CURL_HTTP_VERSION_3ONLY;
+            $constants['CURLINFO_POSTTRANSFER_TIME_T'] = self::CURLINFO_POSTTRANSFER_TIME_T;
+            $constants['CURLOPT_TCP_KEEPCNT'] = self::CURLOPT_TCP_KEEPCNT;
+            $constants['CURLOPT_SERVER_RESPONSE_TIMEOUT'] = self::CURLOPT_SERVER_RESPONSE_TIMEOUT;
+            $constants['CURLOPT_PREREQFUNCTION'] = self::CURLOPT_PREREQFUNCTION;
+            $constants['CURLOPT_DEBUGFUNCTION'] = self::CURLOPT_DEBUGFUNCTION;
+        }
+
+        return $constants;
     }
 }

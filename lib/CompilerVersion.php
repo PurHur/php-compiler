@@ -990,6 +990,20 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ CURLOPT/CURLINFO symbols (php-src ext/curl/curl.stub.php; #21336, #22837).
+     *
+     * {@code CURLOPT_TCP_KEEPCNT}, {@code CURLOPT_PREREQFUNCTION},
+     * {@code CURLOPT_SERVER_RESPONSE_TIMEOUT}, {@code CURLOPT_DEBUGFUNCTION},
+     * {@code CURLINFO_POSTTRANSFER_TIME_T}, {@code CURL_HTTP_VERSION_3}/{@code 3ONLY}
+     * are absent on Zend 8.2/8.3. Withhold on 8.4.0-dev reference / PROFILE=8.2;
+     * enable via stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.4}.
+     */
+    public static function advertisesPhp84CurlOptionConstants(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ curl_multi_get_handles() (php-src ext/curl/multi.c; #20520).
      *
      * Withheld on 8.4.0-dev / PROFILE=8.4 so function_exists matches Zend 8.4. Enable via

@@ -7165,7 +7165,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/CurlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 
 ### `ext/curl/CurlFileBuiltin.php`
 
@@ -41576,7 +41576,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 247 class method(s)
+- 248 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

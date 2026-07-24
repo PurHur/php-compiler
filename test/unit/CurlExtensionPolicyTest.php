@@ -171,4 +171,46 @@ PHP;
             }
         }
     }
+
+    public function testPhp84CurlOptionConstantsProfileGate(): void
+    {
+        if (!VmCurlNative::available()) {
+            $this->markTestSkipped('libcurl FFI unavailable');
+        }
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            self::assertFalse(\PHPCompiler\CompilerVersion::advertisesPhp84CurlOptionConstants());
+            self::assertFalse(CurlExtensionPolicy::advertisesPhp84OptionConstants());
+            $ref = \PHPCompiler\ext\curl\CurlConstants::registeredConstants();
+            self::assertArrayHasKey('CURLOPT_MAXFILESIZE', $ref);
+            self::assertArrayHasKey('CURLINFO_REFERER', $ref);
+            self::assertArrayNotHasKey('CURLOPT_TCP_KEEPCNT', $ref);
+            self::assertArrayNotHasKey('CURLOPT_PREREQFUNCTION', $ref);
+            self::assertArrayNotHasKey('CURLOPT_SERVER_RESPONSE_TIMEOUT', $ref);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertTrue(\PHPCompiler\CompilerVersion::advertisesPhp84CurlOptionConstants());
+            self::assertTrue(CurlExtensionPolicy::advertisesPhp84OptionConstants());
+            $fwd = \PHPCompiler\ext\curl\CurlConstants::registeredConstants();
+            self::assertArrayHasKey('CURLOPT_TCP_KEEPCNT', $fwd);
+            self::assertArrayHasKey('CURLOPT_SERVER_RESPONSE_TIMEOUT', $fwd);
+            self::assertSame(326, $fwd['CURLOPT_TCP_KEEPCNT']);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
