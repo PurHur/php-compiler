@@ -40,6 +40,7 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('FileGetContentsJitHelper.php', $spine);
         $this->assertStringContainsString('StringFileGetContents.php', $spine);
         $this->assertStringNotContainsString('JitFileGetContentsKernel.php', $spine);
+        $this->assertStringNotContainsString('phpc_file_get_contents_kernel.php', $spine);
         $this->assertStringNotContainsString('StringFileGetContentsLibc.php', $spine);
     }
 

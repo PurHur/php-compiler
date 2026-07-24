@@ -92,6 +92,12 @@ if [[ "${SKIP_LINK}" -eq 0 ]]; then
   if [[ -n "${live_fp}" && -n "${old_fp}" && "${live_fp}" != "${old_fp}" ]] \
     || [[ "${BOOTSTRAP_GEN0_FORCE_ZEND_SPINE:-0}" == "1" ]]; then
     echo "==> Zend honest full-spine compile (lowering fingerprint stale or BOOTSTRAP_GEN0_FORCE_ZEND_SPINE=1 — #22642)"
+    # Fail-fast nikic parse of every spine PHP file before multi-hour AOT (#22642 r9:
+    # DateTime*/ in a docblock aborted parseAndCompile after ~226m).
+    if ! php "${ROOT}/script/bootstrap-spine-nikic-preflight.php"; then
+      echo "bootstrap-refresh-gen0-sidecar: spine nikic preflight failed — fix syntax before Zend AOT" >&2
+      exit 1
+    fi
     # Default CI ulimit -v is 8 GiB (#436). Zend full-spine AOT grows virtual size (mmap/LLVM)
     # far ahead of RSS — a finite -v cap SIGKILLs (exit 137) around ~1 GiB RSS while still in
     # parseAndCompileFile (#22642). Disable virtual-memory ulimit here; Docker cgroup + PHP
