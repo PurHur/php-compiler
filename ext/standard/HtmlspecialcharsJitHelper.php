@@ -8,10 +8,15 @@ namespace PHPCompiler\ext\standard;
  * Lowered into JIT/AOT modules for htmlspecialchars() runtime (#9445, #20487, php-in-PHP).
  *
  * Logic mirrors {@see VmString::htmlspecialchars()} UTF-8 subset (php-src ext/standard/html.c).
- * Self-contained (no VmString / strlen / substr) so NestedJIT helper units are not
+ * Self-contained (no VmString / strlen / substr / str_replace) so NestedJIT helper units are not
  * ExternalMethod-stubbed (#16075; peer Bin2hex #20452 / HashEquals #20469).
- * Length via isset-scan; UTF-8 structural checks via {@see ord()} (AOT cannot lower
- * string <= / < on byte chars — #22845).
+ *
+ * UTF-8 structural checks via {@see ord()} (AOT NestedJIT cannot lower string <= / < on byte
+ * chars — TYPE_SMALLER pair 134/132; #22845).
+ *
+ * Escape accumulation uses recursion rather than `$out .=` in a loop: NestedJIT helper TUs
+ * drop loop-carried string concatenations (top-level AOT loops are fine; helper embed is not).
+ * MiniWebApp / title strings are short; long-string loop concat belongs in a NestedJIT fix.
  */
 final class HtmlspecialcharsJitHelper
 {
@@ -21,49 +26,48 @@ final class HtmlspecialcharsJitHelper
             if (0 === ($flags & ENT_SUBSTITUTE)) {
                 return '';
             }
-            $string = self::substituteInvalidUtf8($string);
+            $string = self::substituteInvalidUtf8($string, 0);
         }
+
+        return self::escapeAt($string, 0, $flags);
+    }
+
+    private static function escapeAt(string $string, int $i, int $flags): string
+    {
+        if (!isset($string[$i])) {
+            return '';
+        }
+        $ch = $string[$i];
         $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
-        $out = '';
-        $len = 0;
-        while (isset($string[$len])) {
-            ++$len;
-        }
-        for ($i = 0; $i < $len; ++$i) {
-            $ch = $string[$i];
-            switch ($ch) {
-                case '&':
-                    $out .= '&amp;';
-                    break;
-                case '<':
-                    $out .= '&lt;';
-                    break;
-                case '>':
-                    $out .= '&gt;';
-                    break;
-                case '"':
-                    $out .= ($quoteBoth || $quoteDouble) ? '&quot;' : '"';
-                    break;
-                case "'":
-                    $out .= $quoteBoth ? ($entHtml5 ? '&apos;' : '&#039;') : "'";
-                    break;
-                default:
-                    $out .= $ch;
+        if ('&' === $ch) {
+            $piece = '&amp;';
+        } elseif ('<' === $ch) {
+            $piece = '&lt;';
+        } elseif ('>' === $ch) {
+            $piece = '&gt;';
+        } elseif ('"' === $ch) {
+            $piece = ($quoteBoth || $quoteDouble) ? '&quot;' : '"';
+        } elseif ("'" === $ch) {
+            if ($quoteBoth) {
+                $piece = $entHtml5 ? '&apos;' : '&#039;';
+            } else {
+                $piece = "'";
             }
+        } else {
+            $piece = $ch;
         }
 
-        return $out;
+        return $piece.self::escapeAt($string, $i + 1, $flags);
     }
 
     private static function isValidUtf8(string $string): bool
     {
         $i = 0;
+        // Length-style isset scan (no string accumulator) is NestedJIT-safe (#22845).
         while (isset($string[$i])) {
             $ch = $string[$i];
-            // AOT NestedJIT cannot lower string <= / < on byte chars (TYPE_SMALLER
-            // pair 134/132); use ord() so htmlspecialchars() is non-empty (#22845).
             $b0 = \ord($ch);
             if ($b0 <= 0x7F) {
                 ++$i;
@@ -82,31 +86,34 @@ final class HtmlspecialcharsJitHelper
         return true;
     }
 
-    private static function substituteInvalidUtf8(string $string): string
+    private static function substituteInvalidUtf8(string $string, int $i): string
     {
-        $out = '';
-        $i = 0;
-        while (isset($string[$i])) {
-            $ch = $string[$i];
-            $b0 = \ord($ch);
-            if ($b0 <= 0x7F) {
-                $out .= $ch;
-                ++$i;
-                continue;
+        if (!isset($string[$i])) {
+            return '';
+        }
+        $ch = $string[$i];
+        $b0 = \ord($ch);
+        if ($b0 <= 0x7F) {
+            return $ch.self::substituteInvalidUtf8($string, $i + 1);
+        }
+        $need = self::utf8NeedByte($b0);
+        if (0 !== $need && self::utf8TrailValidBytes($string, $i, $need, $b0)) {
+            // Unrolled short UTF-8 sequence copy — NestedJIT drops loop-carried `$out .=`.
+            $chunk = $string[$i];
+            if ($need >= 1) {
+                $chunk = $chunk.$string[$i + 1];
             }
-            $need = self::utf8NeedByte($b0);
-            if (0 !== $need && self::utf8TrailValidBytes($string, $i, $need, $b0)) {
-                for ($j = 0; $j <= $need; ++$j) {
-                    $out .= $string[$i + $j];
-                }
-                $i += $need + 1;
-            } else {
-                $out .= "\xEF\xBF\xBD";
-                ++$i;
+            if ($need >= 2) {
+                $chunk = $chunk.$string[$i + 2];
             }
+            if ($need >= 3) {
+                $chunk = $chunk.$string[$i + 3];
+            }
+
+            return $chunk.self::substituteInvalidUtf8($string, $i + $need + 1);
         }
 
-        return $out;
+        return "\xEF\xBF\xBD".self::substituteInvalidUtf8($string, $i + 1);
     }
 
     /** @return int continuation bytes required, or 0 if lead is invalid */
@@ -127,12 +134,30 @@ final class HtmlspecialcharsJitHelper
 
     private static function utf8TrailValidBytes(string $string, int $i, int $need, int $lead): bool
     {
-        for ($j = 1; $j <= $need; ++$j) {
-            if (!isset($string[$i + $j])) {
+        if ($need >= 1) {
+            if (!isset($string[$i + 1])) {
                 return false;
             }
-            $next = \ord($string[$i + $j]);
-            if ($next < 0x80 || $next > 0xBF) {
+            $n1 = \ord($string[$i + 1]);
+            if ($n1 < 0x80 || $n1 > 0xBF) {
+                return false;
+            }
+        }
+        if ($need >= 2) {
+            if (!isset($string[$i + 2])) {
+                return false;
+            }
+            $n2 = \ord($string[$i + 2]);
+            if ($n2 < 0x80 || $n2 > 0xBF) {
+                return false;
+            }
+        }
+        if ($need >= 3) {
+            if (!isset($string[$i + 3])) {
+                return false;
+            }
+            $n3 = \ord($string[$i + 3]);
+            if ($n3 < 0x80 || $n3 > 0xBF) {
                 return false;
             }
         }
