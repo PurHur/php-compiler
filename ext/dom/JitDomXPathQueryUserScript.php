@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPLLVM\Value;
 
 /** User-script standalone AOT: compile-time DOMXPath::query() (#18493). */
@@ -39,6 +40,13 @@ final class JitDomXPathQueryUserScript
         $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
         if (null === $xml) {
             return null;
+        }
+
+        // Invalid literal → warning + false (php-src xpath.c; #22721). Prefer host Zend
+        // when available so we do not mis-classify unimplemented-but-valid paths.
+        $invalid = self::tryHostInvalidExpressionFalse($context, $xml, $exprLit, 'query');
+        if (null !== $invalid) {
+            return $invalid;
         }
 
         // Namespace axis lengths at compile time (#20206) — avoid ABI fallback segfault.
@@ -118,5 +126,76 @@ final class JitDomXPathQueryUserScript
         );
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    /**
+     * Host Zend DOMXPath::query() false → compile-time warn + false (#22721).
+     * Returns null when the expression is valid or host DOM is unavailable.
+     */
+    public static function tryHostInvalidExpressionFalse(
+        Context $context,
+        string $xml,
+        string $expression,
+        string $method
+    ): ?Value {
+        if (!\extension_loaded('dom') || !\class_exists(\DOMDocument::class, false)) {
+            // Heuristic fallback when host has no DOM (rare in Docker image).
+            if ('' === trim($expression) || 1 === preg_match('/^[@#]$|^!+$|^\@{2,}$/', trim($expression))) {
+                JitBuiltinWarning::emit($context, sprintf('DOMXPath::%s(): Invalid expression', $method));
+
+                return self::boxFalse($context);
+            }
+
+            return null;
+        }
+        $warn = null;
+        set_error_handler(static function (int $severity, string $message) use (&$warn): bool {
+            $warn = $message;
+
+            return true;
+        });
+        try {
+            $doc = new \DOMDocument();
+            if (!@$doc->loadXML($xml)) {
+                restore_error_handler();
+
+                return null;
+            }
+            $xpath = new \DOMXPath($doc);
+            $result = $xpath->query($expression);
+        } catch (\Throwable) {
+            restore_error_handler();
+
+            return null;
+        }
+        restore_error_handler();
+        if (false !== $result) {
+            return null;
+        }
+        $msg = sprintf('DOMXPath::%s(): Invalid expression', $method);
+        if (\is_string($warn)) {
+            if (str_contains($warn, 'Undefined namespace prefix')) {
+                $msg = sprintf('DOMXPath::%s(): Undefined namespace prefix', $method);
+            } elseif (str_contains($warn, 'Invalid number of arguments')) {
+                $msg = sprintf('DOMXPath::%s(): Invalid number of arguments', $method);
+            } elseif (preg_match('/DOMXPath::(?:query|evaluate)\(\):\s*(.+)$/', $warn, $m)) {
+                $msg = sprintf('DOMXPath::%s(): %s', $method, $m[1]);
+            }
+        }
+        JitBuiltinWarning::emit($context, $msg);
+
+        return self::boxFalse($context);
+    }
+
+    private static function boxFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool(
+            $context,
+            $slot,
+            $context->getTypeFromString('int1')->constInt(0, false)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
     }
 }

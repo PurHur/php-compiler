@@ -41,7 +41,7 @@ final class XPathQuery extends DomClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMXPath::query() requires VM context in this compiler build');
         }
-        $list = VmDomXPath::query($frame->vmContext, $xpath, $expression, $context, $registerNodeNS);
+        $list = VmDomXPath::query($frame->vmContext, $xpath, $expression, $context, $registerNodeNS, 'query', $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($list);
         }
