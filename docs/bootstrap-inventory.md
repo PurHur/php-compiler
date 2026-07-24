@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6512 |
-| Phase A inventory files (M2 ratio SSOT) | 6512 |
+| PHP files on vm.php path | 6513 |
+| Phase A inventory files (M2 ratio SSOT) | 6513 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
 | Source constructs flagged (warnings) | 20908 |
@@ -540,6 +540,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/FilterConstants.php` | 0 | 2 |
 | `ext/filter/FilterDomainJitHelper.php` | 0 | 1 |
 | `ext/filter/FilterEmailJitHelper.php` | 0 | 1 |
+| `ext/filter/FilterEmailValidate.php` | 0 | 1 |
 | `ext/filter/FilterIntJitHelper.php` | 0 | 1 |
 | `ext/filter/FilterIpJitHelper.php` | 0 | 1 |
 | `ext/filter/FilterMacJitHelper.php` | 0 | 1 |
@@ -5176,7 +5177,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterDomain.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringFilterEmail.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringFilterEmail.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterInt.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterIp.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterMac.php` | 0 | 2 |
@@ -10396,6 +10397,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/filter/FilterEmailValidate.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `ext/filter/FilterIntJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10482,12 +10488,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 975)
 - new Variable (line 1112)
 - new Variable (line 1295)
-- new Variable (line 1531)
-- new Variable (line 1576)
-- new HashTable (line 1633)
-- new HashTable (line 1648)
-- new Variable (line 1687)
-- 75 class method(s)
+- new Variable (line 1466)
+- new Variable (line 1511)
+- new HashTable (line 1568)
+- new HashTable (line 1583)
+- new Variable (line 1622)
+- 70 class method(s)
 
 ### `ext/filter/filter_has_var.php`
 
@@ -29320,7 +29326,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/SprintfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 20 class method(s)
 
 ### `ext/standard/SqrtJitHelper.php`
 
@@ -31836,9 +31842,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSprintf.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 253)
-- new Error (line 369)
-- 30 class method(s)
+- new ArgumentCountError (line 270)
+- new Error (line 386)
+- 31 class method(s)
 
 ### `ext/standard/VmSscanf.php`
 
@@ -44219,7 +44225,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFilterEmail.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 124)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFilterInt.php`
@@ -52446,30 +52451,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 1204)
 - new Variable (line 1329)
 - new EnumCaseEntry (line 1331)
-- new self (line 1822)
-- new self (line 1840)
-- new self (line 2009)
-- new self (line 2017)
-- new self (line 2025)
-- new self (line 2027)
-- new self (line 2263)
-- new ArithmeticError (line 2368)
-- new self (line 2387)
-- new self (line 2481)
-- new Error (line 2488)
-- new DivisionByZeroError (line 2593)
-- new DivisionByZeroError (line 2600)
-- new self (line 2621)
-- new Error (line 2650)
-- new self (line 2671)
-- new self (line 2683)
-- new Error (line 2710)
-- new self (line 2731)
-- new self (line 2739)
-- new Error (line 2924)
-- new Error (line 2930)
-- new Error (line 2940)
-- 125 class method(s)
+- new self (line 1860)
+- new self (line 1878)
+- new self (line 2047)
+- new self (line 2055)
+- new self (line 2063)
+- new self (line 2065)
+- new self (line 2301)
+- new ArithmeticError (line 2406)
+- new self (line 2425)
+- new self (line 2519)
+- new Error (line 2526)
+- new DivisionByZeroError (line 2631)
+- new DivisionByZeroError (line 2638)
+- new self (line 2659)
+- new Error (line 2688)
+- new self (line 2709)
+- new self (line 2721)
+- new Error (line 2748)
+- new self (line 2769)
+- new self (line 2777)
+- new Error (line 2962)
+- new Error (line 2968)
+- new Error (line 2978)
+- 126 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`
 
