@@ -160,15 +160,24 @@ final class VmDatePure
     /** @return array<string, mixed>|false */
     public static function strptimeArray(string $date, string $format): array|false
     {
-        if (!\function_exists('strptime')) {
+        // Prefer HashTable SSOT; flatten for rare array callers (#22771).
+        $ht = StrptimeJitHelper::strptimeArgv($date, $format);
+        if (false === $ht) {
             return false;
         }
-        $parsed = @\strptime($date, $format);
-        if (!\is_array($parsed)) {
-            return false;
+        $out = [];
+        foreach (['tm_sec', 'tm_min', 'tm_hour', 'tm_mday', 'tm_mon', 'tm_year', 'tm_wday', 'tm_yday'] as $key) {
+            $v = $ht->find($key);
+            if (null !== $v) {
+                $out[$key] = $v->resolveIndirect()->toInt();
+            }
+        }
+        $u = $ht->find('unparsed');
+        if (null !== $u) {
+            $out['unparsed'] = $u->resolveIndirect()->toString();
         }
 
-        return $parsed;
+        return $out;
     }
 
     public static function strftime(string $format, int $timestamp, bool $gmt): string|false

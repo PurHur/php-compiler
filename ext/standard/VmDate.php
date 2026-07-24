@@ -288,21 +288,8 @@ final class VmDate
      */
     public static function strptime(string $date, string $format): HashTable|false
     {
-        $parsed = VmDatePure::strptimeArray($date, $format);
-        if (false === $parsed) {
-            return false;
-        }
-        $ht = new HashTable();
-        foreach (['tm_sec', 'tm_min', 'tm_hour', 'tm_mday', 'tm_mon', 'tm_year', 'tm_wday', 'tm_yday'] as $key) {
-            if (\array_key_exists($key, $parsed)) {
-                self::hashSetLong($ht, $key, (int) $parsed[$key]);
-            }
-        }
-        if (isset($parsed['unparsed']) && \is_string($parsed['unparsed'])) {
-            self::hashSetString($ht, 'unparsed', $parsed['unparsed']);
-        }
-
-        return $ht;
+        // SSOT: StrptimeJitHelper pure PHP (no host \strptime) (#22771).
+        return StrptimeJitHelper::strptimeArgv($date, $format);
     }
 
     /**
