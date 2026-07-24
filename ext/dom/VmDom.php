@@ -3889,6 +3889,10 @@ final class VmDom
         // Resolve after the full parent chain exists — nested parse only sees local parents (#19467).
         self::resolveSubtreeNamespaceUris($root);
         self::propagateDocumentId($root, $document->id);
+        // php-src / libxml XML_PARSE_NOCDATA — CDATA → text + coalesce adjacent text (#22754).
+        if (0 !== ($options & LibxmlConstants::LIBXML_NOCDATA)) {
+            self::convertCdataSectionsToTextOnLoad($ctx, $root, $document);
+        }
         // php-src: preserveWhiteSpace=false and/or LIBXML_NOBLANKS → XML_PARSE_NOBLANKS (#20476).
         if (self::shouldStripBlankNodesOnLoad($document, $options)) {
             self::stripBlankTextNodesFromSubtree($root);
@@ -4048,6 +4052,77 @@ final class VmDom
         }
 
         return !self::documentPreserveWhiteSpace($document);
+    }
+
+    /**
+     * LIBXML_NOCDATA / XML_PARSE_NOCDATA — replace CDATA with text and coalesce adjacent text
+     * (php-src ext/dom/document.c via libxml2; #22754).
+     *
+     * Lone empty CDATA becomes an empty #text node; empty CDATA adjacent to text merges away.
+     */
+    private static function convertCdataSectionsToTextOnLoad(
+        Context $ctx,
+        ObjectEntry $node,
+        ObjectEntry $ownerDocument
+    ): void {
+        $state = DomRegistry::state($node);
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && self::nodeSupportsChildList($child)) {
+                self::convertCdataSectionsToTextOnLoad($ctx, $child, $ownerDocument);
+            }
+        }
+        if (!self::nodeSupportsChildList($node)) {
+            return;
+        }
+
+        $mergedChildIds = [];
+        $carryTextId = null;
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (self::isCdataNode($child)) {
+                $cdataState = DomRegistry::state($child);
+                $textNode = self::createTextNode($ctx, $cdataState->textContent ?? '', $ownerDocument);
+                DomRegistry::state($textNode)->lineNo = $cdataState->lineNo;
+                self::linkChildToParent($child, null);
+                self::linkChildToParent($textNode, $node);
+                $child = $textNode;
+                $childId = $textNode->id;
+            } elseif (!self::isTextNode($child)) {
+                $carryTextId = null;
+                $mergedChildIds[] = $childId;
+
+                continue;
+            }
+
+            $text = DomRegistry::state($child)->textContent ?? '';
+            if ('' === $text) {
+                if (null !== $carryTextId) {
+                    self::linkChildToParent($child, null);
+
+                    continue;
+                }
+                $carryTextId = $childId;
+                $mergedChildIds[] = $childId;
+
+                continue;
+            }
+            if (null !== $carryTextId) {
+                $carry = DomRegistry::entry($carryTextId);
+                if (null !== $carry) {
+                    self::setTextNodeData($carry, (DomRegistry::state($carry)->textContent ?? '').$text);
+                    self::linkChildToParent($child, null);
+                }
+
+                continue;
+            }
+            $carryTextId = $childId;
+            $mergedChildIds[] = $childId;
+        }
+        $state->childIds = $mergedChildIds;
     }
 
     /**
