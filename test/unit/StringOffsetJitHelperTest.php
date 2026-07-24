@@ -28,6 +28,14 @@ final class StringOffsetJitHelperTest extends TestCase
         );
     }
 
+    public function testAssignOpErrorMessage(): void
+    {
+        $this->assertSame(
+            'Cannot use assign-op operators with string offsets',
+            StringOffsetJitHelper::assignOpErrorMessage()
+        );
+    }
+
     public function testByteFromLongTruncates(): void
     {
         $this->assertSame(65, StringOffsetJitHelper::byteFromLong(65));

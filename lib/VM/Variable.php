@@ -30,6 +30,8 @@ final class Variable {
 
     /** @see Zend/zend_operators.c increment_function() / decrement_function() on TYPE_STRING offsets */
     public const STRING_OFFSET_INCDEC_ERROR = 'Cannot increment/decrement string offsets';
+    /** @see Zend/zend_execute.c zend_binary_assign_op_* — assign-op on string offsets (#22897) */
+    public const STRING_OFFSET_ASSIGN_OP_ERROR = 'Cannot use assign-op operators with string offsets';
     /** @see Zend/zend_execute.c zend_assign_to_string_offset() — empty/null RHS */
     public const STRING_OFFSET_EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
     /** @see Zend/zend_execute.c zend_assign_to_string_offset() — multi-byte RHS (#22380) */
@@ -711,6 +713,20 @@ final class Variable {
             self::numericOpOperatorSymbol($opCode),
             self::operandZendTypeName($right)
         ));
+    }
+
+    /**
+     * Zend rejects all assign-op operators on string offsets before operand evaluation (#22897).
+     *
+     * @see Zend/zend_execute.c zend_binary_assign_op_dim / string offset guard
+     */
+    public static function rejectAssignOpOnStringOffset(Variable ...$operands): void
+    {
+        foreach ($operands as $operand) {
+            if (self::TYPE_STRING_OFFSET === $operand->resolveIndirect()->type) {
+                throw new \Error(self::STRING_OFFSET_ASSIGN_OP_ERROR);
+            }
+        }
     }
 
     /**
@@ -2335,6 +2351,7 @@ restart:
         ?\PHPCompiler\VM $vm = null,
         ?\PHPCompiler\Frame $frame = null
     ): void {
+        self::rejectAssignOpOnStringOffset($this, $left, $right);
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
             $result->bitwiseOp($opCode, $left, $right, $vm, $frame);
@@ -2459,6 +2476,7 @@ restart:
         ?\PHPCompiler\VM $vm = null,
         ?\PHPCompiler\Frame $frame = null
     ): void {
+        self::rejectAssignOpOnStringOffset($this, $left, $right);
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
             $result->numericOp($opCode, $left, $right, $vm, $frame);

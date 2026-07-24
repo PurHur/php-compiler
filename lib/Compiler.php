@@ -15473,6 +15473,10 @@ class Compiler {
             if ($this->isIncDecUsingOperand($usage, $fetch->result)) {
                 continue;
             }
+            // AssignOp ($s[$i] += 1) expands to BinaryOp(left=fetch) + Assign(var=fetch) (#22897).
+            if ($this->isAssignOpBinaryUsingDimFetch($usage, $fetch, $block)) {
+                continue;
+            }
             if (
                 $usage instanceof Op\Expr\ArrayDimFetch
                 && $usage->var === $fetch->result
@@ -15522,6 +15526,13 @@ class Compiler {
             if ($this->isIncDecUsingOperand($next, $fetch->result)) {
                 return true;
             }
+            // AssignOp: ArrayDimFetch; BinaryOp; Assign back to fetch (#22897).
+            if (
+                $next instanceof Op\Expr\BinaryOp
+                && $this->isAssignOpPatternFollowingDimFetch($fetch, $next, $children, $i)
+            ) {
+                return true;
+            }
             if (
                 $next instanceof Op\Expr\ArrayDimFetch
                 && $next->var === $fetch->result
@@ -15537,6 +15548,73 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg expands AssignOp to BinaryOp(left=dim) + Assign(var=dim); ??= stays read (#22897).
+     *
+     * The trailing Assign often is absent from operand->usages (only BinaryOp is listed).
+     */
+    private function isAssignOpBinaryUsingDimFetch($usage, Op\Expr\ArrayDimFetch $fetch, Block $block): bool
+    {
+        if (!$usage instanceof Op\Expr\BinaryOp) {
+            return false;
+        }
+        // Zend allows ??= on string offsets (no assign-op Error).
+        if ($usage instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        if ($usage->left !== $fetch->result) {
+            return false;
+        }
+        foreach ($fetch->result->usages as $u) {
+            if (
+                $u instanceof Op\Expr\Assign
+                && $u->var === $fetch->result
+                && $u->expr === $usage->result
+            ) {
+                return true;
+            }
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\Assign
+                && $child->var === $fetch->result
+                && $child->expr === $usage->result
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<Op> $children
+     */
+    private function isAssignOpPatternFollowingDimFetch(
+        Op\Expr\ArrayDimFetch $fetch,
+        Op\Expr\BinaryOp $bin,
+        array $children,
+        int $fetchIndex
+    ): bool {
+        if ($bin instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        if ($bin->left !== $fetch->result) {
+            return false;
+        }
+        if ($fetchIndex + 2 >= \count($children)) {
+            return false;
+        }
+        $assign = $children[$fetchIndex + 2];
+
+        return $assign instanceof Op\Expr\Assign
+            && $assign->var === $fetch->result
+            && $assign->expr === $bin->result;
     }
 
     /**

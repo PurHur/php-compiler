@@ -14,6 +14,9 @@ final class StringOffsetJitHelper
 {
     public const INCDEC_ERROR = 'Cannot increment/decrement string offsets';
 
+    /** @see Variable::STRING_OFFSET_ASSIGN_OP_ERROR (#22897) */
+    public const ASSIGN_OP_ERROR = 'Cannot use assign-op operators with string offsets';
+
     public const EMPTY_ASSIGN_ERROR = 'Cannot assign an empty string to a string offset';
 
     /** @see Variable::STRING_OFFSET_FIRST_BYTE_WARNING (#22380) */
@@ -59,6 +62,11 @@ final class StringOffsetJitHelper
     public static function incDecErrorMessage(): string
     {
         return self::INCDEC_ERROR;
+    }
+
+    public static function assignOpErrorMessage(): string
+    {
+        return self::ASSIGN_OP_ERROR;
     }
 
     public static function emptyAssignErrorMessage(): string

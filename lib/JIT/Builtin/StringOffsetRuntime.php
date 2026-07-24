@@ -95,6 +95,13 @@ final class StringOffsetRuntime
         ErrorRaise::emitRaise($context, StringOffsetJitHelper::incDecErrorMessage());
     }
 
+    public static function emitAssignOpError(Context $context): void
+    {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, StringOffsetJitHelper::assignOpErrorMessage());
+    }
+
     public static function emitEmptyAssignError(Context $context): void
     {
         ErrorRaise::registerDeclarations($context);
