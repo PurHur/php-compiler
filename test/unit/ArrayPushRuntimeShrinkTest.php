@@ -9,7 +9,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_push() JIT routes through ArrayPushJitHelper PHP not ArrayBuiltinHelper LLVM (#12719, #14303). */
+/**
+ * array_push() NestedJIT via JitVmHelperLink::ensureCompiled (#22801 / peer #22519).
+ */
 final class ArrayPushRuntimeShrinkTest extends TestCase
 {
     public function testArrayPushRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -17,6 +19,13 @@ final class ArrayPushRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPushRuntime.php');
         $this->assertStringContainsString('ArrayPushJitHelper', $runtime);
         $this->assertStringContainsString('storeHashtableInArrayVariable', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('parseAndCompile', $runtime);
+        $this->assertStringNotContainsString('new JIT(', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::push', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
