@@ -58,6 +58,17 @@ final class DomExceptionConstants
     }
 
     /**
+     * Hierarchy Request Error (HIERARCHY_REQUEST_ERR = 3).
+     *
+     * @throws \DOMException
+     * @return never
+     */
+    public static function raiseHierarchyRequest(): void
+    {
+        self::raise('Hierarchy Request Error', self::HIERARCHY_REQUEST_ERR);
+    }
+
+    /**
      * Wrong Document Error (WRONG_DOCUMENT_ERR = 4).
      *
      * @throws \DOMException

@@ -5870,7 +5870,9 @@ final class VmDom
         }
 
         if (!self::isTreeMutationChild($child)) {
-            throw new \DOMException('Hierarchy request error');
+            // Document/DocumentType/etc. are typed as DOMNode then rejected here
+            // (php-src ext/dom/node.c; #22698 Hierarchy Request Error code 3).
+            DomExceptionConstants::raiseHierarchyRequest();
         }
 
         $parentState = DomRegistry::state($parent);
@@ -5886,7 +5888,7 @@ final class VmDom
         if (DomConstants::XML_ELEMENT_NODE !== $parentState->nodeType
             && DomConstants::XML_DOCUMENT_FRAG_NODE !== $parentState->nodeType
         ) {
-            throw new \DOMException('Hierarchy request error');
+            DomExceptionConstants::raiseHierarchyRequest();
         }
 
         self::assertSameDocument($parent, $child);
