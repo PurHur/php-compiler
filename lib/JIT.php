@@ -8438,10 +8438,20 @@ class JIT {
                         // immediate. The promotion above only covers TYPE_STRING, so a dest whose
                         // inferred type never settled on string reached here and emitted
                         // `store %__string__* %x, i64 N`, failing module verification (#21886).
+                        // KIND_VARIABLE string locals already hold an `__string__**` alloca —
+                        // do not treat that pointer-to-pointer as "wrong" and allocate a second
+                        // slot (load $out from %8 / store concat into %0 — #22845).
                         $destSlot = $result->value;
-                        if (null === $destSlot
+                        $destSlotTy = null !== $destSlot
+                            ? $this->context->getStringFromType($destSlot->typeOf())
+                            : '';
+                        $hasStringAlloca = Variable::KIND_VARIABLE === $result->kind
+                            && ('__string__**' === $destSlotTy || 'ptr' === $destSlotTy);
+                        if (!$hasStringAlloca && (
+                            null === $destSlot
                             || Variable::KIND_VALUE === $result->kind
-                            || '__string__*' !== $this->context->getStringFromType($destSlot->typeOf())) {
+                            || ('__string__*' !== $destSlotTy && '__string__**' !== $destSlotTy)
+                        )) {
                             $destSlot = JIT\BasicBlockHelper::entryAllocaForFunction(
                                 $this->context,
                                 $func,
