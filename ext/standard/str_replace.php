@@ -51,6 +51,8 @@ final class str_replace extends Internal
             2,
             'subject'
         );
+        // php-src string.c php_str_replace_common — array $replace only when $search is array (#22827).
+        self::rejectStringSearchWithArrayReplace($searchVar, $replaceVar, 'str_replace');
 
         if (Variable::TYPE_STRING === $subjectVar->type) {
             $count = 0;
@@ -129,6 +131,15 @@ final class str_replace extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
         JitPregSubject::requireStringOrArray($context, $args[2], 'str_replace', 2, 'subject');
+        // php-src string.c — string $search + array $replace → TypeError (#22827 / re-#11056).
+        if (JitStrReplaceSearchReplaceGuard::rejectStringSearchWithArrayReplace(
+            $context,
+            $args[0],
+            $args[1],
+            'str_replace'
+        )) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         $countSlot = self::jitCountSlot($context, 4 === $argc);
         if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
             if (self::isArrayReplaceArg($args[0]) || self::isArrayReplaceArg($args[1])) {
@@ -279,5 +290,18 @@ final class str_replace extends Internal
         }
 
         return false;
+    }
+
+    /** @throws \TypeError */
+    private static function rejectStringSearchWithArrayReplace(
+        Variable $searchVar,
+        Variable $replaceVar,
+        string $function
+    ): void {
+        if (Variable::TYPE_ARRAY !== $searchVar->type && Variable::TYPE_ARRAY === $replaceVar->type) {
+            throw new \TypeError(
+                $function.'(): Argument #2 ($replace) must be of type string when argument #1 ($search) is a string'
+            );
+        }
     }
 }
