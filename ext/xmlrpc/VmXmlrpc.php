@@ -8,12 +8,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * XML-RPC encode/decode (php-src ext/xmlrpc/xmlrpc-epi-php.c; #6579).
+ * XML-RPC encode/decode + request/type helpers (php-src ext/xmlrpc/xmlrpc-epi-php.c; #6579, #22254).
  *
  * PHP-in-PHP value serialization — string XML parser (no host DOMDocument; #19048 AOT).
  */
 final class VmXmlrpc
 {
+    /** Struct key used by {@see setType()} / {@see getType()} / encode for base64|datetime. */
+    public const TYPED_VALUE_KEY = '__xmlrpc_type__';
+
     private static ?string $lastError = null;
 
     public static function getLastError(): string
@@ -66,24 +69,271 @@ final class VmXmlrpc
         }
     }
 
+    /**
+     * xmlrpc_encode_request() — methodCall / fault response XML (#22254).
+     *
+     * php-src: ext/xmlrpc/xmlrpc-epi-php.c — PHP_FUNCTION(xmlrpc_encode_request)
+     */
+    public static function encodeRequest(?string $method, Variable $params): string
+    {
+        self::$lastError = null;
+        $resolved = $params->resolveIndirect();
+        if (null === $method || '' === $method) {
+            if (Variable::TYPE_ARRAY === $resolved->type && self::isFaultArray($resolved->toArray())) {
+                return self::encodeFaultResponse($resolved);
+            }
+
+            return self::encodeMethodResponse($resolved);
+        }
+
+        $paramValues = self::requestParamList($resolved);
+        $out = '<?xml version="1.0" encoding="UTF-8"?>'."\n"
+            .'<methodCall>'."\n"
+            .'<methodName>'.self::escapeXml($method).'</methodName>'."\n"
+            .'<params>'."\n";
+        foreach ($paramValues as $param) {
+            $out .= '<param><value>'.self::encodeValue($param).'</value></param>'."\n";
+        }
+
+        return $out.'</params>'."\n".'</methodCall>';
+    }
+
+    /**
+     * xmlrpc_decode_request() — methodCall/methodResponse → PHP value (#22254).
+     *
+     * @param-out string $method
+     *
+     * @return mixed|false
+     */
+    public static function decodeRequest(string $xml, ?string &$method)
+    {
+        self::$lastError = null;
+        $method = '';
+        $xml = trim($xml);
+        if ('' === $xml || !str_contains($xml, '<')) {
+            self::$lastError = 'Invalid XML';
+
+            return false;
+        }
+
+        $callInner = self::extractBalancedElementInner($xml, 'methodCall');
+        if (null !== $callInner) {
+            $nameInner = self::extractBalancedElementInner($callInner, 'methodName');
+            $method = null !== $nameInner ? trim($nameInner) : '';
+            $paramsInner = self::extractBalancedElementInner($callInner, 'params');
+            if (null === $paramsInner) {
+                return [];
+            }
+
+            return self::decodeParamsList($paramsInner);
+        }
+
+        $responseInner = self::extractBalancedElementInner($xml, 'methodResponse');
+        if (null !== $responseInner) {
+            $faultInner = self::extractBalancedElementInner($responseInner, 'fault');
+            if (null !== $faultInner) {
+                $valueInner = self::extractBalancedElementInner($faultInner, 'value');
+                if (null === $valueInner) {
+                    self::$lastError = 'Invalid XML-RPC fault';
+
+                    return false;
+                }
+
+                return self::decodeValueString($valueInner);
+            }
+            $paramsInner = self::extractBalancedElementInner($responseInner, 'params');
+            if (null !== $paramsInner) {
+                $list = self::decodeParamsList($paramsInner);
+
+                return 1 === \count($list) ? $list[0] : $list;
+            }
+            $valueInner = self::extractBalancedElementInner($responseInner, 'value');
+            if (null !== $valueInner) {
+                return self::decodeValueString($valueInner);
+            }
+        }
+
+        return self::decode($xml);
+    }
+
+    /**
+     * xmlrpc_is_fault() — faultCode + faultString array (#22254).
+     */
+    public static function isFault(Variable $arg): bool
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            return false;
+        }
+
+        return self::isFaultArray($arg->toArray());
+    }
+
+    /**
+     * xmlrpc_get_type() — XML-RPC type name for a PHP value (#22254).
+     */
+    public static function getType(Variable $value): string
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type) {
+            $object = $value->toObject();
+            if ($object->hasProperty('xmlrpc_type')) {
+                $typeProp = $object->getProperty('xmlrpc_type')->resolveIndirect();
+                if (Variable::TYPE_STRING === $typeProp->type) {
+                    $typed = strtolower($typeProp->toString(null));
+                    if ('base64' === $typed || 'datetime' === $typed) {
+                        return $typed;
+                    }
+                }
+            }
+
+            return 'struct';
+        }
+        if (Variable::TYPE_ARRAY === $value->type) {
+            $typed = self::typedArrayKind($value->toArray());
+            if (null !== $typed) {
+                return $typed;
+            }
+
+            return $value->toArray()->isPackedList() ? 'array' : 'struct';
+        }
+
+        return match ($value->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOLEAN => 'boolean',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'double',
+            Variable::TYPE_STRING => 'string',
+            default => 'unknown',
+        };
+    }
+
+    /**
+     * xmlrpc_set_type() — mark string as base64/datetime for encode (#22254).
+     *
+     * Stored as a struct array with {@see TYPED_VALUE_KEY} so by-ref call sites keep
+     * the payload (stdClass dynamic props were cleared across builtin return).
+     */
+    public static function setType(Variable $valueSlot, string $type): bool
+    {
+        $type = strtolower(trim($type));
+        if ('datetime.iso8601' === $type) {
+            $type = 'datetime';
+        }
+        if ('base64' !== $type && 'datetime' !== $type) {
+            return false;
+        }
+
+        $resolved = $valueSlot->resolveIndirect();
+        $scalar = match ($resolved->type) {
+            Variable::TYPE_STRING => $resolved->toString(null),
+            Variable::TYPE_INTEGER => (string) $resolved->toInt(null),
+            Variable::TYPE_FLOAT => self::formatDouble($resolved->toFloat(null)),
+            Variable::TYPE_BOOLEAN => $resolved->toBool(null) ? '1' : '0',
+            Variable::TYPE_NULL => '',
+            default => (string) $resolved->toString(null),
+        };
+
+        $ht = new HashTable();
+        $typeVar = new Variable();
+        $typeVar->string($type);
+        $ht->add(self::TYPED_VALUE_KEY, $typeVar);
+        $scalarVar = new Variable();
+        $scalarVar->string($scalar);
+        $ht->add('scalar', $scalarVar);
+        if ('datetime' === $type) {
+            $ts = strtotime($scalar);
+            $tsVar = new Variable();
+            $tsVar->int(false === $ts ? 0 : $ts);
+            $ht->add('timestamp', $tsVar);
+        }
+        $resolved->array($ht);
+
+        return true;
+    }
+
     private static function encodeValue(Variable $value): string
     {
-        switch ($value->type) {
-            case Variable::TYPE_NULL:
-                return '<string></string>';
-            case Variable::TYPE_BOOLEAN:
-                return '<boolean>'.($value->toBool(null) ? '1' : '0').'</boolean>';
-            case Variable::TYPE_INTEGER:
-                return '<int>'.$value->toInt(null).'</int>';
-            case Variable::TYPE_FLOAT:
-                return '<double>'.self::formatDouble($value->toFloat(null)).'</double>';
-            case Variable::TYPE_STRING:
-                return '<string>'.self::escapeXml($value->toString(null)).'</string>';
-            case Variable::TYPE_ARRAY:
-                return self::encodeArray($value->toArray());
-            default:
-                throw new \Exception('Cannot xmlrpc_encode() value of type '.$value->type);
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type) {
+            $object = $value->toObject();
+            if ($object->hasProperty('xmlrpc_type')) {
+                $typeProp = $object->getProperty('xmlrpc_type')->resolveIndirect();
+                if (Variable::TYPE_STRING === $typeProp->type) {
+                    $typed = strtolower($typeProp->toString(null));
+                    $scalar = '';
+                    if ($object->hasProperty('scalar')) {
+                        $scalarProp = $object->getProperty('scalar')->resolveIndirect();
+                        if (Variable::TYPE_STRING === $scalarProp->type) {
+                            $scalar = $scalarProp->toString(null);
+                        }
+                    }
+                    if ('base64' === $typed) {
+                        return '<base64>'.base64_encode($scalar).'</base64>';
+                    }
+                    if ('datetime' === $typed) {
+                        return '<dateTime.iso8601>'.self::escapeXml($scalar).'</dateTime.iso8601>';
+                    }
+                }
+            }
+
+            throw new \Exception('Cannot xmlrpc_encode() value of type object');
         }
+        if (Variable::TYPE_ARRAY === $value->type) {
+            $table = $value->toArray();
+            $typed = self::typedArrayKind($table);
+            if (null !== $typed) {
+                $scalar = self::typedArrayScalar($table);
+                if ('base64' === $typed) {
+                    return '<base64>'.base64_encode($scalar).'</base64>';
+                }
+
+                return '<dateTime.iso8601>'.self::escapeXml($scalar).'</dateTime.iso8601>';
+            }
+
+            return self::encodeArray($table);
+        }
+
+        return match ($value->type) {
+            Variable::TYPE_NULL => '<string></string>',
+            Variable::TYPE_BOOLEAN => '<boolean>'.($value->toBool(null) ? '1' : '0').'</boolean>',
+            Variable::TYPE_INTEGER => '<int>'.$value->toInt(null).'</int>',
+            Variable::TYPE_FLOAT => '<double>'.self::formatDouble($value->toFloat(null)).'</double>',
+            Variable::TYPE_STRING => '<string>'.self::escapeXml($value->toString(null)).'</string>',
+            default => throw new \Exception('Cannot xmlrpc_encode() value of type '.$value->type),
+        };
+    }
+
+    private static function typedArrayKind(HashTable $table): ?string
+    {
+        foreach (iterator_to_array($table->iterateKeyed(true), false) as [$key, $element]) {
+            if (self::TYPED_VALUE_KEY !== self::arrayKeyToString($key->resolveIndirect())) {
+                continue;
+            }
+            $element = $element->resolveIndirect();
+            if (Variable::TYPE_STRING !== $element->type) {
+                return null;
+            }
+            $typed = strtolower($element->toString(null));
+
+            return ('base64' === $typed || 'datetime' === $typed) ? $typed : null;
+        }
+
+        return null;
+    }
+
+    private static function typedArrayScalar(HashTable $table): string
+    {
+        foreach (iterator_to_array($table->iterateKeyed(true), false) as [$key, $element]) {
+            if ('scalar' !== self::arrayKeyToString($key->resolveIndirect())) {
+                continue;
+            }
+            $element = $element->resolveIndirect();
+
+            return Variable::TYPE_STRING === $element->type ? $element->toString(null) : '';
+        }
+
+        return '';
     }
 
     private static function encodeArray(HashTable $table): string
@@ -106,6 +356,93 @@ final class VmXmlrpc
         }
 
         return $out.'</struct>';
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    private static function requestParamList(Variable $params): array
+    {
+        if (Variable::TYPE_ARRAY !== $params->type) {
+            return [$params];
+        }
+        $table = $params->toArray();
+        if (!$table->isPackedList()) {
+            return [$params];
+        }
+        $out = [];
+        foreach (iterator_to_array($table->iterateKeyed(true), false) as [, $element]) {
+            $out[] = $element;
+        }
+
+        return $out;
+    }
+
+    private static function encodeMethodResponse(Variable $value): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8"?>'."\n"
+            .'<methodResponse>'."\n"
+            .'<params>'."\n"
+            .'<param><value>'.self::encodeValue($value).'</value></param>'."\n"
+            .'</params>'."\n"
+            .'</methodResponse>';
+    }
+
+    private static function encodeFaultResponse(Variable $fault): string
+    {
+        return '<?xml version="1.0" encoding="UTF-8"?>'."\n"
+            .'<methodResponse>'."\n"
+            .'<fault>'."\n"
+            .'<value>'.self::encodeValue($fault).'</value>'."\n"
+            .'</fault>'."\n"
+            .'</methodResponse>';
+    }
+
+    private static function isFaultArray(HashTable $table): bool
+    {
+        $hasCode = false;
+        $hasString = false;
+        foreach (iterator_to_array($table->iterateKeyed(true), false) as [$key, $element]) {
+            $name = strtolower(self::arrayKeyToString($key->resolveIndirect()));
+            if ('faultcode' === $name) {
+                $hasCode = true;
+            } elseif ('faultstring' === $name) {
+                $hasString = true;
+            }
+        }
+
+        return $hasCode && $hasString;
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private static function decodeParamsList(string $paramsInner): array
+    {
+        $out = [];
+        $pos = 0;
+        $len = \strlen($paramsInner);
+        while ($pos < $len) {
+            if (!preg_match('/<param(\s[^>]*)?>/i', $paramsInner, $match, PREG_OFFSET_CAPTURE, $pos)) {
+                break;
+            }
+            $sliceStart = $match[0][1];
+            $paramInner = self::extractBalancedElementInner(\substr($paramsInner, $sliceStart), 'param');
+            if (null === $paramInner) {
+                break;
+            }
+            $valueInner = self::extractBalancedElementInner($paramInner, 'value');
+            if (null !== $valueInner) {
+                $out[] = self::decodeValueString($valueInner);
+            }
+            $closePos = stripos($paramsInner, '</param>', $sliceStart);
+            if (false === $closePos) {
+                break;
+            }
+            $pos = $closePos + 8;
+        }
+
+        return $out;
     }
 
     private static function arrayKeyToString(Variable $key): string
@@ -179,11 +516,11 @@ final class VmXmlrpc
         if ('<' !== $valueInner[0]) {
             return $valueInner;
         }
-        if (!preg_match('/^<([a-zA-Z0-9]+)/', $valueInner, $tagMatch)) {
+        if (!preg_match('/^<([a-zA-Z0-9.]+)/', $valueInner, $tagMatch)) {
             return $valueInner;
         }
         $tag = strtolower($tagMatch[1]);
-        $typedInner = self::extractBalancedElementInner($valueInner, $tag);
+        $typedInner = self::extractBalancedElementInner($valueInner, $tagMatch[1]);
         if (null === $typedInner) {
             return trim($valueInner);
         }
@@ -195,6 +532,7 @@ final class VmXmlrpc
             'double', 'float' => self::parseDouble($typedInner),
             'string' => $typedInner,
             'base64' => self::decodeBase64($typedInner),
+            'datetime.iso8601' => $typedInner,
             'array' => self::decodeArrayString($typedInner),
             'struct' => self::decodeStructString($typedInner),
             default => $typedInner,
