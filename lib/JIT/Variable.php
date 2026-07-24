@@ -860,6 +860,16 @@ final class Variable {
     public function dimFetch(self $dim, ?Type $expectedType = null, bool $forWrite = false): Variable {
         switch ($this->type) {
             case self::TYPE_STRING:
+                // Zend zend_check_string_offset — reject illegal dims before coerce (#22895).
+                if (self::emitIllegalStringOffsetDimGuard($this->context, $dim)) {
+                    return new Variable(
+                        $this->context,
+                        self::TYPE_NULL,
+                        self::KIND_VALUE,
+                        $this->context->getTypeFromString('__value__*')->constNull()
+                    );
+                }
+                $dim = self::coerceStringOffsetDimToLong($this->context, $dim);
                 $str = $this->context->helper->loadValue($this);
                 if ($forWrite) {
                     $charPtr = StringOffsetHelper::dimFetch(
@@ -1198,6 +1208,76 @@ final class Variable {
             self::TYPE_VALUE,
             self::KIND_VARIABLE,
             $resultSlot
+        );
+    }
+
+    /**
+     * Compile-time zend_check_string_offset guard for known illegal dims (#22895).
+     *
+     * @return bool true when a TypeError was emitted (caller should return a dummy)
+     */
+    private static function emitIllegalStringOffsetDimGuard(Context $context, self $dim): bool
+    {
+        if (self::TYPE_HASHTABLE === $dim->type) {
+            HashTableHelper::emitIllegalOffsetType(
+                $context,
+                \PHPCompiler\VM\StringOffsetJitHelper::illegalDimTypeErrorMessage('array')
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->clearInsertionPosition();
+
+            return true;
+        }
+        if (self::TYPE_OBJECT === $dim->type) {
+            // Compile-time class name is not always on the JIT Variable; Zend uses the live class.
+            // Prefer overloaded/property class hints when present (#22895).
+            $className = $dim->magicGetOverloadedClass
+                ?? $dim->objectPropertyClassName
+                ?? 'object';
+            HashTableHelper::emitIllegalOffsetType(
+                $context,
+                \PHPCompiler\VM\StringOffsetJitHelper::illegalDimTypeErrorMessage($className)
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->clearInsertionPosition();
+
+            return true;
+        }
+        if (self::TYPE_STRING === $dim->type && null !== $dim->compileTimeString) {
+            $parsed = VMVariable::tryParseStringOffsetLong($dim->compileTimeString);
+            if (null === $parsed) {
+                HashTableHelper::emitIllegalOffsetType(
+                    $context,
+                    \PHPCompiler\VM\StringOffsetJitHelper::illegalDimTypeErrorMessage('string')
+                );
+                $context->builder->call($context->lookupFunction('abort'));
+                $context->builder->clearInsertionPosition();
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Coerce a compile-time numeric string dim to native long for string-offset LLVM (#22895).
+     */
+    private static function coerceStringOffsetDimToLong(Context $context, self $dim): self
+    {
+        if (self::TYPE_STRING !== $dim->type || null === $dim->compileTimeString) {
+            return $dim;
+        }
+        $parsed = VMVariable::tryParseStringOffsetLong($dim->compileTimeString);
+        if (null === $parsed) {
+            return $dim;
+        }
+
+        return new self(
+            $context,
+            self::TYPE_NATIVE_LONG,
+            self::KIND_VALUE,
+            $context->constantFromInteger($parsed[0])
         );
     }
 }

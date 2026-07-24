@@ -26,6 +26,16 @@ final class StringOffsetJitHelper
     public const REF_ERROR = 'Cannot create references to/from string offsets';
 
     /**
+     * Zend zend_illegal_string_offset TypeError text (#22895).
+     *
+     * php-src: Zend/zend_execute.c — "Cannot access offset of type %s on string"
+     */
+    public static function illegalDimTypeErrorMessage(string $typeName): string
+    {
+        return 'Cannot access offset of type ' . $typeName . ' on string';
+    }
+
+    /**
      * Zend-style byte index: negative offsets count from the end (PHP 7.1+).
      *
      * Mirrors LLVM normalizeOffset / {@see Variable::resolveStringOffsetByteIndex} pre-range check.
@@ -37,6 +47,15 @@ final class StringOffsetJitHelper
         }
 
         return $rawIndex;
+    }
+
+    /**
+     * @return array{0: int, 1: bool}|null
+     * @see Variable::tryParseStringOffsetLong()
+     */
+    public static function tryParseOffsetLong(string $s): ?array
+    {
+        return Variable::tryParseStringOffsetLong($s);
     }
 
     /**
