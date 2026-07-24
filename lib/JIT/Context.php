@@ -980,9 +980,10 @@ class Context {
         $this->functionProxies['datetimeimmutable::format'] = new Call\DateTimeFormat();
         // Mutable setTimezone — thin user-script AOT property write (#22824).
         $this->functionProxies['datetime::settimezone'] = new Call\DateTimeSetTimezone(false);
-        // Immutable needs Object_::cloneObject; that path loses the insert-block parent under
-        // thin user-script AOT (same as PHP `clone $dateTimeImmutable`). Register for MCJIT
-        // / full-init only — VM Builtin covers php bin/vm.php (#22824).
+        // Immutable: allocate+copy (not cloneObject) for MCJIT. Thin user-script AOT still
+        // hits "basic block has no parent" inside Object_::allocate / NestedJIT ensureLinked
+        // (same as `new DateTimeImmutable` under HELPER_RUNTIME_O=0). VM Builtin covers
+        // php bin/vm.php; register proxy for MCJIT / full-init only (#22824).
         if (!UserScriptAotEnv::isActive()) {
             $this->functionProxies['datetimeimmutable::settimezone'] = new Call\DateTimeSetTimezone(true);
         }
