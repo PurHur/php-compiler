@@ -77,9 +77,9 @@ final class VmMessageFormatter
     }
 
     /**
-     * Shared init for create() / __construct() (#20809).
+     * Shared init for create() / __construct() (#20809, #22577).
      *
-     * @return bool false + intl error when pattern is empty
+     * @return bool false + intl error when pattern is empty or ICU-invalid
      */
     public static function initObject(ObjectEntry $object, string $locale, string $pattern): bool
     {
@@ -88,6 +88,12 @@ final class VmMessageFormatter
                 IntlError::U_ILLEGAL_ARGUMENT_ERROR,
                 'msgfmt_create: pattern is empty: U_ILLEGAL_ARGUMENT_ERROR'
             );
+
+            return false;
+        }
+        $patternError = self::validatePattern($pattern);
+        if (null !== $patternError) {
+            IntlError::set($patternError[0], $patternError[1]);
 
             return false;
         }
@@ -101,6 +107,63 @@ final class VmMessageFormatter
         IntlError::clear();
 
         return true;
+    }
+
+    /**
+     * ICU MessageFormat create-time brace check (php-src msgformat_create.c / umsg_open; #22577).
+     *
+     * Unclosed `{` → U_UNMATCHED_BRACES. Lone `}` at depth 0 is accepted (Zend/ICU).
+     *
+     * @return array{0: int, 1: string}|null error code + message, or null when OK
+     */
+    public static function validatePattern(string $pattern): ?array
+    {
+        $len = \strlen($pattern);
+        $depth = 0;
+        $i = 0;
+        while ($i < $len) {
+            $ch = $pattern[$i];
+            if ("'" === $ch) {
+                ++$i;
+                if ($i < $len && "'" === $pattern[$i]) {
+                    ++$i;
+                    continue;
+                }
+                while ($i < $len) {
+                    if ("'" === $pattern[$i]) {
+                        ++$i;
+                        if ($i < $len && "'" === $pattern[$i]) {
+                            ++$i;
+                            continue;
+                        }
+                        break;
+                    }
+                    ++$i;
+                }
+                continue;
+            }
+            if ('{' === $ch) {
+                ++$depth;
+                ++$i;
+                continue;
+            }
+            if ('}' === $ch) {
+                if ($depth > 0) {
+                    --$depth;
+                }
+                ++$i;
+                continue;
+            }
+            ++$i;
+        }
+        if ($depth > 0) {
+            return [
+                IntlError::U_UNMATCHED_BRACES,
+                'msgfmt_create: message formatter creation failed: U_UNMATCHED_BRACES',
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -133,6 +196,16 @@ final class VmMessageFormatter
             IntlError::set(
                 IntlError::U_ILLEGAL_ARGUMENT_ERROR,
                 'msgfmt_set_pattern: pattern is empty: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $patternError = self::validatePattern($pattern);
+        if (null !== $patternError) {
+            // php-src msgfmt_set_pattern uses a different ICU message prefix than create (#22577).
+            IntlError::set(
+                $patternError[0],
+                'Error setting symbol value: U_UNMATCHED_BRACES'
             );
 
             return false;
@@ -870,7 +943,10 @@ final class MessageFormatterConstruct extends VmClassMethod
         }
         $locale = VmMessageFormatter::coerceLocaleArg($frame->calledArgs[1], 'MessageFormatter::__construct', 1);
         $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[2], 'MessageFormatter::__construct', 2);
-        VmMessageFormatter::initObject($receiver->toObject(), $locale, $pattern);
+        if (!VmMessageFormatter::initObject($receiver->toObject(), $locale, $pattern)) {
+            // php-src msgformat_create.c — construct failure throws IntlException (#22577).
+            throw new \IntlException(IntlError::getMessage());
+        }
     }
 }
 
@@ -898,7 +974,8 @@ final class MessageFormatterCreate extends VmClassMethod
         }
         $object = VmMessageFormatter::create($frame->vmContext, $locale, $pattern);
         if (null === $object) {
-            $frame->returnVar->bool(false);
+            // php-src MessageFormatter::create → null (not false) on ICU failure (#22577).
+            $frame->returnVar->null();
 
             return;
         }

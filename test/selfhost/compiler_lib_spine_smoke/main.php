@@ -947,6 +947,7 @@ require_once __DIR__.'/../../../ext/intl/VmIntlDatePatternGenerator.php';
 require_once __DIR__.'/../../../ext/intl/VmIntlTimeZone.php';
 require_once __DIR__.'/../../../ext/intl/VmLocale.php';
 require_once __DIR__.'/../../../ext/intl/VmMessageFormatter.php';
+require_once __DIR__.'/../../../ext/intl/bootstrap_intlexception.php';
 require_once __DIR__.'/../../../ext/intl/VmNormalizer.php';
 require_once __DIR__.'/../../../ext/intl/VmNumberFormatter.php';
 require_once __DIR__.'/../../../ext/intl/VmResourceBundle.php';

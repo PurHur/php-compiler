@@ -96,6 +96,8 @@ final class ThrowableManifest
 
     public const LC_SODIUM_EXCEPTION = 'sodiumexception';
 
+    public const LC_INTL_EXCEPTION = 'intlexception';
+
     /**
      * Parent map in registration order: child => parent name, or null when implementing Throwable directly.
      *
@@ -146,6 +148,7 @@ final class ThrowableManifest
         'DOMException' => 'Exception',
         'PharException' => 'Exception',
         'SodiumException' => 'Exception',
+        'IntlException' => 'Exception',
         'SQLite3Exception' => 'Exception',
         'PDOException' => 'RuntimeException',
         'RedisException' => 'Exception',
@@ -189,6 +192,7 @@ final class ThrowableManifest
         'DOMException' => \DOMException::class,
         'PharException' => 'PharException',
         'SodiumException' => \SodiumException::class,
+        'IntlException' => \IntlException::class,
         'SQLite3Exception' => 'SQLite3Exception',
         'PDOException' => 'PDOException',
         'RedisException' => 'RedisException',
@@ -222,6 +226,7 @@ final class ThrowableManifest
             'RequestParseBodyException' => CompilerVersion::advertisesRequestParseBodyExceptionClass(),
             'StreamException' => CompilerVersion::advertisesStreamErrorApi(),
             'PharException' => \PHPCompiler\ext\phar\PharExtensionPolicy::advertisesExtension(),
+            'IntlException' => \PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesExtension(),
             'SQLite3Exception' => \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass(),
             'PDOException' => \PHPCompiler\ext\pdo\PdoExtensionPolicy::advertisesExceptionClass(),
             'RedisException' => \PHPCompiler\ext\redis\RedisExtensionPolicy::advertisesExtension(),
