@@ -18,7 +18,7 @@ final class PipeOperatorReferenceProfileTest extends TestCase
     public function testDesugarNoOpWhenPipeDisabled(): void
     {
         if (CompilerVersion::supportsPipeOperator()) {
-            $this->markTestSkipped('pipe operator enabled on PHP 8.4.0+ target');
+            $this->markTestSkipped('pipe operator enabled on PHP 8.5.0+ target');
         }
         $src = '<?php $x = 5 |> fn ($v) => $v * 2;';
         $this->assertSame($src, PipeOperatorDesugar::desugar($src));

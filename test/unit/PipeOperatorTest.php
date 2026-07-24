@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPUnit\Framework\TestCase;
 
-/** PHP 8.4+ pipe operator (|>) VM desugar (#3243, #7219). */
+/** PHP 8.5+ pipe operator (|>) VM desugar (#3243, #7219, #22792). */
 final class PipeOperatorTest extends TestCase
 {
     protected function setUp(): void
