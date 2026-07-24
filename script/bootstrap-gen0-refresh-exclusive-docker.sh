@@ -8,10 +8,16 @@
 # "agent-harness"). Unprotected durable refreshes die mid-spine with ~1 GiB RSS
 # and look like mysterious CONTAINER_GONE — not OOM.
 #
+# By default this script rsyncs a frozen snapshot of the tree and binds that
+# into the container (plus live mounts for prelinked/bootstrap-gen0 + build/).
+# That way a mid-run `git checkout master` on the workspace cannot drop the
+# ClassConstFetchHelper trait self-require after hours of Zend AOT (r6 @ 163m).
+#
 # Usage (host, from repo root):
 #   ./script/bootstrap-gen0-refresh-exclusive-docker.sh
 #   BOOTSTRAP_GEN0_EXCLUSIVE_NAME=agent-harness-phpc-gen0-22642-rN \
 #     ./script/bootstrap-gen0-refresh-exclusive-docker.sh
+#   BOOTSTRAP_GEN0_EXCLUSIVE_SNAPSHOT=0  # opt out of snapshot (live bind only)
 #
 # Requires: docker, image php-compiler:22.04-dev, PHP_COMPILER_DOCKER_BIND_SRC
 # (or a host path that docker can bind — never the empty Runforge /app bind).
@@ -25,6 +31,7 @@ NAME="${BOOTSTRAP_GEN0_EXCLUSIVE_NAME:-agent-harness-phpc-gen0-refresh}"
 MEM="${BOOTSTRAP_GEN0_EXCLUSIVE_MEMORY:-32g}"
 CPUS="${BOOTSTRAP_GEN0_EXCLUSIVE_CPUS:-4}"
 PHP_MEM="${PHP_COMPILER_MEMORY_LIMIT:-24576M}"
+USE_SNAPSHOT="${BOOTSTRAP_GEN0_EXCLUSIVE_SNAPSHOT:-1}"
 
 BIND_SRC="${PHP_COMPILER_DOCKER_BIND_SRC:-}"
 if [[ -z "${BIND_SRC}" ]]; then
@@ -62,9 +69,8 @@ if docker inspect "${NAME}" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Host-side pin: bind-mount shares the workspace. A mid-run `git checkout master`
-# drops ClassConstFetchHelper's trait self-require and kills Zend spine after hours
-# (r6 @ 163m — #22642). Refuse to start unless the fix is present on the bind src.
+# Host-side pin: refuse to start unless the ClassConstFetchHelper trait
+# self-require is present (r6 @ 163m — #22642).
 if ! grep -q "require_once __DIR__ . '/ClassConstFetchHelperTrait.php'" \
   "${BIND_SRC}/lib/JIT/ClassConstFetchHelper.php"; then
   echo "bootstrap-gen0-refresh-exclusive-docker: ClassConstFetchHelper.php on bind src" >&2
@@ -74,17 +80,41 @@ fi
 PIN_HEAD="$(git -C "${BIND_SRC}" rev-parse HEAD)"
 PIN_BRANCH="$(git -C "${BIND_SRC}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo DETACHED)"
 
-mkdir -p "${ROOT}/build"
+mkdir -p "${ROOT}/build" "${BIND_SRC}/build" "${BIND_SRC}/prelinked/bootstrap-gen0"
 LOG_HOST="${ROOT}/build/gen0-refresh-exclusive.log"
 
-echo "bootstrap-gen0-refresh-exclusive-docker: name=${NAME} bind=${BIND_SRC} mem=${MEM} cpus=${CPUS}"
+COMPILER_BIND="${BIND_SRC}"
+EXTRA_MOUNTS=()
+if [[ "${USE_SNAPSHOT}" == "1" ]]; then
+  SNAP_DIR="${BOOTSTRAP_GEN0_SNAPSHOT_DIR:-$(dirname "${BIND_SRC}")/gen0-refresh-snap}"
+  echo "bootstrap-gen0-refresh-exclusive-docker: snapshotting ${BIND_SRC} -> ${SNAP_DIR}"
+  mkdir -p "${SNAP_DIR}"
+  # Frozen source tree: workspace git checkout cannot mutate files under /compiler.
+  # Live-mount build/ + prelinked/bootstrap-gen0 so refresh outputs land in the workspace.
+  rsync -a --delete \
+    --exclude '/build/' \
+    --exclude '/.git/' \
+    --exclude '/prelinked/bootstrap-gen0/' \
+    --exclude '/gen0-refresh-snap/' \
+    "${BIND_SRC}/" "${SNAP_DIR}/"
+  mkdir -p "${SNAP_DIR}/build" "${SNAP_DIR}/prelinked/bootstrap-gen0"
+  printf '%s\n' "${PIN_HEAD}" > "${SNAP_DIR}/.gen0-pin-head"
+  COMPILER_BIND="${SNAP_DIR}"
+  EXTRA_MOUNTS+=(
+    -v "${BIND_SRC}/build:/compiler/build"
+    -v "${BIND_SRC}/prelinked/bootstrap-gen0:/compiler/prelinked/bootstrap-gen0"
+  )
+fi
+
+echo "bootstrap-gen0-refresh-exclusive-docker: name=${NAME} bind=${COMPILER_BIND} mem=${MEM} cpus=${CPUS} snapshot=${USE_SNAPSHOT}"
 echo "bootstrap-gen0-refresh-exclusive-docker: pin HEAD=${PIN_HEAD:0:12} branch=${PIN_BRANCH}"
 # Intentionally NO --rm: keep exit/OOM flags after failure for triage.
 docker run -d \
   --name "${NAME}" \
   --memory="${MEM}" \
   --cpus="${CPUS}" \
-  -v "${BIND_SRC}:/compiler" \
+  -v "${COMPILER_BIND}:/compiler" \
+  "${EXTRA_MOUNTS[@]}" \
   -w /compiler \
   -e PHP_COMPILER_ALLOW_PARALLEL_CI=1 \
   -e BOOTSTRAP_GEN0_PIN_HEAD="${PIN_HEAD}" \
@@ -108,14 +138,19 @@ docker run -d \
     PIN_HEAD=\${BOOTSTRAP_GEN0_PIN_HEAD:-}
     drift_abort() {
       echo \"DRIFT_ABORT: \$*\" | tee -a \"\$STATUS\"
-      # Prefer killing the compile child so time(1) returns; fall back to container exit.
       pkill -TERM -f 'bin/compile.php' 2>/dev/null || true
       exit 97
     }
     ( while true; do
-        cur=\$(git rev-parse HEAD 2>/dev/null || echo unknown)
+        # Prefer pin file (snapshot has no .git); fall back to git when live-bound.
+        cur=\$PIN_HEAD
+        if [[ -f /compiler/.gen0-pin-head ]]; then
+          cur=\$(tr -d '[:space:]' < /compiler/.gen0-pin-head)
+        elif command -v git >/dev/null 2>&1 && git rev-parse HEAD >/dev/null 2>&1; then
+          cur=\$(git rev-parse HEAD)
+        fi
         if [[ -n \"\$PIN_HEAD\" && \"\$cur\" != \"\$PIN_HEAD\" ]]; then
-          drift_abort \"HEAD drifted \$PIN_HEAD -> \$cur (do not checkout other branches mid-refresh)\"
+          drift_abort \"HEAD/pin drifted \$PIN_HEAD -> \$cur\"
         fi
         if ! grep -q \"require_once __DIR__ . '/ClassConstFetchHelperTrait.php'\" \
           /compiler/lib/JIT/ClassConstFetchHelper.php 2>/dev/null; then
@@ -127,12 +162,12 @@ docker run -d \
           rss=\$(awk '/VmRSS/{print \$2}' /proc/\$cpid/status)
         fi
         prog=\$(cat /compiler/build/.last-jit-spine-exclusive 2>/dev/null || echo none)
-        echo \"\$(date -u +%H:%M:%S) heartbeat rss=\${rss}kB prog=\$prog head=\${cur:0:12}\" >> \"\$HB\"
+        echo \"\$(date -u +%H:%M:%S) heartbeat rss=\${rss}kB prog=\$prog pin=\${cur:0:12}\" >> \"\$HB\"
         sleep 60
       done ) &
     HBPID=\$!
     {
-      echo START \$(date -u +%H:%M:%S) HEAD=\$(git rev-parse --short HEAD) pin=\${PIN_HEAD:0:12} ulimit_v=\$(ulimit -v) name=${NAME}
+      echo START \$(date -u +%H:%M:%S) pin=\${PIN_HEAD:0:12} ulimit_v=\$(ulimit -v) name=${NAME} snapshot=${USE_SNAPSHOT}
       echo ${NAME} \$\$ \$(date -u -Iseconds) > /compiler/build/.gen0-refresh-exclusive.lock
       set +e
       time ./script/bootstrap-refresh-gen0-sidecar.sh
