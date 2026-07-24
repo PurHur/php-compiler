@@ -1722,6 +1722,8 @@ final class BuiltinClasses
             'DateTime',
             $pub
         );
+        // php-src date_object_clone_date — mark clone initialized after shallow prop copy (#22892).
+        $dt->cloneObjectHandler = [DateTimeSupport::class, 'cloneInto'];
         $ctx->classes[DateTimeSupport::CLASS_DATETIME] = $dt;
 
         $dti = new ClassEntry('DateTimeImmutable');
@@ -1761,6 +1763,8 @@ final class BuiltinClasses
             'DateTimeImmutable',
             $pub
         );
+        // php-src date_object_clone_date — mark clone initialized after shallow prop copy (#22892).
+        $dti->cloneObjectHandler = [DateTimeSupport::class, 'cloneInto'];
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEIMMUTABLE] = $dti;
 
         $floatProto = new Variable(Variable::TYPE_FLOAT);

@@ -613,6 +613,19 @@ final class DateTimeSupport
         self::$dateTimeLikeInitialized[$dt->id] = true;
     }
 
+    /**
+     * php-src date_object_clone_date — transfer initialized flag after cloneShallow (#22892).
+     *
+     * Instance __dt_* slots are already copied; the side table is keyed by ObjectEntry::$id.
+     */
+    public static function cloneInto(ObjectEntry $src, ObjectEntry $dest): void
+    {
+        if (!isset(self::$dateTimeLikeInitialized[$src->id])) {
+            return;
+        }
+        self::markDateTimeLikeInitialized($dest);
+    }
+
     private static function throwUninitializedDateTimeLike(ObjectEntry $obj): void
     {
         self::throwDateObjectError(
