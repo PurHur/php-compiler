@@ -599,25 +599,38 @@ class Context {
     /**
      * Resolve a function call target; namespaced unqualified calls fall back to global builtins (#10534).
      *
-     * Honors function_exists visibility (exit/die hidden on the 8.2 reference profile, #22796).
+     * Honors function_exists visibility for exit/die on the 8.2 reference profile (#22796), but still
+     * resolves compiler ABI helpers (phpc_, __compiler_, web_ prefixes) used by match/clone-with
+     * lowering (#22820).
      */
     public function resolveFunctionCallLc(string $name): ?string
     {
         $lcname = strtolower($name);
-        if (isset($this->functions[$lcname])
-            && \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists($lcname)) {
+        if (isset($this->functions[$lcname]) && self::isResolvableRegisteredFunction($lcname)) {
             return $lcname;
         }
         if (str_contains($name, '\\') && !str_contains($name, '::')) {
             $globalFn = substr($name, strrpos($name, '\\') + 1);
             $globalLc = strtolower($globalFn);
-            if (isset($this->functions[$globalLc])
-                && \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists($globalLc)) {
+            if (isset($this->functions[$globalLc]) && self::isResolvableRegisteredFunction($globalLc)) {
                 return $globalLc;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Registered builtins may be hidden from function_exists but still callable when the compiler
+     * lowers to them (#22820). exit/die stay unresolvable on the 8.2 reference profile (#22796).
+     */
+    private static function isResolvableRegisteredFunction(string $lcname): bool
+    {
+        if (\PHPCompiler\ext\standard\VmReflection::isCompilerAbiHelperName($lcname)) {
+            return true;
+        }
+
+        return \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists($lcname);
     }
 
     /**
