@@ -22930,6 +22930,9 @@ class Compiler {
             return null;
         }
         $callee = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        // null callee: variable `$fn((object)…)` still needs Cast→arg0 (#15858).
+        // Reject only when the name is a known non-allowlisted string (#22894 object invoke
+        // has null name and is filtered by contiguous-producer scan below).
         if (
             null !== $callee
             && !\in_array(
@@ -22948,6 +22951,15 @@ class Compiler {
                 ],
                 true
             )
+        ) {
+            return null;
+        }
+        $callArg0 = $cfgCallOp->args[0] ?? null;
+        // Only dead inline temps from `(object)[...]` / casts — never literals or CVs (#22894).
+        if (
+            !$callArg0 instanceof Operand
+            || $this->isEmbeddedCallLiteralArg($callArg0)
+            || !$this->callArgIsDeadInlineTemporary($callArg0)
         ) {
             return null;
         }
@@ -22977,29 +22989,41 @@ class Compiler {
         if (null === $callIndex || [] === $cfgChildren) {
             return null;
         }
-        for ($i = $callIndex - 1; $i >= 0; --$i) {
-            $child = $cfgChildren[$i] ?? null;
-            if ($child instanceof Op\Expr\Array_) {
-                if ($i === $callIndex - 1) {
-                    // array_merge((object)[...], [...]) — stmt-before Array_ is arg #1; scan for Cast (#15858).
+        // Only contiguous inline producers immediately before the call (Echo/Terminal breaks).
+        // Stmt-level `(string)$obj` then `$obj($arg)` must not steal the Cast (#22894).
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $cfgCallOp);
+        $cast = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Cast) {
+                $cast = $producer;
+                break;
+            }
+        }
+        if (null === $cast) {
+            // array_merge((object)[...], [...]) — Cast may sit behind immediate Array_ (#15858).
+            for ($i = $callIndex - 1; $i >= 0; --$i) {
+                $child = $cfgChildren[$i] ?? null;
+                if ($child instanceof Op\Expr\Array_ && $i === $callIndex - 1) {
                     continue;
+                }
+                if ($child instanceof Op\Expr\Cast) {
+                    $cast = $child;
+                    break;
                 }
                 break;
             }
-            if (!$child instanceof Op\Expr\Cast) {
-                continue;
-            }
-            if (null === $block->slotForOperand($child->result)) {
-                foreach ($this->compileExpr($child, $block) as $op) {
-                    $block->opCodes[] = $op;
-                }
-            }
-            $slot = $block->slotForOperand($child->result);
-
-            return null !== $slot ? (string) $slot : null;
         }
+        if (null === $cast) {
+            return null;
+        }
+        if (null === $block->slotForOperand($cast->result)) {
+            foreach ($this->compileExpr($cast, $block) as $op) {
+                $block->opCodes[] = $op;
+            }
+        }
+        $slot = $block->slotForOperand($cast->result);
 
-        return null;
+        return null !== $slot ? (string) $slot : null;
     }
 
     private function inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
