@@ -220,6 +220,9 @@ final class StdlibModuleConstants
             $standard[$name] = $value;
         }
         foreach (StdlibConstants::CORE_INT_BY_NAME as $lc => $value) {
+            if (null === StdlibConstants::coreIntByName($lc)) {
+                continue;
+            }
             $standard[strtoupper($lc)] = $value;
         }
         foreach (StdlibConstants::CORE_FLOAT_BY_NAME as $lc => $value) {

@@ -9152,7 +9152,7 @@ class Compiler {
 
             return $value;
         }
-        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lc] ?? null;
+        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::coreIntByName($lc);
         if (null !== $stdlibInt) {
             $v = new Variable(Variable::TYPE_INTEGER);
             $v->int($stdlibInt);
@@ -16684,7 +16684,7 @@ class Compiler {
                 if ('null' === $lookup) {
                     return !$cfgClone;
                 }
-                if (!$cfgClone && isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                if (!$cfgClone && \PHPCompiler\ext\standard\StdlibConstants::hasCoreIntByName($lookup)) {
                     return true;
                 }
             }
@@ -17271,7 +17271,7 @@ class Compiler {
                 if (null !== $name) {
                     $lookup = strtolower($name);
                     $isHoistedScalar = \in_array($lookup, ['true', 'false', 'null'], true)
-                        || isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])
+                        || \PHPCompiler\ext\standard\StdlibConstants::hasCoreIntByName($lookup)
                         || null !== \PHPCompiler\VM\Context::errorReportingConstant($name);
                     if ($isHoistedScalar) {
                         $callArg = $callOp->args[$argIndex] ?? null;
@@ -17313,7 +17313,7 @@ class Compiler {
                             null !== $callArg
                             && $isLastArg
                             && (
-                                isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])
+                                \PHPCompiler\ext\standard\StdlibConstants::hasCoreIntByName($lookup)
                                 || null !== \PHPCompiler\VM\Context::errorReportingConstant($name)
                             )
                         ) {
@@ -34431,7 +34431,7 @@ class Compiler {
                 }
                 $folded = $this->tryFoldGlobalConstFetch($prelude);
                 if (null === $folded) {
-                    $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$name] ?? null;
+                    $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::coreIntByName($name);
                     if (null !== $stdlibInt) {
                         $folded = new Variable(Variable::TYPE_INTEGER);
                         $folded->int($stdlibInt);

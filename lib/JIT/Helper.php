@@ -2102,8 +2102,9 @@ return_bool:
             return null;
         }
         $lookup = strtolower($name);
-        if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
-            return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+        $stdlibInt = StdlibConstants::coreIntByName($lookup);
+        if (null !== $stdlibInt) {
+            return $stdlibInt;
         }
         if (null === $this->context->runtime->vmContext) {
             return null;

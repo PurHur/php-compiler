@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6508 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20899 |
+| Source constructs flagged (warnings) | 20900 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2956,6 +2956,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StatCacheJitHelper.php` | 0 | 1 |
 | `ext/standard/StatFieldsJitHelper.php` | 0 | 1 |
 | `ext/standard/StatPathJitHelper.php` | 0 | 1 |
+| `ext/standard/StdlibConstants.php` | 0 | 1 |
 | `ext/standard/StdlibModuleConstants.php` | 0 | 1 |
 | `ext/standard/StrContainsJitHelper.php` | 0 | 1 |
 | `ext/standard/StrIncdecJitHelper.php` | 0 | 1 |
@@ -29348,6 +29349,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `ext/standard/StdlibConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/StdlibModuleConstants.php`
 
 **Warnings** (review for bootstrap subset):
@@ -46634,7 +46640,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 194)
 - new Variable (line 1847)
 - new Variable (line 1851)
-- new Variable (line 2122)
+- new Variable (line 2123)
 - 11 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
@@ -51413,22 +51419,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 414)
 - new Variable (line 419)
 - new Variable (line 424)
-- new Variable (line 440)
-- new Variable (line 447)
-- new Variable (line 454)
-- new Variable (line 465)
-- new Variable (line 752)
-- new HashTable (line 753)
-- new Variable (line 781)
-- new Variable (line 881)
-- new Variable (line 893)
-- new HashTable (line 894)
-- new Variable (line 925)
-- new Variable (line 932)
-- new Variable (line 990)
-- new Variable (line 997)
-- new Variable (line 1006)
-- new RunStackEntry (line 1041)
+- new Variable (line 435)
+- new Variable (line 442)
+- new Variable (line 449)
+- new Variable (line 460)
+- new Variable (line 747)
+- new HashTable (line 748)
+- new Variable (line 776)
+- new Variable (line 876)
+- new Variable (line 888)
+- new HashTable (line 889)
+- new Variable (line 920)
+- new Variable (line 927)
+- new Variable (line 985)
+- new Variable (line 992)
+- new Variable (line 1001)
+- new RunStackEntry (line 1036)
 - 53 class method(s)
 
 ### `lib/VM/CycleCollector.php`
