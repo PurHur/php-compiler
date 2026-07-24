@@ -334,9 +334,10 @@ final class VmNumberFormatter
     }
 
     /**
-     * ICU/php-src default UNumberFormatAttribute values per style (#21894, #22900).
+     * ICU/php-src default UNumberFormatAttribute values per style (#21894, #22900, #22919).
      * PERCENT CLDR patterns use 0 fraction digits; CURRENCY uses 2;
-     * DECIMAL uses min 0 / max 3 (CLDR #,##0.###); SCIENTIFIC uses 0/0/0.
+     * DECIMAL uses min 0 / max 3 fraction (CLDR #,##0.###) and INTEGER 1/1/2e9;
+     * SCIENTIFIC uses 0/0/0 fraction and INTEGER 1/1/1.
      *
      * @return array<int, int|float>
      */
@@ -345,6 +346,10 @@ final class VmNumberFormatter
         $attrs = [
             self::GROUPING_USED => 1,
             self::ROUNDING_MODE => self::ROUND_HALFEVEN,
+            // ICU DecimalFormat integer defaults (#22919).
+            self::INTEGER_DIGITS => 1,
+            self::MIN_INTEGER_DIGITS => 1,
+            self::MAX_INTEGER_DIGITS => 2000000000,
         ];
         if (self::PERCENT === $style) {
             $attrs[self::FRACTION_DIGITS] = 0;
@@ -364,6 +369,7 @@ final class VmNumberFormatter
             $attrs[self::FRACTION_DIGITS] = 0;
             $attrs[self::MIN_FRACTION_DIGITS] = 0;
             $attrs[self::MAX_FRACTION_DIGITS] = 0;
+            $attrs[self::MAX_INTEGER_DIGITS] = 1;
 
             return $attrs;
         }
@@ -723,7 +729,8 @@ final class VmNumberFormatter
 
             return false;
         }
-        // ICU UNUM_FRACTION_DIGITS sets both min and max (php-src formatter_attr.c / #22900).
+        // ICU UNUM_FRACTION_DIGITS / UNUM_INTEGER_DIGITS set both min and max
+        // (php-src formatter_attr.c / #22900, #22919).
         if (self::FRACTION_DIGITS === $attribute) {
             $n = (int) $value;
             self::$state[$formatter->id]['attributes'][self::FRACTION_DIGITS] = $n;
@@ -734,6 +741,15 @@ final class VmNumberFormatter
             self::$state[$formatter->id]['attributes'][self::MIN_FRACTION_DIGITS] = $n;
             // getAttribute(FRACTION_DIGITS) mirrors min when min ≠ max (Zend/ICU).
             self::$state[$formatter->id]['attributes'][self::FRACTION_DIGITS] = $n;
+        } elseif (self::INTEGER_DIGITS === $attribute) {
+            $n = (int) $value;
+            self::$state[$formatter->id]['attributes'][self::INTEGER_DIGITS] = $n;
+            self::$state[$formatter->id]['attributes'][self::MIN_INTEGER_DIGITS] = $n;
+            self::$state[$formatter->id]['attributes'][self::MAX_INTEGER_DIGITS] = $n;
+        } elseif (self::MIN_INTEGER_DIGITS === $attribute) {
+            $n = (int) $value;
+            self::$state[$formatter->id]['attributes'][self::MIN_INTEGER_DIGITS] = $n;
+            self::$state[$formatter->id]['attributes'][self::INTEGER_DIGITS] = $n;
         } else {
             self::$state[$formatter->id]['attributes'][$attribute] = $value;
         }
@@ -885,10 +901,38 @@ final class VmNumberFormatter
             return false;
         }
         self::$state[$formatter->id]['pattern'] = $pattern;
+        self::applyPatternDigitAttributes($formatter->id, $pattern);
         self::clearObjectError($formatter);
         IntlError::clear();
 
         return true;
+    }
+
+    /**
+     * Mirror ICU DecimalFormat.applyPattern digit / grouping effects (#22919).
+     * Positive subpattern only (before ';'). Min integer digits = count of '0' in
+     * the integer section; absence of ',' disables grouping.
+     */
+    private static function applyPatternDigitAttributes(int $id, string $pattern): void
+    {
+        $pos = explode(';', $pattern, 2)[0];
+        self::$state[$id]['attributes'][self::GROUPING_USED] = str_contains($pos, ',') ? 1 : 0;
+
+        $intPart = $pos;
+        $dot = strpos($pos, '.');
+        if (false !== $dot) {
+            $intPart = substr($pos, 0, $dot);
+        } else {
+            $ePos = stripos($pos, 'E');
+            if (false !== $ePos) {
+                $intPart = substr($pos, 0, $ePos);
+            }
+        }
+        $minZeros = substr_count($intPart, '0');
+        if ($minZeros > 0) {
+            self::$state[$id]['attributes'][self::MIN_INTEGER_DIGITS] = $minZeros;
+            self::$state[$id]['attributes'][self::INTEGER_DIGITS] = $minZeros;
+        }
     }
 
     /**
@@ -1118,7 +1162,11 @@ final class VmNumberFormatter
             $scaled = round($abs, $maxFrac);
             $intPart = (int) floor($scaled + 1e-12);
             $fracInt = (int) round(($scaled - $intPart) * (10 ** $maxFrac));
-            $intStr = self::groupDigits((string) $intPart, $grouping, $groupSize);
+            $intStr = self::groupDigits(
+                self::applyIntegerDigitAttrs((string) $intPart, $attrs),
+                $grouping,
+                $groupSize
+            );
             if ($maxFrac <= 0) {
                 return $intStr;
             }
@@ -1139,7 +1187,11 @@ final class VmNumberFormatter
             $scaled = round($abs, $maxFrac);
             $intPart = (int) floor($scaled + 1e-12);
             $frac = $scaled - $intPart;
-            $intStr = self::groupDigits((string) $intPart, $grouping, $groupSize);
+            $intStr = self::groupDigits(
+                self::applyIntegerDigitAttrs((string) $intPart, $attrs),
+                $grouping,
+                $groupSize
+            );
             if ($maxFrac <= 0 || $frac <= 0.0) {
                 return $intStr;
             }
@@ -1154,7 +1206,11 @@ final class VmNumberFormatter
             $scaled = round($abs, max($minFrac, 6));
             $intPart = (int) floor($scaled + 1e-12);
             $frac = $scaled - $intPart;
-            $intStr = self::groupDigits((string) $intPart, $grouping, $groupSize);
+            $intStr = self::groupDigits(
+                self::applyIntegerDigitAttrs((string) $intPart, $attrs),
+                $grouping,
+                $groupSize
+            );
             $raw = rtrim(rtrim(sprintf('%.6F', $frac), '0'), '.');
             $fracStr = str_starts_with($raw, '0.') ? substr($raw, 2) : '';
             $fracStr = str_pad($fracStr, $minFrac, '0', STR_PAD_RIGHT);
@@ -1174,9 +1230,40 @@ final class VmNumberFormatter
                 $fracStr = $raw;
             }
         }
-        $intStr = self::groupDigits((string) $intPart, $grouping, $groupSize);
+        $intStr = self::groupDigits(
+            self::applyIntegerDigitAttrs((string) $intPart, $attrs),
+            $grouping,
+            $groupSize
+        );
 
         return '' !== $fracStr ? $intStr.$decimal.$fracStr : $intStr;
+    }
+
+    /**
+     * Apply MIN/MAX_INTEGER_DIGITS before grouping (ICU DecimalFormat; #22919).
+     * Max truncates to the least-significant digits; min zero-pads on the left.
+     *
+     * @param array<int, int|float> $attrs
+     */
+    private static function applyIntegerDigitAttrs(string $intDigits, array $attrs): string
+    {
+        if ('' === $intDigits) {
+            $intDigits = '0';
+        }
+        $maxInt = isset($attrs[self::MAX_INTEGER_DIGITS]) ? (int) $attrs[self::MAX_INTEGER_DIGITS] : -1;
+        $minInt = isset($attrs[self::MIN_INTEGER_DIGITS]) ? (int) $attrs[self::MIN_INTEGER_DIGITS] : -1;
+        if ($maxInt >= 0 && strlen($intDigits) > $maxInt) {
+            if (0 === $maxInt) {
+                $intDigits = '0';
+            } else {
+                $intDigits = substr($intDigits, -$maxInt);
+            }
+        }
+        if ($minInt > 0) {
+            $intDigits = str_pad($intDigits, $minInt, '0', STR_PAD_LEFT);
+        }
+
+        return $intDigits;
     }
 
     /**
