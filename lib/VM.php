@@ -5035,6 +5035,10 @@ restart:
                         }
 
                         return null;
+                    } catch (\CompileError $e) {
+                        // Zend inheritance compile fatals during eval are uncatchable
+                        // E_COMPILE_ERROR (zend_error_noreturn), not try/catch (#22922, #22329).
+                        $this->raiseEvalCompileFatal($e, $frame);
                     }
                     $dest->copyFrom($evalResult);
                     break;
@@ -10464,6 +10468,41 @@ restart:
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /**
+     * Zend E_COMPILE_ERROR during eval() — uncatchable CLI fatal (#22922).
+     *
+     * php-src: zend_error_noreturn(E_COMPILE_ERROR, …) from zend_inheritance.c;
+     * file shape Command line code(N) : eval()'d code (zif_eval / #4410).
+     *
+     * @return never
+     */
+    private function raiseEvalCompileFatal(\CompileError $error, Frame $frame): never
+    {
+        $evalLine = 1;
+        if ($error instanceof \PHPCompiler\Compiler\CompileFatal && $error->sourceLine > 0) {
+            // wrapEvalCode prepends "<?php\n" — map compiler line back to eval body (#22796).
+            $evalLine = $error->sourceLine > 1 ? $error->sourceLine - 1 : max(1, $error->sourceLine);
+        }
+        [$file, $line] = VM\ExceptionSupport::evalFatalSite($frame, $evalLine);
+        if ($this->context->isolatedPhpFunctionInvoke || $this->context->bubbleUncaughtToNative) {
+            throw $error;
+        }
+        $this->context->errors->recordLastError(
+            VM\ErrorReporter::E_COMPILE_ERROR,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+        VM\ErrorReporter::writeCliErrorOutput(
+            VM\ErrorReporter::E_COMPILE_ERROR,
+            $error->getMessage(),
+            $file,
+            $line,
+            $this->context->errors->getDisplayErrors()
+        );
+        throw new ScriptExit(255);
     }
 
     private function dispatchVmParseError(\ParseError $error, Frame $frame): ?Frame

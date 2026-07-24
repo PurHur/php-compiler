@@ -1408,6 +1408,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'eval_readonly_inheritance') || str_contains($name, 'eval_nonreadonly_extends_readonly')) {
                 continue;
             }
+            // eval() final class const override: VM E_COMPILE_ERROR via TYPE_EVAL (#22922); MCJIT inline eval deferral pending.
+            if (str_contains($name, 'final_class_const_eval_override')) {
+                continue;
+            }
             // preserve_keys=true: VM + JIT/AOT via ArrayBuiltinHelper (#3524).
             // array_merge_recursive(): VM + JIT via ArrayMergeRecursiveJitHelper PHP (#3297, #10183).
             if (str_contains(strtolower($case[0]), 'array_merge_recursive')) {
