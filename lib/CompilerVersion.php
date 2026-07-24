@@ -2378,13 +2378,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ array_pad() optional $pad_type + ARRAY_PAD_* constants (ext/standard/array.c, #14993).
+     * PHP 8.4+ array_pad() optional $pad_type + ARRAY_PAD_* constants (ext/standard/array.c, #14993, #22786).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#14983 reference gate).
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so PROFILE=8.2 and the 8.4.0-dev
+     * reference profile match Zend (no ARRAY_PAD_* / 4th arg). Enable via PHP_COMPILER_PROFILE=8.4+.
      */
     public static function supportsArrayPadPadType(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

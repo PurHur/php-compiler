@@ -1,9 +1,11 @@
 --TEST--
-stdlib array_pad() ARRAY_PAD_* pad type (PHP 8.4+, #14993, ext/standard/array.c)
+stdlib array_pad() ARRAY_PAD_* pad type (PHP 8.4+, #14993, #22786, ext/standard/array.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 if (!defined('ARRAY_PAD_RIGHT')) {
-    die('skip ARRAY_PAD_* not on reference profile');
+    die('skip ARRAY_PAD_* not on forward 8.4 profile');
 }
 
 $r = array_pad([1, 2], 5, 0, ARRAY_PAD_RIGHT);
