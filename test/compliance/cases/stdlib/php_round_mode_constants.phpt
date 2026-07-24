@@ -1,5 +1,7 @@
 --TEST--
-PHP 8.4 PHP_ROUND_CEILING/FLOOR/TOWARD_ZERO/AWAY_FROM_ZERO constants (issue #11730)
+PHP 8.4 PHP_ROUND_CEILING/FLOOR/TOWARD_ZERO/AWAY_FROM_ZERO constants (issue #11730, #22785)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo defined('PHP_ROUND_CEILING') ? '1' : '0', "\n";
@@ -14,6 +16,7 @@ echo round(2.5, 0, PHP_ROUND_CEILING), "\n";
 echo round(-2.5, 0, PHP_ROUND_FLOOR), "\n";
 echo round(2.7, 0, PHP_ROUND_TOWARD_ZERO), "\n";
 echo round(2.3, 0, PHP_ROUND_AWAY_FROM_ZERO), "\n";
+echo defined('PHP_ROUND_HALF_UP') ? '1' : '0', "\n";
 ?>
 --EXPECT--
 1
@@ -28,3 +31,4 @@ echo round(2.3, 0, PHP_ROUND_AWAY_FROM_ZERO), "\n";
 -3
 2
 3
+1
