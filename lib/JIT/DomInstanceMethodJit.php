@@ -69,6 +69,8 @@ final class DomInstanceMethodJit
         'domelement::removechild' => true,
         'domnode::replacechild' => true,
         'domelement::replacechild' => true,
+        'domnode::insertbefore' => true,
+        'domelement::insertbefore' => true,
         'domnode::normalize' => true,
         'domelement::normalize' => true,
         'domdocument::normalize' => true,
@@ -329,6 +331,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domelement::insertbefore' === $lc || 'domnode::insertbefore' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeInsertBefore();
+
+                return;
+            }
             if ('domnode::normalize' === $lc
                 || 'domelement::normalize' === $lc
                 || 'domdocument::normalize' === $lc
@@ -467,6 +474,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::removechild');
             self::ensureProxy($context, 'domnode::replacechild');
             self::ensureProxy($context, 'domelement::replacechild');
+            self::ensureProxy($context, 'domnode::insertbefore');
+            self::ensureProxy($context, 'domelement::insertbefore');
             self::ensureProxy($context, 'domnode::normalize');
             self::ensureProxy($context, 'domelement::normalize');
             self::ensureProxy($context, 'domdocument::normalize');

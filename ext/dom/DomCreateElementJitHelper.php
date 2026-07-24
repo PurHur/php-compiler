@@ -58,6 +58,22 @@ final class DomCreateElementJitHelper
         }
     }
 
+    /** DOMNode::insertBefore() — user-script AOT (#22686, php-src ext/dom/node.c). */
+    public static function insertBeforeObjectArgv2(
+        ObjectEntry $parent,
+        ObjectEntry $newChild,
+        ObjectEntry $refChild
+    ): void {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        $newCanon = DomRegistry::entry($newChild->id) ?? $newChild;
+        $refCanon = DomRegistry::entry($refChild->id) ?? $refChild;
+        VmDom::insertBefore($ctx, $canonical, $newCanon, $refCanon);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
     public static function appendObjectArgv2(ObjectEntry $parent, ObjectEntry $a1, ObjectEntry $a2): void
     {
         self::appendObjectArgv1($parent, $a1);

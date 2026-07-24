@@ -818,6 +818,20 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    public static function ensureInsertBeforeBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        self::ensureBridge(
+            $context,
+            DomNodeTreeMutationRuntime::ABI_INSERT_BEFORE,
+            'dom_insert_before_user_script',
+            [$objPtr, $objPtr, $objPtr],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::insertBeforeObjectArgv2',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
     public static function ensureParentNodeBridge(Context $context): void
     {
         self::ensureBridge(
