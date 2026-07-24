@@ -22,6 +22,8 @@ final class JitStrptime
                 \count($args)
             ));
         }
+        // php-src: ext/date/php_date.c — PHP_FUNCTION(strptime) deprecated since 8.1 (#22771).
+        VmEngineBuiltinDeprecation::emitJitFunction($context, 'strptime');
 
         StringStrptime::ensureLinked($context);
 

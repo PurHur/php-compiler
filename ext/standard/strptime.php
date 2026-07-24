@@ -26,6 +26,8 @@ final class strptime extends Internal
                 \count($frame->calledArgs)
             ));
         }
+        // php-src: ext/date/php_date.c — PHP_FUNCTION(strptime) deprecated since 8.1 (#22771).
+        VmEngineBuiltinDeprecation::emitFunction($frame, 'strptime');
         if (null === $frame->returnVar) {
             return;
         }
