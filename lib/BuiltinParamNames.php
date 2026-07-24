@@ -116,9 +116,11 @@ final class BuiltinParamNames
             case 'array_product':
                 return ['array'];
             case 'array_push':
+                return ['array', 'values'];
+            case 'array_unshift':
+                return ['array', 'values'];
             case 'array_pop':
             case 'array_shift':
-            case 'array_unshift':
             case 'current':
             case 'end':
             case 'key':
@@ -126,6 +128,9 @@ final class BuiltinParamNames
             case 'prev':
             case 'reset':
                 return ['array'];
+            case 'array_replace':
+            case 'array_replace_recursive':
+                return ['array', 'replacements'];
             case 'array_walk':
             case 'array_walk_recursive':
                 return ['array', 'callback', 'arg'];
@@ -217,13 +222,25 @@ final class BuiltinParamNames
                 return ['constant_name', 'value', 'case_insensitive'];
             case 'vsprintf':
                 return ['format', 'args'];
+            case 'sprintf':
+            case 'printf':
+                // Zend stub: format + ...values (#22825); arity via zendInternalVariadicReflectionArity.
+                return ['format', 'values'];
             case 'sscanf':
-                return ['string', 'format'];
+                return ['string', 'format', 'vars'];
             case 'vfscanf':
             case 'fscanf':
-                return ['stream', 'format'];
+                return ['stream', 'format', 'vars'];
             case 'fprintf':
-                return ['stream', 'format'];
+                return ['stream', 'format', 'values'];
+            case 'pack':
+                return ['format', 'values'];
+            case 'array_merge':
+            case 'array_merge_recursive':
+                return ['arrays'];
+            case 'max':
+            case 'min':
+                return ['value', 'values'];
             case 'fread':
                 return ['stream', 'length'];
             case 'fwrite':
@@ -552,15 +569,26 @@ final class BuiltinParamNames
 
     /**
      * Parameter count for internal builtins (BuiltinParamNames first, then InternalArgInfo; #11453).
+     *
+     * Zend stub arity wins for known internal variadics (#22825).
      */
     public static function paramCountForInternalFunction(string $name): ?int
     {
+        $meta = self::zendInternalVariadicReflectionArity($name);
+        if (null !== $meta) {
+            return $meta['total'];
+        }
         $names = self::paramNamesForInternalFunction($name);
-        if (null !== $names) {
-            return \count($names);
+        if (null === $names) {
+            return null;
+        }
+        $count = \count($names);
+        $variadic = self::variadicParamIndexForFunction($name);
+        if (null !== $variadic) {
+            $count = max($count, $variadic + 1);
         }
 
-        return null;
+        return $count;
     }
 
     /**
@@ -616,9 +644,19 @@ final class BuiltinParamNames
 
     public static function requiredParamCountForInternalFunction(string $name): ?int
     {
+        $meta = self::zendInternalVariadicReflectionArity($name);
+        if (null !== $meta) {
+            return $meta['required'];
+        }
         $names = self::forFunction($name);
         if (null !== $names) {
-            return self::requiredParamCountFromNames(array_keys($names));
+            $required = self::requiredParamCountFromNames(array_values($names));
+            $variadic = self::variadicParamIndexForFunction($name);
+            if (null !== $variadic) {
+                $required = min($required, $variadic);
+            }
+
+            return $required;
         }
 
         return BuiltinInternalArgInfo::requiredParamCountForFunction($name);
@@ -652,14 +690,73 @@ final class BuiltinParamNames
     }
 
     /**
-     * Variadic parameter index for builtins that accept ...$args (issue #10637).
+     * Variadic parameter index for builtins that accept ...$args (#10637, #22825).
+     *
+     * Prefer Zend stub reflection arity; fall back to InternalArgInfo `...` markers.
      */
     public static function variadicParamIndexForFunction(string $name): ?int
     {
+        $meta = self::zendInternalVariadicReflectionArity($name);
+        if (null !== $meta) {
+            return $meta['index'];
+        }
+
+        return BuiltinInternalArgInfo::variadicParamIndexForFunction($name);
+    }
+
+    /**
+     * php-src stub reflection arity for internal variadics (ext/standard/*.stub.php, #22825).
+     *
+     * Legacy InternalArgInfo often keeps pre-stub shapes (e.g. sprintf format+arg1+... → tot=3);
+     * Zend ReflectionFunction reports the stub shape (format+...values → tot=2).
+     *
+     * @return array{index: int, required: int, total: int}|null
+     */
+    private static function zendInternalVariadicReflectionArity(string $name): ?array
+    {
         return match (strtolower($name)) {
-            'call_user_func' => 1,
-            'array_map' => 2,
-            'array_multisort' => 1,
+            'sprintf',
+            'printf',
+            'pack' => ['index' => 1, 'required' => 1, 'total' => 2],
+            'fprintf',
+            'sscanf',
+            'fscanf',
+            'vfscanf' => ['index' => 2, 'required' => 2, 'total' => 3],
+            'array_merge',
+            'array_merge_recursive' => ['index' => 0, 'required' => 0, 'total' => 1],
+            'array_push',
+            'array_unshift',
+            'array_replace',
+            'array_replace_recursive',
+            'array_diff',
+            'array_diff_assoc',
+            'array_diff_key',
+            'array_diff_uassoc',
+            'array_diff_ukey',
+            'array_intersect',
+            'array_intersect_assoc',
+            'array_intersect_key',
+            'array_intersect_uassoc',
+            'array_intersect_ukey',
+            'array_udiff',
+            'array_udiff_assoc',
+            'array_udiff_uassoc',
+            'array_uintersect',
+            'array_uintersect_assoc',
+            'array_uintersect_uassoc',
+            'array_multisort',
+            'call_user_func',
+            'forward_static_call',
+            'compact',
+            'var_dump',
+            'debug_zval_dump',
+            'register_shutdown_function',
+            'register_tick_function',
+            'max',
+            'min' => ['index' => 1, 'required' => 1, 'total' => 2],
+            'array_map' => ['index' => 2, 'required' => 2, 'total' => 3],
+            'setlocale' => ['index' => 2, 'required' => 2, 'total' => 3],
+            'mb_convert_variables' => ['index' => 3, 'required' => 3, 'total' => 4],
             default => null,
         };
     }

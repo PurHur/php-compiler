@@ -198,6 +198,35 @@ final class BuiltinInternalArgInfo
         return false;
     }
 
+    /**
+     * Index of the `...$name` param in InternalArgInfo, or null (#22825).
+     *
+     * Note: legacy arginfo may keep a pre-variadic optional (sprintf arg1= + ...=);
+     * {@see BuiltinParamNames::variadicParamIndexForFunction()} prefers Zend stub arity.
+     */
+    public static function variadicParamIndexForFunction(string $name): ?int
+    {
+        $lc = strtolower($name);
+        $info = self::instance()->functions[$lc] ?? null;
+        if (null === $info) {
+            return null;
+        }
+        foreach ($info['params'] as $index => $param) {
+            $paramName = (string) ($param['name'] ?? '');
+            if (str_ends_with($paramName, '=')) {
+                $paramName = substr($paramName, 0, -1);
+            }
+            if (str_starts_with($paramName, '&')) {
+                $paramName = substr($paramName, 1);
+            }
+            if (str_starts_with($paramName, '...')) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
     private static ?InternalArgInfo $argInfo = null;
 
     public static function typeStringAllowsNull(string $type): bool

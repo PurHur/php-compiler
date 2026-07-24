@@ -1,5 +1,5 @@
 --TEST--
-ReflectionFunction::isVariadic() (#22045, ext/reflection/php_reflection.c)
+ReflectionFunction::isVariadic() (#22045, #22825, ext/reflection/php_reflection.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -24,6 +24,15 @@ echo (new ReflectionMethod(M::class, 'm'))->isVariadic() ? "method_yes\n" : "met
 
 echo (new ReflectionFunction('call_user_func'))->isVariadic() ? "cuf_yes\n" : "cuf_no\n";
 echo (new ReflectionFunction('strlen'))->isVariadic() ? "strlen_yes\n" : "strlen_no\n";
+
+foreach (['sprintf', 'printf', 'array_merge', 'array_push', 'max', 'min', 'array_map'] as $fn) {
+    $r = new ReflectionFunction($fn);
+    echo $fn,
+        ' var=', $r->isVariadic() ? '1' : '0',
+        ' req=', $r->getNumberOfRequiredParameters(),
+        ' tot=', $r->getNumberOfParameters(),
+        "\n";
+}
 --EXPECT--
 f_yes
 g_no
@@ -33,3 +42,10 @@ closure_yes
 method_yes
 cuf_yes
 strlen_no
+sprintf var=1 req=1 tot=2
+printf var=1 req=1 tot=2
+array_merge var=1 req=0 tot=1
+array_push var=1 req=1 tot=2
+max var=1 req=1 tot=2
+min var=1 req=1 tot=2
+array_map var=1 req=2 tot=3
