@@ -17,9 +17,10 @@ use PHPLLVM\Value;
  *
  * php-src: ext/date/php_date.c — zim_date_timezone_set / zim_DateTimeImmutable_setTimezone
  *
- * Mutable: in-place TZ property write. Immutable: allocate + copy props (not cloneObject —
- * thin user-script AOT loses insert-block parent on cloneObject; same pattern as
- * DatePeriodIteratorJitHelper::cloneDateTimeObject).
+ * Mutable: in-place TZ property write (thin user-script AOT OK).
+ * Immutable: allocate + copy props (MCJIT) — not cloneObject. Thin user-script AOT still
+ * cannot allocate DateTimeImmutable (insert-block / NestedJIT ensureLinked gap); Context
+ * registers the immutable proxy only when UserScriptAotEnv is inactive.
  */
 final class DateTimeSetTimezone implements Call
 {
