@@ -79,6 +79,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -6582,6 +6583,18 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetInterfaces.php'
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionReturnsReference.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodReturnsReference.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_execute_query.php';
+require_once __DIR__.'/../../../ext/xmlrpc/xmlrpc_decode_request.php';
+require_once __DIR__.'/../../../ext/xmlrpc/xmlrpc_encode_request.php';
+require_once __DIR__.'/../../../ext/xmlrpc/xmlrpc_get_type.php';
+require_once __DIR__.'/../../../ext/xmlrpc/xmlrpc_is_fault.php';
+require_once __DIR__.'/../../../ext/xmlrpc/xmlrpc_set_type.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionConstruct.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetAuthor.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetCopyright.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetURL.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetVersion.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionToString.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -6614,11 +6627,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionConstruct.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetAuthor.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetCopyright.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetName.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetURL.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetVersion.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionToString.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
