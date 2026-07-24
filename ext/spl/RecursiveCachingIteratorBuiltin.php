@@ -107,7 +107,7 @@ final class RecursiveCachingIteratorBuiltin
         }
         $object = new ObjectEntry($class);
         $object->constructed = true;
-        SplDualIteratorStorage::callInner($frame, $inner, 'rewind');
+        // Match CachingIterator: no construct-time rewind (#22876).
         SplCachingIteratorStorage::init($object, $inner, $flags);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
@@ -164,7 +164,7 @@ final class RecursiveCachingIteratorConstruct extends VmClassMethod
             $frame->calledArgs[2] ?? null,
             'RecursiveCachingIterator::__construct'
         );
-        SplDualIteratorStorage::callInner($frame, $inner, 'rewind');
+        // Match CachingIterator: no construct-time rewind (#22876).
         SplCachingIteratorStorage::init($object, $inner, $flags);
     }
 }
