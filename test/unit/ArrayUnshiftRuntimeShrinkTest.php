@@ -9,7 +9,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_unshift() JIT routes through ArrayUnshiftJitHelper PHP not ArrayBuiltinHelper LLVM (#12717, #14316). */
+/**
+ * array_unshift() NestedJIT via JitVmHelperLink::ensureCompiled (#22818 / peer #22801).
+ */
 final class ArrayUnshiftRuntimeShrinkTest extends TestCase
 {
     public function testArrayUnshiftRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -17,6 +19,13 @@ final class ArrayUnshiftRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayUnshiftRuntime.php');
         $this->assertStringContainsString('ArrayUnshiftJitHelper', $runtime);
         $this->assertStringContainsString('storeHashtableInArrayVariable', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('parseAndCompile', $runtime);
+        $this->assertStringNotContainsString('new JIT(', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::unshift', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
