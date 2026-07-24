@@ -51,4 +51,23 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'reflection_named.php'));
         $this->assertSame("ReflectionNamedType\nint\n1\n0\n", ob_get_clean());
     }
+
+    /** @covers issue #22851 */
+    public function testReflectionUnionTypeAllowsNullOnlyWhenNullMember(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function a(int|string $x) {}
+function b(?int $x) {}
+function c(int|string|null $x) {}
+foreach (['a', 'b', 'c'] as $fn) {
+    $t = (new ReflectionFunction($fn))->getParameters()[0]->getType();
+    echo $fn, ' allowsNull=', (int) $t->allowsNull(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'reflection_union_allows_null.php'));
+        $this->assertSame("a allowsNull=0\nb allowsNull=1\nc allowsNull=1\n", ob_get_clean());
+    }
 }
