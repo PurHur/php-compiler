@@ -26,12 +26,31 @@ final class CompareJitHelperScalars
         return self::spaceshipNumeric($left, $right);
     }
 
-    /** @return int -1, 0, or 1 (LLVM i64 ABI) */
+    /**
+     * Zend zendi_smart_strcmp — numeric strings compare as numbers (#22848).
+     *
+     * php-src: Zend/zend_operators.c — zendi_smart_strcmp / is_numeric_string_ex
+     *
+     * @return int -1, 0, or 1 (LLVM i64 ABI)
+     */
     public static function stringSpaceship(string $left, string $right): int
     {
+        if (is_numeric($left) && is_numeric($right)) {
+            return self::spaceshipNumeric(self::numericFromString($left), self::numericFromString($right));
+        }
         $cmp = strcmp($left, $right);
 
         return $cmp < 0 ? -1 : ($cmp > 0 ? 1 : 0);
+    }
+
+    /** Match Variable::looseNumericFromString for whole-string is_numeric operands. */
+    private static function numericFromString(string $s): int|float
+    {
+        if (((string) (int) $s) === $s) {
+            return (int) $s;
+        }
+
+        return (float) $s;
     }
 
     /** @param int $numOnLeft 1 when the numeric operand is on the left, 0 otherwise */

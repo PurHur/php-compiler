@@ -46,6 +46,8 @@ final class VmStringCompare
             case OpCode::TYPE_SMALLER_OR_EQUAL:
             case OpCode::TYPE_GREATER_OR_EQUAL:
                 return self::orderedCompare($context, $opcode->type, $leftStr, $rightStr);
+            case OpCode::TYPE_SPACESHIP:
+                return self::smartStrcmp($context, $leftStr, $rightStr);
             default:
                 throw new \LogicException(
                     'String/string comparison opcode not implemented for JIT: '.opcode_type_name($opcode->type)
@@ -59,7 +61,8 @@ final class VmStringCompare
         Value $leftStr,
         Value $rightStr
     ): Value {
-        $cmp = self::strcmp($context, $leftStr, $rightStr);
+        // Zend zendi_smart_strcmp — numeric strings as numbers (#22848).
+        $cmp = self::smartStrcmp($context, $leftStr, $rightStr);
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
 
@@ -72,6 +75,44 @@ final class VmStringCompare
                 'String/string ordering opcode not implemented for JIT: '.opcode_type_name($opcodeType)
             ),
         };
+    }
+
+    /**
+     * Zend zendi_smart_strcmp on native {@see __string__} (#22848).
+     *
+     * @return Value i64 -1 / 0 / 1
+     */
+    public static function smartStrcmp(Context $context, Value $leftStr, Value $rightStr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $lex = self::strcmp($context, $leftStr, $rightStr);
+        $bothNumeric = $context->builder->and(
+            VmValueCompare::stringIsNumeric($context, $leftStr),
+            VmValueCompare::stringIsNumeric($context, $rightStr)
+        );
+        $leftDouble = VmValueCompare::stringToDouble($context, $leftStr);
+        $rightDouble = VmValueCompare::stringToDouble($context, $rightStr);
+        $lt = $context->builder->fcmp(Builder::REAL_OLT, $leftDouble, $rightDouble);
+        $gt = $context->builder->fcmp(Builder::REAL_OGT, $leftDouble, $rightDouble);
+        $negOne = $i64->constInt(-1, true);
+        $one = $i64->constInt(1, true);
+        $zero = $i64->constInt(0, false);
+        $numericCmp = $context->builder->select(
+            $gt,
+            $one,
+            $context->builder->select($lt, $negOne, $zero)
+        );
+        $lexNorm = $context->builder->select(
+            $context->builder->icmp(Builder::INT_SLT, $lex, $zero),
+            $negOne,
+            $context->builder->select(
+                $context->builder->icmp(Builder::INT_SGT, $lex, $zero),
+                $one,
+                $zero
+            )
+        );
+
+        return $context->builder->select($bothNumeric, $numericCmp, $lexNorm);
     }
 
     /** True when $haystack ends with the same bytes as $suffix (inventory argv absolute paths — #3046). */

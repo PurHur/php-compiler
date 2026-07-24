@@ -1874,7 +1874,11 @@ restart:
                 $this->bool($this->_compareOp($opCode, $left->float, $right->float));
                 break;
             case TYPE_PAIR_STRING_STRING:
-                $this->bool($this->_compareOp($opCode, $left->string, $right->string));
+                // Zend compare_function string branch uses zendi_smart_strcmp (#22848).
+                $this->bool($this->_compareFromSpaceship(
+                    $opCode,
+                    CompareJitHelperScalars::stringSpaceship($left->string, $right->string)
+                ));
                 break;
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
                 $this->bool($this->_compareOp($opCode, $left->bool, $right->bool));
@@ -2038,8 +2042,8 @@ restart:
                 $this->int($this->_spaceship($leftCopy->float, $rightCopy->float));
                 break;
             case TYPE_PAIR_STRING_STRING:
-                $cmp = strcmp($leftCopy->string, $rightCopy->string);
-                $this->int($cmp < 0 ? -1 : ($cmp > 0 ? 1 : 0));
+                // Zend zendi_smart_strcmp — numeric strings as numbers (#22848).
+                $this->int(CompareJitHelperScalars::stringSpaceship($leftCopy->string, $rightCopy->string));
                 break;
             case TYPE_PAIR_BOOLEAN_BOOLEAN:
                 $this->int($this->_spaceship((int) $leftCopy->bool, (int) $rightCopy->bool));
