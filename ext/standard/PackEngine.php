@@ -77,7 +77,8 @@ final class PackEngine
                 case 'H':
                     $valueIdx = $currentArg;
                     $str = self::argString($args[$currentArg++], $frame, $valueIdx);
-                    $packed = self::packHex($str, $arg, 'H' === $code);
+                    // VM Frame-aware illegal-hex E_WARNING (php-src pack.c; #22831).
+                    $packed = self::packHex($str, $arg, 'H' === $code, $frame);
                     $output = self::writeAt($output, $outputPos, $packed);
                     $outputPos += \strlen($packed);
                     break;
@@ -253,6 +254,20 @@ final class PackEngine
             return;
         }
         $message = \sprintf('pack(): %d arguments unused', $argc - $consumed);
+        self::emitPackWarning($message, $frame);
+    }
+
+    /**
+     * php-src pack.c hex path → E_WARNING `pack(): Type %c: illegal hex digit %c` (#22831).
+     */
+    public static function warnIllegalHexDigit(string $type, string $digit, ?Frame $frame = null): void
+    {
+        $ch = '' !== $digit ? $digit[0] : "\0";
+        self::emitPackWarning(\sprintf('pack(): Type %s: illegal hex digit %s', $type, $ch), $frame);
+    }
+
+    private static function emitPackWarning(string $message, ?Frame $frame = null): void
+    {
         if (null !== $frame && null !== $frame->vmContext) {
             $frame->vmContext->errors->triggerError(
                 $message,
@@ -477,13 +492,19 @@ final class PackEngine
         return $outputSize;
     }
 
-    private static function packHex(string $str, int $arg, bool $highNibbleFirst): string
+    /**
+     * Hex nibble pack for format `H`/`h` — VM Frame-aware warnings (#22831).
+     *
+     * JIT/AOT uses {@see PackEngineEncode::packHex} (trigger_error only).
+     */
+    private static function packHex(string $str, int $arg, bool $highNibbleFirst, ?Frame $frame = null): string
     {
         $out = '';
         $remain = $arg;
         $pos = 0;
         $slen = \strlen($str);
         $nibbleShift = $highNibbleFirst ? 4 : 0;
+        $type = $highNibbleFirst ? 'H' : 'h';
         $first = true;
         $byte = 0;
 
@@ -492,8 +513,10 @@ final class PackEngine
         }
 
         while ($remain-- > 0) {
-            $n = self::hexNibble($str[$pos++]);
+            $digit = $str[$pos++];
+            $n = self::hexNibble($digit);
             if ($n < 0) {
+                self::warnIllegalHexDigit($type, $digit, $frame);
                 $n = 0;
             }
             if ($first) {

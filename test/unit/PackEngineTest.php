@@ -70,6 +70,30 @@ final class PackEngineTest extends TestCase
         $this->assertSame(\E_USER_WARNING, $seen[0][0]);
     }
 
+    /** php-src pack.c hex path → `pack(): Type %c: illegal hex digit %c` (#22831). */
+    public function testIllegalHexDigitEmitWarning(): void
+    {
+        $seen = [];
+        set_error_handler(static function (int $errno, string $message) use (&$seen): bool {
+            $seen[] = [$errno, $message];
+
+            return true;
+        });
+        try {
+            $this->assertSame("\0", PackEngine::pack('H', ['x']));
+            $this->assertSame("\0\x10", PackEngine::pack('H*', ['0g1']));
+            $this->assertSame("\0", PackEngine::pack('h*', ['gx']));
+        } finally {
+            restore_error_handler();
+        }
+        $this->assertCount(4, $seen);
+        $this->assertSame('pack(): Type H: illegal hex digit x', $seen[0][1]);
+        $this->assertSame('pack(): Type H: illegal hex digit g', $seen[1][1]);
+        $this->assertSame('pack(): Type h: illegal hex digit g', $seen[2][1]);
+        $this->assertSame('pack(): Type h: illegal hex digit x', $seen[3][1]);
+        $this->assertSame(\E_USER_WARNING, $seen[0][0]);
+    }
+
     public function testFloatFormatsMatchZend(): void
     {
         foreach ([0.0, 1.5, -2.25, 3.14159] as $value) {

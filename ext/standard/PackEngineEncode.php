@@ -8,6 +8,9 @@ namespace PHPCompiler\ext\standard;
  * pack() binary encode helpers — separate compile unit for nested JIT (#13062).
  *
  * php-src: ext/standard/pack.c
+ *
+ * Keep this unit free of Frame/ErrorReporter/PackEngine so PackJitHelper nested
+ * AOT emit stays lean (#22831).
  */
 final class PackEngineEncode
 {
@@ -75,6 +78,14 @@ final class PackEngineEncode
         return \substr($output, 0, $pos).$chunk.\substr($output, $pos + \strlen($chunk));
     }
 
+    /**
+     * Hex nibble pack for format `H`/`h` (php-src pack.c).
+     *
+     * Illegal hex digits emit E_WARNING then coerce to 0 (#22831).
+     * Nested JIT/AOT uses host trigger_error (no Frame); VM path is {@see PackEngine}.
+     *
+     * @param bool $highNibbleFirst true for `H`, false for `h`
+     */
     public static function packHex(string $str, int $arg, bool $highNibbleFirst): string
     {
         $out = '';
@@ -82,6 +93,7 @@ final class PackEngineEncode
         $pos = 0;
         $slen = \strlen($str);
         $nibbleShift = $highNibbleFirst ? 4 : 0;
+        $type = $highNibbleFirst ? 'H' : 'h';
         $first = true;
         $byte = 0;
 
@@ -90,8 +102,14 @@ final class PackEngineEncode
         }
 
         while ($remain-- > 0) {
-            $n = self::hexNibble($str[$pos++]);
+            $digit = $str[$pos++];
+            $n = self::hexNibble($digit);
             if ($n < 0) {
+                // php-src: php_error_docref(NULL, E_WARNING, "Type %c: illegal hex digit %c", code, n);
+                @\trigger_error(
+                    \sprintf('pack(): Type %s: illegal hex digit %s', $type, $digit),
+                    \E_USER_WARNING
+                );
                 $n = 0;
             }
             if ($first) {
@@ -107,6 +125,7 @@ final class PackEngineEncode
             }
         }
 
+        // php-src ext/standard/pack.c: odd nibble count emits high/low nibble as one byte (#12217).
         if (!$first) {
             $out .= \chr($byte);
         }
