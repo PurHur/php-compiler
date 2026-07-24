@@ -127,6 +127,18 @@ class AotTest extends BaseTest
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
                 continue;
             }
+            // isSensitive (#22899 / #7072) — same 8.4 gate; exclude *_parameter* names.
+            if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_phantom')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsEncapsedCoalesce()
                 && str_contains($name, 'encapsed_coalesce_interpolation')) {
                 continue;
