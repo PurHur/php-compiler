@@ -41,6 +41,10 @@ final class ArrayPadVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_pad_pad_type.phpt',
             'array_pad_pad_type.phpt'
         );
+        yield 'array_pad_pad_type_profile82.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_pad_type_profile82.phpt',
+            'array_pad_pad_type_profile82.phpt'
+        );
         yield 'array_pad_type_enum.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/array_pad_type_enum.phpt',
             'array_pad_type_enum.phpt'

@@ -315,7 +315,7 @@ final class StdlibConstants
     public const GLOB_AVAILABLE_FLAGS = 9303;
 
     /**
-     * Profile-gated CORE_INT lookup for defined()/ConstFetch (#14993 ARRAY_PAD_*, #22785 PHP_ROUND_*).
+     * Profile-gated CORE_INT lookup for defined()/ConstFetch (#14993/#22786 ARRAY_PAD_*, #22785 PHP_ROUND_*).
      *
      * Internal mode tables may still read {@see CORE_INT_BY_NAME} / class constants directly.
      */
