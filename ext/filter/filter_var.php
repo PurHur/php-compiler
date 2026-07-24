@@ -49,7 +49,7 @@ final class filter_var extends Internal
         if (!VmFilter::isSupportedFilter($filterId)) {
             self::triggerUnknownFilterWarning($frame, $filterId);
         }
-        self::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options));
+        self::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options, $frame));
     }
 
     public static function triggerUnknownFilterWarning(Frame $frame, int $filterId): void
@@ -306,6 +306,10 @@ final class filter_var extends Internal
                 break;
             case Variable::TYPE_NULL:
                 $frame->returnVar->null();
+                break;
+            case Variable::TYPE_ARRAY:
+            case Variable::TYPE_OBJECT:
+                $frame->returnVar->copyFrom($result);
                 break;
             default:
                 throw new \LogicException('filter_var() returned unexpected type');
