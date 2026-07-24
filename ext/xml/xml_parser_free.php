@@ -11,7 +11,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** xml_parser_free() — release SAX parser handle (php-src ext/xml/xml.c; #11987). */
+/**
+ * xml_parser_free() — documented no-op since PHP 8.0 (php-src ext/xml/xml.c; #11987, #22813).
+ *
+ * Validates XMLParser and returns true; GC owns teardown (unset/$parser = null).
+ */
 final class xml_parser_free extends Internal
 {
     public function __construct()
