@@ -781,20 +781,29 @@ class Block {
 
     /**
      * Copy variable slot mappings from a parent block (for synthetic CFG branches).
+     *
+     * @param bool $remapCollidingSlots When true (literal include/require inlining),
+     *        assign fresh slots if the parent's index is already used so {@see getOperand()}
+     *        cannot return a callee temp for a parent local (#22845 MiniWebApp nested
+     *        $appName). CFG branch inheritance must keep shared slot indices (default).
      */
-    public function inheritScopeFrom(Block $parent): void
+    public function inheritScopeFrom(Block $parent, bool $remapCollidingSlots = false): void
     {
         foreach ($parent->scope as $operand) {
             if ($this->scope->contains($operand)) {
                 continue;
             }
-            $slot = $parent->scope[$operand];
+            $parentSlot = $parent->scope[$operand];
+            $slot = $parentSlot;
+            if ($remapCollidingSlots && null !== $this->operandForScopeSlot($slot)) {
+                $slot = $this->nextScopeSlot();
+            }
             $this->scope[$operand] = $slot;
             if ($parent->args->contains($operand)) {
                 $this->args[$operand] = $slot;
             }
-            if (isset($parent->constants[$slot]) && !isset($this->constants[$slot])) {
-                $this->constants[$slot] = $parent->constants[$slot];
+            if (isset($parent->constants[$parentSlot]) && !isset($this->constants[$slot])) {
+                $this->constants[$slot] = $parent->constants[$parentSlot];
             }
         }
         foreach ($parent->namedAssignDestSlotIndexes as $slot => $_) {

@@ -121,17 +121,19 @@ final class IncludeHelper
     ): void {
         $context = $jit->context;
 
-        $included->inheritScopeFrom($callerBlock);
+        // Remap colliding parent slots — callee opcodes keep their indices; parent
+        // locals are name-bound via IncludeBindingJitHelper (#22845).
+        $included->inheritScopeFrom($callerBlock, true);
         $included->inheritUndefinedLocals = true;
 
         $context->inlineIncludeCallerBlocks[] = $callerBlock;
+        // Bind from the immediate caller TU. Nested layout→partial sees names the
+        // layout already inherited from the defining method (#764). Skipping to the
+        // grandparent re-resolved defining-TU __value__ slots and could surface a
+        // sibling local ($title) as $appName in the partial (#22845).
         $bindingCaller = $callerBlock;
         if (null !== $context->listUnpackAssignCallerBlock) {
             $bindingCaller = $context->listUnpackAssignCallerBlock;
-        } elseif (\count($context->inlineIncludeCallerBlocks) > 1) {
-            $bindingCaller = $context->inlineIncludeCallerBlocks[
-                \count($context->inlineIncludeCallerBlocks) - 2
-            ];
         }
         $localBindings = IncludeBindingJitHelper::collectCalleeLocalBindings($context, $bindingCaller, $included);
         $preIncludeBb = $context->builder->getInsertBlock();

@@ -176,6 +176,55 @@ final class BasicBlockHelper
         return $slot;
     }
 
+    /**
+     * Store into an entry alloca from the function entry block (after leading allocas).
+     *
+     * CONCAT KIND_VALUE→alloca promotion must not emit the seed store in a loop body —
+     * that re-initializes the local every iteration (#22845 MiniWebApp htmlspecialchars).
+     */
+    public static function storeAtFunctionEntry(Context $context, Function_ $fn, Value $value, Value $slot): void
+    {
+        $entry = $fn->countBasicBlocks() > 0
+            ? $fn->getEntryBasicBlock()
+            : $fn->appendBasicBlock('entry');
+        $restore = self::tryGetInsertBlock($context);
+        try {
+            $inst = $entry->getFirstInstruction();
+            while (null !== $inst && $inst->isAAllocaInst()) {
+                $inst = $inst->getNext();
+            }
+            if (null !== $inst) {
+                // Insert before first non-alloca (may be the terminator) — never after it.
+                $context->builder->position($entry, $inst);
+            } else {
+                $terminator = $entry->getTerminator();
+                if (null !== $terminator) {
+                    $context->builder->positionBefore($terminator);
+                } else {
+                    $context->builder->positionAtEnd($entry);
+                }
+            }
+        } catch (\Throwable) {
+            $terminator = $entry->getTerminator();
+            if (null !== $terminator) {
+                $context->builder->positionBefore($terminator);
+            } else {
+                $context->builder->positionAtEnd($entry);
+            }
+        }
+        $context->builder->store($value, $slot);
+        if (null !== $restore) {
+            $terminator = $restore->getTerminator();
+            if (null !== $terminator) {
+                $context->builder->positionBefore($terminator);
+            } else {
+                $context->builder->positionAtEnd($restore);
+            }
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
     public static function sealOpenBlock(Context $context, BasicBlock $block): void
     {
         if (null !== $block->getTerminator()) {

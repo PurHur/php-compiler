@@ -8383,12 +8383,31 @@ class JIT {
                             Variable::KIND_VARIABLE,
                             $slot
                         );
-                        $promoted->initialize();
+                        // Seed at function entry — not at the CONCAT site (may be a loop body) (#22845).
                         if (null !== $result->value) {
-                            $this->context->builder->store($result->value, $slot);
+                            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                                $this->context,
+                                $func,
+                                $result->value,
+                                $slot
+                            );
                             $promoted->addref();
+                        } else {
+                            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                                $this->context,
+                                $func,
+                                $this->context->type->string->pointer->constNull(),
+                                $slot
+                            );
                         }
                         $this->context->setVariableOp($destOp, $promoted);
+                        // In-place CONCAT may use an unnamed Temporary for the slot while
+                        // the named `$out` Operand still points at the pre-promote alloca —
+                        // bind by scoped name so left load and store share one slot (#22845).
+                        $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
+                        if (null !== ($result->compileTimeString ?? null)) {
+                            $promoted->compileTimeString = $result->compileTimeString;
+                        }
                         $result = $promoted;
                     }
                     $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
@@ -8427,10 +8446,20 @@ class JIT {
                         // immediate. The promotion above only covers TYPE_STRING, so a dest whose
                         // inferred type never settled on string reached here and emitted
                         // `store %__string__* %x, i64 N`, failing module verification (#21886).
+                        // KIND_VARIABLE string locals already hold an `__string__**` alloca —
+                        // do not treat that pointer-to-pointer as "wrong" and allocate a second
+                        // slot (load $out from %8 / store concat into %0 — #22845).
                         $destSlot = $result->value;
-                        if (null === $destSlot
+                        $destSlotTy = null !== $destSlot
+                            ? $this->context->getStringFromType($destSlot->typeOf())
+                            : '';
+                        $hasStringAlloca = Variable::KIND_VARIABLE === $result->kind
+                            && ('__string__**' === $destSlotTy || 'ptr' === $destSlotTy);
+                        if (!$hasStringAlloca && (
+                            null === $destSlot
                             || Variable::KIND_VALUE === $result->kind
-                            || '__string__*' !== $this->context->getStringFromType($destSlot->typeOf())) {
+                            || ('__string__*' !== $destSlotTy && '__string__**' !== $destSlotTy)
+                        )) {
                             $destSlot = JIT\BasicBlockHelper::entryAllocaForFunction(
                                 $this->context,
                                 $func,
@@ -8442,8 +8471,19 @@ class JIT {
                                 Variable::KIND_VARIABLE,
                                 $destSlot
                             );
-                            $promoted->initialize();
+                            // Seed at entry so loop-carried CONCAT does not reset (#22845).
+                            $seed = null !== $result->value
+                                && Variable::KIND_VALUE === $result->kind
+                                ? $result->value
+                                : $this->context->type->string->pointer->constNull();
+                            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                                $this->context,
+                                $func,
+                                $seed,
+                                $destSlot
+                            );
                             $this->context->setVariableOp($destOp, $promoted);
+                            $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
                             $result = $promoted;
                         }
                         $this->context->builder->store($newStr, $destSlot);
@@ -18263,6 +18303,36 @@ class JIT {
             return;
         }
         $this->context->bindVariableByName($name, $this->context->getVariableFromOp($op));
+    }
+
+    /**
+     * After KIND_VALUE→alloca CONCAT promotion, rebind every Operand for the dest
+     * scope slot (named local + unnamed Temporary) so in-place `$out .=` loads and
+     * stores the same alloca across loop iterations (#22845).
+     */
+    private function bindPromotedStringConcatDest(Block $block, Operand $destOp, Variable $promoted): void
+    {
+        $names = [];
+        $destName = JIT\OperandName::resolve($destOp);
+        if (null !== $destName && '' !== $destName) {
+            $names[$destName] = true;
+        }
+        $slot = $block->slotForOperand($destOp);
+        if (null !== $slot) {
+            foreach ($block->scopedOperands() as $scopeOp) {
+                if ($block->slotForOperand($scopeOp) !== $slot) {
+                    continue;
+                }
+                $this->context->setVariableOp($scopeOp, $promoted);
+                $scopeName = JIT\OperandName::resolve($scopeOp);
+                if (null !== $scopeName && '' !== $scopeName) {
+                    $names[$scopeName] = true;
+                }
+            }
+        }
+        foreach ($names as $name => $_) {
+            $this->context->bindVariableByName((string) $name, $promoted);
+        }
     }
 
     /**
