@@ -22644,7 +22644,11 @@ class Compiler {
             if (null === $producer->result) {
                 continue;
             }
-            if (!$this->operandsReferToSameVariable($producer->result, $callArg)) {
+            // php-cfg parseArg clones leave distinct temps with producer listed in Temporary->ops (#22753).
+            $opsMatch = isset($callArg->ops)
+                && \is_array($callArg->ops)
+                && \in_array($producer, $callArg->ops, true);
+            if (!$this->operandsReferToSameVariable($producer->result, $callArg) && !$opsMatch) {
                 continue;
             }
             if (
@@ -25499,6 +25503,19 @@ class Compiler {
             if (
                 $child instanceof Op\Expr\PropertyFetch
                 && $this->isPropertyFetchOnlyIssetVar($child, $next)
+            ) {
+                continue;
+            }
+            // $a->b?->m() / $a?->b?->m() — receiver fetch feeds NullsafeMethodCall, not outer call arg (#22753).
+            // Without this, byIndex maps var_export($h->b?->f(), true) arg0 to the Recv object.
+            if (
+                ($child instanceof Op\Expr\PropertyFetch || $child instanceof Op\Expr\NullsafePropertyFetch)
+                && $next instanceof Op\Expr\NullsafeMethodCall
+                && null !== $child->result
+                && (
+                    $next->var === $child->result
+                    || $this->operandsReferToSameVariable($next->var, $child->result)
+                )
             ) {
                 continue;
             }
