@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * VM-runtime sprintf() subset (%s, %d, %f, %a, %A, %%, %n$ positional, width/flags, #3631, #9069).
+ * VM-runtime sprintf() subset (%s, %d, %f, %a, %A, %%, %n$ positional, width/flags, %'<char> pad, #3631, #9069, #22833).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -155,6 +155,16 @@ final class VmSprintf
             }
             if ('+' === $flag) {
                 $showSign = '+';
+                ++$pos;
+                continue;
+            }
+            // php-src formatted_print.c — %'<char> custom pad (issue #22833).
+            if ("'" === $flag) {
+                ++$pos;
+                if ($pos >= $len) {
+                    throw new \ValueError('Missing padding character');
+                }
+                $padding = $format[$pos];
                 ++$pos;
                 continue;
             }
