@@ -2251,27 +2251,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ DateTime::createFromTimestamp() / DateTimeImmutable::createFromTimestamp() (ext/date/php_date.c, #5973, #9984, #18027).
+     * PHP 8.4+ DateTime::createFromTimestamp() / DateTimeImmutable::createFromTimestamp()
+     * (ext/date/php_date.c, #5973, #9984, #18027, #22795).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 — methods absent). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * php.net 8.4 release — not present on Zend 8.3. Same gate as {@see supportsDateTimeMicrosecond()}.
      */
     public static function supportsDateTimeCreateFromTimestamp(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
