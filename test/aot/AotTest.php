@@ -80,16 +80,6 @@ class AotTest extends BaseTest
                 && str_contains($name, 'clamp')) {
                 continue;
             }
-            if (!CompilerVersion::supportsPhp83ArrayKeyFunctions()
-                && str_contains($name, 'array_first_last_key')
-                && !str_contains($name, 'array_first_last_key_phantom')
-                && !str_contains($name, 'array_first_last_key_forward_84')) {
-                continue;
-            }
-            if (CompilerVersion::supportsPhp83ArrayKeyFunctions()
-                && str_contains($name, 'array_first_last_key_phantom')) {
-                continue;
-            }
             if (!CompilerVersion::supportsPhp85ArrayFirstLast()
                 && ((str_contains($name, 'array_first') && !str_contains($name, 'array_first_key') && !str_contains($name, 'array_first_last_key'))
                     || (str_contains($name, 'array_last') && !str_contains($name, 'array_last_key') && !str_contains($name, 'array_first_last_key')))

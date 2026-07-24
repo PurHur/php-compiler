@@ -644,11 +644,6 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
-    public function testPhp83ArrayKeyFunctionsWithheldOnReferenceProfile(): void
-    {
-        $this->assertFalse(CompilerVersion::supportsPhp83ArrayKeyFunctions());
-    }
-
     public function testPhp84ArraySearchFunctionsWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
@@ -686,28 +681,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testPhp83ArrayKeyFunctionsTrueWhenProfile83(): void
-    {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.3');
-        try {
-            $this->assertTrue(CompilerVersion::supportsPhp83ArrayKeyFunctions());
-            $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
-    }
-
     public function testPhp84ArraySearchFunctionsTrueWhenProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsPhp83ArrayKeyFunctions());
             $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
             $this->assertFalse(CompilerVersion::supportsPhp85ArrayFirstLast());
             $this->assertFalse(CompilerVersion::advertisesPhp85ArrayFirstLast());
@@ -1172,8 +1150,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
             foreach (['array_find', 'array_find_key', 'array_any', 'array_all'] as $fn) {
                 $this->assertTrue(isset($ctx->functions[$fn]), $fn);
             }
-            foreach (['array_first', 'array_last'] as $fn) {
+            foreach (['array_first', 'array_last', 'array_first_key', 'array_last_key'] as $fn) {
                 $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+            }
+            foreach (['array_key_first', 'array_key_last'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
             }
         } finally {
             if (false === $prev) {
@@ -1193,6 +1174,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
             $ctx = $runtime->vmContext;
             foreach (['array_first', 'array_last'] as $fn) {
                 $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+            foreach (['array_first_key', 'array_last_key'] as $fn) {
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
         } finally {
             if (false === $prev) {

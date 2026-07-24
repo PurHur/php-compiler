@@ -238,7 +238,6 @@ class Module extends ModuleAbstract
             new array_key_exists('key_exists'),
             new array_key_first(),
             new array_key_last(),
-            ...(CompilerVersion::supportsPhp83ArrayKeyFunctions() ? [new array_first_key(), new array_last_key()] : []),
             new key(),
             new current(),
             new pos(),

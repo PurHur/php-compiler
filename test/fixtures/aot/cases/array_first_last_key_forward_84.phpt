@@ -1,23 +1,16 @@
 --TEST--
-AOT: array_first_key()/array_last_key() PHP 8.4 forward profile (#16995, ext/standard/array.c)
+AOT: array_first_key()/array_last_key() phantom on PHP 8.4 forward profile (#22793)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-$k = array_first_key([]);
-echo $k === null ? "empty_first\n" : "bad_first\n";
-$k = array_last_key([]);
-echo $k === null ? "empty_last\n" : "bad_last\n";
-$list = [10, 20, 30];
-echo array_first_key($list), "\n";
-echo array_last_key($list), "\n";
+echo function_exists('array_first_key') ? "fail_first\n" : "ok_first\n";
+echo function_exists('array_last_key') ? "fail_last\n" : "ok_last\n";
 $a = ['x' => 1, 'y' => 2];
-echo array_first_key($a), "\n";
-echo array_last_key($a), "\n";
+echo array_key_first($a), "\n";
+echo array_key_last($a), "\n";
 --EXPECT--
-empty_first
-empty_last
-0
-2
+ok_first
+ok_last
 x
 y
