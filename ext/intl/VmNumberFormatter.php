@@ -353,6 +353,8 @@ final class VmNumberFormatter
             // ICU pad defaults (#22920): width 0, PAD_BEFORE_PREFIX.
             self::FORMAT_WIDTH => 0,
             self::PADDING_POSITION => self::PAD_BEFORE_PREFIX,
+            // Significant digits unused until setAttribute (#22921).
+            self::SIGNIFICANT_DIGITS_USED => 0,
         ];
         if (self::PERCENT === $style) {
             $attrs[self::FRACTION_DIGITS] = 0;
@@ -726,6 +728,11 @@ final class VmNumberFormatter
         if (self::FORMAT_WIDTH === $attribute && is_numeric($value) && 0 === (int) $value) {
             return false;
         }
+        // Unused significant min/max are unset → false (#22921).
+        if ((self::MIN_SIGNIFICANT_DIGITS === $attribute || self::MAX_SIGNIFICANT_DIGITS === $attribute)
+            && !array_key_exists($attribute, $state['attributes'])) {
+            return false;
+        }
 
         return $value;
     }
@@ -759,6 +766,18 @@ final class VmNumberFormatter
             $n = (int) $value;
             self::$state[$formatter->id]['attributes'][self::MIN_INTEGER_DIGITS] = $n;
             self::$state[$formatter->id]['attributes'][self::INTEGER_DIGITS] = $n;
+        } elseif (self::SIGNIFICANT_DIGITS_USED === $attribute) {
+            $n = (int) $value;
+            self::$state[$formatter->id]['attributes'][self::SIGNIFICANT_DIGITS_USED] = $n;
+            // ICU fills default min/max when significant mode is first enabled (#22921).
+            if ($n !== 0) {
+                if (!isset(self::$state[$formatter->id]['attributes'][self::MIN_SIGNIFICANT_DIGITS])) {
+                    self::$state[$formatter->id]['attributes'][self::MIN_SIGNIFICANT_DIGITS] = 1;
+                }
+                if (!isset(self::$state[$formatter->id]['attributes'][self::MAX_SIGNIFICANT_DIGITS])) {
+                    self::$state[$formatter->id]['attributes'][self::MAX_SIGNIFICANT_DIGITS] = 6;
+                }
+            }
         } else {
             self::$state[$formatter->id]['attributes'][$attribute] = $value;
         }
@@ -864,6 +883,10 @@ final class VmNumberFormatter
             self::fail($formatter, 'Error setting text attribute: U_UNSUPPORTED_ERROR');
 
             return false;
+        }
+        // ICU UNUM_PADDING_CHARACTER is a single UChar (#22920).
+        if (self::PADDING_CHARACTER === $attribute && '' !== $value) {
+            $value = substr($value, 0, 1);
         }
         self::$state[$formatter->id]['textAttributes'][$attribute] = $value;
         self::clearObjectError($formatter);
@@ -1174,6 +1197,44 @@ final class VmNumberFormatter
             $grouping = '';
         }
 
+        // Significant-digit mode overrides fraction attrs (#22921).
+        if ((int) ($attrs[self::SIGNIFICANT_DIGITS_USED] ?? 0) !== 0) {
+            $minSig = (int) ($attrs[self::MIN_SIGNIFICANT_DIGITS] ?? 1);
+            $maxSig = (int) ($attrs[self::MAX_SIGNIFICANT_DIGITS] ?? 6);
+            if ($minSig < 1) {
+                $minSig = 1;
+            }
+            if ($maxSig < $minSig) {
+                $maxSig = $minSig;
+            }
+            [$abs, $minFrac, $maxFrac] = self::roundToSignificantDigits($abs, $minSig, $maxSig);
+            // Skip normal fraction attr resolution; use significant-derived fracs.
+            $forceFrac = null;
+            $intPart = (int) floor($abs + 1e-12);
+            $frac = $abs - $intPart;
+            $intStr = self::groupDigits(
+                self::applyIntegerDigitAttrs((string) $intPart, $attrs),
+                $grouping,
+                $groupSize
+            );
+            if ($maxFrac <= 0) {
+                return $intStr;
+            }
+            $fracInt = (int) round($frac * (10 ** $maxFrac) + 1e-12);
+            $fracStr = str_pad((string) $fracInt, $maxFrac, '0', STR_PAD_LEFT);
+            if ($minFrac < $maxFrac) {
+                $fracStr = substr($fracStr, 0, max($minFrac, strlen(rtrim($fracStr, '0'))));
+                if ($minFrac > 0) {
+                    $fracStr = str_pad($fracStr, $minFrac, '0', STR_PAD_RIGHT);
+                }
+            }
+            if ('' === $fracStr && 0 === $minFrac) {
+                return $intStr;
+            }
+
+            return $intStr.$decimal.str_pad($fracStr, max($minFrac, strlen($fracStr)), '0', STR_PAD_RIGHT);
+        }
+
         // Prefer MIN/MAX_FRACTION_DIGITS (ICU DecimalFormat). FRACTION_DIGITS alone is
         // only a fallback when min/max were never materialized (#22900 — DECIMAL
         // defaults are min=0 max=3 with getAttribute(FRACTION_DIGITS)=0).
@@ -1304,6 +1365,43 @@ final class VmNumberFormatter
         }
 
         return $intDigits;
+    }
+
+    /**
+     * Round abs value to max significant digits; return [value, minFrac, maxFrac] (#22921).
+     *
+     * @return array{0: float, 1: int, 2: int}
+     */
+    private static function roundToSignificantDigits(float $abs, int $minSig, int $maxSig): array
+    {
+        if ($abs <= 0.0 || !is_finite($abs)) {
+            // Zend formats 0 with minSig as 0.0 when minSig=2.
+            $frac = max(0, $minSig - 1);
+
+            return [0.0, $frac, $frac];
+        }
+        $exp = (int) floor(log10($abs) + 1e-12);
+        $magnitude = 10 ** ($exp - $maxSig + 1);
+        if ($magnitude == 0.0) {
+            $magnitude = 1e-300;
+        }
+        $rounded = round($abs / $magnitude) * $magnitude;
+        if ($rounded <= 0.0) {
+            $frac = max(0, $minSig - 1);
+
+            return [0.0, $frac, $frac];
+        }
+        // Recompute exponent after rounding (999 → 1000 bumps exp).
+        $exp2 = (int) floor(log10($rounded) + 1e-12);
+        $maxFrac = max(0, $maxSig - $exp2 - 1);
+        $minFrac = max(0, $minSig - $exp2 - 1);
+        // For values like 12 (maxSig=2), minFrac/maxFrac are 0.
+        // Keep trailing zeros when minSig requires more fraction digits than maxFrac.
+        if ($minFrac > $maxFrac) {
+            $maxFrac = $minFrac;
+        }
+
+        return [$rounded, $minFrac, $maxFrac];
     }
 
     /**
