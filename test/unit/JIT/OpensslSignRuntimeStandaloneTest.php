@@ -24,6 +24,8 @@ final class OpensslSignRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('OPENSSL_LINK_LIB', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/OpensslSignRuntime.php');
         $this->assertStringContainsString('OpensslSignJitHelper', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
     }
 
     /**
