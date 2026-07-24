@@ -70,6 +70,10 @@ final class JitParseUrl
             }
             if (null !== $urlLiteral) {
                 $result = VmString::parseUrl($urlLiteral, -1);
+                // Invalid port / empty host → false (php-src url.c); do not throw (#22822).
+                if (false === $result) {
+                    return self::materializeVmResult($context, false);
+                }
                 if (!\is_array($result)) {
                     throw new \LogicException('parse_url() compile-time URL must yield an array');
                 }
@@ -225,7 +229,7 @@ final class JitParseUrl
         if (false === $result) {
             JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
         } elseif (null === $result) {
-            JitValueBox::writeNull($context, $slot);
+            $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
         } elseif (\is_int($result)) {
             $i64 = $context->getTypeFromString('int64');
             JitValueBox::writeLong($context, $slot, $i64->constInt($result, false));
