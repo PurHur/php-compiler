@@ -204,7 +204,31 @@ final class BuiltinParamNamesAliasTest extends TestCase
         $names = BuiltinParamNames::forFunction('call_user_func');
         self::assertSame(['callback'], $names);
         self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('call_user_func'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('call_user_func'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('call_user_func'));
         self::assertSame(['callback', 'args'], BuiltinParamNames::forFunction('call_user_func_array'));
+    }
+
+    /** @covers issue #22825 */
+    public function testInternalPrintfFamilyAndArrayVariadicReflectionArity(): void
+    {
+        $cases = [
+            'sprintf' => [1, 1, 2],
+            'printf' => [1, 1, 2],
+            'array_merge' => [0, 0, 1],
+            'array_push' => [1, 1, 2],
+            'max' => [1, 1, 2],
+            'min' => [1, 1, 2],
+            'array_map' => [2, 2, 3],
+        ];
+        foreach ($cases as $fn => [$index, $required, $total]) {
+            self::assertSame($index, BuiltinParamNames::variadicParamIndexForFunction($fn), $fn.' variadic index');
+            self::assertSame($required, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn.' required');
+            self::assertSame($total, BuiltinParamNames::paramCountForInternalFunction($fn), $fn.' total');
+        }
+        self::assertSame(['format', 'values'], BuiltinParamNames::forFunction('sprintf'));
+        self::assertSame(['arrays'], BuiltinParamNames::forFunction('array_merge'));
+        self::assertNull(BuiltinParamNames::variadicParamIndexForFunction('strlen'));
     }
 
     /** @covers issue #10042 */
