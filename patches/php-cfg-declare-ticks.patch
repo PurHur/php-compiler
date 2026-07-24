@@ -1,1 +1,2 @@
-# Marker patch — applied via apply_php_cfg_declare_ticks_overlay() in apply-patches.sh (#3343).
+# Marker patch — applied via apply_php_cfg_declare_ticks_overlay() in apply-patches.sh (#3343, #22840).
+# Braced declare(ticks=N){…} parses stmts + LeaveTickInterval; SetTickInterval::$scoped.

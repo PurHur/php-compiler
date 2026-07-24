@@ -225,6 +225,12 @@ class OpCode {
     /** End declare(ticks=N) block scope — restore previous interval (#3343). */
     const TYPE_TICK_SCOPE_LEAVE = 132;
 
+    /**
+     * Statement-boundary tick check (Zend tickable statement cadence, #22840).
+     * Runtime decrements EG-style counter and may invoke register_tick_function handlers.
+     */
+    const TYPE_TICKS = 133;
+
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];
 

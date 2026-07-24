@@ -248,6 +248,14 @@ function opcode_type_name(int $type): string
             return 'TYPE_PROPERTY_FETCH_WRITE';
         case 129:
             return 'TYPE_EMPTY_DIMENSION';
+        case 130:
+            return 'TYPE_TICK_SCOPE_ENTER';
+        case 131:
+            return 'TYPE_TICK_SCOPE_SET';
+        case 132:
+            return 'TYPE_TICK_SCOPE_LEAVE';
+        case 133:
+            return 'TYPE_TICKS';
         default:
             return 'unknown opcode';
     }

@@ -314,12 +314,34 @@ class Parser
         if (null === $this->currentFunc) {
             return;
         }
+        $tickInterval = null;
         foreach ($node->declares as $item) {
-            if ('strict_types' !== $item->key->toLowerString()) {
+            $key = $item->key->toLowerString();
+            if ('ticks' === $key && $item->value instanceof Node\Scalar\LNumber) {
+                $tickInterval = max(0, (int) $item->value->value);
+                continue;
+            }
+            if ('strict_types' !== $key) {
                 continue;
             }
             if ($item->value instanceof Node\Scalar\LNumber) {
                 $this->currentFunc->strictTypes = 1 === $item->value->value;
+            }
+        }
+        $braced = null !== $node->stmts;
+        if (null !== $tickInterval) {
+            $this->block->children[] = new Op\Terminal\SetTickInterval(
+                $tickInterval,
+                $this->mapAttributes($node),
+                $braced
+            );
+        }
+        if ($braced) {
+            $this->block = $this->parseNodes($node->stmts, $this->block);
+            if (null !== $tickInterval) {
+                $this->block->children[] = new Op\Terminal\LeaveTickInterval(
+                    $this->mapAttributes($node)
+                );
             }
         }
     }
