@@ -82,6 +82,7 @@ use PHPCompiler\Compiler\GeneratorStaticMethodCompileCheck;
 use PHPCompiler\Compiler\ReadonlyClassCompileCheck;
 use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Compiler\TraitCollisionCheck;
+use PHPCompiler\Compiler\ClassConstVisibilityInheritCheck;
 use PHPCompiler\Compiler\TypedClassConstInheritCheck;
 use PHPCompiler\Compiler\ClassCompileRegistry;
 use PHPCompiler\Compiler\OverrideValidator;
@@ -561,6 +562,7 @@ class Compiler {
         FinalClassConstCheck::validate($script);
         TraitClassConstConflictCheck::validate($script);
         TypedClassConstInheritCheck::validate($script);
+        ClassConstVisibilityInheritCheck::validate($script);
         InterfaceConstVisibilityCheck::validate($script);
         InterfaceMethodVisibilityCheck::validate($script);
         InterfaceMethodBodyCheck::validate($script);
