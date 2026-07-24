@@ -457,6 +457,43 @@ class VM {
         return false;
     }
 
+    /**
+     * Zend zend_check_private: when virtual lookup found a private method outside the
+     * calling scope, rebind to the caller's same-name private if $obj is in that hierarchy.
+     *
+     * php-src: Zend/zend_object_handlers.c — zend_check_private / zend_std_get_method (#22928).
+     */
+    private function resolvePrivateInstanceMethodForScope(
+        ClassEntry $declaringClass,
+        string $methodLc,
+        ClassEntry $objectClass,
+        ?string $callerClassLc
+    ): ClassEntry {
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        if (($vis & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
+            return $declaringClass;
+        }
+        if (null === $callerClassLc || $callerClassLc === strtolower($declaringClass->name)) {
+            return $declaringClass;
+        }
+        if (!isset($this->context->classes[$callerClassLc])) {
+            return $declaringClass;
+        }
+        $callerEntry = $this->context->classes[$callerClassLc];
+        if (!isset($callerEntry->methods[$methodLc])) {
+            return $declaringClass;
+        }
+        $callerVis = $callerEntry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        if (($callerVis & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
+            return $declaringClass;
+        }
+        if (!$this->isClassSameOrSubclassOf(strtolower($objectClass->name), $callerClassLc)) {
+            return $declaringClass;
+        }
+
+        return $callerEntry;
+    }
+
     /** Coerce a VM value to string, invoking __toString on objects when defined (issue #3296). */
     public function coerceVariableToString(Variable $var, ?Frame $frame = null): string
     {
@@ -15296,8 +15333,17 @@ restart:
             }
             throw $e;
         }
-        $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        // Zend zend_check_private / early-bind: when the resolved method is private and the
+        // calling scope differs, prefer the caller's same-name private if $obj is in that
+        // class hierarchy (Zend/zend_object_handlers.c; #22928).
         $callerClassLc = $this->callerClassLc($frame);
+        $declaringClass = $this->resolvePrivateInstanceMethodForScope(
+            $declaringClass,
+            $methodLc,
+            $class,
+            $callerClassLc
+        );
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
         $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodName;
         try {
