@@ -273,7 +273,11 @@ final class ReflectionTypeSupport
         $class = self::requireClass($ctx, ReflectionSupport::REFLECTION_UNION_TYPE);
         $obj = new ObjectEntry($class);
         $obj->constructed = true;
-        self::storeCommonTypeProps($obj, $typeString, true);
+        // php-src ReflectionUnionType::allowsNull — true only when null is a member
+        // (or a nested nullable/mixed), not for every multi-type union (#22851).
+        self::storeCommonTypeProps($obj, $typeString, self::allowsNullFromCfg(
+            new CfgType\Union_($members)
+        ));
         $obj->getProperty(ReflectionSupport::PROP_TYPE_MEMBERS)->copyFrom(
             self::membersArray($ctx, $members)
         );
