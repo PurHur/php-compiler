@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\intl\BuiltinClasses;
+use PHPCompiler\ext\intl\IntlError;
 use PHPCompiler\ext\intl\IntlExtensionPolicy;
 use PHPCompiler\ext\intl\VmLocale;
 use PHPCompiler\ext\standard\VmReflection;
@@ -59,5 +60,23 @@ PHP;
         $accepted = VmLocale::acceptFromHttp('en-US,en;q=0.9,fr;q=0.8');
         self::assertIsString($accepted);
         self::assertSame('en_US', $accepted);
+    }
+
+    /** #22853 — ICU reject sets U_ILLEGAL_ARGUMENT_ERROR (php-src locale_methods.c). */
+    public function test_accept_from_http_invalid_sets_illegal_argument(): void
+    {
+        IntlError::clear();
+        $r = VmLocale::acceptFromHttp('!!!invalid!!!');
+        self::assertFalse($r);
+        self::assertSame(IntlError::U_ILLEGAL_ARGUMENT_ERROR, IntlError::getCode());
+        self::assertSame(
+            'locale_accept_from_http: failed to find acceptable locale: U_ILLEGAL_ARGUMENT_ERROR',
+            IntlError::getMessage()
+        );
+        self::assertTrue(IntlError::isFailure(IntlError::getCode()));
+
+        $ok = VmLocale::acceptFromHttp('en-US,en;q=0.5');
+        self::assertSame('en_US', $ok);
+        self::assertFalse(IntlError::isFailure(IntlError::getCode()));
     }
 }
