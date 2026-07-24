@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ObjectLifetime;
 use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\VM\Variable;
 
@@ -186,7 +187,13 @@ final class SplIteratorSupport
     }
 
     /**
-     * Reattach Generator/Closure payload cleared by premature ObjectLifetime GC (#6138).
+     * Reattach Generator/Closure payload cleared by premature ObjectLifetime GC (#6138, #22874).
+     *
+     * Frame {@see ObjectLifetime::releaseDirectObject} can drive refcount to 0 while a pin
+     * Variable still holds the ObjectEntry. That runs {@see \PHPCompiler\VM::closeGenerator}
+     * (marking the pinned {@see GeneratorState} done) and {@see ObjectEntry::destroyForGc}
+     * (nulling the live pointer). Restore the pointer and undo a never-started force-close
+     * so IteratorIterator / NoRewindIterator / CachingIterator can rewind temp Generators.
      */
     public static function ensurePinnedObjectAlive(ObjectEntry $object): void
     {
@@ -196,10 +203,40 @@ final class SplIteratorSupport
         if (null === $object->closureState && isset(self::$closureStatePins[$object->id])) {
             $object->closureState = self::$closureStatePins[$object->id];
         }
+        $gen = $object->generatorState;
+        if (null !== $gen && isset(self::$generatorStatePins[$object->id])) {
+            // Premature dtor: closeGenerator → markClosedWithoutReturn without ever starting.
+            if ($gen->done && !$gen->started && !$gen->hasReturned) {
+                $gen->rewind();
+                $object->destructorInvoked = false;
+            }
+        }
         if (!ObjectRegistry::isRegistered($object->id)
             && (isset(self::$generatorStatePins[$object->id]) || isset(self::$closureStatePins[$object->id]))) {
             ObjectRegistry::register($object);
         }
+        // Pin Variable still owns the object but skewed releaseDirectObject left refCount at 0.
+        if ($object->refCount < 1 && self::pinVariableHolds($object)) {
+            ObjectLifetime::addRef($object);
+        }
+    }
+
+    private static function pinVariableHolds(ObjectEntry $object): bool
+    {
+        foreach (self::$objectPins as $storedKey => $slot) {
+            if (!str_ends_with($storedKey, ':'.$object->id) && $storedKey !== 'obj:'.$object->id) {
+                continue;
+            }
+            if (Variable::TYPE_OBJECT === $slot->type) {
+                try {
+                    return $slot->toObject()->id === $object->id;
+                } catch (\LogicException) {
+                    return false;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static function typeLabel(Variable $var): string
