@@ -41,6 +41,9 @@ final class VmJson
     /** JSON_ERROR_DEPTH — maximum stack depth exceeded (Zend ext/json/php_json.c). */
     public const ERROR_DEPTH = 1;
 
+    /** JSON_ERROR_UTF16 — unpaired UTF-16 surrogate in \\u escape (Zend ext/json/json_scanner.re). */
+    public const ERROR_UTF16 = 10;
+
     /** Last JSON_ERROR_* from VM json_* (Zend ext/json/php_json.c). */
     private static int $lastError = 0;
 
@@ -69,6 +72,7 @@ final class VmJson
             self::ERROR_RECURSION => 'Recursion detected',
             self::ERROR_INF_OR_NAN => 'Inf and NaN cannot be JSON encoded',
             self::ERROR_UNSUPPORTED_TYPE => 'Type is not supported',
+            self::ERROR_UTF16 => 'Single unpaired UTF-16 surrogate in unicode escape',
             self::ERROR_NON_BACKED_ENUM => 'Non-backed enums have no default serialization',
             default => 'Unknown error',
         };

@@ -131,8 +131,10 @@ final class VmJsonParser
         $objectOut = new \stdClass();
         for (;;) {
             $key = $this->parseStringValue();
-            if (!\is_string($key) || '' === $key) {
-                VmJson::setLastError(4);
+            if (!\is_string($key)) {
+                if (0 === VmJson::lastError()) {
+                    VmJson::setLastError(4);
+                }
 
                 return null;
             }
@@ -249,19 +251,11 @@ final class VmJsonParser
                 continue;
             }
             if ('u' === $esc) {
-                if ($this->pos + 4 > $this->len) {
-                    VmJson::setLastError(4);
-
+                $escaped = $this->parseUnicodeEscape();
+                if (null === $escaped) {
                     return null;
                 }
-                $hex = \substr($this->json, $this->pos, 4);
-                if (!ctype_xdigit($hex)) {
-                    VmJson::setLastError(4);
-
-                    return null;
-                }
-                $this->pos += 4;
-                $out .= self::unicodeEscape((int) hexdec($hex));
+                $out .= $escaped;
                 continue;
             }
             VmJson::setLastError(4);
@@ -403,6 +397,69 @@ final class VmJsonParser
         $this->pos += $litLen;
 
         return true;
+    }
+
+    /**
+     * php-src ext/json/json_scanner.re — UTF16_1..4 / UCS2; unpaired surrogates → JSON_ERROR_UTF16.
+     */
+    private function parseUnicodeEscape(): ?string
+    {
+        $unit = $this->readHexUnicodeUnit();
+        if (null === $unit) {
+            return null;
+        }
+        if ($unit >= 0xD800 && $unit <= 0xDBFF) {
+            // php-src: unpaired high → JSON_ERROR_UTF16 even if a following \u is truncated/invalid.
+            if ($this->pos + 6 > $this->len
+                || '\\' !== $this->json[$this->pos]
+                || 'u' !== $this->json[$this->pos + 1]
+            ) {
+                VmJson::setLastError(VmJson::ERROR_UTF16);
+
+                return null;
+            }
+            $lowHex = \substr($this->json, $this->pos + 2, 4);
+            if (!ctype_xdigit($lowHex)) {
+                VmJson::setLastError(VmJson::ERROR_UTF16);
+
+                return null;
+            }
+            $low = (int) hexdec($lowHex);
+            if ($low < 0xDC00 || $low > 0xDFFF) {
+                VmJson::setLastError(VmJson::ERROR_UTF16);
+
+                return null;
+            }
+            $this->pos += 6;
+            $codepoint = 0x10000 + (($unit & 0x3FF) << 10) + ($low & 0x3FF);
+
+            return self::unicodeEscape($codepoint);
+        }
+        if ($unit >= 0xDC00 && $unit <= 0xDFFF) {
+            VmJson::setLastError(VmJson::ERROR_UTF16);
+
+            return null;
+        }
+
+        return self::unicodeEscape($unit);
+    }
+
+    private function readHexUnicodeUnit(): ?int
+    {
+        if ($this->pos + 4 > $this->len) {
+            VmJson::setLastError(4);
+
+            return null;
+        }
+        $hex = \substr($this->json, $this->pos, 4);
+        if (!ctype_xdigit($hex)) {
+            VmJson::setLastError(4);
+
+            return null;
+        }
+        $this->pos += 4;
+
+        return (int) hexdec($hex);
     }
 
     private static function unicodeEscape(int $codepoint): string
