@@ -8381,6 +8381,14 @@ class JIT {
                             $promoted->addref();
                         }
                         $this->context->setVariableOp($destOp, $promoted);
+                        // Named locals must follow KIND_VALUE→alloca promotion or later
+                        // getVariableFromOp keeps the stale rvalue (#22845 method/helper concat).
+                        // Bind $promoted directly — maybeBindNamedVariable would re-read the
+                        // stale namedVariableBindings entry and undo the promotion.
+                        $destName = JIT\OperandName::resolve($destOp);
+                        if (null !== $destName && '' !== $destName) {
+                            $this->context->bindVariableByName($destName, $promoted);
+                        }
                         $result = $promoted;
                     }
                     $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
@@ -8436,6 +8444,11 @@ class JIT {
                             );
                             $promoted->initialize();
                             $this->context->setVariableOp($destOp, $promoted);
+                            // Keep namedVariableBindings in sync with the alloca (#22845).
+                            $destName = JIT\OperandName::resolve($destOp);
+                            if (null !== $destName && '' !== $destName) {
+                                $this->context->bindVariableByName($destName, $promoted);
+                            }
                             $result = $promoted;
                         }
                         $this->context->builder->store($newStr, $destSlot);
