@@ -48,9 +48,8 @@ final class SplQueueBuiltin
             }
         }
 
+        // php-src: SplQueue has no reflected __construct (#22789).
         $entry->constructor = new SplQueueConstruct();
-        $entry->methods['__construct'] = $entry->constructor;
-        $entry->methodVisibility['__construct'] = $pub;
         foreach ([
             'enqueue' => SplQueueEnqueue::class,
             'dequeue' => SplQueueDequeue::class,
@@ -98,9 +97,8 @@ final class SplStackBuiltin
             }
         }
 
+        // php-src: SplStack has no reflected __construct (#22789).
         $entry->constructor = new SplStackConstruct();
-        $entry->methods['__construct'] = $entry->constructor;
-        $entry->methodVisibility['__construct'] = $pub;
         $entry->methods['setiteratormode'] = new SplStackSetIteratorMode();
         $entry->methodVisibility['setiteratormode'] = $pub;
         $entry->methodNames['setiteratormode'] = 'setIteratorMode';
@@ -116,7 +114,8 @@ final class SplStackBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['__construct'], $entry->methods['getiteratormode'], $entry->methods['top']);
+        return isset($entry->methods['getiteratormode'], $entry->methods['top'])
+            && null !== $entry->constructor;
     }
 }
 

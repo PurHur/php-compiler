@@ -2469,13 +2469,21 @@ final class VmReflection
     }
 
     /**
+     * Public (etc.) method names including parents — php-src get_class_methods (#22789).
+     *
+     * Walks `parentLc` like {@see collectClassMethodsForReflection()} so builtin SPL
+     * subclasses (SplFileObject → SplFileInfo, SplStack → SplDoublyLinkedList, …) list
+     * inherited methods. Interfaces keep {@see interfaceDeclarationChain()}.
+     *
      * @return list<string>
      */
     public static function classMethodsList(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): array
     {
         $entries = [$entry];
-        if ($entry->isInterface && null !== $ctx) {
-            $entries = self::interfaceDeclarationChain($entry, $ctx);
+        if (null !== $ctx) {
+            $entries = $entry->isInterface
+                ? self::interfaceDeclarationChain($entry, $ctx)
+                : self::classHierarchyChain($entry, $ctx);
         }
         $names = [];
         /** @var array<string, true> */
@@ -2496,6 +2504,14 @@ final class VmReflection
                 }
                 $vis = $scan->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
                 if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+                    continue;
+                }
+                // Parent-private methods are not visible on the child (zend_get_class_methods).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $scan !== $entry) {
+                    continue;
+                }
+                // PDO_*_Ext / similar parent-only methods are not inherited (#21552).
+                if ($scan !== $entry && isset($scan->methodNotInherited[$methodLc])) {
                     continue;
                 }
                 $seenMethodLcs[$methodLc] = true;
