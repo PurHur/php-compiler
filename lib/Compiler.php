@@ -43,6 +43,7 @@ use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\FinalPromotedPropertyRewriter;
 use PHPCompiler\Ast\LazyPropertyRewriter;
 use PHPCompiler\Ast\GeneratorYieldSourceMarker;
+use PHPCompiler\Compiler\AbstractMethodBodyCheck;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceConstVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceMethodBodyCheck;
@@ -564,6 +565,7 @@ class Compiler {
         InterfaceConstVisibilityCheck::validate($script);
         InterfaceMethodVisibilityCheck::validate($script);
         InterfaceMethodBodyCheck::validate($script);
+        AbstractMethodBodyCheck::validate($script);
         AbstractMethodVisibilityCheck::validate($script);
         MagicMethodReturnTypeCheck::validate($script);
         EnumMagicMethodCheck::validate($script);
