@@ -685,6 +685,8 @@ final class BuiltinExceptionSupport
         $entry = $ctx->classes[$classLc];
         $obj = new ObjectEntry($entry);
         $obj->getProperty(self::PROP_MESSAGE)->string($message);
+        // php-src zend_throw_exception / zend_exception_get_props: default code is 0 (#22945).
+        $obj->getProperty(ExceptionSupport::PROP_CODE)->int(0);
         ExceptionSupport::stampThrowableSite($obj, $file, $line);
         $obj->constructed = true;
         $var = new Variable();
@@ -699,18 +701,7 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
-        if (!isset($ctx->classes[self::CLASS_DIVISION_BY_ZERO_ERROR])) {
-            throw new \LogicException('DivisionByZeroError builtin class is not registered');
-        }
-        $entry = $ctx->classes[self::CLASS_DIVISION_BY_ZERO_ERROR];
-        $obj = new ObjectEntry($entry);
-        $obj->getProperty(self::PROP_MESSAGE)->string($message);
-        ExceptionSupport::stampThrowableSite($obj, $file, $line);
-        $obj->constructed = true;
-        $var = new Variable();
-        $var->object($obj);
-
-        return $var;
+        return self::materializeThrowable($ctx, self::CLASS_DIVISION_BY_ZERO_ERROR, $message, $file, $line);
     }
 
     public static function materializeArithmeticError(Context $ctx, string $message): Variable
