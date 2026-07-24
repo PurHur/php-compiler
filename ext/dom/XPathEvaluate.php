@@ -36,7 +36,8 @@ final class XPathEvaluate extends DomClassMethod
             $xpath,
             $expression,
             $context,
-            $registerNodeNS
+            $registerNodeNS,
+            $frame
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($result);

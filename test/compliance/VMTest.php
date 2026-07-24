@@ -18,6 +18,11 @@ class VMTest extends BaseTest {
                 && !\PHPCompiler\ext\gd\VmGdFreeType::available()) {
                 continue;
             }
+            // Host without php-gd: withhold functional gd_* / image* cases; keep phantom (#22740).
+            if (!\PHPCompiler\ext\gd\GdExtensionPolicy::runsGdCompliance($name)
+                && \PHPCompiler\ext\gd\GdExtensionPolicy::isGdComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsStrIncrement()
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))
                 && !str_contains($name, 'str_increment_phantom')) {

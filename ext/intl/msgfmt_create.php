@@ -36,7 +36,8 @@ final class msgfmt_create extends Internal
         }
         $object = VmMessageFormatter::create($frame->vmContext, $locale, $pattern);
         if (null === $object) {
-            $frame->returnVar->bool(false);
+            // php-src msgfmt_create → null on ICU failure (#22577).
+            $frame->returnVar->null();
 
             return;
         }

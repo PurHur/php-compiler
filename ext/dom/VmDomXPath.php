@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -191,17 +193,17 @@ final class VmDomXPath
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode = null,
-        bool $registerNodeNS = true
+        bool $registerNodeNS = true,
+        string $failureMethod = 'query',
+        ?Frame $frame = null
     ): Variable {
         try {
             $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
         } catch (\DOMException $e) {
-            // Legacy DOMXPath: libxml warning + false; Dom\XPath throws (#20842 / php-src xpath.c).
-            if ('Undefined namespace prefix' === $e->getMessage() && !VmDom::prefersDomNodeList($xpath)) {
-                $false = new Variable(Variable::TYPE_BOOLEAN);
-                $false->bool(false);
-
-                return $false;
+            // Legacy DOMXPath: libxml E_WARNING + false; Dom\XPath throws (#22721 / php-src xpath.c).
+            $legacy = self::tryLegacyLibxmlXPathFailure($ctx, $xpath, $failureMethod, $e, $frame);
+            if (null !== $legacy) {
+                return $legacy;
             }
             throw $e;
         }
@@ -218,7 +220,8 @@ final class VmDomXPath
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode = null,
-        bool $registerNodeNS = true
+        bool $registerNodeNS = true,
+        ?Frame $frame = null
     ): Variable {
         $expression = trim($expression);
         try {
@@ -249,16 +252,49 @@ final class VmDomXPath
                 return $var;
             }
 
-            return self::query($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+            // Node-set path — keep warn method as evaluate (#22755).
+            return self::query($ctx, $xpath, $expression, $contextNode, $registerNodeNS, 'evaluate', $frame);
         } catch (\DOMException $e) {
-            if ('Undefined namespace prefix' === $e->getMessage() && !VmDom::prefersDomNodeList($xpath)) {
-                $false = new Variable(Variable::TYPE_BOOLEAN);
-                $false->bool(false);
-
-                return $false;
+            // Legacy DOMXPath: libxml E_WARNING + false; Dom\XPath throws (#22721 / #22755).
+            $legacy = self::tryLegacyLibxmlXPathFailure($ctx, $xpath, 'evaluate', $e, $frame);
+            if (null !== $legacy) {
+                return $legacy;
             }
             throw $e;
         }
+    }
+
+    /**
+     * php-src ext/dom/xpath.c — xmlXPathEval failure on classic DOMXPath → E_WARNING + false.
+     * Living Dom\XPath keeps DOMException (#20842).
+     */
+    private static function tryLegacyLibxmlXPathFailure(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $method,
+        \DOMException $e,
+        ?Frame $frame = null
+    ): ?Variable {
+        if (VmDom::prefersDomNodeList($xpath)) {
+            return null;
+        }
+        $message = $e->getMessage();
+        if ('Invalid expression' !== $message
+            && 'Undefined namespace prefix' !== $message
+            && 'Invalid number of arguments' !== $message) {
+            return null;
+        }
+        $ctx->errors->triggerError(
+            sprintf('DOMXPath::%s(): %s', $method, $message),
+            ErrorReporter::E_WARNING,
+            null !== $frame && '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $ctx,
+            $frame
+        );
+        $false = new Variable(Variable::TYPE_BOOLEAN);
+        $false->bool(false);
+
+        return $false;
     }
 
     /**

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\gd\GdExtensionPolicy;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
 /**
- * gd extension module skeleton registration (issue #7407).
+ * gd extension module registration gated on host php-gd (#7407, #22740).
  *
  * @group gd_skeleton
  */
@@ -18,8 +19,36 @@ final class GdModuleSkeletonTest extends TestCase
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
+        $fns = [
+            'imagecreate',
+            'imagecreatetruecolor',
+            'imagealphablending',
+            'imagesavealpha',
+            'imagecolorallocatealpha',
+            'imageantialias',
+            'imagesetthickness',
+        ];
 
-        foreach (['imagecreate', 'imagecreatetruecolor', 'imagealphablending', 'imagesavealpha', 'imagecolorallocatealpha', 'imageantialias', 'imagesetthickness'] as $fn) {
+        if (!GdExtensionPolicy::advertisesExtension()) {
+            foreach ($fns as $fn) {
+                self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
+            }
+            self::assertFalse(ext\standard\ModuleRegistry::extensionLoaded('gd'));
+
+            $code = <<<'PHP'
+<?php
+echo (int) function_exists('imagecreate');
+echo (int) extension_loaded('gd');
+PHP;
+            $block = $runtime->parseAndCompile($code, 'gd_module.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame('00', ob_get_clean());
+
+            return;
+        }
+
+        foreach ($fns as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -38,16 +67,5 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame('11111111', ob_get_clean());
-    }
-
-    public function test_imagecreate_stub_throws_error(): void
-    {
-        $runtime = new Runtime();
-        $fn = new \PHPCompiler\ext\gd\imagecreate();
-        $frame = $fn->getFrame($runtime->vmContext);
-
-        $this->expectException(\Error::class);
-        $this->expectExceptionMessage('imagecreate() is not implemented in this compiler build (issue #3496)');
-        $fn->execute($frame);
     }
 }

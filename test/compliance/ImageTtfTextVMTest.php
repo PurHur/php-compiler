@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\gd\GdExtensionPolicy;
 use PHPCompiler\ext\gd\VmGdFreeType;
 
 require_once __DIR__.'/../BaseTest.php';
@@ -15,7 +16,8 @@ final class ImageTtfTextVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        if (!VmGdFreeType::available()
+        if (!GdExtensionPolicy::advertisesExtension()
+            || !VmGdFreeType::available()
             || !\is_readable('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')) {
             return;
         }
@@ -31,6 +33,9 @@ final class ImageTtfTextVMTest extends BaseTest
 
     public function setUp(): void
     {
+        if (!GdExtensionPolicy::advertisesExtension()) {
+            $this->markTestSkipped('host php-gd required for #6532 (#22740)');
+        }
         if (!VmGdFreeType::available()
             || !\is_readable('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')) {
             $this->markTestSkipped('libfreetype + DejaVuSans required for #6532');

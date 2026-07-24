@@ -23,6 +23,11 @@ class JITTest extends BaseTest {
                 && !\PHPCompiler\ext\gd\VmGdFreeType::available()) {
                 continue;
             }
+            // Host without php-gd: withhold functional gd_* / image* cases; keep phantom (#22740).
+            if (!\PHPCompiler\ext\gd\GdExtensionPolicy::runsGdCompliance($name)
+                && \PHPCompiler\ext\gd\GdExtensionPolicy::isGdComplianceCase($name)) {
+                continue;
+            }
             // VM-first (#6212/#6248/#6064): JIT hangs/OOM on create_listen / datagram accept scripts; defer JIT PHPT.
             if (str_contains($name, 'socket_create_listen')
                 || str_contains($name, 'socket_datagram')

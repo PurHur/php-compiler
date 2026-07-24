@@ -253,6 +253,7 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         VmMessageFormatter::registerClass($ctx);
+        self::registerIntlException($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -317,9 +318,28 @@ final class BuiltinClasses
 
     private static function registerIntlException(Context $ctx): void
     {
+        if (isset($ctx->classes['intlexception'])) {
+            return;
+        }
+        // Prefer ThrowableManifest registration (properties + ExceptionConstruct). Forced
+        // MessageFormatter registration without host intl still needs a usable class (#22577).
         $entry = new ClassEntry('IntlException');
         if (isset($ctx->classes['exception'])) {
+            $parent = $ctx->classes['exception'];
             $entry->parentLc = 'exception';
+            foreach ($parent->properties as $prop) {
+                $entry->properties[] = $prop;
+            }
+            foreach ($parent->methods as $lc => $handler) {
+                $entry->methods[$lc] = $handler;
+                if (isset($parent->methodVisibility[$lc])) {
+                    $entry->methodVisibility[$lc] = $parent->methodVisibility[$lc];
+                }
+                if (isset($parent->methodNames[$lc])) {
+                    $entry->methodNames[$lc] = $parent->methodNames[$lc];
+                }
+            }
+            $entry->constructor = $parent->constructor;
         }
         $ctx->classes['intlexception'] = $entry;
     }
