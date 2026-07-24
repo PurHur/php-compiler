@@ -839,7 +839,19 @@ C;
                 $buf = $ffi->new('char[157]');
                 $len = (int) $ffi->$accept($buf, 156, \FFI::addr($out), $header, $en, \FFI::addr($status));
                 $ffi->$close($en);
-                if ((int) $status->cdata > 0 || $len < 0 || 0 === (int) $out->cdata) {
+                // php-src locale_methods.c: INTL_CHECK_STATUS(status, "…failed to find acceptable locale")
+                // then RETURN_FALSE when len < 0 || ULOC_ACCEPT_FAILED (no extra error if status OK).
+                if ((int) $status->cdata > 0) {
+                    $code = (int) $status->cdata;
+                    $name = IntlError::errorName($code);
+                    IntlError::set(
+                        $code,
+                        'locale_accept_from_http: failed to find acceptable locale: '.$name
+                    );
+
+                    return false;
+                }
+                if ($len < 0 || 0 === (int) $out->cdata) {
                     IntlError::clear();
 
                     return false;
