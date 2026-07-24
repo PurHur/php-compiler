@@ -255,6 +255,10 @@ final class VmFilterTest extends TestCase
     {
         $this->assertTrue(VmFilter::isValidEmailSubset('user@example.com'));
         $this->assertTrue(VmFilter::isValidEmailSubset('a@b.co'));
+        // php-src allows consecutive hyphens and digit-leading non-TLD labels.
+        $this->assertTrue(VmFilter::isValidEmailSubset('user@ex--ample.com'));
+        $this->assertTrue(VmFilter::isValidEmailSubset('user@1example.com'));
+        $this->assertTrue(VmFilter::isValidEmailSubset('user@example.c0m'));
     }
 
     public function testIsValidEmailSubsetRejectsInvalidAddresses(): void
@@ -265,6 +269,14 @@ final class VmFilterTest extends TestCase
         $this->assertFalse(VmFilter::isValidEmailSubset('@example.com'));
         $this->assertFalse(VmFilter::isValidEmailSubset('a@b'));
         $this->assertFalse(VmFilter::isValidEmailSubset('a@@b.co'));
+        // Domain label rules (php-src logical_filters.c / #22826).
+        $this->assertFalse(VmFilter::isValidEmailSubset('test@-example.com'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('a@b..com'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('test@.com'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('test@example.com.'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('a@b-.com'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('a@-b.com'));
+        $this->assertFalse(VmFilter::isValidEmailSubset('a@b.1com'));
     }
 
     public function testUnknownFilterReturnsFalse(): void

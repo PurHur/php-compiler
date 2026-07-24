@@ -910,7 +910,7 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
-        if (!self::isValidEmailSubset($s, $flags)) {
+        if (!FilterEmailValidate::isValid($s, $flags)) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
@@ -1448,77 +1448,12 @@ final class VmFilter
 
     /**
      * Practical email subset: one @, non-empty local/domain, domain has a dot, ASCII only.
+     *
+     * SSOT: {@see FilterEmailValidate::isValid()} (Nested JIT/AOT unit).
      */
     public static function isValidEmailSubset(string $s, int $flags = 0): bool
     {
-        $len = strlen($s);
-        if (0 === $len || $len > 320) {
-            return false;
-        }
-        $at = strpos($s, '@');
-        if (false === $at || $at !== strrpos($s, '@')) {
-            return false;
-        }
-        if (0 === $at || $at === $len - 1) {
-            return false;
-        }
-        $local = substr($s, 0, $at);
-        $domain = substr($s, $at + 1);
-        if ('' === $local || '' === $domain || !str_contains($domain, '.')) {
-            return false;
-        }
-        $unicode = 0 !== ($flags & self::FILTER_FLAG_EMAIL_UNICODE);
-        if (!self::isEmailLocalPart($local, $unicode) || !self::isEmailDomainPart($domain, $unicode)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static function isEmailLocalPart(string $local, bool $unicode): bool
-    {
-        if ($unicode) {
-            return (bool) preg_match('/^[\p{L}\p{N}.!#$%&\'*+\/=?^_`{|}~-]+$/u', $local);
-        }
-
-        return self::charsMatch($local, [self::class, 'isEmailLocalChar']);
-    }
-
-    private static function isEmailDomainPart(string $domain, bool $unicode): bool
-    {
-        if ($unicode) {
-            return (bool) preg_match('/^[\p{L}\p{N}.-]+$/u', $domain);
-        }
-
-        return self::charsMatch($domain, [self::class, 'isEmailDomainChar']);
-    }
-
-    private static function charsMatch(string $s, callable $predicate): bool
-    {
-        $len = strlen($s);
-        for ($i = 0; $i < $len; ++$i) {
-            if (!$predicate($s[$i])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static function isEmailLocalChar(string $ch): bool
-    {
-        return ($ch >= 'a' && $ch <= 'z')
-            || ($ch >= 'A' && $ch <= 'Z')
-            || ($ch >= '0' && $ch <= '9')
-            || str_contains('.!#$%&\'*+/=?^_`{|}~-', $ch);
-    }
-
-    private static function isEmailDomainChar(string $ch): bool
-    {
-        return ($ch >= 'a' && $ch <= 'z')
-            || ($ch >= 'A' && $ch <= 'Z')
-            || ($ch >= '0' && $ch <= '9')
-            || '.' === $ch || '-' === $ch;
+        return FilterEmailValidate::isValid($s, $flags);
     }
 
     /** filter_has_var() — key present in request-input snapshot (php-src IF_G; #3294, #19640). */
