@@ -9,16 +9,18 @@ use PHPUnit\Framework\TestCase;
 /** filter_var FILTER_VALIDATE_EMAIL JIT routes through FilterEmailJitHelper PHP (#9860). */
 final class FilterEmailJitRuntimeShrinkTest extends TestCase
 {
-    public function testFilterEmailJitHelperDelegatesToVmFilter(): void
+    public function testFilterEmailJitHelperDelegatesToFilterEmailValidate(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/filter/FilterEmailJitHelper.php');
-        $this->assertStringContainsString('VmFilter::isValidEmailSubset', $source);
+        $this->assertStringContainsString('FilterEmailValidate::isValid', $source);
+        $this->assertStringNotContainsString('VmFilter::', $source);
     }
 
     public function testStringFilterEmailRoutesThroughFilterEmailJitHelper(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilterEmail.php');
         $this->assertStringContainsString('FilterEmailJitHelper', $source);
+        $this->assertStringContainsString('FilterEmailValidate', $source);
         $this->assertStringNotContainsString('llvmIsLocalChar', $source);
         $this->assertStringNotContainsString('filter_email_find_at_head', $source);
         $this->assertLessThan(160, \substr_count($source, "\n"), 'StringFilterEmail must be a thin bridge');
@@ -38,5 +40,10 @@ final class FilterEmailJitRuntimeShrinkTest extends TestCase
         $this->assertNull(\PHPCompiler\ext\filter\FilterEmailJitHelper::validate('bad'));
         $this->assertNull(\PHPCompiler\ext\filter\FilterEmailJitHelper::validate('bad@'));
         $this->assertNull(\PHPCompiler\ext\filter\FilterEmailJitHelper::validate('@example.com'));
+        // Domain label rules (#22826).
+        $this->assertNull(\PHPCompiler\ext\filter\FilterEmailJitHelper::validate('test@-example.com'));
+        $this->assertNull(\PHPCompiler\ext\filter\FilterEmailJitHelper::validate('a@b..com'));
+        $this->assertNull(\PHPCompiler\ext\filter\FilterEmailJitHelper::validate('test@example.com.'));
+        $this->assertSame('user@ex--ample.com', \PHPCompiler\ext\filter\FilterEmailJitHelper::validate('user@ex--ample.com'));
     }
 }
