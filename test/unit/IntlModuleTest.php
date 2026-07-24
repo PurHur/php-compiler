@@ -147,6 +147,44 @@ PHP;
         self::assertSame("3 files\ndoc uploaded\n1 x\n", ob_get_clean());
     }
 
+    public function test_messageformatter_invalid_pattern_create_null_construct_throws(): void
+    {
+        require_once dirname(__DIR__, 2).'/ext/intl/bootstrap_intlexception.php';
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerMessageFormatter($runtime->vmContext);
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\msgfmt_create());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\intl_get_error_code());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\intl_get_error_message());
+        $code = <<<'PHP'
+<?php
+echo 'idle=', var_export(intl_get_error_message(), true), "\n";
+$bad = MessageFormatter::create('en_US', '{invalid');
+echo 'type=', get_debug_type($bad), "\n";
+echo 'msg=', intl_get_error_message(), "\n";
+echo 'code=', intl_get_error_code(), "\n";
+try {
+    new MessageFormatter('en_US', '{invalid');
+    echo "no_throw\n";
+} catch (Throwable $e) {
+    echo 'err=', get_class($e), ':', $e->getMessage(), "\n";
+}
+$proc = msgfmt_create('en_US', '{invalid');
+echo 'proc=', get_debug_type($proc), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_msgfmt_bad_pattern.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "idle='U_ZERO_ERROR'\n"
+            ."type=null\n"
+            ."msg=msgfmt_create: message formatter creation failed: U_UNMATCHED_BRACES\n"
+            ."code=65801\n"
+            ."err=IntlException:msgfmt_create: message formatter creation failed: U_UNMATCHED_BRACES\n"
+            ."proc=null\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_transliterator_latin_ascii_via_forced_registration(): void
     {
         $runtime = new Runtime();

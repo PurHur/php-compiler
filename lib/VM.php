@@ -9772,6 +9772,8 @@ restart:
             return $this->dispatchVmDomException($e, $callerFrame);
         } catch (\SodiumException $e) {
             return $this->dispatchVmSodiumException($e, $callerFrame);
+        } catch (\IntlException $e) {
+            return $this->dispatchVmIntlException($e, $callerFrame);
         } catch (\RedisException $e) {
             return $this->dispatchVmRedisException($e, $callerFrame);
         } catch (\PHPCompiler\ext\simdjson\SimdJsonException $e) {
@@ -10460,6 +10462,20 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeSodiumException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native IntlException from ext/intl builtins into user catch handlers (#22577). */
+    private function dispatchVmIntlException(\IntlException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeIntlException(
             $this->context,
             $error->getMessage(),
             $file,

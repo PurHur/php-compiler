@@ -29,7 +29,7 @@ exists
 failure_fn
 name_fn
 0
-
+U_ZERO_ERROR
 ok
 yes
 U_ZERO_ERROR

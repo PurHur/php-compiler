@@ -26,6 +26,7 @@ final class BuiltinExceptionSupport
     public const CLASS_JSON_EXCEPTION = 'jsonexception';
     public const CLASS_DOM_EXCEPTION = 'domexception';
     public const CLASS_SODIUM_EXCEPTION = 'sodiumexception';
+    public const CLASS_INTL_EXCEPTION = 'intlexception';
     public const CLASS_REDIS_EXCEPTION = 'redisexception';
     public const CLASS_SIMDJSON_EXCEPTION = 'simdjsonexception';
     public const CLASS_PDO_EXCEPTION = 'pdoexception';
@@ -174,6 +175,20 @@ final class BuiltinExceptionSupport
         int $line = 0
     ): Variable {
         return self::materializeThrowable($ctx, self::CLASS_SODIUM_EXCEPTION, $message, $file, $line);
+    }
+
+    /** Bridge native IntlException from ext/intl builtins (#22577). */
+    public static function materializeIntlException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_INTL_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_INTL_EXCEPTION, $message, $file, $line);
     }
 
     /**

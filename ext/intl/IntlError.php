@@ -26,6 +26,9 @@ final class IntlError
     /** php-src / ICU U_INTERNAL_PROGRAM_ERROR */
     public const U_INTERNAL_PROGRAM_ERROR = 5;
 
+    /** php-src / ICU U_UNMATCHED_BRACES — MessageFormat create/parse (#22577). */
+    public const U_UNMATCHED_BRACES = 65801;
+
     /** php-src U_USING_FALLBACK_WARNING — not a failure for intl_is_failure() */
     public const U_USING_FALLBACK_WARNING = -128;
 
@@ -34,7 +37,8 @@ final class IntlError
 
     private static int $code = self::U_ZERO_ERROR;
 
-    private static string $message = '';
+    /** Idle / cleared state matches php-src intl_error_reset → "U_ZERO_ERROR" (#22577). */
+    private static string $message = 'U_ZERO_ERROR';
 
     private static ?\FFI $errorNameFfi = null;
 
@@ -61,7 +65,7 @@ final class IntlError
     public static function clear(): void
     {
         self::$code = self::U_ZERO_ERROR;
-        self::$message = '';
+        self::$message = 'U_ZERO_ERROR';
     }
 
     /** php-src PHP_FUNCTION(intl_is_failure) */
@@ -150,6 +154,7 @@ final class IntlError
             10 => 'U_INVALID_CHAR_FOUND',
             15 => 'U_BUFFER_OVERFLOW_ERROR',
             16 => 'U_UNSUPPORTED_ERROR',
+            65801 => 'U_UNMATCHED_BRACES',
             -127 => 'U_USING_DEFAULT_WARNING',
             -128 => 'U_USING_FALLBACK_WARNING',
         ];

@@ -41,6 +41,7 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        require_once __DIR__.'/bootstrap_intlexception.php';
         if (IntlExtensionPolicy::advertisesLocale()) {
             BuiltinClasses::registerLocale($runtime->vmContext);
         }
