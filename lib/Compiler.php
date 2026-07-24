@@ -24027,25 +24027,46 @@ class Compiler {
      * e.g. filter_var('abc', FILTER_VALIDATE_REGEXP, ['options' => ['regexp' => '/^a/']])
      * — producers [ConstFetch, inner Array_, outer Array_].
      *
+     * Also: filter_var('01', FILTER_VALIDATE_INT, ['options' => ['flags' => FILTER_FLAG_ALLOW_OCTAL]])
+     * — producers [ConstFetch filter, ConstFetch flags, inner Array_, outer Array_] (#22772).
+     * Intervening ConstFetches are array-element values; the call arg is still the outermost Array_.
+     *
      * @param list<Op\Expr> $producers
      *
      * @return array{0: Op\Expr\ConstFetch, 1: list<Op\Expr\Array_>}|null
      */
     private function splitLeadingConstFetchWithNestedArrayLiteralChain(array $producers): ?array
     {
-        $first = $producers[0] ?? null;
+        $count = \count($producers);
+        if ($count < 2) {
+            return null;
+        }
+        $first = $producers[0];
         if (!$first instanceof Op\Expr\ConstFetch) {
             return null;
         }
-        $rest = array_slice($producers, 1);
-        if ([] === $rest || !$this->producersAreNestedArrayLiteralChain($rest)) {
+        $arrayStart = null;
+        for ($i = 0; $i < $count; ++$i) {
+            if ($producers[$i] instanceof Op\Expr\Array_) {
+                $arrayStart = $i;
+                break;
+            }
+            if (!$producers[$i] instanceof Op\Expr\ConstFetch) {
+                return null;
+            }
+        }
+        if (null === $arrayStart || $arrayStart < 1) {
             return null;
         }
-        if (!$this->arrayProducersFormNestedChain($rest)) {
+        $arrayChain = \array_slice($producers, $arrayStart);
+        if ([] === $arrayChain || !$this->producersAreNestedArrayLiteralChain($arrayChain)) {
+            return null;
+        }
+        if (!$this->arrayProducersFormNestedChain($arrayChain)) {
             return null;
         }
 
-        return [$first, $rest];
+        return [$first, $arrayChain];
     }
 
     /**
@@ -43997,7 +44018,18 @@ class Compiler {
                     true
                 )
             ) {
-                $inlineArray = null;
+                // Flat ['flags'=>FILTER_*] defers to ConstFetch+Array_ wiring (#12326).
+                // Nested ['options'=>[...]] must keep the outermost Array_ (#12007, #22772).
+                $filterProducers = null !== $block->orig
+                    ? $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
+                    : [];
+                $leadingConstNested = $this->splitLeadingConstFetchWithNestedArrayLiteralChain($filterProducers);
+                if (null !== $leadingConstNested) {
+                    [, $arrayChain] = $leadingConstNested;
+                    $inlineArray = $arrayChain[\count($arrayChain) - 1];
+                } else {
+                    $inlineArray = null;
+                }
             }
             $arrayCombineNestedFuncArg = false;
             $arrayMergeNestedFuncArg = false;
@@ -47173,13 +47205,20 @@ class Compiler {
                 && 2 === (int) $argIndex
             ) {
                 $optionsArg = $cfgCallOp->args[2] ?? $arg;
-                if (
-                    $this->callArgIsDeadInlineTemporary($optionsArg)
-                    && $this->callArgOperandExpectsArrayProducer($optionsArg)
-                ) {
-                    $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
-                    if (null !== $outerSlot) {
-                        $valueSlot = $outerSlot;
+                if ($this->callArgIsDeadInlineTemporary($optionsArg)) {
+                    // Typed array[] options (#12007). Unknown-typed nested options with
+                    // FILTER_FLAG_* ConstFetch elements still need the outermost INIT_ARRAY (#22772).
+                    $useOutermostOptionsArray = $this->callArgOperandExpectsArrayProducer($optionsArg);
+                    if (!$useOutermostOptionsArray && null !== $block->orig) {
+                        $useOutermostOptionsArray = null !== $this->splitLeadingConstFetchWithNestedArrayLiteralChain(
+                            $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
+                        );
+                    }
+                    if ($useOutermostOptionsArray) {
+                        $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
+                        if (null !== $outerSlot) {
+                            $valueSlot = $outerSlot;
+                        }
                     }
                 }
             }
@@ -47189,13 +47228,18 @@ class Compiler {
                 && 3 === (int) $argIndex
             ) {
                 $optionsArg = $cfgCallOp->args[3] ?? $arg;
-                if (
-                    $this->callArgIsDeadInlineTemporary($optionsArg)
-                    && $this->callArgOperandExpectsArrayProducer($optionsArg)
-                ) {
-                    $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
-                    if (null !== $outerSlot) {
-                        $valueSlot = $outerSlot;
+                if ($this->callArgIsDeadInlineTemporary($optionsArg)) {
+                    $useOutermostOptionsArray = $this->callArgOperandExpectsArrayProducer($optionsArg);
+                    if (!$useOutermostOptionsArray && null !== $block->orig) {
+                        $useOutermostOptionsArray = null !== $this->splitLeadingConstFetchWithNestedArrayLiteralChain(
+                            $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
+                        );
+                    }
+                    if ($useOutermostOptionsArray) {
+                        $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
+                        if (null !== $outerSlot) {
+                            $valueSlot = $outerSlot;
+                        }
                     }
                 }
             }
