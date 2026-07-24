@@ -3580,14 +3580,17 @@ final class VmDateTimeNative
                 $h += 24;
                 --$d;
             }
-            if ($d < 0) {
-                $prevMonth = $m2 - 1;
-                $prevYear = $y2;
-                if ($prevMonth < 1) {
-                    $prevMonth = 12;
-                    --$prevYear;
+            // timelib_do_rel_normalize — keep borrowing months until d >= 0 (#22849).
+            // One-shot borrow left month-end → next-month-1st with negative d (m=1,d=-1).
+            $monthCursor = $m2;
+            $yearCursor = $y2;
+            while ($d < 0) {
+                --$monthCursor;
+                if ($monthCursor < 1) {
+                    $monthCursor = 12;
+                    --$yearCursor;
                 }
-                $d += self::daysInMonth($prevYear, $prevMonth);
+                $d += self::daysInMonth($yearCursor, $monthCursor);
                 --$m;
             }
             if ($m < 0) {
