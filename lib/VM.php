@@ -11082,6 +11082,24 @@ restart:
         $throwFrame = $this->context->pendingFinallyUnwindThrowFrame;
         $this->context->pendingFinallyUnwindThrowFrame = null;
         $this->releaseHandlerScopeObjectRefsOnExceptionLeave($handler, $throwFrame);
+        // Generator try/finally must bubble to the resume caller via GeneratorUncaughtThrow —
+        // not findCatchFrameForThrow into a caller try that is isolated during advance (#22869).
+        $gen = $this->findGeneratorState($handler);
+        if (null === $gen && null !== $throwFrame) {
+            $gen = $this->findGeneratorState($throwFrame);
+        }
+        if (null !== $gen) {
+            $gen->frame = null;
+            $gen->markClosedWithoutReturn();
+            throw new VM\GeneratorUncaughtThrow($thrown, $throwFrame ?? $handler);
+        }
+        $fiber = $this->context->currentFiber;
+        if (null !== $fiber && (
+            $this->findFiberState($handler) === $fiber
+            || (null !== $throwFrame && $this->findFiberState($throwFrame) === $fiber)
+        )) {
+            throw new VM\FiberUncaughtThrow($thrown);
+        }
         $outerCatch = $this->findCatchFrameForThrow($handler->parent ?? $handler, $thrown);
         if (null !== $outerCatch) {
             return $outerCatch;
@@ -14316,11 +14334,17 @@ restart:
             // Instance-method / bound-closure generators need $this in scope (#22067).
             VM\GeneratorTrace::ensureFrameThisBound($gen->frame, $gen);
         }
-        $this->applyGeneratorPendingSend($gen);
-        $this->applyGeneratorPendingThrow($gen);
         $gen->started = true;
         $savedStack = $this->context->swapRunStack(null);
+        // Isolate try/catch from the caller so a suspended generator try cannot absorb
+        // uncaught exceptions after yield / throw→yield-in-catch (#22869).
+        $savedTryHandlers = $this->context->activeTryHandlerFrames;
+        $savedTryMergeIds = $this->context->tryMergeBlockIds;
+        $this->context->activeTryHandlerFrames = $gen->suspendedTryHandlerFrames;
+        $this->context->tryMergeBlockIds = $gen->suspendedTryMergeBlockIds;
         try {
+            $this->applyGeneratorPendingSend($gen);
+            $this->applyGeneratorPendingThrow($gen);
             $this->context->push($gen->frame);
             try {
                 $result = $this->runFrames();
@@ -14341,6 +14365,9 @@ restart:
                 if (null !== $catchFrame) {
                     $catchFrame->generatorState = $gen;
                     $gen->frame = $catchFrame;
+                    // Keep live try state for the nested advance (still inside this isolation).
+                    $gen->suspendedTryHandlerFrames = $this->context->activeTryHandlerFrames;
+                    $gen->suspendedTryMergeBlockIds = $this->context->tryMergeBlockIds;
 
                     return $this->advanceGeneratorIteration($gen);
                 }
@@ -14356,12 +14383,23 @@ restart:
                 throw new VM\GeneratorUncaughtThrow($thrown, $frame);
             }
         } finally {
+            // Snapshot only while still suspended; closed/returned generators must not keep
+            // try handlers that would leak into the caller on the next throw (#22869).
+            if (!$gen->done && null !== $gen->frame) {
+                $gen->suspendedTryHandlerFrames = $this->context->activeTryHandlerFrames;
+                $gen->suspendedTryMergeBlockIds = $this->context->tryMergeBlockIds;
+            } else {
+                $gen->clearSuspendedTryState();
+            }
+            $this->context->activeTryHandlerFrames = $savedTryHandlers;
+            $this->context->tryMergeBlockIds = $savedTryMergeIds;
             $this->context->swapRunStack($savedStack);
         }
         if (self::GENERATOR_YIELD === $result) {
             return $gen->hasCurrent;
         }
         $gen->frame = null;
+        $gen->clearSuspendedTryState();
         if (self::SUCCESS === $result) {
             if (!$gen->hasReturned) {
                 $gen->markReturned(null);

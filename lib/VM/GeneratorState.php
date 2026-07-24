@@ -90,6 +90,23 @@ final class GeneratorState
     /** Closure binding when this generator was created from a closure (#6567). */
     public ?ClosureState $closureCall = null;
 
+    /**
+     * Try handlers active when this generator last suspended (yield / catch-yield).
+     *
+     * Isolated from the caller's {@see Context::$activeTryHandlerFrames} so a suspended
+     * generator try/catch cannot absorb uncaught exceptions in the caller (#22869).
+     *
+     * @var list<Frame>
+     */
+    public array $suspendedTryHandlerFrames = [];
+
+    /**
+     * Merge-block ids paired with {@see $suspendedTryHandlerFrames} (#22869).
+     *
+     * @var array<int, true>
+     */
+    public array $suspendedTryMergeBlockIds = [];
+
     /** @var list<Variable> */
     public readonly array $calledArgs;
 
@@ -211,6 +228,7 @@ final class GeneratorState
     {
         $this->done = true;
         $this->frame = null;
+        $this->clearSuspendedTryState();
         $this->clearCurrentValue();
         $this->hasReturned = true;
         if (null !== $value) {
@@ -225,7 +243,15 @@ final class GeneratorState
     {
         $this->done = true;
         $this->frame = null;
+        $this->clearSuspendedTryState();
         $this->clearCurrentValue();
+    }
+
+    /** Drop try/catch isolation state when the generator is no longer suspended (#22869). */
+    public function clearSuspendedTryState(): void
+    {
+        $this->suspendedTryHandlerFrames = [];
+        $this->suspendedTryMergeBlockIds = [];
     }
 
     public function wrapObject(): ObjectEntry
@@ -254,6 +280,7 @@ final class GeneratorState
         $this->done = false;
         $this->clearCurrentValue();
         $this->frame = null;
+        $this->clearSuspendedTryState();
         $this->autoKey = 0;
         $this->yieldFromActive = false;
         $this->yieldFromIteratorAdvance = false;
