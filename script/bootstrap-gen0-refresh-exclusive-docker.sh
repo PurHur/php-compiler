@@ -167,13 +167,21 @@ docker run -d \
           /compiler/lib/JIT/ClassConstFetchHelper.php 2>/dev/null; then
           drift_abort 'ClassConstFetchHelperTrait self-require missing from bind mount'
         fi
-        cpid=\$(pgrep -n -f '/compiler/bin/compile.php' || true)
+        # Match the php compile worker only — pgrep -f '/compiler/bin/compile.php'
+        # also hits this bash wrapper (script text contains that path), so -n often
+        # picked a shell and reported rss=0kB while the real RSS was multi-GiB.
+        cpid=\$(pgrep -n -f '^php .*/bin/compile\\.php' || true)
+        if [[ -z \"\$cpid\" ]]; then
+          cpid=\$(pgrep -n -f '[Pp]hp .*bin/compile\\.php' || true)
+        fi
         rss=0
+        vsz=0
         if [[ -n \"\$cpid\" && -r /proc/\$cpid/status ]]; then
           rss=\$(awk '/VmRSS/{print \$2}' /proc/\$cpid/status)
+          vsz=\$(awk '/VmSize/{print \$2}' /proc/\$cpid/status)
         fi
         prog=\$(cat /compiler/build/.last-jit-spine-exclusive 2>/dev/null || echo none)
-        echo \"\$(date -u +%H:%M:%S) heartbeat rss=\${rss}kB prog=\$prog pin=\${cur:0:12}\" >> \"\$HB\"
+        echo \"\$(date -u +%H:%M:%S) heartbeat pid=\${cpid:-none} rss=\${rss}kB vsz=\${vsz}kB prog=\$prog pin=\${cur:0:12}\" >> \"\$HB\"
         sleep 60
       done ) &
     HBPID=\$!
