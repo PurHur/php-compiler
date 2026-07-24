@@ -4,27 +4,56 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\VM\Variable as VmVariable;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062).
+ * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062, #22842).
  *
- * JIT and standalone AOT both use compiled {@see PackJitHelper} + {@see PackEngine}.
+ * Helper compile: chained {@see JitVmHelperLink::ensureCompiled} (peer StringLz4 #22602 /
+ * StringHex2bin #22746) — Ieee754 → PackEngineEncode → PackJitEngine → PackJitHelper.
  * php-src: ext/standard/pack.c
  */
 final class StringPack
 {
+    private const IEEE_PATH = '/ext/standard/Ieee754.php';
+
+    private const ENCODE_PATH = '/ext/standard/PackEngineEncode.php';
+
+    private const ENGINE_PATH = '/ext/standard/PackJitEngine.php';
+
     private const HELPER_PATH = '/ext/standard/PackJitHelper.php';
 
+    private const IEEE_ENCODE32 = 'PHPCompiler\\ext\\standard\\Ieee754::encodeFloat32';
+
+    private const IEEE_ENCODE64 = 'PHPCompiler\\ext\\standard\\Ieee754::encodeFloat64';
+
+    private const ENCODE_PUT_FLOAT = 'PHPCompiler\\ext\\standard\\PackEngineEncode::putFloat';
+
+    private const ENCODE_PUT_DOUBLE = 'PHPCompiler\\ext\\standard\\PackEngineEncode::putDouble';
+
+    private const ENGINE_PACK = 'PHPCompiler\\ext\\standard\\PackJitEngine::pack';
+
     private const PACK_HELPER = 'PHPCompiler\\ext\\standard\\PackJitHelper::packArgv';
+
+    /** @var list<string> */
+    private const COMPILED_IEEE = [
+        self::IEEE_ENCODE32,
+        self::IEEE_ENCODE64,
+    ];
+
+    /** @var list<string> */
+    private const COMPILED_ENCODE = [
+        self::ENCODE_PUT_FLOAT,
+        self::ENCODE_PUT_DOUBLE,
+    ];
+
+    /** @var list<string> */
+    private const COMPILED_ENGINE = [
+        self::ENGINE_PACK,
+    ];
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -159,56 +188,16 @@ final class StringPack
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after PackJitHelper compile (#9133)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#22842');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 3);
-        $path = $root.self::HELPER_PATH;
-        $enginePath = $root.'/ext/standard/PackJitEngine.php';
-        $ieeePath = $root.'/ext/standard/Ieee754.php';
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $enginePath, $ieeePath): void {
-            $jit = new JIT($context);
-            foreach ([$ieeePath, $enginePath, $path] as $includePath) {
-                $real = \realpath($includePath) ?: $includePath;
-                if ($context->hasJitIncludedFileCompiled($real)) {
-                    continue;
-                }
-                $block = $runtime->parseAndCompile(
-                    (string) \file_get_contents($includePath),
-                    \basename($includePath)
-                );
-                if (null === $block) {
-                    throw new \LogicException(\basename($includePath).' parseAndCompile failed (#9133)');
-                }
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($real);
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9133)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled($context, self::IEEE_PATH, self::COMPILED_IEEE, '#22842');
+        JitVmHelperLink::ensureCompiled($context, self::ENCODE_PATH, self::COMPILED_ENCODE, '#22842');
+        JitVmHelperLink::ensureCompiled($context, self::ENGINE_PATH, self::COMPILED_ENGINE, '#22842');
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#22842');
     }
 
     private static function registerLinkedRuntime(Context $context): void
