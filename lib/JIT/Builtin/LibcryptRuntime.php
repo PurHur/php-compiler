@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_libcrypt via LibcryptJitHelper PHP (#9275, #14182).
+ * JIT/AOT link for __compiler_libcrypt via LibcryptJitHelper PHP (#9275, #14182, #22886).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ParseUrl #22861 / Modf #22519).
  * Replaces libc crypt(3) LLVM in {@see LibcryptThinRuntime}. SSOT: host crypt() via helper.
  * php-src: ext/standard/crypt.c
  */
@@ -97,44 +97,18 @@ final class LibcryptRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after LibcryptJitHelper compile (#9275)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#22886');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'LibcryptJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('LibcryptJitHelper.php parseAndCompile failed (#9275)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT libcrypt (#9275)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22886'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
