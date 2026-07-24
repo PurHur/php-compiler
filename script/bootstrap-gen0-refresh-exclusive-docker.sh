@@ -143,6 +143,9 @@ docker run -d \
     export PHP_COMPILER_LLVM_MEMORY_LIMIT=${PHP_MEM}
     export PHP_COMPILER_HELPER_RUNTIME_O=1
     export PHP_COMPILER_JIT_PROGRESS_FILE=/compiler/build/.last-jit-spine-exclusive
+    # Runtime::parseAndCompileFile writes the include path to ENTRY (#22642 triage).
+    export PHP_COMPILER_JIT_ENTRY_FILE=/compiler/build/.last-jit-spine-exclusive-entry
+    export PHP_COMPILER_JIT_PHASE_FILE=/compiler/build/.last-jit-spine-exclusive-phase
     LOG=/compiler/build/gen0-refresh-exclusive-inner.log
     STATUS=/compiler/build/gen0-refresh-exclusive.status
     HB=/compiler/build/gen0-refresh-exclusive.heartbeat
@@ -181,7 +184,10 @@ docker run -d \
           vsz=\$(awk '/VmSize/{print \$2}' /proc/\$cpid/status)
         fi
         prog=\$(cat /compiler/build/.last-jit-spine-exclusive 2>/dev/null || echo none)
-        echo \"\$(date -u +%H:%M:%S) heartbeat pid=\${cpid:-none} rss=\${rss}kB vsz=\${vsz}kB prog=\$prog pin=\${cur:0:12}\" >> \"\$HB\"
+        entry=\$(cat /compiler/build/.last-jit-spine-exclusive-entry 2>/dev/null || echo none)
+        # Shorten absolute /compiler/... paths for heartbeat readability.
+        entry=\${entry#/compiler/}
+        echo \"\$(date -u +%H:%M:%S) heartbeat pid=\${cpid:-none} rss=\${rss}kB vsz=\${vsz}kB prog=\$prog entry=\$entry pin=\${cur:0:12}\" >> \"\$HB\"
         sleep 60
       done ) &
     HBPID=\$!
@@ -194,6 +200,7 @@ docker run -d \
       set -e
       echo REFRESH_RC=\$rc \$(date -u +%H:%M:%S) | tee -a \"\$STATUS\"
       echo LAST_PROGRESS=\$(cat /compiler/build/.last-jit-spine-exclusive 2>/dev/null)
+      echo LAST_ENTRY=\$(cat /compiler/build/.last-jit-spine-exclusive-entry 2>/dev/null)
       if [[ \$rc -eq 0 ]]; then
         echo REFRESH_OK \$(date -u +%H:%M:%S)
         php script/check-bootstrap-gen0-manifest-sync.php
