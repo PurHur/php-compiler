@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\gd\GdExtensionPolicy;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,6 +14,10 @@ final class ImagecreatefromstringTest extends TestCase
 {
     public function test_png_decode_and_round_trip(): void
     {
+        if (!GdExtensionPolicy::advertisesExtension()) {
+            self::markTestSkipped('host php-gd required for imagecreatefromstring (#22740)');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

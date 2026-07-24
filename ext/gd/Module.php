@@ -11,8 +11,10 @@ use PHPCompiler\VM;
 /**
  * gd extension module entry (php-src ext/gd/gd.c; issue #7407).
  *
- * libgd drawing parity tracked in #3496; register under {@see standard} so
- * extension_loaded('gd') stays false until libgd ships (#11675).
+ * Register under {@see standard}; advertise {@code gd} via
+ * {@see getAdditionalExtensionNames()} only when host Zend has php-gd
+ * ({@see GdExtensionPolicy}, #22740 / re-#11675). PHP-in-PHP decode/draw stays
+ * in-tree for hosts with php-gd (#3496 / #6215).
  */
 class Module extends ModuleAbstract
 {
