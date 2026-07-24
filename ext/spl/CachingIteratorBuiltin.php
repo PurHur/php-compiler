@@ -190,7 +190,8 @@ final class SplCachingIteratorStorage
         if ($state['index'] < 0) {
             return false;
         }
-        self::syncInnerPosition($frame, $state['inner'], $state['index']);
+        // Do not rewind/resync the inner here — Generators are not rewound (#22876).
+        // Sequential next()/rewind() already keep the inner at the wrapper index.
         $valid = SplDualIteratorStorage::callInner($frame, $state['inner'], 'valid')->resolveIndirect();
 
         return Variable::TYPE_BOOLEAN === $valid->type && $valid->toBool();
@@ -522,7 +523,8 @@ final class CachingIteratorConstruct extends VmClassMethod
         );
         // php-src: int $flags = self::CALL_TOSTRING; explicit null → 0 (Z_PARAM_LONG_OR_NULL).
         $flags = self::resolveConstructFlags($flagsArg, 'CachingIterator::__construct');
-        SplDualIteratorStorage::callInner($frame, $inner, 'rewind');
+        // php-src zim_cachingiterator_construct — store iterator only; first rewind is on
+        // iteration (foreach / explicit rewind). Construct-time rewind breaks Generators (#22876).
         SplCachingIteratorStorage::init($object, $inner, $flags);
     }
 
