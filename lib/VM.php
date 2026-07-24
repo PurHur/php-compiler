@@ -19039,8 +19039,14 @@ restart:
                 }
             }
         }
-        ObjectLifetime::releaseDirectObject($frame->scope[$slot]);
-        $frame->scope[$slot]->null();
+        // Direct TYPE_OBJECT holders: Variable::null()/reset() already releaseRef once.
+        // INDIRECT aliases do not own a ref in reset(), so release the target once first
+        // (#22868 — releaseDirectObject+null double-freed temps still bound on closures).
+        $slotVar = $frame->scope[$slot];
+        if ($slotVar->isIndirect()) {
+            ObjectLifetime::releaseDirectObject($slotVar);
+        }
+        $slotVar->null();
     }
 
     /** Keep array-literal element objects alive when expr temps are released (#14120, #5593). */
