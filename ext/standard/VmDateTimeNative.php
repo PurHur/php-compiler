@@ -1289,6 +1289,8 @@ final class VmDateTimeNative
     {
         self::$createFromFormatTrailingData = false;
         $bangReset = false;
+        $pipeReset = false;
+        $allowTrailing = false;
         if (\str_starts_with($format, '!')) {
             $bangReset = true;
             $format = \substr($format, 1);
@@ -1321,6 +1323,16 @@ final class VmDateTimeNative
                 continue;
             }
             switch ($fc) {
+                case '|':
+                    // timelib: reset unparsed fields to Unix epoch after a successful parse (#22836).
+                    $pipeReset = true;
+
+                    break;
+                case '+':
+                    // timelib: trailing data after a successful parse is allowed (#22836).
+                    $allowTrailing = true;
+
+                    break;
                 case 'Y':
                     $digits = self::readDigits($time, $pos, 4, 4);
                     if (false === $digits) {
@@ -1468,11 +1480,14 @@ final class VmDateTimeNative
             }
         }
         if ($pos !== $timeLen) {
-            self::$createFromFormatTrailingData = true;
+            if (!$allowTrailing) {
+                self::$createFromFormatTrailingData = true;
 
-            return false;
+                return false;
+            }
+            // `+`: ignore trailing input after a successful format match (#22836).
         }
-        if ($bangReset) {
+        if ($bangReset || $pipeReset) {
             foreach ([
                 'year' => 1970,
                 'month' => 1,
