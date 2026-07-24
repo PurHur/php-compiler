@@ -57,15 +57,15 @@ final class VmXml
         return isset(self::$parsers[$parserId]);
     }
 
+    /**
+     * xml_parser_free() — no-op since PHP 8.0 (php-src ext/xml/xml.c).
+     *
+     * XMLParser objects are GC-owned; freeing must not invalidate the handle so
+     * later xml_parse()/xml_parser_free() still succeed (#22813).
+     */
     public static function parserFree(int $parser): bool
     {
-        if (!isset(self::$parsers[$parser])) {
-            return false;
-        }
-        XmlParserHandlers::releaseParserPins($parser);
-        unset(self::$parsers[$parser]);
-
-        return true;
+        return isset(self::$parsers[$parser]);
     }
 
     public static function getErrorCode(int $parser): int

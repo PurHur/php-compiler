@@ -87,4 +87,19 @@ PHP;
         $runtime->run($block);
         self::assertSame("start:root\nstart:a\nend:a\nend:root\ndone\n", ob_get_clean());
     }
+
+    /** php-src ext/xml/xml.c — xml_parser_free is a no-op since PHP 8.0 (#22813). */
+    public function test_xml_parser_free_is_noop(): void
+    {
+        $runtime = new Runtime();
+        $code = file_get_contents(__DIR__.'/../repro/xml_parser_free_noop.php');
+        self::assertNotFalse($code);
+        $block = $runtime->parseAndCompile($code, 'xml_parser_free_noop.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "parse_ret=1 type=XMLParser\ntrue\n",
+            ob_get_clean()
+        );
+    }
 }
