@@ -11,8 +11,9 @@ use PHPCompiler\Runtime;
  * ffi extension module entry (php-src ext/ffi/ffi.c; #4420).
  *
  * VM-only: {@see FFI::cdef}/{@see FFI::new}/{@see cast}/{@see typeof}/{@see sizeof}/
- * {@see addr}/{@see isNull}/{@see free} + dynamic C calls via host {@see \FFI} (libffi).
- * No new runtime/*.c — host FFI is the thin ABI trampoline (#4420, #22369).
+ * {@see addr}/{@see isNull}/{@see free}/{@see memcpy}/{@see memcmp}/{@see memset}/
+ * {@see string}/{@see alignof}/{@see type} + dynamic C calls via host {@see \FFI} (libffi).
+ * No new runtime/*.c — host FFI is the thin ABI trampoline (#4420, #22369, #22760).
  */
 class Module extends ModuleAbstract
 {

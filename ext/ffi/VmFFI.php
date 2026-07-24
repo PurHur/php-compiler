@@ -22,7 +22,8 @@ use PHPCompiler\ext\standard\VmString;
  * FFI VM class — host {@see \FFI} delegation (php-src ext/ffi/ffi.c; #4420, #22369).
  *
  * Surface: {@see FFI::cdef} + {@see __call} + {@see FFI::new}/{@see cast}/{@see typeof}/
- * {@see sizeof}/{@see addr}/{@see isNull}/{@see free}. CData property access via __get/__set.
+ * {@see sizeof}/{@see addr}/{@see isNull}/{@see free} + {@see memcpy}/{@see memcmp}/{@see memset}/
+ * {@see string}/{@see alignof}/{@see type} (#22369, #22760). CData property access via __get/__set.
  * JIT/AOT: VM-only (VmClassMethod::call throws).
  */
 final class VmFFI
@@ -44,7 +45,7 @@ final class VmFFI
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['new'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['memcpy'])) {
             return;
         }
 
@@ -68,6 +69,12 @@ final class VmFFI
             'addr' => [new FfiAddr(), 'addr', $pubStatic],
             'isnull' => [new FfiIsNull(), 'isNull', $pubStatic],
             'free' => [new FfiFree(), 'free', $pubStatic],
+            'memcpy' => [new FfiMemcpy(), 'memcpy', $pubStatic],
+            'memcmp' => [new FfiMemcmp(), 'memcmp', $pubStatic],
+            'memset' => [new FfiMemset(), 'memset', $pubStatic],
+            'string' => [new FfiString(), 'string', $pubStatic],
+            'alignof' => [new FfiAlignof(), 'alignof', $pubStatic],
+            'type' => [new FfiType(), 'type', $pubStatic],
         ];
         foreach ($methods as $lc => [$handler, $name, $vis]) {
             $entry->methods[$lc] = $handler;
@@ -429,6 +436,43 @@ final class VmFFI
             EnumCaseSupport::typeNameForVariable($var)
         ));
     }
+
+    public static function coerceIntArg(Variable $var, string $label, int $index, string $paramName): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return (int) $var->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool() ? 1 : 0;
+        }
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $label,
+            $index + 1,
+            $paramName,
+            EnumCaseSupport::typeNameForVariable($var)
+        ));
+    }
+
+    /**
+     * Host value for memcpy/memcmp "from"/"ptr" args (CData|string|int…).
+     */
+    public static function exportMemcpySource(Variable $var, Frame $frame): mixed
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type && self::isCDataObject($var->toObject())) {
+            return self::hostCData($var->toObject());
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+
+        return self::exportValue($var, $frame);
+    }
 }
 
 /** Shared wiring for ext/ffi class methods (#4420, #22369). */
@@ -751,6 +795,215 @@ final class FfiFree extends FfiClassMethod
         } catch (\FFI\Exception $e) {
             throw $e;
         }
+    }
+}
+
+/** FFI::memcpy(FFI\CData $to, mixed $from, int $size): void (#22760) */
+final class FfiMemcpy extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('memcpy');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::memcpy() expects exactly 3 arguments, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $to = VmFFI::requireCDataArg($frame->calledArgs[0], 'FFI::memcpy', 0, 'to');
+        $from = VmFFI::exportMemcpySource($frame->calledArgs[1], $frame);
+        $size = VmFFI::coerceIntArg($frame->calledArgs[2], 'FFI::memcpy', 2, 'size');
+        try {
+            \FFI::memcpy($to, $from, $size);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        } catch (\TypeError $e) {
+            throw $e;
+        }
+    }
+}
+
+/** FFI::memcmp(mixed $ptr1, mixed $ptr2, int $size): int (#22760) */
+final class FfiMemcmp extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('memcmp');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::memcmp() expects exactly 3 arguments, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr1 = VmFFI::exportMemcpySource($frame->calledArgs[0], $frame);
+        $ptr2 = VmFFI::exportMemcpySource($frame->calledArgs[1], $frame);
+        $size = VmFFI::coerceIntArg($frame->calledArgs[2], 'FFI::memcmp', 2, 'size');
+        try {
+            $cmp = \FFI::memcmp($ptr1, $ptr2, $size);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        } catch (\TypeError $e) {
+            throw $e;
+        }
+        $result = new Variable();
+        $result->int($cmp);
+        $this->returnImported($frame, $result);
+    }
+}
+
+/** FFI::memset(FFI\CData $ptr, int $value, int $size): void (#22760) */
+final class FfiMemset extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('memset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::memset() expects exactly 3 arguments, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr = VmFFI::requireCDataArg($frame->calledArgs[0], 'FFI::memset', 0, 'ptr');
+        $value = VmFFI::coerceIntArg($frame->calledArgs[1], 'FFI::memset', 1, 'value');
+        $size = VmFFI::coerceIntArg($frame->calledArgs[2], 'FFI::memset', 2, 'size');
+        try {
+            \FFI::memset($ptr, $value, $size);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+    }
+}
+
+/** FFI::string(FFI\CData $ptr, ?int $size = null): string (#22760) */
+final class FfiString extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('string');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(
+                'FFI::string() expects at least 1 argument and at most 2, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr = VmFFI::requireCDataArg($frame->calledArgs[0], 'FFI::string', 0, 'ptr');
+        $size = null;
+        if ($argc >= 2) {
+            $sizeVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $sizeVar->type) {
+                $size = VmFFI::coerceIntArg($frame->calledArgs[1], 'FFI::string', 1, 'size');
+            }
+        }
+        try {
+            $str = null === $size ? \FFI::string($ptr) : \FFI::string($ptr, $size);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        $result = new Variable();
+        $result->string($str);
+        $this->returnImported($frame, $result);
+    }
+}
+
+/** FFI::alignof(FFI\CData|FFI\CType $ptr): int (#22760) */
+final class FfiAlignof extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('alignof');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::alignof() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $ptr = VmFFI::requireCDataOrCTypeArg($frame->calledArgs[0], 'FFI::alignof', 0, 'ptr');
+        try {
+            $align = \FFI::alignof($ptr);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        $result = new Variable();
+        $result->int($align);
+        $this->returnImported($frame, $result);
+    }
+}
+
+/** FFI::type(string $type): ?FFI\CType (#22760) */
+final class FfiType extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('type');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::type() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $type = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'FFI::type',
+            0,
+            'type'
+        );
+        try {
+            $host = \FFI::type($type);
+        } catch (\FFI\ParserException $e) {
+            throw $e;
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        if (null === $host) {
+            $null = new Variable();
+            $null->null();
+            $this->returnImported($frame, $null);
+
+            return;
+        }
+        $this->returnImported($frame, VmFFI::wrapCType($frame->vmContext, $host));
     }
 }
 
