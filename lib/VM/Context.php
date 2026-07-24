@@ -430,13 +430,8 @@ class Context {
         if (null !== $filterVar) {
             return $filterVar;
         }
-        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
+        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::coreIntByName(strtolower($name));
         if (null !== $stdlibInt) {
-            $lc = strtolower($name);
-            if (str_starts_with($lc, 'array_pad_')
-                && !\PHPCompiler\CompilerVersion::supportsArrayPadPadType()) {
-                return null;
-            }
             $var = new Variable(Variable::TYPE_INTEGER);
             $var->int($stdlibInt);
 

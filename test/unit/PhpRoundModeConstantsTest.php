@@ -7,7 +7,7 @@ namespace PHPCompiler\test\unit;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPUnit\Framework\TestCase;
 
-/** Issue #11730 — PHP 8.4 PHP_ROUND_* mode constants registered for userland. */
+/** Issue #11730 / #22785 — PHP 8.4 PHP_ROUND_* mode constants registered for userland. */
 final class PhpRoundModeConstantsTest extends TestCase
 {
     public function testPhp84RoundModeConstantsInCoreIntByName(): void
@@ -19,5 +19,42 @@ final class PhpRoundModeConstantsTest extends TestCase
         self::assertSame(8, $map['php_round_away_from_zero']);
         self::assertContains('php_round_ceiling', StdlibConstants::CORE_FETCH_NAMES);
         self::assertContains('php_round_floor', StdlibConstants::CORE_FETCH_NAMES);
+    }
+
+    public function testPhp84RoundModesGatedOffOnProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            self::assertNull(StdlibConstants::coreIntByName('php_round_ceiling'));
+            self::assertNull(StdlibConstants::coreIntByName('php_round_floor'));
+            self::assertNull(StdlibConstants::coreIntByName('php_round_toward_zero'));
+            self::assertNull(StdlibConstants::coreIntByName('php_round_away_from_zero'));
+            self::assertSame(1, StdlibConstants::coreIntByName('php_round_half_up'));
+        } finally {
+            if (false === $prev || '' === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testPhp84RoundModesAvailableOnProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertSame(5, StdlibConstants::coreIntByName('php_round_ceiling'));
+            self::assertSame(6, StdlibConstants::coreIntByName('php_round_floor'));
+            self::assertSame(7, StdlibConstants::coreIntByName('php_round_toward_zero'));
+            self::assertSame(8, StdlibConstants::coreIntByName('php_round_away_from_zero'));
+        } finally {
+            if (false === $prev || '' === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }

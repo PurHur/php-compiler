@@ -64,10 +64,26 @@ final class StdlibConstants
     public const PHP_ROUND_HALF_DOWN = 2;
     public const PHP_ROUND_HALF_EVEN = 3;
     public const PHP_ROUND_HALF_ODD = 4;
+    /** PHP 8.4+ only — gate via {@see coreIntByName()} (#22785, #11730). */
     public const PHP_ROUND_CEILING = 5;
     public const PHP_ROUND_FLOOR = 6;
     public const PHP_ROUND_TOWARD_ZERO = 7;
     public const PHP_ROUND_AWAY_FROM_ZERO = 8;
+
+    /**
+     * Lowercase names for PHP 8.4-only PHP_ROUND_* modes (php_math_round_mode.h; #22785).
+     *
+     * Values stay in {@see CORE_INT_BY_NAME} for internal VmRound/VmBcmath; userland
+     * defined()/ConstFetch must go through {@see coreIntByName()}.
+     *
+     * @var array<string, true>
+     */
+    private const PHP84_ROUND_MODE_LC = [
+        'php_round_ceiling' => true,
+        'php_round_floor' => true,
+        'php_round_toward_zero' => true,
+        'php_round_away_from_zero' => true,
+    ];
 
     /** array_change_key_case() mode flags (ext/standard/array.c). */
     public const CASE_LOWER = 0;
@@ -297,6 +313,34 @@ final class StdlibConstants
     public const GLOB_BRACE = 1024;
     public const GLOB_ONLYDIR = 8192;
     public const GLOB_AVAILABLE_FLAGS = 9303;
+
+    /**
+     * Profile-gated CORE_INT lookup for defined()/ConstFetch (#14993 ARRAY_PAD_*, #22785 PHP_ROUND_*).
+     *
+     * Internal mode tables may still read {@see CORE_INT_BY_NAME} / class constants directly.
+     */
+    public static function coreIntByName(string $lc): ?int
+    {
+        $value = self::CORE_INT_BY_NAME[$lc] ?? null;
+        if (null === $value) {
+            return null;
+        }
+        if (str_starts_with($lc, 'array_pad_')
+            && !\PHPCompiler\CompilerVersion::supportsArrayPadPadType()) {
+            return null;
+        }
+        if (isset(self::PHP84_ROUND_MODE_LC[$lc])
+            && !\PHPCompiler\CompilerVersion::supportsRoundingModeEnum()) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    public static function hasCoreIntByName(string $lc): bool
+    {
+        return null !== self::coreIntByName($lc);
+    }
 
     /** Lowercase name => int value for VM\Context::constantFetch(). */
     public const CORE_INT_BY_NAME = [
