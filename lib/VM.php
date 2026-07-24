@@ -4220,7 +4220,16 @@ restart:
                         }
                     }
                     // ZEND_FETCH_DIM_W: null/undefined/false containers auto-vivify (#21992, #22650).
+                    // false→[] also emits E_DEPRECATED since PHP 8.1 (zend_execute.c / #22828).
                     if ($forWrite && TypeCheck::isNullContainerForDimAutovivify($container)) {
+                        if (TypeCheck::isFalseContainerForDimAutovivify($container)) {
+                            $this->context->errors->internalDeprecated(
+                                TypeCheck::FALSE_TO_ARRAY_DEPRECATED_MESSAGE,
+                                $this->context,
+                                $frame,
+                                '' !== $frame->scriptPath ? $frame->scriptPath : null
+                            );
+                        }
                         $container->array(new HashTable());
                     }
                     $isGlobals = Variable::TYPE_ARRAY === $container->type

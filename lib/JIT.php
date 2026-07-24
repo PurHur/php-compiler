@@ -7776,7 +7776,7 @@ class JIT {
                         $this->context->setVariableOp($block->getOperand($op->arg2), $value);
                     }
                     if ($forWrite && Variable::TYPE_NATIVE_BOOL === $value->type) {
-                        // Runtime: false→[]; true→Error (zend_execute.c / #22650).
+                        // Runtime: false→[] + E_DEPRECATED; true→Error (zend_execute.c / #22650, #22828).
                         $boolVal = $this->context->helper->loadValue($value);
                         $isTrue = $this->context->builder->icmp(
                             \PHPLLVM\Builder::INT_NE,
@@ -7795,6 +7795,14 @@ class JIT {
                         );
                         $this->context->builder->call($this->context->lookupFunction('abort'));
                         $this->context->builder->positionAtEnd($okBb);
+                        $deprecationLine = null !== $op->sourceLocation && $op->sourceLocation->startLine > 0
+                            ? $op->sourceLocation->startLine
+                            : 0;
+                        JIT\DynamicPropertyDeprecationGuard::emitFalseToArray(
+                            $this->context,
+                            $block->scriptPath(),
+                            $deprecationLine
+                        );
                         JIT\HashTableHelper::initArray($this->context, $value);
                         $this->context->setVariableOp($block->getOperand($op->arg2), $value);
                     }
