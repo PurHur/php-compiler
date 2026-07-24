@@ -2379,9 +2379,17 @@ final class VmString
         if (preg_match('#^([a-z][a-z0-9+.-]*):#i', $rest, $m)) {
             $scheme = strtolower($m[1]);
             $rest = substr($rest, strlen($m[0]));
-            $hadAuthority = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
+            $auth = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
+            if (null === $auth) {
+                return false;
+            }
+            $hadAuthority = $auth;
         } elseif (str_starts_with($rest, '//')) {
-            $hadAuthority = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
+            $auth = self::parseUrlAuthority($rest, $host, $port, $hasPort, $user, $pass);
+            if (null === $auth) {
+                return false;
+            }
+            $hadAuthority = $auth;
         }
 
         if ($hadAuthority && (null === $host || '' === $host)) {
@@ -2419,10 +2427,11 @@ final class VmString
             if ($hasPort) {
                 $filtered['port'] = $port;
             }
-            if (null !== $user && '' !== $user) {
+            // Empty user/pass are still present when userinfo used ':' / lone '@' (php-src url.c).
+            if (null !== $user) {
                 $filtered['user'] = $user;
             }
-            if (null !== $pass && '' !== $pass) {
+            if (null !== $pass) {
                 $filtered['pass'] = $pass;
             }
             if (null !== $path && ('' !== $path || '' === $url)) {
@@ -2446,9 +2455,9 @@ final class VmString
             case VmParseUrl::PHP_URL_PORT:
                 return $hasPort ? $port : null;
             case VmParseUrl::PHP_URL_USER:
-                return null !== $user && '' !== $user ? $user : null;
+                return null !== $user ? $user : null;
             case VmParseUrl::PHP_URL_PASS:
-                return null !== $pass && '' !== $pass ? $pass : null;
+                return null !== $pass ? $pass : null;
             case VmParseUrl::PHP_URL_PATH:
                 return null !== $path && ('' !== $path || '' === $url) ? $path : null;
             case VmParseUrl::PHP_URL_QUERY:
@@ -2489,6 +2498,8 @@ final class VmString
 
     /**
      * Parse //authority from $rest when present (scheme-relative or post-scheme URLs).
+     *
+     * @return bool|null true=authority ok, false=no //authority, null=invalid (whole URL false)
      */
     private static function parseUrlAuthority(
         string &$rest,
@@ -2497,7 +2508,7 @@ final class VmString
         bool &$hasPort,
         ?string &$user,
         ?string &$pass
-    ): bool {
+    ): ?bool {
         if (!str_starts_with($rest, '//')) {
             return false;
         }
@@ -2512,14 +2523,13 @@ final class VmString
             $atPos = strrpos($authority, '@');
             $userinfo = substr($authority, 0, $atPos);
             $authority = substr($authority, $atPos + 1);
-            if ('' !== $userinfo) {
-                $colonPos = strpos($userinfo, ':');
-                if (false !== $colonPos) {
-                    $user = substr($userinfo, 0, $colonPos);
-                    $pass = substr($userinfo, $colonPos + 1);
-                } else {
-                    $user = $userinfo;
-                }
+            // php-src always allocates user (and pass when ':' present), including empty strings.
+            $colonPos = strpos($userinfo, ':');
+            if (false !== $colonPos) {
+                $user = substr($userinfo, 0, $colonPos);
+                $pass = substr($userinfo, $colonPos + 1);
+            } else {
+                $user = $userinfo;
             }
         }
         if (str_starts_with($authority, '[')) {
@@ -2528,10 +2538,9 @@ final class VmString
                 $host = substr($authority, 0, $closeBracket + 1);
                 $remainder = substr($authority, $closeBracket + 1);
                 if ('' !== $remainder && ':' === $remainder[0]) {
-                    $portVal = (int) substr($remainder, 1);
-                    if ($portVal > 0 && $portVal <= 65535) {
-                        $port = $portVal;
-                        $hasPort = true;
+                    $portStatus = self::parseUrlPortString(substr($remainder, 1), $port, $hasPort);
+                    if (null === $portStatus) {
+                        return null;
                     }
                 }
             } else {
@@ -2539,14 +2548,41 @@ final class VmString
             }
         } elseif (str_contains($authority, ':')) {
             [$host, $portStr] = explode(':', $authority, 2);
-            $portVal = (int) $portStr;
-            if ($portVal > 0 && $portVal <= 65535) {
-                $port = $portVal;
-                $hasPort = true;
+            $portStatus = self::parseUrlPortString($portStr, $port, $hasPort);
+            if (null === $portStatus) {
+                return null;
             }
         } else {
             $host = $authority;
         }
+
+        return true;
+    }
+
+    /**
+     * php-src url.c port scan after host — length ≤5, ZEND_STRTOL 0..65535 or fail whole URL (#22822).
+     *
+     * @return bool|null true=port set or empty (no port), null=invalid port → parse_url false
+     */
+    private static function parseUrlPortString(string $portStr, int &$port, bool &$hasPort): ?bool
+    {
+        $len = self::byteLength($portStr);
+        if (0 === $len) {
+            return true;
+        }
+        if ($len > 5) {
+            return null;
+        }
+        // Match ZEND_STRTOL: leading optional sign + digits; trailing garbage ignored (e.g. 80abc → 80).
+        if (1 !== preg_match('/^[+-]?\d+/', $portStr, $m)) {
+            return null;
+        }
+        $portVal = (int) $m[0];
+        if ($portVal < 0 || $portVal > 65535) {
+            return null;
+        }
+        $port = $portVal;
+        $hasPort = true;
 
         return true;
     }

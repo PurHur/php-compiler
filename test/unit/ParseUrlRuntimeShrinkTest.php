@@ -30,7 +30,7 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString('emitParseParts', $source);
         $this->assertStringNotContainsString('__phpc_parse_url_strdup0', $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(330, \substr_count($source, "\n") + 1);
     }
 
     public function testParseUrlJitHelperMatchesVmString(): void
@@ -51,5 +51,17 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $expected = VmString::parseUrl($url, -1);
         $this->assertIsArray($expected);
         $this->assertSame($expected, $assoc);
+
+        // #22822 — invalid port / empty userinfo (php-src url.c)
+        $this->assertFalse(VmString::parseUrl('http://ex.com:port/'));
+        $this->assertNull(ParseUrlJitHelper::parseUrlAssoc('http://ex.com:99999/'));
+        $emptyPass = VmString::parseUrl('http://user:@h/');
+        $this->assertIsArray($emptyPass);
+        $this->assertSame('', $emptyPass['pass']);
+        $this->assertSame($emptyPass, ParseUrlJitHelper::parseUrlAssoc('http://user:@h/'));
+        $emptyUser = VmString::parseUrl('http://:pass@h/');
+        $this->assertIsArray($emptyUser);
+        $this->assertSame('', $emptyUser['user']);
+        $this->assertSame($emptyUser, ParseUrlJitHelper::parseUrlAssoc('http://:pass@h/'));
     }
 }

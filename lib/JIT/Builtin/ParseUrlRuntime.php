@@ -104,6 +104,11 @@ final class ParseUrlRuntime
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        // Type.php predeclares empty __phpc_parse_url_* — reuse (ArrayPushRuntime pattern).
+        try {
+            return $context->lookupFunction($name);
+        } catch (\Throwable) {
+        }
         $voidTy = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
