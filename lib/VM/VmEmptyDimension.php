@@ -101,13 +101,17 @@ final class VmEmptyDimension
 
                 return null;
             }
-            $index = Variable::stringOffsetIndexFromDim(
-                $dim,
-                $vm->context->errors,
-                $vm->context,
-                $frame,
-                $scriptFile
-            );
+            try {
+                $index = Variable::stringOffsetIndexFromDim(
+                    $dim,
+                    $vm->context->errors,
+                    $vm->context,
+                    $frame,
+                    $scriptFile
+                );
+            } catch (\TypeError $e) {
+                return $vm->propagateEmptyDimensionTypeError($e, $frame);
+            }
             $char = $container->string[$index] ?? '';
             $charVar = new Variable();
             $charVar->string($char);

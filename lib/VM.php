@@ -4352,13 +4352,22 @@ restart:
                     }
                     if ($container->type === Variable::TYPE_STRING) {
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                        $byteIndex = Variable::stringOffsetIndexFromDim(
-                            $arg3,
-                            $this->context->errors,
-                            $this->context,
-                            $frame,
-                            $scriptFile
-                        );
+                        try {
+                            $byteIndex = Variable::stringOffsetIndexFromDim(
+                                $arg3,
+                                $this->context->errors,
+                                $this->context,
+                                $frame,
+                                $scriptFile
+                            );
+                        } catch (\TypeError $e) {
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
                         if ($forWrite) {
                             $offset = new Variable(Variable::TYPE_STRING_OFFSET);
                             $offset->stringOffset(

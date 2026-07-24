@@ -244,8 +244,24 @@ final class IssetHelperLlvm
 
     private static function compileStringOffsetIsSet(Context $context, Variable $container, Variable $dim): Value
     {
-        if (Variable::TYPE_NATIVE_LONG !== $dim->type) {
-            return $context->getTypeFromString('int1')->constInt(0, false);
+        $i1 = $context->getTypeFromString('int1');
+        // zend_isset_dim_slow: only IS_LONG or strict integral numeric string (#22895)
+        if (Variable::TYPE_OBJECT === $dim->type || Variable::TYPE_HASHTABLE === $dim->type) {
+            return $i1->constInt(0, false);
+        }
+        if (Variable::TYPE_STRING === $dim->type) {
+            $lit = $dim->compileTimeString;
+            if (null === $lit || !\PHPCompiler\VM\Variable::isIntegralNumericString($lit)) {
+                return $i1->constInt(0, false);
+            }
+            $dim = new Variable(
+                $context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $context->constantFromInteger((int) trim($lit))
+            );
+        } elseif (Variable::TYPE_NATIVE_LONG !== $dim->type) {
+            return $i1->constInt(0, false);
         }
         $str = $context->helper->loadValue($container);
         $map = $context->structFieldMap['__string__'];

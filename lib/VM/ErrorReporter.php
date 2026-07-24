@@ -186,6 +186,25 @@ final class ErrorReporter
     }
 
     /**
+     * Zend zend_check_string_offset — leading-numeric string with trailing junk (#22895).
+     *
+     * php-src: Zend/zend_execute.c — E_WARNING "Illegal string offset \"%s\""
+     */
+    public function illegalStringOffsetQuoted(
+        string $offset,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            'Illegal string offset "' . $offset . '"',
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    /**
      * Zend/zend_execute.c — multi-byte RHS assigned to a string offset keeps only byte 0 (#22380).
      */
     public function onlyFirstByteAssignedToStringOffset(

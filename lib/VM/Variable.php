@@ -1116,6 +1116,10 @@ final class Variable {
     /**
      * Zend string offset index: null/bool/float emit "String offset cast occurred" then coerce.
      *
+     * Non-integral string / object / array dims → TypeError (php-src zend_check_string_offset).
+     * Leading-numeric strings with trailing junk warn then coerce (#22895).
+     *
+     * php-src: Zend/zend_execute.c — zend_check_string_offset / zend_illegal_string_offset
      * php-src: Zend/zend_operators.c — string offset index cast (#4166 float, #22896 null/bool)
      */
     public static function stringOffsetIndexFromDim(
@@ -1140,12 +1144,39 @@ final class Variable {
 
             return $dim->toInt();
         }
+        if (self::TYPE_STRING === $dim->type) {
+            $parsed = self::tryParseStringOffsetLong($dim->string);
+            if (null === $parsed) {
+                throw new \TypeError(sprintf(
+                    'Cannot access offset of type %s on string',
+                    self::operandZendTypeName($dim)
+                ));
+            }
+            if ($parsed[1] && null !== $reporter) {
+                $reporter->illegalStringOffsetQuoted($dim->string, $context, $frame, $file);
+            }
+
+            return $parsed[0];
+        }
+        if (
+            self::TYPE_OBJECT === $dim->type
+            || self::TYPE_ARRAY === $dim->type
+            || self::TYPE_ENUM_CASE === $dim->type
+        ) {
+            throw new \TypeError(sprintf(
+                'Cannot access offset of type %s on string',
+                self::operandZendTypeName($dim)
+            ));
+        }
 
         return $dim->toInt();
     }
 
     /**
      * isset()/empty() on string offsets: in-bounds true, OOB false, no uninitialized warning (#5307).
+     *
+     * Illegal dims (non-integral string / object / array) → false, no TypeError
+     * ({@see zend_isset_dim_slow}, #22895).
      */
     public static function stringOffsetIsSetFromDim(
         self $container,
@@ -1159,7 +1190,23 @@ final class Variable {
         if (self::TYPE_STRING !== $container->type) {
             return false;
         }
-        $rawIndex = self::stringOffsetIndexFromDim($dim, $reporter, $context, $frame, $file);
+        $dim = $dim->resolveIndirect();
+        if (
+            self::TYPE_OBJECT === $dim->type
+            || self::TYPE_ARRAY === $dim->type
+            || self::TYPE_ENUM_CASE === $dim->type
+        ) {
+            return false;
+        }
+        if (self::TYPE_STRING === $dim->type) {
+            // is_numeric_string(..., allow_errors=0) — trailing junk → not set
+            if (!self::isIntegralNumericString($dim->string)) {
+                return false;
+            }
+            $rawIndex = (int) trim($dim->string);
+        } else {
+            $rawIndex = self::stringOffsetIndexFromDim($dim, $reporter, $context, $frame, $file);
+        }
         $len = strlen($container->string);
         $index = $rawIndex;
         if ($index < 0) {
@@ -1167,6 +1214,60 @@ final class Variable {
         }
 
         return $index >= 0 && $index < $len;
+    }
+
+    /**
+     * Zend is_numeric_string_ex(allow_errors=true) IS_LONG arm for string-offset dims (#22895).
+     *
+     * @return array{0: int, 1: bool}|null [offset, hasTrailingData] or null when not IS_LONG
+     */
+    public static function tryParseStringOffsetLong(string $s): ?array
+    {
+        $len = \strlen($s);
+        $i = 0;
+        while ($i < $len && \ctype_space($s[$i])) {
+            $i++;
+        }
+        if ($i >= $len) {
+            return null;
+        }
+        $neg = false;
+        if ('+' === $s[$i] || '-' === $s[$i]) {
+            $neg = '-' === $s[$i];
+            $i++;
+        }
+        if ($i >= $len || !\ctype_digit($s[$i])) {
+            return null;
+        }
+        $digitStart = $i;
+        while ($i < $len && \ctype_digit($s[$i])) {
+            $i++;
+        }
+        // Float form (. / exponent) → IS_DOUBLE → TypeError for string offsets
+        if ($i < $len && ('.' === $s[$i] || 'e' === $s[$i] || 'E' === $s[$i])) {
+            return null;
+        }
+        $digits = \substr($s, $digitStart, $i - $digitStart);
+        $digitsTrim = \ltrim($digits, '0');
+        if ('' === $digitsTrim) {
+            $digitsTrim = '0';
+        }
+        $limit = $neg ? \substr((string) \PHP_INT_MIN, 1) : (string) \PHP_INT_MAX;
+        $dlen = \strlen($digitsTrim);
+        $limitLen = \strlen($limit);
+        if ($dlen > $limitLen || ($dlen === $limitLen && $digitsTrim > $limit)) {
+            return null;
+        }
+        $offset = (int) (($neg ? '-' : '') . $digits);
+        $trailing = false;
+        while ($i < $len && \ctype_space($s[$i])) {
+            $i++;
+        }
+        if ($i < $len) {
+            $trailing = true;
+        }
+
+        return [$offset, $trailing];
     }
 
     public function stringOffset(
