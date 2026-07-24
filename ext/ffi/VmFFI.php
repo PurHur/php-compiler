@@ -23,7 +23,8 @@ use PHPCompiler\ext\standard\VmString;
  *
  * Surface: {@see FFI::cdef} + {@see __call} + {@see FFI::new}/{@see cast}/{@see typeof}/
  * {@see sizeof}/{@see addr}/{@see isNull}/{@see free} + {@see memcpy}/{@see memcmp}/{@see memset}/
- * {@see string}/{@see alignof}/{@see type} (#22369, #22760). CData property access via __get/__set.
+ * {@see string}/{@see alignof}/{@see type}/{@see load}/{@see scope}/{@see arrayType}
+ * (#22369, #22760, #22759). CData property + array dim access via __get/__set/offset*.
  * JIT/AOT: VM-only (VmClassMethod::call throws).
  */
 final class VmFFI
@@ -45,7 +46,7 @@ final class VmFFI
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['memcpy'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['arraytype'])) {
             // Refresh CData dim handlers when only FFI statics were registered earlier (#22761).
             self::registerCDataClass($ctx);
 
@@ -78,6 +79,9 @@ final class VmFFI
             'string' => [new FfiString(), 'string', $pubStatic],
             'alignof' => [new FfiAlignof(), 'alignof', $pubStatic],
             'type' => [new FfiType(), 'type', $pubStatic],
+            'load' => [new FfiLoad(), 'load', $pubStatic],
+            'scope' => [new FfiScope(), 'scope', $pubStatic],
+            'arraytype' => [new FfiArrayType(), 'arrayType', $pubStatic],
         ];
         foreach ($methods as $lc => [$handler, $name, $vis]) {
             $entry->methods[$lc] = $handler;
@@ -478,6 +482,57 @@ final class VmFFI
             $paramName,
             EnumCaseSupport::typeNameForVariable($var)
         ));
+    }
+
+    public static function requireCTypeArg(Variable $var, string $label, int $index, string $paramName): \FFI\CType
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type || !self::isCTypeObject($var->toObject())) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type FFI\\CType, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+
+        return self::hostCType($var->toObject());
+    }
+
+    /**
+     * @return list<int>
+     */
+    public static function exportPositiveIntList(Variable $var, string $label, int $index, string $paramName): array
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        $out = [];
+        foreach ($var->toArray()->iterateKeyed(true) as [$key, $value]) {
+            $value = $value->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $value->type) {
+                $out[] = $value->toInt();
+            } elseif (Variable::TYPE_FLOAT === $value->type) {
+                $out[] = (int) $value->toFloat();
+            } else {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($%s) must contain only int dimensions',
+                    $label,
+                    $index + 1,
+                    $paramName
+                ));
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -1024,6 +1079,120 @@ final class FfiType extends FfiClassMethod
             $this->returnImported($frame, $null);
 
             return;
+        }
+        $this->returnImported($frame, VmFFI::wrapCType($frame->vmContext, $host));
+    }
+}
+
+/** FFI::load(string $filename): ?FFI (#22759) */
+final class FfiLoad extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('load');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::load() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $filename = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'FFI::load',
+            0,
+            'filename'
+        );
+        try {
+            $host = \FFI::load($filename);
+        } catch (\FFI\ParserException $e) {
+            throw $e;
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        if (null === $host) {
+            $null = new Variable();
+            $null->null();
+            $this->returnImported($frame, $null);
+
+            return;
+        }
+        $this->returnImported($frame, VmFFI::wrapHost($frame->vmContext, $host));
+    }
+}
+
+/** FFI::scope(string $name): FFI (#22759) */
+final class FfiScope extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('scope');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::scope() expects exactly 1 argument, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $name = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'FFI::scope',
+            0,
+            'name'
+        );
+        try {
+            $host = \FFI::scope($name);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        }
+        $this->returnImported($frame, VmFFI::wrapHost($frame->vmContext, $host));
+    }
+}
+
+/** FFI::arrayType(FFI\CType $type, array $dimensions): FFI\CType (#22759) */
+final class FfiArrayType extends FfiClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('arrayType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(
+                'FFI::arrayType() expects exactly 2 arguments, '.$argc.' given'
+            );
+        }
+        if (!FfiExtensionPolicy::hostFfiAvailable()) {
+            throw new \Error('FFI extension is not available in this build');
+        }
+        $type = VmFFI::requireCTypeArg($frame->calledArgs[0], 'FFI::arrayType', 0, 'type');
+        $dims = VmFFI::exportPositiveIntList(
+            $frame->calledArgs[1],
+            'FFI::arrayType',
+            1,
+            'dimensions'
+        );
+        try {
+            $host = \FFI::arrayType($type, $dims);
+        } catch (\FFI\Exception $e) {
+            throw $e;
+        } catch (\TypeError $e) {
+            throw $e;
         }
         $this->returnImported($frame, VmFFI::wrapCType($frame->vmContext, $host));
     }
