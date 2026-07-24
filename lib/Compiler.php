@@ -13109,6 +13109,18 @@ class Compiler {
             }
         }
         $fetches = $leafFetches;
+        // MethodCall receiver PropertyFetch is hoisted with arg fetches but is not a call arg
+        // (documentElement->insertBefore($d2->…->firstChild, $d1->…->firstChild)) (#22710).
+        if ($cfgCallOp instanceof Op\Expr\MethodCall && null !== $cfgCallOp->var) {
+            $receiverVar = $cfgCallOp->var;
+            $fetches = \array_values(\array_filter(
+                $fetches,
+                function ($fetch) use ($receiverVar): bool {
+                    return null === $fetch->result
+                        || !$this->operandsReferToSameVariable($receiverVar, $fetch->result);
+                }
+            ));
+        }
         if ([] === $fetches) {
             return null;
         }
@@ -13178,14 +13190,21 @@ class Compiler {
             }
         }
 
+        // Prefer this prelude's operand slot. Looking back for the last TYPE_PROPERTY_FETCH
+        // collapses distinct PropertyFetch call args onto one temp — e.g. peek($a->x, $b->x)
+        // and insertBefore($d2->documentElement->firstChild, $d1->…->firstChild) (#22710).
+        $operandSlot = $block->slotForOperand($prelude->result);
+        if (null !== $operandSlot) {
+            return (string) $operandSlot;
+        }
+
         return $this->compiledExpressionPreludeResultSlotBeforePendingFuncCall($block, $prelude)
             ?? $this->slotForInlineCallArgProducerResult(
                 $block,
                 $prelude,
                 $cfgCallOp,
                 null !== $block->orig ? $block->orig->children : null
-            )
-            ?? $block->slotForOperand($prelude->result);
+            );
     }
 
     private function compileStaticPropertyFetchRead(
