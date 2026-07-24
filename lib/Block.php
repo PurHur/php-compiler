@@ -1790,14 +1790,19 @@ class Block {
         if (!$nameOp instanceof Literal) {
             return null;
         }
+        $value = $nameOp->value;
+        // php-cfg: Expr_Variable name Scalar_LNumber → int Literal for ${1} (Zend CV "$1", #22776).
+        if (\is_int($value) || \is_float($value)) {
+            return (string) $value;
+        }
+        if (!\is_string($value)) {
+            return null;
+        }
         if (null !== $nameOp->type && Variable::mapFromType($nameOp->type) !== Variable::TYPE_STRING) {
             return null;
         }
-        if (!is_string($nameOp->value)) {
-            return null;
-        }
 
-        return $nameOp->value;
+        return $value;
     }
 
     /**
