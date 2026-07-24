@@ -24,12 +24,18 @@ final class PackJitHelper
 
     private const TAG_ARRAY = 5;
 
+    /** NestedJIT rejects function-static null defaults (#2286); class prop is OK (#22842). */
+    private static ?PackedArgvArrayMarker $arrayMarker = null;
+
     /** Internal marker decoded from {@see self::TAG_ARRAY} argv slots (#13598). */
     public static function packedArrayMarker(): PackedArgvArrayMarker
     {
-        static $marker = null;
+        // Explicit null check — ??= / isset on typed static props breaks NestedJIT (#22842 / #2286).
+        if (null === self::$arrayMarker) {
+            self::$arrayMarker = new PackedArgvArrayMarker();
+        }
 
-        return $marker ??= new PackedArgvArrayMarker();
+        return self::$arrayMarker;
     }
 
     /**
