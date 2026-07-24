@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\simplexml;
 
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -168,6 +170,66 @@ final class JitSimpleXmlUserScript
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    /**
+     * Compile-time SimpleXMLElement::xpath via host php-src (#22720).
+     * Supports false (invalid / undef prefix) and empty node-sets; non-empty
+     * node results still need runtime materialization.
+     */
+    public static function tryXpath(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 2 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $path = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $path) {
+            return null;
+        }
+        $warn = null;
+        set_error_handler(static function (int $severity, string $message) use (&$warn): bool {
+            $warn = $message;
+
+            return true;
+        });
+        try {
+            $result = $tree->xpath($path);
+        } catch (\Throwable) {
+            restore_error_handler();
+
+            return null;
+        }
+        restore_error_handler();
+
+        if (false === $result) {
+            $msg = 'SimpleXMLElement::xpath(): Invalid expression';
+            if (\is_string($warn)) {
+                if (str_contains($warn, 'Undefined namespace prefix')) {
+                    $msg = 'SimpleXMLElement::xpath(): Undefined namespace prefix';
+                } elseif (preg_match('/SimpleXMLElement::xpath\(\):\s*(.+)$/', $warn, $m)) {
+                    $msg = 'SimpleXMLElement::xpath(): '.$m[1];
+                }
+            }
+            JitBuiltinWarning::emit($context, $msg);
+            $slot = JitValueBox::alloc($context);
+            JitValueBox::writeBool(
+                $context,
+                $slot,
+                $context->getTypeFromString('int1')->constInt(0, false)
+            );
+
+            return JitValueBox::normalizeValuePtr($context, $slot);
+        }
+        if ([] === $result) {
+            return HashTableHelper::emptyVariable($context)->value;
+        }
+
+        // Non-empty node-set: cannot reify SimpleXMLElement handles in user-script AOT yet.
+        return null;
     }
 
     private static function store(JITVariable $receiver, \SimpleXMLElement $tree): void

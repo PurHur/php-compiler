@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6503 |
-| Phase A inventory files (M2 ratio SSOT) | 6503 |
+| PHP files on vm.php path | 6505 |
+| Phase A inventory files (M2 ratio SSOT) | 6505 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20887 |
+| Source constructs flagged (warnings) | 20891 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1746,7 +1746,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/JitSimpleXmlAddChild.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAsXml.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlConstruct.php` | 0 | 1 |
-| `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 2 |
+| `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 3 |
+| `ext/simplexml/JitSimpleXmlXpath.php` | 0 | 1 |
 | `ext/simplexml/Module.php` | 0 | 4 |
 | `ext/simplexml/SimpleXmlElementAddAttribute.php` | 0 | 2 |
 | `ext/simplexml/SimpleXmlElementAddChild.php` | 0 | 1 |
@@ -5507,6 +5508,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/SimpleXMLElementAddChild.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementAsXml.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementXpath.php` | 0 | 1 |
 | `lib/JIT/Call/SplObjectStorageMethod.php` | 0 | 3 |
 | `lib/JIT/Call/Vararg.php` | 0 | 1 |
 | `lib/JIT/Call/VariableCopyFrom.php` | 0 | 1 |
@@ -5666,7 +5668,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/SensitiveParamHelper.php` | 0 | 1 |
 | `lib/JIT/ShutdownCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/SidecarPathRemap.php` | 0 | 1 |
-| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 4 |
+| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 5 |
 | `lib/JIT/SplAutoloadCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
@@ -20758,8 +20760,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new SimpleXMLElement (line 38)
-- 6 class method(s)
+- new SimpleXMLElement (line 40)
+- 7 class method(s)
+- 1 closure(s)
+
+### `ext/simplexml/JitSimpleXmlXpath.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/simplexml/Module.php`
 
@@ -20959,29 +20967,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SimpleXmlNodeState (line 826)
 - new SimpleXmlNodeState (line 839)
 - new SimpleXmlNodeState (line 920)
-- new HashTable (line 1001)
-- new Variable (line 1024)
-- new Variable (line 1033)
-- new Variable (line 1080)
-- new Variable (line 1101)
-- new SimpleXmlNodeState (line 1138)
-- new ObjectEntry (line 1162)
-- new SimpleXmlNodeState (line 1248)
-- new SimpleXmlNodeState (line 1258)
-- new SimpleXmlNodeState (line 1261)
-- new ObjectEntry (line 1282)
-- new SimpleXmlNodeState (line 1303)
-- new ObjectEntry (line 1311)
-- new SimpleXmlNodeState (line 1315)
-- new ObjectEntry (line 1332)
-- new ObjectEntry (line 1348)
-- new Error (line 1424)
-- new ObjectEntry (line 1436)
-- new HashTable (line 1795)
-- new Variable (line 1797)
-- new SimpleXmlNodeState (line 1856)
-- new SimpleXmlNodeState (line 1865)
-- 72 class method(s)
+- new HashTable (line 1003)
+- new Variable (line 1034)
+- new Variable (line 1043)
+- new Variable (line 1104)
+- new Variable (line 1130)
+- new SimpleXmlNodeState (line 1216)
+- new ObjectEntry (line 1240)
+- new SimpleXmlNodeState (line 1326)
+- new SimpleXmlNodeState (line 1336)
+- new SimpleXmlNodeState (line 1339)
+- new ObjectEntry (line 1360)
+- new SimpleXmlNodeState (line 1381)
+- new ObjectEntry (line 1389)
+- new SimpleXmlNodeState (line 1393)
+- new ObjectEntry (line 1410)
+- new ObjectEntry (line 1426)
+- new Error (line 1502)
+- new ObjectEntry (line 1514)
+- new HashTable (line 1873)
+- new Variable (line 1875)
+- new SimpleXmlNodeState (line 1934)
+- new SimpleXmlNodeState (line 1943)
+- 74 class method(s)
 - 4 closure(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
@@ -46029,6 +46037,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/SimpleXMLElementXpath.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/SplObjectStorageMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -47151,9 +47164,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SimpleXmlInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\SimpleXMLElementConstruct (line 31)
-- new Call\SimpleXMLElementAddChild (line 36)
-- new Call\SimpleXMLElementAsXml (line 42)
+- new Call\SimpleXMLElementConstruct (line 32)
+- new Call\SimpleXMLElementAddChild (line 37)
+- new Call\SimpleXMLElementAsXml (line 43)
+- new Call\SimpleXMLElementXpath (line 48)
 - 1 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`

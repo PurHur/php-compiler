@@ -15,6 +15,7 @@ final class SimpleXmlInstanceMethodJit
         'simplexmlelement::addchild' => true,
         'simplexmlelement::asxml' => true,
         'simplexmlelement::savexml' => true,
+        'simplexmlelement::xpath' => true,
     ];
 
     public static function ensureProxy(Context $context, string $proxyName): void
@@ -40,6 +41,11 @@ final class SimpleXmlInstanceMethodJit
         // saveXML is a php-src FALIAS of asXML (#19413).
         if ('simplexmlelement::asxml' === $lc || 'simplexmlelement::savexml' === $lc) {
             $context->functionProxies[$lc] = new Call\SimpleXMLElementAsXml();
+
+            return;
+        }
+        if ('simplexmlelement::xpath' === $lc) {
+            $context->functionProxies[$lc] = new Call\SimpleXMLElementXpath();
         }
     }
 }
