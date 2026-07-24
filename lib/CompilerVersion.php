@@ -2164,6 +2164,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ IMAGETYPE_HEIF (ext/standard/image.c / php_image.h; #22787).
+     *
+     * Gated on {@see languageProfileVersion()} so PROFILE≤8.4 and the 8.4.0-dev reference profile
+     * match Zend (defined('IMAGETYPE_HEIF') === false). Enable via PHP_COMPILER_PROFILE=8.5+.
+     * Internal HEIF sniffing may keep using the numeric type without advertising the constant.
+     */
+    public static function supportsImagTypeHeif(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ generator_to_array() (ext/standard/array.c, issue #6025, #16723, #17118, #18084).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 phantom gate). Enable via stable

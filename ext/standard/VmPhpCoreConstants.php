@@ -323,13 +323,9 @@ final class VmPhpCoreConstants
         if (str_contains($name, '::')) {
             return null;
         }
-        if (\defined($name)) {
-            return $name;
-        }
+        // Only Core PHP_* names — do not treat host ext/standard constants (IMAGETYPE_*, …) as
+        // engine core or they shadow module bootstrap under a different language profile (#22787).
         $upper = strtoupper($name);
-        if (\defined($upper)) {
-            return $upper;
-        }
         if (!str_starts_with($upper, 'PHP_')) {
             return null;
         }

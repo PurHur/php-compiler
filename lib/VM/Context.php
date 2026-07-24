@@ -299,6 +299,11 @@ class Context {
                 return $engineAlias;
             }
         }
+        // Module/user defineConstant values win over host-backed core fetch so PROFILE-gated
+        // constants (e.g. IMAGETYPE_COUNT 21 vs host 20) are not shadowed (#22787).
+        if (isset($this->constants[$name])) {
+            return $this->constants[$name];
+        }
         $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($name);
         if (null !== $phpCore) {
             return $phpCore;
@@ -308,9 +313,6 @@ class Context {
             $var = new Variable(Variable::TYPE_INTEGER);
             $var->int($errorInt);
             return $var;
-        }
-        if (isset($this->constants[$name])) {
-            return $this->constants[$name];
         }
 
         return null;

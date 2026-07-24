@@ -16,7 +16,7 @@ final class GetDefinedConstantsParity
         'ARRAY_PAD_RIGHT' => true,
         'CREDITS_WEB' => true,
         'DEBUG_BACKTRACE_IGNORE_STATIC_ARGS' => true,
-        'IMAGETYPE_HEIF' => true,
+        // IMAGETYPE_HEIF: withheld from registration on PROFILE<8.5 (#22787); when advertised it belongs in standard.
         'LOG_FTP' => true,
         'PHP_ROUND_AWAY_FROM_ZERO' => true,
         'PHP_ROUND_CEILING' => true,
