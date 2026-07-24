@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for password_hash/verify/crypt/get_info via PasswordJitHelper PHP (#9908).
+ * JIT/AOT link for password_hash/verify/crypt/get_info via PasswordJitHelper PHP (#9908, #22934).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Libcrypt #22886 / OpensslSign #22911).
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\PasswordJitHelper}; thin LLVM
  * bridges forward the ABI (#9908, #12869).
  * SSOT: {@see \PHPCompiler\ext\standard\VmPassword}
@@ -94,16 +93,10 @@ final class PasswordCryptoRuntime
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            try {
-                $context->builder->positionAtEnd($savedBlock);
-            } catch (\Throwable) {
-                JitNativeString::ensureInsertBlock($context);
-            }
+            $context->builder->positionAtEnd($savedBlock);
         } else {
-            JitNativeString::ensureInsertBlock($context);
+            $context->builder->clearInsertionPosition();
         }
-        // Nested helper compile swaps builders; stale intrinsic emits cross-block (#9275, #2967).
-        $context->intrinsic->builder = $context->builder;
     }
 
     /**
@@ -211,44 +204,18 @@ final class PasswordCryptoRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after PasswordJitHelper compile (#9908)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#22934');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'PasswordJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('PasswordJitHelper.php parseAndCompile failed (#9908)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT password (#9908)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22934'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
