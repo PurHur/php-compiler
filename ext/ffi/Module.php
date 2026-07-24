@@ -10,8 +10,9 @@ use PHPCompiler\Runtime;
 /**
  * ffi extension module entry (php-src ext/ffi/ffi.c; #4420).
  *
- * VM-only v1: {@see FFI::cdef} + dynamic C calls via host {@see \FFI} (libffi).
- * No new runtime/*.c — host FFI is the thin ABI trampoline.
+ * VM-only: {@see FFI::cdef}/{@see FFI::new}/{@see cast}/{@see typeof}/{@see sizeof}/
+ * {@see addr}/{@see isNull}/{@see free} + dynamic C calls via host {@see \FFI} (libffi).
+ * No new runtime/*.c — host FFI is the thin ABI trampoline (#4420, #22369).
  */
 class Module extends ModuleAbstract
 {
