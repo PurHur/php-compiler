@@ -43,7 +43,8 @@ final class FragmentAppendChild extends DomClassMethod
             ));
         }
         $object = $var->toObject();
-        if (!VmDom::isAppendChildCandidate($object)) {
+        // php-src stub: DOMNode $node — accept Document; hierarchy rejects later (#22698).
+        if (!VmDom::isDomNode($object)) {
             throw new \TypeError(sprintf(
                 '%s expects argument #%d to be of type DOMNode, %s given',
                 $label,

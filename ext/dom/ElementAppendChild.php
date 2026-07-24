@@ -43,7 +43,9 @@ final class ElementAppendChild extends DomClassMethod
             ));
         }
         $object = $var->toObject();
-        if (!VmDom::isAppendChildCandidate($object)) {
+        // php-src stub: DOMNode $node — DOMDocument is a DOMNode subclass; hierarchy
+        // rejects documents later with DOMException (not TypeError) (#22698).
+        if (!VmDom::isDomNode($object)) {
             throw new \TypeError(sprintf(
                 '%s expects argument #%d to be of type DOMNode, %s given',
                 $label,
