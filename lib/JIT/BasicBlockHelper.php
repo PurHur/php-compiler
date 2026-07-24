@@ -191,21 +191,26 @@ final class BasicBlockHelper
         try {
             $inst = $entry->getFirstInstruction();
             while (null !== $inst && $inst->isAAllocaInst()) {
-                $next = $inst->getNext();
-                if (null === $next) {
-                    $context->builder->positionAtEnd($entry);
-                    $inst = null;
-                    break;
-                }
-                $inst = $next;
+                $inst = $inst->getNext();
             }
             if (null !== $inst) {
+                // Insert before first non-alloca (may be the terminator) — never after it.
                 $context->builder->position($entry, $inst);
+            } else {
+                $terminator = $entry->getTerminator();
+                if (null !== $terminator) {
+                    $context->builder->positionBefore($terminator);
+                } else {
+                    $context->builder->positionAtEnd($entry);
+                }
+            }
+        } catch (\Throwable) {
+            $terminator = $entry->getTerminator();
+            if (null !== $terminator) {
+                $context->builder->positionBefore($terminator);
             } else {
                 $context->builder->positionAtEnd($entry);
             }
-        } catch (\Throwable) {
-            $context->builder->positionAtEnd($entry);
         }
         $context->builder->store($value, $slot);
         if (null !== $restore) {

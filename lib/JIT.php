@@ -8393,14 +8393,10 @@ class JIT {
                             );
                         }
                         $this->context->setVariableOp($destOp, $promoted);
-                        // Named locals must follow KIND_VALUE→alloca promotion or later
-                        // getVariableFromOp keeps the stale rvalue via namedVariableBindings.
-                        // Bind $promoted directly — maybeBindNamedVariable would re-read the
-                        // stale namedVariableBindings entry and undo the promotion.
-                        $destName = JIT\OperandName::resolve($destOp);
-                        if (null !== $destName && '' !== $destName) {
-                            $this->context->bindVariableByName($destName, $promoted);
-                        }
+                        // In-place CONCAT may use an unnamed Temporary for the slot while
+                        // the named `$out` Operand still points at the pre-promote alloca —
+                        // bind by scoped name so left load and store share one slot (#22845).
+                        $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
                         if (null !== ($result->compileTimeString ?? null)) {
                             $promoted->compileTimeString = $result->compileTimeString;
                         }
@@ -8457,13 +8453,19 @@ class JIT {
                                 Variable::KIND_VARIABLE,
                                 $destSlot
                             );
-                            $promoted->initialize();
+                            // Seed at entry so loop-carried CONCAT does not reset (#22845).
+                            $seed = null !== $result->value
+                                && Variable::KIND_VALUE === $result->kind
+                                ? $result->value
+                                : $this->context->type->string->pointer->constNull();
+                            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                                $this->context,
+                                $func,
+                                $seed,
+                                $destSlot
+                            );
                             $this->context->setVariableOp($destOp, $promoted);
-                            // Keep namedVariableBindings in sync with the alloca (#22845).
-                            $destName = JIT\OperandName::resolve($destOp);
-                            if (null !== $destName && '' !== $destName) {
-                                $this->context->bindVariableByName($destName, $promoted);
-                            }
+                            $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
                             $result = $promoted;
                         }
                         $this->context->builder->store($newStr, $destSlot);
@@ -18283,6 +18285,36 @@ class JIT {
             return;
         }
         $this->context->bindVariableByName($name, $this->context->getVariableFromOp($op));
+    }
+
+    /**
+     * After KIND_VALUE→alloca CONCAT promotion, rebind every Operand for the dest
+     * scope slot (named local + unnamed Temporary) so in-place `$out .=` loads and
+     * stores the same alloca across loop iterations (#22845).
+     */
+    private function bindPromotedStringConcatDest(Block $block, Operand $destOp, Variable $promoted): void
+    {
+        $names = [];
+        $destName = JIT\OperandName::resolve($destOp);
+        if (null !== $destName && '' !== $destName) {
+            $names[$destName] = true;
+        }
+        $slot = $block->slotForOperand($destOp);
+        if (null !== $slot) {
+            foreach ($block->scopedOperands() as $scopeOp) {
+                if ($block->slotForOperand($scopeOp) !== $slot) {
+                    continue;
+                }
+                $this->context->setVariableOp($scopeOp, $promoted);
+                $scopeName = JIT\OperandName::resolve($scopeOp);
+                if (null !== $scopeName && '' !== $scopeName) {
+                    $names[$scopeName] = true;
+                }
+            }
+        }
+        foreach ($names as $name => $_) {
+            $this->context->bindVariableByName((string) $name, $promoted);
+        }
     }
 
     /**
