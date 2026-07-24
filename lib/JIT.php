@@ -8370,6 +8370,21 @@ class JIT {
                         break;
                     }
                     $result = $this->context->getVariableFromOp($destOp);
+                    $leftProbeOp = $block->getOperand($op->arg2);
+                    if (
+                        JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
+                        || (
+                            $this->context->hasVariableOp($leftProbeOp)
+                            && JIT\StringOffsetHelper::isWritableCharOffsetLvalue(
+                                $this->context->getVariableFromOp($leftProbeOp),
+                                $this->context
+                            )
+                        )
+                    ) {
+                        // Zend: Cannot use assign-op operators with string offsets (#22897).
+                        JIT\StringOffsetHelper::emitAssignOpError($this->context);
+                        break;
+                    }
                     if (Variable::TYPE_STRING === $result->type && Variable::KIND_VALUE === $result->kind) {
                         $destOp = $block->getOperand($op->arg1);
                         $slot = JIT\BasicBlockHelper::entryAllocaForFunction(
@@ -9116,6 +9131,27 @@ class JIT {
                     JIT\Builtin\ScriptExit::emit($this->context, $exitArg);
                     break;
                 case OpCode::TYPE_POW:
+                    $powLeftOp = $block->getOperand($op->arg2);
+                    $powDestOp = $block->getOperand($op->arg1);
+                    if (
+                        (
+                            $this->context->hasVariableOp($powLeftOp)
+                            && JIT\StringOffsetHelper::isWritableCharOffsetLvalue(
+                                $this->context->getVariableFromOp($powLeftOp),
+                                $this->context
+                            )
+                        )
+                        || (
+                            $this->context->hasVariableOp($powDestOp)
+                            && JIT\StringOffsetHelper::isWritableCharOffsetLvalue(
+                                $this->context->getVariableFromOp($powDestOp),
+                                $this->context
+                            )
+                        )
+                    ) {
+                        JIT\StringOffsetHelper::emitAssignOpError($this->context);
+                        break;
+                    }
                     $pow = new \PHPCompiler\ext\standard\pow();
                     $this->context->powReturnValueBox = true;
                     $powResult = $pow->call(
@@ -9180,11 +9216,28 @@ class JIT {
                         break;
                     }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
+                    $binLeftOp = $this->binaryOpLeftOperand($block, $op);
+                    $binDestOp = $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result');
+                    $binLeft = $this->context->getVariableFromOp($binLeftOp);
+                    if (
+                        JIT\StringOffsetHelper::isWritableCharOffsetLvalue($binLeft, $this->context)
+                        || (
+                            $this->context->hasVariableOp($binDestOp)
+                            && JIT\StringOffsetHelper::isWritableCharOffsetLvalue(
+                                $this->context->getVariableFromOp($binDestOp),
+                                $this->context
+                            )
+                        )
+                    ) {
+                        // Zend: Cannot use assign-op operators with string offsets (#22897).
+                        JIT\StringOffsetHelper::emitAssignOpError($this->context);
+                        break;
+                    }
                     $this->assignOperand(
-                        $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
+                        $binDestOp,
                         $this->compileBinaryOp(
                             $op,
-                            $this->context->getVariableFromOp($this->binaryOpLeftOperand($block, $op)),
+                            $binLeft,
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
                         )
                     );

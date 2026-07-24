@@ -32,6 +32,11 @@ final class StringOffsetHelper
         StringOffsetRuntime::emitIncDecError($context);
     }
 
+    public static function emitAssignOpError(Context $context): void
+    {
+        StringOffsetRuntime::emitAssignOpError($context);
+    }
+
     public static function emitRefError(Context $context): void
     {
         StringOffsetRuntime::emitRefError($context);

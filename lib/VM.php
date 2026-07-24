@@ -4868,6 +4868,11 @@ restart:
                         }
                     }
                     try {
+                        // Zend: assign-op on string offsets before concat (#22897).
+                        Variable::rejectAssignOpOnStringOffset(
+                            $arg1,
+                            $frame->scope[(int) $op->arg2]
+                        );
                         $left = $op->arg1 === $op->arg2
                             ? $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2)
                             : $this->readRuntimeOperandForConcat($frame, (int) $op->arg2);
