@@ -8375,19 +8375,34 @@ class JIT {
                             Variable::KIND_VARIABLE,
                             $slot
                         );
-                        $promoted->initialize();
+                        // Seed at function entry — not at the CONCAT site (may be a loop body) (#22845).
                         if (null !== $result->value) {
-                            $this->context->builder->store($result->value, $slot);
+                            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                                $this->context,
+                                $func,
+                                $result->value,
+                                $slot
+                            );
                             $promoted->addref();
+                        } else {
+                            JIT\BasicBlockHelper::storeAtFunctionEntry(
+                                $this->context,
+                                $func,
+                                $this->context->type->string->pointer->constNull(),
+                                $slot
+                            );
                         }
                         $this->context->setVariableOp($destOp, $promoted);
                         // Named locals must follow KIND_VALUE→alloca promotion or later
-                        // getVariableFromOp keeps the stale rvalue (#22845 method/helper concat).
+                        // getVariableFromOp keeps the stale rvalue via namedVariableBindings.
                         // Bind $promoted directly — maybeBindNamedVariable would re-read the
                         // stale namedVariableBindings entry and undo the promotion.
                         $destName = JIT\OperandName::resolve($destOp);
                         if (null !== $destName && '' !== $destName) {
                             $this->context->bindVariableByName($destName, $promoted);
+                        }
+                        if (null !== ($result->compileTimeString ?? null)) {
+                            $promoted->compileTimeString = $result->compileTimeString;
                         }
                         $result = $promoted;
                     }
