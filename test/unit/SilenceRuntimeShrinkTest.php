@@ -6,7 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** SilenceRuntime must route @ through ErrorSilenceJitHelper PHP, not LLVM silence globals (#9197, #12809). */
+/**
+ * SilenceRuntime must route @ through ErrorSilenceJitHelper PHP, not LLVM silence globals (#9197, #12809).
+ * NestedJIT helper compile via JitVmHelperLink::ensureCompiled (#22751 / peer #22519).
+ */
 final class SilenceRuntimeShrinkTest extends TestCase
 {
     public function testSilenceRuntimeUsesErrorSilenceJitHelperNotLlvmGlobals(): void
@@ -20,10 +23,17 @@ final class SilenceRuntimeShrinkTest extends TestCase
 
         $silenceSource = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SilenceRuntime.php');
         $this->assertStringContainsString('ErrorSilenceJitHelper', $silenceSource);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $silenceSource);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $silenceSource);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $silenceSource);
+        $this->assertStringNotContainsString('parseAndCompile', $silenceSource);
+        $this->assertStringNotContainsString('new JIT(', $silenceSource);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $silenceSource);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $silenceSource);
         $this->assertStringNotContainsString('SilenceStandaloneLlvm', $silenceSource);
         $this->assertStringNotContainsString('implementStandaloneThinAbi', $silenceSource);
         $this->assertStringNotContainsString('standaloneAbiFunction', $silenceSource);
-        $this->assertLessThan(380, \substr_count($silenceSource, "\n") + 1);
+        $this->assertLessThan(320, \substr_count($silenceSource, "\n") + 1);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/SilenceStandaloneLlvm.php');
     }

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6505 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20817 |
+| Source constructs flagged (warnings) | 20891 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -523,7 +523,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ffi/BuiltinClasses.php` | 0 | 1 |
 | `ext/ffi/FfiExtensionPolicy.php` | 0 | 1 |
 | `ext/ffi/Module.php` | 0 | 1 |
-| `ext/ffi/VmFFI.php` | 0 | 26 |
+| `ext/ffi/VmFFI.php` | 0 | 102 |
 | `ext/fileinfo/BuiltinClasses.php` | 0 | 7 |
 | `ext/fileinfo/FileinfoConstants.php` | 0 | 1 |
 | `ext/fileinfo/Module.php` | 0 | 7 |
@@ -5082,7 +5082,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionWriteClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/SettypeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ShuffleRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SocketAtmarkRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SocketExportStreamRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SocketImportStreamRuntime.php` | 0 | 3 |
@@ -10171,32 +10171,108 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ffi/VmFFI.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 45)
-- new FfiCdef (line 51)
-- new FfiCall (line 55)
-- new ClassEntry (line 73)
-- new ClassEntry (line 78)
-- new ClassEntry (line 90)
-- new Variable (line 98)
-- new Variable (line 99)
-- new Variable (line 100)
-- new Variable (line 101)
-- new Variable (line 102)
-- new ClassProperty (line 108)
-- new ClassProperty (line 109)
-- new ClassProperty (line 110)
-- new ClassProperty (line 111)
-- new ClassProperty (line 112)
-- new ClassProperty (line 120)
-- new ObjectEntry (line 137)
-- new Variable (line 140)
-- new Error (line 149)
-- new Error (line 158)
-- new Error (line 192)
-- new Error (line 195)
-- new ArgumentCountError (line 249)
-- new ArgumentCountError (line 290)
-- 12 class method(s)
+- new ClassEntry (line 60)
+- new FfiCdef (line 67)
+- new FfiCall (line 68)
+- new FfiNew (line 69)
+- new FfiCast (line 70)
+- new FfiTypeof (line 71)
+- new FfiSizeof (line 72)
+- new FfiAddr (line 73)
+- new FfiIsNull (line 74)
+- new FfiFree (line 75)
+- new FfiMemcpy (line 76)
+- new FfiMemcmp (line 77)
+- new FfiMemset (line 78)
+- new FfiString (line 79)
+- new FfiAlignof (line 80)
+- new FfiType (line 81)
+- new FfiLoad (line 82)
+- new FfiScope (line 83)
+- new FfiArrayType (line 84)
+- new ClassEntry (line 109)
+- new FfiCDataGet (line 119)
+- new FfiCDataSet (line 122)
+- new FfiCDataOffsetGet (line 125)
+- new FfiCDataOffsetSet (line 128)
+- new FfiCDataOffsetExists (line 131)
+- new FfiCDataOffsetUnset (line 134)
+- new ClassEntry (line 143)
+- new ClassEntry (line 155)
+- new Variable (line 163)
+- new Variable (line 164)
+- new Variable (line 165)
+- new Variable (line 166)
+- new Variable (line 167)
+- new ClassProperty (line 173)
+- new ClassProperty (line 174)
+- new ClassProperty (line 175)
+- new ClassProperty (line 176)
+- new ClassProperty (line 177)
+- new ClassProperty (line 185)
+- new ObjectEntry (line 202)
+- new Variable (line 205)
+- new ObjectEntry (line 216)
+- new Variable (line 219)
+- new ObjectEntry (line 230)
+- new Variable (line 233)
+- new Error (line 242)
+- new Error (line 251)
+- new Error (line 260)
+- new Error (line 279)
+- new Error (line 313)
+- new Error (line 320)
+- new Error (line 327)
+- new ArgumentCountError (line 592)
+- new ArgumentCountError (line 630)
+- new ArgumentCountError (line 659)
+- new Error (line 664)
+- new Variable (line 681)
+- new ArgumentCountError (line 703)
+- new Error (line 708)
+- new Variable (line 720)
+- new ArgumentCountError (line 742)
+- new Error (line 747)
+- new ArgumentCountError (line 771)
+- new Error (line 776)
+- new Variable (line 784)
+- new ArgumentCountError (line 802)
+- new Error (line 807)
+- new ArgumentCountError (line 831)
+- new Error (line 836)
+- new Variable (line 844)
+- new ArgumentCountError (line 862)
+- new Error (line 867)
+- new ArgumentCountError (line 890)
+- new Error (line 895)
+- new ArgumentCountError (line 922)
+- new Error (line 927)
+- new Variable (line 939)
+- new ArgumentCountError (line 957)
+- new Error (line 962)
+- new ArgumentCountError (line 987)
+- new Error (line 992)
+- new Variable (line 1007)
+- new ArgumentCountError (line 1025)
+- new Error (line 1030)
+- new Variable (line 1038)
+- new ArgumentCountError (line 1056)
+- new Error (line 1061)
+- new Variable (line 1077)
+- new ArgumentCountError (line 1099)
+- new Error (line 1104)
+- new Variable (line 1120)
+- new ArgumentCountError (line 1142)
+- new Error (line 1147)
+- new ArgumentCountError (line 1176)
+- new Error (line 1181)
+- new ArgumentCountError (line 1213)
+- new ArgumentCountError (line 1248)
+- new ArgumentCountError (line 1285)
+- new ArgumentCountError (line 1315)
+- new Error (line 1348)
+- new Error (line 1362)
+- 52 class method(s)
 
 ### `ext/fileinfo/BuiltinClasses.php`
 
@@ -43620,9 +43696,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SilenceRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 244)
 - 16 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/SocketAtmarkRuntime.php`
 
