@@ -71,6 +71,18 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         );
     }
 
+    public function testVmSprintfCustomPadMatchesZendShapes(): void
+    {
+        $x = new Variable();
+        $x->string('x');
+        $seven = new Variable();
+        $seven->int(7);
+        $this->assertSame('*******************x', VmSprintf::format("%'*20s", [$x]));
+        $this->assertSame('*********7', VmSprintf::format("%'*10d", [$seven]));
+        $this->assertSame('*********x', VmSprintf::format("%1$'*10s", [$x]));
+        $this->assertSame('x*********', VmSprintf::format("%-'*10s", [$x]));
+    }
+
     public function testSprintfJitHelperNumberFormatBasics(): void
     {
         $this->assertSame('1,234.50', SprintfJitHelper::numberFormat(1234.5, 2, '.', ','));
