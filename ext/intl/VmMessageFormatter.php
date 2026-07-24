@@ -681,7 +681,9 @@ final class VmMessageFormatter
         $has = \array_key_exists($name, $args)
             || (ctype_digit($name) && \array_key_exists((int) $name, $args));
         if (!$has) {
-            return [\substr($pattern, $start, $end - $start + 1), $end + 1];
+            // php-src/ICU: missing args leave a stripped placeholder `{n}` / `{name}`,
+            // not the full type/style skeleton (`{0,number}`, `{0,select,…}`) (#22946).
+            return ['{'.$name.'}', $end + 1];
         }
         $val = self::lookupArg($args, $name);
         if (null === $type || 'none' === $type) {

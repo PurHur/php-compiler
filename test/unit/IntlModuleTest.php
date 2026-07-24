@@ -147,6 +147,46 @@ PHP;
         self::assertSame("3 files\ndoc uploaded\n1 x\n", ob_get_clean());
     }
 
+    public function test_messageformatter_missing_args_strip_skeleton(): void
+    {
+        // php-src msgformat_format.c / ICU — missing args leave {n}/{name} (#22946).
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerMessageFormatter($runtime->vmContext);
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\msgfmt_create());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\msgfmt_format());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\msgfmt_format_message());
+        $code = <<<'PHP'
+<?php
+$f = MessageFormatter::create('en_US', 'Item {0,number} of {1,number}');
+echo 'both=', $f->format([3, 10]), "\n";
+echo 'one=', $f->format([3]), "\n";
+echo 'none=', $f->format([]), "\n";
+$f2 = MessageFormatter::create('en_US', '{0,select,male{he}female{she}other{they}} went');
+echo 'selMiss=', $f2->format([]), "\n";
+$f3 = MessageFormatter::create('en_US', 'Hi {name}');
+echo 'named=', $f3->format(['name' => 'Bob']), "\n";
+$f4 = MessageFormatter::create('en_US', 'Hi {name,select,other{X}}');
+echo 'namedMiss=', $f4->format([]), "\n";
+$f5 = MessageFormatter::create('en_US', '{0,plural,one{# item} other{# items}}');
+echo 'plMiss=', $f5->format([]), "\n";
+echo 'proc=', msgfmt_format_message('en_US', 'Item {0,number} of {1,number}', [3]), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_msgfmt_missing_args.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "both=Item 3 of 10\n"
+            ."one=Item 3 of {1}\n"
+            ."none=Item {0} of {1}\n"
+            ."selMiss={0} went\n"
+            ."named=Hi Bob\n"
+            ."namedMiss=Hi {name}\n"
+            ."plMiss={0}\n"
+            ."proc=Item 3 of {1}\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_messageformatter_invalid_pattern_create_null_construct_throws(): void
     {
         require_once dirname(__DIR__, 2).'/ext/intl/bootstrap_intlexception.php';
