@@ -15887,6 +15887,11 @@ restart:
                     if ($declaringLc === $traitLc) {
                         continue;
                     }
+                    $existing = $entry->staticProperties[$name];
+                    if ($this->traitStaticPropertiesCompatible($entry, $name, $existing, $trait, $storage)) {
+                        // Zend: identical definitions merge; keep the earlier property (#22850).
+                        continue;
+                    }
                     $prevTrait = $usedTraitNameByLc[$declaringLc]
                         ?? $this->context->classes[$declaringLc]->name
                         ?? $declaringLc;
@@ -16220,6 +16225,58 @@ restart:
         TraitCompositionConflictMessage::throwRuntimeFatal($message, $file, $line);
     }
 
+    /**
+     * Compare an existing class/trait static slot against a trait static being merged (#22850).
+     */
+    private function traitStaticPropertiesCompatible(
+        ClassEntry $entry,
+        string $name,
+        Variable $existing,
+        ClassEntry $trait,
+        Variable $incoming,
+    ): bool {
+        return $this->traitStaticPropertySlotsCompatible(
+            $existing,
+            (int) ($entry->staticPropertyVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC),
+            (int) ($entry->staticPropertySetVisibility[$name] ?? 0),
+            (int) ($entry->staticPropertyGetVisibility[$name] ?? 0),
+            !empty($entry->staticPropertyAsymmetricExplicitRead[$name]),
+            $incoming,
+            (int) ($trait->staticPropertyVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC),
+            (int) ($trait->staticPropertySetVisibility[$name] ?? 0),
+            (int) ($trait->staticPropertyGetVisibility[$name] ?? 0),
+            !empty($trait->staticPropertyAsymmetricExplicitRead[$name]),
+        );
+    }
+
+    private function traitStaticPropertySlotsCompatible(
+        Variable $left,
+        int $leftVisibility,
+        int $leftSetVisibility,
+        int $leftGetVisibility,
+        bool $leftAsymmetricExplicitRead,
+        Variable $right,
+        int $rightVisibility,
+        int $rightSetVisibility,
+        int $rightGetVisibility,
+        bool $rightAsymmetricExplicitRead,
+    ): bool {
+        return VM\TraitPropertyCompatibility::staticPropertiesCompatible(
+            $left,
+            $leftVisibility,
+            $left,
+            $right,
+            $rightVisibility,
+            $right,
+            $leftSetVisibility,
+            $rightSetVisibility,
+            $leftGetVisibility,
+            $rightGetVisibility,
+            $leftAsymmetricExplicitRead,
+            $rightAsymmetricExplicitRead,
+        );
+    }
+
     protected function inheritTraitInstanceProperties(ClassEntry $entry, ClassEntry $trait, string $traitName): void
     {
         $traitLc = strtolower(ltrim($traitName, '\\'));
@@ -16237,6 +16294,10 @@ restart:
                             $this->mergeTraitAbstractPropertyHookOverride($entry, $trait, $property, $existing);
                             continue 2;
                         }
+                        // Identical class+trait definitions merge; keep the class property (#22850).
+                        if (VM\TraitPropertyCompatibility::instancePropertiesCompatible($existing, $property)) {
+                            continue 2;
+                        }
                         $this->throwTraitPropertyCompositionFatal(
                             TraitCompositionConflictMessage::incompatibleClassTraitProperty(
                                 $entry->name,
@@ -16245,6 +16306,10 @@ restart:
                             ),
                             $entry
                         );
+                    }
+                    if (VM\TraitPropertyCompatibility::instancePropertiesCompatible($existing, $property)) {
+                        // Two traits with identical definitions — keep the first (#22850).
+                        continue 2;
                     }
                     $prevTraitLc = $existing->declaringClassLc;
                     $prevTrait = isset($this->context->classes[$prevTraitLc])
@@ -16992,6 +17057,24 @@ restart:
                     $propLc = strtolower($name->toString());
                     $classLc = strtolower($entry->name);
                     $traitAbstractHookOverride = null;
+                    $prototype = $frame->scope[$op->arg3];
+                    $incoming = new VM\ClassProperty(
+                        $name->toString(),
+                        $default,
+                        $prototype,
+                        $op->propertyReadonly,
+                        MethodVisibility::mask($op->propertyVisibility),
+                        $classLc,
+                        (int) ($op->propertySetVisibility ?? 0),
+                        (int) ($op->propertyGetVisibility ?? 0),
+                        (bool) ($op->propertyAsymmetricExplicitRead ?? false),
+                        (bool) ($op->propertyLazy ?? false)
+                    );
+                    $incoming->fromConstructorPromotion = $op->propertyFromConstructorPromotion;
+                    $incoming->propertyFinal = (bool) ($op->propertyFinal ?? false);
+                    if ($entry->readonly) {
+                        $incoming->readonly = true;
+                    }
                     foreach ($entry->properties as $idx => $existing) {
                         if (strtolower($existing->name) !== $propLc) {
                             continue;
@@ -17011,6 +17094,12 @@ restart:
                                 $entry->properties = array_values($entry->properties);
                                 break;
                             }
+                            // Class redeclare of trait property: identical → replace with class (#22850).
+                            if (VM\TraitPropertyCompatibility::instancePropertiesCompatible($existing, $incoming)) {
+                                unset($entry->properties[$idx]);
+                                $entry->properties = array_values($entry->properties);
+                                break;
+                            }
                             $traitName = isset($this->context->classes[$declaringLc])
                                 ? $this->context->classes[$declaringLc]->name
                                 : $declaringLc;
@@ -17026,24 +17115,7 @@ restart:
                             );
                         }
                     }
-                    $prop = new VM\ClassProperty(
-                        $name->toString(),
-                        $default,
-                        $frame->scope[$op->arg3],
-                        $op->propertyReadonly,
-                        MethodVisibility::mask($op->propertyVisibility),
-                        strtolower($entry->name),
-                        (int) ($op->propertySetVisibility ?? 0),
-                        (int) ($op->propertyGetVisibility ?? 0),
-                        (bool) ($op->propertyAsymmetricExplicitRead ?? false),
-                        (bool) ($op->propertyLazy ?? false)
-                    );
-                    $prop->fromConstructorPromotion = $op->propertyFromConstructorPromotion;
-                    $prop->propertyFinal = (bool) ($op->propertyFinal ?? false);
-                    // readonly-class promoted props are readonly even without `readonly` on the param (#15409).
-                    if ($entry->readonly) {
-                        $prop->readonly = true;
-                    }
+                    $prop = $incoming;
                     $entry->properties[] = $prop;
                     if ([] !== $op->attributeNames) {
                         $entry->propertyAttributeNames[$propLc] = $op->attributeNames;
@@ -17072,28 +17144,48 @@ restart:
                     $pendingTraits = [];
                     $name = strtolower($frame->scope[$op->arg1]->toString());
                     $classLc = strtolower($entry->name);
-                    if (isset($entry->staticProperties[$name])) {
-                        $declaringLc = $entry->staticPropertyDeclaringClassLc[$name] ?? $classLc;
-                        if ($declaringLc !== $classLc) {
-                            $traitName = isset($this->context->classes[$declaringLc])
-                                ? $this->context->classes[$declaringLc]->name
-                                : $declaringLc;
-                            $this->throwTraitPropertyCompositionFatal(
-                                TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-                                    $entry->name,
-                                    $traitName,
-                                    $name
-                                ),
-                                $entry,
-                                null,
-                                $frame
-                            );
-                        }
-                    }
                     $storage = $this->cloneStaticPropertyStorage($frame->scope[$op->arg3]);
                     $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
                     if (null !== $default) {
                         $storage->copyFrom($default);
+                    }
+                    $newVis = MethodVisibility::mask($op->propertyVisibility);
+                    $newSetVis = (int) ($op->propertySetVisibility ?? 0);
+                    $newGetVis = (int) ($op->propertyGetVisibility ?? 0);
+                    $newAsym = (bool) ($op->propertyAsymmetricExplicitRead ?? false);
+                    if (isset($entry->staticProperties[$name])) {
+                        $declaringLc = $entry->staticPropertyDeclaringClassLc[$name] ?? $classLc;
+                        if ($declaringLc !== $classLc) {
+                            $existing = $entry->staticProperties[$name];
+                            if ($this->traitStaticPropertySlotsCompatible(
+                                $existing,
+                                (int) ($entry->staticPropertyVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC),
+                                (int) ($entry->staticPropertySetVisibility[$name] ?? 0),
+                                (int) ($entry->staticPropertyGetVisibility[$name] ?? 0),
+                                !empty($entry->staticPropertyAsymmetricExplicitRead[$name]),
+                                $storage,
+                                $newVis,
+                                $newSetVis,
+                                $newGetVis,
+                                $newAsym
+                            )) {
+                                // Identical class+trait static — class wins declaring (#22850).
+                            } else {
+                                $traitName = isset($this->context->classes[$declaringLc])
+                                    ? $this->context->classes[$declaringLc]->name
+                                    : $declaringLc;
+                                $this->throwTraitPropertyCompositionFatal(
+                                    TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                                        $entry->name,
+                                        $traitName,
+                                        $name
+                                    ),
+                                    $entry,
+                                    null,
+                                    $frame
+                                );
+                            }
+                        }
                     }
                     $this->linkStaticTypedPropertySlot(
                         $storage,
@@ -17101,10 +17193,10 @@ restart:
                         $frame->scope[$op->arg1]->toString()
                     );
                     $entry->staticProperties[$name] = $storage;
-                    $entry->staticPropertyVisibility[$name] = MethodVisibility::mask($op->propertyVisibility);
-                    $entry->staticPropertySetVisibility[$name] = (int) ($op->propertySetVisibility ?? 0);
-                    $entry->staticPropertyGetVisibility[$name] = (int) ($op->propertyGetVisibility ?? 0);
-                    if ($op->propertyAsymmetricExplicitRead ?? false) {
+                    $entry->staticPropertyVisibility[$name] = $newVis;
+                    $entry->staticPropertySetVisibility[$name] = $newSetVis;
+                    $entry->staticPropertyGetVisibility[$name] = $newGetVis;
+                    if ($newAsym) {
                         $entry->staticPropertyAsymmetricExplicitRead[$name] = true;
                     }
                     $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);

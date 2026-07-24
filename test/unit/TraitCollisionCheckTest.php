@@ -133,7 +133,7 @@ PHP;
         $runtime->parseAndCompile($code, 'trait_collision_parent.php');
     }
 
-    public function testClassTraitPropertyConflictFailsAtCompileTime(): void
+    public function testClassTraitPropertyConflictFailsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -141,12 +141,30 @@ PHP;
 trait T { public $x = 1; }
 class C { use T; public $x = 2; }
 PHP;
-        $this->expectException(\CompileError::class);
+        $block = $runtime->parseAndCompile($code, 'trait_class_property_conflict.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
             'C and T define the same property ($x) in the composition of C. '
             .'However, the definition differs and is considered incompatible. Class was composed'
         );
-        $runtime->parseAndCompile($code, 'trait_class_property_conflict.php');
+        $runtime->run($block, false);
+    }
+
+    public function testIdenticalClassTraitPropertyMerges(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public $x = 1; }
+class C { use T; public $x = 1; }
+echo (new C())->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_class_property_identical.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
     }
 
     public function testTraitPropertyMergeWithoutRedefinitionStillWorks(): void

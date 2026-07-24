@@ -44,6 +44,7 @@ use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\EnumCasePropertyJitHelper;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\TraitCompositionConflictMessage;
+use PHPCompiler\VM\TraitPropertyCompatibility;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPLLVM;
 
@@ -166,6 +167,12 @@ class Object_ extends Type {
     private array $staticPropertyDeclaringClassId = [];
     /** @var array<int, array<string, int>> class id => instance prop lc => declaring trait/class id (#7418) */
     private array $instancePropertyDeclaringClassId = [];
+    /**
+     * Trait instance property snapshot awaiting class-body merge check (#22850).
+     *
+     * @var array<int, array<string, array<string, mixed>>>
+     */
+    private array $pendingTraitInstancePropertyOverride = [];
 
     private ?int $splObjectStorageClassId = null;
 
@@ -3769,13 +3776,270 @@ class Object_ extends Type {
 
     public function defineProperty(int $classId, string $name, int $type): void
     {
-        $this->assertClassOwnInstancePropertyAllowed($classId, $name);
+        $nameLc = strtolower($name);
+        foreach ($this->properties[$classId] ?? [] as $idx => $existing) {
+            if (strtolower($existing[1]) !== $nameLc) {
+                continue;
+            }
+            $declaringId = $this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId;
+            if ($declaringId === $classId) {
+                // Same class already declared this property — keep the first slot.
+                return;
+            }
+            // Class body redeclares a trait property: reuse the slot; finish with
+            // assertClassTraitInstancePropertyMerge after defaults/flags (#22850).
+            $this->pendingTraitInstancePropertyOverride[$classId][$nameLc] = $this->snapshotInstanceProperty(
+                $classId,
+                $declaringId,
+                $existing
+            );
+            $this->properties[$classId][$idx] = [
+                $existing[0], $name, $type, $existing[3],
+            ];
+            $this->instancePropertyDeclaringClassId[$classId][$nameLc] = $classId;
+            // Drop trait default so a class body without an initializer stays unset.
+            unset($this->propertyDefaults[$classId][$existing[3]]);
+            unset($this->runtimePropertyNewDefaults[$classId][$existing[3]]);
+
+            return;
+        }
         if (!isset($this->propNameMap[$name])) {
             $this->propNameMap[$name] = count($this->propNameMap);
+        }
+        if (!isset($this->properties[$classId])) {
+            $this->properties[$classId] = [];
         }
         $this->properties[$classId][] = [
             $this->propNameMap[$name], $name, $type, count($this->properties[$classId]),
         ];
+        $this->instancePropertyDeclaringClassId[$classId][$nameLc] = $classId;
+    }
+
+    /**
+     * After class-body DECLARE_PROPERTY metadata is applied, merge or fatal vs trait (#22850).
+     */
+    public function assertClassTraitInstancePropertyMerge(int $classId, string $name): void
+    {
+        $nameLc = strtolower($name);
+        $pending = $this->pendingTraitInstancePropertyOverride[$classId][$nameLc] ?? null;
+        if (null === $pending) {
+            return;
+        }
+        unset($this->pendingTraitInstancePropertyOverride[$classId][$nameLc]);
+        $current = $this->findInstancePropertySet($classId, $name);
+        if (null === $current) {
+            return;
+        }
+        if ($this->instancePropertySnapshotsCompatible(
+            $pending,
+            $this->snapshotInstanceProperty($classId, $classId, $current)
+        )) {
+            return;
+        }
+        throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+            $this->classNameForId($classId),
+            $this->classNameForId((int) $pending['declaringId']),
+            $name
+        ));
+    }
+
+    /**
+     * @param array{0: int, 1: string, 2: int, 3: int} $propset
+     * @return array<string, mixed>
+     */
+    private function snapshotInstanceProperty(int $classId, int $declaringId, array $propset): array
+    {
+        $name = $propset[1];
+        $slot = $propset[3];
+
+        return [
+            'declaringId' => $declaringId,
+            'name' => $name,
+            'type' => $propset[2],
+            'visibility' => $this->propertyVisibility($classId, $name),
+            'setVisibility' => $this->propertySetVisibility($classId, $name),
+            'getVisibility' => $this->propertyGetVisibility($classId, $name),
+            'readonly' => $this->isPropertyReadonly($classId, $name),
+            'default' => $this->propertyDefaults[$classId][$slot] ?? null,
+            'dnf' => $this->dnfArmsForProperty($classId, $name),
+            'typedGuard' => isset($this->typedPropertyInitGuardSlots[$classId][$slot]),
+        ];
+    }
+
+    /**
+     * @return array{0: int, 1: string, 2: int, 3: int}|null
+     */
+    private function findInstancePropertySet(int $classId, string $name): ?array
+    {
+        $nameLc = strtolower($name);
+        foreach ($this->properties[$classId] ?? [] as $propset) {
+            if (strtolower($propset[1]) === $nameLc) {
+                return $propset;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $left
+     * @param array<string, mixed> $right
+     */
+    private function instancePropertySnapshotsCompatible(array $left, array $right): bool
+    {
+        if (MethodVisibility::mask((int) $left['visibility']) !== MethodVisibility::mask((int) $right['visibility'])) {
+            return false;
+        }
+        if ((bool) $left['readonly'] !== (bool) $right['readonly']) {
+            return false;
+        }
+        if ((int) $left['setVisibility'] !== (int) $right['setVisibility']
+            || (int) $left['getVisibility'] !== (int) $right['getVisibility']) {
+            return false;
+        }
+        if ((bool) $left['typedGuard'] !== (bool) $right['typedGuard']) {
+            return false;
+        }
+        if ($left['dnf'] != $right['dnf']) {
+            return false;
+        }
+
+        return $this->jitPropertyDefaultEntriesCompatible($left['default'] ?? null, $right['default'] ?? null);
+    }
+
+    /**
+     * @param array{0: int, 1: string, 2: int, 3: int} $classPropset
+     * @param array{0: int, 1: string, 2: int, 3: int} $traitPropset
+     */
+    private function jitInstancePropertiesCompatible(
+        int $classId,
+        int $traitId,
+        string $name,
+        array $classPropset,
+        array $traitPropset,
+    ): bool {
+        return $this->instancePropertySnapshotsCompatible(
+            $this->snapshotInstanceProperty(
+                $classId,
+                $this->instancePropertyDeclaringClassId[$classId][strtolower($name)] ?? $classId,
+                $classPropset
+            ),
+            $this->snapshotInstanceProperty($traitId, $traitId, $traitPropset)
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $traitEntry
+     */
+    private function jitStaticPropertiesCompatible(
+        int $classId,
+        int $traitId,
+        string $name,
+        array $traitEntry,
+    ): bool {
+        $existing = $this->staticPropertyGlobals[$classId][$name];
+
+        return $this->jitStaticPropertyEntriesCompatible(
+            $existing,
+            (int) ($this->staticPropertyVisibility[$classId][$name] ?? \PHPCfg\Func::FLAG_PUBLIC),
+            (int) ($this->staticPropertySetVisibility[$classId][$name] ?? 0),
+            (int) ($this->staticPropertyGetVisibility[$classId][$name] ?? 0),
+            !empty($this->staticPropertyAsymmetricExplicitRead[$classId][$name]),
+            (int) $traitEntry['type'],
+            $traitEntry['default'] ?? null,
+            !empty($traitEntry['typedWithoutDefault']),
+            (int) ($this->staticPropertyVisibility[$traitId][$name] ?? \PHPCfg\Func::FLAG_PUBLIC),
+            (int) ($this->staticPropertySetVisibility[$traitId][$name] ?? 0),
+            (int) ($this->staticPropertyGetVisibility[$traitId][$name] ?? 0),
+            !empty($this->staticPropertyAsymmetricExplicitRead[$traitId][$name]),
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $existing
+     */
+    private function jitStaticPropertyEntriesCompatible(
+        array $existing,
+        int $existingVisibility,
+        int $existingSetVisibility,
+        int $existingGetVisibility,
+        bool $existingAsym,
+        int $incomingType,
+        ?VMVariable $incomingDefault,
+        bool $incomingTypedWithoutDefault,
+        int $incomingVisibility,
+        int $incomingSetVisibility = 0,
+        int $incomingGetVisibility = 0,
+        bool $incomingAsym = false,
+    ): bool {
+        if (MethodVisibility::mask($existingVisibility) !== MethodVisibility::mask($incomingVisibility)) {
+            return false;
+        }
+        if ($existingSetVisibility !== $incomingSetVisibility
+            || $existingGetVisibility !== $incomingGetVisibility
+            || $existingAsym !== $incomingAsym) {
+            return false;
+        }
+        if ((int) $existing['type'] !== $incomingType) {
+            return false;
+        }
+        $existingTypedWithoutDefault = !empty($existing['typedWithoutDefault']);
+        $existingDefault = $existing['default'] ?? null;
+        $existingDefaultVar = $existingDefault instanceof VMVariable ? $existingDefault : null;
+        $incomingDefaultVar = $incomingDefault;
+
+        return TraitPropertyCompatibility::defaultsCompatible(
+            $existingTypedWithoutDefault ? null : $existingDefaultVar,
+            $existingTypedWithoutDefault || (
+                null !== $existingDefaultVar && (
+                    $existingDefaultVar->hasDeclaredTypeConstraint()
+                    || (null !== $existingDefaultVar->declaredTypeLabel && '' !== $existingDefaultVar->declaredTypeLabel)
+                )
+            ),
+            $incomingTypedWithoutDefault ? null : $incomingDefaultVar,
+            $incomingTypedWithoutDefault || (
+                null !== $incomingDefaultVar && (
+                    $incomingDefaultVar->hasDeclaredTypeConstraint()
+                    || (null !== $incomingDefaultVar->declaredTypeLabel && '' !== $incomingDefaultVar->declaredTypeLabel)
+                )
+            ),
+        );
+    }
+
+    /**
+     * @param mixed $left
+     * @param mixed $right
+     */
+    private function jitPropertyDefaultEntriesCompatible($left, $right): bool
+    {
+        if ($left === null && $right === null) {
+            return true;
+        }
+        if ($left === null || $right === null) {
+            // Untyped missing ≡ null default entry when the other is null-typed.
+            $present = $left ?? $right;
+            if (is_array($present) && ($present['type'] ?? null) === Variable::TYPE_NULL) {
+                return true;
+            }
+
+            return false;
+        }
+        if (!is_array($left) || !is_array($right)) {
+            return false;
+        }
+        if (!empty($left['emptyArray']) || !empty($right['emptyArray'])) {
+            return !empty($left['emptyArray']) && !empty($right['emptyArray']);
+        }
+        if (($left['type'] ?? null) !== ($right['type'] ?? null)) {
+            return false;
+        }
+        foreach (['value', 'string', 'integer', 'float', 'bool'] as $key) {
+            if (($left[$key] ?? null) !== ($right[$key] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -3873,13 +4137,15 @@ class Object_ extends Type {
             return;
         }
         $declaringId = $this->staticPropertyDeclaringClassId[$classId][$key] ?? $classId;
-        if ($declaringId !== $classId) {
-            throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
-                $this->classNameForId($classId),
-                $this->classNameForId($declaringId),
-                $name
-            ));
+        if ($declaringId === $classId) {
+            return;
         }
+        // Compatible class redeclare is handled in defineStaticProperty (#22850).
+        throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+            $this->classNameForId($classId),
+            $this->classNameForId($declaringId),
+            $name
+        ));
     }
 
     public function definePropertyDefault(int $classId, string $name, VMVariable $value): void
@@ -4354,6 +4620,9 @@ class Object_ extends Type {
         $className = $this->classNameForId($classId);
         foreach ($this->staticPropertyGlobals[$traitId] as $name => $entry) {
             if (isset($this->staticPropertyGlobals[$classId][$name])) {
+                if ($this->jitStaticPropertiesCompatible($classId, $traitId, $name, $entry)) {
+                    continue;
+                }
                 $prevTraitId = $this->staticPropertyDeclaringClassId[$classId][$name] ?? $classId;
                 throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
                     $this->classNameForId($prevTraitId),
@@ -4402,6 +4671,9 @@ class Object_ extends Type {
             $nameLc = strtolower($name);
             foreach ($this->properties[$classId] ?? [] as $existing) {
                 if (strtolower($existing[1]) === $nameLc) {
+                    if ($this->jitInstancePropertiesCompatible($classId, $traitId, $name, $existing, $propset)) {
+                        continue 2;
+                    }
                     $prevTraitId = $this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId;
                     if ($prevTraitId === $classId) {
                         throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
@@ -4769,6 +5041,35 @@ class Object_ extends Type {
     ): void {
         $key = strtolower($name);
         if (isset($this->staticPropertyGlobals[$classId][$key])) {
+            $declaringId = $this->staticPropertyDeclaringClassId[$classId][$key] ?? $classId;
+            if ($declaringId === $classId) {
+                return;
+            }
+            $existing = $this->staticPropertyGlobals[$classId][$key];
+            $incomingTypedWithoutDefault = $forceTypedWithoutDefault
+                || (
+                    null === $default
+                    && null !== $prototype
+                    && $prototype->hasDeclaredTypeConstraint()
+                    && $prototype->isUndefined()
+                );
+            if ($this->jitStaticPropertyEntriesCompatible(
+                $existing,
+                (int) ($this->staticPropertyVisibility[$classId][$key] ?? \PHPCfg\Func::FLAG_PUBLIC),
+                (int) ($this->staticPropertySetVisibility[$classId][$key] ?? 0),
+                (int) ($this->staticPropertyGetVisibility[$classId][$key] ?? 0),
+                !empty($this->staticPropertyAsymmetricExplicitRead[$classId][$key]),
+                $jitType,
+                $default,
+                $incomingTypedWithoutDefault,
+                $visibilityFlags
+            )) {
+                // Identical class+trait static — class wins declaring (#22850).
+                $this->staticPropertyDeclaringClassId[$classId][$key] = $classId;
+                $this->staticPropertyVisibility[$classId][$key] = $visibilityFlags;
+
+                return;
+            }
             $this->assertClassOwnStaticPropertyAllowed($classId, $name);
 
             return;
