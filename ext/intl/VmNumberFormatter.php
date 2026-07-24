@@ -301,8 +301,8 @@ final class VmNumberFormatter
             'locale' => $resolvedLocale,
             'style' => $style,
             'pattern' => null !== $pattern ? $pattern : self::defaultPatternForStyle($style),
-            // php-src/ICU style defaults (#21894): PERCENT → 0 fraction digits
-            // (format(0.456) → "46%"); CURRENCY → 2; DECIMAL keeps unlimited (-1).
+            // php-src/ICU style defaults (#21894, #22900): PERCENT → 0 fraction
+            // digits; CURRENCY → 2; DECIMAL → min 0 / max 3 (CLDR #,##0.###).
             'attributes' => self::defaultAttributesForStyle($style),
             'symbols' => self::defaultSymbolsForLocale($resolvedLocale),
             'textAttributes' => self::defaultTextAttributes(),
@@ -334,8 +334,9 @@ final class VmNumberFormatter
     }
 
     /**
-     * ICU/php-src default UNumberFormatAttribute values per style (#21894).
-     * PERCENT CLDR patterns use 0 fraction digits; CURRENCY uses 2.
+     * ICU/php-src default UNumberFormatAttribute values per style (#21894, #22900).
+     * PERCENT CLDR patterns use 0 fraction digits; CURRENCY uses 2;
+     * DECIMAL uses min 0 / max 3 (CLDR #,##0.###); SCIENTIFIC uses 0/0/0.
      *
      * @return array<int, int|float>
      */
@@ -359,7 +360,17 @@ final class VmNumberFormatter
 
             return $attrs;
         }
-        $attrs[self::FRACTION_DIGITS] = -1;
+        if (self::SCIENTIFIC === $style) {
+            $attrs[self::FRACTION_DIGITS] = 0;
+            $attrs[self::MIN_FRACTION_DIGITS] = 0;
+            $attrs[self::MAX_FRACTION_DIGITS] = 0;
+
+            return $attrs;
+        }
+        // DECIMAL / PATTERN_DECIMAL / default — ICU unum_open DECIMAL (#22900).
+        $attrs[self::FRACTION_DIGITS] = 0;
+        $attrs[self::MIN_FRACTION_DIGITS] = 0;
+        $attrs[self::MAX_FRACTION_DIGITS] = 3;
 
         return $attrs;
     }
@@ -712,7 +723,20 @@ final class VmNumberFormatter
 
             return false;
         }
-        self::$state[$formatter->id]['attributes'][$attribute] = $value;
+        // ICU UNUM_FRACTION_DIGITS sets both min and max (php-src formatter_attr.c / #22900).
+        if (self::FRACTION_DIGITS === $attribute) {
+            $n = (int) $value;
+            self::$state[$formatter->id]['attributes'][self::FRACTION_DIGITS] = $n;
+            self::$state[$formatter->id]['attributes'][self::MIN_FRACTION_DIGITS] = $n;
+            self::$state[$formatter->id]['attributes'][self::MAX_FRACTION_DIGITS] = $n;
+        } elseif (self::MIN_FRACTION_DIGITS === $attribute) {
+            $n = (int) $value;
+            self::$state[$formatter->id]['attributes'][self::MIN_FRACTION_DIGITS] = $n;
+            // getAttribute(FRACTION_DIGITS) mirrors min when min ≠ max (Zend/ICU).
+            self::$state[$formatter->id]['attributes'][self::FRACTION_DIGITS] = $n;
+        } else {
+            self::$state[$formatter->id]['attributes'][$attribute] = $value;
+        }
         self::clearObjectError($formatter);
         IntlError::clear();
 
@@ -1066,21 +1090,27 @@ final class VmNumberFormatter
             $grouping = '';
         }
 
-        $fracDigitsAttr = $attrs[self::FRACTION_DIGITS] ?? -1;
+        // Prefer MIN/MAX_FRACTION_DIGITS (ICU DecimalFormat). FRACTION_DIGITS alone is
+        // only a fallback when min/max were never materialized (#22900 — DECIMAL
+        // defaults are min=0 max=3 with getAttribute(FRACTION_DIGITS)=0).
         $minFrac = null;
         $maxFrac = null;
         if (null !== $forceFrac) {
             $minFrac = $forceFrac;
             $maxFrac = $forceFrac;
-        } elseif (is_numeric($fracDigitsAttr) && (int) $fracDigitsAttr >= 0) {
-            $minFrac = (int) $fracDigitsAttr;
-            $maxFrac = (int) $fracDigitsAttr;
         } else {
             if (isset($attrs[self::MIN_FRACTION_DIGITS]) && (int) $attrs[self::MIN_FRACTION_DIGITS] >= 0) {
                 $minFrac = (int) $attrs[self::MIN_FRACTION_DIGITS];
             }
             if (isset($attrs[self::MAX_FRACTION_DIGITS]) && (int) $attrs[self::MAX_FRACTION_DIGITS] >= 0) {
                 $maxFrac = (int) $attrs[self::MAX_FRACTION_DIGITS];
+            }
+            if (null === $minFrac && null === $maxFrac) {
+                $fracDigitsAttr = $attrs[self::FRACTION_DIGITS] ?? -1;
+                if (is_numeric($fracDigitsAttr) && (int) $fracDigitsAttr >= 0) {
+                    $minFrac = (int) $fracDigitsAttr;
+                    $maxFrac = (int) $fracDigitsAttr;
+                }
             }
         }
 
