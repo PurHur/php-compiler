@@ -7,7 +7,7 @@ namespace PHPCompiler\VM\Builtin;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\DateTimeSupport;
 
-/** DateTime::setTimezone(DateTimeZone $timezone) — VM (#3072). */
+/** DateTime::setTimezone() / DateTimeImmutable::setTimezone() — VM (#3072, #22824). */
 final class DateTimeSetTimezone extends VmClassMethod
 {
     public function __construct()
@@ -20,17 +20,25 @@ final class DateTimeSetTimezone extends VmClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DateTime::setTimezone() expects exactly 1 argument');
         }
-        $receiver = DateTimeSupport::requireDateTime(
+        $receiver = DateTimeSupport::requireDateTimeLike(
             $frame->calledArgs[0],
             'DateTime::setTimezone()',
-            null,
-            null,
             $frame->vmContext
         );
-        $timezone = DateTimeSupport::requireDateTimeZone($frame->calledArgs[1], 'DateTime::setTimezone() timezone');
-        DateTimeSupport::setTimezone($receiver, $timezone);
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom($frame->calledArgs[0]);
+        $label = DateTimeSupport::isDateTimeImmutable($receiver) ? 'DateTimeImmutable' : 'DateTime';
+        $timezone = DateTimeSupport::requireDateTimeZone(
+            $frame->calledArgs[1],
+            "{$label}::setTimezone() timezone"
+        );
+        if (null === $frame->returnVar) {
+            return;
         }
+        if (DateTimeSupport::isDateTimeImmutable($receiver)) {
+            $frame->returnVar->object(DateTimeSupport::withTimezone($receiver, $timezone));
+
+            return;
+        }
+        DateTimeSupport::setTimezone($receiver, $timezone);
+        $frame->returnVar->object($receiver);
     }
 }
