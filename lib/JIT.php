@@ -16116,6 +16116,9 @@ class JIT {
             } elseif ('replacechild' === $methodLc && $this->context->functionIsRegistered('domnode::replacechild')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('insertbefore' === $methodLc && $this->context->functionIsRegistered('domnode::insertbefore')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
             } elseif ('comparedocumentposition' === $methodLc && $this->context->functionIsRegistered('domnode::comparedocumentposition')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';

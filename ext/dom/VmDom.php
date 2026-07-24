@@ -5941,6 +5941,11 @@ final class VmDom
         self::assertNotAncestorOfParent($parent, $newChild);
         if (null !== $refChild) {
             self::assertChildOfParent($parent, $refChild, 'DOMNode::insertBefore()');
+            // php-src ext/dom/node.c — xmlAddPrevSibling fails when new == ref → Error, not NOT_FOUND (#22686).
+            // Without this guard, detachNodeIfAttached() removes the child then childIndex() raises NOT_FOUND.
+            if ($newChild->id === $refChild->id) {
+                throw new \Error('Cannot add newnode as the previous sibling of refnode');
+            }
         }
         self::detachNodeIfAttached($ctx, $newChild);
         $parentState = DomRegistry::state($parent);
@@ -6603,6 +6608,10 @@ final class VmDom
         self::assertNotAncestorOfParent($parent, $newChild);
         if (null !== $refChild) {
             self::assertChildOfParent($parent, $refChild, 'DOMNode::insertBefore()');
+            // php-src: same-node insertBefore → Error (not DOMException NOT_FOUND after detach) (#22686).
+            if ($newChild->id === $refChild->id) {
+                throw new \Error('Cannot add newnode as the previous sibling of refnode');
+            }
         }
         self::detachNodeIfAttached($ctx, $newChild);
         $parentState = DomRegistry::state($parent);
