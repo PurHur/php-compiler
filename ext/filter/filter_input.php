@@ -65,7 +65,7 @@ final class filter_input extends Internal
         if (!VmFilter::isSupportedFilter($filterId)) {
             filter_var::triggerUnknownFilterWarning($frame, $filterId);
         }
-        filter_var::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options));
+        filter_var::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options, $frame));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

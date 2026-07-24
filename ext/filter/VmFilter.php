@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\filter;
 
 use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmEngineBuiltinDeprecation;
 use PHPCompiler\ext\standard\VmInetPure;
 use PHPCompiler\ext\standard\VmPregNative;
@@ -17,9 +18,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * filter_var() / filter_input() subset (issue #104, #6028).
+ * filter_var() / filter_input() subset (issue #104, #6028, #22852).
  *
- * php-src: ext/filter/filter.c, logical_filters.c
+ * php-src: ext/filter/filter.c, logical_filters.c, callback_filter.c
  */
 final class VmFilter
 {
@@ -92,7 +93,9 @@ final class VmFilter
 
     public static function isSupportedFilter(int $filter): bool
     {
-        return self::isValidateFilter($filter) || self::isSanitizeFilter($filter);
+        return self::isValidateFilter($filter)
+            || self::isSanitizeFilter($filter)
+            || self::FILTER_CALLBACK === $filter;
     }
 
     public static function isValidateFilter(int $filter): bool
@@ -128,42 +131,286 @@ final class VmFilter
         return 'filter_var(): Unknown filter with ID '.$filter;
     }
 
-    public static function filterVar(Variable $value, int $filter, ?Variable $options = null): Variable
-    {
+    /**
+     * php-src php_filter_call / filter_var() (#22852 CALLBACK, #22839 definition flags).
+     *
+     * @param int $defaultFlags FILTER_REQUIRE_SCALAR for filter_var(); overridden by options flags
+     */
+    public static function filterVar(
+        Variable $value,
+        int $filter,
+        ?Variable $options = null,
+        ?Frame $frame = null,
+        int $defaultFlags = self::FILTER_REQUIRE_SCALAR
+    ): Variable {
+        if (self::FILTER_CALLBACK === $filter) {
+            return self::applyCallbackFilter($value, $options, $frame, $defaultFlags);
+        }
+
         $parsed = self::parseFilterArgs($options);
-        $nullOnFailure = 0 !== ($parsed['flags'] & self::FILTER_NULL_ON_FAILURE);
+        $flags = self::normalizeFilterFlags($parsed['flags'], $options, $defaultFlags);
+        $value = $value->resolveIndirect();
+
+        if (Variable::TYPE_ARRAY === $value->type) {
+            if (0 !== ($flags & self::FILTER_REQUIRE_SCALAR)) {
+                return self::failureResult(0 !== ($flags & self::FILTER_NULL_ON_FAILURE));
+            }
+
+            return self::filterVarRecursive($value->toArray(), $filter, $options, $frame, $flags);
+        }
+        if (0 !== ($flags & self::FILTER_REQUIRE_ARRAY)) {
+            return self::failureResult(0 !== ($flags & self::FILTER_NULL_ON_FAILURE));
+        }
+
+        $filtered = self::filterVarScalar($value, $filter, $flags, $parsed['filterOptions']);
+        if (0 !== ($flags & self::FILTER_FORCE_ARRAY)) {
+            return self::wrapInArray($filtered);
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * Apply a non-callback filter to a scalar (no array / FORCE_ARRAY handling).
+     */
+    private static function filterVarScalar(
+        Variable $value,
+        int $filter,
+        int $flags,
+        ?HashTable $filterOptions
+    ): Variable {
+        $nullOnFailure = 0 !== ($flags & self::FILTER_NULL_ON_FAILURE);
         if (self::FILTER_VALIDATE_INT === $filter) {
-            return self::validateInt($value, $nullOnFailure, $parsed['flags'], $parsed['filterOptions']);
+            return self::validateInt($value, $nullOnFailure, $flags, $filterOptions);
         }
         if (self::FILTER_VALIDATE_BOOLEAN === $filter) {
             return self::validateBoolean($value, $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_FLOAT === $filter) {
-            return self::validateFloat($value, $nullOnFailure, $parsed['filterOptions']);
+            return self::validateFloat($value, $nullOnFailure, $filterOptions);
         }
         if (self::FILTER_VALIDATE_REGEXP === $filter) {
-            return self::validateRegexp($value, $parsed['filterOptions'], $nullOnFailure);
+            return self::validateRegexp($value, $filterOptions, $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_DOMAIN === $filter) {
-            return self::validateDomain($value, $nullOnFailure, $parsed['flags']);
+            return self::validateDomain($value, $nullOnFailure, $flags);
         }
         if (self::FILTER_VALIDATE_URL === $filter) {
-            return self::validateUrl($value, $nullOnFailure, $parsed['flags']);
+            return self::validateUrl($value, $nullOnFailure, $flags);
         }
         if (self::FILTER_VALIDATE_EMAIL === $filter) {
-            return self::validateEmail($value, $nullOnFailure, $parsed['flags']);
+            return self::validateEmail($value, $nullOnFailure, $flags);
         }
         if (self::FILTER_VALIDATE_IP === $filter) {
-            return self::validateIp($value, $nullOnFailure, $parsed['flags']);
+            return self::validateIp($value, $nullOnFailure, $flags);
         }
         if (self::FILTER_VALIDATE_MAC === $filter) {
-            return self::validateMac($value, $nullOnFailure, $parsed['filterOptions']);
+            return self::validateMac($value, $nullOnFailure, $filterOptions);
         }
         if (self::isSanitizeFilter($filter)) {
-            return self::sanitize($value, $filter, $parsed['flags'], $parsed['filterOptions']);
+            return self::sanitize($value, $filter, $flags, $filterOptions);
         }
 
         return self::failureResult(false);
+    }
+
+    /**
+     * php-src php_zval_filter_recursive — map filter over array elements.
+     */
+    private static function filterVarRecursive(
+        HashTable $ht,
+        int $filter,
+        ?Variable $options,
+        ?Frame $frame,
+        int $flags
+    ): Variable {
+        $out = new HashTable();
+        $childFlags = $flags & ~self::FILTER_FORCE_ARRAY;
+        $parsed = self::parseFilterArgs($options);
+        foreach ($ht->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $value = $valueVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $value->type) {
+                if (0 !== ($childFlags & self::FILTER_REQUIRE_SCALAR)) {
+                    $filtered = self::failureResult(0 !== ($childFlags & self::FILTER_NULL_ON_FAILURE));
+                } else {
+                    $filtered = self::filterVarRecursive(
+                        $value->toArray(),
+                        $filter,
+                        $options,
+                        $frame,
+                        $childFlags
+                    );
+                }
+            } elseif (0 !== ($childFlags & self::FILTER_REQUIRE_ARRAY)) {
+                $filtered = self::failureResult(0 !== ($childFlags & self::FILTER_NULL_ON_FAILURE));
+            } else {
+                $filtered = self::filterVarScalar($value, $filter, $childFlags, $parsed['filterOptions']);
+            }
+            self::storeFilteredEntry($out, $keyVar, $filtered);
+        }
+        $result = new Variable();
+        $result->array($out);
+
+        return $result;
+    }
+
+    /**
+     * FILTER_CALLBACK — php-src ext/filter/callback_filter.c (#22852).
+     */
+    private static function applyCallbackFilter(
+        Variable $value,
+        ?Variable $options,
+        ?Frame $frame,
+        int $defaultFlags
+    ): Variable {
+        [$callback, $flags] = self::parseCallbackArgs($options, $defaultFlags);
+        $ctx = null !== $frame ? $frame->vmContext : null;
+        if (null === $ctx
+            || null === $callback
+            || !VmCallable::isCallable($ctx, $callback, false, null, $frame)
+        ) {
+            throw new \TypeError('filter_var(): Option must be a valid callback');
+        }
+
+        return self::invokeCallbackFilter($ctx, $callback, $value, $flags, $frame);
+    }
+
+    /**
+     * Apply an already-validated FILTER_CALLBACK callable (php_zval_filter_recursive).
+     */
+    private static function invokeCallbackFilter(
+        Context $ctx,
+        Variable $callback,
+        Variable $value,
+        int $flags,
+        ?Frame $frame
+    ): Variable {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $value->type) {
+            if (0 !== ($flags & self::FILTER_REQUIRE_SCALAR)) {
+                return self::failureResult(0 !== ($flags & self::FILTER_NULL_ON_FAILURE));
+            }
+            $out = new HashTable();
+            $childFlags = $flags & ~self::FILTER_FORCE_ARRAY;
+            foreach ($value->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                $filtered = self::invokeCallbackFilter(
+                    $ctx,
+                    $callback,
+                    $valueVar->resolveIndirect(),
+                    $childFlags,
+                    $frame
+                );
+                self::storeFilteredEntry($out, $keyVar, $filtered);
+            }
+            $result = new Variable();
+            $result->array($out);
+
+            return $result;
+        }
+        if (0 !== ($flags & self::FILTER_REQUIRE_ARRAY)) {
+            return self::failureResult(0 !== ($flags & self::FILTER_NULL_ON_FAILURE));
+        }
+
+        $arg = new Variable();
+        $arg->copyFrom($value);
+        $filtered = VmCallable::invoke($ctx, $callback, $arg);
+        if (0 !== ($flags & self::FILTER_FORCE_ARRAY)) {
+            return self::wrapInArray($filtered);
+        }
+
+        return $filtered;
+    }
+
+    /**
+     * @return array{0: ?Variable, 1: int}
+     */
+    private static function parseCallbackArgs(?Variable $options, int $defaultFlags): array
+    {
+        if (null === $options || $options->isUndefined() || Variable::TYPE_NULL === $options->type) {
+            return [null, self::normalizeFilterFlags(0, null, $defaultFlags)];
+        }
+        $resolved = $options->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return [null, self::normalizeFilterFlags($resolved->toInt(), $options, $defaultFlags)];
+        }
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            throw new \LogicException('filter_var() options must be an integer flag bitmask or array');
+        }
+        $ht = $resolved->toArray();
+        $callback = null;
+        $flags = $defaultFlags;
+        $optionsVar = $ht->find('options');
+        if (null !== $optionsVar && !$optionsVar->isUndefined() && Variable::TYPE_NULL !== $optionsVar->type) {
+            // php-src: FILTER_CALLBACK options value is the callable; clears inherited flags.
+            $callback = $optionsVar->resolveIndirect();
+            $flags = 0;
+        }
+        $flagsVar = $ht->find('flags');
+        if (null !== $flagsVar && !$flagsVar->isUndefined() && Variable::TYPE_NULL !== $flagsVar->type) {
+            if (Variable::TYPE_INTEGER !== $flagsVar->resolveIndirect()->type) {
+                throw new \LogicException('filter_var() options[flags] must be an integer');
+            }
+            $flags = $flagsVar->resolveIndirect()->toInt();
+            if (0 === ($flags & self::FILTER_REQUIRE_ARRAY) && 0 === ($flags & self::FILTER_FORCE_ARRAY)) {
+                $flags |= self::FILTER_REQUIRE_SCALAR;
+            }
+        }
+
+        return [$callback, $flags];
+    }
+
+    /**
+     * When options is an int bitmask or absent, OR REQUIRE_SCALAR unless FORCE/REQUIRE_ARRAY.
+     * When options is an array without a flags key, keep $defaultFlags (php-src php_filter_call).
+     */
+    private static function normalizeFilterFlags(int $flags, ?Variable $options, int $defaultFlags): int
+    {
+        if (null === $options || $options->isUndefined() || Variable::TYPE_NULL === $options->type) {
+            $flags = $defaultFlags;
+            if (0 === ($flags & self::FILTER_REQUIRE_ARRAY) && 0 === ($flags & self::FILTER_FORCE_ARRAY)) {
+                $flags |= self::FILTER_REQUIRE_SCALAR;
+            }
+
+            return $flags;
+        }
+        $resolved = $options->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            $flags = $resolved->toInt();
+            if (0 === ($flags & self::FILTER_REQUIRE_ARRAY) && 0 === ($flags & self::FILTER_FORCE_ARRAY)) {
+                $flags |= self::FILTER_REQUIRE_SCALAR;
+            }
+
+            return $flags;
+        }
+        if (Variable::TYPE_ARRAY === $resolved->type) {
+            $flagsVar = $resolved->toArray()->find('flags');
+            if (null === $flagsVar || $flagsVar->isUndefined() || Variable::TYPE_NULL === $flagsVar->type) {
+                return $defaultFlags;
+            }
+            if (Variable::TYPE_INTEGER !== $flagsVar->resolveIndirect()->type) {
+                throw new \LogicException('filter_var() options[flags] must be an integer');
+            }
+            $flags = $flagsVar->resolveIndirect()->toInt();
+            if (0 === ($flags & self::FILTER_REQUIRE_ARRAY) && 0 === ($flags & self::FILTER_FORCE_ARRAY)) {
+                $flags |= self::FILTER_REQUIRE_SCALAR;
+            }
+
+            return $flags;
+        }
+
+        return $flags;
+    }
+
+    private static function wrapInArray(Variable $filtered): Variable
+    {
+        $ht = new HashTable();
+        $stored = new Variable();
+        $stored->copyFrom($filtered);
+        $ht->addIndex(0, $stored);
+        $out = new Variable();
+        $out->array($ht);
+
+        return $out;
     }
 
     /**
@@ -175,9 +422,6 @@ final class VmFilter
         int $flags = 0,
         ?\PHPCompiler\VM\HashTable $filterOptions = null
     ): Variable {
-        if (self::FILTER_CALLBACK === $filter) {
-            throw new \ValueError('filter_var(): Option must be a valid callback');
-        }
         if (self::FILTER_SANITIZE_STRING === $filter) {
             VmEngineBuiltinDeprecation::emitConstant(null, 'FILTER_SANITIZE_STRING');
         }
@@ -1567,13 +1811,17 @@ final class VmFilter
         }
         $out = new HashTable();
         foreach ($data->iterateKeyed(true) as [$keyVar, $valueVar]) {
-            $filtered = self::filterVar($valueVar->resolveIndirect(), $filterId, null);
+            $filtered = self::filterVar($valueVar->resolveIndirect(), $filterId, null, $frame);
             self::storeFilteredEntry($out, $keyVar, $filtered);
         }
 
         return $out;
     }
 
+    /**
+     * php-src php_filter_array_handler — definition values are int filter IDs or
+     * arrays with filter/flags/options keys (#22839, #22852).
+     */
     private static function filterVarArrayWithDefinition(
         HashTable $data,
         HashTable $definition,
@@ -1584,10 +1832,25 @@ final class VmFilter
         foreach ($definition->iterateKeyed(true) as [$defKeyVar, $filterVar]) {
             $defKey = $defKeyVar->resolveIndirect();
             $filterResolved = $filterVar->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $filterResolved->type) {
+            $filterId = self::FILTER_DEFAULT;
+            $optionsVar = null;
+            if (Variable::TYPE_INTEGER === $filterResolved->type) {
+                $filterId = $filterResolved->toInt();
+            } elseif (Variable::TYPE_ARRAY === $filterResolved->type) {
+                // Whole definition array is php_filter_call's filter_args_ht.
+                $optionsVar = $filterResolved;
+                $defHt = $filterResolved->toArray();
+                $filterOpt = $defHt->find('filter');
+                if (null !== $filterOpt && !$filterOpt->isUndefined() && Variable::TYPE_NULL !== $filterOpt->type) {
+                    $filterIdVar = $filterOpt->resolveIndirect();
+                    if (Variable::TYPE_INTEGER !== $filterIdVar->type) {
+                        throw new \LogicException('filter_var_array() definition filter must be an integer');
+                    }
+                    $filterId = $filterIdVar->toInt();
+                }
+            } else {
                 throw new \LogicException('filter_var_array() definition values must be filter IDs');
             }
-            $filterId = $filterResolved->toInt();
             if (!self::isSupportedFilter($filterId)) {
                 filter_var::triggerUnknownFilterWarning($frame, $filterId);
             }
@@ -1598,7 +1861,7 @@ final class VmFilter
                 }
                 continue;
             }
-            $filtered = self::filterVar($stored->resolveIndirect(), $filterId, null);
+            $filtered = self::filterVar($stored->resolveIndirect(), $filterId, $optionsVar, $frame);
             self::storeFilteredEntry($out, $defKeyVar, $filtered);
         }
 
