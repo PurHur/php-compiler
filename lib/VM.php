@@ -8464,6 +8464,9 @@ restart:
                         ? $this->context->tickInterval
                         : 0;
                     break;
+                case OpCode::TYPE_TICKS:
+                    $this->maybeRunTick();
+                    break;
                 default:
                     throw new \LogicException("VM OpCode Not Implemented: " . opcode_type_name($op->type));
                 }
@@ -8506,7 +8509,6 @@ restart:
                 $frame = $redirect->catchFrame;
                 goto restart;
             }
-            $this->maybeRunTick();
             if ($this->shouldAbortPropertyHookInvocation($frame)) {
                 return self::FAILURE;
             }

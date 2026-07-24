@@ -274,7 +274,9 @@ patch_already_applied() {
       grep -q 'KIND_LINE' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/MagicScriptConst.php" 2>/dev/null
       ;;
     php-cfg-declare-ticks.patch)
-      grep -q 'SetTickInterval' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      grep -q 'SetTickInterval' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q 'LeaveTickInterval' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q 'node->stmts' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-magic-line.patch)
       ! grep -q 'MagicConst\\Line' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
@@ -4888,48 +4890,78 @@ PY
 
 apply_php_cfg_declare_ticks_overlay() {
   local op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/SetTickInterval.php"
+  local leave_op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/LeaveTickInterval.php"
   local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
   local overlay_op="$PATCH_DIR/overlays/php-cfg/Op/Terminal/SetTickInterval.php"
-  if grep -q 'SetTickInterval' "$parser" 2>/dev/null; then
+  local overlay_leave="$PATCH_DIR/overlays/php-cfg/Op/Terminal/LeaveTickInterval.php"
+  if grep -q 'LeaveTickInterval' "$parser" 2>/dev/null \
+    && grep -q 'node->stmts' "$parser" 2>/dev/null \
+    && [[ -f "$op" ]] && [[ -f "$leave_op" ]] \
+    && grep -q 'public bool \$scoped' "$op" 2>/dev/null; then
     echo "Skip php-cfg-declare-ticks.patch (already applied)"
     return 0
   fi
-  if [[ ! -f "$overlay_op" ]]; then
+  if [[ ! -f "$overlay_op" ]] || [[ ! -f "$overlay_leave" ]]; then
     echo "Skip php-cfg-declare-ticks.patch (overlay missing)" >&2
     return 1
   fi
   mkdir -p "$(dirname "$op")"
   cp "$overlay_op" "$op"
+  cp "$overlay_leave" "$leave_op"
   python3 - "$parser" <<'PY'
+import re
 import sys
 from pathlib import Path
 
 parser_path = Path(sys.argv[1])
 text = parser_path.read_text()
-old = (
-    "        foreach ($node->declares as $item) {\n"
-    "            if ('strict_types' !== $item->key->toLowerString()) {\n"
-    "                continue;\n"
-    "            }\n"
+new_method = '''    protected function parseStmt_Declare(Stmt\\Declare_ $node)
+    {
+        if (null === $this->currentFunc) {
+            return;
+        }
+        $tickInterval = null;
+        foreach ($node->declares as $item) {
+            $key = $item->key->toLowerString();
+            if ('ticks' === $key && $item->value instanceof Node\\Scalar\\LNumber) {
+                $tickInterval = max(0, (int) $item->value->value);
+                continue;
+            }
+            if ('strict_types' !== $key) {
+                continue;
+            }
+            if ($item->value instanceof Node\\Scalar\\LNumber) {
+                $this->currentFunc->strictTypes = 1 === $item->value->value;
+            }
+        }
+        $braced = null !== $node->stmts;
+        if (null !== $tickInterval) {
+            $this->block->children[] = new Op\\Terminal\\SetTickInterval(
+                $tickInterval,
+                $this->mapAttributes($node),
+                $braced
+            );
+        }
+        if ($braced) {
+            $this->block = $this->parseNodes($node->stmts, $this->block);
+            if (null !== $tickInterval) {
+                $this->block->children[] = new Op\\Terminal\\LeaveTickInterval(
+                    $this->mapAttributes($node)
+                );
+            }
+        }
+    }
+'''
+pattern = re.compile(
+    r'    protected function parseStmt_Declare\(Stmt\\Declare_ \$node\)\s*\{.*?\n    \}\n\n    protected function parseStmt_Do',
+    re.S,
 )
-new = (
-    "        foreach ($node->declares as $item) {\n"
-    "            $key = $item->key->toLowerString();\n"
-    "            if ('ticks' === $key && $item->value instanceof Node\\Scalar\\LNumber) {\n"
-    "                $this->block->children[] = new Op\\Terminal\\SetTickInterval(\n"
-    "                    max(0, (int) $item->value->value),\n"
-    "                    $this->mapAttributes($node)\n"
-    "                );\n"
-    "                continue;\n"
-    "            }\n"
-    "            if ('strict_types' !== $key) {\n"
-    "                continue;\n"
-    "            }\n"
-)
-if old not in text:
-    sys.stderr.write("php-cfg-declare-ticks: Parser.php anchor not found\n")
+replacement = new_method + '\n    protected function parseStmt_Do'
+match = pattern.search(text)
+if not match:
+    sys.stderr.write("php-cfg-declare-ticks: parseStmt_Declare anchor not found\n")
     raise SystemExit(1)
-parser_path.write_text(text.replace(old, new, 1))
+parser_path.write_text(text[:match.start()] + replacement + text[match.end():])
 print("Applied php-cfg-declare-ticks.patch (overlay)")
 PY
 }

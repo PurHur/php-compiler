@@ -155,6 +155,15 @@ class Compiler {
     /** Force PROPERTY_FETCH_WRITE for array-literal by-ref element lowering (#6426, #17353). */
     private int $forcePropertyFetchForWrite = 0;
 
+    /**
+     * Compile-time declare(ticks=N) interval for emitting TYPE_TICKS after statements (#22840).
+     * Mirrors CG(declarables).ticks — braced scopes push/pop via activeTickIntervalStack.
+     */
+    private int $activeTickInterval = 0;
+
+    /** @var list<int> */
+    private array $activeTickIntervalStack = [];
+
     /** Byte offset where halt trailing data starts; null when no __halt_compiler() (#5455). */
     private ?int $haltCompilerOffset = null;
 
@@ -2024,11 +2033,61 @@ class Compiler {
             ) {
                 array_splice($block->opCodes, $i, 0, [new OpCode(OpCode::TYPE_TICK_SCOPE_LEAVE)]);
                 ++$block->nOpCodes;
+                $this->restoreActiveTickIntervalAfterImplicitLeave();
 
                 return;
             }
         }
         $block->addOpCode(new OpCode(OpCode::TYPE_TICK_SCOPE_LEAVE));
+        $this->restoreActiveTickIntervalAfterImplicitLeave();
+    }
+
+    private function restoreActiveTickIntervalAfterImplicitLeave(): void
+    {
+        if ([] !== $this->activeTickIntervalStack) {
+            $this->activeTickInterval = array_pop($this->activeTickIntervalStack);
+        } else {
+            $this->activeTickInterval = 0;
+        }
+    }
+
+    private function emitTicksBeforeStatementIfNeeded(Op $op, Block $block, array $ops, int $index): void
+    {
+        if ($this->activeTickInterval <= 0) {
+            return;
+        }
+        if ($op instanceof Op\Terminal\SetTickInterval || $op instanceof Op\Terminal\LeaveTickInterval) {
+            return;
+        }
+        if (
+            $op instanceof Op\Stmt\Function_
+            || $op instanceof Op\Stmt\Class_
+            || $op instanceof Op\Stmt\Interface_
+            || $op instanceof Op\Stmt\Trait_
+            || $op instanceof Op\Stmt\Enum_
+            || $op instanceof Op\Stmt\Jump
+            || $op instanceof Op\Stmt\JumpIf
+            || $op instanceof Op\Terminal\Const_
+            || $op instanceof Op\Terminal\Return_
+        ) {
+            return;
+        }
+        // php-cfg lowers `$x += 1` to BinaryOp + Assign — only the Assign is tickable (#22840).
+        if ($op instanceof Op\Expr\BinaryOp || $op instanceof Op\Expr\ConcatList) {
+            return;
+        }
+        if ($op instanceof Op\Expr\Closure) {
+            return;
+        }
+        // `echo $a, $b` becomes consecutive Terminal_Echo — one Zend statement (#22840).
+        // Fire once before the first echo expr, not before each fragment.
+        if ($op instanceof Op\Terminal && 'Terminal_Echo' === $op->getType()) {
+            $prev = $ops[$index - 1] ?? null;
+            if ($prev instanceof Op\Terminal && 'Terminal_Echo' === $prev->getType()) {
+                return;
+            }
+        }
+        $block->addOpCode(new OpCode(OpCode::TYPE_TICKS));
     }
 
     protected function compileOps(array $ops, Block $block): void {
@@ -2542,6 +2601,7 @@ class Compiler {
                         ) {
                             $this->assignRefBindRefFlags = OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK;
                         }
+                        $this->emitTicksBeforeStatementIfNeeded($child, $block, $ops, $i);
                         $this->compileOp($child, $block);
                         $this->assignRefBindRefFlags = $savedAssignRefFlags;
                     }
@@ -38362,6 +38422,8 @@ class Compiler {
                 throw new \LogicException('StaticVar must be compiled via compileOps (#4352)');
             case 'Terminal_SetTickInterval':
                 return $this->compileSetTickInterval($terminal, $block);
+            case 'Terminal_LeaveTickInterval':
+                return $this->compileLeaveTickInterval($terminal, $block);
             default:
                 $this->throwCompileLogic("Unknown Terminal Type: " . $terminal->getType());
         }
@@ -38376,13 +38438,35 @@ class Compiler {
             $this->throwCompileLogic('Expected SetTickInterval terminal');
         }
         $interval = max(0, $terminal->interval);
-        if (!$block->tickScopeOpened) {
+        $scoped = !empty($terminal->scoped);
+        // Braced declare(ticks=N){…} always pushes so LeaveTickInterval can restore (#22840).
+        if ($scoped || !$block->tickScopeOpened) {
             $block->tickScopeOpened = true;
+            $this->activeTickIntervalStack[] = $this->activeTickInterval;
+            $this->activeTickInterval = $interval;
 
             return [new OpCode(OpCode::TYPE_TICK_SCOPE_ENTER, $interval)];
         }
+        $this->activeTickInterval = $interval;
 
         return [new OpCode(OpCode::TYPE_TICK_SCOPE_SET, $interval)];
+    }
+
+    /**
+     * @return list<OpCode>
+     */
+    protected function compileLeaveTickInterval(Op\Terminal $terminal, Block $block): array
+    {
+        if (!$terminal instanceof Op\Terminal\LeaveTickInterval) {
+            $this->throwCompileLogic('Expected LeaveTickInterval terminal');
+        }
+        if ([] !== $this->activeTickIntervalStack) {
+            $this->activeTickInterval = array_pop($this->activeTickIntervalStack);
+        } else {
+            $this->activeTickInterval = 0;
+        }
+
+        return [new OpCode(OpCode::TYPE_TICK_SCOPE_LEAVE)];
     }
 
 
