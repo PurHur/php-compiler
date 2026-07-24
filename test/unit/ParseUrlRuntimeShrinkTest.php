@@ -8,7 +8,10 @@ use PHPCompiler\ext\standard\ParseUrlJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** parse_url JIT routes through ParseUrlJitHelper PHP not ParseUrlJit LLVM (#9358). */
+/**
+ * parse_url JIT routes through ParseUrlJitHelper PHP not ParseUrlJit LLVM (#9358).
+ * NestedJIT via JitVmHelperLink::ensureCompiled (#22861 / peer #22575).
+ */
 final class ParseUrlRuntimeShrinkTest extends TestCase
 {
     public function testParseUrlJitFileDeleted(): void
@@ -27,10 +30,16 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ParseUrlRuntime.php');
         $this->assertStringContainsString('ParseUrlJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('emitParseParts', $source);
         $this->assertStringNotContainsString('__phpc_parse_url_strdup0', $source);
-        $this->assertLessThan(330, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(300, \substr_count($source, "\n") + 1);
     }
 
     public function testParseUrlJitHelperMatchesVmString(): void
