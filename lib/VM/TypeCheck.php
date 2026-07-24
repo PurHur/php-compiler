@@ -628,6 +628,13 @@ final class TypeCheck
     public const STRING_APPEND_UNSUPPORTED_MESSAGE = '[] operator not supported for strings';
 
     /**
+     * Zend 8.1+ E_DEPRECATED when FETCH_DIM_W / []= promotes false→array (zend_execute.c, #22828).
+     *
+     * Null/undefined auto-vivify silently; only false emits this notice.
+     */
+    public const FALSE_TO_ARRAY_DEPRECATED_MESSAGE = 'Automatic conversion of false to array is deprecated';
+
+    /**
      * True when FETCH_DIM_W / []= must auto-vivify an empty array (zend_execute.c, #21992, #22650).
      *
      * Zend promotes null, undefined, and false containers; true/int/float still Error
@@ -645,6 +652,18 @@ final class TypeCheck
         }
 
         // Legacy Zend: false→[] on dim write, same as null (zend_execute.c / #22650).
+        return self::isFalseContainerForDimAutovivify($resolved);
+    }
+
+    /**
+     * True when the dim-write container is boolean false (zend_execute.c / #22828).
+     *
+     * Callers that auto-vivify must emit {@see FALSE_TO_ARRAY_DEPRECATED_MESSAGE} first.
+     */
+    public static function isFalseContainerForDimAutovivify(Variable $value): bool
+    {
+        $resolved = $value->resolveIndirect();
+
         return Variable::TYPE_BOOLEAN === $resolved->type && !$resolved->toBool();
     }
 

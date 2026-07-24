@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\TypeCheck;
 
 /**
- * Emit E_DEPRECATED when JIT lowers a write to an undeclared instance property (#4570, #21953).
+ * Emit engine E_DEPRECATED notices from JIT lowering (#4570, #21953, #22828).
  */
 final class DynamicPropertyDeprecationGuard
 {
@@ -37,6 +39,20 @@ final class DynamicPropertyDeprecationGuard
             $propertyName
         );
         self::emitDeprecated($context, $message, $file, $line);
+    }
+
+    /**
+     * FETCH_DIM_W / []= on false — Zend 8.1+ E_DEPRECATED then promote (zend_execute.c, #22828).
+     */
+    public static function emitFalseToArray(Context $context, string $file = '', int $line = 0): void
+    {
+        StringTriggerError::ensureLinked($context);
+        self::emitDeprecated(
+            $context,
+            TypeCheck::FALSE_TO_ARRAY_DEPRECATED_MESSAGE,
+            $file,
+            $line
+        );
     }
 
     private static function emitDeprecated(
