@@ -83,6 +83,29 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         $this->assertSame('x*********', VmSprintf::format("%-'*10s", [$x]));
     }
 
+    public function testSprintfJitHelperPositionalStarMatchesVmSprintf(): void
+    {
+        // Packed argv: TAG_LONG(5), TAG_STRING("z") — %2$*1$s
+        $blob = "\x01".\pack('q', 5)."\x04".\pack('q', 1).'z';
+        $this->assertSame('    z', SprintfJitHelper::sprintfArgv('%2$*1$s', $blob));
+        $w = new Variable();
+        $w->int(5);
+        $s = new Variable();
+        $s->string('z');
+        $this->assertSame(
+            VmSprintf::format('%2$*1$s', [$w, $s]),
+            SprintfJitHelper::sprintfArgv('%2$*1$s', $blob)
+        );
+
+        // TAG_STRING("abcdef"), TAG_LONG(3) — %1$.*2$s
+        $blob2 = "\x04".\pack('q', 6).'abcdef'."\x01".\pack('q', 3);
+        $this->assertSame('abc', SprintfJitHelper::sprintfArgv('%1$.*2$s', $blob2));
+
+        // TAG_LONG(8), TAG_LONG(3), TAG_STRING("abcdef") — %3$*1$.*2$s
+        $blob3 = "\x01".\pack('q', 8)."\x01".\pack('q', 3)."\x04".\pack('q', 6).'abcdef';
+        $this->assertSame('     abc', SprintfJitHelper::sprintfArgv('%3$*1$.*2$s', $blob3));
+    }
+
     public function testSprintfJitHelperNumberFormatBasics(): void
     {
         $this->assertSame('1,234.50', SprintfJitHelper::numberFormat(1234.5, 2, '.', ','));
