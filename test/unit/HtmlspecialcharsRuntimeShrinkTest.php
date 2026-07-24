@@ -32,9 +32,9 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HtmlspecialcharsJitHelper.php');
         $this->assertStringContainsString('&amp;', $source);
         $this->assertStringContainsString('isset($string[$len])', $source);
+        $this->assertStringContainsString('ord(', $source); // AOT-safe UTF-8 byte checks (#22845)
         $this->assertStringNotContainsString('return VmString::', $source);
         $this->assertStringNotContainsString('strlen(', $source);
-        $this->assertStringNotContainsString('ord(', $source);
         $this->assertStringNotContainsString('substr(', $source);
     }
 

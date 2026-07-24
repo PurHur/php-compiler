@@ -2,5 +2,4 @@
 
 declare(strict_types=1);
 
-/** @var string $appName */
-echo $appName, "Partial\n";
+echo "HomePartial\n";
