@@ -62,10 +62,12 @@ final class VmStreamContext
      *
      * Deep-copies nested option arrays like JIT {@see \PHPCompiler\JIT\Builtin\StreamContextRuntime}
      * so assigning the result does not share buckets with the input variable.
+     *
+     * Params (including notification Closures) are applied via {@see setParams} — same as
+     * php-src parse_context_params() — not http_build_query export (#22815, re-#19696).
      */
     public static function createFromVmOptions(?Variable $optionsVar, ?Variable $paramsVar = null): HashTable
     {
-        $hostOptions = [];
         if (null !== $optionsVar) {
             $resolved = $optionsVar->resolveIndirect();
             if (Variable::TYPE_NULL === $resolved->type) {
@@ -74,27 +76,21 @@ final class VmStreamContext
                 self::throwCreateArrayTypeError(1, 'options', $resolved);
             } else {
                 VmStreamContextOptions::validateOptionsVariable($optionsVar, 'stream_context_create');
+                // Ensure nested option values are exportable scalars/arrays (shape already validated).
                 $exported = VmHttpBuildQuery::export($resolved);
                 if (!\is_array($exported)) {
                     self::throwCreateArrayTypeError(1, 'options', $resolved);
                 }
-                $hostOptions = $exported;
             }
         }
 
-        $hostParams = [];
         if (null !== $paramsVar) {
             $resolvedParams = $paramsVar->resolveIndirect();
             if (Variable::TYPE_NULL === $resolvedParams->type) {
                 // php-src: null params → omitted (#13356)
+                $paramsVar = null;
             } elseif (Variable::TYPE_ARRAY !== $resolvedParams->type) {
                 self::throwCreateArrayTypeError(2, 'params', $resolvedParams);
-            } else {
-                $exportedParams = VmHttpBuildQuery::export($resolvedParams);
-                if (!\is_array($exportedParams)) {
-                    self::throwCreateArrayTypeError(2, 'params', $resolvedParams);
-                }
-                $hostParams = $exportedParams;
             }
         }
 
@@ -107,11 +103,14 @@ final class VmStreamContext
         $marker = new Variable(Variable::TYPE_INTEGER);
         $marker->int($id);
         $ht->add(self::MARKER_KEY, $marker);
-        if ([] !== $hostParams) {
-            self::attachParamsHashTable($ht, $hostParams);
-        }
         $ht->markResourceLikeHandle();
         self::registerActive($id, $ht);
+
+        if (null !== $paramsVar && Variable::TYPE_ARRAY === $paramsVar->resolveIndirect()->type) {
+            $contextVar = new Variable();
+            $contextVar->array($ht);
+            self::setParams($contextVar, $paramsVar);
+        }
 
         return $ht;
     }
@@ -462,6 +461,10 @@ final class VmStreamContext
     /**
      * HTTP/HTTPS wrapper options from a stream context (ext/standard/streams.c, #9752).
      *
+     * Export the options bag only — the params bag may hold a notification Closure
+     * (php-src parse_context_params); feeding the whole context through
+     * {@see VmHttpBuildQuery::export} throws LogicException (#22815, re-#19696).
+     *
      * @return array<string, mixed>
      */
     public static function httpWrapperOptions(Variable $context, string $wrapper = 'http'): array
@@ -471,11 +474,12 @@ final class VmStreamContext
             return [];
         }
 
-        $exported = VmHttpBuildQuery::export($resolved);
+        $optionsVar = new Variable();
+        $optionsVar->array(self::getOptionsHashTable($resolved));
+        $exported = VmHttpBuildQuery::export($optionsVar);
         if (!\is_array($exported)) {
             return [];
         }
-        unset($exported[self::MARKER_KEY], $exported[self::PARAMS_MARKER_KEY]);
         if (!isset($exported[$wrapper]) || !\is_array($exported[$wrapper])) {
             return [];
         }

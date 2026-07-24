@@ -29,7 +29,8 @@ final class StreamContextJitHelper
         }
         self::stampMarker($out);
         if (null !== $params) {
-            self::attachParams($out, $params);
+            // parse_context_params — preserve notification Closures (#22815, re-#19696)
+            self::setParams($out, $params);
         }
 
         return $out;
