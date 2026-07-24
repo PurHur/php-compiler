@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6513 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20906 |
+| Source constructs flagged (warnings) | 20907 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6326,7 +6326,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/ReflectionPropertyTypeSupport.php` | 0 | 3 |
 | `lib/VM/ReflectionReferenceSupport.php` | 0 | 1 |
 | `lib/VM/ReflectionSupport.php` | 0 | 44 |
-| `lib/VM/ReflectionTypeSupport.php` | 0 | 15 |
+| `lib/VM/ReflectionTypeSupport.php` | 0 | 16 |
 | `lib/VM/ReservedBuiltinClass.php` | 0 | 2 |
 | `lib/VM/ResourceSupport.php` | 0 | 3 |
 | `lib/VM/SapiOutput.php` | 0 | 1 |
@@ -28869,7 +28869,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 19 class method(s)
 
 ### `ext/standard/PackEngineEncode.php`
 
@@ -40634,8 +40634,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 302)
-- 18 class method(s)
+- new InternalArgInfo (line 331)
+- 19 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
 
@@ -40650,8 +40650,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 687)
-- 14 class method(s)
+- new ArgumentCountError (line 784)
+- 15 class method(s)
 - 1 closure(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -52276,10 +52276,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CfgType\Intersection (line 228)
 - new CfgType\Literal (line 231)
 - new ObjectEntry (line 274)
-- new ObjectEntry (line 290)
-- new CfgType\Intersection (line 293)
-- new ObjectEntry (line 309)
-- new Variable (line 333)
+- new CfgType\Union_ (line 279)
+- new ObjectEntry (line 294)
+- new CfgType\Intersection (line 297)
+- new ObjectEntry (line 313)
+- new Variable (line 337)
 - 18 class method(s)
 
 ### `lib/VM/ReservedBuiltinClass.php`
