@@ -281,6 +281,32 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ arbitrary function-local static initializers (Zend/zend_compile.c, #22923).
+     *
+     * On PHP &lt; 8.3, `static $a = $param` is a compile fatal ("Constant expression contains
+     * invalid operations"). PHP 8.3+ allows non-constant expressions and evaluates them once.
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2). Enable via stable 8.4.0+ or
+     * explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsArbitraryStaticVariableInitializers(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ `final const` at compile-unit scope (Zend/zend_compile.c, #15165, #16859).
      *
      * Rejected on reference profile and PHP 8.3 forward profile (#10324, #15185). Class-scoped
