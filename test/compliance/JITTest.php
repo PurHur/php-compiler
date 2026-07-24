@@ -963,7 +963,8 @@ class JITTest extends BaseTest {
             // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).
             if (CompilerVersion::supportsExitFunctionForm()
                 && (str_contains($name, 'exit_named_status_reference_profile')
-                    || str_contains($name, 'die_named_message_reference_profile'))) {
+                    || str_contains($name, 'die_named_message_reference_profile')
+                    || str_contains($name, 'exit_die_fcc_reference_profile'))) {
                 continue;
             }
             // Pre-8.4 construct soft-coerces array status (#5441); 8.4+ TypeError (#22492).

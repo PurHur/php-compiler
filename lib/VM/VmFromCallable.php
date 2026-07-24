@@ -82,8 +82,10 @@ final class VmFromCallable
         }
 
         $lc = strtolower($name);
-        if (!$context->functionIsRegistered($lc)) {
-            throw new \LogicException("Call to undefined function {$lc}()");
+        // exit/die remain registered for 8.4 paren-call lowering but are not FCC-visible on 8.2 (#22796).
+        if (!$context->functionIsRegistered($lc)
+            || !\PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists($lc)) {
+            throw new \Error("Call to undefined function {$lc}()");
         }
 
         return self::wrapCallableProxy($context, $context->resolveFunctionProxy($lc));

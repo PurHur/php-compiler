@@ -27,7 +27,9 @@ final class ClosureFromCallable extends VmClassMethod
         $entry = ClosureSupport::fromCallable(
             $frame->vmContext,
             $frame,
-            $frame->calledArgs[0]
+            $frame->calledArgs[0],
+            false,
+            true
         );
         if (null !== $frame->returnVar) {
             $ret = new Variable(Variable::TYPE_OBJECT);

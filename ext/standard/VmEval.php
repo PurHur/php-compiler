@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Frame;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -77,6 +78,13 @@ final class VmEval
 
         try {
             $block = $runtime->parseAndCompile($wrapped, self::EVAL_FILENAME);
+        } catch (CompileFatal $e) {
+            // Reference-profile syntax rejectors throw CompileFatal; Zend eval surfaces ParseError (#22796).
+            if (CompileFatal::isSyntaxParseErrorMessage($e->getMessage())) {
+                $line = $e->sourceLine > 1 ? $e->sourceLine - 1 : max(1, $e->sourceLine);
+                self::failEvalParse($ctx, $e->getMessage(), $line);
+            }
+            throw $e;
         } catch (\CompileError $e) {
             throw $e;
         } catch (\Throwable $e) {

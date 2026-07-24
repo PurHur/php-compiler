@@ -598,17 +598,21 @@ class Context {
 
     /**
      * Resolve a function call target; namespaced unqualified calls fall back to global builtins (#10534).
+     *
+     * Honors function_exists visibility (exit/die hidden on the 8.2 reference profile, #22796).
      */
     public function resolveFunctionCallLc(string $name): ?string
     {
         $lcname = strtolower($name);
-        if (isset($this->functions[$lcname])) {
+        if (isset($this->functions[$lcname])
+            && \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists($lcname)) {
             return $lcname;
         }
         if (str_contains($name, '\\') && !str_contains($name, '::')) {
             $globalFn = substr($name, strrpos($name, '\\') + 1);
             $globalLc = strtolower($globalFn);
-            if (isset($this->functions[$globalLc])) {
+            if (isset($this->functions[$globalLc])
+                && \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists($globalLc)) {
                 return $globalLc;
             }
         }

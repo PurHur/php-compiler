@@ -82,4 +82,23 @@ final class ExitFunctionSyntaxReferenceProfileTest extends TestCase
             $this->assertStringContainsString(ExitFunctionDesugar::REFERENCE_PROFILE_UNEXPECTED_COLON, $e->getMessage());
         }
     }
+
+    /** FCC / fromCallable treat exit/die as undefined on the 8.2 reference profile (#22796). */
+    public function testFccAndFromCallableRejectExitOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsExitFunctionForm()) {
+            $this->markTestSkipped('exit function form enabled on PHP 8.4.0+ target');
+        }
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            file_get_contents(dirname(__DIR__).'/repro/exit_fcc_reference_profile.php'),
+            'exit_fcc_reference_profile.php'
+        );
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        $this->assertStringContainsString('exit=Error:Call to undefined function exit()', $out);
+        $this->assertStringContainsString('die=Error:Call to undefined function die()', $out);
+        $this->assertStringContainsString('named_parse:syntax error, unexpected token ":"', $out);
+    }
 }

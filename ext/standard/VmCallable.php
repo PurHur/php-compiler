@@ -391,6 +391,10 @@ final class VmCallable
 
             return $ctx->runtime->vm->invokeStaticWithCalledScope($class, $method, ...$args);
         }
+        // exit/die are registered Internals but hidden on the 8.2 reference profile (#22796).
+        if (!VmReflection::isVisibleToFunctionExists($name)) {
+            throw new \TypeError(self::invalidStringCallbackTypeError($name, $function));
+        }
         try {
             $internal = VmInternalCall::resolveStringCallback($name);
         } catch (\LogicException) {
@@ -420,6 +424,9 @@ final class VmCallable
             $resolved = self::resolveEntriesToPositional($entries);
 
             return self::invokeStringCallable($ctx, $name, $function, ...$resolved);
+        }
+        if (!VmReflection::isVisibleToFunctionExists($name)) {
+            throw new \TypeError(self::invalidStringCallbackTypeError($name, $function));
         }
         try {
             $internal = VmInternalCall::resolveStringCallback($name);

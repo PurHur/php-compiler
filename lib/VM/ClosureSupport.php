@@ -91,8 +91,16 @@ final class ClosureSupport
         return self::wrapState($ctx, self::fromStaticStringCallable($ctx, $frame, $name));
     }
 
-    public static function fromCallable(Context $ctx, Frame $frame, Variable $callable, bool $parentScope = false): ObjectEntry
-    {
+    /**
+     * @param bool $fromCallableApi true for Closure::fromCallable() (TypeError); false for FCC `$name(...)` (Error)
+     */
+    public static function fromCallable(
+        Context $ctx,
+        Frame $frame,
+        Variable $callable,
+        bool $parentScope = false,
+        bool $fromCallableApi = false
+    ): ObjectEntry {
         $callable = $callable->resolveIndirect();
         if (Variable::TYPE_OBJECT === $callable->type) {
             $state = $callable->toObject()->closureState;
@@ -122,7 +130,7 @@ final class ClosureSupport
                 return self::wrapState($ctx, self::fromStaticStringCallable($ctx, $frame, $name));
             }
 
-            return self::wrapState($ctx, self::fromFunctionName($ctx, $name));
+            return self::wrapState($ctx, self::fromFunctionName($ctx, $name, $fromCallableApi));
         }
         if (Variable::TYPE_ARRAY === $callable->type) {
             return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable, $parentScope));
@@ -382,13 +390,28 @@ final class ClosureSupport
         return $ctx->runtime->vm->invokeClosure($invokeState, ...$copies);
     }
 
-    private static function fromFunctionName(Context $ctx, string $name): ClosureState
+    /**
+     * Resolve a global function name for FCC / fromCallable.
+     *
+     * exit/die stay in the function table for 8.4 paren-call lowering but are hidden on the
+     * Zend 8.2 reference profile (php-src zend_is_callable / Closure::fromCallable, #22796).
+     *
+     * @param bool $fromCallableApi Closure::fromCallable() → TypeError; FCC `$name(...)` → Error
+     */
+    private static function fromFunctionName(Context $ctx, string $name, bool $fromCallableApi = false): ClosureState
     {
         $lc = strtolower($name);
-        if (!isset($ctx->functions[$lc])) {
-            throw new \LogicException(
-                "Closure::fromCallable(): Function '{$name}' not found"
-            );
+        $visible = isset($ctx->functions[$lc])
+            && \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists($name);
+        if (!$visible) {
+            if ($fromCallableApi) {
+                throw new \TypeError(
+                    'Failed to create closure from callable: function "'.$name
+                    .'" not found or invalid function name'
+                );
+            }
+
+            throw new \Error('Call to undefined function '.$lc.'()');
         }
 
         return ClosureState::fromWrappedFunc($ctx->functions[$lc]);
