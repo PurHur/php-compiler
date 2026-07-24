@@ -19,7 +19,7 @@
 # /compiler/prelinked/bootstrap-gen0-publish (workspace prelinked/).
 #
 # Host triage paths (snapshot mode):
-#   ${BOOTSTRAP_GEN0_SNAPSHOT_DIR:-../gen0-refresh-snap}/build/gen0-refresh-exclusive.heartbeat
+#   ${BOOTSTRAP_GEN0_SNAPSHOT_DIR:-../gen0-refresh-snap-<NAME>}/build/gen0-refresh-exclusive.heartbeat
 #   .../build/gen0-refresh-exclusive-inner.log
 #
 # Usage (host, from repo root):
@@ -28,6 +28,7 @@
 #     ./script/bootstrap-gen0-refresh-exclusive-docker.sh
 #   BOOTSTRAP_GEN0_EXCLUSIVE_SNAPSHOT=0  # opt out of snapshot (live bind only)
 #   BOOTSTRAP_GEN0_EXCLUSIVE_LIVE_MOUNTS=1  # legacy: live-mount build/ + prelinked
+#   BOOTSTRAP_GEN0_EXCLUSIVE_FORCE=1  # allow launch while another gen0 exclusive runs
 #
 # Requires: docker, image php-compiler:22.04-dev, PHP_COMPILER_DOCKER_BIND_SRC
 # (or a host path that docker can bind — never the empty Runforge /app bind).
@@ -81,6 +82,19 @@ if docker inspect "${NAME}" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Peer guard: a second launch used to `rm -rf` the shared snapshot dir while an older
+# exclusive container still had it bind-mounted — that made r11/r12 look like mysterious
+# CONTAINER_GONE mid-spine (#22642). Refuse unless FORCE=1.
+PEER_FORCE="${BOOTSTRAP_GEN0_EXCLUSIVE_FORCE:-0}"
+mapfile -t PEERS < <(docker ps --format '{{.Names}}' | grep -E '^agent-harness-phpc-gen0-' || true)
+if [[ ${#PEERS[@]} -gt 0 && "${PEER_FORCE}" != "1" ]]; then
+  echo "bootstrap-gen0-refresh-exclusive-docker: refusing launch — peer exclusive refresh still running:" >&2
+  printf '  %s\n' "${PEERS[@]}" >&2
+  echo "Leave it alone (docker logs -f <name>), or set BOOTSTRAP_GEN0_EXCLUSIVE_FORCE=1 after" >&2
+  echo "explicitly stopping the peer. Shared snapshot rm would yank the live bind mount (#22642)." >&2
+  exit 1
+fi
+
 # Host-side pin: refuse to start unless the ClassConstFetchHelper trait
 # self-require is present (r6 @ 163m — #22642).
 if ! grep -q "require_once __DIR__ . '/ClassConstFetchHelperTrait.php'" \
@@ -98,9 +112,18 @@ LOG_HOST="${ROOT}/build/gen0-refresh-exclusive.log"
 COMPILER_BIND="${BIND_SRC}"
 EXTRA_MOUNTS=()
 if [[ "${USE_SNAPSHOT}" == "1" ]]; then
-  SNAP_DIR="${BOOTSTRAP_GEN0_SNAPSHOT_DIR:-$(dirname "${BIND_SRC}")/gen0-refresh-snap}"
+  # Per-container snapshot path so a later rN launch cannot rm -rf a live peer's bind (#22642).
+  SNAP_DIR="${BOOTSTRAP_GEN0_SNAPSHOT_DIR:-$(dirname "${BIND_SRC}")/gen0-refresh-snap-${NAME}}"
   echo "bootstrap-gen0-refresh-exclusive-docker: snapshotting ${BIND_SRC} -> ${SNAP_DIR}"
-  rm -rf "${SNAP_DIR}"
+  if [[ -d "${SNAP_DIR}" ]]; then
+    # Refuse to wipe a snap that a running container still mounts.
+    if docker ps --format '{{.Names}}\t{{.Mounts}}' | grep -F "${SNAP_DIR}" >/dev/null 2>&1; then
+      echo "bootstrap-gen0-refresh-exclusive-docker: snapshot ${SNAP_DIR} is mounted by a running container" >&2
+      echo "Refuse to rm -rf it (that is what killed r11/r12 mid-spine). Stop that container first." >&2
+      exit 1
+    fi
+    rm -rf "${SNAP_DIR}"
+  fi
   mkdir -p "${SNAP_DIR}"
   # Frozen source tree: workspace git checkout cannot mutate files under /compiler.
   # Live-mount build/ + prelinked/bootstrap-gen0 so refresh outputs land in the workspace.
