@@ -4,22 +4,28 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 
 /**
  * BackedEnum::from / tryFrom lookup (Zend parity, #3114).
  *
- * @see Zend/zend_enum.c — zend_enum_from_case(), zend_try_enum_from_case()
+ * @see Zend/zend_enum.c — zend_enum_from_base(), zend_enum_get_case_by_value()
  */
 final class BackedEnum
 {
     /**
      * Like {@see caseForValue()} but returns null when the operand cannot coerce to a backing scalar (#5803).
      */
-    public static function tryCaseForValue(ClassEntry $enum, Variable $value): ?EnumCaseEntry
-    {
+    public static function tryCaseForValue(
+        ClassEntry $enum,
+        Variable $value,
+        ?Context $vmContext = null,
+        ?Frame $frame = null,
+        string $methodName = 'from',
+    ): ?EnumCaseEntry {
         try {
-            return self::caseForValue($enum, $value);
+            return self::caseForValue($enum, $value, $vmContext, $frame, $methodName);
         } catch (\TypeError) {
             return null;
         }
@@ -59,13 +65,24 @@ final class BackedEnum
         }
     }
 
-    public static function caseForValue(ClassEntry $enum, Variable $value): ?EnumCaseEntry
-    {
+    public static function caseForValue(
+        ClassEntry $enum,
+        Variable $value,
+        ?Context $vmContext = null,
+        ?Frame $frame = null,
+        string $methodName = 'from',
+    ): ?EnumCaseEntry {
         if (!$enum->isEnum || null === $enum->backedType) {
             return null;
         }
         EnumSupport::ensureBackedEnumValuesUnique($enum);
-        $normalized = self::normalizeBackingArgument($enum, $value->resolveIndirect());
+        $normalized = self::normalizeBackingArgument(
+            $enum,
+            $value->resolveIndirect(),
+            $vmContext,
+            $frame,
+            $methodName
+        );
         $match = self::matchCaseForBackingValue($enum, $normalized);
         if (null !== $match) {
             return $match;
@@ -169,7 +186,8 @@ final class BackedEnum
     {
         $value = $value->resolveIndirect();
         try {
-            $normalized = self::normalizeBackingArgument($enum, $value);
+            // Silent normalize — deprecation already emitted in caseForValue (#22947).
+            $normalized = self::normalizeBackingArgument($enum, $value, null, null);
             $repr = self::formatBackingRepr($enum->backedType ?? '', $normalized);
         } catch (\TypeError) {
             $repr = self::formatRawRepr($value);
@@ -178,21 +196,34 @@ final class BackedEnum
         return $repr.' is not a valid backing value for enum '.$enum->name;
     }
 
-    private static function normalizeBackingArgument(ClassEntry $enum, Variable $arg): Variable
-    {
+    private static function normalizeBackingArgument(
+        ClassEntry $enum,
+        Variable $arg,
+        ?Context $vmContext = null,
+        ?Frame $frame = null,
+        string $methodName = 'from',
+    ): Variable {
         $backedType = $enum->backedType;
         if ('int' === $backedType) {
-            return self::normalizeIntBackingArgument($enum->name, $arg);
+            return self::normalizeIntBackingArgument($enum->name, $arg, $vmContext, $frame, $methodName);
         }
         if ('string' === $backedType) {
-            return self::normalizeStringBackingArgument($arg);
+            return self::normalizeStringBackingArgument($arg, $vmContext, $frame);
         }
 
         throw new \LogicException('Unsupported enum backing type: '.$backedType);
     }
 
-    private static function normalizeIntBackingArgument(string $enumName, Variable $arg): Variable
-    {
+    /**
+     * Z_PARAM_LONG for int-backed enums: finite float truncates; precision loss → E_DEPRECATED (#22947).
+     */
+    private static function normalizeIntBackingArgument(
+        string $enumName,
+        Variable $arg,
+        ?Context $vmContext = null,
+        ?Frame $frame = null,
+        string $methodName = 'from',
+    ): Variable {
         $result = new Variable(Variable::TYPE_INTEGER);
         switch ($arg->type) {
             case Variable::TYPE_INTEGER:
@@ -210,11 +241,7 @@ final class BackedEnum
 
                 return $result;
             case Variable::TYPE_FLOAT:
-                $float = $arg->toFloat();
-                if (!is_finite($float) || (float) (int) $float !== $float) {
-                    break;
-                }
-                $result->int((int) $float);
+                $result->int(self::floatToBackingLong($enumName, $arg->toFloat(), $vmContext, $frame, $methodName));
 
                 return $result;
             case Variable::TYPE_STRING:
@@ -230,13 +257,19 @@ final class BackedEnum
         }
 
         throw new \TypeError(
-            $enumName.'::from(): Argument #1 ($value) must be of type int, '
+            $enumName.'::'.$methodName.'(): Argument #1 ($value) must be of type int, '
             .self::typeLabel($arg).' given'
         );
     }
 
-    private static function normalizeStringBackingArgument(Variable $arg): Variable
-    {
+    /**
+     * Z_PARAM_STR_OR_LONG: float → long (deprecate) → zend_long_to_str (#22947).
+     */
+    private static function normalizeStringBackingArgument(
+        Variable $arg,
+        ?Context $vmContext = null,
+        ?Frame $frame = null,
+    ): Variable {
         $result = new Variable(Variable::TYPE_STRING);
         switch ($arg->type) {
             case Variable::TYPE_STRING:
@@ -248,7 +281,15 @@ final class BackedEnum
 
                 return $result;
             case Variable::TYPE_FLOAT:
-                $result->string((string) $arg->toFloat());
+                // Weak path uses Z_PARAM_STR_OR_LONG — finite float→long→str; NAN/INF→"NAN"/"INF" (#22947).
+                $float = $arg->toFloat();
+                if (!is_finite($float)) {
+                    $result->string((string) $float);
+
+                    return $result;
+                }
+                $long = self::floatToBackingLong('BackedEnum', $float, $vmContext, $frame);
+                $result->string((string) $long);
 
                 return $result;
             case Variable::TYPE_BOOLEAN:
@@ -267,6 +308,28 @@ final class BackedEnum
         throw new \TypeError(
             'Argument #1 ($value) must be of type string, '.self::typeLabel($arg).' given'
         );
+    }
+
+    /**
+     * zend_dval_to_lval / Z_PARAM_LONG float path (NAN/INF → TypeError).
+     */
+    private static function floatToBackingLong(
+        string $enumName,
+        float $float,
+        ?Context $vmContext = null,
+        ?Frame $frame = null,
+        string $methodName = 'from',
+    ): int {
+        if (!is_finite($float)) {
+            throw new \TypeError(
+                $enumName.'::'.$methodName.'(): Argument #1 ($value) must be of type int, float given'
+            );
+        }
+        if (null !== $vmContext) {
+            VmMath::warnFloatToIntPrecisionLoss($float, $vmContext, $frame);
+        }
+
+        return VmMath::floatToZendLong($float);
     }
 
     private static function backingValuesMatch(string $backedType, Variable $caseValue, Variable $arg): bool
