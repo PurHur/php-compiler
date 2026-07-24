@@ -65,7 +65,12 @@ final class VmPregMatches
             }
             $wrap = new Variable();
             $wrap->array($groupHt);
-            $ht->updateIndex((int) $group, $wrap);
+            // php-src PATTERN_ORDER: numeric groups and named subpatterns share values (#22835).
+            if (\is_string($group)) {
+                $ht->add($group, $wrap);
+            } else {
+                $ht->updateIndex((int) $group, $wrap);
+            }
         }
 
         return $ht;
