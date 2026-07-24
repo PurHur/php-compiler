@@ -2445,14 +2445,15 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ mb_ucfirst()/mb_lcfirst() (ext/mbstring/mbstring.c, issue #4007, #17609).
+     * PHP 8.4+ mb_ucfirst()/mb_lcfirst() (ext/mbstring/mbstring.c, issue #4007, #17609, #22794).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Zend/php-src ships these with mb_trim* in 8.4 only — not on 8.3. Withheld on 8.4.0-dev
+     * reference profile (matches Zend 8.2 function_exists gate). Enable via stable 8.4.0+ or
+     * explicit `PHP_COMPILER_PROFILE=8.4` forward profile (same shape as {@see supportsMbTrimFunctions()}).
      */
     public static function supportsMbUcfirstLcfirst(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
+        if (version_compare(self::VERSION, '8.4', '<')) {
             return false;
         }
 
@@ -2465,11 +2466,11 @@ final class CompilerVersion
             return false;
         }
 
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
-     * mb_ucfirst()/mb_lcfirst() visible to function_exists() — stable runtime or forward profile (#17609).
+     * mb_ucfirst()/mb_lcfirst() visible to function_exists() — stable runtime or forward 8.4+ (#17609, #22794).
      */
     public static function advertisesMbUcfirstLcfirst(): bool
     {
@@ -2486,7 +2487,7 @@ final class CompilerVersion
             return false;
         }
 
-        return true;
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

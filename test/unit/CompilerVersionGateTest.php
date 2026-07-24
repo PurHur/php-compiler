@@ -1886,6 +1886,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testVmDoesNotRegisterMbUcfirstLcfirstOnPhp83Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['mb_ucfirst', 'mb_lcfirst'] as $fn) {
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+            }
+            $this->assertTrue(isset($ctx->functions['mb_str_pad']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmRegistersMbUcfirstLcfirstOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
