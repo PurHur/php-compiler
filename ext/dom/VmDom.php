@@ -3839,6 +3839,25 @@ final class VmDom
 
             return false;
         }
+        // libxml rejects undeclared general entities (XML_ERR_UNDECLARED_ENTITY) — do not
+        // silently keep `&foo;` as text that later serializes as `&amp;foo;` (#22774).
+        $undeclaredEntity = self::detectUndeclaredEntityInElementXml(
+            $elementXml,
+            $generalEntities,
+            $elementOffset
+        );
+        if (null !== $undeclaredEntity) {
+            self::reportDomLibxmlError(
+                $ctx,
+                $undeclaredEntity['message'],
+                $undeclaredEntity['code'],
+                $undeclaredEntity['column'],
+                $frame,
+                $undeclaredEntity['level']
+            );
+
+            return false;
+        }
         // Pass $document so living Dom\XMLDocument nodeClassMap → Dom\Element (#20856).
         $root = self::parseElementTree(
             $ctx,
@@ -4439,7 +4458,122 @@ final class VmDom
             'message' => $message,
             'file' => '',
             'line' => 1,
-        ], $frame, null, 'DOMDocument::loadXML(): '.$message.' in Entity, line: 1');
+        ], $frame, null, 'DOMDocument::loadXML(): '.rtrim($message).' in Entity, line: 1');
+    }
+
+    /**
+     * Scan document-element markup for undeclared / unterminated entity refs (libxml2;
+     * php-src ext/dom/document.c; #22774).
+     *
+     * Skips CDATA, comments, and PIs. Predefined entities, DTD general entities, and
+     * numeric character references are accepted.
+     *
+     * @param array<string, string> $generalEntities
+     *
+     * @return null|array{message: string, code: int, column: int, level: int}
+     */
+    private static function detectUndeclaredEntityInElementXml(
+        string $elementXml,
+        array $generalEntities,
+        int $columnBase = 0
+    ): ?array {
+        $len = \strlen($elementXml);
+        $pos = 0;
+        while ($pos < $len) {
+            if ('<' === $elementXml[$pos]) {
+                $cdata = VmXml::parseCdataSectionAt($elementXml, $pos);
+                if (null !== $cdata) {
+                    $pos = $cdata['end'];
+
+                    continue;
+                }
+                $comment = VmXml::parseCommentAt($elementXml, $pos);
+                if (null !== $comment) {
+                    $pos = $comment['end'];
+
+                    continue;
+                }
+                $pi = VmXml::parseProcessingInstructionAt($elementXml, $pos);
+                if (null !== $pi) {
+                    $pos = $pi['end'];
+
+                    continue;
+                }
+                ++$pos;
+
+                continue;
+            }
+            if ('&' !== $elementXml[$pos]) {
+                ++$pos;
+
+                continue;
+            }
+            $amp = $pos;
+            $afterAmp = $amp + 1;
+            if ($afterAmp >= $len) {
+                return self::entityRefExpectingSemicolonError($columnBase + $amp + 1);
+            }
+            // Character references: &#...; / &#x...; (finer libxml diagnostics out of #22774 scope).
+            if ('#' === $elementXml[$afterAmp]) {
+                $semi = strpos($elementXml, ';', $afterAmp + 1);
+                if (false === $semi) {
+                    return self::entityRefExpectingSemicolonError($columnBase + $len);
+                }
+                $pos = $semi + 1;
+
+                continue;
+            }
+            $semi = strpos($elementXml, ';', $afterAmp);
+            if (false === $semi) {
+                // libxml column is the first non-Name char where ';' was expected (#22774).
+                $nameEnd = $afterAmp;
+                while ($nameEnd < $len && 1 === preg_match('/[A-Za-z0-9._:-]/', $elementXml[$nameEnd])) {
+                    ++$nameEnd;
+                }
+
+                return self::entityRefExpectingSemicolonError($columnBase + $nameEnd + 1);
+            }
+            // Name must be contiguous through ';'; any other char → expecting ';'.
+            $nameEnd = $afterAmp;
+            while ($nameEnd < $semi && 1 === preg_match('/[A-Za-z0-9._:-]/', $elementXml[$nameEnd])) {
+                ++$nameEnd;
+            }
+            if ($nameEnd !== $semi) {
+                return self::entityRefExpectingSemicolonError($columnBase + $nameEnd + 1);
+            }
+            $refName = substr($elementXml, $afterAmp, $semi - $afterAmp);
+            if ('' === $refName) {
+                return self::entityRefExpectingSemicolonError($columnBase + $semi + 1);
+            }
+            if (isset($generalEntities[$refName])
+                || null !== self::decodePredefinedXmlEntity($refName)
+            ) {
+                $pos = $semi + 1;
+
+                continue;
+            }
+
+            // XML_ERR_UNDECLARED_ENTITY — column is 1-based index of the char after ';'.
+            return [
+                'message' => "Entity '".$refName."' not defined\n",
+                'code' => 26,
+                'column' => $columnBase + $semi + 2,
+                'level' => LibxmlConstants::LIBXML_ERR_FATAL,
+            ];
+        }
+
+        return null;
+    }
+
+    /** @return array{message: string, code: int, column: int, level: int} */
+    private static function entityRefExpectingSemicolonError(int $column): array
+    {
+        return [
+            'message' => "EntityRef: expecting ';'\n",
+            'code' => 23,
+            'column' => $column,
+            'level' => LibxmlConstants::LIBXML_ERR_FATAL,
+        ];
     }
 
     /**
@@ -5380,7 +5514,9 @@ final class VmDom
                     self::linkChildToParent($entityRef, $parent);
                 }
             } else {
-                $decoded = self::decodePredefinedXmlEntity($refName);
+                // Predefined + numeric char refs (#21034 helper); undeclared named refs are
+                // rejected earlier in loadXML (#22774) — keep raw only for non-load callers.
+                $decoded = self::decodeXmlContentEntityRef($refName);
                 if (null !== $decoded) {
                     if ('' === $buffer) {
                         $bufferStart = $amp;
