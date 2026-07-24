@@ -33,6 +33,11 @@ final class JitDomXPathEvaluateUserScript
         }
 
         $expression = trim($exprLit);
+        // Invalid literal → warning + false before specialized folds (#22755 / #22721).
+        $invalid = JitDomXPathQueryUserScript::tryHostInvalidExpressionFalse($context, $xml, $exprLit, 'evaluate');
+        if (null !== $invalid) {
+            return $invalid;
+        }
         if (preg_match('~^boolean\((.+)\)$~i', $expression, $boolWrap)) {
             $inner = trim($boolWrap[1]);
             if (preg_match('~^count\((.+)\)$~i', $inner, $countWrap)) {
