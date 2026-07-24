@@ -350,6 +350,9 @@ final class VmNumberFormatter
             self::INTEGER_DIGITS => 1,
             self::MIN_INTEGER_DIGITS => 1,
             self::MAX_INTEGER_DIGITS => 2000000000,
+            // ICU pad defaults (#22920): width 0, PAD_BEFORE_PREFIX.
+            self::FORMAT_WIDTH => 0,
+            self::PADDING_POSITION => self::PAD_BEFORE_PREFIX,
         ];
         if (self::PERCENT === $style) {
             $attrs[self::FRACTION_DIGITS] = 0;
@@ -718,7 +721,13 @@ final class VmNumberFormatter
         self::clearObjectError($formatter);
         IntlError::clear();
 
-        return $state['attributes'][$attribute] ?? -1;
+        $value = $state['attributes'][$attribute] ?? -1;
+        // Zend/php-src returns boolean false for FORMAT_WIDTH when ICU width is 0 (#22920).
+        if (self::FORMAT_WIDTH === $attribute && is_numeric($value) && 0 === (int) $value) {
+            return false;
+        }
+
+        return $value;
     }
 
     public static function setAttribute(ObjectEntry $formatter, int $attribute, int|float $value): bool
@@ -1101,13 +1110,44 @@ final class VmNumberFormatter
         if ($negative) {
             $prefix = $text[self::NEGATIVE_PREFIX] ?? '-';
             $suffix = $text[self::NEGATIVE_SUFFIX] ?? '';
-
-            return $prefix.$body.$suffix;
+        } else {
+            $prefix = $text[self::POSITIVE_PREFIX] ?? '';
+            $suffix = $text[self::POSITIVE_SUFFIX] ?? '';
         }
-        $prefix = $text[self::POSITIVE_PREFIX] ?? '';
-        $suffix = $text[self::POSITIVE_SUFFIX] ?? '';
 
-        return $prefix.$body.$suffix;
+        return self::applyFormatWidthPadding($state, $prefix, $body, $suffix);
+    }
+
+    /**
+     * ICU UNUM_FORMAT_WIDTH / UNUM_PADDING_POSITION / PADDING_CHARACTER (#22920).
+     *
+     * @param array{
+     *   attributes: array<int, int|float>,
+     *   textAttributes: array<int, string>
+     * } $state
+     */
+    private static function applyFormatWidthPadding(array $state, string $prefix, string $body, string $suffix): string
+    {
+        $attrs = $state['attributes'];
+        $width = (int) ($attrs[self::FORMAT_WIDTH] ?? 0);
+        $composed = $prefix.$body.$suffix;
+        if ($width <= 0 || strlen($composed) >= $width) {
+            return $composed;
+        }
+        $padChar = $state['textAttributes'][self::PADDING_CHARACTER] ?? ' ';
+        if ('' === $padChar) {
+            $padChar = ' ';
+        }
+        $padChar = substr($padChar, 0, 1);
+        $pad = str_repeat($padChar, $width - strlen($composed));
+        $pos = (int) ($attrs[self::PADDING_POSITION] ?? self::PAD_BEFORE_PREFIX);
+
+        return match ($pos) {
+            self::PAD_AFTER_PREFIX => $prefix.$pad.$body.$suffix,
+            self::PAD_BEFORE_SUFFIX => $prefix.$body.$pad.$suffix,
+            self::PAD_AFTER_SUFFIX => $prefix.$body.$suffix.$pad,
+            default => $pad.$prefix.$body.$suffix, // PAD_BEFORE_PREFIX
+        };
     }
 
     /**
