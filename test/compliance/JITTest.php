@@ -386,6 +386,18 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
                 continue;
             }
+            // isSensitive (#22899 / #7072) — same 8.4 gate; exclude *_parameter* names.
+            if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_phantom')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
             // JIT: method_exists(Closure::class, …) segfaults; phantom/profile introspection is VM-only (#14504, #16989, #22583).
             if (str_contains($name, 'closure_get_current_phantom')
                 || str_contains($name, 'closure_get_current_profile')
@@ -396,8 +408,10 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'closure_debug_info')) {
                 continue;
             }
-            // JIT: method_exists(ReflectionParameter::class, …) segfaults; phantom is VM-only (#16130).
-            if (str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+            // JIT: method_exists(ReflectionParameter::class, …) segfaults; phantom is VM-only (#16130, #22899).
+            if (str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')
+                || (str_contains($name, 'reflection_parameter_is_sensitive_phantom')
+                    && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom'))) {
                 continue;
             }
             // JIT: method_exists(ReflectionClass/Property::class, …) fails (pcreJit); profile phantoms are VM-only (#22599, #22601).

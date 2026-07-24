@@ -1,4 +1,6 @@
 <?php
+// Requires PHP_COMPILER_PROFILE=8.4 (default 8.2 profile withholds isSensitive — #22899).
+// See also test/repro/reflection_parameter_is_sensitive_profile.php
 function f(#[\SensitiveParameter] string $p) {}
 function g(string $p) {}
 $rf = new ReflectionParameter('f', 0);

@@ -793,9 +793,10 @@ final class BuiltinClasses
         $rparam->methodVisibility['isnamed'] = $pub;
         $rparam->methods['isvariadic'] = new ReflectionParameterIsVariadic();
         $rparam->methodVisibility['isvariadic'] = $pub;
-        $rparam->methods['issensitive'] = new ReflectionParameterIsSensitive();
-        $rparam->methodVisibility['issensitive'] = $pub;
+        // isSensitive / isSensitiveParameter: PHP 8.4+ only (Zend 8.2 absent) — #22899, #16130, #7072
         if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
+            $rparam->methods['issensitive'] = new ReflectionParameterIsSensitive();
+            $rparam->methodVisibility['issensitive'] = $pub;
             $rparam->methods['issensitiveparameter'] = new ReflectionParameterIsSensitiveParameter();
             $rparam->methodVisibility['issensitiveparameter'] = $pub;
         }

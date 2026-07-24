@@ -358,6 +358,18 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
                 continue;
             }
+            // isSensitive (#22899 / #7072) — same 8.4 gate as isSensitiveParameter; exclude *_parameter* names.
+            if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_phantom')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
             // Functional mb_str_pad_*_forward* cases set PROFILE via --ENV--; always include (#22373).
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')

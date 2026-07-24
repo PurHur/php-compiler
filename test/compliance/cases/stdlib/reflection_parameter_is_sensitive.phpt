@@ -1,5 +1,14 @@
 --TEST--
-Stdlib: ReflectionParameter::isSensitive() — #[\SensitiveParameter] probe (#7072)
+Stdlib: ReflectionParameter::isSensitive() — #[\SensitiveParameter] probe (#7072, #22899)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
+    die('skip requires PHP_COMPILER_PROFILE=8.4');
+}
+?>
 --FILE--
 <?php
 function f(#[\SensitiveParameter] string $p) {}

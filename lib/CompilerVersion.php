@@ -1374,10 +1374,11 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ReflectionParameter::isSensitiveParameter() (ext/reflection/php_reflection.c, #16130).
+     * PHP 8.4+ ReflectionParameter::isSensitive() / isSensitiveParameter()
+     * (ext/reflection/php_reflection.c, #7072, #16130, #22899).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionParameterIsSensitiveParameter(): bool
     {
