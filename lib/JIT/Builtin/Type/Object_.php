@@ -3176,6 +3176,9 @@ class Object_ extends Type {
             $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::MICROSECOND_PROPERTY, Variable::TYPE_NATIVE_LONG);
             $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::TZ_PROPERTY, Variable::TYPE_STRING);
         }
+        if ('datetimezone' === $lcname) {
+            $this->defineProperty($id, \PHPCompiler\VM\DateTimeSupport::TZ_NAME_PROPERTY, Variable::TYPE_STRING);
+        }
         if ('dateperiod' === $lcname) {
             $this->ensureTraversableBuiltinInterfaces();
             // php-src date.stub.php — IteratorAggregate only (#22263, #22608).

@@ -946,6 +946,15 @@ final class DateTimeSupport
         self::requireStringProperty($dt, self::TZ_PROPERTY, self::classLabel($dt))->string($tzName);
     }
 
+    /** php-src zim_DateTimeImmutable_setTimezone — returns new instance (#22824). */
+    public static function withTimezone(ObjectEntry $dt, ObjectEntry $timezone): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::setTimezone($clone, $timezone);
+
+        return $clone;
+    }
+
     /** php-src php_date_add — mutable in-place (#4604). */
     public static function addInterval(ObjectEntry $dt, ObjectEntry $interval): void
     {
