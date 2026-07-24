@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6503 |
-| Phase A inventory files (M2 ratio SSOT) | 6503 |
+| PHP files on vm.php path | 6505 |
+| Phase A inventory files (M2 ratio SSOT) | 6505 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20813 |
+| Source constructs flagged (warnings) | 20817 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1746,7 +1746,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/JitSimpleXmlAddChild.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAsXml.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlConstruct.php` | 0 | 1 |
-| `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 2 |
+| `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 3 |
+| `ext/simplexml/JitSimpleXmlXpath.php` | 0 | 1 |
 | `ext/simplexml/Module.php` | 0 | 4 |
 | `ext/simplexml/SimpleXmlElementAddAttribute.php` | 0 | 2 |
 | `ext/simplexml/SimpleXmlElementAddChild.php` | 0 | 1 |
@@ -5081,7 +5082,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionWriteClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/SettypeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ShuffleRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/SilenceRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SocketAtmarkRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SocketExportStreamRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SocketImportStreamRuntime.php` | 0 | 3 |
@@ -5507,6 +5508,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/SimpleXMLElementAddChild.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementAsXml.php` | 0 | 1 |
 | `lib/JIT/Call/SimpleXMLElementConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/SimpleXMLElementXpath.php` | 0 | 1 |
 | `lib/JIT/Call/SplObjectStorageMethod.php` | 0 | 3 |
 | `lib/JIT/Call/Vararg.php` | 0 | 1 |
 | `lib/JIT/Call/VariableCopyFrom.php` | 0 | 1 |
@@ -5666,7 +5668,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/SensitiveParamHelper.php` | 0 | 1 |
 | `lib/JIT/ShutdownCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/SidecarPathRemap.php` | 0 | 1 |
-| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 4 |
+| `lib/JIT/SimpleXmlInstanceMethodJit.php` | 0 | 5 |
 | `lib/JIT/SplAutoloadCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/StaticPropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/StringOffsetHelper.php` | 0 | 1 |
@@ -5959,7 +5961,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/ReflectionEnumBackedCaseConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumBackedCaseGetBackingValue.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumBackedCaseIsBacked.php` | 0 | 1 |
-| `lib/VM/Builtin/ReflectionEnumConstruct.php` | 0 | 2 |
+| `lib/VM/Builtin/ReflectionEnumConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumFromName.php` | 0 | 2 |
 | `lib/VM/Builtin/ReflectionEnumGetBackingType.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumGetCase.php` | 0 | 1 |
@@ -6101,7 +6103,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/ReflectionMethodToString.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionNamedTypeGetName.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionNamedTypeIsBuiltin.php` | 0 | 1 |
-| `lib/VM/Builtin/ReflectionObjectConstruct.php` | 0 | 3 |
+| `lib/VM/Builtin/ReflectionObjectConstruct.php` | 0 | 2 |
 | `lib/VM/Builtin/ReflectionParameterAllowsNull.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionParameterCanBePassedByValue.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionParameterConstruct.php` | 0 | 1 |
@@ -6315,7 +6317,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/ReflectionPropertyHookSupport.php` | 0 | 5 |
 | `lib/VM/ReflectionPropertyTypeSupport.php` | 0 | 3 |
 | `lib/VM/ReflectionReferenceSupport.php` | 0 | 1 |
-| `lib/VM/ReflectionSupport.php` | 0 | 43 |
+| `lib/VM/ReflectionSupport.php` | 0 | 44 |
 | `lib/VM/ReflectionTypeSupport.php` | 0 | 15 |
 | `lib/VM/ReservedBuiltinClass.php` | 0 | 2 |
 | `lib/VM/ResourceSupport.php` | 0 | 3 |
@@ -8663,7 +8665,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 1399)
+- new JIT (line 1379)
 - 76 class method(s)
 - 1 closure(s)
 
@@ -8723,7 +8725,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLoadHTML.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/dom/JitDomLoadHTMLFile.php`
 
@@ -8746,7 +8748,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLoadXML.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/dom/JitDomLoadXMLUserScript.php`
 
@@ -9608,49 +9610,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomJitDispatch.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 33)
-- new Variable (line 46)
-- new Variable (line 65)
-- new Variable (line 100)
-- new Variable (line 118)
-- new Variable (line 138)
-- new ArgumentCountError (line 161)
-- new Variable (line 170)
-- new ArgumentCountError (line 182)
-- new Variable (line 187)
-- new Variable (line 209)
-- new Variable (line 221)
-- new Variable (line 233)
-- new ArgumentCountError (line 316)
-- new ArgumentCountError (line 321)
-- new Variable (line 344)
-- new Variable (line 358)
-- new Variable (line 370)
-- new Variable (line 418)
-- new Variable (line 447)
-- new Variable (line 474)
-- new ArgumentCountError (line 488)
-- new Variable (line 492)
-- new Variable (line 504)
-- new Variable (line 516)
-- new Variable (line 528)
-- new Error (line 542)
-- new Variable (line 553)
-- new Error (line 570)
-- new Variable (line 586)
-- new Variable (line 609)
-- new Variable (line 630)
-- new Variable (line 657)
-- new Variable (line 683)
-- new Variable (line 695)
-- new Variable (line 709)
-- new Variable (line 721)
-- new Variable (line 764)
-- new Variable (line 776)
-- new Variable (line 793)
-- new Variable (line 818)
-- new Variable (line 860)
-- new ArgumentCountError (line 909)
+- new Variable (line 39)
+- new Variable (line 52)
+- new Variable (line 71)
+- new Variable (line 106)
+- new Variable (line 124)
+- new Variable (line 144)
+- new ArgumentCountError (line 167)
+- new Variable (line 176)
+- new ArgumentCountError (line 188)
+- new Variable (line 193)
+- new Variable (line 215)
+- new Variable (line 227)
+- new Variable (line 239)
+- new ArgumentCountError (line 322)
+- new ArgumentCountError (line 327)
+- new Variable (line 350)
+- new Variable (line 364)
+- new Variable (line 376)
+- new Variable (line 424)
+- new Variable (line 453)
+- new Variable (line 480)
+- new ArgumentCountError (line 494)
+- new Variable (line 498)
+- new Variable (line 510)
+- new Variable (line 522)
+- new Variable (line 534)
+- new Error (line 548)
+- new Variable (line 559)
+- new Error (line 576)
+- new Variable (line 592)
+- new Variable (line 615)
+- new Variable (line 636)
+- new Variable (line 663)
+- new Variable (line 689)
+- new Variable (line 701)
+- new Variable (line 715)
+- new Variable (line 727)
+- new Variable (line 770)
+- new Variable (line 782)
+- new Variable (line 799)
+- new Variable (line 824)
+- new Variable (line 866)
+- new ArgumentCountError (line 915)
 - 55 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
@@ -10749,7 +10751,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/GdExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 6 class method(s)
 
 ### `ext/gd/GdFontRegistry.php`
 
@@ -10786,106 +10788,106 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 42)
-- new imagecreate (line 56)
-- new imagecreatetruecolor (line 57)
-- new gd_info (line 58)
-- new imagetypes (line 59)
-- new imagecolorallocate (line 62)
-- new imagecolorallocatealpha (line 63)
-- new imagecolorsforindex (line 64)
-- new imagecolorclosest (line 65)
-- new imagecolorclosestalpha (line 66)
-- new imagecolorclosesthwb (line 67)
-- new imagecolorexact (line 68)
-- new imagecolorexactalpha (line 69)
-- new imagecolorresolve (line 70)
-- new imagecolorresolvealpha (line 71)
-- new imagecolorset (line 72)
-- new imagecolortransparent (line 73)
-- new imagecolormatch (line 74)
-- new imagealphablending (line 75)
-- new imagelayereffect (line 76)
-- new imageresolution (line 77)
-- new imagesavealpha (line 78)
-- new imageantialias (line 79)
-- new imagesetthickness (line 80)
-- new imagesetbrush (line 81)
-- new imagesetstyle (line 82)
-- new imageistruecolor (line 83)
-- new imagetruecolortopalette (line 84)
-- new imagepalettetotruecolor (line 85)
-- new imagesetinterpolation (line 86)
-- new imagegetinterpolation (line 87)
-- new imagefill (line 88)
-- new imagefilltoborder (line 89)
-- new imagedestroy (line 90)
-- new imagesx (line 91)
-- new imagesy (line 92)
-- new imagecolorat (line 93)
-- new imagecopy (line 94)
-- new imagecopymerge (line 95)
-- new imagecopyresampled (line 96)
-- new imagecopyresized (line 97)
-- new imagesetpixel (line 98)
-- new imageline (line 99)
-- new imagedashedline (line 100)
-- new imagerectangle (line 101)
-- new imageellipse (line 102)
-- new imagefilledellipse (line 103)
-- new imagearc (line 104)
-- new imagefilledarc (line 105)
-- new imagepolygon (line 106)
-- new imageopenpolygon (line 107)
-- new imagefilledpolygon (line 108)
-- new imagefilledrectangle (line 109)
-- new imagestring (line 110)
-- new imagestringup (line 111)
-- new imagechar (line 112)
-- new imagecharup (line 113)
-- new imageloadfont (line 114)
-- new imagegammacorrect (line 115)
-- new imageinterlace (line 116)
-- new imagesetclip (line 117)
-- new imagegetclip (line 118)
-- new imagefttext (line 120)
-- new imageftbbox (line 121)
-- new imagettftext (line 122)
-- new imagettfbbox (line 123)
-- new imagefilter (line 125)
-- new imageflip (line 126)
-- new imagecrop (line 127)
-- new imagecropauto (line 128)
-- new imagerotate (line 129)
-- new imagescale (line 130)
-- new imageaffine (line 131)
-- new imageaffinematrixget (line 132)
-- new imageaffinematrixconcat (line 133)
-- new imageconvolution (line 134)
-- new imagecreatefromstring (line 137)
-- new imagepng (line 138)
-- new imagejpeg (line 139)
-- new imagegif (line 140)
-- new imagewebp (line 141)
-- new imageavif (line 142)
-- new imagebmp (line 143)
-- new imagewbmp (line 144)
-- new imagexbm (line 145)
-- new imagegd (line 146)
-- new imagegd2 (line 147)
-- new imagecreatefrompng (line 148)
-- new imagecreatefromjpeg (line 149)
-- new imagecreatefromgif (line 150)
-- new imagecreatefromwebp (line 151)
-- new imagecreatefromavif (line 152)
-- new imagecreatefrombmp (line 153)
-- new imagecreatefromwbmp (line 154)
-- new imagecreatefromxbm (line 155)
-- new imagecreatefromxpm (line 156)
-- new imagecreatefromgd (line 157)
-- new imagecreatefromgd2 (line 158)
-- new imagecreatefromgd2part (line 159)
-- new imagecreatefromtga (line 160)
+- new VM\Variable (line 44)
+- new imagecreate (line 58)
+- new imagecreatetruecolor (line 59)
+- new gd_info (line 60)
+- new imagetypes (line 61)
+- new imagecolorallocate (line 64)
+- new imagecolorallocatealpha (line 65)
+- new imagecolorsforindex (line 66)
+- new imagecolorclosest (line 67)
+- new imagecolorclosestalpha (line 68)
+- new imagecolorclosesthwb (line 69)
+- new imagecolorexact (line 70)
+- new imagecolorexactalpha (line 71)
+- new imagecolorresolve (line 72)
+- new imagecolorresolvealpha (line 73)
+- new imagecolorset (line 74)
+- new imagecolortransparent (line 75)
+- new imagecolormatch (line 76)
+- new imagealphablending (line 77)
+- new imagelayereffect (line 78)
+- new imageresolution (line 79)
+- new imagesavealpha (line 80)
+- new imageantialias (line 81)
+- new imagesetthickness (line 82)
+- new imagesetbrush (line 83)
+- new imagesetstyle (line 84)
+- new imageistruecolor (line 85)
+- new imagetruecolortopalette (line 86)
+- new imagepalettetotruecolor (line 87)
+- new imagesetinterpolation (line 88)
+- new imagegetinterpolation (line 89)
+- new imagefill (line 90)
+- new imagefilltoborder (line 91)
+- new imagedestroy (line 92)
+- new imagesx (line 93)
+- new imagesy (line 94)
+- new imagecolorat (line 95)
+- new imagecopy (line 96)
+- new imagecopymerge (line 97)
+- new imagecopyresampled (line 98)
+- new imagecopyresized (line 99)
+- new imagesetpixel (line 100)
+- new imageline (line 101)
+- new imagedashedline (line 102)
+- new imagerectangle (line 103)
+- new imageellipse (line 104)
+- new imagefilledellipse (line 105)
+- new imagearc (line 106)
+- new imagefilledarc (line 107)
+- new imagepolygon (line 108)
+- new imageopenpolygon (line 109)
+- new imagefilledpolygon (line 110)
+- new imagefilledrectangle (line 111)
+- new imagestring (line 112)
+- new imagestringup (line 113)
+- new imagechar (line 114)
+- new imagecharup (line 115)
+- new imageloadfont (line 116)
+- new imagegammacorrect (line 117)
+- new imageinterlace (line 118)
+- new imagesetclip (line 119)
+- new imagegetclip (line 120)
+- new imagefttext (line 122)
+- new imageftbbox (line 123)
+- new imagettftext (line 124)
+- new imagettfbbox (line 125)
+- new imagefilter (line 127)
+- new imageflip (line 128)
+- new imagecrop (line 129)
+- new imagecropauto (line 130)
+- new imagerotate (line 131)
+- new imagescale (line 132)
+- new imageaffine (line 133)
+- new imageaffinematrixget (line 134)
+- new imageaffinematrixconcat (line 135)
+- new imageconvolution (line 136)
+- new imagecreatefromstring (line 139)
+- new imagepng (line 140)
+- new imagejpeg (line 141)
+- new imagegif (line 142)
+- new imagewebp (line 143)
+- new imageavif (line 144)
+- new imagebmp (line 145)
+- new imagewbmp (line 146)
+- new imagexbm (line 147)
+- new imagegd (line 148)
+- new imagegd2 (line 149)
+- new imagecreatefrompng (line 150)
+- new imagecreatefromjpeg (line 151)
+- new imagecreatefromgif (line 152)
+- new imagecreatefromwebp (line 153)
+- new imagecreatefromavif (line 154)
+- new imagecreatefrombmp (line 155)
+- new imagecreatefromwbmp (line 156)
+- new imagecreatefromxbm (line 157)
+- new imagecreatefromxpm (line 158)
+- new imagecreatefromgd (line 159)
+- new imagecreatefromgd2 (line 160)
+- new imagecreatefromgd2part (line 161)
+- new imagecreatefromtga (line 162)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -20682,8 +20684,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new SimpleXMLElement (line 38)
-- 6 class method(s)
+- new SimpleXMLElement (line 40)
+- 7 class method(s)
+- 1 closure(s)
+
+### `ext/simplexml/JitSimpleXmlXpath.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/simplexml/Module.php`
 
@@ -20883,29 +20891,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SimpleXmlNodeState (line 826)
 - new SimpleXmlNodeState (line 839)
 - new SimpleXmlNodeState (line 920)
-- new HashTable (line 1001)
-- new Variable (line 1024)
-- new Variable (line 1033)
-- new Variable (line 1080)
-- new Variable (line 1101)
-- new SimpleXmlNodeState (line 1138)
-- new ObjectEntry (line 1162)
-- new SimpleXmlNodeState (line 1248)
-- new SimpleXmlNodeState (line 1258)
-- new SimpleXmlNodeState (line 1261)
-- new ObjectEntry (line 1282)
-- new SimpleXmlNodeState (line 1303)
-- new ObjectEntry (line 1311)
-- new SimpleXmlNodeState (line 1315)
-- new ObjectEntry (line 1332)
-- new ObjectEntry (line 1348)
-- new Error (line 1424)
-- new ObjectEntry (line 1436)
-- new HashTable (line 1795)
-- new Variable (line 1797)
-- new SimpleXmlNodeState (line 1856)
-- new SimpleXmlNodeState (line 1865)
-- 72 class method(s)
+- new HashTable (line 1003)
+- new Variable (line 1034)
+- new Variable (line 1043)
+- new Variable (line 1104)
+- new Variable (line 1130)
+- new SimpleXmlNodeState (line 1216)
+- new ObjectEntry (line 1240)
+- new SimpleXmlNodeState (line 1326)
+- new SimpleXmlNodeState (line 1336)
+- new SimpleXmlNodeState (line 1339)
+- new ObjectEntry (line 1360)
+- new SimpleXmlNodeState (line 1381)
+- new ObjectEntry (line 1389)
+- new SimpleXmlNodeState (line 1393)
+- new ObjectEntry (line 1410)
+- new ObjectEntry (line 1426)
+- new Error (line 1502)
+- new ObjectEntry (line 1514)
+- new HashTable (line 1873)
+- new Variable (line 1875)
+- new SimpleXmlNodeState (line 1934)
+- new SimpleXmlNodeState (line 1943)
+- 74 class method(s)
 - 4 closure(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
@@ -41619,48 +41627,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 13753)
 - new Variable (line 13780)
 - new Variable (line 13806)
-- new Variable (line 14135)
-- new Variable (line 14503)
-- new Variable (line 14533)
-- new Variable (line 14552)
-- new Variable (line 14582)
-- new Variable (line 14619)
-- new Variable (line 14667)
-- new Variable (line 14710)
-- new VM\Variable (line 15055)
-- new Variable (line 15089)
-- new Variable (line 15140)
-- new Variable (line 15156)
-- new Variable (line 15175)
-- new Variable (line 15182)
-- new OpCode (line 15202)
-- new Variable (line 15203)
-- new Variable (line 15375)
-- new Variable (line 15413)
-- new OpCode (line 15427)
-- new Variable (line 15428)
-- new Variable (line 15487)
-- new OpCode (line 15508)
-- new Variable (line 15509)
-- new Variable (line 15606)
-- new Variable (line 15628)
-- new Variable (line 15696)
-- new Operand\Literal (line 15705)
-- new Variable (line 15720)
-- new Variable (line 15904)
-- new VM\PropertyIsInitializedHandler (line 15986)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16026)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16211)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16316)
-- new JIT\Call\VmCoerceVariableToString (line 16440)
-- new JIT\Call\IncludePathResolverResolve (line 16710)
-- new Variable (line 17768)
-- new VM (line 17812)
-- new VM\Variable (line 17821)
-- new Variable (line 17842)
-- new Variable (line 17888)
-- new Variable (line 18382)
-- 370 class method(s)
+- new Variable (line 14136)
+- new Variable (line 14504)
+- new Variable (line 14534)
+- new Variable (line 14553)
+- new Variable (line 14583)
+- new Variable (line 14620)
+- new Variable (line 14668)
+- new Variable (line 14711)
+- new VM\Variable (line 15056)
+- new Variable (line 15090)
+- new Variable (line 15141)
+- new Variable (line 15157)
+- new Variable (line 15176)
+- new Variable (line 15183)
+- new OpCode (line 15203)
+- new Variable (line 15204)
+- new Variable (line 15376)
+- new Variable (line 15414)
+- new OpCode (line 15428)
+- new Variable (line 15429)
+- new Variable (line 15488)
+- new OpCode (line 15509)
+- new Variable (line 15510)
+- new Variable (line 15607)
+- new Variable (line 15629)
+- new Variable (line 15697)
+- new Operand\Literal (line 15706)
+- new Variable (line 15721)
+- new Variable (line 15905)
+- new VM\PropertyIsInitializedHandler (line 15997)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16037)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16252)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16357)
+- new JIT\Call\VmCoerceVariableToString (line 16481)
+- new JIT\Call\IncludePathResolverResolve (line 16751)
+- new Variable (line 17809)
+- new VM (line 17853)
+- new VM\Variable (line 17862)
+- new Variable (line 17883)
+- new Variable (line 17929)
+- new Variable (line 18423)
+- 371 class method(s)
 - 7 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -43612,8 +43620,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SilenceRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 245)
+- new JIT (line 244)
 - 16 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/SocketAtmarkRuntime.php`
 
@@ -45954,6 +45963,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/SimpleXMLElementXpath.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/SplObjectStorageMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -47076,9 +47090,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SimpleXmlInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\SimpleXMLElementConstruct (line 31)
-- new Call\SimpleXMLElementAddChild (line 36)
-- new Call\SimpleXMLElementAsXml (line 42)
+- new Call\SimpleXMLElementConstruct (line 32)
+- new Call\SimpleXMLElementAddChild (line 37)
+- new Call\SimpleXMLElementAsXml (line 43)
+- new Call\SimpleXMLElementXpath (line 48)
 - 1 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`
@@ -49195,7 +49210,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionEnumConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumFromName.php`
@@ -49354,7 +49368,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionFiberConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 31)
+- new Variable (line 32)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionFiberGetCallable.php`
@@ -49610,7 +49624,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionGeneratorConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 31)
+- new Variable (line 32)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionGeneratorGetExecutingFile.php`
@@ -49950,8 +49964,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionObjectConstruct.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
-- new Variable (line 43)
+- new Variable (line 40)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionParameterAllowsNull.php`
@@ -52078,47 +52091,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ReflectionException (line 259)
-- new AttributeEntry (line 269)
-- new Variable (line 289)
-- new ObjectEntry (line 296)
-- new Variable (line 302)
-- new Variable (line 315)
-- new Variable (line 319)
-- new Variable (line 322)
-- new Variable (line 343)
-- new Variable (line 379)
-- new Variable (line 398)
-- new Variable (line 417)
-- new Error (line 443)
-- new Error (line 447)
-- new ObjectEntry (line 449)
-- new Variable (line 450)
-- new Variable (line 461)
-- new Error (line 479)
-- new Variable (line 485)
-- new Error (line 491)
-- new Error (line 509)
-- new Variable (line 511)
-- new Variable (line 630)
-- new ObjectEntry (line 1157)
-- new Variable (line 1159)
-- new AttributeEntry (line 1777)
-- new Variable (line 2304)
-- new ParameterMetadata (line 2310)
-- new Variable (line 3094)
-- new ObjectEntry (line 3269)
-- new SourceLocation (line 3297)
-- new ParameterMetadata (line 3777)
-- new ObjectEntry (line 3845)
-- new ObjectEntry (line 3862)
-- new ObjectEntry (line 4080)
-- new ObjectEntry (line 4093)
-- new Variable (line 4173)
-- new ObjectEntry (line 4295)
-- new ObjectEntry (line 4315)
-- new Variable (line 4502)
-- new Variable (line 4687)
-- 246 class method(s)
+- new ArgumentCountError (line 277)
+- new AttributeEntry (line 294)
+- new Variable (line 314)
+- new ObjectEntry (line 321)
+- new Variable (line 327)
+- new Variable (line 340)
+- new Variable (line 344)
+- new Variable (line 347)
+- new Variable (line 368)
+- new Variable (line 404)
+- new Variable (line 423)
+- new Variable (line 442)
+- new Error (line 468)
+- new Error (line 472)
+- new ObjectEntry (line 474)
+- new Variable (line 475)
+- new Variable (line 486)
+- new Error (line 504)
+- new Variable (line 510)
+- new Error (line 516)
+- new Error (line 534)
+- new Variable (line 536)
+- new Variable (line 655)
+- new ObjectEntry (line 1182)
+- new Variable (line 1184)
+- new AttributeEntry (line 1802)
+- new Variable (line 2329)
+- new ParameterMetadata (line 2335)
+- new Variable (line 3119)
+- new ObjectEntry (line 3294)
+- new SourceLocation (line 3322)
+- new ParameterMetadata (line 3802)
+- new ObjectEntry (line 3870)
+- new ObjectEntry (line 3887)
+- new ObjectEntry (line 4105)
+- new ObjectEntry (line 4118)
+- new Variable (line 4198)
+- new ObjectEntry (line 4320)
+- new ObjectEntry (line 4340)
+- new Variable (line 4527)
+- new Variable (line 4712)
+- 247 class method(s)
 - 2 closure(s)
 
 ### `lib/VM/ReflectionTypeSupport.php`

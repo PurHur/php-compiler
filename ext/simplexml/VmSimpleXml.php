@@ -988,19 +988,24 @@ final class VmSimpleXml
     }
 
     /**
-     * SimpleXMLElement::xpath — php-src zim_simplexmlelement_xpath (#20334).
+     * SimpleXMLElement::xpath — php-src zim_simplexmlelement_xpath (#20334, #22720).
      *
      * Prefixes resolve from in-scope xmlns (xmlGetNsList) plus registerXPathNamespace
      * (xmlXPathRegisterNs). `//name` is document-wide (absolute), not context-scoped.
+     * Invalid expressions follow php-src: E_WARNING "Invalid expression" + false
+     * (xmlXPathEvalExpression failure) — not an empty node-set.
      *
-     * @return HashTable|false list of SimpleXMLElement objects, or false on undefined prefix
+     * @return HashTable|false list of SimpleXMLElement objects, or false on failure
      */
     public static function xpath(Context $ctx, ObjectEntry $entry, string $expression, ?Frame $frame = null): HashTable|false
     {
         $expression = trim($expression);
         $ht = new HashTable();
-        if ('' === $expression) {
-            return $ht;
+        // php-src: empty / whitespace-only → xmlXPathEval failure (#22720).
+        if ('' === $expression || self::isInvalidXPathExpression($expression)) {
+            self::warn($ctx, 'SimpleXMLElement::xpath(): Invalid expression', $frame);
+
+            return false;
         }
 
         $nsMap = self::xpathNamespaceMap($entry);
@@ -1009,6 +1014,11 @@ final class VmSimpleXml
 
         // `//tag` / `//ns:tag` / `//tag[@attr="v"]` — absolute from document root (XPath //).
         if (preg_match('~^//([\w:-]+)(?:\[@([\w:-]+)=["\']([^"\']*)["\']\])?$~', $expression, $m)) {
+            if (!self::isValidXPathNameTest($m[1]) || (isset($m[2]) && !self::isValidXPathNameTest($m[2]))) {
+                self::warn($ctx, 'SimpleXMLElement::xpath(): Invalid expression', $frame);
+
+                return false;
+            }
             $resolved = self::resolveXPathQName($m[1], $nsMap);
             if (null === $resolved) {
                 self::warn($ctx, 'SimpleXMLElement::xpath(): Undefined namespace prefix', $frame);
@@ -1039,6 +1049,15 @@ final class VmSimpleXml
         }
 
         if (str_starts_with($expression, '/')) {
+            // `/` alone → empty node-set; `//` / `///` / trailing `/` → invalid (libxml).
+            if ('/' === $expression) {
+                return $ht;
+            }
+            if (preg_match('#^/{2,}$#', $expression) || str_ends_with($expression, '/')) {
+                self::warn($ctx, 'SimpleXMLElement::xpath(): Invalid expression', $frame);
+
+                return false;
+            }
             $segments = array_values(array_filter(explode('/', $expression), static fn (string $part): bool => '' !== $part));
             if ([] === $segments) {
                 return $ht;
@@ -1047,6 +1066,11 @@ final class VmSimpleXml
             /** @var list<array{0: SimpleXmlNodeState, 1: array<string, string>}> $frontier */
             $frontier = [[SimpleXmlRegistry::rootState($docKey), []]];
             foreach ($segments as $index => $segment) {
+                if (!self::isValidXPathNameTest($segment)) {
+                    self::warn($ctx, 'SimpleXMLElement::xpath(): Invalid expression', $frame);
+
+                    return false;
+                }
                 $resolved = self::resolveXPathQName($segment, $nsMap);
                 if (null === $resolved) {
                     self::warn($ctx, 'SimpleXMLElement::xpath(): Undefined namespace prefix', $frame);
@@ -1086,6 +1110,11 @@ final class VmSimpleXml
         }
 
         if (preg_match('~^[\w:-]+$~', $expression)) {
+            if (!self::isValidXPathNameTest($expression)) {
+                self::warn($ctx, 'SimpleXMLElement::xpath(): Invalid expression', $frame);
+
+                return false;
+            }
             $resolved = self::resolveXPathQName($expression, $nsMap);
             if (null === $resolved) {
                 self::warn($ctx, 'SimpleXMLElement::xpath(): Undefined namespace prefix', $frame);
@@ -1108,7 +1137,56 @@ final class VmSimpleXml
             return $ht;
         }
 
+        // Subset gap: valid XPath we do not evaluate yet → empty node-set (not false).
+        // Clearly-invalid forms already rejected above via isInvalidXPathExpression.
         return $ht;
+    }
+
+    /**
+     * Conservative invalid-expression detector for the SimpleXML xpath subset (#22720).
+     * Matches common libxml xmlXPathEvalExpression failures without flagging valid
+     * location paths / node-tests we still return as empty node-sets.
+     */
+    private static function isInvalidXPathExpression(string $expression): bool
+    {
+        if ('' === $expression) {
+            return true;
+        }
+        if (preg_match('#^/{2,}$#', $expression)) {
+            return true;
+        }
+        if (str_ends_with($expression, '/') && '/' !== $expression) {
+            return true;
+        }
+        if ('[' === $expression || ']' === $expression || '()' === $expression || './' === $expression) {
+            return true;
+        }
+        if (substr_count($expression, '[') !== substr_count($expression, ']')) {
+            return true;
+        }
+        if (substr_count($expression, '(') !== substr_count($expression, ')')) {
+            return true;
+        }
+        // Bare `@` / `@@@` — attribute axis requires a NameTest.
+        if (preg_match('/^@+$/', $expression)) {
+            return true;
+        }
+        // `!` is only legal inside `!=` (XPath 1.0).
+        if (preg_match('/!(?!=)/', $expression)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** XPath NameTest / QName for the location-path subset (`*`, NCName, NCName:NCName). */
+    private static function isValidXPathNameTest(string $name): bool
+    {
+        if ('*' === $name) {
+            return true;
+        }
+
+        return 1 === preg_match('/^[A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?$/', $name);
     }
 
     /** @return HashTable string map */
