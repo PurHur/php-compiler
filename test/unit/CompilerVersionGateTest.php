@@ -1971,11 +1971,34 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($dti->methods['createfromtimestamp']));
     }
 
-    public function testVmRegistersCreateFromTimestampOnForwardProfile(): void
+    public function testVmDoesNotRegisterCreateFromTimestampOnProfile83(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.3');
         try {
+            $this->assertFalse(CompilerVersion::supportsDateTimeCreateFromTimestamp());
+            $runtime = new Runtime();
+            $dt = $runtime->vmContext->classes['datetime'] ?? null;
+            $dti = $runtime->vmContext->classes['datetimeimmutable'] ?? null;
+            $this->assertNotNull($dt);
+            $this->assertNotNull($dti);
+            $this->assertFalse(isset($dt->methods['createfromtimestamp']));
+            $this->assertFalse(isset($dti->methods['createfromtimestamp']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersCreateFromTimestampOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDateTimeCreateFromTimestamp());
             $runtime = new Runtime();
             $dt = $runtime->vmContext->classes['datetime'] ?? null;
             $dti = $runtime->vmContext->classes['datetimeimmutable'] ?? null;
