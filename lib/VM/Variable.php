@@ -1098,7 +1098,9 @@ final class Variable {
     }
 
     /**
-     * Zend string offset index: float emits "String offset cast occurred" then truncates.
+     * Zend string offset index: null/bool/float emit "String offset cast occurred" then coerce.
+     *
+     * php-src: Zend/zend_operators.c — string offset index cast (#4166 float, #22896 null/bool)
      */
     public static function stringOffsetIndexFromDim(
         self $dim,
@@ -1108,12 +1110,19 @@ final class Variable {
         ?string $file = null
     ): int {
         $dim = $dim->resolveIndirect();
-        if (self::TYPE_FLOAT === $dim->type) {
+        if (
+            self::TYPE_FLOAT === $dim->type
+            || self::TYPE_NULL === $dim->type
+            || self::TYPE_BOOLEAN === $dim->type
+        ) {
             if (null !== $reporter) {
                 $reporter->stringOffsetCastOccurred($context, $frame, $file);
             }
+            if (self::TYPE_FLOAT === $dim->type) {
+                return (int) $dim->float;
+            }
 
-            return (int) $dim->float;
+            return $dim->toInt();
         }
 
         return $dim->toInt();
