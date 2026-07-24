@@ -62,10 +62,23 @@ if docker inspect "${NAME}" >/dev/null 2>&1; then
   exit 1
 fi
 
+# Host-side pin: bind-mount shares the workspace. A mid-run `git checkout master`
+# drops ClassConstFetchHelper's trait self-require and kills Zend spine after hours
+# (r6 @ 163m — #22642). Refuse to start unless the fix is present on the bind src.
+if ! grep -q "require_once __DIR__ . '/ClassConstFetchHelperTrait.php'" \
+  "${BIND_SRC}/lib/JIT/ClassConstFetchHelper.php"; then
+  echo "bootstrap-gen0-refresh-exclusive-docker: ClassConstFetchHelper.php on bind src" >&2
+  echo "  lacks trait self-require — checkout the #22642 branch before launching." >&2
+  exit 2
+fi
+PIN_HEAD="$(git -C "${BIND_SRC}" rev-parse HEAD)"
+PIN_BRANCH="$(git -C "${BIND_SRC}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo DETACHED)"
+
 mkdir -p "${ROOT}/build"
 LOG_HOST="${ROOT}/build/gen0-refresh-exclusive.log"
 
 echo "bootstrap-gen0-refresh-exclusive-docker: name=${NAME} bind=${BIND_SRC} mem=${MEM} cpus=${CPUS}"
+echo "bootstrap-gen0-refresh-exclusive-docker: pin HEAD=${PIN_HEAD:0:12} branch=${PIN_BRANCH}"
 # Intentionally NO --rm: keep exit/OOM flags after failure for triage.
 docker run -d \
   --name "${NAME}" \
@@ -74,6 +87,7 @@ docker run -d \
   -v "${BIND_SRC}:/compiler" \
   -w /compiler \
   -e PHP_COMPILER_ALLOW_PARALLEL_CI=1 \
+  -e BOOTSTRAP_GEN0_PIN_HEAD="${PIN_HEAD}" \
   "${IMAGE}" \
   bash -lc "
     set -uo pipefail
@@ -90,8 +104,35 @@ docker run -d \
     export PHP_COMPILER_JIT_PROGRESS_FILE=/compiler/build/.last-jit-spine-exclusive
     LOG=/compiler/build/gen0-refresh-exclusive-inner.log
     STATUS=/compiler/build/gen0-refresh-exclusive.status
+    HB=/compiler/build/gen0-refresh-exclusive.heartbeat
+    PIN_HEAD=\${BOOTSTRAP_GEN0_PIN_HEAD:-}
+    drift_abort() {
+      echo \"DRIFT_ABORT: \$*\" | tee -a \"\$STATUS\"
+      # Prefer killing the compile child so time(1) returns; fall back to container exit.
+      pkill -TERM -f 'bin/compile.php' 2>/dev/null || true
+      exit 97
+    }
+    ( while true; do
+        cur=\$(git rev-parse HEAD 2>/dev/null || echo unknown)
+        if [[ -n \"\$PIN_HEAD\" && \"\$cur\" != \"\$PIN_HEAD\" ]]; then
+          drift_abort \"HEAD drifted \$PIN_HEAD -> \$cur (do not checkout other branches mid-refresh)\"
+        fi
+        if ! grep -q \"require_once __DIR__ . '/ClassConstFetchHelperTrait.php'\" \
+          /compiler/lib/JIT/ClassConstFetchHelper.php 2>/dev/null; then
+          drift_abort 'ClassConstFetchHelperTrait self-require missing from bind mount'
+        fi
+        cpid=\$(pgrep -n -f '/compiler/bin/compile.php' || true)
+        rss=0
+        if [[ -n \"\$cpid\" && -r /proc/\$cpid/status ]]; then
+          rss=\$(awk '/VmRSS/{print \$2}' /proc/\$cpid/status)
+        fi
+        prog=\$(cat /compiler/build/.last-jit-spine-exclusive 2>/dev/null || echo none)
+        echo \"\$(date -u +%H:%M:%S) heartbeat rss=\${rss}kB prog=\$prog head=\${cur:0:12}\" >> \"\$HB\"
+        sleep 60
+      done ) &
+    HBPID=\$!
     {
-      echo START \$(date -u +%H:%M:%S) HEAD=\$(git rev-parse --short HEAD) ulimit_v=\$(ulimit -v) name=${NAME}
+      echo START \$(date -u +%H:%M:%S) HEAD=\$(git rev-parse --short HEAD) pin=\${PIN_HEAD:0:12} ulimit_v=\$(ulimit -v) name=${NAME}
       echo ${NAME} \$\$ \$(date -u -Iseconds) > /compiler/build/.gen0-refresh-exclusive.lock
       set +e
       time ./script/bootstrap-refresh-gen0-sidecar.sh
@@ -107,6 +148,7 @@ docker run -d \
       fi
       echo EXCLUSIVE_END rc=\$rc \$(date -u +%H:%M:%S)
       rm -f /compiler/build/.gen0-refresh-exclusive.lock
+      kill \$HBPID 2>/dev/null || true
       exit \$rc
     } 2>&1 | tee \"\$LOG\"
   "
