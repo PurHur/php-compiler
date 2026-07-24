@@ -24,7 +24,12 @@ final class EnumFromJitHelper
 
     public static function stringBackingFromDouble(float $value): string
     {
-        return (string) $value;
+        // Z_PARAM_STR_OR_LONG: finite → long→str; non-finite → convert_to_string (#22947).
+        if (!is_finite($value)) {
+            return (string) $value;
+        }
+
+        return (string) self::intBackingFromDouble($value);
     }
 
     public static function stringBackingFromBool(bool $value): string
@@ -53,13 +58,20 @@ final class EnumFromJitHelper
         return $value;
     }
 
+    /**
+     * Z_PARAM_LONG float path — truncate toward zero; NAN/INF → TypeError (#22947).
+     * Precision-loss E_DEPRECATED is emitted by the VM/JIT call site (VmMath / LLVM).
+     */
     public static function intBackingFromDouble(float $value): int
     {
-        if (!is_finite($value) || (float) (int) $value !== $value) {
-            throw new \TypeError('mixed is not a valid backing coercion for int enum');
+        if (!is_finite($value)) {
+            throw new \TypeError('Argument #1 ($value) must be of type int, float given');
+        }
+        if ($value >= 0.0) {
+            return (int) floor($value);
         }
 
-        return (int) $value;
+        return (int) ceil($value);
     }
 
     public static function intBackingFromString(string $enumName, string $value): int

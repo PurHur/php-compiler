@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
@@ -124,7 +125,26 @@ final class BackedEnumFromRuntime
         );
         $context->builder->positionAtEnd($floatBlock);
         $floatVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
-        $floatStr = self::formatDoubleString($context, $floatVal);
+        // Z_PARAM_STR_OR_LONG: finite float→long→str (+ E_DEPRECATED); NAN/INF→"NAN"/"INF" (#22947).
+        $isFinite = MathIsFinite::invoke($context, $floatVal);
+        $finiteBlock = $fn->appendBasicBlock('enum_from_norm_str_float_finite');
+        $nonFiniteBlock = $fn->appendBasicBlock('enum_from_norm_str_float_nonfinite');
+        $mergeFloat = $fn->appendBasicBlock('enum_from_norm_str_float_merge');
+        $context->builder->branchIf($isFinite, $finiteBlock, $nonFiniteBlock);
+        $context->builder->positionAtEnd($finiteBlock);
+        $floatLong = JitIntdiv::floatToLongWithPrecisionWarning($context, $floatVal);
+        $finiteStr = JitNativeString::formatIndexKey($context, $floatLong);
+        $finiteEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeFloat);
+        $context->builder->positionAtEnd($nonFiniteBlock);
+        $nonFiniteStr = self::callStringHelper($context, self::STRING_FROM_DOUBLE, $floatVal);
+        $nonFiniteEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeFloat);
+        $context->builder->positionAtEnd($mergeFloat);
+        $strPtrTyEarly = $context->getTypeFromString('__string__*');
+        $floatStr = $context->builder->phi($strPtrTyEarly, 'enum_from_norm_str_float_phi');
+        $floatStr->addIncoming($finiteStr, $finiteEnd);
+        $floatStr->addIncoming($nonFiniteStr, $nonFiniteEnd);
         $floatEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -217,7 +237,22 @@ final class BackedEnumFromRuntime
         );
         $context->builder->positionAtEnd($floatBlock);
         $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
-        $floatInt = $context->builder->fpToSi($doubleVal, $i64);
+        // Z_PARAM_LONG: finite float truncates (+ E_DEPRECATED on precision loss); NAN/INF → TypeError (#22947).
+        $isFinite = MathIsFinite::invoke($context, $doubleVal);
+        $floatOk = $fn->appendBasicBlock('enum_from_norm_int_float_ok');
+        $floatBad = $fn->appendBasicBlock('enum_from_norm_int_float_bad');
+        $context->builder->branchIf($isFinite, $floatOk, $floatBad);
+        $context->builder->positionAtEnd($floatBad);
+        $badMsg = self::callStringHelper(
+            $context,
+            self::INT_TYPE_ERROR,
+            self::literalString($context, $className)
+        );
+        self::raiseTypeErrorFromString($context, $badMsg);
+        $floatBadEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($floatOk);
+        $floatInt = JitIntdiv::floatToLongWithPrecisionWarning($context, $doubleVal);
         $floatEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -276,6 +311,7 @@ final class BackedEnumFromRuntime
         $phi = $context->builder->phi($i64, 'enum_from_norm_int_phi');
         $phi->addIncoming($longVal, $longEnd);
         $phi->addIncoming($floatInt, $floatEnd);
+        $phi->addIncoming($i64->constInt(0, false), $floatBadEnd);
         $phi->addIncoming($stringInt, $stringEnd);
         $phi->addIncoming($nullInt, $nullEnd);
         $phi->addIncoming($boolInt, $boolEnd);
