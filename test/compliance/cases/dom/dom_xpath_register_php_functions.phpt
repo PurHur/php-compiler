@@ -1,5 +1,5 @@
 --TEST--
-ext/dom DOMXPath::registerPhpFunctions() — php:function / functionString (#19331/#19709, ext/dom/xpath.c)
+ext/dom DOMXPath::registerPhpFunctions() — php:function / functionString (#19331/#19709/#22719, ext/dom/xpath.c)
 --FILE--
 <?php
 $doc = new DOMDocument();
@@ -13,6 +13,9 @@ echo "\n";
 // Absolute path string(/r/a) — was empty before #19709 (evaluateAbsolutePath started at documentElement).
 var_export($xp->evaluate('php:functionString("strtoupper", string(/r/a))'));
 echo "\n";
+// Nested string(php:functionString(...)) — was '' before #22719 (evaluateToMixed skipped php:function*).
+var_export($xp->evaluate('string(php:functionString("strtoupper", //a))'));
+echo "\n";
 // php:function node-set args are DOMNode[] — strtoupper TypeErrors like Zend.
 try {
     $xp->evaluate('php:function("strtoupper", //a)');
@@ -23,6 +26,7 @@ try {
 ?>
 --EXPECT--
 has=1
+'HI'
 'HI'
 'HI'
 TypeError

@@ -1954,6 +1954,15 @@ final class VmDomXPath
         if ('' === $expression) {
             throw new \DOMException('Invalid expression');
         }
+        // Nested php:function() / php:functionString() inside string()/number()/… (#22719).
+        $phpFn = self::tryEvaluatePhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+        if (null !== $phpFn) {
+            return self::phpFunctionResultToMixed($phpFn);
+        }
+        $nsFn = self::tryEvaluateNamespacedPhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+        if (null !== $nsFn) {
+            return self::phpFunctionResultToMixed($nsFn);
+        }
         if (self::isBooleanExpression($expression)) {
             return self::evaluateBoolean($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
         }
@@ -1965,6 +1974,31 @@ final class VmDomXPath
         }
 
         return self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+    }
+
+    /**
+     * Convert php:function* Variable result to evaluateToMixed scalar/node-set shape (#22719).
+     */
+    private static function phpFunctionResultToMixed(Variable $result): mixed
+    {
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_NULL === $result->type) {
+            return null;
+        }
+        if (Variable::TYPE_BOOLEAN === $result->type) {
+            return $result->toBool();
+        }
+        if (Variable::TYPE_STRING === $result->type) {
+            return $result->toString();
+        }
+        if (Variable::TYPE_INTEGER === $result->type) {
+            return $result->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $result->type) {
+            return $result->toFloat();
+        }
+
+        return $result->toString();
     }
 
     /**
