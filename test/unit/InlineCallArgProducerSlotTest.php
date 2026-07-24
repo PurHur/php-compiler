@@ -5549,6 +5549,58 @@ PHP;
         self::assertSame("ok\n", $out);
     }
 
+    /** Issue #22772 — nested options['flags'] ConstFetch + Array_ chain must bind outer Array_. */
+    public function testFilterVarNestedOptionsFlagsArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+filter_var('01', FILTER_VALIDATE_INT, ['options' => ['flags' => FILTER_FLAG_ALLOW_OCTAL]]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_nested_options_flags.php');
+
+        $constSlot = null;
+        $outerArraySlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constSlot) {
+                $constSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $outerArraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($constSlot);
+        self::assertNotNull($outerArraySlot);
+        self::assertCount(3, $sendSlots, 'filter_var arg sends='.json_encode($sendSlots));
+        self::assertSame($constSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($outerArraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #22772 — nested options['flags'] must not act as top-level FILTER_FLAG_ALLOW_OCTAL. */
+    public function testFilterVarNestedOptionsFlagsRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$nested = filter_var('01', FILTER_VALIDATE_INT, ['options' => ['flags' => FILTER_FLAG_ALLOW_OCTAL]]);
+$top = filter_var('01', FILTER_VALIDATE_INT, ['flags' => FILTER_FLAG_ALLOW_OCTAL]);
+echo false === $nested ? "nested_ok\n" : "nested_bad\n";
+echo 1 === $top ? "top_ok\n" : "top_bad\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_nested_options_flags_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("nested_ok\ntop_ok\n", $out);
+    }
+
     /** Issue #17410 — filter_var() BitwiseOr int flags maps filter const + flags expr to arg slots. */
     public function testFilterVarSanitizeNumberFloatBitmaskFlagsSlots(): void
     {
