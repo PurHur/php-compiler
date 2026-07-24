@@ -1187,7 +1187,8 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'try_catch_else_reference_profile')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when pipe operator enabled (#12424, #18007).
+            // 8.5-target reject gate; skipped when pipe operator enabled (#12424, #18007, #22792).
+            // profile84_reject uses --ENV-- PROFILE=8.4 — always include.
             if (CompilerVersion::supportsPipeOperator()
                 && str_contains($name, 'pipe_operator_reference_profile')) {
                 continue;
@@ -1195,6 +1196,7 @@ class VMTest extends BaseTest {
             if (!CompilerVersion::supportsPipeOperator()
                 && str_contains($name, 'pipe_operator')
                 && !str_contains($name, 'pipe_operator_reference_profile')
+                && !str_contains($name, 'pipe_operator_profile84_reject')
                 && !str_contains($name, 'pipe_operator_forward_profile')) {
                 continue;
             }

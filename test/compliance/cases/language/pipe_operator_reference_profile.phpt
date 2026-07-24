@@ -6,7 +6,7 @@ if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
 if (PHPCompiler\CompilerVersion::supportsPipeOperator()) {
-    die('skip pipe operator enabled on PHP 8.4.0+ target');
+    die('skip pipe operator enabled on PHP 8.5.0+ target');
 }
 ?>
 --FILE--

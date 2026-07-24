@@ -8,10 +8,10 @@ use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject PHP 8.4+ pipe operator (|>) on the Zend 8.2 reference profile (#12424, #18007).
+ * Reject PHP 8.5+ pipe operator (|>) below PROFILE=8.5 (#12424, #18007, #22792).
  *
  * Must run before {@see Ast\PipeOperatorDesugar} so pipe syntax is not lowered into valid PHP.
- * php-src: Zend/zend_language_parser.y pipe expression grammar.
+ * php-src: Zend/zend_language_parser.y pipe expression grammar (PHP 8.5+).
  */
 final class PipeOperatorSyntaxRejector
 {

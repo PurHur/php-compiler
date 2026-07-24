@@ -7,10 +7,10 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Desugar PHP 8.4+ pipe operator (|>) before nikic/php-parser (#3243, #7219).
+ * Desugar PHP 8.5+ pipe operator (|>) before nikic/php-parser (#3243, #7219, #22792).
  *
  * Lowering matches Zend: $lhs |> $callable(...) becomes $callable($lhs, ...).
- * php-src: Zend/zend_compile.c pipe expression handling.
+ * php-src: Zend/zend_compile.c pipe expression handling (PHP 8.5+).
  */
 final class PipeOperatorDesugar
 {

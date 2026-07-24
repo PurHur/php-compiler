@@ -14,7 +14,7 @@ final class PipeOperatorSyntaxRejectorTest extends TestCase
     public function testRejectsPipeOnReferenceProfile(): void
     {
         if (CompilerVersion::supportsPipeOperator()) {
-            self::markTestSkipped('pipe operator enabled on PHP 8.4.0+ target');
+            self::markTestSkipped('pipe operator enabled on PHP 8.5.0+ target');
         }
 
         $this->expectException(CompileFatal::class);
@@ -26,7 +26,7 @@ final class PipeOperatorSyntaxRejectorTest extends TestCase
     public function testReferenceProfileSyntaxErrorLine(): void
     {
         if (CompilerVersion::supportsPipeOperator()) {
-            self::markTestSkipped('pipe operator enabled on PHP 8.4.0+ target');
+            self::markTestSkipped('pipe operator enabled on PHP 8.5.0+ target');
         }
 
         $error = PipeOperatorDesugar::referenceProfileSyntaxError(<<<'PHP'
@@ -43,7 +43,7 @@ PHP
     public function testNoOpWithoutPipeToken(): void
     {
         if (CompilerVersion::supportsPipeOperator()) {
-            self::markTestSkipped('pipe operator enabled on PHP 8.4.0+ target');
+            self::markTestSkipped('pipe operator enabled on PHP 8.5.0+ target');
         }
 
         $code = '<?php echo 1 + 2;';
