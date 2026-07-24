@@ -88,15 +88,26 @@ EXTRA_MOUNTS=()
 if [[ "${USE_SNAPSHOT}" == "1" ]]; then
   SNAP_DIR="${BOOTSTRAP_GEN0_SNAPSHOT_DIR:-$(dirname "${BIND_SRC}")/gen0-refresh-snap}"
   echo "bootstrap-gen0-refresh-exclusive-docker: snapshotting ${BIND_SRC} -> ${SNAP_DIR}"
+  rm -rf "${SNAP_DIR}"
   mkdir -p "${SNAP_DIR}"
   # Frozen source tree: workspace git checkout cannot mutate files under /compiler.
   # Live-mount build/ + prelinked/bootstrap-gen0 so refresh outputs land in the workspace.
-  rsync -a --delete \
-    --exclude '/build/' \
-    --exclude '/.git/' \
-    --exclude '/prelinked/bootstrap-gen0/' \
-    --exclude '/gen0-refresh-snap/' \
-    "${BIND_SRC}/" "${SNAP_DIR}/"
+  # Prefer rsync when present; otherwise GNU tar (Runforge agents often lack rsync).
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete \
+      --exclude '/build/' \
+      --exclude '/.git/' \
+      --exclude '/prelinked/bootstrap-gen0/' \
+      --exclude '/gen0-refresh-snap/' \
+      "${BIND_SRC}/" "${SNAP_DIR}/"
+  else
+    tar -C "${BIND_SRC}" \
+      --exclude=./build \
+      --exclude=./.git \
+      --exclude=./prelinked/bootstrap-gen0 \
+      --exclude=./gen0-refresh-snap \
+      -cf - . | tar -C "${SNAP_DIR}" -xf -
+  fi
   mkdir -p "${SNAP_DIR}/build" "${SNAP_DIR}/prelinked/bootstrap-gen0"
   printf '%s\n' "${PIN_HEAD}" > "${SNAP_DIR}/.gen0-pin-head"
   COMPILER_BIND="${SNAP_DIR}"
