@@ -90,6 +90,18 @@ final class CurlExtensionPolicy
     }
 
     /**
+     * PHP 8.4+ CURLOPT/CURLINFO constants (php-src curl.stub.php; #21336, #22837).
+     *
+     * Withholds TCP_KEEPCNT / PREREQFUNCTION / SERVER_RESPONSE_TIMEOUT / DEBUGFUNCTION /
+     * POSTTRANSFER_TIME_T / HTTP_VERSION_3 on the 8.2 reference profile.
+     */
+    public static function advertisesPhp84OptionConstants(): bool
+    {
+        return self::advertisesExtension()
+            && CompilerVersion::advertisesPhp84CurlOptionConstants();
+    }
+
+    /**
      * curl_multi_get_handles() — PHP 8.5+ only (php-src ext/curl/multi.c; #20520).
      *
      * Withheld on 8.4 profiles so function_exists matches Zend 8.4 (no phantom 8.5 symbol).
