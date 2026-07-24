@@ -2673,6 +2673,11 @@ class VM {
         if (null === $class->constructor && !$this->hasInstanceMethod($class, '__construct')) {
             return null;
         }
+        // Internal ce handlers may keep $entry->constructor without advertising __construct
+        // in the method table (php-src SplDoublyLinkedList / SplStack / SplQueue, #22789).
+        if (!$this->hasInstanceMethod($class, '__construct')) {
+            return null;
+        }
         try {
             [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, '__construct');
             $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
@@ -17690,22 +17695,25 @@ restart:
         }
         VM\ClassValidator::assertInstantiable($class);
         if (null !== $class->constructor || $this->hasInstanceMethod($class, '__construct')) {
-            try {
-                [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, '__construct');
-                $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                $callerClassLc = $this->callerClassLc($frame);
-                $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
-                MethodVisibility::assertConstructorCallable(
-                    $vis,
-                    $callerClassLc,
-                    strtolower($declaringClass->name),
-                    $declaringClass->name,
-                    false,
-                    fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
-                    $callerDisplay
-                );
-            } catch (\LogicException $e) {
-                throw new \Error($e->getMessage());
+            // Unadvertised internal constructors skip visibility resolve (#22789).
+            if ($this->hasInstanceMethod($class, '__construct')) {
+                try {
+                    [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, '__construct');
+                    $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                    $callerClassLc = $this->callerClassLc($frame);
+                    $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
+                    MethodVisibility::assertConstructorCallable(
+                        $vis,
+                        $callerClassLc,
+                        strtolower($declaringClass->name),
+                        $declaringClass->name,
+                        false,
+                        fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                        $callerDisplay
+                    );
+                } catch (\LogicException $e) {
+                    throw new \Error($e->getMessage());
+                }
             }
         }
         $this->emitClassInstantiationDeprecation($class, $frame);

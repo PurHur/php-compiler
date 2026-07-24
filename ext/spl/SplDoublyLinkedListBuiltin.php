@@ -69,9 +69,8 @@ final class SplDoublyLinkedListBuiltin
             'IT_MODE_KEEP' => self::IT_MODE_KEEP,
         ]);
 
+        // php-src 8.2: no reflected/get_class_methods __construct (create via ce handler only) (#22789).
         $entry->constructor = new SplDoublyLinkedListConstruct();
-        $entry->methods['__construct'] = $entry->constructor;
-        $entry->methodVisibility['__construct'] = $pub;
         foreach ([
             'push' => SplDoublyLinkedListPush::class,
             'pop' => SplDoublyLinkedListPop::class,
