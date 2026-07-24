@@ -42,5 +42,22 @@ final class ClassConstFetchRuntimeShrinkTest extends TestCase
         $this->assertNotFalse($usePos);
         $this->assertLessThan($usePos, $requirePos);
     }
+
+    /**
+     * Incremental AOT compiles each require as its own Script. Helper's `use Trait`
+     * must not CompileFatal when the trait AST is in a prior include unit (#22642).
+     */
+    public function testSeparateIncludeUnitsCompileHelperAfterTrait(): void
+    {
+        $runtime = new \PHPCompiler\Runtime();
+        $trait = (string) file_get_contents(__DIR__.'/../../lib/JIT/ClassConstFetchHelperTrait.php');
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ClassConstFetchHelper.php');
+        $this->assertNotNull(
+            $runtime->parseAndCompile($trait, 'ClassConstFetchHelperTrait.php'),
+            'trait unit must compile'
+        );
+        $block = $runtime->parseAndCompile($helper, 'ClassConstFetchHelper.php');
+        $this->assertNotNull($block, 'helper unit must compile after trait unit (#22642)');
+    }
 }
 
