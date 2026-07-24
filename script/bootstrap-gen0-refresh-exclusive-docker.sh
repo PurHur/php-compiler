@@ -187,6 +187,8 @@ docker run -d \
   -e PHP_COMPILER_ALLOW_PARALLEL_CI=1 \
   -e BOOTSTRAP_GEN0_PIN_HEAD="${PIN_HEAD}" \
   -e BOOTSTRAP_GEN0_LIVE_MOUNTS="${LIVE_MOUNTS}" \
+  -e BOOTSTRAP_GEN0_HELPER_RUNTIME_O="${BOOTSTRAP_GEN0_HELPER_RUNTIME_O:-0}" \
+  -e BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP="${BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP:-0}" \
   "${IMAGE}" \
   bash -lc "
     set -uo pipefail
@@ -199,7 +201,13 @@ docker run -d \
     ulimit -v unlimited 2>/dev/null || ulimit -v 0 2>/dev/null || true
     export PHP_COMPILER_MEMORY_LIMIT=${PHP_MEM}
     export PHP_COMPILER_LLVM_MEMORY_LIMIT=${PHP_MEM}
-    export PHP_COMPILER_HELPER_RUNTIME_O=1
+    # Zend full-spine must not pay cold helper-runtime NestedJIT per include (#22642 r14:
+    # HELPER_RUNTIME_O=1 with stale core fingerprint → ~1 file/min). Opt in with
+    # BOOTSTRAP_GEN0_HELPER_RUNTIME_O=1 after warming script/emit-helper-runtime-object.php.
+    export PHP_COMPILER_HELPER_RUNTIME_O=\${BOOTSTRAP_GEN0_HELPER_RUNTIME_O:-0}
+    # Flat spine requires: keep shared include slots (pre-#22845 pace). MiniWebApp keeps
+    # default remapping when this env is unset (#22642 r14 vs r13).
+    export PHP_COMPILER_INCLUDE_SCOPE_REMAP=\${BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP:-0}
     mkdir -p /compiler/build
     export PHP_COMPILER_JIT_PROGRESS_FILE=/compiler/build/.last-jit-spine-exclusive
     # Runtime::parseAndCompileFile writes the include path to ENTRY (#22642 triage).

@@ -113,6 +113,9 @@ if [[ "${SKIP_LINK}" -eq 0 ]]; then
       || [[ "${PHP_COMPILER_MEMORY_LIMIT}" == "8192M" ]]; then
       export PHP_COMPILER_MEMORY_LIMIT=16384M
     fi
+    # Match exclusive launcher defaults: flat include slots + no cold helper NestedJIT (#22642).
+    export PHP_COMPILER_INCLUDE_SCOPE_REMAP="${PHP_COMPILER_INCLUDE_SCOPE_REMAP:-0}"
+    export PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-0}"
     mkdir -p "${ROOT}/build"
     rm -f "${SPINE_OUT}" "${LIB_BLOB}"
     if ! bootstrap_compiler_lib_honest_zend_compile "${SPINE_OUT}" "${SPINE_ENTRY}" full; then
