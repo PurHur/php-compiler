@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * IMAGETYPE_* helpers — php-src ext/standard/image.c (issues #6091, #6063, #3271).
+ * IMAGETYPE_* helpers — php-src ext/standard/image.c (issues #6091, #6063, #3271, #22787).
  *
  * @see https://github.com/php/php-src/blob/master/ext/standard/php_image.h image_filetype enum
  */
@@ -37,8 +38,12 @@ final class VmImage
     public const IMAGETYPE_ICO = 17;
     public const IMAGETYPE_WEBP = 18;
     public const IMAGETYPE_AVIF = 19;
+    /** Internal type id; userland constant only when {@see CompilerVersion::supportsImagTypeHeif()} (#22787). */
     public const IMAGETYPE_HEIF = 20;
+    /** php-src IMAGE_FILETYPE_COUNT with HEIF (PHP 8.5+). Pre-HEIF count is {@see IMAGETYPE_COUNT_PRE_HEIF}. */
     public const IMAGETYPE_COUNT = 21;
+    /** IMAGE_FILETYPE_COUNT before IMAGETYPE_HEIF (AVIF is last → count 20). */
+    public const IMAGETYPE_COUNT_PRE_HEIF = 20;
 
     /** @var array<int, string> dotted extension per IMAGE_FILETYPE_* */
     private const EXTENSIONS = [
@@ -67,7 +72,7 @@ final class VmImage
     /** @return array<string, int> */
     public static function constants(): array
     {
-        return [
+        $out = [
             'IMAGETYPE_UNKNOWN' => self::IMAGETYPE_UNKNOWN,
             'IMAGETYPE_GIF' => self::IMAGETYPE_GIF,
             'IMAGETYPE_JPEG' => self::IMAGETYPE_JPEG,
@@ -89,9 +94,16 @@ final class VmImage
             'IMAGETYPE_ICO' => self::IMAGETYPE_ICO,
             'IMAGETYPE_WEBP' => self::IMAGETYPE_WEBP,
             'IMAGETYPE_AVIF' => self::IMAGETYPE_AVIF,
-            'IMAGETYPE_HEIF' => self::IMAGETYPE_HEIF,
-            'IMAGETYPE_COUNT' => self::IMAGETYPE_COUNT,
         ];
+        // IMAGETYPE_HEIF is PHP 8.5+ (php-src image.c / UPGRADING); keep internal sniffing without defined() (#22787).
+        if (CompilerVersion::supportsImagTypeHeif()) {
+            $out['IMAGETYPE_HEIF'] = self::IMAGETYPE_HEIF;
+            $out['IMAGETYPE_COUNT'] = self::IMAGETYPE_COUNT;
+        } else {
+            $out['IMAGETYPE_COUNT'] = self::IMAGETYPE_COUNT_PRE_HEIF;
+        }
+
+        return $out;
     }
 
     /**
