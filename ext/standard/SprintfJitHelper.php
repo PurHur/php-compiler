@@ -64,7 +64,236 @@ final class SprintfJitHelper
             return $starString;
         }
 
+        // %N$*M$s / %N$.*M$s / %N$*M$.*P$s — positional star width/precision (#22834).
+        $positionalStar = self::tryFormatPositionalStar($format, $fmtLen, $packedArgs, $packLen);
+        if (null !== $positionalStar) {
+            return $positionalStar;
+        }
+
         return $format;
+    }
+
+    /**
+     * NestedJIT-safe positional * width/precision (php-src formatted_print.c; issue #22834).
+     *
+     * Handles single-conversion forms: %N$*M$s, %N$*M$d, %N$.*M$s, %N$*M$.*P$s,
+     * and %N$*s / %N$.*s (star arg sequential from argv[0]).
+     *
+     * @return ?string null when format is not a handled positional-star conversion
+     */
+    private static function tryFormatPositionalStar(
+        string $format,
+        int $fmtLen,
+        string $packedArgs,
+        int $packLen
+    ): ?string {
+        if ($fmtLen < 5 || '%' !== $format[0]) {
+            return null;
+        }
+        $pos = 1;
+        $valueArg = self::consumeArgnumAt($format, $fmtLen, $pos);
+        if (null === $valueArg) {
+            return null;
+        }
+        $widthFromArg = false;
+        $widthArg = null;
+        if ($pos < $fmtLen && '*' === $format[$pos]) {
+            $widthFromArg = true;
+            ++$pos;
+            $widthArg = self::consumeArgnumAt($format, $fmtLen, $pos);
+        }
+        $precisionFromArg = false;
+        $precisionArg = null;
+        $precision = null;
+        if ($pos < $fmtLen && '.' === $format[$pos]) {
+            ++$pos;
+            if ($pos < $fmtLen && '*' === $format[$pos]) {
+                $precisionFromArg = true;
+                ++$pos;
+                $precisionArg = self::consumeArgnumAt($format, $fmtLen, $pos);
+            } elseif ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                $precision = 0;
+                while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    $precision = ($precision * 10) + self::digitValue($format[$pos]);
+                    ++$pos;
+                }
+            } else {
+                $precision = 0;
+            }
+        }
+        if ($pos >= $fmtLen || ($pos + 1) !== $fmtLen) {
+            return null;
+        }
+        $spec = $format[$pos];
+        if ('s' !== $spec && 'd' !== $spec) {
+            return null;
+        }
+        if (!$widthFromArg && !$precisionFromArg) {
+            return null;
+        }
+
+        $seq = 0;
+        $width = null;
+        if ($widthFromArg) {
+            $wIdx = null !== $widthArg ? $widthArg - 1 : $seq++;
+            $widthRead = self::readPackedLongAtIndex($packedArgs, $packLen, $wIdx);
+            if (null === $widthRead) {
+                return $format;
+            }
+            $width = $widthRead < 0 ? 0 : $widthRead;
+        }
+        if ($precisionFromArg) {
+            $pIdx = null !== $precisionArg ? $precisionArg - 1 : $seq++;
+            $precRead = self::readPackedLongAtIndex($packedArgs, $packLen, $pIdx);
+            if (null === $precRead) {
+                return $format;
+            }
+            $precision = $precRead < 0 ? 0 : $precRead;
+        }
+
+        if ('s' === $spec) {
+            $string = self::readPackedStringAtIndex($packedArgs, $packLen, $valueArg - 1);
+            if (null === $string) {
+                return $format;
+            }
+            $out = null !== $precision ? self::truncateBytes($string, $precision) : $string;
+            if (null !== $width) {
+                $out = self::padLeftSpaces($out, $width);
+            }
+
+            return $out;
+        }
+
+        // %d — decimal with positional/sequential star width.
+        $n = self::readPackedLongAtIndex($packedArgs, $packLen, $valueArg - 1);
+        if (null === $n) {
+            return $format;
+        }
+        $digits = (string) $n;
+        if (null !== $width) {
+            return self::padLeftSpaces($digits, $width);
+        }
+
+        return $digits;
+    }
+
+    /**
+     * Consume N$ at $pos ( NestedJIT-safe). Advances $pos past '$' on success.
+     *
+     * @param-out int $pos
+     */
+    private static function consumeArgnumAt(string $format, int $fmtLen, int &$pos): ?int
+    {
+        if ($pos >= $fmtLen || !self::isDigitByte($format[$pos])) {
+            return null;
+        }
+        $start = $pos;
+        $argnum = 0;
+        while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+            $argnum = ($argnum * 10) + self::digitValue($format[$pos]);
+            ++$pos;
+        }
+        if ($pos >= $fmtLen || '$' !== $format[$pos] || $argnum <= 0) {
+            $pos = $start;
+
+            return null;
+        }
+        ++$pos;
+
+        return $argnum;
+    }
+
+    private static function readPackedLongAtIndex(string $packed, int $packLen, int $index): ?int
+    {
+        $cursor = 0;
+        $i = 0;
+        while ($i < $index) {
+            if (!self::skipPackedArgAt($packed, $packLen, $cursor)) {
+                return null;
+            }
+            ++$i;
+        }
+
+        return self::readPackedLongAt($packed, $packLen, $cursor);
+    }
+
+    private static function readPackedStringAtIndex(string $packed, int $packLen, int $index): ?string
+    {
+        $cursor = 0;
+        $i = 0;
+        while ($i < $index) {
+            if (!self::skipPackedArgAt($packed, $packLen, $cursor)) {
+                return null;
+            }
+            ++$i;
+        }
+
+        return self::readPackedStringAt($packed, $packLen, $cursor);
+    }
+
+    /** @param-out int $cursor */
+    private static function skipPackedArgAt(string $packed, int $packLen, int &$cursor): bool
+    {
+        if ($cursor >= $packLen) {
+            return false;
+        }
+        $tag = self::byteOrd($packed[$cursor]);
+        ++$cursor;
+        if (0 === $tag) {
+            // TAG_NULL
+            return true;
+        }
+        if (1 === $tag) {
+            // TAG_LONG + 8 bytes
+            if ($cursor + 8 > $packLen) {
+                return false;
+            }
+            $cursor += 8;
+
+            return true;
+        }
+        if (2 === $tag) {
+            // TAG_DOUBLE + 8 bytes
+            if ($cursor + 8 > $packLen) {
+                return false;
+            }
+            $cursor += 8;
+
+            return true;
+        }
+        if (3 === $tag) {
+            // TAG_BOOL + 1 byte
+            if ($cursor + 1 > $packLen) {
+                return false;
+            }
+            ++$cursor;
+
+            return true;
+        }
+        if (4 === $tag) {
+            if ($cursor + 8 > $packLen) {
+                return false;
+            }
+            $len = 0;
+            $i = 0;
+            while ($i < 8) {
+                $len |= self::byteOrd($packed[$cursor + $i]) << (8 * $i);
+                ++$i;
+            }
+            $cursor += 8;
+            if ($len < 0 || $cursor + $len > $packLen) {
+                return false;
+            }
+            $cursor += $len;
+
+            return true;
+        }
+        if (5 === $tag) {
+            // TAG_ARRAY — empty marker only in pack argv
+            return true;
+        }
+
+        return false;
     }
 
     /**

@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 /**
- * VM-runtime sprintf() subset (%s, %d, %f, %a, %A, %%, %n$ positional, width/flags, %'<char> pad, #3631, #9069, #22833).
+ * VM-runtime sprintf() subset (%s, %d, %f, %a, %A, %%, %n$ positional, width/flags,
+ * %'<char> pad, %* / %.* / %N$*M$ / %N$.*M$ star args, #3631, #9069, #22833, #22834).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -43,20 +44,15 @@ final class VmSprintf
 
             $width = $parsed['width'];
             if ($parsed['widthFromArg']) {
-                $widthVarIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount, $arrayArgs);
+                // php-src formatted_print.c — width * uses *N$ or sequential currarg, not value argnum (#22834).
+                $widthVarIdx = self::resolveArgIndex($parsed['widthPositional'], $argIdx, $argCount, $arrayArgs);
                 $width = self::argToWidth($args[$widthVarIdx], $frame);
-                if (null !== $parsed['positional']) {
-                    $parsed['positional'] = null;
-                }
             }
 
             $precision = $parsed['precision'];
             if ($parsed['precisionFromArg']) {
-                $precVarIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount, $arrayArgs);
+                $precVarIdx = self::resolveArgIndex($parsed['precisionPositional'], $argIdx, $argCount, $arrayArgs);
                 $precision = self::argToPrecision($args[$precVarIdx], $frame);
-                if (null !== $parsed['positional']) {
-                    $parsed['positional'] = null;
-                }
             }
 
             $varIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount, $arrayArgs);
@@ -83,7 +79,7 @@ final class VmSprintf
     }
 
     /**
-     * Parse a conversion after '%' (php-src ext/standard/sprintf.c — positional, flags, width, precision).
+     * Parse a conversion after '%' (php-src ext/standard/formatted_print.c — positional, flags, width, precision).
      *
      * @return array{
      *     nextPos: int,
@@ -95,8 +91,10 @@ final class VmSprintf
      *     showSign: ?string,
      *     width: ?int,
      *     widthFromArg: bool,
+     *     widthPositional: ?int,
      *     precision: ?int,
-     *     precisionFromArg: bool
+     *     precisionFromArg: bool,
+     *     precisionPositional: ?int
      * }
      */
     private static function parseConversionSpec(string $format, int $start, int $len): array
@@ -113,30 +111,15 @@ final class VmSprintf
                 'showSign' => null,
                 'width' => null,
                 'widthFromArg' => false,
+                'widthPositional' => null,
                 'precision' => null,
                 'precisionFromArg' => false,
+                'precisionPositional' => null,
             ];
         }
 
-        $positional = null;
-        if ($pos < $len && \ctype_digit($format[$pos])) {
-            $numStart = $pos;
-            while ($pos < $len && \ctype_digit($format[$pos])) {
-                ++$pos;
-            }
-            if ($pos < $len && '$' === $format[$pos]) {
-                $argnum = (int) \substr($format, $numStart, $pos - $numStart);
-                if ($argnum <= 0) {
-                    throw new \ValueError(
-                        'Argument number specifier must be greater than zero and less than 2147483647'
-                    );
-                }
-                $positional = $argnum;
-                ++$pos;
-            } else {
-                $pos = $numStart;
-            }
-        }
+        // php-src php_sprintf_get_argnum — leading N$ selects the value argument.
+        [$positional, $pos] = self::consumeOptionalArgnum($format, $pos, $len);
 
         $leftAdjust = false;
         $padding = ' ';
@@ -176,9 +159,12 @@ final class VmSprintf
 
         $width = null;
         $widthFromArg = false;
+        $widthPositional = null;
         if ($pos < $len && '*' === $format[$pos]) {
             $widthFromArg = true;
             ++$pos;
+            // php-src: after '*', optional N$ width argnum (issue #22834).
+            [$widthPositional, $pos] = self::consumeOptionalArgnum($format, $pos, $len);
         } elseif ($pos < $len && \ctype_digit($format[$pos])) {
             $widthStart = $pos;
             while ($pos < $len && \ctype_digit($format[$pos])) {
@@ -189,11 +175,13 @@ final class VmSprintf
 
         $precision = null;
         $precisionFromArg = false;
+        $precisionPositional = null;
         if ($pos < $len && '.' === $format[$pos]) {
             ++$pos;
             if ($pos < $len && '*' === $format[$pos]) {
                 $precisionFromArg = true;
                 ++$pos;
+                [$precisionPositional, $pos] = self::consumeOptionalArgnum($format, $pos, $len);
             } elseif ($pos < $len && \ctype_digit($format[$pos])) {
                 $precStart = $pos;
                 while ($pos < $len && \ctype_digit($format[$pos])) {
@@ -219,9 +207,38 @@ final class VmSprintf
             'showSign' => $showSign,
             'width' => $width,
             'widthFromArg' => $widthFromArg,
+            'widthPositional' => $widthPositional,
             'precision' => $precision,
             'precisionFromArg' => $precisionFromArg,
+            'precisionPositional' => $precisionPositional,
         ];
+    }
+
+    /**
+     * php-src php_sprintf_get_argnum — digits+$ → 1-based argnum; else leave position unchanged.
+     *
+     * @return array{0: ?int, 1: int} [argnum or null, nextPos]
+     */
+    private static function consumeOptionalArgnum(string $format, int $pos, int $len): array
+    {
+        if ($pos >= $len || !\ctype_digit($format[$pos])) {
+            return [null, $pos];
+        }
+        $numStart = $pos;
+        while ($pos < $len && \ctype_digit($format[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= $len || '$' !== $format[$pos]) {
+            return [null, $numStart];
+        }
+        $argnum = (int) \substr($format, $numStart, $pos - $numStart);
+        if ($argnum <= 0) {
+            throw new \ValueError(
+                'Argument number specifier must be greater than zero and less than 2147483647'
+            );
+        }
+
+        return [$argnum, $pos + 1];
     }
 
     private static function resolveArgIndex(?int $positional, int &$sequentialIdx, int $argCount, bool $arrayArgs): int
