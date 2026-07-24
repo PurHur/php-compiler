@@ -34,4 +34,19 @@ final class VmPregMatchesTest extends TestCase
         );
         $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $ht);
     }
+
+    public function testHostMatchAllPatternOrderKeepsNamedKeys(): void
+    {
+        $ht = VmPregMatches::hostMatchAllToHashTable(
+            [
+                0 => ['12', '34'],
+                1 => ['12', '34'],
+                'n' => ['12', '34'],
+            ],
+            StdlibConstants::PREG_PATTERN_ORDER
+        );
+        $named = $ht->find('n');
+        $this->assertNotNull($named);
+        $this->assertSame(\PHPCompiler\VM\Variable::TYPE_ARRAY, $named->resolveIndirect()->type);
+    }
 }
