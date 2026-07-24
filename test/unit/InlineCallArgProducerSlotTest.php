@@ -3886,6 +3886,76 @@ PHP;
         self::assertSame("hi world\n", ob_get_clean());
     }
 
+    /** Issue #22770 — new C(null, [...]) must send null ConstFetch slot, not sibling Array_. */
+    public function testNewNullLiteralThenArrayUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct($a, $b) {}
+}
+new C(null, ['k' => 1]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'new_null_literal_array_arg_slots.php');
+
+        $constFetchSlots = [];
+        $arraySlots = [];
+        $ctorSendSlots = [];
+        $seenNew = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constFetchSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type) {
+                $seenNew = true;
+                $ctorSendSlots = [];
+                continue;
+            }
+            if ($seenNew && OpCode::TYPE_ARG_SEND === $op->type) {
+                $ctorSendSlots[] = $op->arg1;
+            }
+            if ($seenNew && (
+                OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type
+                || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+            )) {
+                break;
+            }
+        }
+
+        self::assertCount(2, $ctorSendSlots, 'ctor sends='.json_encode($ctorSendSlots));
+        self::assertNotEmpty($arraySlots);
+        self::assertSame($arraySlots[0], $ctorSendSlots[1], 'arg1 must use Array_ slot');
+        self::assertNotSame(
+            $arraySlots[0],
+            $ctorSendSlots[0],
+            'arg0 must not reuse Array_ slot (null literal / ConstFetch)'
+        );
+        self::assertNotSame($ctorSendSlots[0], $ctorSendSlots[1]);
+    }
+
+    /** Issue #22770 — new C(null, [...]) runtime parity with Zend. */
+    public function testNewNullLiteralThenArrayRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct($a, $b) {
+        echo 'a=', var_export($a, true), ' b=', gettype($b), "\n";
+    }
+}
+new C(null, ['k' => 1]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'new_null_literal_array_arg_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("a=NULL b=array\n", ob_get_clean());
+    }
+
     /** Issue #10373 — var_export(substr(...), true) wires nested FuncCall + ConstFetch producer slots. */
     public function testVarExportNestedBuiltinReturnTrueUsesFuncCallProducerSlot(): void
     {

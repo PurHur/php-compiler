@@ -1213,8 +1213,29 @@ class Compiler {
             && $this->callArgIsDeadInlineTemporary($arg)
         ) {
             $prelude = $this->hoistedDeadInlinePreludeProducerForCallArgIndex($cfgCallOp, $argIndex, $block);
-
-            return $prelude instanceof Op\Expr\ConstFetch && $this->constFetchIsNull($prelude);
+            if ($prelude instanceof Op\Expr\ConstFetch && $this->constFetchIsNull($prelude)) {
+                return true;
+            }
+            // `new C(null, [...])` — Array_ sits between ConstFetch null and New_, so the
+            // immediate-prelude walker misses null; use ordinal producer match (#22770).
+            if (null !== $block->orig && property_exists($cfgCallOp, 'args') && \is_array($cfgCallOp->args)) {
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                if ([] !== $producers) {
+                    $matched = $this->matchInlineCallArgProducer(
+                        $producers,
+                        $cfgCallOp->args,
+                        $argIndex,
+                        $cfgCallOp,
+                        $block
+                    );
+                    if ($matched instanceof Op\Expr\ConstFetch && $this->constFetchIsNull($matched)) {
+                        return true;
+                    }
+                }
+            }
         }
 
         return false;
@@ -15832,10 +15853,17 @@ class Compiler {
                     // var_export([array_any([], fn), array_all([], fn)]) — stmt-before Array_ (#14516).
                     // new C([...]) in param/static defaultBlocks: php-cfg often leaves the ctor arg
                     // as inferred unknown/mixed while Array_.result is int[] (#22390, #8561).
+                    // Do not apply the New_ fallback to typed null/scalar dead temps — that steals
+                    // the trailing Array_ for `new C(null, [...])` (#22770).
                     $deadTempWantsArray = $this->callArgIsDeadInlineTemporary($callArgProbe)
                         && (
                             $this->callArgOperandExpectsArrayProducer($callArgProbe)
-                            || $callOp instanceof Op\Expr\New_
+                            || $this->newCtorDeadTempMayBindStmtBeforeArray(
+                                $callArgProbe,
+                                $callOp,
+                                $argIndex,
+                                $block
+                            )
                         );
                     if (
                         $i === $callIndex - 1
@@ -16425,6 +16453,55 @@ class Compiler {
         }
         // Union/intersection builtins (proc_open array|string, etc.) may pass inline Expr_Array (#13734).
         return (bool) preg_match('/\barray\b/', $repr);
+    }
+
+    /**
+     * Dead ctor arg with unknown/mixed (or absent) type — #22390 `new C([...])` defaults.
+     * Typed null/int/… must not use the stmt-before Array_ fallback (#22770).
+     */
+    private function callArgIsDeadUnknownOrMixedTemporary(Operand $callArg): bool
+    {
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($callArg);
+        if (null === $root->type || !method_exists($root->type, 'toString')) {
+            return true;
+        }
+        $repr = $root->type->toString();
+
+        return \in_array($repr, ['unknown', 'mixed'], true);
+    }
+
+    /**
+     * Whether a New_ dead arg may bind the immediate stmt-before Array_ (#22390).
+     * Rejects typed non-array temps and args whose multi-arg producer match is not Array_ (#22770).
+     */
+    private function newCtorDeadTempMayBindStmtBeforeArray(
+        Operand $callArg,
+        Op $callOp,
+        int $argIndex,
+        Block $block
+    ): bool {
+        if (!$callOp instanceof Op\Expr\New_ || !$this->callArgIsDeadUnknownOrMixedTemporary($callArg)) {
+            return false;
+        }
+        if (null === $block->orig || !\is_array($callOp->args) || \count($callOp->args) < 2) {
+            return true;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+        if (\count($producers) < 2) {
+            return true;
+        }
+        $matched = $this->matchInlineCallArgProducer(
+            $producers,
+            $callOp->args,
+            $argIndex,
+            $callOp,
+            $block
+        );
+
+        return !$matched instanceof Op\Expr || $matched instanceof Op\Expr\Array_;
     }
 
     /**
@@ -44179,8 +44256,14 @@ class Compiler {
             ) {
                 // new C([...]) — php-cfg often leaves the ctor arg Temporary untyped; the
                 // stmt-before Array_ is the real operand (static/param defaults) (#22390).
+                // Typed null ahead of Array_ must not keep the Array_ on arg #0 (#22770).
                 $keepUntypedNewCtorArray = $cfgCallOp instanceof Op\Expr\New_
-                    && $this->callArgIsDeadInlineTemporary($callArgOperand)
+                    && $this->newCtorDeadTempMayBindStmtBeforeArray(
+                        $callArgOperand,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $block
+                    )
                     && $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) === $inlineArray;
                 if (!$keepUntypedNewCtorArray) {
                     $producers = (null !== $cfgCallOp && null !== $block->orig)
