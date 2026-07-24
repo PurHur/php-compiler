@@ -1111,7 +1111,7 @@ final class VmValueCompare
         return $context->builder->select($isEmpty, $context->constantFromBool(false), $consumedAll);
     }
 
-    private static function stringToDouble(Context $context, Value $strPtr): Value
+    public static function stringToDouble(Context $context, Value $strPtr): Value
     {
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];

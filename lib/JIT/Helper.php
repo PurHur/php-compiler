@@ -808,6 +808,10 @@ restart:
                     $result = $this->context->builder->signedRem($leftLong, $rightLong);
                     goto return_long;
                 }
+                if (OpCode::TYPE_SPACESHIP === $opcode->type) {
+                    $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
+                    goto return_long;
+                }
                 $result = JitStringCompare::binaryOp($this->context, $opcode, $leftValue, $rightValue);
                 goto return_bool;
         }

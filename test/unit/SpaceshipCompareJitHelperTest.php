@@ -69,6 +69,11 @@ final class SpaceshipCompareJitHelperTest extends TestCase
     {
         $this->assertSame(-1, \PHPCompiler\VM\CompareJitHelper::longSpaceship(1, 2));
         $this->assertSame(-1, \PHPCompiler\VM\CompareJitHelper::stringSpaceship('a', 'b'));
+        // Zend zendi_smart_strcmp (#22848): both numeric → numeric order.
+        $this->assertSame(1, \PHPCompiler\VM\CompareJitHelper::stringSpaceship('10', '2'));
+        $this->assertSame(-1, \PHPCompiler\VM\CompareJitHelper::stringSpaceship('2', '10'));
+        $this->assertSame(0, \PHPCompiler\VM\CompareJitHelper::stringSpaceship('1e1', '10'));
+        $this->assertSame(0, \PHPCompiler\VM\CompareJitHelper::stringSpaceship('0', '00'));
         $this->assertSame(-1, \PHPCompiler\VM\CompareJitHelper::spaceshipNumberString(1.0, 'b', 1));
         $this->assertSame(0, \PHPCompiler\VM\CompareJitHelper::spaceshipNumberString(1.0, '1', 1));
         $this->assertSame(-1, \PHPCompiler\VM\CompareJitHelperScalars::longSpaceship(1, 2));
