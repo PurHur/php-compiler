@@ -9,6 +9,7 @@ use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinInternalArgInfo;
 use PHPCompiler\BuiltinInternalDefaultValues;
 use PHPCompiler\BuiltinParamNames;
+use PHPCompiler\Compiler\AttributeClassRegistry;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\DeprecatedMetadata;
@@ -765,6 +766,42 @@ final class ReflectionSupport
         }
 
         return $obj;
+    }
+
+    /**
+     * ReflectionAttribute::newInstance() — reject non-IS_REPEATABLE user duplicates (#22930).
+     *
+     * php-src: ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)
+     * when ce is ZEND_USER_CLASS, flags lack ZEND_ATTRIBUTE_IS_REPEATABLE, and
+     * zend_is_attribute_repeated() is true. Compile still allows user duplicates (≠ #5239).
+     */
+    public static function assertAttributeNewInstanceNotIllegalRepeat(
+        ObjectEntry $receiver,
+        ClassEntry $attributeClass,
+    ): void {
+        if ($attributeClass->isInternal) {
+            return;
+        }
+        $repeatedVar = $receiver->getProperty(self::PROP_ATTR_IS_REPEATED)->resolveIndirect();
+        if (!$repeatedVar->toBool()) {
+            return;
+        }
+        $flags = AttributeClassRegistry::extractSelfAttributeFlags($attributeClass->attributeEntries);
+        if (null === $flags) {
+            $flags = 0;
+        }
+        if (0 !== ($flags & AttributeSupport::isRepeatableFlag())) {
+            return;
+        }
+        $nameVar = $receiver->getProperty(self::PROP_ATTR_NAME)->resolveIndirect();
+        $name = Variable::TYPE_STRING === $nameVar->type
+            ? $nameVar->toString()
+            : $attributeClass->name;
+        $name = ltrim($name, '\\');
+        $pos = strrpos($name, '\\');
+        $short = false !== $pos ? substr($name, $pos + 1) : $name;
+
+        throw new \Error('Attribute "'.$short.'" must not be repeated');
     }
 
     public static function requireReflectionExtension(Frame $frame, Variable $receiver): ObjectEntry

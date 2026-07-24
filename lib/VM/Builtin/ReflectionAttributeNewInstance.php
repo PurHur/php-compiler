@@ -37,6 +37,8 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
             throw new \Error('Attribute class "'.$className.'" not found');
         }
         $classEntry = $ctx->classes[$lc];
+        // Userland non-IS_REPEATABLE duplicates: Error at newInstance, not compile (#22930).
+        ReflectionSupport::assertAttributeNewInstanceNotIllegalRepeat($receiver, $classEntry);
         $object = new ObjectEntry($classEntry);
         $argSpecs = ReflectionSupport::argsFromReflectionObject($receiver);
         $thisVar = new Variable();
