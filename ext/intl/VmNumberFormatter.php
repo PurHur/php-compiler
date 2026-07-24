@@ -482,7 +482,7 @@ final class VmNumberFormatter
         }
         $currency = strtoupper($currency);
         $symbol = self::currencySymbol($currency);
-        $body = self::formatDecimalFromState($state, abs($amount), 2);
+        $body = self::formatDecimalFromState($state, $amount, 2);
         self::clearObjectError($formatter);
         IntlError::clear();
         if ('$' === $symbol || '£' === $symbol || '€' === $symbol || '¥' === $symbol) {
@@ -1099,7 +1099,8 @@ final class VmNumberFormatter
             return self::applyTextAffixes($state, $body, $num < 0);
         }
         if (self::PERCENT === $style) {
-            $body = self::formatDecimalFromState($state, abs($num) * 100.0, null);
+            // Pass signed value so ROUNDING_MODE (CEILING/FLOOR/UP/DOWN) is sign-aware (#22703).
+            $body = self::formatDecimalFromState($state, $num * 100.0, null);
             $pct = $state['symbols'][self::PERCENT_SYMBOL] ?? '%';
 
             return self::applyTextAffixes($state, $body.$pct, $num < 0);
@@ -1108,7 +1109,7 @@ final class VmNumberFormatter
         if (self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style) {
             $forceFrac = 2;
         }
-        $body = self::formatDecimalFromState($state, abs($num), $forceFrac);
+        $body = self::formatDecimalFromState($state, $num, $forceFrac);
         if (self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style) {
             $symbol = $state['symbols'][self::CURRENCY_SYMBOL] ?? '$';
             if (self::CURRENCY_ACCOUNTING === $style && $num < 0) {
@@ -1179,8 +1180,10 @@ final class VmNumberFormatter
      *   attributes: array<int, int|float>,
      *   symbols: array<int, string>
      * } $state
+     *
+     * $num is signed so ROUNDING_MODE CEILING/FLOOR/UP/DOWN match ICU (#22703).
      */
-    private static function formatDecimalFromState(array $state, float $abs, ?int $forceFrac): string
+    private static function formatDecimalFromState(array $state, float $num, ?int $forceFrac): string
     {
         $attrs = $state['attributes'];
         $symbols = $state['symbols'];
@@ -1196,6 +1199,8 @@ final class VmNumberFormatter
         if (!$groupingUsed) {
             $grouping = '';
         }
+        $roundingMode = (int) ($attrs[self::ROUNDING_MODE] ?? self::ROUND_HALFEVEN);
+        $abs = abs($num);
 
         // Significant-digit mode overrides fraction attrs (#22921).
         if ((int) ($attrs[self::SIGNIFICANT_DIGITS_USED] ?? 0) !== 0) {
@@ -1260,9 +1265,13 @@ final class VmNumberFormatter
         }
 
         if (null !== $minFrac && null !== $maxFrac) {
-            $scaled = round($abs, $maxFrac);
+            $scaled = abs(self::roundWithMode($num, $maxFrac, $roundingMode));
             $intPart = (int) floor($scaled + 1e-12);
             $fracInt = (int) round(($scaled - $intPart) * (10 ** $maxFrac));
+            if ($maxFrac > 0 && $fracInt >= (int) (10 ** $maxFrac)) {
+                $fracInt = 0;
+                ++$intPart;
+            }
             $intStr = self::groupDigits(
                 self::applyIntegerDigitAttrs((string) $intPart, $attrs),
                 $grouping,
@@ -1285,7 +1294,7 @@ final class VmNumberFormatter
             return $intStr.$decimal.str_pad($fracStr, max($minFrac, strlen($fracStr)), '0', STR_PAD_RIGHT);
         }
         if (null !== $maxFrac) {
-            $scaled = round($abs, $maxFrac);
+            $scaled = abs(self::roundWithMode($num, $maxFrac, $roundingMode));
             $intPart = (int) floor($scaled + 1e-12);
             $frac = $scaled - $intPart;
             $intStr = self::groupDigits(
@@ -1304,7 +1313,7 @@ final class VmNumberFormatter
             return '' !== $fracStr ? $intStr.$decimal.$fracStr : $intStr;
         }
         if (null !== $minFrac) {
-            $scaled = round($abs, max($minFrac, 6));
+            $scaled = abs(self::roundWithMode($num, max($minFrac, 6), $roundingMode));
             $intPart = (int) floor($scaled + 1e-12);
             $frac = $scaled - $intPart;
             $intStr = self::groupDigits(
@@ -1338,6 +1347,56 @@ final class VmNumberFormatter
         );
 
         return '' !== $fracStr ? $intStr.$decimal.$fracStr : $intStr;
+    }
+
+    /**
+     * ICU UNumberFormatRoundingMode for fraction digits (#22703 / #20710).
+     *
+     * php-src: unum_setAttribute(UNUM_ROUNDING_MODE) → DecimalFormat rounding.
+     */
+    private static function roundWithMode(float $value, int $precision, int $mode): float
+    {
+        if (!is_finite($value)) {
+            return $value;
+        }
+        $precision = max(0, $precision);
+
+        return match ($mode) {
+            self::ROUND_HALFDOWN => round($value, $precision, PHP_ROUND_HALF_DOWN),
+            self::ROUND_HALFUP => round($value, $precision, PHP_ROUND_HALF_UP),
+            self::ROUND_HALFODD => round($value, $precision, PHP_ROUND_HALF_ODD),
+            self::ROUND_CEILING => self::scaledDirRound($value, $precision, true, null),
+            self::ROUND_FLOOR => self::scaledDirRound($value, $precision, false, null),
+            self::ROUND_DOWN => self::scaledDirRound($value, $precision, null, true),
+            self::ROUND_UP => self::scaledDirRound($value, $precision, null, false),
+            // HALFEVEN (default) and ROUND_UNNECESSARY → banker's rounding.
+            default => round($value, $precision, PHP_ROUND_HALF_EVEN),
+        };
+    }
+
+    /**
+     * Scale → ceil/floor / toward-or-away-from-zero → unscale.
+     *
+     * @param bool|null $ceil true=CEILING, false=FLOOR, null=use $towardZero
+     * @param bool|null $towardZero true=DOWN (toward 0), false=UP (away from 0)
+     */
+    private static function scaledDirRound(float $value, int $precision, ?bool $ceil, ?bool $towardZero): float
+    {
+        $factor = 10 ** $precision;
+        $scaled = $value * $factor;
+        $near = round($scaled);
+        if (abs($scaled - $near) < 1e-9) {
+            $scaled = (float) $near;
+        }
+        if (null !== $towardZero) {
+            $rounded = $towardZero
+                ? ($scaled >= 0.0 ? floor($scaled) : ceil($scaled))
+                : ($scaled >= 0.0 ? ceil($scaled) : floor($scaled));
+        } else {
+            $rounded = $ceil ? ceil($scaled) : floor($scaled);
+        }
+
+        return $rounded / $factor;
     }
 
     /**
@@ -1427,7 +1486,7 @@ final class VmNumberFormatter
             ],
             'symbols' => self::defaultSymbolsForLocale($locale),
         ];
-        $body = self::formatDecimalFromState($state, abs($num), $forceFrac);
+        $body = self::formatDecimalFromState($state, $num, $forceFrac);
 
         return $num < 0 ? '-'.$body : $body;
     }
