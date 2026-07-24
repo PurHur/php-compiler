@@ -9,15 +9,25 @@
 # and look like mysterious CONTAINER_GONE — not OOM.
 #
 # By default this script rsyncs a frozen snapshot of the tree and binds that
-# into the container (plus live mounts for prelinked/bootstrap-gen0 + build/).
-# That way a mid-run `git checkout master` on the workspace cannot drop the
-# ClassConstFetchHelper trait self-require after hours of Zend AOT (r6 @ 163m).
+# into the container. Compile outputs stay inside the snapshot's build/ +
+# prelinked/ during the run — **no live mount of workspace build/ or
+# prelinked/bootstrap-gen0** — so a concurrent agent `git checkout` / stamp
+# restamp on the shared worktree cannot wipe heartbeats or poison mid-spine
+# provenance (r9 @ ~06:24Z RELOCK_AFTER_CONTAMINATION, #22642).
+#
+# On REFRESH_OK the container copies snap prelinked → a publish bind at
+# /compiler/prelinked/bootstrap-gen0-publish (workspace prelinked/).
+#
+# Host triage paths (snapshot mode):
+#   ${BOOTSTRAP_GEN0_SNAPSHOT_DIR:-../gen0-refresh-snap}/build/gen0-refresh-exclusive.heartbeat
+#   .../build/gen0-refresh-exclusive-inner.log
 #
 # Usage (host, from repo root):
 #   ./script/bootstrap-gen0-refresh-exclusive-docker.sh
 #   BOOTSTRAP_GEN0_EXCLUSIVE_NAME=agent-harness-phpc-gen0-22642-rN \
 #     ./script/bootstrap-gen0-refresh-exclusive-docker.sh
 #   BOOTSTRAP_GEN0_EXCLUSIVE_SNAPSHOT=0  # opt out of snapshot (live bind only)
+#   BOOTSTRAP_GEN0_EXCLUSIVE_LIVE_MOUNTS=1  # legacy: live-mount build/ + prelinked
 #
 # Requires: docker, image php-compiler:22.04-dev, PHP_COMPILER_DOCKER_BIND_SRC
 # (or a host path that docker can bind — never the empty Runforge /app bind).
@@ -32,6 +42,8 @@ MEM="${BOOTSTRAP_GEN0_EXCLUSIVE_MEMORY:-32g}"
 CPUS="${BOOTSTRAP_GEN0_EXCLUSIVE_CPUS:-4}"
 PHP_MEM="${PHP_COMPILER_MEMORY_LIMIT:-24576M}"
 USE_SNAPSHOT="${BOOTSTRAP_GEN0_EXCLUSIVE_SNAPSHOT:-1}"
+# Legacy shared live mounts (unsafe on multi-agent worktrees). Default off when snapshot=1.
+LIVE_MOUNTS="${BOOTSTRAP_GEN0_EXCLUSIVE_LIVE_MOUNTS:-0}"
 
 BIND_SRC="${PHP_COMPILER_DOCKER_BIND_SRC:-}"
 if [[ -z "${BIND_SRC}" ]]; then
@@ -109,16 +121,38 @@ if [[ "${USE_SNAPSHOT}" == "1" ]]; then
       -cf - . | tar -C "${SNAP_DIR}" -xf -
   fi
   mkdir -p "${SNAP_DIR}/build" "${SNAP_DIR}/prelinked/bootstrap-gen0"
+  # Seed snap prelinked from workspace so refresh can compare old blob sha (#22642).
+  if [[ -d "${BIND_SRC}/prelinked/bootstrap-gen0" ]]; then
+    if command -v rsync >/dev/null 2>&1; then
+      rsync -a "${BIND_SRC}/prelinked/bootstrap-gen0/" "${SNAP_DIR}/prelinked/bootstrap-gen0/"
+    else
+      tar -C "${BIND_SRC}/prelinked/bootstrap-gen0" -cf - . \
+        | tar -C "${SNAP_DIR}/prelinked/bootstrap-gen0" -xf -
+    fi
+  fi
   printf '%s\n' "${PIN_HEAD}" > "${SNAP_DIR}/.gen0-pin-head"
+  printf '%s\n' "${PIN_BRANCH}" > "${SNAP_DIR}/.gen0-pin-branch"
   COMPILER_BIND="${SNAP_DIR}"
-  EXTRA_MOUNTS+=(
-    -v "${BIND_SRC}/build:/compiler/build"
-    -v "${BIND_SRC}/prelinked/bootstrap-gen0:/compiler/prelinked/bootstrap-gen0"
-  )
+  if [[ "${LIVE_MOUNTS}" == "1" ]]; then
+    echo "bootstrap-gen0-refresh-exclusive-docker: WARNING — LIVE_MOUNTS=1 (legacy shared build/prelinked)" >&2
+    EXTRA_MOUNTS+=(
+      -v "${BIND_SRC}/build:/compiler/build"
+      -v "${BIND_SRC}/prelinked/bootstrap-gen0:/compiler/prelinked/bootstrap-gen0"
+    )
+  else
+    # Publish-only bind: workspace prelinked is untouched until REFRESH_OK.
+    mkdir -p "${BIND_SRC}/prelinked/bootstrap-gen0"
+    EXTRA_MOUNTS+=(
+      -v "${BIND_SRC}/prelinked/bootstrap-gen0:/compiler/prelinked/bootstrap-gen0-publish"
+    )
+  fi
 fi
 
-echo "bootstrap-gen0-refresh-exclusive-docker: name=${NAME} bind=${COMPILER_BIND} mem=${MEM} cpus=${CPUS} snapshot=${USE_SNAPSHOT}"
+echo "bootstrap-gen0-refresh-exclusive-docker: name=${NAME} bind=${COMPILER_BIND} mem=${MEM} cpus=${CPUS} snapshot=${USE_SNAPSHOT} live_mounts=${LIVE_MOUNTS}"
 echo "bootstrap-gen0-refresh-exclusive-docker: pin HEAD=${PIN_HEAD:0:12} branch=${PIN_BRANCH}"
+if [[ "${USE_SNAPSHOT}" == "1" && "${LIVE_MOUNTS}" != "1" ]]; then
+  echo "bootstrap-gen0-refresh-exclusive-docker: heartbeat → ${COMPILER_BIND}/build/gen0-refresh-exclusive.heartbeat"
+fi
 # Intentionally NO --rm: keep exit/OOM flags after failure for triage.
 docker run -d \
   --name "${NAME}" \
@@ -129,6 +163,7 @@ docker run -d \
   -w /compiler \
   -e PHP_COMPILER_ALLOW_PARALLEL_CI=1 \
   -e BOOTSTRAP_GEN0_PIN_HEAD="${PIN_HEAD}" \
+  -e BOOTSTRAP_GEN0_LIVE_MOUNTS="${LIVE_MOUNTS}" \
   "${IMAGE}" \
   bash -lc "
     set -uo pipefail
@@ -142,6 +177,7 @@ docker run -d \
     export PHP_COMPILER_MEMORY_LIMIT=${PHP_MEM}
     export PHP_COMPILER_LLVM_MEMORY_LIMIT=${PHP_MEM}
     export PHP_COMPILER_HELPER_RUNTIME_O=1
+    mkdir -p /compiler/build
     export PHP_COMPILER_JIT_PROGRESS_FILE=/compiler/build/.last-jit-spine-exclusive
     # Runtime::parseAndCompileFile writes the include path to ENTRY (#22642 triage).
     export PHP_COMPILER_JIT_ENTRY_FILE=/compiler/build/.last-jit-spine-exclusive-entry
@@ -150,12 +186,15 @@ docker run -d \
     STATUS=/compiler/build/gen0-refresh-exclusive.status
     HB=/compiler/build/gen0-refresh-exclusive.heartbeat
     PIN_HEAD=\${BOOTSTRAP_GEN0_PIN_HEAD:-}
+    LIVE_MOUNTS=\${BOOTSTRAP_GEN0_LIVE_MOUNTS:-0}
     drift_abort() {
+      mkdir -p /compiler/build
       echo \"DRIFT_ABORT: \$*\" | tee -a \"\$STATUS\"
       pkill -TERM -f 'bin/compile.php' 2>/dev/null || true
       exit 97
     }
     ( while true; do
+        mkdir -p /compiler/build
         # Prefer pin file (snapshot has no .git); fall back to git when live-bound.
         cur=\$PIN_HEAD
         if [[ -f /compiler/.gen0-pin-head ]]; then
@@ -192,7 +231,7 @@ docker run -d \
       done ) &
     HBPID=\$!
     {
-      echo START \$(date -u +%H:%M:%S) pin=\${PIN_HEAD:0:12} ulimit_v=\$(ulimit -v) name=${NAME} snapshot=${USE_SNAPSHOT}
+      echo START \$(date -u +%H:%M:%S) pin=\${PIN_HEAD:0:12} ulimit_v=\$(ulimit -v) name=${NAME} snapshot=${USE_SNAPSHOT} live_mounts=\${LIVE_MOUNTS}
       echo ${NAME} \$\$ \$(date -u -Iseconds) > /compiler/build/.gen0-refresh-exclusive.lock
       set +e
       time ./script/bootstrap-refresh-gen0-sidecar.sh
@@ -203,6 +242,18 @@ docker run -d \
       echo LAST_ENTRY=\$(cat /compiler/build/.last-jit-spine-exclusive-entry 2>/dev/null)
       if [[ \$rc -eq 0 ]]; then
         echo REFRESH_OK \$(date -u +%H:%M:%S)
+        if [[ \"\$LIVE_MOUNTS\" != \"1\" && -d /compiler/prelinked/bootstrap-gen0-publish ]]; then
+          echo PUBLISH_PRELINKED \$(date -u +%H:%M:%S)
+          # Atomic-ish publish: only after verified refresh wrote snap prelinked.
+          if command -v rsync >/dev/null 2>&1; then
+            rsync -a --delete /compiler/prelinked/bootstrap-gen0/ /compiler/prelinked/bootstrap-gen0-publish/
+          else
+            rm -rf /compiler/prelinked/bootstrap-gen0-publish/*
+            tar -C /compiler/prelinked/bootstrap-gen0 -cf - . \
+              | tar -C /compiler/prelinked/bootstrap-gen0-publish -xf -
+          fi
+          echo PUBLISH_OK \$(date -u +%H:%M:%S)
+        fi
         php script/check-bootstrap-gen0-manifest-sync.php
         make north-star5-verify-fast
         ./script/release-readiness.sh --json | tee /compiler/build/release-readiness-gen0-exclusive.json
@@ -216,5 +267,10 @@ docker run -d \
 
 echo "bootstrap-gen0-refresh-exclusive-docker: launched ${NAME}"
 echo "  docker logs -f ${NAME}"
-echo "  host log hint: ${LOG_HOST} (copy from build/gen0-refresh-exclusive-inner.log)"
+if [[ "${USE_SNAPSHOT}" == "1" && "${LIVE_MOUNTS}" != "1" ]]; then
+  echo "  host heartbeat: ${COMPILER_BIND}/build/gen0-refresh-exclusive.heartbeat"
+  echo "  host inner log: ${COMPILER_BIND}/build/gen0-refresh-exclusive-inner.log"
+else
+  echo "  host log hint: ${LOG_HOST} (copy from build/gen0-refresh-exclusive-inner.log)"
+fi
 docker ps --filter "name=${NAME}" --format '{{.Names}} {{.Status}}'
