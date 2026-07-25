@@ -6773,9 +6773,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6538,
+        "inventory_files": 6539,
         "excluded": 0,
-        "eligible": 6538,
+        "eligible": 6539,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

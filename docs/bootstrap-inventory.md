@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6538 |
-| Phase A inventory files (M2 ratio SSOT) | 6538 |
+| PHP files on vm.php path | 6539 |
+| Phase A inventory files (M2 ratio SSOT) | 6539 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21003 |
+| Source constructs flagged (warnings) | 21004 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -298,6 +298,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomUserScriptLiveTagListLlvm.php` | 0 | 1 |
 | `ext/dom/DomXPathEvaluateJitHelper.php` | 0 | 1 |
 | `ext/dom/DomXPathQueryJitHelper.php` | 0 | 1 |
+| `ext/dom/DomXPathSerializeDeny.php` | 0 | 3 |
 | `ext/dom/ElementAppendChild.php` | 0 | 1 |
 | `ext/dom/ElementClosest.php` | 0 | 3 |
 | `ext/dom/ElementConstruct.php` | 0 | 2 |
@@ -4785,7 +4786,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ArrayCountValuesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayDiffAssocRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayDiffKeyRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/ArrayDiffRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ArrayDiffRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayElemRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFillKeysRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFillRuntime.php` | 0 | 1 |
@@ -8339,6 +8340,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/dom/DomXPathSerializeDeny.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 23)
+- new Exception (line 30)
+- 4 class method(s)
 
 ### `ext/dom/ElementAppendChild.php`
 
@@ -31790,63 +31798,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmSerializeRefState (line 52)
-- new Exception (line 157)
-- new Exception (line 161)
-- new Exception (line 165)
-- new Exception (line 169)
-- new Exception (line 172)
-- new Exception (line 176)
-- new Variable (line 205)
-- new Variable (line 228)
-- new Variable (line 238)
-- new Variable (line 248)
-- new Variable (line 258)
-- new Variable (line 268)
-- new Variable (line 278)
-- new VmSerializeRefState (line 370)
-- new Exception (line 514)
-- new Exception (line 518)
-- new Exception (line 522)
-- new Exception (line 526)
+- new VmSerializeRefState (line 53)
+- new Exception (line 158)
+- new Exception (line 162)
+- new Exception (line 166)
+- new Exception (line 170)
+- new Exception (line 173)
+- new Exception (line 177)
+- new Variable (line 208)
+- new Variable (line 231)
+- new Variable (line 241)
+- new Variable (line 251)
+- new Variable (line 261)
+- new Variable (line 271)
+- new Variable (line 281)
+- new VmSerializeRefState (line 373)
+- new Exception (line 517)
+- new Exception (line 521)
+- new Exception (line 525)
 - new Exception (line 529)
-- new Exception (line 533)
-- new ObjectEntry (line 736)
-- new Variable (line 737)
-- new ObjectEntry (line 784)
-- new Variable (line 788)
-- new ObjectEntry (line 800)
-- new Variable (line 806)
-- new Variable (line 816)
-- new ObjectEntry (line 834)
-- new Variable (line 835)
-- new Variable (line 837)
-- new Variable (line 894)
-- new Exception (line 920)
-- new Exception (line 924)
-- new Exception (line 928)
-- new Exception (line 932)
-- new Exception (line 936)
-- new Exception (line 940)
-- new VmSerializeEnumCaseRef (line 998)
-- new VmSerializeEnumCaseRef (line 1003)
-- new Variable (line 1078)
-- new VmSerializeRefState (line 1128)
-- new Variable (line 1145)
-- new VmSerializeRefState (line 1167)
-- new Variable (line 1177)
-- new Variable (line 1227)
-- new Variable (line 1240)
-- new Variable (line 1346)
-- new ObjectEntry (line 1376)
-- new Variable (line 1380)
-- new Frame (line 1399)
-- new Variable (line 1402)
-- new Variable (line 1431)
-- new Variable (line 1447)
-- new Variable (line 1452)
-- new Variable (line 1467)
-- new Exception (line 1490)
+- new Exception (line 532)
+- new Exception (line 536)
+- new ObjectEntry (line 741)
+- new Variable (line 742)
+- new ObjectEntry (line 789)
+- new Variable (line 793)
+- new ObjectEntry (line 805)
+- new Variable (line 811)
+- new Variable (line 821)
+- new ObjectEntry (line 839)
+- new Variable (line 840)
+- new Variable (line 842)
+- new Variable (line 899)
+- new Exception (line 925)
+- new Exception (line 929)
+- new Exception (line 933)
+- new Exception (line 937)
+- new Exception (line 941)
+- new Exception (line 945)
+- new VmSerializeEnumCaseRef (line 1004)
+- new VmSerializeEnumCaseRef (line 1009)
+- new Variable (line 1084)
+- new VmSerializeRefState (line 1134)
+- new Variable (line 1151)
+- new VmSerializeRefState (line 1173)
+- new Variable (line 1183)
+- new Variable (line 1233)
+- new Variable (line 1246)
+- new Variable (line 1352)
+- new ObjectEntry (line 1382)
+- new Variable (line 1386)
+- new Frame (line 1405)
+- new Variable (line 1408)
+- new Variable (line 1437)
+- new Variable (line 1453)
+- new Variable (line 1458)
+- new Variable (line 1473)
+- new Exception (line 1496)
 - 60 class method(s)
 - 1 closure(s)
 
@@ -42149,9 +42157,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayDiffRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 220)
 - 14 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/ArrayElemRuntime.php`
 
