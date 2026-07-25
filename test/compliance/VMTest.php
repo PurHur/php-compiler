@@ -28,6 +28,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\soap\SoapExtensionPolicy::isSoapComplianceCase($name)) {
                 continue;
             }
+            // Host/profile without gmp: withhold functional gmp_* cases; keep phantom (#22860).
+            if (!\PHPCompiler\ext\gmp\GmpExtensionPolicy::runsGmpCompliance($name)
+                && \PHPCompiler\ext\gmp\GmpExtensionPolicy::isGmpComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsStrIncrement()
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))
                 && !str_contains($name, 'str_increment_phantom')) {
