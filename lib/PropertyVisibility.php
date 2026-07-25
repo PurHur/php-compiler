@@ -22,6 +22,15 @@ final class PropertyVisibility
     }
 
     /**
+     * php-src zend_API.c — `private(set)` properties are implicitly final (#23068).
+     * Uses the asymmetric set-visibility flag (not effective write = private).
+     */
+    public static function isImplicitlyFinalFromPrivateSet(int $setVisibilityFlags): bool
+    {
+        return ($setVisibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0;
+    }
+
+    /**
      * Parent private slots are not visible by plain name from a child method scope (zend_fetch_property).
      */
     public static function isParentPrivatePropertyInvisibleFromChildScope(

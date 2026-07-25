@@ -17230,7 +17230,11 @@ restart:
                         (bool) ($op->propertyLazy ?? false)
                     );
                     $incoming->fromConstructorPromotion = $op->propertyFromConstructorPromotion;
-                    $incoming->propertyFinal = (bool) ($op->propertyFinal ?? false);
+                    // php-src zend_API.c — private(set) ⇒ ZEND_ACC_FINAL (#23068).
+                    $incoming->propertyFinal = (bool) ($op->propertyFinal ?? false)
+                        || PropertyVisibility::isImplicitlyFinalFromPrivateSet(
+                            (int) ($op->propertySetVisibility ?? 0)
+                        );
                     if ($entry->readonly) {
                         $incoming->readonly = true;
                     }
@@ -17893,7 +17897,11 @@ restart:
         );
         $property->defaultInitBlock = $block->fragmentForOpcodes($pendingNewDefaultOps);
         $property->defaultInitResultSlot = $resultSlot;
-        $property->propertyFinal = (bool) ($declareOp->propertyFinal ?? false);
+        // php-src zend_API.c — private(set) ⇒ ZEND_ACC_FINAL (#23068).
+        $property->propertyFinal = (bool) ($declareOp->propertyFinal ?? false)
+            || PropertyVisibility::isImplicitlyFinalFromPrivateSet(
+                (int) ($declareOp->propertySetVisibility ?? 0)
+            );
         $entry->properties[] = $property;
     }
 

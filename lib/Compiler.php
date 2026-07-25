@@ -7484,8 +7484,13 @@ class Compiler {
                             || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyLazy = (property_exists($child, 'propertyLazy') && $child->propertyLazy)
                             || LazyPropertyRewriter::isLazyFromAttributes($child->getAttributes());
-                        $declare->propertyFinal = $this->isFinalPropertyDeclaration($child);
-                        if ($declare->propertyFinal && !CompilerVersion::supportsFinalProperties()) {
+                        // Explicit `final` vs implicit from private(set) (zend_API.c, #23068).
+                        $explicitFinal = $this->isFinalPropertyDeclaration($child);
+                        $declare->propertyFinal = $explicitFinal
+                            || PropertyVisibility::isImplicitlyFinalFromPrivateSet(
+                                (int) $declare->propertySetVisibility
+                            );
+                        if ($explicitFinal && !CompilerVersion::supportsFinalProperties()) {
                             // php-src Zend/zend_compile.c — pre-8.4 (#22308, re-#22241).
                             $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
                             $this->throwCompileError(sprintf(
@@ -8207,9 +8212,16 @@ class Compiler {
             $typeSlot
         );
         $declare->propertyReadonly = $this->isPromotedParamReadonly($param);
-        $declare->propertyFinal = FinalPromotedPropertyRewriter::isFinalFromAttributes($param->getAttributes())
+        $declare->propertyFromConstructorPromotion = true;
+        $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
+        $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
+        $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($param);
+        $explicitFinal = FinalPromotedPropertyRewriter::isFinalFromAttributes($param->getAttributes())
             || (property_exists($param, 'promotionFinal') && $param->promotionFinal);
-        if ($declare->propertyFinal && !CompilerVersion::supportsFinalProperties()) {
+        // php-src zend_API.c — private(set) promoted props are implicitly final (#23068).
+        $declare->propertyFinal = $explicitFinal
+            || PropertyVisibility::isImplicitlyFinalFromPrivateSet((int) $declare->propertySetVisibility);
+        if ($explicitFinal && !CompilerVersion::supportsFinalProperties()) {
             // php-src Zend/zend_compile.c — pre-8.4 (#22451, re-#22308).
             $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
             $propName = $param->name instanceof Operand\Literal && is_string($param->name->value)
@@ -8221,10 +8233,6 @@ class Compiler {
                 $propName
             ));
         }
-        $declare->propertyFromConstructorPromotion = true;
-        $declare->propertyVisibility = MethodVisibility::mask($param->promotionFlags);
-        $declare->propertySetVisibility = $this->asymmetricSetVisibilityFromCfgOp($param);
-        $declare->propertyGetVisibility = $this->asymmetricGetVisibilityFromCfgOp($param);
         $declare->propertyAsymmetricExplicitRead = Ast\AsymmetricVisibilityRewriter::hasExplicitReadModifierFromAttributes(
             $param->getAttributes()
         );

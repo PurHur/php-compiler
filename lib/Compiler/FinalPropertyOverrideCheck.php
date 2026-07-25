@@ -80,9 +80,10 @@ final class FinalPropertyOverrideCheck
                 $propDisplay = $this->propertyDisplayName($member->name);
                 $propLc = strtolower($propDisplay);
                 $fromFlags = $this->isFinalFromFlags($member);
+                $fromPrivateSet = $this->isImplicitlyFinalFromPrivateSet($member);
                 $fromRegistry = $this->isFinalFromHookRegistry($classLc, $propDisplay);
                 $properties[$propLc] = [
-                    'final' => $fromFlags || $fromRegistry,
+                    'final' => $fromFlags || $fromPrivateSet || $fromRegistry,
                     'fromFlags' => $fromFlags,
                     'display' => $propDisplay,
                 ];
@@ -107,12 +108,13 @@ final class FinalPropertyOverrideCheck
                     $param->getAttributes()
                 );
                 $fromField = property_exists($param, 'promotionFinal') && $param->promotionFinal;
-                $isFinal = $fromMarker || $fromField;
+                $fromPrivateSet = $this->isImplicitlyFinalFromPrivateSetParam($param);
+                $isFinal = $fromMarker || $fromField || $fromPrivateSet;
                 // Always record promoted props so a non-final child redeclaration can
                 // trip "Cannot override final property" against a final parent (#22451).
                 $properties[$propLc] = [
                     'final' => $isFinal,
-                    'fromFlags' => $isFinal,
+                    'fromFlags' => $fromMarker || $fromField,
                     'display' => $propDisplay,
                 ];
             }
@@ -129,6 +131,41 @@ final class FinalPropertyOverrideCheck
         }
 
         return ClassFinal::fromClassFlags((int) $member->visibility);
+    }
+
+    /** php-src zend_API.c — private(set) ⇒ ZEND_ACC_FINAL (#23068). */
+    private function isImplicitlyFinalFromPrivateSet(Op\Stmt\Property $member): bool
+    {
+        $setVis = 0;
+        if (property_exists($member, 'setVisibility')) {
+            $setVis = (int) $member->setVisibility;
+        }
+        if (0 === $setVis) {
+            $setVis = \PHPCompiler\Ast\AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes(
+                $member->getAttributes()
+            );
+        }
+
+        return \PHPCompiler\PropertyVisibility::isImplicitlyFinalFromPrivateSet($setVis);
+    }
+
+    /** @param Op\Expr\Param $param */
+    private function isImplicitlyFinalFromPrivateSetParam(Op\Expr\Param $param): bool
+    {
+        $setVis = 0;
+        if (property_exists($param, 'setVisibility')) {
+            $setVis = (int) $param->setVisibility;
+        }
+        if (0 === $setVis && property_exists($param, 'promotionSetVisibility')) {
+            $setVis = (int) $param->promotionSetVisibility;
+        }
+        if (0 === $setVis) {
+            $setVis = \PHPCompiler\Ast\AsymmetricVisibilityRewriter::extractSetVisibilityFromAttributes(
+                $param->getAttributes()
+            );
+        }
+
+        return \PHPCompiler\PropertyVisibility::isImplicitlyFinalFromPrivateSet($setVis);
     }
 
     private function isFinalFromHookRegistry(string $classLc, string $propDisplay): bool
