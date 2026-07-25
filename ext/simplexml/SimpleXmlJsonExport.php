@@ -33,6 +33,10 @@ final class SimpleXmlJsonExport
     public static function exportZendJsonWire(ObjectEntry $object): \stdClass
     {
         VmSimpleXml::requireElement($object, 'json_encode');
+        if (SimpleXmlRegistry::isAttributeNodeView($object)) {
+            // Live attr handle: {"0":"<current value>"} (php-src sxe.c; #22733, #22654).
+            return self::toJsonObject(['0' => VmSimpleXml::textContent($object)]);
+        }
         if (SimpleXmlRegistry::isAttributesView($object)) {
             $attrs = VmSimpleXml::attributesMap($object);
 
@@ -69,6 +73,16 @@ final class SimpleXmlJsonExport
         $class = $object->class;
         $docKey = SimpleXmlRegistry::documentKey($object);
 
+        if (SimpleXmlRegistry::isAttributeNodeView($object)) {
+            $ht = new HashTable();
+            $text = new Variable();
+            $text->string(VmSimpleXml::textContent($object));
+            $ht->add(0, $text);
+            $result = new Variable();
+            $result->array($ht);
+
+            return $result;
+        }
         if (SimpleXmlRegistry::isAttributesView($object)) {
             $attrs = VmSimpleXml::attributesMap($object);
 

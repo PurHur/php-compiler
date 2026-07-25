@@ -75,6 +75,9 @@ final class VmSimpleXmlIterator
         if (!isset($children[$index])) {
             throw new \LogicException('SimpleXMLIterator child index out of range');
         }
+        if (SimpleXmlRegistry::isAttributesView($iterator)) {
+            return VmSimpleXml::wrapAttributeNode($ctx, $iterator, $children[$index]->name);
+        }
         $class = $ctx->classes[self::CLASS_LC] ?? $iterator->class;
 
         return VmSimpleXml::wrapIteratorNode(

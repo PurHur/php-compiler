@@ -57,6 +57,10 @@ final class SimpleXmlElementIterator
         if (!isset($children[$index])) {
             throw new \LogicException('SimpleXMLElement child index out of range');
         }
+        // attributes() foreach yields live attr handles (php-src sxe.c; #22654).
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            return VmSimpleXml::wrapAttributeNode($ctx, $entry, $children[$index]->name);
+        }
         // Preserve receiver class (SimpleXMLIterator subclass; php-src uses sxe->zo.ce).
         $class = $entry->class;
 
