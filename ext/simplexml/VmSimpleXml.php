@@ -899,11 +899,10 @@ final class VmSimpleXml
         if (SimpleXmlRegistry::isView($entry) && !SimpleXmlRegistry::isChildrenView($entry)) {
             $elements = self::directElementChildren($entry);
             $scope = self::inScopeNamespacesForEntry($entry);
+            // php-src sxe_children: null/'' ⇒ unprefixed element children only (still include
+            // default-xmlns nodes); non-empty ⇒ URI/prefix filter (#22737, re-#19342).
             if (null === $namespaceOrPrefix || '' === $namespaceOrPrefix) {
-                $elements = array_values(array_filter(
-                    $elements,
-                    static fn (SimpleXmlNodeState $element): bool => '' === self::resolveElementNamespaceUri($element, $scope)
-                ));
+                $elements = self::filterUnprefixedElementChildren($elements);
             } else {
                 $elements = self::filterChildrenByNamespace($elements, $namespaceOrPrefix, $isPrefix, $entry, $scope);
             }
@@ -1701,14 +1700,11 @@ final class VmSimpleXml
         array $filter
     ): array {
         $elements = $parent->children;
-        $scope = self::inScopeNamespacesForEntry($entry);
         $namespaceOrPrefix = $filter['ns'];
-        // php-src: null or '' ⇒ no-namespace children only; non-empty ⇒ URI/prefix filter.
+        // php-src sxe_children: null or '' ⇒ unprefixed element children only (default xmlns
+        // still included; prefixed QNames excluded). Non-empty ⇒ URI/prefix filter (#22737).
         if (null === $namespaceOrPrefix || '' === $namespaceOrPrefix) {
-            return array_values(array_filter(
-                $elements,
-                static fn (SimpleXmlNodeState $element): bool => '' === self::resolveElementNamespaceUri($element, $scope)
-            ));
+            return self::filterUnprefixedElementChildren($elements);
         }
 
         return self::filterChildrenByNamespace(
@@ -1716,8 +1712,25 @@ final class VmSimpleXml
             $namespaceOrPrefix,
             $filter['isPrefix'],
             $entry,
-            $scope
+            self::inScopeNamespacesForEntry($entry)
         );
+    }
+
+    /**
+     * children()/children('') — element children whose QName has no prefix (php-src sxe.c).
+     *
+     * Default-xmlns nodes stay included; `prefix:local` nodes are excluded (#22737).
+     *
+     * @param list<SimpleXmlNodeState> $elements
+     *
+     * @return list<SimpleXmlNodeState>
+     */
+    private static function filterUnprefixedElementChildren(array $elements): array
+    {
+        return array_values(array_filter(
+            $elements,
+            static fn (SimpleXmlNodeState $element): bool => false === strpos($element->name, ':')
+        ));
     }
 
     /** Detached xpath/node handles throw like php-src "not properly initialized" (#20483). */
