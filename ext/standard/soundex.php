@@ -27,9 +27,8 @@ final class soundex extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('soundex() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireExactArgCount($frame, 'soundex', 1);
         $string = self::vmStringArg($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;
@@ -42,8 +41,8 @@ final class soundex extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== \count($args)) {
-            throw new \LogicException('soundex() requires exactly one argument in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, 'soundex', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
 
         $input = self::jitStringArg($context, $args[0], 1, 'string');

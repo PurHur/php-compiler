@@ -27,10 +27,9 @@ final class str_split extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'str_split', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('str_split() requires one or two arguments');
-        }
         $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'str_split', 0, 'string');
         $length = 1;
         if (2 === $argc) {
@@ -53,10 +52,10 @@ final class str_split extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('str_split() requires one or two arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'str_split', 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
         $literal = $args[0]->compileTimeString ?? null;
         $skipLiteralFastPath = 2 === $argc
             && $context->callerStrictTypes

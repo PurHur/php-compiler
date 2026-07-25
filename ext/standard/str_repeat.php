@@ -29,9 +29,8 @@ final class str_repeat extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('str_repeat() requires exactly two arguments');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireExactArgCount($frame, 'str_repeat', 2);
         $input = self::vmStringArg($frame);
         $times = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_repeat', 2, 'times');
         $result = VmString::repeat($input, $times);
@@ -43,8 +42,8 @@ final class str_repeat extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== count($args)) {
-            throw new \LogicException('str_repeat() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'str_repeat', 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
 
         StringStrRepeat::ensureLinked($context);

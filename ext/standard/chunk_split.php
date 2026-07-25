@@ -25,10 +25,9 @@ final class chunk_split extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'chunk_split', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('chunk_split() requires one to three arguments in this compiler build');
-        }
         // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21190; reverts zparam TypeError).
         $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'chunk_split', 0, 'string');
         $length = 76;
@@ -48,10 +47,10 @@ final class chunk_split extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('chunk_split() requires one to three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'chunk_split', 1, 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         $input = self::jitStringArg($context, $args[0], 0, 'string');
         $workBlock = BasicBlockHelper::append($context, 'chunksplit_call_work');
         $context->builder->branch($workBlock);

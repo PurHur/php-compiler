@@ -27,9 +27,8 @@ final class strcasecmp extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== count($frame->calledArgs)) {
-            throw new \LogicException('strcasecmp() requires exactly two arguments');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireExactArgCount($frame, 'strcasecmp', 2);
         $a = self::vmStringArg($frame, 0, 'string1');
         $b = self::vmStringArg($frame, 1, 'string2');
         if (null === $frame->returnVar) {
@@ -43,8 +42,8 @@ final class strcasecmp extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (2 !== count($args)) {
-            throw new \LogicException('strcasecmp() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'strcasecmp', 2)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         StringStrcasecmp::ensureLinked($context);
         $p0 = $this->stringDataPtr($context, self::jitStringArg($context, $args[0], 0, 'string1'));

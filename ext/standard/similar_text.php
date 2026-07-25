@@ -27,10 +27,9 @@ final class similar_text extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'similar_text', 2, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('similar_text() accepts two or three arguments in this compiler build');
-        }
         $s1 = self::vmStringArg($frame, 0, 'string1');
         $s2 = self::vmStringArg($frame, 1, 'string2');
         if (3 === $argc) {
@@ -51,10 +50,10 @@ final class similar_text extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('similar_text() accepts two or three arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'similar_text', 2, 3)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
+        $argc = \count($args);
         StringSimilarText::ensureLinked($context);
         $str0 = self::jitStringArg($context, $args[0], 1, 'string1');
         $str1 = self::jitStringArg($context, $args[1], 2, 'string2');

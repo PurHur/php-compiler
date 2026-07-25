@@ -28,10 +28,9 @@ final class metaphone extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'metaphone', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('metaphone() accepts one or two arguments in this compiler build');
-        }
         $string = self::vmStringArg($frame, 0, 'string');
         $maxPhonemes = 0;
         if ($argc >= 2) {
@@ -55,10 +54,10 @@ final class metaphone extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('metaphone() accepts one or two arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'metaphone', 1, 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         $i64 = $context->getTypeFromString('int64');
         $maxPhonemes = $i64->constInt(0, false);
         if ($argc >= 2) {

@@ -31,10 +31,9 @@ final class nl2br extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'nl2br', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('nl2br() requires one or two arguments');
-        }
         $subject = self::vmStringArg($frame, 0, 'string');
         $useXhtml = true;
         if (2 === $argc) {
@@ -49,10 +48,10 @@ final class nl2br extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('nl2br() requires one or two arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'nl2br', 1, 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
 
         $strLit = JitStringArg::compileTimeLiteral($args[0]);
         $flagLit = 2 === $argc ? JitStringArg::compileTimeLiteral($args[1]) : null;
