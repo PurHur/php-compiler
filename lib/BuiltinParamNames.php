@@ -376,6 +376,14 @@ final class BuiltinParamNames
             case 'str_starts_with':
             case 'str_ends_with':
                 return ['haystack', 'needle'];
+            // php-src ext/standard/string.stub.php — named dispatch uses forFunction (#23182, re-#16616)
+            case 'strpos':
+            case 'stripos':
+            case 'strrpos':
+                return ['haystack', 'needle', 'offset'];
+            case 'strstr':
+                // InternalArgInfo still says `part`; Zend stub is before_needle
+                return ['haystack', 'needle', 'before_needle'];
             case 'preg_match':
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];
             case 'preg_match_all':
