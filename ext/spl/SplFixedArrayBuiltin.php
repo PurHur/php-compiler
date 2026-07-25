@@ -287,17 +287,15 @@ final class SplFixedArrayBuiltin
         return $object;
     }
 
+    /**
+     * SplFixedArray::getIterator — InternalIterator snapshot (php-src spl_fixedarray.c; #23168).
+     *
+     * Snapshot at call time (same as DatePeriod / WeakMap table-backed InternalIterator).
+     */
     public static function createIterator(Context $ctx, ObjectEntry $object): Variable
     {
-        $class = $ctx->classes[ArrayIteratorBuiltin::CLASS_LC] ?? null;
-        if (null === $class) {
-            throw new \LogicException('ArrayIterator is not registered in this compiler build');
-        }
-        $entry = new ObjectEntry($class);
-        $entry->constructed = true;
-        ArrayIteratorBuiltin::init($entry, self::toArray($object));
         $var = new Variable(Variable::TYPE_OBJECT);
-        $var->object($entry);
+        $var->object(InternalIteratorBuiltin::fromTable($ctx, self::toArray($object)));
 
         return $var;
     }
