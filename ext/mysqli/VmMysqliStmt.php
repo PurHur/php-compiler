@@ -52,6 +52,7 @@ final class VmMysqliStmt
             'data_seek' => new MysqliStmtDataSeek(),
             'reset' => new MysqliStmtReset(),
             'store_result' => new MysqliStmtStoreResult(),
+            'get_result' => new MysqliStmtGetResult(),
             'free_result' => new MysqliStmtFreeResult(),
             'result_metadata' => new MysqliStmtResultMetadata(),
             'more_results' => new MysqliStmtMoreResults(),
@@ -294,6 +295,26 @@ final class VmMysqliStmt
     public static function storeResult(ObjectEntry $stmt): bool
     {
         return self::requireNative($stmt)->store_result();
+    }
+
+    /**
+     * Buffered result set from a prepared statement (php-src mysqli_stmt_get_result; #22162).
+     *
+     * Requires mysqlnd on the host bridge — without get_result(), returns false.
+     */
+    public static function getResult(ObjectEntry $stmt): ObjectEntry|false
+    {
+        $native = self::requireNative($stmt);
+        if (!\method_exists($native, 'get_result')) {
+            return false;
+        }
+        $result = $native->get_result();
+        if (false === $result || null === $result) {
+            return false;
+        }
+        $ctx = self::state($stmt)->ctx ?? throw new \LogicException('mysqli_stmt requires VM context');
+
+        return VmMysqliResult::wrap($ctx, $result);
     }
 
     public static function freeResult(ObjectEntry $stmt): bool
@@ -637,6 +658,28 @@ final class MysqliStmtStoreResult extends MysqliClassMethod
         $receiver = $this->receiver($frame, 'mysqli_stmt::store_result()');
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmMysqliStmt::storeResult($receiver));
+        }
+    }
+}
+
+final class MysqliStmtGetResult extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::get_result()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmMysqliStmt::getResult($receiver);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($result);
         }
     }
 }

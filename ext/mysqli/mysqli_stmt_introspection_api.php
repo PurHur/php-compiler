@@ -211,6 +211,33 @@ final class mysqli_stmt_store_result extends MysqliStmtIntrospectionBuiltin
     }
 }
 
+/** mysqli_stmt_get_result() — php-src ext/mysqli/mysqli_stmt.c (#22162). */
+final class mysqli_stmt_get_result extends MysqliStmtIntrospectionBuiltin
+{
+    public function __construct()
+    {
+        parent::__construct('mysqli_stmt_get_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmMysqliStmt::getResult($this->stmt($frame));
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($result);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \Error($this->getName().'() is not implemented for JIT (issue #22162)');
+    }
+}
+
 final class mysqli_stmt_free_result extends MysqliStmtIntrospectionBuiltin
 {
     public function __construct()
