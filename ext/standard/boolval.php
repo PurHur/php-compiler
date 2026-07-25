@@ -124,6 +124,13 @@ final class boolval extends Internal
             case Variable::TYPE_ARRAY:
                 return $v->toArray()->getNumElements() > 0;
             case Variable::TYPE_OBJECT:
+                $object = $v->toObject();
+                // SimpleXMLElement: empty($sxe) uses sxe_object_cast_ex, not object-always-true (#22714).
+                if (\PHPCompiler\ext\simplexml\VmSimpleXml::handlesObjectCast($object)) {
+                    return \PHPCompiler\ext\simplexml\VmSimpleXml::objectIsTruthy($object);
+                }
+
+                return true;
             case Variable::TYPE_ENUM_CASE:
                 return true;
             default:
