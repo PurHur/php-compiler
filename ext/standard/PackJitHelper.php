@@ -150,10 +150,10 @@ final class PackJitHelper
             }
         }
         if ('a' === $code) {
-            return PackEngineEncode::padRight($str, $arg, "\0");
+            return PackEngineEncode::padRightNull($str, $arg);
         }
         if ('A' === $code) {
-            return PackEngineEncode::padRight($str, $arg, ' ');
+            return PackEngineEncode::padRightSpace($str, $arg);
         }
         // Z — NUL-terminated; last byte is NUL when arg > 0 (php-src pack.c).
         if ($arg <= 0) {
@@ -162,7 +162,7 @@ final class PackJitHelper
         if (1 === $arg) {
             return "\0";
         }
-        $body = PackEngineEncode::padRight($str, $arg - 1, "\0");
+        $body = PackEngineEncode::padRightNull($str, $arg - 1);
 
         return $body."\0";
     }

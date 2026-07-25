@@ -143,17 +143,52 @@ final class PackEngineEncode
     /** Right-pad without \str_pad (#22981 NestedJIT). */
     public static function padRight(string $str, int $len, string $pad): string
     {
+        // NestedJIT: `$pad[0]` on "\0"/' ' is a no-op append (#23019) — dedicated paths.
+        if ("\0" === $pad || '' === $pad) {
+            return self::padRightNull($str, $len);
+        }
+        if (' ' === $pad) {
+            return self::padRightSpace($str, $len);
+        }
         $cur = \strlen($str);
         if ($cur >= $len) {
             return \substr($str, 0, $len);
         }
-        $padChar = '' === $pad ? "\0" : $pad[0];
+        $padChar = $pad[0];
         while ($cur < $len) {
             $str .= $padChar;
             ++$cur;
         }
 
         return $str;
+    }
+
+    /** NestedJIT-safe NUL pad — no string-offset pad char (#23019). */
+    public static function padRightNull(string $str, int $len): string
+    {
+        $cur = \strlen($str);
+        if ($cur >= $len) {
+            return \substr($str, 0, $len);
+        }
+
+        return $str.self::zeros($len - $cur);
+    }
+
+    /** NestedJIT-safe space pad — no string-offset pad char (#23019). */
+    public static function padRightSpace(string $str, int $len): string
+    {
+        $cur = \strlen($str);
+        if ($cur >= $len) {
+            return \substr($str, 0, $len);
+        }
+        $need = $len - $cur;
+        $pad = '';
+        while ($need > 0) {
+            $pad .= ' ';
+            --$need;
+        }
+
+        return $str.$pad;
     }
 
     /**

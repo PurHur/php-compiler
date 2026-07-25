@@ -71,6 +71,17 @@ final class PackJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#22981', $source);
         $this->assertStringContainsString('putLongLe', $source);
         $this->assertStringContainsString('NestedJIT', $source);
+        $this->assertStringContainsString('padRightNull', $source);
+        $this->assertStringContainsString('padRightSpace', $source);
+    }
+
+    public function testPackEngineEncodePadRightMatchesHost(): void
+    {
+        $this->assertSame("hi\0", PackEngineEncode::padRightNull('hi', 3));
+        $this->assertSame('hi ', PackEngineEncode::padRightSpace('hi', 3));
+        $this->assertSame("hi\0", PackEngineEncode::padRight('hi', 3, "\0"));
+        $this->assertSame('hi ', PackEngineEncode::padRight('hi', 3, ' '));
+        $this->assertSame('h', PackEngineEncode::padRightNull('hi', 1));
     }
 
     public function testPackEngineEncodePutLongMatchesHostPack(): void
