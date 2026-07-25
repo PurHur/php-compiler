@@ -12,6 +12,7 @@ use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\ext\curl\CurlFileSerializeDeny;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
 use PHPCompiler\ext\spl\SplDllistSerializeSupport;
 use PHPCompiler\ext\spl\SplFileIteratorSerializeDeny;
@@ -154,6 +155,8 @@ final class VmSerialize
             if (0 === strcasecmp($className, 'Fiber')) {
                 throw new \Exception("Unserialization of 'Fiber' is not allowed");
             }
+            // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
+            CurlFileSerializeDeny::rejectUnserialization($className);
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
             if (!self::isClassAllowedForUnserialize($className, $options)) {
                 $parsed = self::parseCustomObjectPayload($payload);
@@ -484,6 +487,8 @@ final class VmSerialize
         if (0 === strcasecmp($entry->class->name, 'Fiber')) {
             throw new \Exception("Serialization of 'Fiber' is not allowed");
         }
+        // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
+        CurlFileSerializeDeny::rejectSerialization($entry->class->name);
         // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
         if ($entry->lazyPending && LazyObjectSupport::shouldInitializeOnSerialize($entry)) {
             $vm = $ctx->runtime->vm ?? null;
@@ -854,6 +859,9 @@ final class VmSerialize
         if (Variable::TYPE_OBJECT === $value->type
             && 0 === strcasecmp($value->toObject()->class->name, 'Fiber')) {
             throw new \Exception("Serialization of 'Fiber' is not allowed");
+        }
+        if (Variable::TYPE_OBJECT === $value->type) {
+            CurlFileSerializeDeny::rejectSerialization($value->toObject()->class->name);
         }
         $enumRef = self::enumCaseRefFromVariable($value);
         if (null !== $enumRef) {

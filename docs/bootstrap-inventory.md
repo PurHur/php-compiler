@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6530 |
-| Phase A inventory files (M2 ratio SSOT) | 6530 |
+| PHP files on vm.php path | 6531 |
+| Phase A inventory files (M2 ratio SSOT) | 6531 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20965 |
+| Source constructs flagged (warnings) | 20969 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -140,6 +140,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/CurlConstants.php` | 0 | 1 |
 | `ext/curl/CurlExtensionPolicy.php` | 0 | 1 |
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
+| `ext/curl/CurlFileSerializeDeny.php` | 0 | 3 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
 | `ext/curl/Module.php` | 0 | 37 |
@@ -1749,7 +1750,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/BuiltinClasses.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAddChild.php` | 0 | 1 |
 | `ext/simplexml/JitSimpleXmlAsXml.php` | 0 | 1 |
-| `ext/simplexml/JitSimpleXmlConstruct.php` | 0 | 1 |
+| `ext/simplexml/JitSimpleXmlConstruct.php` | 0 | 2 |
 | `ext/simplexml/JitSimpleXmlUserScript.php` | 0 | 3 |
 | `ext/simplexml/JitSimpleXmlXpath.php` | 0 | 1 |
 | `ext/simplexml/Module.php` | 0 | 4 |
@@ -7195,6 +7196,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 244)
 - 11 class method(s)
 - 3 closure(s)
+
+### `ext/curl/CurlFileSerializeDeny.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 15)
+- new Exception (line 22)
+- 4 class method(s)
 
 ### `ext/curl/CurlFunction.php`
 
@@ -20813,13 +20821,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/JitSimpleXmlConstruct.php`
 
 **Warnings** (review for bootstrap subset):
+- new Exception (line 26)
 - 1 class method(s)
 
 ### `ext/simplexml/JitSimpleXmlUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new SimpleXMLElement (line 40)
-- 7 class method(s)
+- new SimpleXMLElement (line 55)
+- 8 class method(s)
 - 1 closure(s)
 
 ### `ext/simplexml/JitSimpleXmlXpath.php`
@@ -31723,50 +31732,50 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmSerializeRefState (line 46)
-- new Exception (line 151)
-- new Exception (line 155)
-- new Variable (line 172)
-- new Variable (line 195)
-- new Variable (line 205)
-- new Variable (line 215)
-- new Variable (line 225)
-- new Variable (line 235)
-- new Variable (line 245)
-- new VmSerializeRefState (line 337)
-- new Exception (line 481)
-- new Exception (line 485)
-- new ObjectEntry (line 676)
-- new Variable (line 677)
-- new ObjectEntry (line 724)
-- new Variable (line 728)
-- new ObjectEntry (line 740)
-- new Variable (line 748)
-- new ObjectEntry (line 766)
-- new Variable (line 767)
-- new Variable (line 769)
-- new Variable (line 826)
-- new Exception (line 852)
-- new Exception (line 856)
-- new VmSerializeEnumCaseRef (line 906)
-- new VmSerializeEnumCaseRef (line 911)
-- new Variable (line 955)
-- new VmSerializeRefState (line 1005)
-- new Variable (line 1022)
-- new VmSerializeRefState (line 1044)
-- new Variable (line 1054)
-- new Variable (line 1104)
-- new Variable (line 1117)
-- new Variable (line 1223)
-- new ObjectEntry (line 1253)
-- new Variable (line 1257)
-- new Frame (line 1276)
-- new Variable (line 1279)
-- new Variable (line 1308)
-- new Variable (line 1324)
-- new Variable (line 1329)
-- new Variable (line 1344)
-- new Exception (line 1367)
+- new VmSerializeRefState (line 47)
+- new Exception (line 152)
+- new Exception (line 156)
+- new Variable (line 175)
+- new Variable (line 198)
+- new Variable (line 208)
+- new Variable (line 218)
+- new Variable (line 228)
+- new Variable (line 238)
+- new Variable (line 248)
+- new VmSerializeRefState (line 340)
+- new Exception (line 484)
+- new Exception (line 488)
+- new ObjectEntry (line 681)
+- new Variable (line 682)
+- new ObjectEntry (line 729)
+- new Variable (line 733)
+- new ObjectEntry (line 745)
+- new Variable (line 753)
+- new ObjectEntry (line 771)
+- new Variable (line 772)
+- new Variable (line 774)
+- new Variable (line 831)
+- new Exception (line 857)
+- new Exception (line 861)
+- new VmSerializeEnumCaseRef (line 914)
+- new VmSerializeEnumCaseRef (line 919)
+- new Variable (line 963)
+- new VmSerializeRefState (line 1013)
+- new Variable (line 1030)
+- new VmSerializeRefState (line 1052)
+- new Variable (line 1062)
+- new Variable (line 1112)
+- new Variable (line 1125)
+- new Variable (line 1231)
+- new ObjectEntry (line 1261)
+- new Variable (line 1265)
+- new Frame (line 1284)
+- new Variable (line 1287)
+- new Variable (line 1316)
+- new Variable (line 1332)
+- new Variable (line 1337)
+- new Variable (line 1352)
+- new Exception (line 1375)
 - 59 class method(s)
 - 1 closure(s)
 
@@ -38495,7 +38504,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 38 class method(s)
+- 40 class method(s)
 
 ### `ext/xml/VmXmlSaxDispatcher.php`
 
@@ -41914,19 +41923,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 15802)
 - new Operand\Literal (line 15811)
 - new Variable (line 15826)
-- new Variable (line 16010)
-- new VM\PropertyIsInitializedHandler (line 16102)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16142)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16360)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16465)
-- new JIT\Call\VmCoerceVariableToString (line 16589)
-- new JIT\Call\IncludePathResolverResolve (line 16859)
-- new Variable (line 17917)
-- new VM (line 17961)
-- new VM\Variable (line 17970)
-- new Variable (line 17991)
-- new Variable (line 18037)
-- new Variable (line 18561)
+- new Variable (line 16015)
+- new VM\PropertyIsInitializedHandler (line 16107)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16147)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16365)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16470)
+- new JIT\Call\VmCoerceVariableToString (line 16594)
+- new JIT\Call\IncludePathResolverResolve (line 16864)
+- new Variable (line 17922)
+- new VM (line 17966)
+- new VM\Variable (line 17975)
+- new Variable (line 17996)
+- new Variable (line 18042)
+- new Variable (line 18566)
 - 372 class method(s)
 - 7 closure(s)
 
@@ -47852,8 +47861,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new self (line 92)
 - new self (line 102)
-- new CompileFatal (line 2061)
-- 61 class method(s)
+- new CompileFatal (line 2161)
+- 63 class method(s)
 - 2 closure(s)
 
 ### `lib/SwitchCommaCaseRewriter.php`

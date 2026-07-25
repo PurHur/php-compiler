@@ -138,6 +138,7 @@
         "ext/curl/CurlConstants.php",
         "ext/curl/CurlExtensionPolicy.php",
         "ext/curl/CurlFileBuiltin.php",
+        "ext/curl/CurlFileSerializeDeny.php",
         "ext/curl/CurlFunction.php",
         "ext/curl/CurlStringFileBuiltin.php",
         "ext/curl/Module.php",
@@ -6764,9 +6765,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6530,
+        "inventory_files": 6531,
         "excluded": 0,
-        "eligible": 6530,
+        "eligible": 6531,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

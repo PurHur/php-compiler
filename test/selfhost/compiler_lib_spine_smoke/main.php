@@ -206,6 +206,7 @@ require_once __DIR__.'/../../../ext/curl/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/curl/CurlConstants.php';
 require_once __DIR__.'/../../../ext/curl/CurlExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/curl/CurlFileBuiltin.php';
+require_once __DIR__.'/../../../ext/curl/CurlFileSerializeDeny.php';
 require_once __DIR__.'/../../../ext/curl/CurlFunction.php';
 require_once __DIR__.'/../../../ext/curl/CurlStringFileBuiltin.php';
 require_once __DIR__.'/../../../ext/curl/Module.php';
