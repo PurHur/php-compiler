@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6532 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20978 |
+| Source constructs flagged (warnings) | 20979 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3292,7 +3292,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSapiHeaderGuard.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 6 |
 | `ext/standard/VmScope.php` | 0 | 6 |
-| `ext/standard/VmSerialize.php` | 0 | 52 |
+| `ext/standard/VmSerialize.php` | 0 | 55 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 17 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 5 |
@@ -5052,7 +5052,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PosixStrerrorRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixTerminalRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixTimesRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/PowIntRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/PowIntRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 3 |
@@ -31745,51 +31745,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 157)
 - new Exception (line 161)
 - new Exception (line 165)
-- new Variable (line 186)
-- new Variable (line 209)
-- new Variable (line 219)
-- new Variable (line 229)
-- new Variable (line 239)
-- new Variable (line 249)
-- new Variable (line 259)
-- new VmSerializeRefState (line 351)
-- new Exception (line 495)
-- new Exception (line 499)
-- new Exception (line 503)
-- new Exception (line 507)
-- new ObjectEntry (line 702)
-- new Variable (line 703)
-- new ObjectEntry (line 750)
-- new Variable (line 754)
-- new ObjectEntry (line 766)
-- new Variable (line 774)
-- new ObjectEntry (line 792)
-- new Variable (line 793)
-- new Variable (line 795)
-- new Variable (line 852)
-- new Exception (line 878)
-- new Exception (line 882)
-- new Exception (line 886)
-- new Exception (line 890)
-- new VmSerializeEnumCaseRef (line 944)
-- new VmSerializeEnumCaseRef (line 949)
-- new Variable (line 993)
-- new VmSerializeRefState (line 1043)
-- new Variable (line 1060)
-- new VmSerializeRefState (line 1082)
-- new Variable (line 1092)
-- new Variable (line 1142)
-- new Variable (line 1155)
-- new Variable (line 1261)
-- new ObjectEntry (line 1291)
-- new Variable (line 1295)
-- new Frame (line 1314)
-- new Variable (line 1317)
-- new Variable (line 1346)
-- new Variable (line 1362)
-- new Variable (line 1367)
-- new Variable (line 1382)
-- new Exception (line 1405)
+- new Exception (line 168)
+- new Variable (line 189)
+- new Variable (line 212)
+- new Variable (line 222)
+- new Variable (line 232)
+- new Variable (line 242)
+- new Variable (line 252)
+- new Variable (line 262)
+- new VmSerializeRefState (line 354)
+- new Exception (line 498)
+- new Exception (line 502)
+- new Exception (line 506)
+- new Exception (line 510)
+- new Exception (line 513)
+- new ObjectEntry (line 708)
+- new Variable (line 709)
+- new ObjectEntry (line 756)
+- new Variable (line 760)
+- new ObjectEntry (line 772)
+- new Variable (line 780)
+- new ObjectEntry (line 798)
+- new Variable (line 799)
+- new Variable (line 801)
+- new Variable (line 858)
+- new Exception (line 884)
+- new Exception (line 888)
+- new Exception (line 892)
+- new Exception (line 896)
+- new Exception (line 900)
+- new VmSerializeEnumCaseRef (line 954)
+- new VmSerializeEnumCaseRef (line 959)
+- new Variable (line 1003)
+- new VmSerializeRefState (line 1053)
+- new Variable (line 1070)
+- new VmSerializeRefState (line 1092)
+- new Variable (line 1102)
+- new Variable (line 1152)
+- new Variable (line 1165)
+- new Variable (line 1271)
+- new ObjectEntry (line 1301)
+- new Variable (line 1305)
+- new Frame (line 1324)
+- new Variable (line 1327)
+- new Variable (line 1356)
+- new Variable (line 1372)
+- new Variable (line 1377)
+- new Variable (line 1392)
+- new Exception (line 1415)
 - 59 class method(s)
 - 1 closure(s)
 
@@ -43588,9 +43591,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PowIntRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 167)
 - 6 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php`
 

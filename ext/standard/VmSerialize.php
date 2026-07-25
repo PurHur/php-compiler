@@ -160,9 +160,12 @@ final class VmSerialize
             if (0 === strcasecmp($className, 'Generator')) {
                 throw new \Exception("Unserialization of 'Generator' is not allowed");
             }
-            // php-src Zend/zend_weakrefs.c — ZEND_ACC_NOT_SERIALIZABLE (#23062).
+            // php-src Zend/zend_weakrefs.c — ZEND_ACC_NOT_SERIALIZABLE (#23062, #23063).
             if (0 === strcasecmp($className, 'WeakMap')) {
                 throw new \Exception("Unserialization of 'WeakMap' is not allowed");
+            }
+            if (0 === strcasecmp($className, 'WeakReference')) {
+                throw new \Exception("Unserialization of 'WeakReference' is not allowed");
             }
             // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
             CurlFileSerializeDeny::rejectUnserialization($className);
@@ -502,9 +505,12 @@ final class VmSerialize
         if (0 === strcasecmp($entry->class->name, 'Generator')) {
             throw new \Exception("Serialization of 'Generator' is not allowed");
         }
-        // php-src Zend/zend_weakrefs.c — ZEND_ACC_NOT_SERIALIZABLE (#23062).
+        // php-src Zend/zend_weakrefs.c — ZEND_ACC_NOT_SERIALIZABLE (#23062, #23063).
         if (0 === strcasecmp($entry->class->name, 'WeakMap')) {
             throw new \Exception("Serialization of 'WeakMap' is not allowed");
+        }
+        if (0 === strcasecmp($entry->class->name, 'WeakReference')) {
+            throw new \Exception("Serialization of 'WeakReference' is not allowed");
         }
         // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
         CurlFileSerializeDeny::rejectSerialization($entry->class->name);
@@ -888,6 +894,10 @@ final class VmSerialize
         if (Variable::TYPE_OBJECT === $value->type
             && 0 === strcasecmp($value->toObject()->class->name, 'WeakMap')) {
             throw new \Exception("Serialization of 'WeakMap' is not allowed");
+        }
+        if (Variable::TYPE_OBJECT === $value->type
+            && 0 === strcasecmp($value->toObject()->class->name, 'WeakReference')) {
+            throw new \Exception("Serialization of 'WeakReference' is not allowed");
         }
         if (Variable::TYPE_OBJECT === $value->type) {
             CurlFileSerializeDeny::rejectSerialization($value->toObject()->class->name);
