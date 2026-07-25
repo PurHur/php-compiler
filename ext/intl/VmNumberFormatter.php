@@ -531,14 +531,14 @@ final class VmNumberFormatter
                 $start = 0;
             }
             if ($start > \strlen($value)) {
-                self::fail($formatter, 'numfmt_parse: Number parsing failed: U_PARSE_ERROR');
+                self::failParse($formatter);
 
                 return false;
             }
             $slice = \substr($value, $start);
             $prefix = self::matchNumberPrefix($slice, $state['locale']);
             if (null === $prefix) {
-                self::fail($formatter, 'numfmt_parse: Number parsing failed: U_PARSE_ERROR');
+                self::failParse($formatter);
 
                 return false;
             }
@@ -551,7 +551,7 @@ final class VmNumberFormatter
                 // Fallback: historic full-string sanitize for whitespace / odd separators.
                 $num = self::parseNumberString($value, $state['locale']);
                 if (null === $num) {
-                    self::fail($formatter, 'numfmt_parse: Number parsing failed: U_PARSE_ERROR');
+                    self::failParse($formatter);
 
                     return false;
                 }
@@ -599,7 +599,7 @@ final class VmNumberFormatter
                 $start = 0;
             }
             if ($start > \strlen($value)) {
-                self::fail($formatter, 'numfmt_parse_currency: Currency parsing failed: U_PARSE_ERROR');
+                self::failParse($formatter);
                 $currencyOut = null;
 
                 return false;
@@ -608,7 +608,7 @@ final class VmNumberFormatter
         $slice = $hasOffset ? \substr($value, $start) : $value;
         $parsed = self::parseCurrencySlice($slice, $state['locale']);
         if (null === $parsed) {
-            self::fail($formatter, 'numfmt_parse_currency: Currency parsing failed: U_PARSE_ERROR');
+            self::failParse($formatter);
             $currencyOut = null;
 
             return false;
@@ -1036,11 +1036,22 @@ final class VmNumberFormatter
         return VmString::coerceStringBuiltinArg($var, $function, $position, $name);
     }
 
-    private static function fail(ObjectEntry $formatter, string $message): void
+    private static function fail(ObjectEntry $formatter, string $message, int $code = IntlError::U_ILLEGAL_ARGUMENT_ERROR): void
     {
-        IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, $message);
+        IntlError::set($code, $message);
         if (isset(self::$state[$formatter->id])) {
-            self::$state[$formatter->id]['errorCode'] = IntlError::U_ILLEGAL_ARGUMENT_ERROR;
+            self::$state[$formatter->id]['errorCode'] = $code;
+            self::$state[$formatter->id]['errorMessage'] = $message;
+        }
+    }
+
+    /**
+     * Parse/parseCurrency failure — object error only (php-src leaves intl_get_error_code at 0) (#22855).
+     */
+    private static function failParse(ObjectEntry $formatter, string $message = 'Number parsing failed: U_PARSE_ERROR'): void
+    {
+        if (isset(self::$state[$formatter->id])) {
+            self::$state[$formatter->id]['errorCode'] = IntlError::U_PARSE_ERROR;
             self::$state[$formatter->id]['errorMessage'] = $message;
         }
     }
