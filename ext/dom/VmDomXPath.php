@@ -225,11 +225,25 @@ final class VmDomXPath
     ): Variable {
         $expression = trim($expression);
         try {
-            $phpFn = self::tryEvaluatePhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+            $phpFn = self::tryEvaluatePhpFunction(
+                $ctx,
+                $xpath,
+                $expression,
+                $contextNode,
+                $registerNodeNS,
+                $frame
+            );
             if (null !== $phpFn) {
                 return $phpFn;
             }
-            $nsFn = self::tryEvaluateNamespacedPhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+            $nsFn = self::tryEvaluateNamespacedPhpFunction(
+                $ctx,
+                $xpath,
+                $expression,
+                $contextNode,
+                $registerNodeNS,
+                $frame
+            );
             if (null !== $nsFn) {
                 return $nsFn;
             }
@@ -2631,7 +2645,8 @@ final class VmDomXPath
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode,
-        bool $registerNodeNS
+        bool $registerNodeNS,
+        ?Frame $frame = null
     ): ?Variable {
         if (!preg_match('~^([A-Za-z_][\w]*)\:(function(?:String)?)\(~i', $expression, $prefixMatch)) {
             return null;
@@ -2683,7 +2698,7 @@ final class VmDomXPath
         $callback->string($handlerName);
         $result = VmCallable::invoke($ctx, $callback, ...$callArgs);
 
-        return self::coercePhpFunctionReturn($result);
+        return self::coercePhpFunctionReturn($ctx, $xpath, $result, $frame);
     }
 
     /**
@@ -2694,7 +2709,8 @@ final class VmDomXPath
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode,
-        bool $registerNodeNS
+        bool $registerNodeNS,
+        ?Frame $frame = null
     ): ?Variable {
         if (!preg_match('~^([A-Za-z_][\w]*):([A-Za-z_][\w.-]*)\(~', $expression, $prefixMatch)) {
             return null;
@@ -2723,7 +2739,8 @@ final class VmDomXPath
             $prefixMatch[1],
             $prefixMatch[2],
             $argsStr,
-            $contextNode
+            $contextNode,
+            $frame
         );
     }
 
@@ -2782,7 +2799,8 @@ final class VmDomXPath
                 $prefix,
                 $localName,
                 $argsStr,
-                $element
+                $element,
+                null
             );
             if (null === $compare) {
                 if (self::booleanizePhpFunctionResult($result)) {
@@ -2802,7 +2820,8 @@ final class VmDomXPath
         string $prefix,
         string $localName,
         string $argsStr,
-        ?ObjectEntry $contextNode
+        ?ObjectEntry $contextNode,
+        ?Frame $frame = null
     ): Variable {
         $state = DomRegistry::state($xpath);
         $nsUri = $state->xpathNamespaces[$prefix] ?? null;
@@ -2822,7 +2841,12 @@ final class VmDomXPath
             $callArgs[] = self::evaluatePhpFunctionArg($ctx, $xpath, trim($argExpr), $contextNode, false);
         }
 
-        return self::coercePhpFunctionReturn(VmCallable::invoke($ctx, $callable, ...$callArgs));
+        return self::coercePhpFunctionReturn(
+            $ctx,
+            $xpath,
+            VmCallable::invoke($ctx, $callable, ...$callArgs),
+            $frame
+        );
     }
 
     private static function booleanizePhpFunctionResult(Variable $result): bool
@@ -2981,29 +3005,50 @@ final class VmDomXPath
         return $var;
     }
 
-    private static function coercePhpFunctionReturn(Variable $result): Variable
-    {
+    /**
+     * php-src ext/dom/xpath_callbacks.c — php_dom_xpath_callback_dispatch return push (#22797).
+     * DOM node → nodeset; bool → bool; else convert_to_string (null/int/float/array/…).
+     */
+    private static function coercePhpFunctionReturn(
+        Context $ctx,
+        ObjectEntry $xpath,
+        Variable $result,
+        ?Frame $frame = null
+    ): Variable {
         $result = $result->resolveIndirect();
-        if (Variable::TYPE_BOOLEAN === $result->type
-            || Variable::TYPE_STRING === $result->type
-            || Variable::TYPE_INTEGER === $result->type
-            || Variable::TYPE_FLOAT === $result->type
-            || Variable::TYPE_NULL === $result->type
-        ) {
-            if (Variable::TYPE_INTEGER === $result->type) {
-                // XPath numeric returns are floats in evaluate().
-                $out = new Variable(Variable::TYPE_FLOAT);
-                $out->float((float) $result->toInt());
-
-                return $out;
-            }
-
+        if (Variable::TYPE_BOOLEAN === $result->type) {
             return $result;
         }
-        // Non-DOM object returns → string cast (php-src xpath_callbacks.c).
-        $out = new Variable(Variable::TYPE_STRING);
         if (Variable::TYPE_OBJECT === $result->type) {
-            throw new \TypeError('Only objects that are instances of DOM nodes can be converted to an XPath expression');
+            $obj = $result->toObject();
+            if (null !== $obj && VmDom::isDomNodeInstance($obj, $ctx)) {
+                $nodeIds = [$obj->id];
+                if (VmDom::prefersDomNodeList($xpath)) {
+                    return VmDom::createDomNodeList($ctx, $nodeIds);
+                }
+
+                return VmDom::createNodeList($ctx, $nodeIds);
+            }
+            throw new \TypeError(
+                'Only objects that are instances of DOM nodes can be converted to an XPath expression'
+            );
+        }
+        if (Variable::TYPE_STRING === $result->type) {
+            return $result;
+        }
+        // convert_to_string — null→'', int/float→decimal string, array→'Array'+E_WARNING (#22814/#22816).
+        $out = new Variable(Variable::TYPE_STRING);
+        if (Variable::TYPE_ARRAY === $result->type) {
+            $ctx->errors->languageWarning(
+                'Array to string conversion',
+                null !== $frame && '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+                0,
+                $ctx,
+                $frame
+            );
+            $out->string('Array');
+
+            return $out;
         }
         $out->string($result->toString());
 
