@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\standard;
 
 /**
  * json_validate() VM helper — native scanner (VmJsonScanner), no host json_validate/json_decode.
+ *
+ * php-src: ext/json/json.c — php_json_validate_ex (depth exceed → false + JSON_ERROR_DEPTH, not ValueError).
  */
 final class VmJsonValidate
 {
@@ -16,13 +18,16 @@ final class VmJsonValidate
         }
         VmJsonFlags::assertValidateFlags($flags);
         $result = VmJsonScanner::validate($json, $depth, $flags);
-        if (VmJsonScanner::RESULT_DEPTH === $result) {
-            throw new \ValueError('json_validate(): Argument #1 ($json) depth exceeds the maximum allowed depth of '.$depth);
-        }
         if (VmJsonScanner::RESULT_VALID === $result) {
             VmJson::setLastError(0);
 
             return true;
+        }
+        if (VmJsonScanner::RESULT_DEPTH === $result) {
+            // Scanner already set JSON_ERROR_DEPTH (1); match Zend — return false, do not throw.
+            VmJson::setLastError(1);
+
+            return false;
         }
         VmJson::setLastError(4);
 

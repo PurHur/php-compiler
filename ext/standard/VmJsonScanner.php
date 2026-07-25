@@ -169,11 +169,6 @@ final class VmJsonScanner
 
     private function parseValue(): bool
     {
-        if ($this->depth > $this->maxDepth) {
-            VmJson::setLastError(1);
-
-            return false;
-        }
         $this->skipWs();
         if ($this->pos >= $this->len) {
             return false;
@@ -182,25 +177,36 @@ final class VmJsonScanner
         if ('"' === $c) {
             return $this->parseString();
         }
+        // Match VmJsonParser / php-src: depth+1 >= maxDepth before entering {} / [].
         if ('{' === $c) {
-            $this->depth++;
-            if (!$this->parseObject()) {
-                $this->depth--;
+            if ($this->depth + 1 >= $this->maxDepth) {
+                VmJson::setLastError(1);
 
                 return false;
             }
-            $this->depth--;
+            ++$this->depth;
+            if (!$this->parseObject()) {
+                --$this->depth;
+
+                return false;
+            }
+            --$this->depth;
 
             return true;
         }
         if ('[' === $c) {
-            $this->depth++;
-            if (!$this->parseArray()) {
-                $this->depth--;
+            if ($this->depth + 1 >= $this->maxDepth) {
+                VmJson::setLastError(1);
 
                 return false;
             }
-            $this->depth--;
+            ++$this->depth;
+            if (!$this->parseArray()) {
+                --$this->depth;
+
+                return false;
+            }
+            --$this->depth;
 
             return true;
         }
@@ -290,33 +296,8 @@ final class VmJsonScanner
 
     private function parseTop(): bool
     {
-        $this->skipWs();
-        if ($this->pos >= $this->len) {
-            return false;
-        }
-        $c = $this->json[$this->pos];
-        if ('{' === $c) {
-            return $this->parseObject();
-        }
-        if ('[' === $c) {
-            return $this->parseArray();
-        }
-        if ('"' === $c) {
-            return $this->parseString();
-        }
-        if ('-' === $c || ($c >= '0' && $c <= '9')) {
-            return $this->parseNumber();
-        }
-        if ('t' === $c) {
-            return $this->parseLiteral('true');
-        }
-        if ('f' === $c) {
-            return $this->parseLiteral('false');
-        }
-        if ('n' === $c) {
-            return $this->parseLiteral('null');
-        }
-
-        return false;
+        // Must go through parseValue() so top-level {} / [] honor $depth
+        // (php-src php_json_parser / VmJsonParser::parseTop).
+        return $this->parseValue();
     }
 }

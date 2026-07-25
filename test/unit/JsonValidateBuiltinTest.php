@@ -42,21 +42,15 @@ final class JsonValidateBuiltinTest extends TestCase
         $this->assertTrue($this->runValidate('[]'));
     }
 
-    public function testDepthExceededThrows(): void
+    public function testDepthExceededReturnsFalse(): void
     {
-        $nested = '{"a":{"b":{"c":{"d":1}}}}';
-        $runtime = new Runtime();
-        $fn = new json_validate();
-        $frame = $fn->getFrame($runtime->vmContext);
-        $jsonVar = new VMVariable();
-        $jsonVar->string($nested);
-        $depthVar = new VMVariable();
-        $depthVar->int(2);
-        $frame->calledArgs = [$jsonVar, $depthVar];
-        $frame->returnVar = new VMVariable();
-        $this->expectException(\ValueError::class);
-        $this->expectExceptionMessage('depth exceeds');
-        $fn->execute($frame);
+        // php-src json_validate: over-deep → false + JSON_ERROR_DEPTH (#23007), not ValueError.
+        $this->assertFalse($this->runValidate('{"a":1}', 1));
+        $this->assertSame('Maximum stack depth exceeded', \PHPCompiler\ext\standard\VmJson::lastErrorMsg());
+        $this->assertFalse($this->runValidate('{"a":{"b":1}}', 2));
+        $this->assertSame('Maximum stack depth exceeded', \PHPCompiler\ext\standard\VmJson::lastErrorMsg());
+        $this->assertTrue($this->runValidate('{"a":{"b":1}}', 3));
+        $this->assertSame('No error', \PHPCompiler\ext\standard\VmJson::lastErrorMsg());
     }
 
     public function testInvalidUtf8WithoutFlag(): void
