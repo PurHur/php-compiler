@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Compiler ABI helpers stay callable via resolveFunctionCallLc even when hidden
- * from function_exists (#22820 regression after #22796).
+ * from function_exists (#22820 regression after #22796; clone-with #22856).
  */
 final class MatchUnhandledAbiResolveTest extends TestCase
 {
@@ -36,6 +36,37 @@ final class MatchUnhandledAbiResolveTest extends TestCase
             $ctx->resolveFunctionCallLc($name),
             'match lowering must still resolve the ABI helper (#22820)'
         );
+    }
+
+    /**
+     * Clone-with desugar calls phpc_clone_with_{begin,end,reinit}; same ABI-visibility
+     * contract as match helpers (#22856, re-#22820).
+     */
+    public function testPhpcCloneWithHelpersResolveWhileHiddenFromFunctionExists(): void
+    {
+        $runtime = new Runtime();
+        $ref = new \ReflectionObject($runtime);
+        $load = $ref->getMethod('loadCoreModules');
+        $load->setAccessible(true);
+        $load->invoke($runtime);
+        $ctxProp = $ref->getProperty('vmContext');
+        $ctxProp->setAccessible(true);
+        /** @var \PHPCompiler\VM\Context $ctx */
+        $ctx = $ctxProp->getValue($runtime);
+
+        foreach (['phpc_clone_with_begin', 'phpc_clone_with_end', 'phpc_clone_with_reinit'] as $name) {
+            $this->assertTrue(isset($ctx->functions[$name]), "{$name} must be registered");
+            $this->assertFalse(
+                VmReflection::isVisibleToFunctionExists($name),
+                "{$name} stays hidden from function_exists"
+            );
+            $this->assertTrue(VmReflection::isCompilerAbiHelperName($name));
+            $this->assertSame(
+                $name,
+                $ctx->resolveFunctionCallLc($name),
+                "clone-with lowering must resolve {$name} (#22856)"
+            );
+        }
     }
 
     public function testExitStaysUnresolvableOnReferenceProfile(): void
