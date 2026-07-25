@@ -15965,9 +15965,14 @@ class JIT {
             return true;
         }
         // Nested file JIT: func->class may be unset while scope carries the declaring class (#16075).
-        // Do not treat leftover scope->className as applying to {main} — that adds a spurious
-        // __object__* parameter while standalone main still emits call @internal_N() (#22638).
-        if ('' !== $this->context->scope->className && '{main}' !== $block->func->name) {
+        // Do not treat leftover scope->className as applying to {main} or closures — that adds a
+        // spurious __object__* parameter (standalone main call @internal_N() #22638; clone-with
+        // IIFE ARG_RECV "Missing required argument 0" after DECLARE_CLASS #23046 / re-#19130).
+        if (
+            '' !== $this->context->scope->className
+            && '{main}' !== $block->func->name
+            && 0 === (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE)
+        ) {
             return true;
         }
 
