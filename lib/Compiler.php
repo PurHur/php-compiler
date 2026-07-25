@@ -28,6 +28,7 @@ use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\ClassConstExpr;
 use PHPCompiler\VM\ClassConstMaterializer;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
@@ -426,6 +427,20 @@ class Compiler {
     public function setRuntimeEnumCaseConsts(array $runtimeEnumCaseConsts): void
     {
         $this->runtimeEnumCaseConsts = $runtimeEnumCaseConsts;
+    }
+
+    /** @var ?VMContext Compile-time error context when no VM is running (#22987). */
+    private ?VMContext $vmContext = null;
+
+    /**
+     * VM context for compile-time diagnostics when {@see VM::running()} is unset (#22987).
+     *
+     * File-level {@see Runtime::parseAndCompile} runs before {@see Runtime::run}, so
+     * Zend-matching E_DEPRECATED (implicit nullable params, …) must use this context.
+     */
+    public function setVmContext(?VMContext $vmContext): void
+    {
+        $this->vmContext = $vmContext;
     }
 
     /** Bytes after the first __halt_compiler(); in the compiled script, if any (#3479). */
@@ -9913,7 +9928,10 @@ class Compiler {
     }
 
     /**
-     * Zend 8.4 compile-time deprecation for implicit nullable typed parameters (#21390).
+     * Zend 8.4 compile-time deprecation for implicit nullable typed parameters (#21390, #22987).
+     *
+     * Emits during CFG compile for both eval (VM running) and file-level parseAndCompile
+     * (VM not running yet — use {@see $vmContext} from Runtime).
      */
     protected function maybeEmitImplicitNullableParamDeprecation(
         Op\Expr\Param $param,
@@ -9926,8 +9944,10 @@ class Compiler {
         if (!$this->paramIsImplicitNullable($param, $defaultSlot, $block)) {
             return;
         }
+
         $vm = VM::running();
-        if (!$vm instanceof VM) {
+        $context = $vm instanceof VM ? $vm->context : $this->vmContext;
+        if (!$context instanceof VMContext) {
             return;
         }
 
@@ -9935,27 +9955,33 @@ class Compiler {
         $line = max(0, $param->getLine());
         $file = $block->scriptPath();
         if ('' === $file) {
+            $file = $this->debugLastPhaseInputFile;
+        }
+        if (null === $file || '' === $file) {
             $file = null;
         }
-        $frame = $vm->builtinHandlerFrame();
-        if (null === $frame) {
-            $frames = $vm->context->runStackFrames();
-            $frame = [] !== $frames ? $frames[0] : null;
+        $frame = null;
+        if ($vm instanceof VM) {
+            $frame = $vm->builtinHandlerFrame();
+            if (null === $frame) {
+                $frames = $context->runStackFrames();
+                $frame = [] !== $frames ? $frames[0] : null;
+            }
         }
         if (null === $frame) {
             $frame = new Frame(null, $block, null);
-            $frame->vmContext = $vm->context;
+            $frame->vmContext = $context;
             if (null !== $file) {
                 $frame->scriptPath = $file;
             }
         }
 
-        $vm->context->errors->internalDeprecated(
+        $context->errors->internalDeprecated(
             sprintf(
                 'Implicitly marking parameter %s as nullable is deprecated, the explicit nullable type must be used instead',
                 $paramName
             ),
-            $vm->context,
+            $context,
             $frame,
             $file,
             $line
