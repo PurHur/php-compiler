@@ -21,6 +21,30 @@ final class JitVmHelperLink
         array $compiledHelpers,
         string $compileLabel
     ): void {
+        self::ensureCompiledBundle($context, [$relativeHelperPath], $compiledHelpers, $compileLabel);
+    }
+
+    /**
+     * NestedJIT several helper sources in one {@see NestedJitCompileScope} (#22981).
+     *
+     * Pack's Ieee754 → PackEngineEncode → PackJitEngine → PackJitHelper chain must share a
+     * single scope: emitting PackJitHelper alone re-lowers the transitive closure under
+     * ENV_EMITTING (no sibling cache) and does not terminate in practical time (#22843).
+     * Peer: pre-#22843 StringPack multi-file NestedJitCompileScope.
+     *
+     * @param list<string> $relativeHelperPaths repo-root paths (/ext/… or /lib/…)
+     * @param list<string> $compiledHelpers     fully-qualified logical callee names
+     */
+    public static function ensureCompiledBundle(
+        Context $context,
+        array $relativeHelperPaths,
+        array $compiledHelpers,
+        string $compileLabel
+    ): void {
+        if ([] === $relativeHelperPaths) {
+            throw new \InvalidArgumentException('ensureCompiledBundle requires at least one path ('.$compileLabel.')');
+        }
+
         $missing = false;
         foreach ($compiledHelpers as $logical) {
             if (!isset($context->functions[\strtolower($logical)])) {
@@ -49,14 +73,17 @@ final class JitVmHelperLink
         }
 
         $runtime = $context->runtime;
-        $path = self::resolveHelperPath($relativeHelperPath);
-        $basename = \basename($path);
+        $paths = [];
+        foreach ($relativeHelperPaths as $relativeHelperPath) {
+            $path = self::resolveHelperPath($relativeHelperPath);
+            $paths[] = [$path, \basename($path)];
+        }
         NestedVmActiveContextLlvm::ensureMethod($context);
         // Restore caller insert after NestedJIT (#21972 / peer #21965 GethostbynamelRuntime).
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         // User-script standalone: clear env so nested *JitHelper compile is full NestedJIT (#15407, #20246).
         $clearUserScriptEnv = $context->shouldClearUserScriptEnvForNestedHelperCompile();
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel, $clearUserScriptEnv): void {
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $paths, $compileLabel, $clearUserScriptEnv): void {
             $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
             $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
             if ($clearUserScriptEnv && \function_exists('putenv')) {
@@ -67,12 +94,19 @@ final class JitVmHelperLink
                 $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
             }
             try {
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
-                if (null === $block) {
-                    throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
-                }
                 $jit = new \PHPCompiler\JIT($context);
-                $jit->compile($block);
+                foreach ($paths as [$path, $basename]) {
+                    $real = \realpath($path) ?: $path;
+                    if ($context->hasJitIncludedFileCompiled($real)) {
+                        continue;
+                    }
+                    $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
+                    if (null === $block) {
+                        throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
+                    }
+                    $jit->compile($block);
+                    $context->markJitIncludedFileCompiled($real);
+                }
             } finally {
                 if ($clearUserScriptEnv && \function_exists('putenv')) {
                     if (false === $prevUser || '' === (string) $prevUser) {

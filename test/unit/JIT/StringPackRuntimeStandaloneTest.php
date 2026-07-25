@@ -24,7 +24,7 @@ final class StringPackRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('pack_jit_runtime.c', $runtime);
         $bridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPack.php');
         $this->assertStringContainsString('PackJitHelper', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $bridge);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $bridge);
         $this->assertStringNotContainsString('StringPackJit', $bridge);
         $engine = (string) file_get_contents(__DIR__.'/../../../ext/standard/PackJitEngine.php');

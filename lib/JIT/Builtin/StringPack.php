@@ -12,8 +12,14 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062, #22842).
  *
- * Helper compile: chained {@see JitVmHelperLink::ensureCompiled} (peer StringLz4 #22602 /
- * StringHex2bin #22746) — Ieee754 → PackEngineEncode → PackJitEngine → PackJitHelper.
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (Ieee754 →
+ * PackEngineEncode → PackJitEngine → PackJitHelper) in one NestedJIT scope (#22981).
+ *
+ * Intentionally not a helper-runtime corpus unit: the constant is
+ * {@see self::PACK_HELPER_FILE} (name avoids the emit `*HELPER_PATH` suffix), so
+ * emit discovery skips it.
+ * Solo unit emit NestedJITs Ieee754 float math that fails module verify under
+ * ENV_EMITTING; runtime StringPack NestedJIT in a full AOT context is the path.
  * php-src: ext/standard/pack.c
  */
 final class StringPack
@@ -24,39 +30,25 @@ final class StringPack
 
     private const ENGINE_PATH = '/ext/standard/PackJitEngine.php';
 
-    private const HELPER_PATH = '/ext/standard/PackJitHelper.php';
+    /** Repo-root path for PackJitHelper — not `*HELPER_PATH` (corpus skip — #22981). */
+    private const PACK_HELPER_FILE = '/ext/standard/PackJitHelper.php';
 
-    private const IEEE_ENCODE32 = 'PHPCompiler\\ext\\standard\\Ieee754::encodeFloat32';
-
-    private const IEEE_ENCODE64 = 'PHPCompiler\\ext\\standard\\Ieee754::encodeFloat64';
-
-    private const ENCODE_PUT_FLOAT = 'PHPCompiler\\ext\\standard\\PackEngineEncode::putFloat';
-
-    private const ENCODE_PUT_DOUBLE = 'PHPCompiler\\ext\\standard\\PackEngineEncode::putDouble';
-
-    private const ENGINE_PACK = 'PHPCompiler\\ext\\standard\\PackJitEngine::pack';
+    /**
+     * Ordered NestedJIT sources for runtime StringPack (#22981).
+     *
+     * @var list<string>
+     */
+    private const PACK_HELPER_BUNDLE = [
+        self::IEEE_PATH,
+        self::ENCODE_PATH,
+        self::ENGINE_PATH,
+        self::PACK_HELPER_FILE,
+    ];
 
     private const PACK_HELPER = 'PHPCompiler\\ext\\standard\\PackJitHelper::packArgv';
 
     /** @var list<string> */
-    private const COMPILED_IEEE = [
-        self::IEEE_ENCODE32,
-        self::IEEE_ENCODE64,
-    ];
-
-    /** @var list<string> */
-    private const COMPILED_ENCODE = [
-        self::ENCODE_PUT_FLOAT,
-        self::ENCODE_PUT_DOUBLE,
-    ];
-
-    /** @var list<string> */
-    private const COMPILED_ENGINE = [
-        self::ENGINE_PACK,
-    ];
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
+    private const COMPILED_PACK_HELPERS = [
         self::PACK_HELPER,
     ];
 
@@ -194,10 +186,12 @@ final class StringPack
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        JitVmHelperLink::ensureCompiled($context, self::IEEE_PATH, self::COMPILED_IEEE, '#22842');
-        JitVmHelperLink::ensureCompiled($context, self::ENCODE_PATH, self::COMPILED_ENCODE, '#22842');
-        JitVmHelperLink::ensureCompiled($context, self::ENGINE_PATH, self::COMPILED_ENGINE, '#22842');
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#22842');
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::PACK_HELPER_BUNDLE,
+            self::COMPILED_PACK_HELPERS,
+            '#22842'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void

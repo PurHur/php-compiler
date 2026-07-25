@@ -11,6 +11,11 @@ namespace PHPCompiler\ext\standard;
  *
  * Keep this unit free of Frame/ErrorReporter/PackEngine so PackJitHelper nested
  * AOT emit stays lean (#22831).
+ *
+ * Do **not** call host `\pack()` / `\unpack()` here: NestedJIT of this unit is on
+ * the pack() helper path, and `\pack` → StringPack → PackEngineEncode → `\pack`
+ * is the #22981 / #22843 non-termination cycle. Byte encode with chr/shifts
+ * (peer {@see Ieee754::u32ToBytes}).
  */
 final class PackEngineEncode
 {
@@ -19,7 +24,10 @@ final class PackEngineEncode
     public static function machineLe(): bool
     {
         if (null === self::$machineLe) {
-            self::$machineLe = 0 !== \unpack('S', "\x00\x01")[1];
+            // Do not probe with \unpack/\pack — NestedJIT of this unit is on the pack()
+            // helper path and re-entering those builtins is the #22981 hang.
+            // Committed helper-runtime arches (x86_64/aarch64 *-linux) are little-endian.
+            self::$machineLe = true;
         }
 
         return self::$machineLe;
@@ -27,35 +35,46 @@ final class PackEngineEncode
 
     public static function putLong(int $value, int $size, bool $littleEndian): string
     {
+        // Manual two's-complement bytes — never \pack() (#22981 NestedJIT cycle).
         switch ($size) {
             case 1:
-                $fmt = 'c';
-                break;
+                return \chr($value & 0xFF);
             case 2:
-                $fmt = 's';
-                break;
+                return self::u16ToBytes($value & 0xFFFF, $littleEndian);
             case 8:
-                $fmt = 'q';
-                break;
+                return self::i64ToBytes($value, $littleEndian);
             case 4:
             default:
-                $fmt = 'l';
-                break;
+                return self::u32ToBytes($value & 0xFFFFFFFF, $littleEndian);
         }
-        $bytes = \pack($fmt, $value);
+    }
 
-        if (\strlen($bytes) > $size) {
-            $bytes = \substr($bytes, 0, $size);
-        } elseif (\strlen($bytes) < $size) {
-            $bytes = \str_pad($bytes, $size, "\0");
-        }
+    private static function u16ToBytes(int $bits, bool $littleEndian): string
+    {
+        $b0 = \chr($bits & 0xFF);
+        $b1 = \chr(($bits >> 8) & 0xFF);
 
-        $needSwap = ($littleEndian !== self::machineLe());
-        if (!$needSwap) {
-            return $bytes;
-        }
+        return $littleEndian ? $b0.$b1 : $b1.$b0;
+    }
 
-        return \strrev($bytes);
+    private static function u32ToBytes(int $bits, bool $littleEndian): string
+    {
+        $b0 = \chr($bits & 0xFF);
+        $b1 = \chr(($bits >> 8) & 0xFF);
+        $b2 = \chr(($bits >> 16) & 0xFF);
+        $b3 = \chr(($bits >> 24) & 0xFF);
+
+        return $littleEndian ? $b0.$b1.$b2.$b3 : $b3.$b2.$b1.$b0;
+    }
+
+    private static function i64ToBytes(int $value, bool $littleEndian): string
+    {
+        $lo = $value & 0xFFFFFFFF;
+        $hi = ($value >> 32) & 0xFFFFFFFF;
+
+        return $littleEndian
+            ? self::u32ToBytes($lo, true).self::u32ToBytes($hi, true)
+            : self::u32ToBytes($hi, false).self::u32ToBytes($lo, false);
     }
 
     public static function putFloat(float $value, bool $littleEndian): string
@@ -71,11 +90,42 @@ final class PackEngineEncode
     public static function writeAt(string $output, int $pos, string $chunk): string
     {
         $need = $pos + \strlen($chunk);
-        if (\strlen($output) < $need) {
-            $output .= \str_repeat("\0", $need - \strlen($output));
+        // Avoid \str_repeat — NestedJIT of this unit may lack __compiler_str_repeat (#22981).
+        while (\strlen($output) < $need) {
+            $output .= "\0";
         }
 
         return \substr($output, 0, $pos).$chunk.\substr($output, $pos + \strlen($chunk));
+    }
+
+    /** Null-byte run without \str_repeat (#22981 NestedJIT). */
+    public static function zeros(int $n): string
+    {
+        if ($n <= 0) {
+            return '';
+        }
+        $out = '';
+        while ($n-- > 0) {
+            $out .= "\0";
+        }
+
+        return $out;
+    }
+
+    /** Right-pad without \str_pad (#22981 NestedJIT). */
+    public static function padRight(string $str, int $len, string $pad): string
+    {
+        $cur = \strlen($str);
+        if ($cur >= $len) {
+            return \substr($str, 0, $len);
+        }
+        $padChar = '' === $pad ? "\0" : $pad[0];
+        while ($cur < $len) {
+            $str .= $padChar;
+            ++$cur;
+        }
+
+        return $str;
     }
 
     /**

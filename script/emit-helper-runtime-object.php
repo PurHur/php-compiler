@@ -44,7 +44,10 @@ $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
 $force = in_array('--force', $argv, true);
 
 // 1. Discover (helperPath, logicalNames[]) pairs via reflection.
+// Optional *HELPER_BUNDLE (list of repo-root paths) NestedJITs deps + unit in one
+// scope — required for PackJitHelper (#22981 / #22843 solo-unit non-termination).
 $sites = [];
+$bundles = [];
 foreach ([$root.'/lib', $root.'/ext'] as $dir) {
     $it = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
@@ -78,6 +81,10 @@ foreach ([$root.'/lib', $root.'/ext'] as $dir) {
                 continue;
             }
             $sites[$path] = array_values(array_unique(array_merge($sites[$path] ?? [], array_map('strval', $names))));
+            $bundle = $constants[$prefix.'HELPER_BUNDLE'] ?? null;
+            if (\is_array($bundle) && [] !== $bundle) {
+                $bundles[$path] = array_values(array_map('strval', $bundle));
+            }
         }
     }
 }
@@ -129,7 +136,12 @@ if (null !== $unitPath) {
             }
         }
     }
-    JitVmHelperLink::ensureCompiled($context, $unitPath, $names, 'helper-runtime-emit');
+    $bundle = $bundles[$unitPath] ?? [$unitPath];
+    if (\count($bundle) > 1) {
+        JitVmHelperLink::ensureCompiledBundle($context, $bundle, $names, 'helper-runtime-emit');
+    } else {
+        JitVmHelperLink::ensureCompiled($context, $unitPath, $names, 'helper-runtime-emit');
+    }
 
     // A stub main drives the same pending-bridge completion a real script
     // build performs; the duplicate stub main per unit object is discarded by

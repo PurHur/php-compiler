@@ -74,28 +74,29 @@ final class PackJitHelper
                     if ($pos + 8 > $len) {
                         break 2;
                     }
-                    $args[] = (int) \unpack('q', \substr($packed, $pos, 8))[1];
+                    // Manual LE int64 — avoid \unpack (NestedJIT cycle / missing ABI — #22981).
+                    $args[] = self::readInt64Le($packed, $pos);
                     $pos += 8;
                     break;
                 case self::TAG_DOUBLE:
                     if ($pos + 8 > $len) {
                         break 2;
                     }
-                    $args[] = \unpack('d', \substr($packed, $pos, 8))[1];
+                    $args[] = Ieee754::decodeFloat64(\substr($packed, $pos, 8), true);
                     $pos += 8;
                     break;
                 case self::TAG_BOOL:
                     if ($pos + 8 > $len) {
                         break 2;
                     }
-                    $args[] = 0 !== (int) \unpack('q', \substr($packed, $pos, 8))[1];
+                    $args[] = 0 !== self::readInt64Le($packed, $pos);
                     $pos += 8;
                     break;
                 case self::TAG_STRING:
                     if ($pos + 8 > $len) {
                         break 2;
                     }
-                    $sl = (int) \unpack('q', \substr($packed, $pos, 8))[1];
+                    $sl = self::readInt64Le($packed, $pos);
                     $pos += 8;
                     if ($sl < 0 || $pos + $sl > $len) {
                         break 2;
@@ -112,6 +113,21 @@ final class PackJitHelper
         }
 
         return $args;
+    }
+
+    /** Little-endian signed int64 from {@see PackArgvSerialize} blob (#22981). */
+    private static function readInt64Le(string $bytes, int $pos): int
+    {
+        $lo = (\ord($bytes[$pos])
+            | (\ord($bytes[$pos + 1]) << 8)
+            | (\ord($bytes[$pos + 2]) << 16)
+            | (\ord($bytes[$pos + 3]) << 24)) & 0xFFFFFFFF;
+        $hi = (\ord($bytes[$pos + 4])
+            | (\ord($bytes[$pos + 5]) << 8)
+            | (\ord($bytes[$pos + 6]) << 16)
+            | (\ord($bytes[$pos + 7]) << 24)) & 0xFFFFFFFF;
+
+        return ($hi << 32) | $lo;
     }
 }
 
