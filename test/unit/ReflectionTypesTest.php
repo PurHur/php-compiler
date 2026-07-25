@@ -70,4 +70,25 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'reflection_union_allows_null.php'));
         $this->assertSame("a allowsNull=0\nb allowsNull=1\nc allowsNull=1\n", ob_get_clean());
     }
+
+    /** @covers issue #23065 */
+    public function testReflectionTypeToStringDnfAndNullableUnion(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f((Traversable&Countable)|array $x) {}
+function g(int|null $x) {}
+function h(?int $x) {}
+echo (string) (new ReflectionFunction('f'))->getParameters()[0]->getType(), "\n";
+echo (string) (new ReflectionFunction('g'))->getParameters()[0]->getType(), "\n";
+echo (string) (new ReflectionFunction('h'))->getParameters()[0]->getType(), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'reflection_type_tostring.php'));
+        $this->assertSame(
+            "(Traversable&Countable)|array\n?int\n?int\n",
+            ob_get_clean()
+        );
+    }
 }

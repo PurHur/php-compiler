@@ -47,11 +47,12 @@ final class ReflectionTypeSupport
             return self::buildUnionObject(
                 $ctx,
                 [$subtype, new CfgType\Literal('null')],
-                self::cfgTypeString($type)
+                self::cfgTypeStringForDump($type)
             );
         }
         if ($type instanceof CfgType\Union_) {
-            return self::buildUnionObject($ctx, $type->types, self::cfgTypeString($type));
+            // ReflectionType::__toString — ?T for T|null; DNF parens via cfgTypeString (#23065).
+            return self::buildUnionObject($ctx, $type->types, self::cfgTypeStringForDump($type));
         }
         if ($type instanceof CfgType\Intersection) {
             return self::buildIntersectionObject($ctx, $type->types, self::cfgTypeString($type));
@@ -89,12 +90,14 @@ final class ReflectionTypeSupport
             return $type->name;
         }
         if ($type instanceof CfgType\Nullable) {
-            return self::cfgTypeString($type->subtype).'|null';
+            // DNF: intersection inside nullable / |null needs parens (php-src zend_type_to_string).
+            return self::formatUnionMember($type->subtype).'|null';
         }
         if ($type instanceof CfgType\Union_) {
             $parts = [];
             foreach ($type->types as $member) {
-                $parts[] = self::cfgTypeString($member);
+                // DNF parentheses around intersection groups in a union (#23065).
+                $parts[] = self::formatUnionMember($member);
             }
 
             return implode('|', $parts);
@@ -124,9 +127,10 @@ final class ReflectionTypeSupport
     }
 
     /**
-     * Zend _function_string / _parameter_string type label (#22522).
+     * Zend _function_string / _parameter_string / ReflectionType::__toString (#22522, #23065).
      *
      * Simple nullables and T|null unions render as "?T" (php-src zend_type pretty-print).
+     * Multi-member unions keep DNF parentheses from {@see cfgTypeString()}.
      */
     public static function cfgTypeStringForDump(CfgType $type): string
     {
@@ -171,6 +175,17 @@ final class ReflectionTypeSupport
         }
 
         return self::cfgTypeString($type);
+    }
+
+    /** Union-member pretty-print: wrap intersections for DNF (php-src zend_type_to_string). */
+    private static function formatUnionMember(CfgType $member): string
+    {
+        $part = self::cfgTypeString($member);
+        if ($member instanceof CfgType\Intersection) {
+            return '('.$part.')';
+        }
+
+        return $part;
     }
 
     public static function cfgTypeFromLabel(string $label): ?CfgType
