@@ -17,6 +17,7 @@ use PHPCompiler\ext\dom\DomXPathSerializeDeny;
 use PHPCompiler\ext\fileinfo\FinfoSerializeDeny;
 use PHPCompiler\ext\intl\IntlSerializeDeny;
 use PHPCompiler\ext\openssl\OpensslSerializeDeny;
+use PHPCompiler\ext\pdo\PdoSerializeDeny;
 use PHPCompiler\ext\random\RandomSecureSerializeDeny;
 use PHPCompiler\ext\reflection\ReflectionSerializeDeny;
 use PHPCompiler\ext\simplexml\SimpleXmlSerializeDeny;
@@ -191,6 +192,8 @@ final class VmSerialize
             SocketSerializeDeny::rejectUnserialization($className);
             // php-src ext/openssl/openssl.stub.php — @not-serializable (#23100).
             OpensslSerializeDeny::rejectUnserialization($className);
+            // php-src ext/pdo/pdo_dbh.stub.php + pdo_stmt.stub.php — @not-serializable (#23103).
+            PdoSerializeDeny::rejectUnserialization($className);
             // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
             ZlibContextSerializeDeny::rejectUnserialization($className);
             // php-src ext/random/random.stub.php — @not-serializable Random\Engine\Secure (#23102).
@@ -558,6 +561,8 @@ final class VmSerialize
         SocketSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/openssl/openssl.stub.php — @not-serializable (#23100).
         OpensslSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/pdo/pdo_dbh.stub.php + pdo_stmt.stub.php — @not-serializable (#23103).
+        PdoSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
         ZlibContextSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/random/random.stub.php — @not-serializable Random\Engine\Secure (#23102).
@@ -970,6 +975,7 @@ final class VmSerialize
             IntlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
             OpensslSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            PdoSerializeDeny::rejectSerialization($value->toObject()->class->name);
             ZlibContextSerializeDeny::rejectSerialization($value->toObject()->class->name);
             RandomSecureSerializeDeny::rejectSerialization($value->toObject()->class->name);
             XmlParserSerializeDeny::rejectSerialization($value->toObject()->class->name);

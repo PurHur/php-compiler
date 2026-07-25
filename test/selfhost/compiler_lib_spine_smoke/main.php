@@ -1361,6 +1361,7 @@ require_once __DIR__.'/../../../ext/pdo/PdoConstants.php';
 require_once __DIR__.'/../../../ext/pdo/PdoMysqlConstants.php';
 require_once __DIR__.'/../../../ext/pdo/PdoPgsqlConstants.php';
 require_once __DIR__.'/../../../ext/pdo/PdoExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/pdo/PdoSerializeDeny.php';
 require_once __DIR__.'/../../../ext/pdo/VmPDO.php';
 require_once __DIR__.'/../../../ext/pdo/VmPDORow.php';
 require_once __DIR__.'/../../../ext/pdo/VmPDOStatement.php';
