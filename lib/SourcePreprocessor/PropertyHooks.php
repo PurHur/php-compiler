@@ -861,10 +861,110 @@ final class PropertyHooks
         return null;
     }
 
+    /** Body whose function-body intervals are cached in $functionBodyIntervals (#23056). */
+    private string $functionBodyScanBody = "\0none";
+
+    /** @var list<array{0: int, 1: int}> sorted disjoint [first, last] offsets whose innermost brace opens a function */
+    private array $functionBodyIntervals = [];
+
     /**
      * Local `$var = …` inside a method body is not a hooked property decl (#1492 bootstrap spine).
      */
     private function isInsideFunctionBody(string $body, int $offset): bool
+    {
+        // findNextPropertyHookDecl probes every `$var` occurrence, and the legacy answer walked
+        // back to byte 0 per probe AND took substr($body, 0, $i) — O(vars x body) with an O(body)
+        // copy each time. It was 32% of the gen-0 rebuild profile once the php-cfg simplifier
+        // hotspot was removed (#23056). Same remedy as isOffsetInComment: scan once, binary search.
+        if ('1' === getenv('PHP_COMPILER_FUNCTION_BODY_SCAN_LEGACY')) {
+            return $this->isInsideFunctionBodyScan($body, $offset);
+        }
+        if ($body !== $this->functionBodyScanBody) {
+            $this->functionBodyScanBody = $body;
+            $this->functionBodyIntervals = $this->buildFunctionBodyIntervals($body);
+        }
+        $lo = 0;
+        $hi = \count($this->functionBodyIntervals) - 1;
+        while ($lo <= $hi) {
+            $mid = ($lo + $hi) >> 1;
+            [$first, $last] = $this->functionBodyIntervals[$mid];
+            if ($offset < $first) {
+                $hi = $mid - 1;
+            } elseif ($offset > $last) {
+                $lo = $mid + 1;
+            } else {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Offsets whose innermost enclosing `{` opens a function body.
+     *
+     * Mirrors the legacy backward scan exactly: for offset o that scan inspects every brace at a
+     * position strictly below o, so the state established by the brace at p governs offsets
+     * [p + 1, nextBracePos]. Raw byte scan, matching the legacy loop — braces inside strings and
+     * comments confuse both equally, so behaviour is preserved rather than improved.
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    private function buildFunctionBodyIntervals(string $body): array
+    {
+        $len = \strlen($body);
+        $intervals = [];
+        /** @var list<bool> $stack innermost-last: does this brace open a function body? */
+        $stack = [];
+        $spanStart = null;
+
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $body[$i];
+            if ('{' !== $ch && '}' !== $ch) {
+                continue;
+            }
+            // Close the span the previous state governed: [spanStart, $i].
+            if (null !== $spanStart) {
+                $intervals[] = [$spanStart, $i];
+                $spanStart = null;
+            }
+            if ('{' === $ch) {
+                $before = rtrim(substr($body, 0, $i));
+                $stack[] = (bool) preg_match(
+                    '/\bfunction\s*(?:&\s*)?[\w\\\\]*\s*\([^)]*\)\s*(?::\s*[^ {]+)?\s*$/s',
+                    $before
+                );
+            } else {
+                array_pop($stack);
+            }
+            if ([] !== $stack && true === $stack[\count($stack) - 1]) {
+                $spanStart = $i + 1;
+            }
+        }
+        if (null !== $spanStart && $spanStart <= $len) {
+            $intervals[] = [$spanStart, $len];
+        }
+
+        // Adjacent spans coalesce; keeps the binary search shallow on brace-dense bodies.
+        $merged = [];
+        foreach ($intervals as [$first, $last]) {
+            if ($first > $last) {
+                continue;
+            }
+            $n = \count($merged);
+            if ($n > 0 && $first <= $merged[$n - 1][1] + 1) {
+                $merged[$n - 1][1] = max($merged[$n - 1][1], $last);
+
+                continue;
+            }
+            $merged[] = [$first, $last];
+        }
+
+        return $merged;
+    }
+
+    /** Legacy per-offset backward scan, selectable via PHP_COMPILER_FUNCTION_BODY_SCAN_LEGACY=1. */
+    private function isInsideFunctionBodyScan(string $body, int $offset): bool
     {
         $depth = 0;
         for ($i = $offset - 1; $i >= 0; --$i) {
