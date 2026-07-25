@@ -35,7 +35,10 @@ final class JitDebugBacktrace
         $block = $context->jitEnclosingBlock;
         if ($block instanceof Block && null !== $block->func) {
             $function = $block->func->name ?? '';
-            if ('' === $function && null === $block->func->class) {
+            // php-cfg `{anonymous}#N` → Zend `{closure}` (#23184); empty top-level stays unset/{main}.
+            if (preg_match('/^\{anonymous\}#\d+$/', $function)) {
+                $function = '{closure}';
+            } elseif ('' === $function && null === $block->func->class) {
                 $function = '{closure}';
             }
             if ('' !== $function) {
