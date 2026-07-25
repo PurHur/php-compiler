@@ -47,8 +47,6 @@ final class StreamReadRuntime
 
     public const STREAM_COPY_TO_STREAM = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::streamCopyToStreamArgv';
 
-    public const STREAM_COPY_TO_STRING = 'PHPCompiler\\ext\\standard\\StreamReadJitHelper::streamCopyToStringArgv';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::FLOCK,
@@ -61,7 +59,6 @@ final class StreamReadRuntime
         self::FSEEK,
         self::STREAM_GET_CONTENTS,
         self::STREAM_COPY_TO_STREAM,
-        self::STREAM_COPY_TO_STRING,
     ];
 
     /** @var list<string> */
@@ -76,7 +73,6 @@ final class StreamReadRuntime
         '__compiler_fseek',
         '__compiler_stream_get_contents',
         '__compiler_stream_copy_to_stream',
-        '__compiler_stream_copy_to_string',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -132,7 +128,6 @@ final class StreamReadRuntime
         JitStreamReadBridgeKernel::implementI64Bridge($context, '__compiler_fseek', self::FSEEK, 3);
         JitStreamReadBridgeKernel::implementNullableStringBridge($context, '__compiler_stream_get_contents', self::STREAM_GET_CONTENTS, 3);
         JitStreamReadBridgeKernel::implementI64Bridge($context, '__compiler_stream_copy_to_stream', self::STREAM_COPY_TO_STREAM, 4);
-        JitStreamReadBridgeKernel::implementNullableStringBridge($context, '__compiler_stream_copy_to_string', self::STREAM_COPY_TO_STRING, 3);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {

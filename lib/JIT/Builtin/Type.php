@@ -533,18 +533,6 @@ class Type extends Builtin {
             $fntypeStreamCopyToStream
         );
         $this->context->registerFunction('__compiler_stream_copy_to_stream', $fnStreamCopyToStream);
-        $fntypeStreamCopyToString = $this->context->context->functionType(
-            $strPtr,
-            false,
-            $i64,
-            $i64,
-            $i64
-        );
-        $fnStreamCopyToString = $this->context->module->addFunction(
-            '__compiler_stream_copy_to_string',
-            $fntypeStreamCopyToString
-        );
-        $this->context->registerFunction('__compiler_stream_copy_to_string', $fnStreamCopyToString);
         $fntypeGetResourceType = $this->context->context->functionType($strPtr, false, $i64);
         $fnGetResourceType = $this->context->module->addFunction(
             '__compiler_get_resource_type',

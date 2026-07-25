@@ -2579,53 +2579,6 @@ final class VmFs
     }
 
     /**
-     * stream_copy_to_string() — read stream bytes into a string (ext/standard/streams.c, #6547).
-     *
-     * php-src: PHP_FUNCTION(stream_copy_to_string) — offset defaults to 0 (start of stream).
-     *
-     * @return string|false
-     */
-    public static function streamCopyToString(int $handle, int $maxlength = -1, int $offset = 0)
-    {
-        $fp = self::lookup($handle);
-        if (null === $fp) {
-            return false;
-        }
-        if ($offset < 0) {
-            return false;
-        }
-        if (0 !== @\fseek($fp, $offset, \SEEK_SET)) {
-            return false;
-        }
-        if (0 === $maxlength) {
-            return '';
-        }
-        $data = '';
-        $chunkSize = 8192;
-        while (!\feof($fp)) {
-            if ($maxlength > 0) {
-                $remaining = $maxlength - \strlen($data);
-                if ($remaining <= 0) {
-                    break;
-                }
-                $toRead = min($chunkSize, $remaining);
-            } else {
-                $toRead = $chunkSize;
-            }
-            $chunk = @\fread($fp, $toRead);
-            if (false === $chunk) {
-                return false;
-            }
-            if ('' === $chunk) {
-                break;
-            }
-            $data .= $chunk;
-        }
-
-        return VmStreamFilterChain::applyReadFilters($handle, $data);
-    }
-
-    /**
      * get_resource_type() for fopen() stream handles (#3142).
      */
     public static function getResourceType(int $handle): ?string

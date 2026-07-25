@@ -619,7 +619,6 @@ final class VmReflection
         'ldexp',
         'memcmp',
         'modf',
-        'stream_copy_to_string',
         'vfscanf',
     ];
 

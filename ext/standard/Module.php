@@ -592,7 +592,6 @@ class Module extends ModuleAbstract
             new fread(),
             new stream_get_contents(),
             new stream_copy_to_stream(),
-            new stream_copy_to_string(),
             new stream_get_filters(),
             new stream_filter_register(),
             new stream_filter_append(),
