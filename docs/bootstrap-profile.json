@@ -445,6 +445,8 @@
         "ext/dom/NodeReplaceChild.php",
         "ext/dom/NodeReplaceChildren.php",
         "ext/dom/NodeReplaceWith.php",
+        "ext/dom/NodeSleep.php",
+        "ext/dom/NodeWakeup.php",
         "ext/dom/TextIsElementContentWhitespace.php",
         "ext/dom/TextIsWhitespaceInElementContent.php",
         "ext/dom/TextSplitText.php",
@@ -914,6 +916,7 @@
         "ext/intl/IntlDateFormatterSetTimeZone.php",
         "ext/intl/IntlError.php",
         "ext/intl/IntlExtensionPolicy.php",
+        "ext/intl/IntlSerializeDeny.php",
         "ext/intl/JitGrapheme.php",
         "ext/intl/JitGraphemeStrSplit.php",
         "ext/intl/JitLocaleParser.php",
@@ -6768,9 +6771,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6534,
+        "inventory_files": 6537,
         "excluded": 0,
-        "eligible": 6534,
+        "eligible": 6537,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

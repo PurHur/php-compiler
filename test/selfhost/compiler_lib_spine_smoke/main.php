@@ -922,6 +922,7 @@ require_once __DIR__.'/../../../ext/intl/IntlDateFormatterGetErrorCode.php';
 require_once __DIR__.'/../../../ext/intl/IntlDateFormatterGetErrorMessage.php';
 require_once __DIR__.'/../../../ext/intl/IntlError.php';
 require_once __DIR__.'/../../../ext/intl/IntlExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/intl/IntlSerializeDeny.php';
 require_once __DIR__.'/../../../ext/intl/JitGrapheme.php';
 require_once __DIR__.'/../../../ext/intl/JitGraphemeStrSplit.php';
 require_once __DIR__.'/../../../ext/intl/JitLocaleParser.php';
