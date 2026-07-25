@@ -4456,6 +4456,13 @@ restart:
                                 $frame = $catchFrame;
                                 goto restart;
                             }
+                        } catch (\TypeError $e) {
+                            // Dom\TokenList illegal offset (php-src token_list.c; #23006).
+                            $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                         }
                     } elseif (
                         Variable::TYPE_OBJECT === $container->type
@@ -7773,10 +7780,19 @@ restart:
                                 && VmDomCollectionDimension::isCollection($object)
                             ) {
                                 // isset($list[$i]) via DOM has_dimension (php-src php_dom.c; #20311).
-                                $dst->bool(VmDomCollectionDimension::hasDimension(
-                                    $object,
-                                    $frame->scope[$op->arg3]
-                                ));
+                                // TokenList illegal offsets TypeError (token_list.c; #23006).
+                                try {
+                                    $dst->bool(VmDomCollectionDimension::hasDimension(
+                                        $object,
+                                        $frame->scope[$op->arg3]
+                                    ));
+                                } catch (\TypeError $e) {
+                                    $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                                    if (null !== $catchFrame) {
+                                        $frame = $catchFrame;
+                                        goto restart;
+                                    }
+                                }
                                 break;
                             }
                             if (

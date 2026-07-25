@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\VmDomCollectionDimension;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\Frame;
@@ -54,8 +55,18 @@ final class VmEmptyDimension
                 throw new \TypeError('Illegal offset type in isset or empty');
             }
             if (VmDomCollectionDimension::isCollection($object)) {
-                // empty($list[$i]) — has_dimension; nodes are never empty (php-src php_dom.c; #20311).
-                $dst->bool(!VmDomCollectionDimension::hasDimension($object, $dim));
+                try {
+                    if (VmDom::isTokenList($object)) {
+                        // empty($tl[$i]) — has_dimension(check_empty) / zend_is_true (token_list.c; #23006).
+                        $dst->bool(VmDomCollectionDimension::tokenListDimensionIsEmpty($object, $dim));
+
+                        return null;
+                    }
+                    // empty($list[$i]) — has_dimension; nodes are never empty (php-src php_dom.c; #20311).
+                    $dst->bool(!VmDomCollectionDimension::hasDimension($object, $dim));
+                } catch (\TypeError $e) {
+                    return $vm->propagateEmptyDimensionTypeError($e, $frame);
+                }
 
                 return null;
             }

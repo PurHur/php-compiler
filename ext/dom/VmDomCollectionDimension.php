@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
 
 /**
- * DOMNodeList / DOMNamedNodeMap engine dimension handlers (php-src ext/dom/php_dom.c; #20311).
+ * DOMNodeList / DOMNamedNodeMap / Dom\TokenList engine dimension handlers
+ * (php-src ext/dom/php_dom.c, ext/dom/token_list.c; #20311, #23006).
  *
  * Classic collections use zend_object_handlers.read_dimension / has_dimension — not ArrayAccess.
  * Writes remain Error "Cannot use object of type … as array".
@@ -20,7 +23,9 @@ final class VmDomCollectionDimension
 
     public static function isCollection(ObjectEntry $object): bool
     {
-        return VmDom::isNodeList($object) || VmDom::isNamedNodeMap($object);
+        return VmDom::isNodeList($object)
+            || VmDom::isNamedNodeMap($object)
+            || VmDom::isTokenList($object);
     }
 
     /**
@@ -46,6 +51,9 @@ final class VmDomCollectionDimension
 
     public static function hasDimension(ObjectEntry $object, Variable $offset): bool
     {
+        if (VmDom::isTokenList($object)) {
+            return self::tokenListHasDimension($object, $offset);
+        }
         $lval = 0;
         if (self::processOffsetAsNamed($offset, $lval)) {
             if (VmDom::isNamedNodeMap($object)) {
@@ -69,10 +77,16 @@ final class VmDomCollectionDimension
     }
 
     /**
-     * Read $collection[$offset] into $out (object or null). Throws ValueError for NamedNodeMap OOB int.
+     * Read $collection[$offset] into $out (object/string or null).
+     * Throws ValueError for NamedNodeMap OOB int; TypeError for TokenList illegal offsets.
      */
     public static function readDimension(ObjectEntry $object, Variable $offset, Variable $out): void
     {
+        if (VmDom::isTokenList($object)) {
+            self::tokenListReadDimension($object, $offset, $out);
+
+            return;
+        }
         $lval = 0;
         if (self::processOffsetAsNamed($offset, $lval)) {
             if (VmDom::isNamedNodeMap($object)) {
@@ -130,6 +144,72 @@ final class VmDomCollectionDimension
             return;
         }
         $out->object($node);
+    }
+
+    /**
+     * empty($tokenList[$i]) — php-src has_dimension(check_empty) uses zend_is_true on the token (#23006).
+     */
+    public static function tokenListDimensionIsEmpty(ObjectEntry $object, Variable $offset): bool
+    {
+        $index = self::tokenListOffsetToLong($object, $offset);
+        $token = VmDomTokenList::item($object, $index);
+        if (null === $token) {
+            return true;
+        }
+        // Tokens are non-empty strings by construction; "0" is the empty()-falsey case.
+        return '0' === $token || '' === $token;
+    }
+
+    /**
+     * Dom\TokenList / DOMTokenList read_dimension (php-src token_list.c; #23006).
+     */
+    private static function tokenListReadDimension(ObjectEntry $object, Variable $offset, Variable $out): void
+    {
+        $index = self::tokenListOffsetToLong($object, $offset);
+        $token = VmDomTokenList::item($object, $index);
+        if (null === $token) {
+            $out->null();
+
+            return;
+        }
+        $out->string($token);
+    }
+
+    private static function tokenListHasDimension(ObjectEntry $object, Variable $offset): bool
+    {
+        $index = self::tokenListOffsetToLong($object, $offset);
+
+        return null !== VmDomTokenList::item($object, $index);
+    }
+
+    /**
+     * Mirror dom_token_list_offset_convert_to_long — non-numeric offsets TypeError
+     * "Cannot access offset of type … on Dom\TokenList".
+     */
+    private static function tokenListOffsetToLong(ObjectEntry $object, Variable $offset): int
+    {
+        $offset = $offset->resolveIndirect();
+        switch ($offset->type) {
+            case Variable::TYPE_INTEGER:
+                return $offset->toInt();
+            case Variable::TYPE_FLOAT:
+                return (int) $offset->toFloat();
+            case Variable::TYPE_BOOLEAN:
+                return $offset->toBool() ? 1 : 0;
+            case Variable::TYPE_STRING:
+                $asInt = HashTable::tryIntFromNumericString($offset->toString());
+                if (null !== $asInt) {
+                    return $asInt;
+                }
+                break;
+            default:
+                break;
+        }
+        throw new \TypeError(sprintf(
+            'Cannot access offset of type %s on %s',
+            TypeCheck::typeNameForConstraint($offset->type),
+            $object->class->name
+        ));
     }
 
     /**
