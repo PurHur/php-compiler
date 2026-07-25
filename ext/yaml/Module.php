@@ -32,6 +32,7 @@ class Module extends ModuleAbstract
         return [
             new yaml_parse(),
             new yaml_parse_file(),
+            new yaml_parse_url(),
             new yaml_emit(),
             new yaml_emit_file(),
         ];

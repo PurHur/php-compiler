@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\yaml;
 
+use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmStreamOpenFailure;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
@@ -41,6 +43,28 @@ final class VmYaml
         $raw = file_get_contents($filename);
         if (false === $raw) {
             self::emitWarning($frame, 'yaml_parse_file(): Unable to open '.$filename.' for reading');
+
+            return false;
+        }
+
+        return self::parse($raw, $frame);
+    }
+
+    /**
+     * yaml_parse_url() — read via stream wrappers (PECL yaml.c; #22252).
+     *
+     * Unlike {@see parseFile()} (IGNORE_URL), allows file:// / data:// and other wrappers
+     * via php_stream_open_wrapper + REPORT_ERRORS parity.
+     *
+     * @return mixed|false
+     */
+    public static function parseUrl(string $url, ?Frame $frame = null)
+    {
+        $raw = VmFs::readPathContentsViaOpen($url, $frame?->vmContext);
+        if (false === $raw) {
+            if (null !== $frame) {
+                VmStreamOpenFailure::warnFailedToOpen($frame, 'yaml_parse_url', $url);
+            }
 
             return false;
         }
