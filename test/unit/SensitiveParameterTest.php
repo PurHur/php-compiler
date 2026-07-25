@@ -22,6 +22,7 @@ final class SensitiveParameterTest extends BaseTest
             [
                 'sensitive_parameter_backtrace.phpt',
                 'sensitive_parameter_trace_string.phpt',
+                'sensitive_parameter_value_json_var_export.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(

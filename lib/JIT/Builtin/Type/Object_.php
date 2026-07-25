@@ -3228,7 +3228,9 @@ class Object_ extends Type {
         }
         if ('sensitiveparametervalue' === $lcname) {
             // Trace redaction marker — store wrapped arg for getValue() (#3351, #4621, #22487).
+            // Private like Zend zend_exceptions.stub.php — json_encode must not leak (#23042).
             $this->defineProperty($id, 'value', Variable::TYPE_VALUE);
+            $this->definePropertyVisibility($id, 'value', \PHPCfg\Func::FLAG_PRIVATE);
             $pub = \PHPCfg\Func::FLAG_PUBLIC;
             foreach (['__construct', 'getvalue', '__debuginfo'] as $method) {
                 $this->defineMethodVisibility($id, $method, $pub);

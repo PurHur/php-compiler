@@ -285,8 +285,23 @@ final class SensitiveParamSupport
     {
         $mixedProto = new Variable();
         $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        $priv = \PHPCfg\Func::FLAG_PRIVATE;
         $entry = new ClassEntry(self::CLASS_NAME);
-        $entry->properties[] = new ClassProperty(self::PROP_VALUE, null, $mixedProto);
+        // Zend zend_exceptions.stub.php — final internal class; private readonly $value.
+        $entry->isFinal = true;
+        $entry->isInternal = true;
+        // Private + readonly: json_encode / get_object_vars see no public props (#23042).
+        // var_export uses a dedicated empty bag in VM::collectVarExportPropertiesForBuiltin
+        // (Zend get_properties_for VAR_EXPORT returns empty — not just privacy).
+        $valueProp = new ClassProperty(
+            self::PROP_VALUE,
+            null,
+            $mixedProto,
+            true,
+            $priv,
+            strtolower(self::CLASS_NAME)
+        );
+        $entry->properties[] = $valueProp;
         $entry->constructor = new SensitiveParameterValueConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
