@@ -743,6 +743,7 @@
         "ext/gettext/ngettext.php",
         "ext/gettext/textdomain.php",
         "ext/gmp/GmpConstants.php",
+        "ext/gmp/GmpExtensionPolicy.php",
         "ext/gmp/GmpFunction.php",
         "ext/gmp/GmpToString.php",
         "ext/gmp/Module.php",
@@ -895,6 +896,7 @@
         "ext/inotify/inotify_rm_watch.php",
         "ext/intl/BuiltinClasses.php",
         "ext/intl/GraphemeStrSplitJitHelper.php",
+        "ext/intl/IcuDateFormat.php",
         "ext/intl/IdnFunction.php",
         "ext/intl/IntlClassMethod.php",
         "ext/intl/IntlConstants.php",
@@ -6752,9 +6754,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6517,
+        "inventory_files": 6519,
         "excluded": 1,
-        "eligible": 6516,
+        "eligible": 6518,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
