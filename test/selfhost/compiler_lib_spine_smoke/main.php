@@ -536,6 +536,7 @@ require_once __DIR__.'/../../../ext/exif/exif_read_data.php';
 require_once __DIR__.'/../../../ext/exif/exif_thumbnail.php';
 require_once __DIR__.'/../../../ext/fileinfo/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/fileinfo/FileinfoConstants.php';
+require_once __DIR__.'/../../../ext/fileinfo/FinfoSerializeDeny.php';
 require_once __DIR__.'/../../../ext/fileinfo/Module.php';
 require_once __DIR__.'/../../../ext/fileinfo/VmFinfo.php';
 require_once __DIR__.'/../../../ext/fileinfo/finfo_buffer.php';

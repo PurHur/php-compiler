@@ -529,6 +529,7 @@
         "ext/ffi/VmFFI.php",
         "ext/fileinfo/BuiltinClasses.php",
         "ext/fileinfo/FileinfoConstants.php",
+        "ext/fileinfo/FinfoSerializeDeny.php",
         "ext/fileinfo/Module.php",
         "ext/fileinfo/VmFinfo.php",
         "ext/fileinfo/finfo_buffer.php",
@@ -6767,9 +6768,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6533,
+        "inventory_files": 6534,
         "excluded": 0,
-        "eligible": 6533,
+        "eligible": 6534,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
