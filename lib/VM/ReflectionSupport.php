@@ -2580,11 +2580,19 @@ final class ReflectionSupport
         $override = BuiltinParamNames::forFunction($functionName);
         if (null !== $override && isset($override[$index])) {
             $info = BuiltinInternalArgInfo::paramInfoForFunction($functionName, $index);
+            if (null !== $info) {
+                return [
+                    'name' => $override[$index],
+                    'type' => $info['type'],
+                    'isOptional' => $info['isOptional'],
+                ];
+            }
 
+            // Zend stub has trailing optionals not present in legacy InternalArgInfo (#23181).
             return [
                 'name' => $override[$index],
-                'type' => $info['type'] ?? '',
-                'isOptional' => $info['isOptional'] ?? false,
+                'type' => '',
+                'isOptional' => true,
             ];
         }
 
