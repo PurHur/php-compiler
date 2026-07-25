@@ -13,6 +13,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\ext\curl\CurlFileSerializeDeny;
+use PHPCompiler\ext\dom\DomXPathSerializeDeny;
 use PHPCompiler\ext\fileinfo\FinfoSerializeDeny;
 use PHPCompiler\ext\intl\IntlSerializeDeny;
 use PHPCompiler\ext\simplexml\SimpleXmlSerializeDeny;
@@ -181,6 +182,8 @@ final class VmSerialize
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
             // php-src ext/simplexml/sxe.c — zend_class_unserialize_deny (#23072).
             SimpleXmlSerializeDeny::rejectUnserialization($className, $ctx);
+            // php-src ext/dom/xpath.c — zend_class_unserialize_deny (#23088).
+            DomXPathSerializeDeny::rejectUnserialization($className, $ctx);
             if (!self::isClassAllowedForUnserialize($className, $options)) {
                 $parsed = self::parseCustomObjectPayload($payload);
                 if (null === $parsed || !\is_array($parsed[1])) {
@@ -531,6 +534,8 @@ final class VmSerialize
         SocketSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/simplexml/sxe.c — zend_class_serialize_deny (#23072).
         SimpleXmlSerializeDeny::rejectSerialization($entry->class->name, $ctx);
+        // php-src ext/dom/xpath.c — zend_class_serialize_deny (#23088).
+        DomXPathSerializeDeny::rejectSerialization($entry->class->name, $ctx);
         // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
         if ($entry->lazyPending && LazyObjectSupport::shouldInitializeOnSerialize($entry)) {
             $vm = $ctx->runtime->vm ?? null;
@@ -928,6 +933,7 @@ final class VmSerialize
             IntlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
             SimpleXmlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
+            DomXPathSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
         }
         $enumRef = self::enumCaseRefFromVariable($value);
         if (null !== $enumRef) {

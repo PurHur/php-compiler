@@ -342,6 +342,7 @@ require_once __DIR__.'/../../../ext/dom/DomUserScriptElementCacheLlvm.php';
 require_once __DIR__.'/../../../ext/dom/DomUserScriptLiveTagListLlvm.php';
 require_once __DIR__.'/../../../ext/dom/DomXPathEvaluateJitHelper.php';
 require_once __DIR__.'/../../../ext/dom/DomXPathQueryJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomXPathSerializeDeny.php';
 require_once __DIR__.'/../../../ext/dom/ElementAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/ElementClosest.php';
 require_once __DIR__.'/../../../ext/dom/ElementConstruct.php';
