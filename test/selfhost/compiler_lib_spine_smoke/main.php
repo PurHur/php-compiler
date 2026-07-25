@@ -1516,6 +1516,7 @@ require_once __DIR__.'/../../../ext/mongodb/VmMongodb.php';
 require_once __DIR__.'/../../../ext/reflection/IsAnonymousClassJitHelper.php';
 require_once __DIR__.'/../../../ext/reflection/JitIsAnonymousClass.php';
 require_once __DIR__.'/../../../ext/reflection/Module.php';
+require_once __DIR__.'/../../../ext/reflection/ReflectionSerializeDeny.php';
 require_once __DIR__.'/../../../ext/reflection/is_anonymous_class.php';
 require_once __DIR__.'/../../../ext/session/Module.php';
 require_once __DIR__.'/../../../ext/session/SessionConstants.php';
