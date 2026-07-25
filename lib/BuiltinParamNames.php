@@ -533,6 +533,18 @@ final class BuiltinParamNames
                 return ['path', 'flags'];
             case 'dirname':
                 return ['path', 'levels'];
+            // php-src ext/standard/file.stub.php / basic_functions.stub.php / array.stub.php (#23193)
+            case 'basename':
+                return ['path', 'suffix'];
+            case 'uniqid':
+                return ['prefix', 'more_entropy'];
+            case 'gettype':
+                // InternalArgInfo still says `var`; Zend stub is value
+                return ['value'];
+            case 'array_key_exists':
+            case 'key_exists':
+                // InternalArgInfo still says `search`; Zend stub is array
+                return ['key', 'array'];
             case 'extract':
                 return ['array', 'flags', 'prefix'];
             case 'file':
