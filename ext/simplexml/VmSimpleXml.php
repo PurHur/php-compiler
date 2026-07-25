@@ -284,6 +284,63 @@ final class VmSimpleXml
     }
 
     /**
+     * Whether $entry is a SimpleXMLElement (or subclass) with node state for bool cast (#22714).
+     */
+    public static function handlesObjectCast(ObjectEntry $entry): bool
+    {
+        if (!SimpleXmlRegistry::has($entry)) {
+            return false;
+        }
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_LC === $lc || VmSimpleXmlIterator::CLASS_LC === $lc) {
+            return true;
+        }
+
+        return self::CLASS_LC === ($entry->class->parentLc ?? '');
+    }
+
+    /**
+     * (bool)$sxe / empty($sxeVar) — php-src sxe_object_cast_ex(_IS_BOOL) (#22714).
+     *
+     * Present element/attribute node ⇒ true (even when text is empty or "0").
+     * Missing named-child selection / empty root without attrs ⇒ false.
+     * Distinct from empty($sxe->child) property path (#19707), which uses string emptiness.
+     */
+    public static function objectIsTruthy(ObjectEntry $entry): bool
+    {
+        if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
+            $name = SimpleXmlRegistry::attributeNodeName($entry);
+
+            return \array_key_exists($name, SimpleXmlRegistry::state($entry)->attributes);
+        }
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            return [] !== self::attributesMap($entry);
+        }
+        // Named child / children() / frozen multi-match: get_first_node non-null ⇒ true.
+        if (SimpleXmlRegistry::isNamedChildView($entry)
+            || SimpleXmlRegistry::isChildrenView($entry)
+            || SimpleXmlRegistry::isView($entry)) {
+            return [] !== self::viewElements($entry);
+        }
+
+        // Element node: !sxe_prop_is_empty (attrs, element children, or non-empty text).
+        return !self::elementPropIsEmpty(SimpleXmlRegistry::state($entry));
+    }
+
+    /** php-src sxe_prop_is_empty for an element node (ITER_NONE / root). */
+    private static function elementPropIsEmpty(SimpleXmlNodeState $state): bool
+    {
+        if ([] !== $state->attributes) {
+            return false;
+        }
+        if ([] !== $state->children) {
+            return false;
+        }
+
+        return '' === $state->text;
+    }
+
+    /**
      * empty($sxe->child) — missing child, or present child whose string cast is empty (#19707).
      *
      * php-src sxe has_property with ZEND_ISEMPTY checks the concatenated text of matching

@@ -818,11 +818,15 @@ final class Variable {
             case self::TYPE_ARRAY:
                 return $this->toArray()->getNumElements() > 0;
             case self::TYPE_OBJECT:
+                $object = $this->resolveIndirect()->toObject();
+                // SimpleXMLElement: sxe_object_cast_ex(_IS_BOOL), not __toString truthiness (#22714).
+                if (\PHPCompiler\ext\simplexml\VmSimpleXml::handlesObjectCast($object)) {
+                    return \PHPCompiler\ext\simplexml\VmSimpleXml::objectIsTruthy($object);
+                }
                 if (null === $vm) {
                     return true;
                 }
-                $object = $this->resolveIndirect();
-                if (!$vm->hasInstanceMethod($object->object->class, '__tostring')) {
+                if (!$vm->hasInstanceMethod($object->class, '__tostring')) {
                     return true;
                 }
 
