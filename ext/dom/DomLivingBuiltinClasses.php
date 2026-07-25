@@ -42,6 +42,10 @@ final class DomLivingBuiltinClasses
         'relaxngvalidate',
         'relaxngvalidatesource',
         'savexml',
+        // Dom\Document implements ParentNode — not inherited from Dom\Node (php_dom.stub.php; #23155).
+        'append',
+        'prepend',
+        'replacechildren',
     ];
 
     /**
