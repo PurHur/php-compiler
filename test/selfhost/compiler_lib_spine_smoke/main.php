@@ -1074,6 +1074,7 @@ require_once __DIR__.'/../../../ext/ldap/LdapEscapeJitHelper.php';
 require_once __DIR__.'/../../../ext/ldap/LdapDnJitHelper.php';
 require_once __DIR__.'/../../../ext/ldap/VmLdapNative.php';
 require_once __DIR__.'/../../../ext/ldap/LdapExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/ldap/LdapSerializeDeny.php';
 require_once __DIR__.'/../../../ext/ldap/Module.php';
 require_once __DIR__.'/../../../ext/ldap/VmLdapEscape.php';
 require_once __DIR__.'/../../../ext/ldap/VmLdapDn.php';
