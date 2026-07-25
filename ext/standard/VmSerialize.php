@@ -19,6 +19,7 @@ use PHPCompiler\ext\ftp\FtpSerializeDeny;
 use PHPCompiler\ext\intl\IntlSerializeDeny;
 use PHPCompiler\ext\openssl\OpensslSerializeDeny;
 use PHPCompiler\ext\pdo\PdoSerializeDeny;
+use PHPCompiler\ext\pgsql\PgsqlSerializeDeny;
 use PHPCompiler\ext\random\RandomSecureSerializeDeny;
 use PHPCompiler\ext\reflection\ReflectionSerializeDeny;
 use PHPCompiler\ext\simplexml\SimpleXmlSerializeDeny;
@@ -201,6 +202,8 @@ final class VmSerialize
             OpensslSerializeDeny::rejectUnserialization($className);
             // php-src ext/pdo/pdo_dbh.stub.php + pdo_stmt.stub.php — @not-serializable (#23103).
             PdoSerializeDeny::rejectUnserialization($className);
+            // php-src ext/pgsql/pgsql.stub.php — @not-serializable (#23135).
+            PgsqlSerializeDeny::rejectUnserialization($className);
             // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
             ZlibContextSerializeDeny::rejectUnserialization($className);
             // php-src ext/random/random.stub.php — @not-serializable Random\Engine\Secure (#23102).
@@ -576,6 +579,8 @@ final class VmSerialize
         OpensslSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/pdo/pdo_dbh.stub.php + pdo_stmt.stub.php — @not-serializable (#23103).
         PdoSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/pgsql/pgsql.stub.php — @not-serializable (#23135).
+        PgsqlSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
         ZlibContextSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/random/random.stub.php — @not-serializable Random\Engine\Secure (#23102).
@@ -993,6 +998,7 @@ final class VmSerialize
             SysvIpcSerializeDeny::rejectSerialization($value->toObject()->class->name);
             OpensslSerializeDeny::rejectSerialization($value->toObject()->class->name);
             PdoSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            PgsqlSerializeDeny::rejectSerialization($value->toObject()->class->name);
             ZlibContextSerializeDeny::rejectSerialization($value->toObject()->class->name);
             RandomSecureSerializeDeny::rejectSerialization($value->toObject()->class->name);
             XmlParserSerializeDeny::rejectSerialization($value->toObject()->class->name);

@@ -1371,6 +1371,7 @@ require_once __DIR__.'/../../../ext/pdo/pdo_drivers.php';
 require_once __DIR__.'/../../../ext/pgsql/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/pgsql/Module.php';
 require_once __DIR__.'/../../../ext/pgsql/PgsqlExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/pgsql/PgsqlSerializeDeny.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlArg.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlConnection.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlCore.php';
