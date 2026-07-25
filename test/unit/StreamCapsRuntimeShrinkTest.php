@@ -12,7 +12,7 @@ use PHPCompiler\ext\standard\VmStreamSupports;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Stream caps NestedJIT ABI bridges quarantined in ext/standard (#11413, #19772).
+ * Stream caps NestedJIT via JitVmHelperLink (#11413, #19772, #23012).
  */
 final class StreamCapsRuntimeShrinkTest extends TestCase
 {
@@ -39,17 +39,22 @@ final class StreamCapsRuntimeShrinkTest extends TestCase
         $this->assertLessThan(55, \substr_count($orchestrator, "\n") + 1);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelUsesJitVmHelperLinkNotHandRolledNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamCapsKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitStreamCapsKernel', $source);
         $this->assertStringContainsString('__compiler_stream_isatty', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('StreamCapsJitHelper', $source);
-        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void
