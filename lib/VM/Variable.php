@@ -544,6 +544,11 @@ final class Variable {
                         return $enumInt;
                     }
                 }
+                // SimpleXMLElement: sxe_object_cast_ex(IS_LONG) via element text (#22715).
+                $sxeInt = \PHPCompiler\ext\simplexml\VmSimpleXml::tryCastObjectToInt($this->toObject());
+                if (null !== $sxeInt) {
+                    return $sxeInt;
+                }
 
                 // Zend convert_to_long object branch — legacy 1, no __toString (#18444, zend_operators.c).
                 return 1;
@@ -597,6 +602,11 @@ final class Variable {
                     if (null !== $enumFloat) {
                         return $enumFloat;
                     }
+                }
+                // SimpleXMLElement: sxe_object_cast_ex(IS_DOUBLE) via element text (#22715).
+                $sxeFloat = \PHPCompiler\ext\simplexml\VmSimpleXml::tryCastObjectToFloat($this->toObject());
+                if (null !== $sxeFloat) {
+                    return $sxeFloat;
                 }
 
                 // Zend convert_to_double object branch — legacy 1.0, no __toString (#18444, zend_operators.c).

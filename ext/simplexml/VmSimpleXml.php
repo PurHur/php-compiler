@@ -300,6 +300,36 @@ final class VmSimpleXml
     }
 
     /**
+     * (int)$sxe — php-src sxe_object_cast_ex(IS_LONG): stringify node text, then convert (#22715).
+     *
+     * Empty text ⇒ 0; no E_WARNING (unlike plain objects → 1).
+     *
+     * @return int|null null when $entry is not a SimpleXML cast handler
+     */
+    public static function tryCastObjectToInt(ObjectEntry $entry): ?int
+    {
+        if (!self::handlesObjectCast($entry)) {
+            return null;
+        }
+
+        return (int) self::textContent($entry);
+    }
+
+    /**
+     * (float)$sxe — php-src sxe_object_cast_ex(IS_DOUBLE): stringify node text, then convert (#22715).
+     *
+     * @return float|null null when $entry is not a SimpleXML cast handler
+     */
+    public static function tryCastObjectToFloat(ObjectEntry $entry): ?float
+    {
+        if (!self::handlesObjectCast($entry)) {
+            return null;
+        }
+
+        return (float) self::textContent($entry);
+    }
+
+    /**
      * (bool)$sxe / empty($sxeVar) — php-src sxe_object_cast_ex(_IS_BOOL) (#22714).
      *
      * Present element/attribute node ⇒ true (even when text is empty or "0").

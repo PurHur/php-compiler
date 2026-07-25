@@ -379,6 +379,25 @@ final class JitZendScalarCast
         return $context->builder->zExt($boolByte, $targetTy);
     }
 
+    /**
+     * Zend string → long for (int) cast / SXE numeric cast (#5714, #22715).
+     */
+    public static function castStringToInt(Context $context, Value $strPtr): Value
+    {
+        return self::stringToInt($context, $strPtr);
+    }
+
+    /**
+     * Zend string → double for (float) cast / SXE numeric cast (#5714, #22715).
+     */
+    public static function castStringToFloat(Context $context, Value $strPtr): Value
+    {
+        $ptr = self::stringDataPtr($context, $strPtr);
+        $endPtr = $context->getTypeFromString('int8**')->constNull();
+
+        return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
+    }
+
     private static function stringToInt(Context $context, Value $strPtr): Value
     {
         $ptr = self::stringDataPtr($context, $strPtr);
