@@ -9,13 +9,22 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_diff() JIT routes through ArrayDiffJitHelper PHP not ArrayBuiltinHelper LLVM (#12527, #14342). */
+/**
+ * array_diff() NestedJIT via JitVmHelperLink::ensureCompiled (#23116 / peer #22954).
+ */
 final class ArrayDiffRuntimeShrinkTest extends TestCase
 {
     public function testArrayDiffRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayDiffRuntime.php');
         $this->assertStringContainsString('ArrayDiffJitHelper', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('parseAndCompile', $runtime);
+        $this->assertStringNotContainsString('new JIT(', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayDiff', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
