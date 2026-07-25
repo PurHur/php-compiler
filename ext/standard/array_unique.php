@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayUniqueRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -29,10 +30,9 @@ final class array_unique extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        $this->requireArgCountRange($frame, 'array_unique', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('array_unique() requires one or two arguments');
-        }
         $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_unique', 1, 'array');
         $flags = self::resolveVmFlags($frame, $argc);
         if (null === $frame->returnVar) {
@@ -56,10 +56,11 @@ final class array_unique extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('array_unique() requires one or two arguments');
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        if (!$this->requireArgCountRangeJit($context, $args, 'array_unique', 1, 2)) {
+            return HashTableHelper::emptyVariable($context)->value;
         }
+        $argc = \count($args);
 
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {

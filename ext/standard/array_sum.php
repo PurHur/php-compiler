@@ -28,9 +28,8 @@ final class array_sum extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_sum() requires exactly one argument');
-        }
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        $this->requireExactArgCount($frame, 'array_sum', 1);
         $ht = VmArray::requireArrayForCaller($frame, $frame->calledArgs[0]->resolveIndirect(), 'array_sum');
         if (null === $frame->returnVar) {
             return;
@@ -43,8 +42,9 @@ final class array_sum extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         TypeErrorRaise::ensureLinked($context);
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_sum() requires exactly one argument');
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        if (!$this->requireExactJitArgCount($context, $args, 'array_sum', 1)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916/#21926, re-#4504).
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {

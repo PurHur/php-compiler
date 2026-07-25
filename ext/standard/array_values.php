@@ -26,9 +26,8 @@ final class array_values extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_values() requires exactly one argument');
-        }
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        $this->requireExactArgCount($frame, 'array_values', 1);
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_values');
         if (null === $frame->returnVar) {
             return;
@@ -40,8 +39,9 @@ final class array_values extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_values() requires exactly one argument');
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        if (!$this->requireExactJitArgCount($context, $args, 'array_values', 1)) {
+            return HashTableHelper::emptyVariable($context)->value;
         }
 
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type

@@ -29,9 +29,8 @@ final class floatval extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('floatval() requires exactly one argument');
-        }
+        // php-src ext/standard/type.c — ArgumentCountError (#23165).
+        $this->requireExactArgCount($frame, 'floatval', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($v);
         if (null === $frame->returnVar) {
@@ -81,11 +80,12 @@ final class floatval extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('floatval() requires exactly one argument');
+        $double = $context->getTypeFromString('double');
+        // php-src ext/standard/type.c — ArgumentCountError (#23165).
+        if (!$this->requireExactJitArgCount($context, $args, 'floatval', 1)) {
+            return $double->constReal(0.0);
         }
         $v = $context->helper->loadValue($args[0]);
-        $double = $context->getTypeFromString('double');
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:
                 return $context->builder->siToFp($v, $double);

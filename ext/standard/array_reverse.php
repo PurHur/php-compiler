@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayReverseRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -28,10 +29,9 @@ final class array_reverse extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        $this->requireArgCountRange($frame, 'array_reverse', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('array_reverse() requires one or two arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,10 +47,11 @@ final class array_reverse extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('array_reverse() requires one or two arguments in this compiler build');
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        if (!$this->requireArgCountRangeJit($context, $args, 'array_reverse', 1, 2)) {
+            return HashTableHelper::emptyVariable($context)->value;
         }
+        $argc = \count($args);
 
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {

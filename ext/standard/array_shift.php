@@ -25,9 +25,8 @@ final class array_shift extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_shift() requires exactly one argument');
-        }
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        $this->requireExactArgCount($frame, 'array_shift', 1);
         $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_shift', 1, 'array');
         $shifted = ArrayShiftJitHelper::shift($ht);
         if (null === $frame->returnVar) {
@@ -40,8 +39,9 @@ final class array_shift extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_shift() requires exactly one argument');
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        if (!$this->requireExactJitArgCount($context, $args, 'array_shift', 1)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         JitArrayElem::requireArrayParam($context, $args[0], 'array_shift', 1, 'array');
 
