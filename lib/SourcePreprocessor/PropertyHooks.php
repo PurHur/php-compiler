@@ -1101,24 +1101,30 @@ final class PropertyHooks
             $hookSource = substr($body, $open + 1, $close - $open - 1);
             $declPrefix = $this->copyBodySegment($body, $offset, $declStart, $removeSpans);
             $propDeclHead = rtrim(substr($body, $declStart, $hookOpen - $declStart));
-            $isAbstractHook = (bool) preg_match('/\babstract\b/', $declPrefix.$propDeclHead);
-            $isFinalProperty = (bool) preg_match('/\bfinal\b/', $declPrefix.$propDeclHead);
+            // findNextPropertyHookDecl returns `$name` offset — modifiers/type sit in $declPrefix.
+            // Prior members also live in $declPrefix; only this property's suffix is authoritative (#23069).
+            [$priorMembers, $ownDeclPrefix] = $this->splitPropertyDeclPrefix($declPrefix);
+            $ownDeclHead = $ownDeclPrefix.$propDeclHead;
+            $isAbstractHook = (bool) preg_match('/\babstract\b/', $ownDeclHead);
+            $isFinalProperty = (bool) preg_match('/\bfinal\b/', $ownDeclHead);
             // PHP 8.4 explicit `virtual` modifier — strip before nikic/php-parser (#18170, zend_language_parser.y).
-            $isExplicitVirtual = (bool) preg_match('/\bvirtual\b/', $declPrefix.$propDeclHead);
+            $isExplicitVirtual = (bool) preg_match('/\bvirtual\b/', $ownDeclHead);
             $isInterfaceHook = 'interface' === $declKind;
             if ($isAbstractHook) {
-                $declPrefix = preg_replace('/\babstract\s+/', '', $declPrefix) ?? $declPrefix;
+                $ownDeclPrefix = preg_replace('/\babstract\s+/', '', $ownDeclPrefix) ?? $ownDeclPrefix;
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             if ($isFinalProperty) {
-                $declPrefix = preg_replace('/\bfinal\s+/', '', $declPrefix) ?? $declPrefix;
+                $ownDeclPrefix = preg_replace('/\bfinal\s+/', '', $ownDeclPrefix) ?? $ownDeclPrefix;
                 $propDeclHead = preg_replace('/\bfinal\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             if ($isExplicitVirtual) {
-                $declPrefix = preg_replace('/\bvirtual\s+/', '', $declPrefix) ?? $declPrefix;
+                $ownDeclPrefix = preg_replace('/\bvirtual\s+/', '', $ownDeclPrefix) ?? $ownDeclPrefix;
                 $propDeclHead = preg_replace('/\bvirtual\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
-            $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
+            $declPrefix = $priorMembers.$ownDeclPrefix;
+            $ownDeclHead = $ownDeclPrefix.$propDeclHead;
+            $isStatic = (bool) preg_match('/\bstatic\b/', $ownDeclHead);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
                 $body,
                 $declStart,
@@ -1133,7 +1139,7 @@ final class PropertyHooks
             $isTraitDecl = 'trait' === $declKind;
             $skipSemicolonRequiredHooks = $isConcreteClass
                 && $this->isImplicitAsymmetricBackingHookSource($hookSource);
-            $propertyType = $this->propertyTypeFromDeclHead($declPrefix.$propDeclHead);
+            $propertyType = $this->propertyTypeFromDeclHead($ownDeclHead);
             [$methods, $usesBacking, $trailing, $asymmetricSetVis] = $this->lowerHooks(
                 $hookSource,
                 $prop,
@@ -1143,7 +1149,7 @@ final class PropertyHooks
                 $propertyType
             );
             $this->rejectAsymmetricDeclSetWithoutSetHook(
-                $declPrefix.$propDeclHead,
+                $ownDeclHead,
                 $hookSource,
                 $lcClass,
                 $prop,
@@ -1153,14 +1159,15 @@ final class PropertyHooks
             );
             if (null !== $asymmetricSetVis) {
                 $marker = '/*phpc-asymmetric-set:'.$asymmetricSetVis.'*/ ';
-                if (preg_match('/\b(public|protected|private)\b/i', $declPrefix.$propDeclHead)) {
+                if (preg_match('/\b(public|protected|private)\b/i', $ownDeclHead)) {
                     $marker .= '/*phpc-asymmetric-explicit-read*/ ';
                 }
-                if (preg_match('/^(\s*)/', $declPrefix, $indentM)) {
-                    $declPrefix = $indentM[1].$marker.ltrim($declPrefix);
+                if (preg_match('/^(\s*)/', $ownDeclPrefix, $indentM)) {
+                    $ownDeclPrefix = $indentM[1].$marker.ltrim($ownDeclPrefix);
                 } else {
-                    $declPrefix = $marker.$declPrefix;
+                    $ownDeclPrefix = $marker.$ownDeclPrefix;
                 }
+                $declPrefix = $priorMembers.$ownDeclPrefix;
             }
             $sameNameBacking = $usesBacking && $this->hookTouchesBacking($hookSource, $prop, $isStatic);
             $nextOffset = $close + 1;
@@ -1182,6 +1189,18 @@ final class PropertyHooks
                                 [$priorStart, $priorEnd, $initializer] = $priorBacking;
                                 $removeSpans[] = [$priorStart, $priorEnd];
                                 $declPrefix = $this->copyBodySegment($body, $offset, $declStart, $removeSpans);
+                                // Re-apply modifier strips to this property only (#23069).
+                                [$priorMembers, $ownDeclPrefix] = $this->splitPropertyDeclPrefix($declPrefix);
+                                if ($isAbstractHook) {
+                                    $ownDeclPrefix = preg_replace('/\babstract\s+/', '', $ownDeclPrefix) ?? $ownDeclPrefix;
+                                }
+                                if ($isFinalProperty) {
+                                    $ownDeclPrefix = preg_replace('/\bfinal\s+/', '', $ownDeclPrefix) ?? $ownDeclPrefix;
+                                }
+                                if ($isExplicitVirtual) {
+                                    $ownDeclPrefix = preg_replace('/\bvirtual\s+/', '', $ownDeclPrefix) ?? $ownDeclPrefix;
+                                }
+                                $declPrefix = $priorMembers.$ownDeclPrefix;
                             }
                         }
                     }
@@ -1878,6 +1897,72 @@ final class PropertyHooks
         }
 
         return $params;
+    }
+
+    /**
+     * Split class-body text before `$prop` into prior members vs this property's modifiers/type.
+     *
+     * `findNextPropertyHookDecl` returns the `$name` offset, so modifiers sit in `$declPrefix`.
+     * Earlier properties/methods in the same prefix must not contribute `final`/`abstract`/… (#23069).
+     *
+     * @return array{0: string, 1: string} [priorMembers, ownDeclPrefix]
+     */
+    private function splitPropertyDeclPrefix(string $declPrefix): array
+    {
+        $own = $this->propertyOwnDeclPrefix($declPrefix);
+        $priorLen = strlen($declPrefix) - strlen($own);
+
+        return [substr($declPrefix, 0, $priorLen), $own];
+    }
+
+    /**
+     * Suffix of `$declPrefix` that belongs to the hooked property (after last `;` / `}`).
+     */
+    private function propertyOwnDeclPrefix(string $declPrefix): string
+    {
+        $len = strlen($declPrefix);
+        $lastTerm = -1;
+        $i = 0;
+        while ($i < $len) {
+            $c = $declPrefix[$i];
+            if ('/' === $c && $i + 1 < $len && '/' === $declPrefix[$i + 1]) {
+                $i += 2;
+                while ($i < $len && "\n" !== $declPrefix[$i] && "\r" !== $declPrefix[$i]) {
+                    ++$i;
+                }
+                continue;
+            }
+            if ('/' === $c && $i + 1 < $len && '*' === $declPrefix[$i + 1]) {
+                $i += 2;
+                while ($i + 1 < $len && !('*' === $declPrefix[$i] && '/' === $declPrefix[$i + 1])) {
+                    ++$i;
+                }
+                $i = min($len, $i + 2);
+                continue;
+            }
+            if ('"' === $c || "'" === $c) {
+                $quote = $c;
+                ++$i;
+                while ($i < $len) {
+                    if ('\\' === $declPrefix[$i]) {
+                        $i += 2;
+                        continue;
+                    }
+                    if ($quote === $declPrefix[$i]) {
+                        ++$i;
+                        break;
+                    }
+                    ++$i;
+                }
+                continue;
+            }
+            if (';' === $c || '}' === $c) {
+                $lastTerm = $i;
+            }
+            ++$i;
+        }
+
+        return substr($declPrefix, $lastTerm + 1);
     }
 
     private function propertyTypeFromDeclHead(string $propDeclHead): ?string

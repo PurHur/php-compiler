@@ -1135,6 +1135,26 @@ PHP;
         self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
     }
 
+    /** @covers issue #23069 — prior plain `final` must not mark following hooked property */
+    public function testFinalPlainSiblingDoesNotBleedOntoHookedProperty(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    final public string $f = 'f';
+    public string $hook {
+        get => 'h';
+        set { }
+    }
+}
+PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString('final public string $f', $out);
+        self::assertStringNotContainsString('final public string $hook', $out);
+        self::assertStringContainsString('public string $hook;', $out);
+        self::assertFalse($registry['c']['hook']['finalProperty'] ?? false);
+    }
+
     public function testLowersFinalSetHookModifier(): void
     {
         $src = <<<'PHP'
