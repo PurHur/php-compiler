@@ -8,6 +8,12 @@ namespace PHPCompiler\ext\standard;
  * Pure-PHP IEEE754 float encode/decode for pack()/unpack() (self-host; no host \\pack('f'/'d')).
  *
  * php-src: ext/standard/pack.c — php_pack_float / php_unpack_float
+ *
+ * NestedJIT note (#22990): do **not** return floats via array destructuring
+ * (`[$mantissa, $exp] = …`). Array-dim floats are typed as NATIVE_LONG while the
+ * LLVM value stays `double`, so Helper emits integer `mul`/`sub` on doubles and
+ * module verify fails. Do **not** use by-ref int params (NestedJIT segfault) or
+ * bool endian args (ternary always takes the false branch under NestedJIT).
  */
 final class Ieee754
 {
@@ -19,22 +25,48 @@ final class Ieee754
 
     public static function encodeFloat32(float $value, bool $littleEndian): string
     {
-        return self::u32ToBytes(self::float32ToBits($value), $littleEndian);
+        return $littleEndian
+            ? self::encodeFloat32Le($value)
+            : self::u32ToBytesBe(self::float32ToBits($value));
     }
 
     public static function encodeFloat64(float $value, bool $littleEndian): string
     {
-        return self::u64ToBytes(self::float64ToBits($value), $littleEndian);
+        return $littleEndian
+            ? self::encodeFloat64Le($value)
+            : self::u64ToBytesBe(self::float64ToBits($value));
+    }
+
+    /** NestedJIT-safe LE float32 (#22990). */
+    public static function encodeFloat32Le(float $value): string
+    {
+        return self::u32ToBytesLe(self::float32ToBits($value));
+    }
+
+    /** NestedJIT-safe LE float64 (#22990). */
+    public static function encodeFloat64Le(float $value): string
+    {
+        return self::u64ToBytesLe(self::float64ToBits($value));
     }
 
     public static function decodeFloat32(string $bytes, bool $littleEndian): float
     {
-        return self::bitsToFloat32(self::bytesToU32($bytes, $littleEndian));
+        return self::bitsToFloat32(
+            $littleEndian ? self::bytesToU32Le($bytes) : self::bytesToU32Be($bytes)
+        );
     }
 
     public static function decodeFloat64(string $bytes, bool $littleEndian): float
     {
-        return self::bitsToFloat64(self::bytesToU64($bytes, $littleEndian));
+        return self::bitsToFloat64(
+            $littleEndian ? self::bytesToU64Le($bytes) : self::bytesToU64Be($bytes)
+        );
+    }
+
+    /** NestedJIT-safe LE float64 decode (#22990). */
+    public static function decodeFloat64Le(string $bytes): float
+    {
+        return self::bitsToFloat64(self::bytesToU64Le($bytes));
     }
 
     public static function float32ToBits(float $value): int
@@ -53,10 +85,22 @@ final class Ieee754
         }
 
         $sign = $value < 0 ? 0x80000000 : 0;
-        $abs = abs($value);
-        [$mantissa, $exponent] = self::frexpDecompose($abs);
-        $exp = $exponent - 1 + 127;
-        $fraction = (int) round(($mantissa - 0.5) * 2.0 * 8388608.0);
+        $abs = \abs($value);
+        // Inline frexp — NestedJIT by-ref int segfaults (#22990).
+        $exp = 0;
+        $mantissa = $abs;
+        while ($mantissa >= 1.0) {
+            $mantissa = $mantissa / 2.0;
+            ++$exp;
+        }
+        while ($mantissa > 0.0 && $mantissa < 0.5) {
+            $mantissa = $mantissa * 2.0;
+            --$exp;
+        }
+        $exp = $exp - 1 + 127;
+        // Keep every intermediate as float — NestedJIT (#22990).
+        $scaled = ($mantissa - 0.5) * 2.0 * 8388608.0;
+        $fraction = (int) \round($scaled);
         if ($fraction >= 8388608) {
             $fraction = 0;
             ++$exp;
@@ -70,6 +114,7 @@ final class Ieee754
         $sign = ($bits >> 31) & 1;
         $exp = ($bits >> 23) & 0xFF;
         $frac = $bits & 0x7FFFFF;
+        $fracF = (float) $frac;
 
         if (0xFF === $exp) {
             if (0 === $frac) {
@@ -82,11 +127,11 @@ final class Ieee754
             if (0 === $frac) {
                 return $sign ? -0.0 : 0.0;
             }
-            $value = ($frac / 8388608.0) * self::pow2(-126);
+            $value = ($fracF / 8388608.0) * self::pow2(-126);
 
             return $sign ? -$value : $value;
         }
-        $value = (1.0 + $frac / 8388608.0) * self::pow2($exp - 127);
+        $value = (1.0 + $fracF / 8388608.0) * self::pow2($exp - 127);
 
         return $sign ? -$value : $value;
     }
@@ -110,10 +155,21 @@ final class Ieee754
         }
 
         $sign = $value < 0 ? 1 : 0;
-        $abs = abs($value);
-        [$mantissa, $exponent] = self::frexpDecompose($abs);
-        $exp = $exponent - 1 + 1023;
-        $fraction = (int) round(($mantissa - 0.5) * 2.0 * 4503599627370496.0);
+        $abs = \abs($value);
+        // Inline frexp — NestedJIT by-ref int segfaults (#22990).
+        $exp = 0;
+        $mantissa = $abs;
+        while ($mantissa >= 1.0) {
+            $mantissa = $mantissa / 2.0;
+            ++$exp;
+        }
+        while ($mantissa > 0.0 && $mantissa < 0.5) {
+            $mantissa = $mantissa * 2.0;
+            --$exp;
+        }
+        $exp = $exp - 1 + 1023;
+        $scaled = ($mantissa - 0.5) * 2.0 * 4503599627370496.0;
+        $fraction = (int) \round($scaled);
         if ($fraction >= 4503599627370496) {
             $fraction = 0;
             ++$exp;
@@ -128,11 +184,12 @@ final class Ieee754
     /** @param array{0: int, 1: int} $limbs */
     public static function bitsToFloat64(array $limbs): float
     {
-        [$hi, $lo] = $limbs;
+        $hi = $limbs[0];
+        $lo = $limbs[1];
         $sign = ($hi >> 31) & 1;
         $exp = ($hi >> 20) & 0x7FF;
         $fracHi = $hi & 0xFFFFF;
-        $frac = ((float) $fracHi) * 4294967296.0 + ($lo & 0xFFFFFFFF);
+        $frac = ((float) $fracHi) * 4294967296.0 + (float) ($lo & 0xFFFFFFFF);
 
         if (0x7FF === $exp) {
             if (0.0 === $frac) {
@@ -154,25 +211,32 @@ final class Ieee754
         return $sign ? -$value : $value;
     }
 
-    private static function u32ToBytes(int $bits, bool $littleEndian): string
+    private static function u32ToBytesLe(int $bits): string
     {
-        $b0 = \chr($bits & 0xFF);
-        $b1 = \chr(($bits >> 8) & 0xFF);
-        $b2 = \chr(($bits >> 16) & 0xFF);
-        $b3 = \chr(($bits >> 24) & 0xFF);
-
-        return $littleEndian ? $b0.$b1.$b2.$b3 : $b3.$b2.$b1.$b0;
+        return \chr($bits & 0xFF)
+            .\chr(($bits >> 8) & 0xFF)
+            .\chr(($bits >> 16) & 0xFF)
+            .\chr(($bits >> 24) & 0xFF);
     }
 
-    private static function bytesToU32(string $bytes, bool $littleEndian): int
+    private static function u32ToBytesBe(int $bits): string
     {
-        if ($littleEndian) {
-            return \ord($bytes[0])
-                | (\ord($bytes[1]) << 8)
-                | (\ord($bytes[2]) << 16)
-                | (\ord($bytes[3]) << 24);
-        }
+        return \chr(($bits >> 24) & 0xFF)
+            .\chr(($bits >> 16) & 0xFF)
+            .\chr(($bits >> 8) & 0xFF)
+            .\chr($bits & 0xFF);
+    }
 
+    private static function bytesToU32Le(string $bytes): int
+    {
+        return \ord($bytes[0])
+            | (\ord($bytes[1]) << 8)
+            | (\ord($bytes[2]) << 16)
+            | (\ord($bytes[3]) << 24);
+    }
+
+    private static function bytesToU32Be(string $bytes): int
+    {
         return \ord($bytes[3])
             | (\ord($bytes[2]) << 8)
             | (\ord($bytes[1]) << 16)
@@ -180,49 +244,33 @@ final class Ieee754
     }
 
     /** @param array{0: int, 1: int} $limbs */
-    private static function u64ToBytes(array $limbs, bool $littleEndian): string
+    private static function u64ToBytesLe(array $limbs): string
     {
-        [$hi, $lo] = $limbs;
+        return self::u32ToBytesLe($limbs[1]).self::u32ToBytesLe($limbs[0]);
+    }
 
-        return $littleEndian
-            ? self::u32ToBytes($lo, true).self::u32ToBytes($hi, true)
-            : self::u32ToBytes($hi, false).self::u32ToBytes($lo, false);
+    /** @param array{0: int, 1: int} $limbs */
+    private static function u64ToBytesBe(array $limbs): string
+    {
+        return self::u32ToBytesBe($limbs[0]).self::u32ToBytesBe($limbs[1]);
     }
 
     /** @return array{0: int, 1: int} */
-    private static function bytesToU64(string $bytes, bool $littleEndian): array
+    private static function bytesToU64Le(string $bytes): array
     {
-        if ($littleEndian) {
-            return [
-                self::bytesToU32(\substr($bytes, 4, 4), true),
-                self::bytesToU32(\substr($bytes, 0, 4), true),
-            ];
-        }
-
         return [
-            self::bytesToU32(\substr($bytes, 0, 4), false),
-            self::bytesToU32(\substr($bytes, 4, 4), false),
+            self::bytesToU32Le(\substr($bytes, 4, 4)),
+            self::bytesToU32Le(\substr($bytes, 0, 4)),
         ];
     }
 
-    /** @return array{0: float, 1: int} mantissa in [0.5, 1), php-src frexp(3) semantics */
-    private static function frexpDecompose(float $abs): array
+    /** @return array{0: int, 1: int} */
+    private static function bytesToU64Be(string $bytes): array
     {
-        if (0.0 === $abs) {
-            return [0.0, 0];
-        }
-        $exp = 0;
-        $mantissa = $abs;
-        while ($mantissa >= 1.0) {
-            $mantissa /= 2.0;
-            ++$exp;
-        }
-        while ($mantissa > 0.0 && $mantissa < 0.5) {
-            $mantissa *= 2.0;
-            --$exp;
-        }
-
-        return [$mantissa, $exp];
+        return [
+            self::bytesToU32Be(\substr($bytes, 0, 4)),
+            self::bytesToU32Be(\substr($bytes, 4, 4)),
+        ];
     }
 
     /** Integer power-of-two for nested JIT (avoids pow() lowering). */
@@ -234,13 +282,13 @@ final class Ieee754
         $value = 1.0;
         if ($exp > 0) {
             for ($i = 0; $i < $exp; ++$i) {
-                $value *= 2.0;
+                $value = $value * 2.0;
             }
 
             return $value;
         }
         for ($i = 0; $i > $exp; --$i) {
-            $value /= 2.0;
+            $value = $value / 2.0;
         }
 
         return $value;

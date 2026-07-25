@@ -37,28 +37,30 @@ final class PackJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('StringPackJit', $bridge);
-        $this->assertStringContainsString('PackJitEngine', (string) file_get_contents(__DIR__.'/../../ext/standard/PackJitHelper.php'));
+        $this->assertStringContainsString('packFromBlob', (string) file_get_contents(__DIR__.'/../../ext/standard/PackJitHelper.php'));
+        $this->assertStringNotContainsString('PackJitEngine::pack', (string) file_get_contents(__DIR__.'/../../ext/standard/PackJitHelper.php'));
     }
 
     public function testPackJitHelperIsNotHelperRuntimeCorpusUnit(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPack.php');
-        $this->assertStringContainsString('not a helper-runtime corpus unit', $bridge);
+        $this->assertStringContainsString('PACK_HELPER_FILE', $bridge);
         $this->assertMatchesRegularExpression(
             '/PACK_HELPER_BUNDLE\s*=\s*\[[^\]]*'
             .'IEEE_PATH[^\]]*'
             .'ENCODE_PATH[^\]]*'
-            .'ENGINE_PATH[^\]]*'
             .'PACK_HELPER_FILE/s',
             $bridge
         );
+        $this->assertStringNotContainsString('ENGINE_PATH', $bridge);
     }
 
     public function testPackJitHelperAvoidsFunctionStaticNullDefault(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/PackJitHelper.php');
-        $this->assertStringContainsString('private static ?PackedArgvArrayMarker $arrayMarker', $source);
+        $this->assertStringNotContainsString('private static ?PackedArgvArrayMarker $arrayMarker', $source);
         $this->assertStringNotContainsString('static $marker = null', $source);
+        $this->assertStringContainsString('return new PackedArgvArrayMarker()', $source);
     }
 
     public function testPackEngineEncodeAvoidsHostPackBuiltin(): void
@@ -67,7 +69,8 @@ final class PackJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('$bytes = \\pack(', $source);
         $this->assertStringNotContainsString("\\unpack('S'", $source);
         $this->assertStringContainsString('#22981', $source);
-        $this->assertStringContainsString('Manual two\'s-complement bytes', $source);
+        $this->assertStringContainsString('putLongLe', $source);
+        $this->assertStringContainsString('NestedJIT', $source);
     }
 
     public function testPackEngineEncodePutLongMatchesHostPack(): void

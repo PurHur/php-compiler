@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6519 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20929 |
+| Source constructs flagged (warnings) | 20927 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2729,7 +2729,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamBucket.php` | 0 | 3 |
 | `ext/standard/JitStreamBucketKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamBufferKernel.php` | 0 | 2 |
-| `ext/standard/JitStreamCapsKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamCapsKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamContextCreate.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetDefault.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetOptions.php` | 0 | 1 |
@@ -25055,7 +25055,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/Ieee754.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 21 class method(s)
 
 ### `ext/standard/ImageTypeToExtensionJitHelper.php`
 
@@ -27263,9 +27263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamCapsKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 306)
 - 14 class method(s)
-- 1 closure(s)
 
 ### `ext/standard/JitStreamContextCreate.php`
 
@@ -28895,7 +28893,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackEngineEncode.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 17 class method(s)
 
 ### `ext/standard/PackJitEngine.php`
 
@@ -28905,8 +28903,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new PackedArgvArrayMarker (line 35)
-- 5 class method(s)
+- new PackedArgvArrayMarker (line 34)
+- 11 class method(s)
 
 ### `ext/standard/ParamSensitiveJitHelper.php`
 
@@ -46705,9 +46703,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 188)
 - new Variable (line 192)
 - new Variable (line 194)
-- new Variable (line 1851)
-- new Variable (line 1855)
-- new Variable (line 2127)
+- new Variable (line 1864)
+- new Variable (line 1868)
+- new Variable (line 2140)
 - 11 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`

@@ -1007,22 +1007,29 @@ restart:
                     $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
                     goto return_bool;
                 }
+                // Value-box doubles must use fadd/fsub/fmul/fdiv — integer add/sub/mul
+                // on double operands fails LLVM module verify (#22990 pack NestedJIT).
                 $leftDouble = $this->context->builder->call(
                     $this->context->lookupFunction('__value__readDouble'),
                     JitValueBox::valuePtrFromVariable($this->context, $left)
                 );
                 switch ($opcode->type) {
                     case OpCode::TYPE_PLUS:
-                        $result = $this->context->builder->add($leftDouble, $rightValue);
+                        $result = $this->context->builder->fadd($leftDouble, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_MINUS:
-                        $result = $this->context->builder->sub($leftDouble, $rightValue);
+                        $result = $this->context->builder->fsub($leftDouble, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_MUL:
-                        $result = $this->context->builder->mul($leftDouble, $rightValue);
+                        $result = $this->context->builder->fmul($leftDouble, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_DIV:
-                        $result = $this->context->builder->div($leftDouble, $rightValue);
+                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                            $this->context,
+                            $rightValue,
+                            'Division by zero'
+                        );
+                        $result = $this->context->builder->fdiv($leftDouble, $rightValue);
                         goto return_double;
                     case OpCode::TYPE_EQUAL:
                         $result = JitValueCompare::looseEqualValueToNativeDouble(
@@ -1159,22 +1166,28 @@ restart:
                     $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
                     goto return_bool;
                 }
+                // Peer VALUE⊙double above — float ops on boxed RHS (#22990).
                 $rightDouble = $this->context->builder->call(
                     $this->context->lookupFunction('__value__readDouble'),
                     JitValueBox::valuePtrFromVariable($this->context, $right)
                 );
                 switch ($opcode->type) {
                     case OpCode::TYPE_PLUS:
-                        $result = $this->context->builder->add($leftValue, $rightDouble);
+                        $result = $this->context->builder->fadd($leftValue, $rightDouble);
                         goto return_double;
                     case OpCode::TYPE_MINUS:
-                        $result = $this->context->builder->sub($leftValue, $rightDouble);
+                        $result = $this->context->builder->fsub($leftValue, $rightDouble);
                         goto return_double;
                     case OpCode::TYPE_MUL:
-                        $result = $this->context->builder->mul($leftValue, $rightDouble);
+                        $result = $this->context->builder->fmul($leftValue, $rightDouble);
                         goto return_double;
                     case OpCode::TYPE_DIV:
-                        $result = $this->context->builder->div($leftValue, $rightDouble);
+                        JitNumericDivisionGuard::emitZeroDoubleDivisorGuard(
+                            $this->context,
+                            $rightDouble,
+                            'Division by zero'
+                        );
+                        $result = $this->context->builder->fdiv($leftValue, $rightDouble);
                         goto return_double;
                     case OpCode::TYPE_EQUAL:
                         $result = JitValueCompare::looseEqualNativeDoubleToValue(

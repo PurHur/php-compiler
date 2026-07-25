@@ -41,7 +41,8 @@ final class PackJitEngine
         $currentArg = 0;
 
         foreach ($specs as $spec) {
-            [$output, $outputPos, $currentArg] = self::emitSpec(
+            // By-ref emit — NestedJIT list-assign from array returns drops updates (#22990).
+            self::emitSpec(
                 $spec['code'],
                 $spec['arg'],
                 $output,
@@ -63,22 +64,20 @@ final class PackJitEngine
         if ($consumed >= $argc) {
             return;
         }
-        @\trigger_error(\sprintf('pack(): %d arguments unused', $argc - $consumed), \E_USER_WARNING);
+        @\trigger_error('pack(): '.($argc - $consumed).' arguments unused', \E_USER_WARNING);
     }
 
     /**
      * @param list<int|float|string|bool|null> $args
-     *
-     * @return array{0: string, 1: int, 2: int}
      */
     private static function emitSpec(
         string $code,
         int $arg,
-        string $output,
-        int $outputPos,
+        string &$output,
+        int &$outputPos,
         array $args,
-        int $currentArg
-    ): array {
+        int &$currentArg
+    ): void {
         switch ($code) {
             case 'a':
             case 'A':
@@ -89,163 +88,180 @@ final class PackJitEngine
                 $pad = 'A' === $code ? ' ' : "\0";
                 $chunk = PackEngineEncode::padRight(\substr($str, 0, $argCp), $arg, $pad);
                 $output = PackEngineEncode::writeAt($output, $outputPos, $chunk);
+                $outputPos = $outputPos + $arg;
 
-                return [$output, $outputPos + $arg, $currentArg];
+                return;
             case 'h':
             case 'H':
                 $valueIdx = $currentArg;
                 $str = self::argString($args[$currentArg++], $valueIdx);
                 $packed = PackEngineEncode::packHex($str, $arg, 'H' === $code);
                 $output = PackEngineEncode::writeAt($output, $outputPos, $packed);
+                $outputPos = $outputPos + \strlen($packed);
 
-                return [$output, $outputPos + \strlen($packed), $currentArg];
+                return;
             case 'c':
             case 'C':
-                return self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 1, PackEngineEncode::machineLe());
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 1, PackEngineEncode::machineLe());
+
+                return;
+            // Split endian cases — NestedJIT bool literal assigns in array-return paths
+            // used to emit `ret i1` (#22990); keep void + direct bool args.
+            case 'n':
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 2, false);
+
+                return;
+            case 'v':
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 2, true);
+
+                return;
             case 's':
             case 'S':
-            case 'n':
-            case 'v':
-                $le = PackEngineEncode::machineLe();
-                if ('n' === $code) {
-                    $le = false;
-                } elseif ('v' === $code) {
-                    $le = true;
-                }
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 2, PackEngineEncode::machineLe());
 
-                return self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 2, $le);
+                return;
             case 'i':
             case 'I':
-                return self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, self::PACK_INT_SIZE, PackEngineEncode::machineLe());
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, self::PACK_INT_SIZE, PackEngineEncode::machineLe());
+
+                return;
+            case 'N':
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 4, false);
+
+                return;
+            case 'V':
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 4, true);
+
+                return;
             case 'l':
             case 'L':
-            case 'N':
-            case 'V':
-                $le = PackEngineEncode::machineLe();
-                if ('N' === $code) {
-                    $le = false;
-                } elseif ('V' === $code) {
-                    $le = true;
-                }
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 4, PackEngineEncode::machineLe());
 
-                return self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 4, $le);
+                return;
+            case 'J':
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 8, false);
+
+                return;
+            case 'P':
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 8, true);
+
+                return;
             case 'q':
             case 'Q':
-            case 'J':
-            case 'P':
-                $le = PackEngineEncode::machineLe();
-                if ('J' === $code) {
-                    $le = false;
-                } elseif ('P' === $code) {
-                    $le = true;
-                }
+                self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 8, PackEngineEncode::machineLe());
 
-                return self::emitLongRepeat($output, $outputPos, $args, $currentArg, $arg, 8, $le);
+                return;
             case 'f':
-                return self::emitFloatRepeat($output, $outputPos, $args, $currentArg, $arg, PackEngineEncode::machineLe());
+                self::emitFloatRepeat($output, $outputPos, $args, $currentArg, $arg, PackEngineEncode::machineLe());
+
+                return;
             case 'g':
-                return self::emitFloatRepeat($output, $outputPos, $args, $currentArg, $arg, true);
+                self::emitFloatRepeat($output, $outputPos, $args, $currentArg, $arg, true);
+
+                return;
             case 'G':
-                return self::emitFloatRepeat($output, $outputPos, $args, $currentArg, $arg, false);
+                self::emitFloatRepeat($output, $outputPos, $args, $currentArg, $arg, false);
+
+                return;
             case 'd':
-                return self::emitDoubleRepeat($output, $outputPos, $args, $currentArg, $arg, PackEngineEncode::machineLe());
+                self::emitDoubleRepeat($output, $outputPos, $args, $currentArg, $arg, PackEngineEncode::machineLe());
+
+                return;
             case 'e':
-                return self::emitDoubleRepeat($output, $outputPos, $args, $currentArg, $arg, true);
+                self::emitDoubleRepeat($output, $outputPos, $args, $currentArg, $arg, true);
+
+                return;
             case 'E':
-                return self::emitDoubleRepeat($output, $outputPos, $args, $currentArg, $arg, false);
+                self::emitDoubleRepeat($output, $outputPos, $args, $currentArg, $arg, false);
+
+                return;
             case 'x':
                 $output = PackEngineEncode::writeAt($output, $outputPos, PackEngineEncode::zeros($arg));
+                $outputPos = $outputPos + $arg;
 
-                return [$output, $outputPos + $arg, $currentArg];
+                return;
             case 'X':
-                $outputPos = $arg > $outputPos ? 0 : $outputPos - $arg;
+                if ($arg > $outputPos) {
+                    $outputPos = $outputPos - $outputPos;
+                } else {
+                    $outputPos = $outputPos - $arg;
+                }
 
-                return [$output, $outputPos, $currentArg];
+                return;
             case '@':
                 if ($arg > $outputPos) {
                     $output = PackEngineEncode::writeAt($output, $outputPos, PackEngineEncode::zeros($arg - $outputPos));
                 }
+                $outputPos = $arg;
 
-                return [$output, $arg, $currentArg];
+                return;
         }
 
-        throw new \ValueError(\sprintf('Type %s: unknown format code', $code));
+        throw new \ValueError('Type '.$code.': unknown format code');
     }
 
     /**
      * @param list<int|float|string|bool|null> $args
-     *
-     * @return array{0: string, 1: int, 2: int}
      */
     private static function emitLongRepeat(
-        string $output,
-        int $outputPos,
+        string &$output,
+        int &$outputPos,
         array $args,
-        int $currentArg,
+        int &$currentArg,
         int $count,
         int $size,
         bool $le
-    ): array {
+    ): void {
         for ($r = 0; $r < $count; ++$r) {
             $output = PackEngineEncode::writeAt(
                 $output,
                 $outputPos,
                 PackEngineEncode::putLong(self::takeArgLong($args, $currentArg), $size, $le)
             );
-            $outputPos += $size;
+            $outputPos = $outputPos + $size;
         }
-
-        return [$output, $outputPos, $currentArg];
     }
 
     /**
      * @param list<int|float|string|bool|null> $args
-     *
-     * @return array{0: string, 1: int, 2: int}
      */
     private static function emitFloatRepeat(
-        string $output,
-        int $outputPos,
+        string &$output,
+        int &$outputPos,
         array $args,
-        int $currentArg,
+        int &$currentArg,
         int $count,
         bool $le
-    ): array {
+    ): void {
         for ($r = 0; $r < $count; ++$r) {
             $output = PackEngineEncode::writeAt(
                 $output,
                 $outputPos,
                 PackEngineEncode::putFloat(self::takeArgDouble($args, $currentArg), $le)
             );
-            $outputPos += 4;
+            $outputPos = $outputPos + 4;
         }
-
-        return [$output, $outputPos, $currentArg];
     }
 
     /**
      * @param list<int|float|string|bool|null> $args
-     *
-     * @return array{0: string, 1: int, 2: int}
      */
     private static function emitDoubleRepeat(
-        string $output,
-        int $outputPos,
+        string &$output,
+        int &$outputPos,
         array $args,
-        int $currentArg,
+        int &$currentArg,
         int $count,
         bool $le
-    ): array {
+    ): void {
         for ($r = 0; $r < $count; ++$r) {
             $output = PackEngineEncode::writeAt(
                 $output,
                 $outputPos,
                 PackEngineEncode::putDouble(self::takeArgDouble($args, $currentArg), $le)
             );
-            $outputPos += 8;
+            $outputPos = $outputPos + 8;
         }
-
-        return [$output, $outputPos, $currentArg];
     }
 
     /**

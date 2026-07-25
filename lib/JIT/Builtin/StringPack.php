@@ -13,14 +13,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062, #22842).
  *
  * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (Ieee754 →
- * PackEngineEncode → PackJitEngine → PackJitHelper) in one NestedJIT scope (#22981).
- *
- * Intentionally not a helper-runtime corpus unit: the constant is
- * {@see self::PACK_HELPER_FILE} (name avoids the emit `*HELPER_PATH` suffix), so
- * emit discovery skips it.
- * Solo unit emit NestedJITs Ieee754 float math that fails module verify under
- * ENV_EMITTING; runtime StringPack NestedJIT in a full AOT context is the path.
- * php-src: ext/standard/pack.c
+ * PackEngineEncode → PackJitHelper) in one NestedJIT scope (#22981 / #22990).
+ * PackJitEngine is not NestedJIT'd — its specs/list-assign path yields empty output;
+ * PackJitHelper::packFromBlob fast-paths instead (#22990).
  */
 final class StringPack
 {
@@ -28,20 +23,17 @@ final class StringPack
 
     private const ENCODE_PATH = '/ext/standard/PackEngineEncode.php';
 
-    private const ENGINE_PATH = '/ext/standard/PackJitEngine.php';
-
     /** Repo-root path for PackJitHelper — not `*HELPER_PATH` (corpus skip — #22981). */
     private const PACK_HELPER_FILE = '/ext/standard/PackJitHelper.php';
 
     /**
-     * Ordered NestedJIT sources for runtime StringPack (#22981).
+     * Ordered NestedJIT sources for runtime StringPack (#22981 / #22990).
      *
      * @var list<string>
      */
     private const PACK_HELPER_BUNDLE = [
         self::IEEE_PATH,
         self::ENCODE_PATH,
-        self::ENGINE_PATH,
         self::PACK_HELPER_FILE,
     ];
 
