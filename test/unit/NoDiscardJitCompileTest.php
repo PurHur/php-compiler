@@ -34,8 +34,11 @@ final class NoDiscardJitCompileTest extends TestCase
 
     public function testDiscardedCallLowersCompilerTriggerError(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 #[\NoDiscard]
 function must_use(): int {
@@ -43,16 +46,23 @@ function must_use(): int {
 }
 must_use();
 PHP;
-        $block = $runtime->parseAndCompile($code, 'nodiscard_jit_probe.php');
-        $this->assertNotNull($block);
-        $runtime->jitCompileBlock($block);
-        $context = $runtime->loadJitContext();
-        $ir = $context->module->printToString();
-        $this->assertStringContainsString('__compiler_trigger_error', $ir);
-        $this->assertStringContainsString(
-            'should either be used or intentionally ignored by casting it as (void)',
-            $ir
-        );
-        $this->assertArrayHasKey('must_use', $context->noDiscardCalleeMessages);
+            $block = $runtime->parseAndCompile($code, 'nodiscard_jit_probe.php');
+            $this->assertNotNull($block);
+            $runtime->jitCompileBlock($block);
+            $context = $runtime->loadJitContext();
+            $ir = $context->module->printToString();
+            $this->assertStringContainsString('__compiler_trigger_error', $ir);
+            $this->assertStringContainsString(
+                'should either be used or intentionally ignored by casting it as (void)',
+                $ir
+            );
+            $this->assertArrayHasKey('must_use', $context->noDiscardCalleeMessages);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }
