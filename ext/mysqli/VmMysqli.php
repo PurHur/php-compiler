@@ -32,6 +32,15 @@ final class VmMysqli
 
     private static string $connectError = '';
 
+    /** Open mysqli links counted for mysqli_get_links_stats() (php-src MyG(num_links); #22183). */
+    private static int $numLinks = 0;
+
+    /** Active persistent links (php-src MyG(num_active_persistent); #22183). */
+    private static int $numActivePersistent = 0;
+
+    /** Inactive/cached persistent links (php-src MyG(num_inactive_persistent); #22183). */
+    private static int $numInactivePersistent = 0;
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['execute_query'])) {
@@ -166,6 +175,7 @@ final class VmMysqli
         $state->ctx = $ctx;
         self::$store[$entry->id] = $state;
         $entry->constructed = true;
+        self::noteLinkOpened($state);
 
         return $entry;
     }
@@ -182,8 +192,56 @@ final class VmMysqli
         $state->ctx = $ctx;
         self::$store[$entry->id] = $state;
         $entry->constructed = true;
+        self::noteLinkOpened($state);
 
         return $entry;
+    }
+
+    /**
+     * mysqli_get_links_stats() payload (php-src ext/mysqli/mysqli_nonapi.c; #22183).
+     *
+     * @return array{total: int, active_plinks: int, cached_plinks: int}
+     */
+    public static function linksStats(): array
+    {
+        return [
+            'total' => self::$numLinks,
+            'active_plinks' => self::$numActivePersistent,
+            'cached_plinks' => self::$numInactivePersistent,
+        ];
+    }
+
+    /** Count a successfully opened link (php-src MyG(num_links)++; #22183). */
+    public static function noteLinkOpened(MysqliState $state, bool $persistent = false): void
+    {
+        if ($state->countedInLinksStats) {
+            return;
+        }
+        $state->countedInLinksStats = true;
+        $state->persistent = $persistent;
+        ++self::$numLinks;
+        if ($persistent) {
+            ++self::$numActivePersistent;
+        }
+    }
+
+    /** Drop a closed link from counters (php-src MyG(num_links)--; #22183). */
+    public static function noteLinkClosed(MysqliState $state): void
+    {
+        if (!$state->countedInLinksStats) {
+            return;
+        }
+        $state->countedInLinksStats = false;
+        if (self::$numLinks > 0) {
+            --self::$numLinks;
+        }
+        if ($state->persistent) {
+            // Without a persistent free-pool, treat close as ending the active plink.
+            if (self::$numActivePersistent > 0) {
+                --self::$numActivePersistent;
+            }
+            $state->persistent = false;
+        }
     }
 
     public static function setConnectError(int $errno, string $error): void
@@ -518,7 +576,12 @@ final class VmMysqli
         $port = $port ?? (int) (ini_get('mysqli.default_port') ?: 3306);
         $socket = $socket ?? ini_get('mysqli.default_socket') ?: null;
 
-        return $native->real_connect($hostname, $username, $password, $database, $port, $socket, $flags);
+        $ok = $native->real_connect($hostname, $username, $password, $database, $port, $socket, $flags);
+        if ($ok) {
+            self::noteLinkOpened(self::state($entry, $ctx));
+        }
+
+        return $ok;
     }
 
     public static function optionsOnLink(ObjectEntry $entry, Context $ctx, int $option, mixed $value): bool
@@ -969,6 +1032,12 @@ final class MysqliState
     public ?\mysqli $native = null;
 
     public ?Context $ctx = null;
+
+    /** Whether this link is included in mysqli_get_links_stats() total (#22183). */
+    public bool $countedInLinksStats = false;
+
+    /** Persistent (pconnect) link — drives active_plinks (#22183). */
+    public bool $persistent = false;
 }
 
 /** @internal — mysqli_result VM wrapper. */
@@ -1258,6 +1327,7 @@ final class MysqliConstruct extends MysqliClassMethod
         $state->native = $native;
         $state->ctx = $ctx;
         VmMysqli::attachState($receiver, $state);
+        VmMysqli::noteLinkOpened($state);
     }
 
     private function stringArgNullable(Variable $var): ?string
@@ -1368,6 +1438,7 @@ final class MysqliClose extends MysqliClassMethod
             $state->native->close();
             $state->native = null;
         }
+        VmMysqli::noteLinkClosed($state);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

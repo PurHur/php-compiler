@@ -69,6 +69,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_release_savepoint.php';
         require_once __DIR__.'/mysqli_refresh.php';
         require_once __DIR__.'/mysqli_get_connection_stats.php';
+        require_once __DIR__.'/mysqli_get_links_stats.php';
         require_once __DIR__.'/mysqli_real_connect.php';
         require_once __DIR__.'/mysqli_options.php';
         require_once __DIR__.'/mysqli_set_charset.php';
@@ -175,6 +176,7 @@ class Module extends ModuleAbstract
             new mysqli_release_savepoint(),
             new mysqli_refresh(),
             new mysqli_get_connection_stats(),
+            new mysqli_get_links_stats(),
             new mysqli_real_connect(),
             new mysqli_options(),
             new mysqli_options('mysqli_set_opt'),

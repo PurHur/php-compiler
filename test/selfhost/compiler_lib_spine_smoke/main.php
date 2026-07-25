@@ -6586,6 +6586,7 @@ require_once __DIR__.'/../../../ext/mysqli/mysqli_fetch_assoc.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_fetch_row.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_free_result.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_get_connection_stats.php';
+require_once __DIR__.'/../../../ext/mysqli/mysqli_get_links_stats.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_info.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_init.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_multi_query.php';

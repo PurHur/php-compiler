@@ -34,6 +34,7 @@ final class mysqli_close extends Internal
             $state->native->close();
             $state->native = null;
         }
+        VmMysqli::noteLinkClosed($state);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
