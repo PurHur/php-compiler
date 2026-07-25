@@ -48,6 +48,7 @@ final class GeneratorVMTest extends BaseTest
                 'generator_yield_from_enum.phpt',
                 'generator_yield_from_foreach.phpt',
                 'iterator_to_array_generator_key_collision.phpt',
+                'generator_serialize_disallowed.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(
