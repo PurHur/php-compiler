@@ -2168,6 +2168,32 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ NumberFormatter ROUND_HALFODD / ROUND_TOWARD_ZERO / ROUND_AWAY_FROM_ZERO
+     * (ext/intl/formatter/formatter.stub.php; added with ICU UNUM_ROUND_HALF_ODD, #22704).
+     *
+     * Withheld on reference / PROFILE=8.2 (Zend 8.2 defined() false). Enable via stable 8.4.0+
+     * or explicit `PHP_COMPILER_PROFILE=8.4`. ROUND_UNNECESSARY is never advertised — absent
+     * from php-src stubs on every branch.
+     */
+    public static function supportsNumberFormatterPhp84RoundConsts(): bool
+    {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ array_all/any/find/find_key (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027, #15675).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
