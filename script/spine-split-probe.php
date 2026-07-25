@@ -73,16 +73,46 @@ if ([] === $rels) {
     exit(2);
 }
 
+/**
+ * Directories big enough that leaving them whole caps parallelism, mapped to how many
+ * sub-chunks to cut them into. ext/standard alone is ~2.1k files — a third of the spine —
+ * so however many chunks the rest is cut into, it decides wall time on its own.
+ *
+ * Sub-chunking is by first letter of the basename: arbitrary, but these are one-builtin-per-file
+ * leaves, so any balanced partition behaves the same. `--strategy=sub` reports what that costs
+ * in extra cross-chunk edges.
+ */
+const SPINE_SUBSPLIT = [
+    'ext/standard' => true,
+    'lib/JIT' => true,
+    'lib/VM' => true,
+];
+
 /** Chunk key for a repo-relative path under the chosen strategy. */
 $chunkOf = static function (string $rel) use ($strategy): string {
     $parts = explode('/', $rel);
+    $dir = \count($parts) > 2 ? $parts[0].'/'.$parts[1] : $parts[0];
+
     return match ($strategy) {
         // One chunk per top-level tree: lib, ext, …
         'top' => $parts[0],
         // One chunk per ext module, lib/<sub> otherwise.
         'ext' => 'ext' === $parts[0] ? 'ext/'.($parts[1] ?? '_') : 'lib',
+        // Per-directory, but cut the few oversized directories into letter buckets so no
+        // single chunk dominates wall time (#22642 follow-up).
+        'sub' => isset(SPINE_SUBSPLIT[$dir])
+            ? $dir.'#'.strtoupper(substr(basename($rel), 0, 1))
+            : $dir,
+        // Same cut, except the shared Vm* implementation classes stay together as one hub
+        // chunk per directory. The oversized directories are hub-and-leaf: many one-builtin
+        // leaf files calling a small Vm* core, so a letter cut severs every leaf from its hub.
+        'hub' => isset(SPINE_SUBSPLIT[$dir])
+            ? (str_starts_with(basename($rel), 'Vm')
+                ? $dir.'#hub'
+                : $dir.'#'.strtoupper(substr(basename($rel), 0, 1)))
+            : $dir,
         // Default: one chunk per immediate directory — the natural build unit.
-        default => \count($parts) > 2 ? $parts[0].'/'.$parts[1] : $parts[0],
+        default => $dir,
     };
 };
 
