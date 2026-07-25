@@ -164,6 +164,7 @@ class Module extends ModuleAbstract
             new mysqli_stmt_data_seek(),
             new mysqli_stmt_reset(),
             new mysqli_stmt_store_result(),
+            new mysqli_stmt_get_result(),
             new mysqli_stmt_free_result(),
             new mysqli_stmt_result_metadata(),
             new mysqli_autocommit(),

@@ -14,6 +14,7 @@ $funcs = [
     'mysqli_stmt_data_seek',
     'mysqli_stmt_reset',
     'mysqli_stmt_store_result',
+    'mysqli_stmt_get_result',
     'mysqli_stmt_free_result',
     'mysqli_stmt_result_metadata',
 ];
@@ -32,6 +33,7 @@ $methods = [
     'data_seek',
     'reset',
     'store_result',
+    'get_result',
     'free_result',
     'result_metadata',
 ];
@@ -52,6 +54,7 @@ mysqli_stmt_affected_rows:yes
 mysqli_stmt_data_seek:yes
 mysqli_stmt_reset:yes
 mysqli_stmt_store_result:yes
+mysqli_stmt_get_result:yes
 mysqli_stmt_free_result:yes
 mysqli_stmt_result_metadata:yes
 stmt::field_count:yes
@@ -65,5 +68,6 @@ stmt::affected_rows:yes
 stmt::data_seek:yes
 stmt::reset:yes
 stmt::store_result:yes
+stmt::get_result:yes
 stmt::free_result:yes
 stmt::result_metadata:yes

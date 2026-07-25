@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6530 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20960 |
+| Source constructs flagged (warnings) | 20963 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1332,7 +1332,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
 | `ext/mysqli/BuiltinClasses.php` | 0 | 8 |
-| `ext/mysqli/Module.php` | 0 | 88 |
+| `ext/mysqli/Module.php` | 0 | 89 |
 | `ext/mysqli/MysqliClassMethod.php` | 0 | 1 |
 | `ext/mysqli/MysqliConstants.php` | 0 | 1 |
 | `ext/mysqli/MysqliExtensionPolicy.php` | 0 | 1 |
@@ -1340,7 +1340,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mysqli/MysqliReportMode.php` | 0 | 1 |
 | `ext/mysqli/MysqliSqlExceptionGetSqlState.php` | 0 | 1 |
 | `ext/mysqli/VmMysqli.php` | 0 | 98 |
-| `ext/mysqli/VmMysqliStmt.php` | 0 | 27 |
+| `ext/mysqli/VmMysqliStmt.php` | 0 | 28 |
 | `ext/mysqli/bootstrap_mysqli_sql_exception.php` | 0 | 1 |
 | `ext/mysqli/mysqli_affected_rows.php` | 0 | 3 |
 | `ext/mysqli/mysqli_async_api.php` | 0 | 3 |
@@ -1386,7 +1386,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mysqli/mysqli_stmt_close.php` | 0 | 3 |
 | `ext/mysqli/mysqli_stmt_execute.php` | 0 | 3 |
 | `ext/mysqli/mysqli_stmt_fetch.php` | 0 | 3 |
-| `ext/mysqli/mysqli_stmt_introspection_api.php` | 0 | 4 |
+| `ext/mysqli/mysqli_stmt_introspection_api.php` | 0 | 5 |
 | `ext/mysqli/mysqli_store_result.php` | 0 | 2 |
 | `ext/odbc/BuiltinClasses.php` | 0 | 1 |
 | `ext/odbc/Module.php` | 0 | 50 |
@@ -13918,7 +13918,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- 64 class method(s)
+- 65 class method(s)
 - 1 closure(s)
 
 ### `ext/intl/VmMessageFormatter.php`
@@ -16899,32 +16899,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new mysqli_stmt_data_seek (line 164)
 - new mysqli_stmt_reset (line 165)
 - new mysqli_stmt_store_result (line 166)
-- new mysqli_stmt_free_result (line 167)
-- new mysqli_stmt_result_metadata (line 168)
-- new mysqli_autocommit (line 169)
-- new mysqli_begin_transaction (line 170)
-- new mysqli_commit (line 171)
-- new mysqli_rollback (line 172)
-- new mysqli_savepoint (line 173)
-- new mysqli_release_savepoint (line 174)
-- new mysqli_refresh (line 175)
-- new mysqli_get_connection_stats (line 176)
-- new mysqli_real_connect (line 177)
-- new mysqli_options (line 178)
+- new mysqli_stmt_get_result (line 167)
+- new mysqli_stmt_free_result (line 168)
+- new mysqli_stmt_result_metadata (line 169)
+- new mysqli_autocommit (line 170)
+- new mysqli_begin_transaction (line 171)
+- new mysqli_commit (line 172)
+- new mysqli_rollback (line 173)
+- new mysqli_savepoint (line 174)
+- new mysqli_release_savepoint (line 175)
+- new mysqli_refresh (line 176)
+- new mysqli_get_connection_stats (line 177)
+- new mysqli_real_connect (line 178)
 - new mysqli_options (line 179)
-- new mysqli_set_charset (line 180)
-- new mysqli_multi_query (line 181)
-- new mysqli_real_query (line 182)
-- new mysqli_next_result (line 183)
-- new mysqli_store_result (line 184)
-- new mysqli_use_result (line 185)
-- new mysqli_more_results (line 186)
-- new mysqli_stmt_more_results (line 187)
-- new mysqli_stmt_next_result (line 188)
-- new mysqli_poll (line 189)
-- new mysqli_reap_async_query (line 190)
-- new mysqli_info (line 191)
-- new mysqli_stat (line 192)
+- new mysqli_options (line 180)
+- new mysqli_set_charset (line 181)
+- new mysqli_multi_query (line 182)
+- new mysqli_real_query (line 183)
+- new mysqli_next_result (line 184)
+- new mysqli_store_result (line 185)
+- new mysqli_use_result (line 186)
+- new mysqli_more_results (line 187)
+- new mysqli_stmt_more_results (line 188)
+- new mysqli_stmt_next_result (line 189)
+- new mysqli_poll (line 190)
+- new mysqli_reap_async_query (line 191)
+- new mysqli_info (line 192)
+- new mysqli_stat (line 193)
 - 4 class method(s)
 
 ### `ext/mysqli/MysqliClassMethod.php`
@@ -17081,16 +17082,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new MysqliStmtDataSeek (line 52)
 - new MysqliStmtReset (line 53)
 - new MysqliStmtStoreResult (line 54)
-- new MysqliStmtFreeResult (line 55)
-- new MysqliStmtResultMetadata (line 56)
-- new MysqliStmtMoreResults (line 57)
-- new MysqliStmtNextResult (line 58)
-- new ObjectEntry (line 78)
-- new MysqliStmtState (line 79)
-- new ArgumentCountError (line 362)
-- new ArgumentCountError (line 407)
-- new ArgumentCountError (line 603)
-- 48 class method(s)
+- new MysqliStmtGetResult (line 55)
+- new MysqliStmtFreeResult (line 56)
+- new MysqliStmtResultMetadata (line 57)
+- new MysqliStmtMoreResults (line 58)
+- new MysqliStmtNextResult (line 59)
+- new ObjectEntry (line 79)
+- new MysqliStmtState (line 80)
+- new ArgumentCountError (line 383)
+- new ArgumentCountError (line 428)
+- new ArgumentCountError (line 624)
+- 50 class method(s)
 
 ### `ext/mysqli/bootstrap_mysqli_sql_exception.php`
 
@@ -17411,7 +17413,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 25)
 - new Error (line 33)
 - new ArgumentCountError (line 168)
-- 15 class method(s)
+- new Error (line 237)
+- 17 class method(s)
 
 ### `ext/mysqli/mysqli_store_result.php`
 
