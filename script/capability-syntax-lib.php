@@ -108,9 +108,12 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_CLONE', 'TYPE_METHODCALL_INIT'],
             'issue' => 4513,
             'jit' => true,
+            'aot' => true,
+            'profile' => '8.4',
             'notes' => [
                 'Ast\\CloneWithDesugar before php-parser (#4513); lowers to IIFE clone + property writes',
                 'Zend/zend_language_parser.y clone_expr with clause; zend_clones.c property overrides',
+                'AOT user-script: ignore leftover scope className on FLAG_CLOSURE (#23046, re-#19130)',
             ],
             'probe' => 'class C { public int $x = 1; public string $y = "a"; } $c = new C(); $d = clone $c with { x: 2, y: "b" }; echo $d->x, $d->y;',
         ],
