@@ -10,6 +10,12 @@ $payloads = [
     'ResourceBundle' => 'O:14:"ResourceBundle":0:{}',
     'IntlGregorianCalendar' => 'O:21:"IntlGregorianCalendar":0:{}',
     'IntlCalendar' => 'O:12:"IntlCalendar":0:{}',
+    'Transliterator' => 'O:14:"Transliterator":0:{}',
+    'Spoofchecker' => 'O:12:"Spoofchecker":0:{}',
+    'UConverter' => 'O:10:"UConverter":0:{}',
+    'IntlTimeZone' => 'O:12:"IntlTimeZone":0:{}',
+    'IntlBreakIterator' => 'O:17:"IntlBreakIterator":0:{}',
+    'IntlPartsIterator' => 'O:17:"IntlPartsIterator":0:{}',
 ];
 foreach ($payloads as $n => $payload) {
     try {
@@ -27,3 +33,9 @@ MessageFormatter Exception:Unserialization of 'MessageFormatter' is not allowed
 ResourceBundle Exception:Unserialization of 'ResourceBundle' is not allowed
 IntlGregorianCalendar Exception:Unserialization of 'IntlGregorianCalendar' is not allowed
 IntlCalendar Exception:Unserialization of 'IntlCalendar' is not allowed
+Transliterator Exception:Unserialization of 'Transliterator' is not allowed
+Spoofchecker Exception:Unserialization of 'Spoofchecker' is not allowed
+UConverter Exception:Unserialization of 'UConverter' is not allowed
+IntlTimeZone Exception:Unserialization of 'IntlTimeZone' is not allowed
+IntlBreakIterator Exception:Unserialization of 'IntlBreakIterator' is not allowed
+IntlPartsIterator Exception:Unserialization of 'IntlPartsIterator' is not allowed
