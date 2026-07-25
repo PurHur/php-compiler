@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * stream_get_meta_data / stream_set_blocking ABI bridges quarantined in ext/standard (#13846, #19678).
+ * stream_get_meta_data / stream_set_blocking NestedJIT via JitVmHelperLink (#13846, #19678, #22994).
  */
 final class StreamMetaKernelShrinkTest extends TestCase
 {
@@ -21,7 +21,7 @@ final class StreamMetaKernelShrinkTest extends TestCase
         $this->assertStringNotContainsString('StreamMetaJit', $runtime);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelUsesJitVmHelperLinkNotHandRolledNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamMetaKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
@@ -29,8 +29,16 @@ final class StreamMetaKernelShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_stream_get_meta_data', $source);
         $this->assertStringContainsString('__compiler_stream_set_blocking', $source);
         $this->assertStringContainsString('__compiler_stream_enable_crypto', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('StreamMetaJitHelper', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
+        $this->assertLessThan(210, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelNotBuiltinJit(): void
