@@ -2813,6 +2813,17 @@ final class CompilerVersion
     }
 
     /**
+     * ext/gmp via pure PHP {@see \PHPCompiler\ext\gmp\VmGmp} — withheld on reference profile (#22860).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host ext-gmp absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsGmp(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/snmp via pure PHP {@see \PHPCompiler\ext\snmp\VmSnmp} — withheld on reference profile (#6070).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2

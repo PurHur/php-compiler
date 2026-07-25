@@ -22,9 +22,9 @@ final class GmpModuleTest extends BaseTest
             __DIR__.'/../compliance/cases/gmp/add_cmp.phpt',
             'gmp_add_cmp.phpt'
         );
-        yield 'gmp_init_null.phpt' => self::parsePHPT(
-            __DIR__.'/../compliance/cases/gmp/gmp_init_null.phpt',
-            'gmp_init_null.phpt'
+        yield 'extension_loaded_gmp_forward84.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/gmp/extension_loaded_gmp_forward84.phpt',
+            'extension_loaded_gmp_forward84.phpt'
         );
         yield 'gmp_init_null_forward84.phpt' => self::parsePHPT(
             __DIR__.'/../compliance/cases/gmp/gmp_init_null_forward84.phpt',
@@ -41,6 +41,10 @@ final class GmpModuleTest extends BaseTest
         yield 'gmp_phase4_random_import.phpt' => self::parsePHPT(
             __DIR__.'/../compliance/cases/gmp/phase4_random_import.phpt',
             'gmp_phase4_random_import.phpt'
+        );
+        yield 'extension_loaded_gmp_phantom.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/extension_loaded_gmp_phantom.phpt',
+            'extension_loaded_gmp_phantom.phpt'
         );
     }
 }

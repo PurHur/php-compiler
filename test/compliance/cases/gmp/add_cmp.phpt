@@ -1,5 +1,7 @@
 --TEST--
 gmp add/cmp phase-1 parity (ext/gmp/gmp.c; issue #3341)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $a = gmp_init('999999999999999999999');

@@ -753,6 +753,10 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'snmp_phantom')) {
                 continue;
             }
+            if (CompilerVersion::supportsGmp()
+                && str_contains($name, 'extension_loaded_gmp_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))

@@ -9,12 +9,20 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
 
-/** gmp extension module entry (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539, #19540, #20519). */
+/**
+ * gmp extension module entry (php-src ext/gmp/gmp.c; issues #3341, #19527, #22860).
+ *
+ * Surface withheld on the reference profile ({@see GmpExtensionPolicy}) so
+ * extension_loaded('gmp') / function_exists('gmp_*') match Zend without ext-gmp.
+ */
 class Module extends ModuleAbstract
 {
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        if (!GmpExtensionPolicy::advertisesExtension()) {
+            return;
+        }
         VmGmpObject::registerClass($runtime->vmContext);
         foreach (GmpConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
@@ -25,11 +33,18 @@ class Module extends ModuleAbstract
 
     public static function registerClasses(Context $ctx): void
     {
+        if (!GmpExtensionPolicy::advertisesExtension()) {
+            return;
+        }
         VmGmpObject::registerClass($ctx);
     }
 
     public function getFunctions(): array
     {
+        if (!GmpExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
         return [
             new gmp_init(),
             new gmp_add(),

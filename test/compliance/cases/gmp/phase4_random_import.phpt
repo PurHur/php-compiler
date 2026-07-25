@@ -1,5 +1,7 @@
 --TEST--
 gmp phase-4 random/import/export (ext/gmp/gmp.c; issue #19540)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach (['gmp_random_seed','gmp_random_bits','gmp_random_range','gmp_import','gmp_export'] as $f) {

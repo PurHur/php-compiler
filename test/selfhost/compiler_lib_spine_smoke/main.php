@@ -748,6 +748,7 @@ require_once __DIR__.'/../../../ext/gettext/gettext.php';
 require_once __DIR__.'/../../../ext/gettext/ngettext.php';
 require_once __DIR__.'/../../../ext/gettext/textdomain.php';
 require_once __DIR__.'/../../../ext/gmp/GmpConstants.php';
+require_once __DIR__.'/../../../ext/gmp/GmpExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/gmp/GmpFunction.php';
 require_once __DIR__.'/../../../ext/gmp/GmpToString.php';
 require_once __DIR__.'/../../../ext/gmp/Module.php';

@@ -1,5 +1,7 @@
 --TEST--
 GMP phase 5: prime / bit / number-theory (#20394)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo 'sign=', gmp_sign(-3), ',', gmp_sign(0), ',', gmp_sign(9), "\n";

@@ -189,6 +189,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['yaml_parse', 'yaml_parse_file', 'yaml_emit', 'yaml_emit_file'], true)) {
             return \PHPCompiler\ext\yaml\YamlExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'gmp_')) {
+            return \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, [
             'ldap_escape',
             'ldap_dn2ufn',
@@ -284,6 +287,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('ftp' === $ext) {
             return \PHPCompiler\ext\ftp\FtpExtensionPolicy::advertisesExtension();
+        }
+        if ('gmp' === $ext) {
+            return \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();
         }
         if ('gnupg' === $ext) {
             return \PHPCompiler\ext\gnupg\GnupgExtensionPolicy::advertisesExtension();

@@ -1,5 +1,7 @@
 --TEST--
 gmp phase-3 powm/fact/gcd/lcm/sqrt/com (ext/gmp/gmp.c; issue #19539)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach (['gmp_powm','gmp_fact','gmp_gcd','gmp_lcm','gmp_sqrt','gmp_sqrtrem','gmp_perfect_square','gmp_com'] as $f) {

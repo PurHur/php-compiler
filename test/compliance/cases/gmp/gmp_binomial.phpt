@@ -1,5 +1,7 @@
 --TEST--
 gmp_binomial C(n,k) (ext/gmp/gmp.c; issue #20519)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo function_exists('gmp_binomial') ? 'yes' : 'no', "\n";

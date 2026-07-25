@@ -880,6 +880,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'snmp_phantom')) {
                 continue;
             }
+            if (CompilerVersion::supportsGmp()
+                && str_contains($name, 'extension_loaded_gmp_phantom')) {
+                continue;
+            }
+            // extension_loaded / class_exists introspection — VM-only (JIT module-verify on bool→int path; #22860).
+            if (str_contains($name, 'extension_loaded_gmp_phantom')
+                || str_contains($name, 'extension_loaded_gmp_forward84')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))

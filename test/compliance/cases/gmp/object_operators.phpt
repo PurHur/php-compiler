@@ -1,5 +1,7 @@
 --TEST--
 GMP object operators do_operation/compare (ext/gmp/gmp.c; issue #21265)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $a = gmp_init(10);
