@@ -89,6 +89,17 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('JitMbMimeheader.php', $entry);
         $this->assertStringContainsString('mb_encode_mimeheader.php', $entry);
         $this->assertStringContainsString('mb_decode_mimeheader.php', $entry);
+        // Honest full-spine AOT: call builtins, not VmMbstring::encodeMimeheader() STATICCALL (#22642 r13).
+        $this->assertStringContainsString("mb_encode_mimeheader('Hello", $entry);
+        $this->assertStringContainsString('mb_decode_mimeheader($__spineMimeEnc)', $entry);
+        $this->assertStringNotContainsString(
+            '\\PHPCompiler\\ext\\mbstring\\VmMbstring::encodeMimeheader(',
+            $entry
+        );
+        $this->assertStringNotContainsString(
+            '\\PHPCompiler\\ext\\mbstring\\VmMbstring::decodeMimeheader(',
+            $entry
+        );
     }
 
     public function testSpineEntryExercisesSetcookieOptionsParseArgs(): void
