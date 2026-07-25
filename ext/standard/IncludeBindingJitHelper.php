@@ -267,27 +267,34 @@ final class IncludeBindingJitHelper
             if (OpCode::TYPE_ASSIGN === $op->type) {
                 if (null !== $op->arg2) {
                     $alias = $block->getOperand($op->arg2);
-                    $aliasName = OperandName::resolve($alias);
-                    if (
-                        null !== $aliasName
-                        && $name === $aliasName
-                        && $op->arg1 !== $op->arg2
-                    ) {
-                        $storage = $block->getOperand($op->arg1);
-                        if ($context->hasVariableOpInScopes($storage)) {
-                            $storageVar = $context->getVariableFromOpInScopes($storage);
-                            if (
-                                Variable::KIND_VARIABLE === $storageVar->kind
-                                && (Variable::TYPE_VALUE === $storageVar->type || Variable::TYPE_STRING === $storageVar->type)
-                            ) {
-                                $lastAssign = $storageVar;
+                    // Slot may be absent from this block's scope during nested include
+                    // binding walks (honest full-spine AOT / #22642 r15).
+                    if (null !== $alias) {
+                        $aliasName = OperandName::resolve($alias);
+                        if (
+                            null !== $aliasName
+                            && $name === $aliasName
+                            && $op->arg1 !== $op->arg2
+                        ) {
+                            $storage = null !== $op->arg1 ? $block->getOperand($op->arg1) : null;
+                            if (null !== $storage && $context->hasVariableOpInScopes($storage)) {
+                                $storageVar = $context->getVariableFromOpInScopes($storage);
+                                if (
+                                    Variable::KIND_VARIABLE === $storageVar->kind
+                                    && (Variable::TYPE_VALUE === $storageVar->type || Variable::TYPE_STRING === $storageVar->type)
+                                ) {
+                                    $lastAssign = $storageVar;
+                                }
                             }
                         }
                     }
                 }
                 foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                    if (null === $slotIdx) {
+                        continue;
+                    }
                     $dest = $block->getOperand($slotIdx);
-                    if (OperandName::resolve($dest) !== $name) {
+                    if (null === $dest || OperandName::resolve($dest) !== $name) {
                         continue;
                     }
                     if ($context->hasVariableOpInScopes($dest)) {
@@ -329,8 +336,11 @@ final class IncludeBindingJitHelper
             }
             $matches = false;
             foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                if (null === $slotIdx) {
+                    continue;
+                }
                 $dest = $callerBlock->getOperand($slotIdx);
-                if (OperandName::resolve($dest) === $name) {
+                if (null !== $dest && OperandName::resolve($dest) === $name) {
                     $matches = true;
                     break;
                 }
@@ -424,8 +434,11 @@ final class IncludeBindingJitHelper
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN === $op->type) {
                 foreach ([$op->arg1, $op->arg2] as $slotIdx) {
+                    if (null === $slotIdx) {
+                        continue;
+                    }
                     $dest = $block->getOperand($slotIdx);
-                    if (OperandName::resolve($dest) === $name) {
+                    if (null !== $dest && OperandName::resolve($dest) === $name) {
                         ++$count;
                         if ($count > 1) {
                             return;
