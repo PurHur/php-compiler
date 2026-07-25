@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6551 |
-| Phase A inventory files (M2 ratio SSOT) | 6551 |
+| PHP files on vm.php path | 6552 |
+| Phase A inventory files (M2 ratio SSOT) | 6552 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21041 |
+| Source constructs flagged (warnings) | 21044 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -529,6 +529,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/exif/exif_thumbnail.php` | 0 | 2 |
 | `ext/ffi/BuiltinClasses.php` | 0 | 1 |
 | `ext/ffi/FfiExtensionPolicy.php` | 0 | 1 |
+| `ext/ffi/FfiSerializeDeny.php` | 0 | 3 |
 | `ext/ffi/Module.php` | 0 | 1 |
 | `ext/ffi/VmFFI.php` | 0 | 102 |
 | `ext/fileinfo/BuiltinClasses.php` | 0 | 7 |
@@ -10258,6 +10259,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/ffi/FfiSerializeDeny.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 23)
+- new Exception (line 30)
+- 4 class method(s)
 
 ### `ext/ffi/Module.php`
 
@@ -31881,63 +31889,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmSerializeRefState (line 63)
-- new Exception (line 168)
-- new Exception (line 172)
-- new Exception (line 176)
-- new Exception (line 180)
-- new Exception (line 183)
-- new Exception (line 187)
-- new Variable (line 240)
-- new Variable (line 263)
-- new Variable (line 273)
-- new Variable (line 283)
-- new Variable (line 293)
-- new Variable (line 303)
-- new Variable (line 313)
-- new VmSerializeRefState (line 405)
-- new Exception (line 549)
-- new Exception (line 553)
-- new Exception (line 557)
-- new Exception (line 561)
+- new VmSerializeRefState (line 64)
+- new Exception (line 169)
+- new Exception (line 173)
+- new Exception (line 177)
+- new Exception (line 181)
+- new Exception (line 184)
+- new Exception (line 188)
+- new Variable (line 243)
+- new Variable (line 266)
+- new Variable (line 276)
+- new Variable (line 286)
+- new Variable (line 296)
+- new Variable (line 306)
+- new Variable (line 316)
+- new VmSerializeRefState (line 408)
+- new Exception (line 552)
+- new Exception (line 556)
+- new Exception (line 560)
 - new Exception (line 564)
-- new Exception (line 568)
-- new ObjectEntry (line 795)
-- new Variable (line 796)
-- new ObjectEntry (line 843)
-- new Variable (line 847)
-- new ObjectEntry (line 859)
-- new Variable (line 865)
-- new Variable (line 875)
-- new ObjectEntry (line 893)
-- new Variable (line 894)
-- new Variable (line 896)
-- new Variable (line 953)
-- new Exception (line 979)
-- new Exception (line 983)
-- new Exception (line 987)
-- new Exception (line 991)
-- new Exception (line 995)
-- new Exception (line 999)
-- new VmSerializeEnumCaseRef (line 1069)
-- new VmSerializeEnumCaseRef (line 1074)
-- new Variable (line 1149)
-- new VmSerializeRefState (line 1199)
-- new Variable (line 1216)
-- new VmSerializeRefState (line 1238)
-- new Variable (line 1248)
-- new Variable (line 1298)
-- new Variable (line 1311)
-- new Variable (line 1417)
-- new ObjectEntry (line 1447)
-- new Variable (line 1451)
-- new Frame (line 1470)
-- new Variable (line 1473)
-- new Variable (line 1502)
-- new Variable (line 1518)
-- new Variable (line 1523)
-- new Variable (line 1538)
-- new Exception (line 1561)
+- new Exception (line 567)
+- new Exception (line 571)
+- new ObjectEntry (line 800)
+- new Variable (line 801)
+- new ObjectEntry (line 848)
+- new Variable (line 852)
+- new ObjectEntry (line 864)
+- new Variable (line 870)
+- new Variable (line 880)
+- new ObjectEntry (line 898)
+- new Variable (line 899)
+- new Variable (line 901)
+- new Variable (line 958)
+- new Exception (line 984)
+- new Exception (line 988)
+- new Exception (line 992)
+- new Exception (line 996)
+- new Exception (line 1000)
+- new Exception (line 1004)
+- new VmSerializeEnumCaseRef (line 1075)
+- new VmSerializeEnumCaseRef (line 1080)
+- new Variable (line 1155)
+- new VmSerializeRefState (line 1205)
+- new Variable (line 1222)
+- new VmSerializeRefState (line 1244)
+- new Variable (line 1254)
+- new Variable (line 1304)
+- new Variable (line 1317)
+- new Variable (line 1423)
+- new ObjectEntry (line 1453)
+- new Variable (line 1457)
+- new Frame (line 1476)
+- new Variable (line 1479)
+- new Variable (line 1508)
+- new Variable (line 1524)
+- new Variable (line 1529)
+- new Variable (line 1544)
+- new Exception (line 1567)
 - 60 class method(s)
 - 1 closure(s)
 
