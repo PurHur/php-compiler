@@ -87,6 +87,32 @@ final class VmStatCache
         self::clear(true, $path);
     }
 
+    /**
+     * Drop only negative (stat-failed) cache entries for $path — php-src keeps
+     * successful stats across content writes until clearstatcache (#22841).
+     *
+     * Used after create/touch/write when a prior miss must not stick, without
+     * refreshing positive hits (filesize/filemtime stay stale like Zend).
+     */
+    public static function invalidateNegative(string $path): void
+    {
+        if (\array_key_exists($path, self::$stat) && false === self::$stat[$path]) {
+            unset(self::$stat[$path]);
+        }
+        if (\array_key_exists($path, self::$lstat) && false === self::$lstat[$path]) {
+            unset(self::$lstat[$path]);
+        }
+        $resolved = VmStatNative::realpath($path);
+        if (false !== $resolved && $resolved !== $path) {
+            if (\array_key_exists($resolved, self::$stat) && false === self::$stat[$resolved]) {
+                unset(self::$stat[$resolved]);
+            }
+            if (\array_key_exists($resolved, self::$lstat) && false === self::$lstat[$resolved]) {
+                unset(self::$lstat[$resolved]);
+            }
+        }
+    }
+
     public static function reset(): void
     {
         self::$stat = [];
