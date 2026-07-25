@@ -30,6 +30,8 @@ use PHPCompiler\ext\posix\PosixConstants;
 use PHPCompiler\ext\pspell\PspellConstants;
 use PHPCompiler\ext\random\RandomConstants;
 use PHPCompiler\ext\session\SessionConstants;
+use PHPCompiler\ext\snmp\SnmpConstants;
+use PHPCompiler\ext\snmp\SnmpExtensionPolicy;
 use PHPCompiler\ext\soap\SoapConstants;
 use PHPCompiler\ext\sockets\SocketConstants;
 use PHPCompiler\ext\sodium\SodiumConstants;
@@ -97,9 +99,12 @@ final class ExtensionConstantGroups
         if (\PHPCompiler\ext\sodium\SodiumExtensionPolicy::advertisesExtension()) {
             $groups['sodium'] = SodiumConstants::registeredConstants();
         }
-        // Module buckets for extensions that register into Context::$constants (#22337 / re-#19113).
+        // Module buckets for extensions that register into Context::$constants (#22337 / re-#19113 / #22858).
         $groups['ftp'] = FtpConstants::registeredConstants();
         $groups['mysqli'] = MysqliConstants::registeredConstants();
+        if (SnmpExtensionPolicy::advertisesExtension()) {
+            $groups['snmp'] = SnmpConstants::registeredConstants();
+        }
         if (\PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension()) {
             $groups['gmp'] = GmpConstants::registeredConstants();
         }
