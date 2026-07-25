@@ -1,14 +1,19 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php
-@@ -206,6 +206,42 @@
+@@ -205,6 +205,46 @@
+     }
  
      private function replaceVariables(Operand $from, Operand $to, Block $block)
-     {
-+        if ('1' !== getenv('PHPCFG_SIMPLIFIER_USECHAIN')) {
-+            // Default: legacy CFG walk. The use-chain path changes replacement
-+            // ORDER, which is observable in downstream codegen (phi operand
-+            // types) — safe and proven only for lint workloads, which opt in
-+            // via bin/lint.php (#16077).
++    {
++        // Use-chain is the default (#23056): O(uses) instead of O(phis×blocks).
++        // Opcode dumps match legacy on a 193-file corpus; CFG type pretty-print
++        // can still differ. Opt out with PHPCFG_SIMPLIFIER_USECHAIN=0 or
++        // PHPCFG_SIMPLIFIER_LEGACY=1 for bisect (#16077).
++        $usechain = getenv('PHPCFG_SIMPLIFIER_USECHAIN');
++        $legacy = ('0' === $usechain)
++            || ('1' === getenv('PHPCFG_SIMPLIFIER_LEGACY'))
++            || ('false' === strtolower((string) $usechain));
++        if ($legacy) {
 +            $this->replaceVariablesByCfgWalk($from, $to, $block);
 +
 +            return;
@@ -16,7 +21,7 @@
 +        // Use-chain replacement: visit only the ops that actually reference
 +        // $from (Operand tracks usages/write-ops) instead of re-walking the
 +        // whole CFG per removed phi. The CFG walk was O(phis × blocks) and
-+        // took 121 s on a 32k-line file; this is O(uses) (#16077 root cause).
++        // took 121 s on a 32k-line file; this is O(uses) (#16077 / #23056).
 +        $ops = array_merge($from->usages, $from->ops);
 +        foreach ($ops as $op) {
 +            if ($op instanceof Op\Phi) {
@@ -37,9 +42,8 @@
 +        $from->ops = [];
 +    }
 +
-+    /** Legacy whole-CFG replacement, selectable via PHPCFG_SIMPLIFIER_LEGACY=1. */
++    /** Legacy whole-CFG replacement (PHPCFG_SIMPLIFIER_LEGACY=1 or USECHAIN=0). */
 +    private function replaceVariablesByCfgWalk(Operand $from, Operand $to, Block $block)
-+    {
+     {
          $toReplace = new \SplObjectStorage();
          $replaced = new \SplObjectStorage();
-         $toReplace->attach($block);
