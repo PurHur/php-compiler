@@ -96,6 +96,25 @@ PHP;
         self::assertSame('ok', ob_get_clean());
     }
 
+    /** @covers issue #22988 — cross-eval must hit inheritFromParent, not only same-script FinalPropertyOverrideCheck */
+    public function testEvalCannotOverrideFinalPlainProperty(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    final public string $x = 'a';
+}
+eval('class B extends A { public string $x = "b"; }');
+echo "EVAL_OK\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_plain_eval_override.php');
+        $this->assertNotNull($block);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot override final property A::$x');
+        $runtime->run($block);
+    }
+
     /** @covers issue #22474 */
     public function testChildCannotOverrideFinalSetHook(): void
     {

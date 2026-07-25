@@ -16945,9 +16945,16 @@ restart:
                 $exists = true;
                 break;
             }
-            if (!$exists) {
-                $entry->properties[] = $property;
+            if ($exists) {
+                // Child redeclared a non-private parent final property (#22988, Zend/zend_inheritance.c).
+                // Same-script compile is covered by FinalPropertyOverrideCheck; cross-eval needs
+                // this runtime path (see final class const #22329).
+                if (!$isPrivate && $property->propertyFinal) {
+                    $this->rejectChildOverrideOfFinalProperty($entry, $property);
+                }
+                continue;
             }
+            $entry->properties[] = $property;
         }
     }
 
@@ -18739,6 +18746,31 @@ restart:
             $childDisplay,
             $ownerDisplay,
             $constDisplay
+        ));
+    }
+
+    /**
+     * php-src zend_inheritance.c — "Cannot override final property %s::$%s" (#22988, #22339).
+     */
+    private function rejectChildOverrideOfFinalProperty(
+        ClassEntry $entry,
+        VM\ClassProperty $parentProperty
+    ): void {
+        if (!$parentProperty->propertyFinal) {
+            return;
+        }
+        $declaringLc = $parentProperty->declaringClassLc;
+        $ownerDisplay = $declaringLc !== '' ? $declaringLc : $entry->parentLc;
+        if (is_string($ownerDisplay) && isset($this->context->classes[$ownerDisplay])) {
+            $ownerDisplay = $this->context->classes[$ownerDisplay]->name;
+        }
+        if (!is_string($ownerDisplay) || '' === $ownerDisplay) {
+            $ownerDisplay = 'parent';
+        }
+        throw new \CompileError(sprintf(
+            'Cannot override final property %s::$%s',
+            $ownerDisplay,
+            $parentProperty->name
         ));
     }
 
