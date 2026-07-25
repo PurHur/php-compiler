@@ -84,6 +84,9 @@ final class json_validate extends Internal
         }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
+            // Compile-time fold via VmJsonValidate (same depth rules as VM). last_error is not
+            // updated at runtime for folded calls — AOT fixtures check the bool; VM/JIT cover
+            // json_last_error_msg (#23007). Non-literal json always hits NestedJIT below.
             $ok = VmJsonValidate::validate($literal, $depth, $flags ?? 0);
 
             return $context->getTypeFromString('int1')->constInt($ok ? 1 : 0, false);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringJsonDecode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
@@ -14,6 +15,7 @@ final class JitJsonLastErrorMsg
     /** @return Value (native string pointer boxed as PHP string) */
     public static function invoke(Context $context): Value
     {
+        StringJsonDecode::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
