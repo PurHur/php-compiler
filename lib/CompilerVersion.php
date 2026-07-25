@@ -589,6 +589,18 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
+    /**
+     * PHP 8.5+ #[\Deprecated] on traits — use-site E_USER_DEPRECATED + reject on interfaces/classes
+     * (Zend/zend_attributes.c validate_deprecated, rfc:deprecated_traits, #22989).
+     *
+     * Withheld on ≤8.4 profiles (matches Zend 8.4 — attribute on traits is inert; interfaces not fatal yet).
+     * Enable via stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5` forward profile.
+     */
+    public static function supportsDeprecatedTraitAttribute(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
     /** PHP 8.4+ #[\NoDiscard] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
     public static function advertisesNoDiscardAttributeClass(): bool
     {

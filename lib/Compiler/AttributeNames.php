@@ -150,6 +150,46 @@ final class AttributeNames
         );
     }
 
+    /** True when `#[\Deprecated]` is present (#22989). */
+    public static function hasDeprecated(array $names): bool
+    {
+        foreach ($names as $name) {
+            $base = ltrim((string) $name, '\\');
+            if ('Deprecated' === $base || str_ends_with($base, '\\Deprecated')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend 8.5+ validate_deprecated: #[\Deprecated] on class-likes is traits-only
+     * (zend_attributes.c, rfc:deprecated_traits, #22989). Interfaces/classes/enums fatal.
+     *
+     * @param list<string> $names
+     */
+    public static function assertDeprecatedAllowedOnClassLike(
+        array $names,
+        ?DeprecatedMetadata $meta,
+        string $objectType,
+        string $displayName
+    ): void {
+        if (!CompilerVersion::supportsDeprecatedTraitAttribute()) {
+            return;
+        }
+        if (null === $meta && !self::hasDeprecated($names)) {
+            return;
+        }
+        if ('trait' === $objectType) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Cannot apply #[\\Deprecated] to '.$objectType.' '.$displayName
+        );
+    }
+
     /** PHP 8.2 #[\SensitiveParameter] on parameters (issue #3351, Zend zend_attributes.c). */
     public static function isSensitiveParameter(array $names): bool
     {

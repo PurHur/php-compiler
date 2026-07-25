@@ -6815,7 +6815,7 @@ restart:
                     $this->inheritFromInterfaces($ifaceEntry);
                     $this->context->classes[$lcname] = $ifaceEntry;
                     $this->propagateInterfaceConstantsToImplementors($lcname);
-                    $this->flushDeferredTraitUses();
+                    $this->flushDeferredTraitUses($frame);
                     $this->flushDeferredClassConstants();
                     break;
                 case OpCode::TYPE_DECLARE_TRAIT:
@@ -6832,7 +6832,7 @@ restart:
                     $traitEntry->classDeprecated = $op->deprecatedMetadata;
                     self::defineClass($traitEntry, $op->block1, $frame);
                     $this->context->classes[$lcname] = $traitEntry;
-                    $this->flushDeferredTraitUses();
+                    $this->flushDeferredTraitUses($frame);
                     $this->flushDeferredClassConstants();
                     break;
                 case OpCode::TYPE_DECLARE_GLOBAL_CONST:
@@ -6894,7 +6894,7 @@ restart:
                     VM\EnumSupport::ensureBuiltinEnumInterfaces($classEntry);
                     $this->context->classes[$lcname] = $classEntry;
                     $this->context->enums[$lcname] = true;
-                    $this->flushDeferredTraitUses();
+                    $this->flushDeferredTraitUses($frame);
                     $this->flushDeferredClassConstants();
                     break;
                 case OpCode::TYPE_DECLARE_CLASS:
@@ -6968,7 +6968,7 @@ restart:
                         ];
                     }
                     $this->flushDeferredParentInheritance();
-                    $this->flushDeferredTraitUses();
+                    $this->flushDeferredTraitUses($frame);
                     $this->flushDeferredClassConstants();
                     break;
                 case OpCode::TYPE_NEW:
@@ -15729,9 +15729,9 @@ restart:
         return $ownMethods;
     }
 
-    protected function applyTraitUse(ClassEntry $entry, string $traitName, array $ownMethods = []): void
+    protected function applyTraitUse(ClassEntry $entry, string $traitName, array $ownMethods = [], ?Frame $warningFrame = null): void
     {
-        $this->applyTraitUsesWithAdaptations($entry, [$traitName], [], $ownMethods);
+        $this->applyTraitUsesWithAdaptations($entry, [$traitName], [], $ownMethods, $warningFrame);
     }
 
     /**
@@ -15764,17 +15764,19 @@ restart:
         ClassEntry $entry,
         array $traitNames,
         array $adaptations,
-        array $ownMethods
+        array $ownMethods,
+        ?Frame $warningFrame = null
     ): void {
         $this->context->deferredTraitUses[] = [
             'entry' => $entry,
             'traitNames' => $traitNames,
             'adaptations' => $adaptations,
             'ownMethods' => $ownMethods,
+            'warningFrame' => $warningFrame,
         ];
     }
 
-    protected function flushDeferredTraitUses(): void
+    protected function flushDeferredTraitUses(?Frame $warningFrame = null): void
     {
         if ([] === $this->context->deferredTraitUses) {
             return;
@@ -15790,7 +15792,8 @@ restart:
                 $deferred['entry'],
                 $deferred['traitNames'],
                 $deferred['adaptations'],
-                $deferred['ownMethods']
+                $deferred['ownMethods'],
+                $deferred['warningFrame'] ?? $warningFrame
             );
         }
         $this->context->deferredTraitUses = $remaining;
@@ -15915,14 +15918,15 @@ restart:
         ClassEntry $entry,
         array $traitNames,
         array $adaptations,
-        array $ownMethods = []
+        array $ownMethods = [],
+        ?Frame $warningFrame = null
     ): void {
         if ([] === $traitNames) {
             return;
         }
 
         if (!$this->canResolveAllTraitEntries($traitNames)) {
-            $this->queueDeferredTraitUse($entry, $traitNames, $adaptations, $ownMethods);
+            $this->queueDeferredTraitUse($entry, $traitNames, $adaptations, $ownMethods, $warningFrame);
 
             return;
         }
@@ -15957,6 +15961,7 @@ restart:
             if (VM\LazyGhostTraitSupport::isLazyGhostTrait($traitLc)) {
                 $entry->usesLazyGhostTrait = true;
             }
+            $this->emitTraitUseDeprecation($trait, $entry, $warningFrame);
             $entry->usedTraits[$trait->name] = $trait->name;
             $usedTraitNameByLc[$traitLc] = $trait->name;
             if (!isset($perTraitMethods[$traitLc])) {
@@ -16500,12 +16505,16 @@ restart:
      * @param list<string> $pendingTraits
      * @param array<string, true> $ownMethods
      */
-    protected function flushPendingTraitUses(ClassEntry $entry, array $pendingTraits, array $ownMethods = []): void
-    {
+    protected function flushPendingTraitUses(
+        ClassEntry $entry,
+        array $pendingTraits,
+        array $ownMethods = [],
+        ?Frame $warningFrame = null
+    ): void {
         if ([] === $pendingTraits) {
             return;
         }
-        $this->applyTraitUsesWithAdaptations($entry, $pendingTraits, [], $ownMethods);
+        $this->applyTraitUsesWithAdaptations($entry, $pendingTraits, [], $ownMethods, $warningFrame);
     }
 
     protected function inheritFromInterfaces(ClassEntry $entry): void
@@ -17128,7 +17137,7 @@ restart:
                 if ($this->opcodePrecedesPropertyDefaultNew($classBodyOps, $classBodyOpIndex)) {
                     continue;
                 }
-                $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
                 $pendingTraits = [];
                 $this->executeClassBodyDefaultInitOpcode($frame, $op);
 
@@ -17144,12 +17153,12 @@ restart:
                     $pendingTraits[] = $frame->scope[$op->arg1]->toString();
                     break;
                 case OpCode::TYPE_TRAIT_USE_ADAPTATION:
-                    $this->applyTraitUsesWithAdaptations($entry, $pendingTraits, $op->traitAdaptations, $ownMethods);
+                    $this->applyTraitUsesWithAdaptations($entry, $pendingTraits, $op->traitAdaptations, $ownMethods, $warningFrame ?? $frame);
                     $pendingTraits = [];
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     VM\RedundantTrueFalseUnionCheck::assertPropertyOp($frame, $op);
-                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
                     $pendingTraits = [];
                     $name = $frame->scope[$op->arg1];
                     $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
@@ -17239,7 +17248,7 @@ restart:
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     VM\RedundantTrueFalseUnionCheck::assertPropertyOp($frame, $op);
-                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
                     $pendingTraits = [];
                     $name = strtolower($frame->scope[$op->arg1]->toString());
                     $classLc = strtolower($entry->name);
@@ -17307,7 +17316,7 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
-                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
                     $pendingTraits = [];
                     $declaredName = $frame->scope[$op->arg1]->toString();
                     $name = strtolower($declaredName);
@@ -17380,19 +17389,19 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_DECLARE_CLASS_CONST:
-                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
                     $pendingTraits = [];
                     $this->applyClassConstDeclaration($entry, $block, $frame, $op);
                     break;
                 default:
-                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+                    $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
                     $pendingTraits = [];
                     throw new \LogicException(
                         'Other class body types are not jittable for now: '.opcode_type_name($op->type)
                     );
             }
         }
-        $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
+        $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods, $warningFrame ?? $frame);
         if ([] !== $pendingNewDefaultOps) {
             throw new \LogicException('Unterminated property default `new` initializer in class body');
         }
@@ -18533,6 +18542,37 @@ restart:
             return;
         }
         $this->emitDeprecatedNotice($class->classDeprecated->formatClass($class->name), $frame);
+    }
+
+    /**
+     * PHP 8.5+ #[\Deprecated] on traits — notice when the trait is directly `use`d (#22989).
+     *
+     * Bare `#[\Deprecated]` (no message/since) still emits (rfc:deprecated_traits); children that
+     * inherit a class using the trait do not re-emit unless they `use` it again.
+     */
+    private function emitTraitUseDeprecation(ClassEntry $trait, ClassEntry $user, ?Frame $frame = null): void
+    {
+        if (!CompilerVersion::supportsDeprecatedTraitAttribute()) {
+            return;
+        }
+        $meta = $trait->classDeprecated;
+        if (null === $meta) {
+            return;
+        }
+        $message = $meta->formatTraitUse($trait->name, $user->name);
+        $file = $user->sourceLocation?->filename;
+        $line = $user->sourceLocation?->startLine ?? 0;
+        if ((null === $file || '' === $file) && null !== $frame && '' !== $frame->scriptPath) {
+            $file = $frame->scriptPath;
+        }
+        $this->context->errors->triggerError(
+            $message,
+            ErrorReporter::E_USER_DEPRECATED,
+            (null !== $file && '' !== $file) ? $file : null,
+            $this->context,
+            $frame,
+            $line > 0 ? $line : 0
+        );
     }
 
     private function emitGlobalConstFetchDeprecation(string $constName, Frame $frame): void

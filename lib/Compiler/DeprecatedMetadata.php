@@ -203,6 +203,16 @@ final class DeprecatedMetadata
         return 'Class '.$name.' is deprecated'.$this->suffix();
     }
 
+    /**
+     * Trait use-site notice (PHP 8.5+, Zend zend_execute / rfc:deprecated_traits, #22989).
+     *
+     * Bare `#[\Deprecated]` (no message/since) still emits — unlike function/class use sites (#4392).
+     */
+    public function formatTraitUse(string $trait, string $class): string
+    {
+        return 'Trait '.$trait.' used by '.$class.' is deprecated'.$this->suffix();
+    }
+
     public function formatEnum(string $name): string
     {
         return 'Enum '.$name.' is deprecated'.$this->suffix();
