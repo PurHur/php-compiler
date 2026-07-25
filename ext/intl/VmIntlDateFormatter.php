@@ -173,6 +173,19 @@ final class VmIntlDateFormatter
 
             return false;
         }
+        // php-src dateformat_format.c — IS_ARRAY → tm_* localtime fields via formatter calendar (#22870).
+        $datetimeArg = $datetimeArg->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $datetimeArg->type) {
+            $resolved = self::resolveFormatInstantFromLocaltimeArray($formatter, $datetimeArg->toArray(), $state);
+            if (null === $resolved) {
+                return false;
+            }
+            [$timestamp, $microsecond] = $resolved;
+            self::clearObjectError($formatter);
+            IntlError::clear();
+
+            return self::formatIcuPattern($pattern, $timestamp, $microsecond, $state['timezone']);
+        }
         $resolved = self::resolveFormatInstant($datetimeArg, $frame->vmContext);
         if (null === $resolved) {
             return false;
@@ -934,6 +947,102 @@ final class VmIntlDateFormatter
     public static function isFormatterObject(?ObjectEntry $object): bool
     {
         return null !== $object && self::CLASS_LC === strtolower($object->class->name);
+    }
+
+    /**
+     * php-src dateformat_format.c `internal_get_timestamp` — associative localtime() array (#22870).
+     *
+     * Keys: tm_year (years since 1900), tm_mon (0–11), tm_mday, tm_hour, tm_min, tm_sec.
+     * Missing keys default to 0 (ICU ucal_setDateTime roll, e.g. mday=0 → prior month).
+     *
+     * @param array{locale: string, timezone: string, pattern: ?string, datetype: int, timetype: int, calendar: int, errorCode: int, errorMessage: string} $state
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    private static function resolveFormatInstantFromLocaltimeArray(
+        ObjectEntry $formatter,
+        HashTable $hashArr,
+        array $state
+    ): ?array {
+        if (0 === $hashArr->getNumElements()) {
+            return null;
+        }
+        $detail = null;
+        $year = self::localtimeArrayElem($hashArr, 'tm_year', $detail) + 1900;
+        $month = self::localtimeArrayElem($hashArr, 'tm_mon', $detail);
+        $hour = self::localtimeArrayElem($hashArr, 'tm_hour', $detail);
+        $minute = self::localtimeArrayElem($hashArr, 'tm_min', $detail);
+        $second = self::localtimeArrayElem($hashArr, 'tm_sec', $detail);
+        $mday = self::localtimeArrayElem($hashArr, 'tm_mday', $detail);
+        if (null !== $detail) {
+            // php-src INTL_METHOD_CHECK_STATUS after internal_get_timestamp collapses the detail.
+            self::fail(
+                $formatter,
+                'datefmt_format: date formatting failed: U_ILLEGAL_ARGUMENT_ERROR',
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR
+            );
+
+            return null;
+        }
+        try {
+            // tm_mon is 0-based (ICU / localtime); mktimeInTimezone expects 1-based month.
+            $timestamp = self::mktimeInTimezone(
+                $year,
+                $month + 1,
+                $mday,
+                $hour,
+                $minute,
+                $second,
+                $state['timezone']
+            );
+        } catch (\Throwable) {
+            self::fail(
+                $formatter,
+                'datefmt_format: date formatting failed: U_ILLEGAL_ARGUMENT_ERROR',
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR
+            );
+
+            return null;
+        }
+
+        return [$timestamp, 0];
+    }
+
+    /**
+     * php-src dateformat_format.c `internal_get_arr_ele` — missing key → 0; non-int / out of int32 → error.
+     *
+     * @param-out string|null $detail
+     */
+    private static function localtimeArrayElem(HashTable $hashArr, string $key, ?string &$detail): int
+    {
+        if (null !== $detail) {
+            return 0;
+        }
+        $ele = $hashArr->find($key);
+        if (null === $ele) {
+            return 0;
+        }
+        $ele = $ele->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $ele->type) {
+            $detail = \sprintf(
+                "datefmt_format: parameter array contains a non-integer element for key '%s'",
+                $key
+            );
+
+            return 0;
+        }
+        $value = $ele->toInt();
+        if ($value > 2147483647 || $value < -2147483648) {
+            $detail = \sprintf(
+                'datefmt_format: value %d is out of bounds for a 32-bit integer in key \'%s\'',
+                $value,
+                $key
+            );
+
+            return 0;
+        }
+
+        return $value;
     }
 
     /**
