@@ -17,6 +17,7 @@ use PHPCompiler\ext\dom\DomXPathSerializeDeny;
 use PHPCompiler\ext\fileinfo\FinfoSerializeDeny;
 use PHPCompiler\ext\intl\IntlSerializeDeny;
 use PHPCompiler\ext\openssl\OpensslSerializeDeny;
+use PHPCompiler\ext\random\RandomSecureSerializeDeny;
 use PHPCompiler\ext\reflection\ReflectionSerializeDeny;
 use PHPCompiler\ext\simplexml\SimpleXmlSerializeDeny;
 use PHPCompiler\ext\sockets\SocketSerializeDeny;
@@ -192,6 +193,8 @@ final class VmSerialize
             OpensslSerializeDeny::rejectUnserialization($className);
             // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
             ZlibContextSerializeDeny::rejectUnserialization($className);
+            // php-src ext/random/random.stub.php — @not-serializable Random\Engine\Secure (#23102).
+            RandomSecureSerializeDeny::rejectUnserialization($className);
             // php-src ext/xml/xml.stub.php — @not-serializable XMLParser (#23111).
             XmlParserSerializeDeny::rejectUnserialization($className);
             // php-src ext/reflection/php_reflection.stub.php — @not-serializable (#23087).
@@ -557,6 +560,8 @@ final class VmSerialize
         OpensslSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
         ZlibContextSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/random/random.stub.php — @not-serializable Random\Engine\Secure (#23102).
+        RandomSecureSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/xml/xml.stub.php — @not-serializable XMLParser (#23111).
         XmlParserSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/reflection/php_reflection.stub.php — @not-serializable (#23087).
@@ -966,6 +971,7 @@ final class VmSerialize
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
             OpensslSerializeDeny::rejectSerialization($value->toObject()->class->name);
             ZlibContextSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            RandomSecureSerializeDeny::rejectSerialization($value->toObject()->class->name);
             XmlParserSerializeDeny::rejectSerialization($value->toObject()->class->name);
             ReflectionSerializeDeny::rejectSerialization($value->toObject()->class->name);
             SimpleXmlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);

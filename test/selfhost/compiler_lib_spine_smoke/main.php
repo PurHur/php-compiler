@@ -1482,6 +1482,7 @@ require_once __DIR__.'/../../../ext/random/PcgOneseq128XslRr64Instance.php';
 require_once __DIR__.'/../../../ext/random/RandomConstants.php';
 require_once __DIR__.'/../../../ext/random/RandomU64.php';
 require_once __DIR__.'/../../../ext/random/RandomUint128.php';
+require_once __DIR__.'/../../../ext/random/RandomSecureSerializeDeny.php';
 require_once __DIR__.'/../../../ext/random/RandomizerBuiltin.php';
 require_once __DIR__.'/../../../ext/random/RandomizerGetBytesFromStringAlgo.php';
 require_once __DIR__.'/../../../ext/random/SecureInstance.php';
