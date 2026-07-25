@@ -1646,6 +1646,7 @@ require_once __DIR__.'/../../../ext/sockets/SocketAtmarkJitHelper.php';
 require_once __DIR__.'/../../../ext/sockets/SocketConstants.php';
 require_once __DIR__.'/../../../ext/sockets/SocketExportStreamJitHelper.php';
 require_once __DIR__.'/../../../ext/sockets/SocketImportStreamJitHelper.php';
+require_once __DIR__.'/../../../ext/sockets/SocketSerializeDeny.php';
 require_once __DIR__.'/../../../ext/sockets/SocketsLibcThinAbi.php';
 require_once __DIR__.'/../../../ext/sockets/VmAddressInfo.php';
 require_once __DIR__.'/../../../ext/sockets/VmSocket.php';

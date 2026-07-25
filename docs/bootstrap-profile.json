@@ -1816,6 +1816,7 @@
         "ext/simplexml/SimpleXmlJsonExport.php",
         "ext/simplexml/SimpleXmlNodeState.php",
         "ext/simplexml/SimpleXmlRegistry.php",
+        "ext/simplexml/SimpleXmlSerializeDeny.php",
         "ext/simplexml/VmSimpleXml.php",
         "ext/simplexml/VmSimpleXmlIterator.php",
         "ext/simplexml/simplexml_import_dom.php",
@@ -1883,6 +1884,7 @@
         "ext/sockets/SocketConstants.php",
         "ext/sockets/SocketExportStreamJitHelper.php",
         "ext/sockets/SocketImportStreamJitHelper.php",
+        "ext/sockets/SocketSerializeDeny.php",
         "ext/sockets/SocketsLibcThinAbi.php",
         "ext/sockets/VmAddressInfo.php",
         "ext/sockets/VmSocket.php",
@@ -6765,9 +6767,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6531,
+        "inventory_files": 6533,
         "excluded": 0,
-        "eligible": 6531,
+        "eligible": 6533,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
