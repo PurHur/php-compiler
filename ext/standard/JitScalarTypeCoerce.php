@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\simplexml\VmSimpleXml;
+use PHPCompiler\ext\simplexml\VmSimpleXmlIterator;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\MagicMethodDispatch;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -49,6 +53,8 @@ final class JitScalarTypeCoerce
     /**
      * Zend intval/floatval on plain objects after enum dispatch — E_WARNING + 1 / 1.0 (#10810, type.c).
      *
+     * SimpleXMLElement / SimpleXMLIterator: text content → number (sxe_object_cast_ex; #22715).
+     *
      * @param 'int'|'float' $kind
      */
     public static function emitPlainObjectToScalar(Context $context, Value $objPtr, string $kind): Value
@@ -72,14 +78,23 @@ final class JitScalarTypeCoerce
             $entries[(int) $id] = $name;
         }
 
-        $emitScalar = static function (Context $context, string $className, string $kind) use ($i64, $double): Value {
+        $emitScalar = static function (
+            Context $context,
+            string $className,
+            string $kind,
+            Value $objPtr
+        ) use ($i64, $double, $objectBuiltin): Value {
+            $sxe = self::tryEmitSimpleXmlNumericCast($context, $objPtr, $className, $kind, $objectBuiltin);
+            if (null !== $sxe) {
+                return $sxe;
+            }
             JitScalarEnumCoerce::emitObjectScalarWarning($context, $className, $kind);
 
             return 'int' === $kind ? $i64->constInt(1, false) : $double->constReal(1.0);
         };
 
         if ([] === $entries) {
-            return $emitScalar($context, 'stdClass', $kind);
+            return $emitScalar($context, 'stdClass', $kind, $objPtr);
         }
 
         $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
@@ -103,13 +118,13 @@ final class JitScalarTypeCoerce
                 $nextBlock
             );
             $context->builder->positionAtEnd($matchBlock);
-            $incoming[] = [$emitScalar($context, $entries[$id], $kind), $context->builder->getInsertBlock()];
+            $incoming[] = [$emitScalar($context, $entries[$id], $kind, $objPtr), $context->builder->getInsertBlock()];
             $context->builder->branch($doneBlock);
             $context->builder->positionAtEnd($nextBlock);
         }
 
         $context->builder->positionAtEnd($fallbackBlock);
-        $incoming[] = [$emitScalar($context, 'stdClass', $kind), $context->builder->getInsertBlock()];
+        $incoming[] = [$emitScalar($context, 'stdClass', $kind, $objPtr), $context->builder->getInsertBlock()];
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
@@ -119,5 +134,49 @@ final class JitScalarTypeCoerce
         }
 
         return $phi;
+    }
+
+    /**
+     * SimpleXMLElement numeric cast via __toString text then strtol/strtod (#22715).
+     *
+     * @param 'int'|'float' $kind
+     */
+    private static function tryEmitSimpleXmlNumericCast(
+        Context $context,
+        Value $objPtr,
+        string $className,
+        string $kind,
+        ObjectBuiltin $objectBuiltin
+    ): ?Value {
+        if (!self::isSimpleXmlNumericCastClass($objectBuiltin, $className)) {
+            return null;
+        }
+        $objVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $objPtr
+        );
+        $strVar = MagicMethodDispatch::coerceObjectToString($context, $objVar, $className);
+        if (null === $strVar) {
+            return null;
+        }
+        $strPtr = $context->helper->loadValue($strVar);
+        if ('int' === $kind) {
+            return JitZendScalarCast::castStringToInt($context, $strPtr);
+        }
+
+        return JitZendScalarCast::castStringToFloat($context, $strPtr);
+    }
+
+    private static function isSimpleXmlNumericCastClass(ObjectBuiltin $objectBuiltin, string $className): bool
+    {
+        $lc = strtolower(ltrim($className, '\\'));
+        if (VmSimpleXml::CLASS_LC === $lc || VmSimpleXmlIterator::CLASS_LC === $lc) {
+            return true;
+        }
+
+        return $objectBuiltin->classIsSubclassOf($lc, VmSimpleXml::CLASS_LC)
+            || $objectBuiltin->classIsSubclassOf($lc, VmSimpleXmlIterator::CLASS_LC);
     }
 }

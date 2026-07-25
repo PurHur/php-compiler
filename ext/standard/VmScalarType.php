@@ -125,6 +125,13 @@ final class VmScalarType
                 return;
             }
             if (Variable::TYPE_OBJECT === $v->type) {
+                // SimpleXMLElement: text → int (sxe_object_cast_ex), not plain-object warning (#22715).
+                $sxeInt = \PHPCompiler\ext\simplexml\VmSimpleXml::tryCastObjectToInt($v->toObject());
+                if (null !== $sxeInt) {
+                    $result->int($sxeInt);
+
+                    return;
+                }
                 self::legacyPlainObjectScalarCast($result, $v, $frame, 'int');
 
                 return;
@@ -183,6 +190,13 @@ final class VmScalarType
                 return;
             }
             if (Variable::TYPE_OBJECT === $v->type) {
+                // SimpleXMLElement: text → float (sxe_object_cast_ex), not plain-object warning (#22715).
+                $sxeFloat = \PHPCompiler\ext\simplexml\VmSimpleXml::tryCastObjectToFloat($v->toObject());
+                if (null !== $sxeFloat) {
+                    $result->float($sxeFloat);
+
+                    return;
+                }
                 self::legacyPlainObjectScalarCast($result, $v, $frame, 'float');
 
                 return;
