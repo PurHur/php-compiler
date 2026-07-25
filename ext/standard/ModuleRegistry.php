@@ -267,7 +267,8 @@ final class ModuleRegistry
     }
 
     /**
-     * @return list<string>|null null when extension is not loaded (php-src get_extension_funcs)
+     * @return list<string>|null null when extension is not loaded or has no function table
+     *                           (php-src get_extension_funcs — module->functions == NULL → false)
      */
     public static function getExtensionFunctions(string $extension): ?array
     {
@@ -275,8 +276,12 @@ final class ModuleRegistry
         if (!self::extensionLoaded($ext)) {
             return null;
         }
+        // Class-only modules (phar/ffi) never call registerModuleFunction — match Zend false (#23156).
+        if (!isset(self::$extensionFunctions[$ext])) {
+            return null;
+        }
 
-        return self::$extensionFunctions[$ext] ?? [];
+        return self::$extensionFunctions[$ext];
     }
 
     /**
@@ -352,6 +357,11 @@ final class ModuleRegistry
         string $primaryExtension,
         array $additionalExtensions
     ): string {
+        // Modules that shell under {@see standard} with one logical owner (ftp/intl/pgsql)
+        // attribute every registered builtin to that owner (#23156).
+        if ('standard' === $primaryExtension && 1 === \count($additionalExtensions)) {
+            return strtolower($additionalExtensions[0]);
+        }
         foreach ($additionalExtensions as $name) {
             if (self::functionBelongsToLogicalExtension($functionName, $name)) {
                 return strtolower($name);
@@ -447,6 +457,9 @@ final class ModuleRegistry
         'zip',
         'exif',
         'fileinfo',
+        'ftp',
+        'pgsql',
+        'intl',
     ];
 
     private static function functionBelongsToReflectionExtension(string $functionName, string $extension): bool
@@ -502,6 +515,25 @@ final class ModuleRegistry
             'fileinfo' => 'mime_content_type' === $lc,
             // php-src ext/shmop/shmop.c — separate from sysvshm (#22426)
             'shmop' => str_starts_with($lc, 'shmop_'),
+            // php-src ext/ftp/php_ftp.c (#23156)
+            'ftp' => str_starts_with($lc, 'ftp_'),
+            // php-src ext/pgsql/pgsql.c (#23156)
+            'pgsql' => str_starts_with($lc, 'pg_'),
+            // php-src ext/intl/php_intl.c (#23156)
+            'intl' => str_starts_with($lc, 'intl_')
+                || str_starts_with($lc, 'collator_')
+                || str_starts_with($lc, 'numfmt_')
+                || str_starts_with($lc, 'msgfmt_')
+                || str_starts_with($lc, 'datefmt_')
+                || str_starts_with($lc, 'intlcal_')
+                || str_starts_with($lc, 'intltz_')
+                || str_starts_with($lc, 'transliterator_')
+                || str_starts_with($lc, 'resourcebundle_')
+                || str_starts_with($lc, 'normalizer_')
+                || str_starts_with($lc, 'grapheme_')
+                || str_starts_with($lc, 'idn_')
+                || str_starts_with($lc, 'locale_')
+                || str_starts_with($lc, 'spoofchecker_'),
             default => false,
         };
     }
