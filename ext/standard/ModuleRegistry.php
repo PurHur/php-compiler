@@ -153,8 +153,10 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\snmp\SnmpExtensionPolicy::advertisesExtension();
         $withholdFfiSurface = 'ffi' === $primary
             && !\PHPCompiler\ext\ffi\FfiExtensionPolicy::advertisesExtension();
+        $withholdSoapSurface = 'soap' === $primary
+            && !\PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension();
 
-        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface && !$withholdYamlSurface && !$withholdRedisSurface && !$withholdMongodbSurface && !$withholdSnmpSurface && !$withholdFfiSurface) {
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface && !$withholdYamlSurface && !$withholdRedisSurface && !$withholdMongodbSurface && !$withholdSnmpSurface && !$withholdFfiSurface && !$withholdSoapSurface) {
             self::register($module->getExtensionName(), $moduleVersion);
         } elseif ($registerSqlite3ExtensionLoaded) {
             self::register($module->getExtensionName(), $moduleVersion);
@@ -181,7 +183,7 @@ final class ModuleRegistry
                 continue;
             }
             $fnName = strtolower($func->getName());
-            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface || $withholdWddxSurface || $withholdYamlSurface || $withholdRedisSurface || $withholdMongodbSurface || $withholdSnmpSurface || $withholdFfiSurface) {
+            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface || $withholdWddxSurface || $withholdYamlSurface || $withholdRedisSurface || $withholdMongodbSurface || $withholdSnmpSurface || $withholdFfiSurface || $withholdSoapSurface) {
                 self::registerBuiltinLookup($fnName);
 
                 continue;

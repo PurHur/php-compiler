@@ -224,6 +224,9 @@ final class BuiltinIntrospectionPolicy
         if ('fastcgi_finish_request' === $lc) {
             return VmFastCgi::registersFinishRequestFunction();
         }
+        if (\in_array($lc, ['is_soap_fault', 'use_soap_error_handler'], true)) {
+            return \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -287,6 +290,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('gnupg' === $ext) {
             return \PHPCompiler\ext\gnupg\GnupgExtensionPolicy::advertisesExtension();
+        }
+        if ('soap' === $ext) {
+            return \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension();
         }
 
         return true;
