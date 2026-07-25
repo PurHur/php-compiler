@@ -693,10 +693,11 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ #[\NoDiscard] attribute semantics / discarded-call warnings (Zend/zend_attributes.c, #6992).
+     * PHP 8.4+ #[\NoDiscard] unused-return E_WARNING (Zend/zend_attributes.c, #6992, #23038).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference / PROFILE=8.2 match Zend 8.2
-     * (attribute inert / no (void) cast). Forward profile: `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
+     * (attribute inert; no unused-return warning). Forward profile: `PHP_COMPILER_PROFILE=8.4`
+     * or stable 8.4.0+.
      */
     public static function supportsNoDiscardAttribute(): bool
     {
