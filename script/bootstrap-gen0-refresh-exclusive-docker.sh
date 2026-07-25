@@ -189,6 +189,7 @@ docker run -d \
   -e BOOTSTRAP_GEN0_LIVE_MOUNTS="${LIVE_MOUNTS}" \
   -e BOOTSTRAP_GEN0_HELPER_RUNTIME_O="${BOOTSTRAP_GEN0_HELPER_RUNTIME_O:-0}" \
   -e BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP="${BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP:-0}" \
+  -e BOOTSTRAP_GEN0_FORCE_ZEND_SPINE="${BOOTSTRAP_GEN0_FORCE_ZEND_SPINE:-1}" \
   "${IMAGE}" \
   bash -lc "
     set -uo pipefail
@@ -208,6 +209,9 @@ docker run -d \
     # Flat spine requires: keep shared include slots (pre-#22845 pace). MiniWebApp keeps
     # default remapping when this env is unset (#22642 r14 vs r13).
     export PHP_COMPILER_INCLUDE_SCOPE_REMAP=\${BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP:-0}
+    # After a trust restamp, live fingerprint matches the manifest while blobs are still
+    # ancient — force the honest Zend full-spine path (#22642). Opt out with =0.
+    export BOOTSTRAP_GEN0_FORCE_ZEND_SPINE=\${BOOTSTRAP_GEN0_FORCE_ZEND_SPINE:-1}
     mkdir -p /compiler/build
     export PHP_COMPILER_JIT_PROGRESS_FILE=/compiler/build/.last-jit-spine-exclusive
     # Runtime::parseAndCompileFile writes the include path to ENTRY (#22642 triage).
