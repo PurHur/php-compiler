@@ -19,6 +19,18 @@ final class SimpleXmlRegistry
     private static array $attributeViews = [];
 
     /**
+     * Live attribute dimension/property handles (`$sxe['a']`, `$attrs->a`).
+     * Entry shares the owning element node; name selects `$owner->attributes[$name]`
+     * on each read (php-src sxe.c; #22654).
+     *
+     * @var array<int, true>
+     */
+    private static array $attributeNodeViews = [];
+
+    /** @var array<int, string> */
+    private static array $attributeNodeNames = [];
+
+    /**
      * Namespace filter for live attributes() views (php-src sxe.c; #20332).
      * null/`''` ns ⇒ unqualified attrs only; non-empty ⇒ URI/prefix filter.
      *
@@ -64,6 +76,8 @@ final class SimpleXmlRegistry
         self::$states = [];
         self::$views = [];
         self::$attributeViews = [];
+        self::$attributeNodeViews = [];
+        self::$attributeNodeNames = [];
         self::$attributeViewFilters = [];
         self::$childrenViews = [];
         self::$childrenViewFilters = [];
@@ -102,6 +116,25 @@ final class SimpleXmlRegistry
             'ns' => $namespaceOrPrefix,
             'isPrefix' => $isPrefix,
         ];
+    }
+
+    /**
+     * Live `$sxe['attr']` / attributes() property handle (php-src sxe_prop_dim_read; #22654).
+     */
+    public static function attachAttributeNodeView(
+        ObjectEntry $entry,
+        SimpleXmlNodeState $owner,
+        string $attrName,
+        ?int $documentKey = null
+    ): void {
+        self::attach($entry, $owner, $documentKey);
+        self::$attributeNodeViews[$entry->id] = true;
+        self::$attributeNodeNames[$entry->id] = $attrName;
+    }
+
+    public static function attributeNodeName(ObjectEntry $entry): string
+    {
+        return self::$attributeNodeNames[$entry->id] ?? '';
     }
 
     /** @return array{ns: ?string, isPrefix: bool} */
@@ -187,6 +220,11 @@ final class SimpleXmlRegistry
     public static function isAttributesView(ObjectEntry $entry): bool
     {
         return isset(self::$attributeViews[$entry->id]);
+    }
+
+    public static function isAttributeNodeView(ObjectEntry $entry): bool
+    {
+        return isset(self::$attributeNodeViews[$entry->id]);
     }
 
     public static function documentKey(ObjectEntry $entry): int

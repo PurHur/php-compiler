@@ -249,8 +249,8 @@ final class VmSimpleXml
                 return null;
             }
 
-            // Same shape as attributes() foreach / $sxe['attr'] (#19351, #22733).
-            return self::wrapAttributeNode($ctx, $entry, $name, $map[$name]);
+            // Same shape as attributes() foreach / $sxe['attr'] (#19351, #22733, #22654).
+            return self::wrapAttributeNode($ctx, $entry, $name);
         }
         // Property access is always a live named-sibling selection under the context
         // parent (php-src sxe.c; #20483) — never a frozen snapshot or bare single node.
@@ -487,7 +487,7 @@ final class VmSimpleXml
                 }
                 $name = $names[$index];
                 $result = new Variable();
-                $result->object(self::wrapAttributeNode($ctx, $entry, $name, $map[$name]));
+                $result->object(self::wrapAttributeNode($ctx, $entry, $name));
 
                 return $result;
             }
@@ -518,8 +518,8 @@ final class VmSimpleXml
             if (null === $value) {
                 $result->null();
             } else {
-                // php-src sxe_prop_dim_read: $sxe['attr'] is SimpleXMLElement, not string (#22733).
-                $result->object(self::wrapAttributeNode($ctx, $entry, $name, $value));
+                // php-src sxe_prop_dim_read: $sxe['attr'] is live SimpleXMLElement (#22733, #22654).
+                $result->object(self::wrapAttributeNode($ctx, $entry, $name));
             }
 
             return $result;
@@ -706,6 +706,10 @@ final class VmSimpleXml
 
     public static function countElements(ObjectEntry $entry): int
     {
+        if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
+            // php-src: attribute SXE handles are not iterable collections (#22654).
+            return 0;
+        }
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return \count(self::attributesMap($entry));
         }
@@ -725,6 +729,15 @@ final class VmSimpleXml
     public static function elementName(ObjectEntry $entry): string
     {
         self::assertNodeInitialized($entry, 'SimpleXMLElement::getName()');
+        if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
+            $name = SimpleXmlRegistry::attributeNodeName($entry);
+            $owner = SimpleXmlRegistry::state($entry);
+            if (!\array_key_exists($name, $owner->attributes)) {
+                throw new \Error('SimpleXMLElement is not properly initialized');
+            }
+
+            return self::localNameFromQualified($name);
+        }
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             $attrs = self::attributesMap($entry);
             if ([] === $attrs) {
@@ -1209,10 +1222,14 @@ final class VmSimpleXml
     /** @return list<SimpleXmlNodeState> */
     public static function directElementChildren(ObjectEntry $entry): array
     {
+        if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
+            return [];
+        }
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             $out = [];
             foreach (self::attributesMap($entry) as $name => $value) {
                 // php-src sxe.c: attributes() foreach yields name => attribute SimpleXMLElement (#19351).
+                // Placeholder nodes carry the attr name; wrapChild promotes them to live handles (#22654).
                 $out[] = new SimpleXmlNodeState($name, [], [], $value);
             }
 
@@ -1248,6 +1265,12 @@ final class VmSimpleXml
 
     public static function textContent(ObjectEntry $entry): string
     {
+        if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
+            $name = SimpleXmlRegistry::attributeNodeName($entry);
+            $owner = SimpleXmlRegistry::state($entry);
+
+            return $owner->attributes[$name] ?? '';
+        }
         if (SimpleXmlRegistry::isNamedChildView($entry)) {
             $matches = self::namedChildViewElements($entry);
             if ([] === $matches) {
@@ -1366,21 +1389,103 @@ final class VmSimpleXml
     }
 
     /**
-     * Attribute dimension / property handle — php-src sxe_prop_dim_read returns SXE wrapping
-     * the attr local name + text value (not a bare string; #19351, #22733).
+     * Attribute dimension / property handle — php-src sxe_prop_dim_read returns a live SXE
+     * bound to the owning element's attribute slot (#19351, #22733, #22654).
+     *
+     * `$name` is the attributesMap / offset key (local name on NS-filtered views).
      */
-    private static function wrapAttributeNode(
+    public static function wrapAttributeNode(
         Context $ctx,
         ObjectEntry $parent,
-        string $name,
-        string $value
+        string $name
     ): ObjectEntry {
-        return self::wrapNode(
-            $ctx,
-            $parent->class,
-            new SimpleXmlNodeState($name, [], [], $value),
+        $owner = self::attributeOwnerState($parent);
+        $storageKey = self::attributeStorageKey($parent, $owner, $name);
+        $entry = new ObjectEntry($parent->class);
+        $entry->constructed = true;
+        SimpleXmlRegistry::attachAttributeNodeView(
+            $entry,
+            $owner,
+            $storageKey,
             SimpleXmlRegistry::documentKey($parent)
         );
+
+        return $entry;
+    }
+
+    /**
+     * Map an attributesMap / offset key to the owner's stored attribute name.
+     * NS-filtered views expose local names while the element stores `prefix:local` (#19554).
+     */
+    private static function attributeStorageKey(
+        ObjectEntry $parent,
+        SimpleXmlNodeState $owner,
+        string $mapKey
+    ): string {
+        if (!SimpleXmlRegistry::isAttributesView($parent)) {
+            return $mapKey;
+        }
+        if (\array_key_exists($mapKey, $owner->attributes)) {
+            return $mapKey;
+        }
+        $filter = SimpleXmlRegistry::attributesViewFilter($parent);
+        $ns = $filter['ns'];
+        if (null === $ns || '' === $ns) {
+            return $mapKey;
+        }
+        // Same prefix/URI resolution as filterAttributesByNamespace.
+        $namespaces = self::namespaceMapForEntry($parent);
+        $isPrefix = $filter['isPrefix'];
+        $targetUri = $isPrefix ? ($namespaces[$ns] ?? $ns) : $ns;
+        $matchedPrefix = null;
+        if ($isPrefix && isset($namespaces[$ns])) {
+            $matchedPrefix = $ns;
+        } else {
+            foreach ($namespaces as $prefix => $uri) {
+                if ($uri === $targetUri) {
+                    $matchedPrefix = $prefix;
+                    break;
+                }
+            }
+        }
+        foreach ($owner->attributes as $qname => $_) {
+            if (str_starts_with($qname, 'xmlns')) {
+                continue;
+            }
+            $colon = strpos($qname, ':');
+            if (false === $colon) {
+                continue;
+            }
+            $attrPrefix = substr($qname, 0, $colon);
+            $localName = substr($qname, $colon + 1);
+            if ($localName !== $mapKey) {
+                continue;
+            }
+            if (null !== $matchedPrefix && $attrPrefix === $matchedPrefix) {
+                return $qname;
+            }
+            if (null === $matchedPrefix) {
+                $attrUri = $namespaces[$attrPrefix] ?? '';
+                if ($attrUri === $targetUri) {
+                    return $qname;
+                }
+            }
+        }
+
+        return $mapKey;
+    }
+
+    /** Element node that owns the attributes map for `$parent` context. */
+    private static function attributeOwnerState(ObjectEntry $parent): SimpleXmlNodeState
+    {
+        if (SimpleXmlRegistry::isNamedChildView($parent)) {
+            $matches = self::namedChildViewElements($parent);
+            if ([] !== $matches) {
+                return $matches[0];
+            }
+        }
+
+        return SimpleXmlRegistry::state($parent);
     }
 
     /** @param list<SimpleXmlNodeState> $elements */
@@ -1495,7 +1600,9 @@ final class VmSimpleXml
     /** Detached xpath/node handles throw like php-src "not properly initialized" (#20483). */
     private static function assertNodeInitialized(ObjectEntry $entry, string $label): void
     {
-        if (SimpleXmlRegistry::isView($entry) || SimpleXmlRegistry::isAttributesView($entry)) {
+        if (SimpleXmlRegistry::isView($entry)
+            || SimpleXmlRegistry::isAttributesView($entry)
+            || SimpleXmlRegistry::isAttributeNodeView($entry)) {
             return;
         }
         if (SimpleXmlRegistry::state($entry)->detached) {
