@@ -59,11 +59,22 @@ final class ReflectionPropertyHookSupport
 
     /**
      * php-src ReflectionProperty::isFinal — prop->flags & ZEND_ACC_FINAL (#20511).
+     * private(set) is implicitly final (zend_API.c / manual, #23068).
      */
     public static function isFinal(ClassEntry $entry, ?ClassProperty $meta, string $property, Context $ctx): bool
     {
         if (null !== $meta) {
-            return $meta->propertyFinal;
+            if ($meta->propertyFinal
+                || \PHPCompiler\PropertyVisibility::isImplicitlyFinalFromPrivateSet($meta->setVisibility)
+            ) {
+                return true;
+            }
+        }
+        $vis = VmReflection::propertyVisibilityMeta($entry, $property, $ctx);
+        if (null !== $vis
+            && \PHPCompiler\PropertyVisibility::isImplicitlyFinalFromPrivateSet($vis['setVisibility'])
+        ) {
+            return true;
         }
         $lcClass = strtolower($entry->name);
         $propLc = strtolower($property);

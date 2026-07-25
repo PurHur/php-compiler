@@ -2981,9 +2981,12 @@ final class VmReflection
             $modifiers |= self::REFLECTION_IS_READONLY;
         }
         // php-src prop->flags & ZEND_ACC_FINAL → ReflectionProperty::IS_FINAL (#22341).
-        if (null !== $instance && $instance->propertyFinal) {
-            $modifiers |= self::REFLECTION_IS_FINAL;
-        } elseif (self::propertyIsFinalFromHookRegistry($entry, $property, $ctx)) {
+        // private(set) is implicitly final (zend_API.c, #23068).
+        if (
+            (null !== $instance && $instance->propertyFinal)
+            || self::propertyIsFinalFromHookRegistry($entry, $property, $ctx)
+            || \PHPCompiler\PropertyVisibility::isImplicitlyFinalFromPrivateSet($meta['setVisibility'])
+        ) {
             $modifiers |= self::REFLECTION_IS_FINAL;
         }
 
