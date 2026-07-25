@@ -62,6 +62,20 @@ if [[ "${SKIP_LINK}" -eq 0 ]]; then
     echo "bootstrap-refresh-gen0-sidecar: LLVM 9 not found (install via script/install-llvm9.sh)" >&2
     exit 2
   fi
+  # Cold-tree deadlock (#22642): refreshing gen-0 needs a compile driver, but the committed
+  # seed is refused once it is stale (#21855) and BOOTSTRAP_NO_ZEND_FALLBACK=1 forbids Zend —
+  # so the refresh dies after ~8s with "failed to build compiled driver" and the caller has to
+  # rediscover BOOTSTRAP_GEN0_ZEND_ONLY=1 from a log line. On a tree with no usable driver,
+  # bootstrapping through Zend is not a compromise, it is what gen-0 means. Select it here.
+  if [[ -z "${BOOTSTRAP_GEN0_ZEND_ONLY:-}" ]]; then
+    if [[ ! -x "${ROOT}/build/bin-compile-aot" ]] \
+      || ! bootstrap_lowering_source_stamp_matches "$(bootstrap_lowering_source_build_stamp)"; then
+      echo "==> no compile driver in this tree matches current lowering sources — bootstrapping via Zend"
+      echo "    (BOOTSTRAP_GEN0_ZEND_ONLY=1 selected automatically; export BOOTSTRAP_GEN0_ZEND_ONLY=0 to refuse and fail instead)"
+      export BOOTSTRAP_GEN0_ZEND_ONLY=1
+    fi
+  fi
+
   echo "==> M2 full spine link (BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1)"
   BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 \
     bash "${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
