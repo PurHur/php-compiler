@@ -27,8 +27,17 @@ final class JitSimpleXmlUserScript
 
     private static int $tokenSeq = 0;
 
+    /** Set when tryConstruct saw a compile-time literal rejected by host SimpleXMLElement (#22775). */
+    private static bool $lastConstructParseFailed = false;
+
+    public static function lastConstructParseFailed(): bool
+    {
+        return self::$lastConstructParseFailed;
+    }
+
     public static function tryConstruct(Context $context, JITVariable ...$args): ?Value
     {
+        self::$lastConstructParseFailed = false;
         if (\count($args) < 2 || !\extension_loaded('simplexml')) {
             return null;
         }
@@ -36,10 +45,25 @@ final class JitSimpleXmlUserScript
         if (null === $lit) {
             return null;
         }
+        // Clear host libxml ring so a failed construct does not leak into the compiler process.
+        $prevInternal = null;
+        if (\function_exists('libxml_use_internal_errors')) {
+            $prevInternal = \libxml_use_internal_errors(true);
+            \libxml_clear_errors();
+        }
         try {
             $tree = new \SimpleXMLElement($lit);
         } catch (\Throwable) {
+            self::$lastConstructParseFailed = true;
+            if (\function_exists('libxml_clear_errors')) {
+                \libxml_clear_errors();
+            }
+
             return null;
+        } finally {
+            if (null !== $prevInternal && \function_exists('libxml_use_internal_errors')) {
+                \libxml_use_internal_errors($prevInternal);
+            }
         }
         self::store($args[0], $tree);
 

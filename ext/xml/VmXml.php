@@ -29,6 +29,12 @@ final class VmXml
     /** libxml/xmlerror.h — XML_ERR_NAME_REQUIRED (php-src ext/libxml / libxml2; #22655, re-#14467). */
     private const XML_ERR_NAME_REQUIRED = 68;
 
+    /** libxml/xmlerror.h — XML_ERR_ENTITYREF_SEMICOL_MISSING (libxml2; #22774 / #22775). */
+    private const XML_ERR_ENTITYREF_SEMICOL_MISSING = 23;
+
+    /** libxml/xmlerror.h — XML_ERR_UNDECLARED_ENTITY (libxml2; #22774 / #22775). */
+    private const XML_ERR_UNDECLARED_ENTITY = 26;
+
     /** @var array<int, array<string, mixed>> */
     private static array $parsers = [];
 
@@ -255,10 +261,20 @@ final class VmXml
 
     /**
      * Validate XML well-formedness and record libxml errors when invalid (#14185).
+     *
+     * Also rejects undeclared general entities (XML_ERR_UNDECLARED_ENTITY) for SimpleXML /
+     * load-string callers (#22775). DOMDocument::loadXML uses {@see validationErrorRecords}
+     * then its own DTD-aware scan — keep entity checks out of that structural path (#22774).
      */
     public static function validateAndReport(Context $ctx, string $data, ?Frame $frame = null): bool
     {
         $error = self::validationErrorRecord($data);
+        if (null === $error) {
+            $element = self::stripDocumentMiscEnvelope(trim($data));
+            if ('' !== $element) {
+                $error = self::detectUndeclaredEntityRef($element);
+            }
+        }
         if (null === $error) {
             return true;
         }
@@ -359,6 +375,153 @@ final class VmXml
         }
 
         return self::adjustFragmentErrorOffset($error, $trimmed, $matches[3]);
+    }
+
+    /**
+     * Scan markup for undeclared / unterminated entity refs (libxml2 XML_ERR_UNDECLARED_ENTITY;
+     * php-src ext/simplexml/sxe.c + ext/dom/document.c; #22775 / #22774).
+     *
+     * Skips CDATA, comments, and PIs. Predefined entities and numeric character references
+     * are accepted. DTD general entities are not expanded here (caller must pass declared
+     * names when DOCTYPE support is wired).
+     *
+     * @param array<string, string|true> $generalEntities
+     *
+     * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex?: int}
+     */
+    public static function detectUndeclaredEntityRef(string $elementXml, array $generalEntities = []): ?array
+    {
+        $len = \strlen($elementXml);
+        $pos = 0;
+        while ($pos < $len) {
+            if ('<' === $elementXml[$pos]) {
+                $cdata = self::parseCdataSectionAt($elementXml, $pos);
+                if (null !== $cdata) {
+                    $pos = $cdata['end'];
+
+                    continue;
+                }
+                $comment = self::parseCommentAt($elementXml, $pos);
+                if (null !== $comment) {
+                    $pos = $comment['end'];
+
+                    continue;
+                }
+                $pi = self::parseProcessingInstructionAt($elementXml, $pos);
+                if (null !== $pi) {
+                    $pos = $pi['end'];
+
+                    continue;
+                }
+                ++$pos;
+
+                continue;
+            }
+            if ('&' !== $elementXml[$pos]) {
+                ++$pos;
+
+                continue;
+            }
+            $amp = $pos;
+            $afterAmp = $amp + 1;
+            if ($afterAmp >= $len) {
+                return self::errorRecord(
+                    1,
+                    $amp + 1,
+                    "EntityRef: expecting ';'\n",
+                    self::XML_ERR_ENTITYREF_SEMICOL_MISSING,
+                    LibxmlConstants::LIBXML_ERR_FATAL,
+                    $amp
+                );
+            }
+            // Character references: &#...; / &#x...;
+            if ('#' === $elementXml[$afterAmp]) {
+                $semi = strpos($elementXml, ';', $afterAmp + 1);
+                if (false === $semi) {
+                    return self::errorRecord(
+                        1,
+                        $len,
+                        "EntityRef: expecting ';'\n",
+                        self::XML_ERR_ENTITYREF_SEMICOL_MISSING,
+                        LibxmlConstants::LIBXML_ERR_FATAL,
+                        $len - 1
+                    );
+                }
+                $pos = $semi + 1;
+
+                continue;
+            }
+            $semi = strpos($elementXml, ';', $afterAmp);
+            if (false === $semi) {
+                $nameEnd = $afterAmp;
+                while ($nameEnd < $len && 1 === preg_match('/[A-Za-z0-9._:-]/', $elementXml[$nameEnd])) {
+                    ++$nameEnd;
+                }
+
+                return self::errorRecord(
+                    1,
+                    $nameEnd + 1,
+                    "EntityRef: expecting ';'\n",
+                    self::XML_ERR_ENTITYREF_SEMICOL_MISSING,
+                    LibxmlConstants::LIBXML_ERR_FATAL,
+                    $nameEnd
+                );
+            }
+            $nameEnd = $afterAmp;
+            while ($nameEnd < $semi && 1 === preg_match('/[A-Za-z0-9._:-]/', $elementXml[$nameEnd])) {
+                ++$nameEnd;
+            }
+            if ($nameEnd !== $semi) {
+                return self::errorRecord(
+                    1,
+                    $nameEnd + 1,
+                    "EntityRef: expecting ';'\n",
+                    self::XML_ERR_ENTITYREF_SEMICOL_MISSING,
+                    LibxmlConstants::LIBXML_ERR_FATAL,
+                    $nameEnd
+                );
+            }
+            $refName = substr($elementXml, $afterAmp, $semi - $afterAmp);
+            if ('' === $refName) {
+                return self::errorRecord(
+                    1,
+                    $semi + 1,
+                    "EntityRef: expecting ';'\n",
+                    self::XML_ERR_ENTITYREF_SEMICOL_MISSING,
+                    LibxmlConstants::LIBXML_ERR_FATAL,
+                    $semi
+                );
+            }
+            if (isset($generalEntities[$refName]) || null !== self::decodePredefinedXmlEntityName($refName)) {
+                $pos = $semi + 1;
+
+                continue;
+            }
+
+            // XML_ERR_UNDECLARED_ENTITY — column is 1-based index of the char after ';'.
+            return self::errorRecord(
+                1,
+                $semi + 2,
+                "Entity '".$refName."' not defined\n",
+                self::XML_ERR_UNDECLARED_ENTITY,
+                LibxmlConstants::LIBXML_ERR_FATAL,
+                $semi + 1
+            );
+        }
+
+        return null;
+    }
+
+    private static function decodePredefinedXmlEntityName(string $name): ?string
+    {
+        return match ($name) {
+            'amp' => '&',
+            'lt' => '<',
+            'gt' => '>',
+            'quot' => '"',
+            'apos' => "'",
+            default => null,
+        };
     }
 
     /**

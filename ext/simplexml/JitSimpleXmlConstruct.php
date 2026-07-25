@@ -19,6 +19,12 @@ final class JitSimpleXmlConstruct
         }
         $stored = JitSimpleXmlUserScript::tryConstruct($context, ...$args);
         if (null === $stored) {
+            // Host SimpleXMLElement rejected the compile-time literal (undeclared entity, …).
+            // Surface Zend's Exception message at compile time; full catchable AOT throw for
+            // parse failures needs a non-detached builder (follow-up). VM path is SSOT (#22775).
+            if (JitSimpleXmlUserScript::lastConstructParseFailed()) {
+                throw new \Exception('String could not be parsed as XML');
+            }
             throw new \LogicException(
                 'SimpleXMLElement::__construct() user-script AOT requires a compile-time string literal (#19306)'
             );
