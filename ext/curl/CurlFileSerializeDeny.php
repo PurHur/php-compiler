@@ -5,10 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\curl;
 
 /**
- * php-src ext/curl/curl_file.stub.php — @not-serializable on CURLFile (#23064).
+ * php-src @not-serializable curl objects:
+ * - CURLFile — ext/curl/curl_file.stub.php (#23064)
+ * - CurlHandle / CurlMultiHandle / CurlShareHandle — ext/curl/curl.stub.php (#23074)
  */
 final class CurlFileSerializeDeny
 {
+    /** @var list<string> */
+    private const DENIED_LC = [
+        CurlFileBuiltin::CLASS_LC,
+        VmCurlEasy::CLASS_LC,
+        VmCurlMulti::CLASS_LC,
+        VmCurlShare::CLASS_LC,
+        VmCurlShare::PERSISTENT_CLASS_LC,
+    ];
+
     public static function rejectSerialization(string $className): void
     {
         if (self::isDenied($className)) {
@@ -25,7 +36,7 @@ final class CurlFileSerializeDeny
 
     private static function isDenied(string $className): bool
     {
-        return CurlFileBuiltin::CLASS_LC === strtolower(ltrim($className, '\\'));
+        return \in_array(strtolower(ltrim($className, '\\')), self::DENIED_LC, true);
     }
 
     private static function displayName(string $className): string
