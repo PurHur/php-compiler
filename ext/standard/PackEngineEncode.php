@@ -19,72 +19,100 @@ namespace PHPCompiler\ext\standard;
  */
 final class PackEngineEncode
 {
-    private static ?bool $machineLe = null;
-
     public static function machineLe(): bool
     {
-        if (null === self::$machineLe) {
-            // Do not probe with \unpack/\pack — NestedJIT of this unit is on the pack()
-            // helper path and re-entering those builtins is the #22981 hang.
-            // Committed helper-runtime arches (x86_64/aarch64 *-linux) are little-endian.
-            self::$machineLe = true;
-        }
-
-        return self::$machineLe;
+        // NestedJIT of nullable static ?bool props mis-stores __value__* (#22990).
+        // Committed helper-runtime arches (x86_64/aarch64 *-linux) are little-endian
+        // (#22981); no runtime probe.
+        return true;
     }
 
     public static function putLong(int $value, int $size, bool $littleEndian): string
     {
-        // Manual two's-complement bytes — never \pack() (#22981 NestedJIT cycle).
+        // Host/Zend path. NestedJIT mishandles bool args (#22990) — AOT uses putLongLe/Be.
+        return $littleEndian ? self::putLongLe($value, $size) : self::putLongBe($value, $size);
+    }
+
+    /** NestedJIT-safe LE encode — no bool param (#22990). */
+    public static function putLongLe(int $value, int $size): string
+    {
         switch ($size) {
             case 1:
                 return \chr($value & 0xFF);
             case 2:
-                return self::u16ToBytes($value & 0xFFFF, $littleEndian);
+                return self::u16ToBytesLe($value & 0xFFFF);
             case 8:
-                return self::i64ToBytes($value, $littleEndian);
+                return self::u32ToBytesLe($value & 0xFFFFFFFF)
+                    .self::u32ToBytesLe(($value >> 32) & 0xFFFFFFFF);
             case 4:
             default:
-                return self::u32ToBytes($value & 0xFFFFFFFF, $littleEndian);
+                return self::u32ToBytesLe($value & 0xFFFFFFFF);
         }
     }
 
-    private static function u16ToBytes(int $bits, bool $littleEndian): string
+    /** NestedJIT-safe BE encode — no bool param (#22990). */
+    public static function putLongBe(int $value, int $size): string
     {
-        $b0 = \chr($bits & 0xFF);
-        $b1 = \chr(($bits >> 8) & 0xFF);
-
-        return $littleEndian ? $b0.$b1 : $b1.$b0;
+        switch ($size) {
+            case 1:
+                return \chr($value & 0xFF);
+            case 2:
+                return self::u16ToBytesBe($value & 0xFFFF);
+            case 8:
+                return self::u32ToBytesBe(($value >> 32) & 0xFFFFFFFF)
+                    .self::u32ToBytesBe($value & 0xFFFFFFFF);
+            case 4:
+            default:
+                return self::u32ToBytesBe($value & 0xFFFFFFFF);
+        }
     }
 
-    private static function u32ToBytes(int $bits, bool $littleEndian): string
+    private static function u16ToBytesLe(int $bits): string
     {
-        $b0 = \chr($bits & 0xFF);
-        $b1 = \chr(($bits >> 8) & 0xFF);
-        $b2 = \chr(($bits >> 16) & 0xFF);
-        $b3 = \chr(($bits >> 24) & 0xFF);
-
-        return $littleEndian ? $b0.$b1.$b2.$b3 : $b3.$b2.$b1.$b0;
+        return \chr($bits & 0xFF).\chr(($bits >> 8) & 0xFF);
     }
 
-    private static function i64ToBytes(int $value, bool $littleEndian): string
+    private static function u16ToBytesBe(int $bits): string
     {
-        $lo = $value & 0xFFFFFFFF;
-        $hi = ($value >> 32) & 0xFFFFFFFF;
+        return \chr(($bits >> 8) & 0xFF).\chr($bits & 0xFF);
+    }
 
-        return $littleEndian
-            ? self::u32ToBytes($lo, true).self::u32ToBytes($hi, true)
-            : self::u32ToBytes($hi, false).self::u32ToBytes($lo, false);
+    private static function u32ToBytesLe(int $bits): string
+    {
+        return \chr($bits & 0xFF)
+            .\chr(($bits >> 8) & 0xFF)
+            .\chr(($bits >> 16) & 0xFF)
+            .\chr(($bits >> 24) & 0xFF);
+    }
+
+    private static function u32ToBytesBe(int $bits): string
+    {
+        return \chr(($bits >> 24) & 0xFF)
+            .\chr(($bits >> 16) & 0xFF)
+            .\chr(($bits >> 8) & 0xFF)
+            .\chr($bits & 0xFF);
     }
 
     public static function putFloat(float $value, bool $littleEndian): string
     {
-        return Ieee754::encodeFloat32($value, $littleEndian);
+        return $littleEndian ? self::putFloatLe($value) : Ieee754::encodeFloat32($value, false);
     }
 
     public static function putDouble(float $value, bool $littleEndian): string
     {
-        return Ieee754::encodeFloat64($value, $littleEndian);
+        return $littleEndian ? self::putDoubleLe($value) : Ieee754::encodeFloat64($value, false);
+    }
+
+    /** NestedJIT-safe machine-endian float (#22990). */
+    public static function putFloatLe(float $value): string
+    {
+        return Ieee754::encodeFloat32Le($value);
+    }
+
+    /** NestedJIT-safe machine-endian double (#22990). */
+    public static function putDoubleLe(float $value): string
+    {
+        return Ieee754::encodeFloat64Le($value);
     }
 
     public static function writeAt(string $output, int $pos, string $chunk): string
@@ -157,7 +185,7 @@ final class PackEngineEncode
             if ($n < 0) {
                 // php-src: php_error_docref(NULL, E_WARNING, "Type %c: illegal hex digit %c", code, n);
                 @\trigger_error(
-                    \sprintf('pack(): Type %s: illegal hex digit %s', $type, $digit),
+                    'pack(): Type '.$type.': illegal hex digit '.$digit,
                     \E_USER_WARNING
                 );
                 $n = 0;

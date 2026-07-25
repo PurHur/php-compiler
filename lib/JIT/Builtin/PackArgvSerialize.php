@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\VM\Variable as VmVariable;
+use PHPCompiler\JIT\Variable as JitVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -15,6 +15,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Serialize __value__ argv into a blob for {@see PackJitHelper} (#9133).
  *
  * Thin LLVM glue; pack semantics live in {@see \PHPCompiler\ext\standard\PackEngine}.
+ *
+ * Value-box type bytes use JIT tags ({@see __value__writeDouble} →
+ * {@see JitVariable::TYPE_NATIVE_DOUBLE}=3). VmVariable::TYPE_FLOAT=2 collides with
+ * TYPE_NATIVE_BOOL and mis-classifies doubles as bools (#20651 / #22990).
  */
 final class PackArgvSerialize
 {
@@ -157,27 +161,38 @@ final class PackArgvSerialize
         $coerceLongBb = $fn->appendBasicBlock('pack_ser_val_coerce_long');
         $after = $fn->appendBasicBlock('pack_ser_val_after');
 
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_NULL, false));
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JitVariable::TYPE_NULL, false));
         $context->builder->branchIf($isNull, $nullBb, $checkIntBb);
 
         $context->builder->positionAtEnd($checkIntBb);
-        $isInt = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_INTEGER, false));
-        $context->builder->branchIf($isInt, $longBb, $checkFloatBb);
+        $isInt = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JitVariable::TYPE_NATIVE_LONG, false));
+        $context->builder->branchIf($isInt, $longBb, $checkBoolBb);
+
+        // JIT tags: BOOL=2, DOUBLE=3 (#20651). Do not use VM TYPE_FLOAT/BOOLEAN.
+        $context->builder->positionAtEnd($checkBoolBb);
+        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JitVariable::TYPE_NATIVE_BOOL, false));
+        $context->builder->branchIf($isBool, $boolBb, $checkFloatBb);
 
         $context->builder->positionAtEnd($checkFloatBb);
-        $isFloat = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_FLOAT, false));
-        $context->builder->branchIf($isFloat, $doubleBb, $checkBoolBb);
-
-        $context->builder->positionAtEnd($checkBoolBb);
-        $isBool = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_BOOLEAN, false));
-        $context->builder->branchIf($isBool, $boolBb, $checkStringBb);
+        $isFloat = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JitVariable::TYPE_NATIVE_DOUBLE, false));
+        $context->builder->branchIf($isFloat, $doubleBb, $checkStringBb);
 
         $context->builder->positionAtEnd($checkStringBb);
-        $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_STRING, false));
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(JitVariable::TYPE_STRING & 0x7f, false)
+        );
         $context->builder->branchIf($isString, $stringBb, $checkArrayBb);
 
         $context->builder->positionAtEnd($checkArrayBb);
-        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_ARRAY, false));
+        $arrayKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $arrayKind,
+            $i8->constInt(JitVariable::TYPE_HASHTABLE & 0x7f, false)
+        );
         $context->builder->branchIf($isArray, $arrayBb, $coerceLongBb);
 
         $context->builder->positionAtEnd($nullBb);
