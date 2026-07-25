@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6549 |
-| Phase A inventory files (M2 ratio SSOT) | 6549 |
+| PHP files on vm.php path | 6550 |
+| Phase A inventory files (M2 ratio SSOT) | 6550 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21033 |
+| Source constructs flagged (warnings) | 21038 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -189,6 +189,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dba/BuiltinClasses.php` | 0 | 1 |
 | `ext/dba/DbaExtensionPolicy.php` | 0 | 1 |
 | `ext/dba/DbaFunction.php` | 0 | 1 |
+| `ext/dba/DbaSerializeDeny.php` | 0 | 3 |
 | `ext/dba/Module.php` | 0 | 16 |
 | `ext/dba/VmDbaConnection.php` | 0 | 4 |
 | `ext/dba/VmDbaCore.php` | 0 | 3 |
@@ -256,6 +257,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomC14NJitHelper.php` | 0 | 2 |
 | `ext/dom/DomClassConstants.php` | 0 | 2 |
 | `ext/dom/DomClassMethod.php` | 0 | 1 |
+| `ext/dom/DomConstants.php` | 0 | 2 |
 | `ext/dom/DomContainsJitHelper.php` | 0 | 1 |
 | `ext/dom/DomContainsNullJitHelper.php` | 0 | 1 |
 | `ext/dom/DomCreateElementJitHelper.php` | 0 | 2 |
@@ -7577,6 +7579,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dba/DbaSerializeDeny.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 21)
+- new Exception (line 28)
+- 4 class method(s)
+
 ### `ext/dba/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7983,6 +7992,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
+
+### `ext/dom/DomConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 142)
+- 2 class method(s)
 
 ### `ext/dom/DomContainsJitHelper.php`
 
@@ -31858,63 +31873,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmSerializeRefState (line 61)
-- new Exception (line 166)
-- new Exception (line 170)
-- new Exception (line 174)
-- new Exception (line 178)
-- new Exception (line 181)
-- new Exception (line 185)
-- new Variable (line 234)
-- new Variable (line 257)
-- new Variable (line 267)
-- new Variable (line 277)
-- new Variable (line 287)
-- new Variable (line 297)
-- new Variable (line 307)
-- new VmSerializeRefState (line 399)
-- new Exception (line 543)
-- new Exception (line 547)
-- new Exception (line 551)
-- new Exception (line 555)
+- new VmSerializeRefState (line 62)
+- new Exception (line 167)
+- new Exception (line 171)
+- new Exception (line 175)
+- new Exception (line 179)
+- new Exception (line 182)
+- new Exception (line 186)
+- new Variable (line 237)
+- new Variable (line 260)
+- new Variable (line 270)
+- new Variable (line 280)
+- new Variable (line 290)
+- new Variable (line 300)
+- new Variable (line 310)
+- new VmSerializeRefState (line 402)
+- new Exception (line 546)
+- new Exception (line 550)
+- new Exception (line 554)
 - new Exception (line 558)
-- new Exception (line 562)
-- new ObjectEntry (line 785)
-- new Variable (line 786)
-- new ObjectEntry (line 833)
-- new Variable (line 837)
-- new ObjectEntry (line 849)
-- new Variable (line 855)
-- new Variable (line 865)
-- new ObjectEntry (line 883)
-- new Variable (line 884)
-- new Variable (line 886)
-- new Variable (line 943)
-- new Exception (line 969)
-- new Exception (line 973)
-- new Exception (line 977)
-- new Exception (line 981)
-- new Exception (line 985)
-- new Exception (line 989)
-- new VmSerializeEnumCaseRef (line 1057)
-- new VmSerializeEnumCaseRef (line 1062)
-- new Variable (line 1137)
-- new VmSerializeRefState (line 1187)
-- new Variable (line 1204)
-- new VmSerializeRefState (line 1226)
-- new Variable (line 1236)
-- new Variable (line 1286)
-- new Variable (line 1299)
-- new Variable (line 1405)
-- new ObjectEntry (line 1435)
-- new Variable (line 1439)
-- new Frame (line 1458)
-- new Variable (line 1461)
-- new Variable (line 1490)
-- new Variable (line 1506)
-- new Variable (line 1511)
-- new Variable (line 1526)
-- new Exception (line 1549)
+- new Exception (line 561)
+- new Exception (line 565)
+- new ObjectEntry (line 790)
+- new Variable (line 791)
+- new ObjectEntry (line 838)
+- new Variable (line 842)
+- new ObjectEntry (line 854)
+- new Variable (line 860)
+- new Variable (line 870)
+- new ObjectEntry (line 888)
+- new Variable (line 889)
+- new Variable (line 891)
+- new Variable (line 948)
+- new Exception (line 974)
+- new Exception (line 978)
+- new Exception (line 982)
+- new Exception (line 986)
+- new Exception (line 990)
+- new Exception (line 994)
+- new VmSerializeEnumCaseRef (line 1063)
+- new VmSerializeEnumCaseRef (line 1068)
+- new Variable (line 1143)
+- new VmSerializeRefState (line 1193)
+- new Variable (line 1210)
+- new VmSerializeRefState (line 1232)
+- new Variable (line 1242)
+- new Variable (line 1292)
+- new Variable (line 1305)
+- new Variable (line 1411)
+- new ObjectEntry (line 1441)
+- new Variable (line 1445)
+- new Frame (line 1464)
+- new Variable (line 1467)
+- new Variable (line 1496)
+- new Variable (line 1512)
+- new Variable (line 1517)
+- new Variable (line 1532)
+- new Exception (line 1555)
 - 60 class method(s)
 - 1 closure(s)
 
