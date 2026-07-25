@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\ReflectionSupport;
@@ -70,7 +71,7 @@ final class VmSpoofchecker
     {
         // Do not probe ICU/FFI here — Spoofchecker::class during JIT parse would
         // load libicu before WeakRef NestedJIT helpers and abort (#20823).
-        return [
+        $consts = [
             'SINGLE_SCRIPT_CONFUSABLE' => self::SINGLE_SCRIPT_CONFUSABLE,
             'MIXED_SCRIPT_CONFUSABLE' => self::MIXED_SCRIPT_CONFUSABLE,
             'WHOLE_SCRIPT_CONFUSABLE' => self::WHOLE_SCRIPT_CONFUSABLE,
@@ -89,10 +90,15 @@ final class VmSpoofchecker
             'MODERATELY_RESTRICTIVE' => self::MODERATELY_RESTRICTIVE,
             'MINIMALLY_RESTRICTIVE' => self::MINIMALLY_RESTRICTIVE,
             'UNRESTRICTIVE' => self::UNRESTRICTIVE,
-            'IGNORE_SPACE' => self::IGNORE_SPACE,
-            'CASE_INSENSITIVE' => self::CASE_INSENSITIVE,
-            'ADD_CASE_MAPPINGS' => self::ADD_CASE_MAPPINGS,
         ];
+        // USET pattern-option consts ship with setAllowedChars (PHP 8.4+; #23157).
+        if (CompilerVersion::supportsSpoofcheckerSetAllowedChars()) {
+            $consts['IGNORE_SPACE'] = self::IGNORE_SPACE;
+            $consts['CASE_INSENSITIVE'] = self::CASE_INSENSITIVE;
+            $consts['ADD_CASE_MAPPINGS'] = self::ADD_CASE_MAPPINGS;
+        }
+
+        return $consts;
     }
 
     public static function registerClass(Context $ctx): void
@@ -120,8 +126,11 @@ final class VmSpoofchecker
             'setallowedlocales' => [new SpoofcheckerSetAllowedLocales(), 'setAllowedLocales'],
             'setchecks' => [new SpoofcheckerSetChecks(), 'setChecks'],
             'setrestrictionlevel' => [new SpoofcheckerSetRestrictionLevel(), 'setRestrictionLevel'],
-            'setallowedchars' => [new SpoofcheckerSetAllowedChars(), 'setAllowedChars'],
         ];
+        // PHP 8.4+ only — Zend 8.2/8.3 method_exists false (#23157, re-#20823).
+        if (CompilerVersion::supportsSpoofcheckerSetAllowedChars()) {
+            $methods['setallowedchars'] = [new SpoofcheckerSetAllowedChars(), 'setAllowedChars'];
+        }
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
             $entry->methodVisibility[$lc] = $pub;
@@ -133,6 +142,10 @@ final class VmSpoofchecker
     /** Advertise SIMPLE_CASE_INSENSITIVE once ICU ≥73 is confirmed (php-src stub gate). */
     private static function maybeAdvertiseSimpleCaseInsensitive(ObjectEntry $object): void
     {
+        // SIMPLE_CASE_INSENSITIVE ships with setAllowedChars (PHP 8.4+; #23157).
+        if (!CompilerVersion::supportsSpoofcheckerSetAllowedChars()) {
+            return;
+        }
         if (self::icuMajorVersion() < 73) {
             return;
         }

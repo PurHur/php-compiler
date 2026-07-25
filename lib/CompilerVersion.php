@@ -2168,6 +2168,41 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ Spoofchecker::setAllowedChars() + USET pattern-option consts
+     * (ext/intl/spoofchecker/spoofchecker.stub.php; #20823, #23157).
+     *
+     * Withheld on 8.4.0-dev reference profile and PROFILE=8.2 (matches Zend 8.2/8.3
+     * method_exists gate). Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsSpoofcheckerSetAllowedChars(): bool
+    {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** Spoofchecker::setAllowedChars / IGNORE_SPACE family — stable or forward 8.4+ (#23157). */
+    public static function advertisesSpoofcheckerSetAllowedChars(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return self::supportsSpoofcheckerSetAllowedChars();
+    }
+
+    /**
      * PHP 8.4+ NumberFormatter ROUND_HALFODD / ROUND_TOWARD_ZERO / ROUND_AWAY_FROM_ZERO
      * (ext/intl/formatter/formatter.stub.php; added with ICU UNUM_ROUND_HALF_ODD, #22704).
      *
