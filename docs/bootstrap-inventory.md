@@ -47876,8 +47876,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new self (line 92)
 - new self (line 102)
-- new CompileFatal (line 2161)
-- 63 class method(s)
+- new CompileFatal (line 2246)
+- 65 class method(s)
 - 2 closure(s)
 
 ### `lib/SwitchCommaCaseRewriter.php`
