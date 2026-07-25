@@ -11,6 +11,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+// Spine inventory is alphabetical (Helper before HelperTrait). Require the trait here so
+// Zend full-spine AOT cannot hit "Trait not found" when composer autoload is not in play (#22642).
+require_once __DIR__ . '/ClassConstFetchHelperTrait.php';
+
 /**
  * Intentionally small entrypoint: the lowering bodies live in {@see ClassConstFetchHelperTrait}
  * to keep the helper file narrow while the php-in-php migration iterates (#10200).
