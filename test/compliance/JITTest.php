@@ -38,6 +38,17 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\gmp\GmpExtensionPolicy::isGmpComplianceCase($name)) {
                 continue;
             }
+            // Host/profile without sqlite3: withhold functional sqlite3_* cases; keep phantom (#22791).
+            if (!\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::runsSqlite3Compliance($name)
+                && \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::isSqlite3ComplianceCase($name)) {
+                continue;
+            }
+            // extension_loaded / class_exists sqlite3 phantoms — VM-only (JIT module-verify; #22791).
+            if (str_contains($name, 'extension_loaded_sqlite3_phantom')
+                || str_contains($name, 'sqlite3_reference_profile')
+                || str_contains($name, 'sqlite3_forward_profile_surface')) {
+                continue;
+            }
             // VM-first (#6212/#6248/#6064): JIT hangs/OOM on create_listen / datagram accept scripts; defer JIT PHPT.
             if (str_contains($name, 'socket_create_listen')
                 || str_contains($name, 'socket_datagram')

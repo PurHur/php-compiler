@@ -2893,10 +2893,11 @@ final class CompilerVersion
     }
 
     /**
-     * ext/sqlite3 SQLite3 class + query API — forward profile only (#3434).
+     * ext/sqlite3 SQLite3 class + query API — forward profile or host ext (#3434, #22791).
      *
-     * {@code extension_loaded('sqlite3')} and {@code SQLite3Exception} are advertised whenever
-     * the in-tree module loads ({@see Sqlite3ExtensionPolicy::advertisesExtensionLoaded()}, #19047).
+     * {@code extension_loaded('sqlite3')} / {@code SQLite3Exception} follow
+     * {@see \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy} (host ext or PROFILE=8.4;
+     * exception is PHP 8.3+ only).
      */
     public static function supportsSqlite3(): bool
     {

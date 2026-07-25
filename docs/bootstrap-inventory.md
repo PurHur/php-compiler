@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6519 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20931 |
+| Source constructs flagged (warnings) | 20929 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2757,7 +2757,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamIsatty.php` | 0 | 1 |
 | `ext/standard/JitStreamLibcHandleKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamLifecycleKernel.php` | 0 | 1 |
-| `ext/standard/JitStreamMetaKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamMetaKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamModeKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
 | `ext/standard/JitStreamPath.php` | 0 | 1 |
@@ -9709,10 +9709,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomSimpleXmlBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 275)
-- new SimpleXmlNodeState (line 322)
-- new ObjectEntry (line 352)
-- 21 class method(s)
+- new ObjectEntry (line 277)
+- new SimpleXmlNodeState (line 432)
+- new ObjectEntry (line 462)
+- 25 class method(s)
 
 ### `ext/dom/VmDomTokenList.php`
 
@@ -23843,7 +23843,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sqlite3/Sqlite3ExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 7 class method(s)
 
 ### `ext/sqlite3/VmSQLite3.php`
 
@@ -27412,9 +27412,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamMetaKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 210)
 - 9 class method(s)
-- 1 closure(s)
 
 ### `ext/standard/JitStreamModeKernel.php`
 
@@ -28898,18 +28896,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackEngineEncode.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 12 class method(s)
 
 ### `ext/standard/PackJitEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 
 ### `ext/standard/PackJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - new PackedArgvArrayMarker (line 35)
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/ParamSensitiveJitHelper.php`
 
@@ -46943,7 +46941,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitVmHelperLink.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/LateStaticBindingHelper.php`

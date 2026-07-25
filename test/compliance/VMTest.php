@@ -33,6 +33,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\gmp\GmpExtensionPolicy::isGmpComplianceCase($name)) {
                 continue;
             }
+            // Host/profile without sqlite3: withhold functional sqlite3_* cases; keep phantom (#22791).
+            if (!\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::runsSqlite3Compliance($name)
+                && \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::isSqlite3ComplianceCase($name)) {
+                continue;
+            }
             if (!CompilerVersion::supportsStrIncrement()
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))
                 && !str_contains($name, 'str_increment_phantom')) {

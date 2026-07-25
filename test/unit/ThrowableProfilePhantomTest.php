@@ -30,15 +30,17 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedPeriodException'));
         $this->assertTrue(ThrowableManifest::isAdvertised('Exception'));
         $this->assertFalse(ThrowableManifest::isAdvertised('RequestParseBodyException'));
-        $this->assertTrue(ThrowableManifest::isAdvertised('SQLite3Exception'));
+        $this->assertFalse(ThrowableManifest::isAdvertised('SQLite3Exception'));
     }
 
-    public function testVmRegistersSqlite3ExceptionOnReferenceProfile(): void
+    public function testVmOmitsSqlite3ExceptionOnReferenceProfile(): void
     {
+        if (\extension_loaded('sqlite3')) {
+            $this->markTestSkipped('host has ext/sqlite3');
+        }
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertTrue(isset($ctx->classes['sqlite3exception']));
-        $this->assertSame('exception', $ctx->classes['sqlite3exception']->parentLc);
+        $this->assertFalse(isset($ctx->classes['sqlite3exception']));
     }
 
     public function testVmOmitsDateHierarchyOnReferenceProfile(): void
@@ -54,7 +56,7 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(isset($ctx->classes['datemalformedintervalexception']));
         $this->assertFalse(isset($ctx->classes['datemalformedperiodexception']));
         $this->assertFalse(isset($ctx->classes['requestparsebodyexception']));
-        $this->assertTrue(isset($ctx->classes['sqlite3exception']));
+        $this->assertFalse(isset($ctx->classes['sqlite3exception']));
         $this->assertTrue(isset($ctx->classes['exception']));
     }
 

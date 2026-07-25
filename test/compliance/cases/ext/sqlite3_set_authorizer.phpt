@@ -1,5 +1,7 @@
 --TEST--
 ext/sqlite3 SQLite3::setAuthorizer + OK/DENY/IGNORE (#20683)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
 if (!class_exists('SQLite3')) die('skip no SQLite3');
