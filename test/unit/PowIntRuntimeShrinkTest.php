@@ -8,14 +8,22 @@ use PHPCompiler\ext\standard\PowIntJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** PowIntRuntime routes int**int through PowIntJitHelper PHP (#9515). */
+/**
+ * PowIntRuntime NestedJIT via JitVmHelperLink::ensureCompiled (#23097 / peer #22575).
+ */
 final class PowIntRuntimeShrinkTest extends TestCase
 {
     public function testPowIntRuntimeUsesJitHelperBridgeNotLlvmLoop(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PowIntRuntime.php');
         $this->assertStringContainsString('PowIntJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('pow_int_loop_head', $source);
         $this->assertStringNotContainsString('mulOverflows', $source);
         $this->assertStringNotContainsString('private static function implementPowInt(', $source);
