@@ -1894,7 +1894,11 @@ final class VmDom
     }
 
     /**
-     * DOMElement::getInnerHTML() — serialize child nodes (php-src ext/dom/inner_html_mixin.c; #16916).
+     * DOMElement::getInnerHTML() / Dom\Element::$innerHTML — serialize child nodes
+     * (php-src ext/dom/inner_html_mixin.c; #16916, #22773).
+     *
+     * HTML documents use the HTML serializer (same empty/void rules as saveHTML);
+     * XML documents keep XML empty-element form (`<i/>`).
      */
     public static function getInnerHTML(ObjectEntry $element): string
     {
@@ -1905,11 +1909,13 @@ final class VmDom
         if ([] === $state->childIds) {
             return '';
         }
+        // HTML doc → no XML self-close; XML doc → `<tag/>` (#22773 / php-src inner_html_mixin.c).
+        $emptySelfClosing = !self::elementOwnerIsHtmlDocument($element);
         $parts = [];
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $parts[] = self::serializeHtmlNode($child);
+                $parts[] = self::serializeHtmlNode($child, $emptySelfClosing);
             }
         }
 
@@ -1917,7 +1923,8 @@ final class VmDom
     }
 
     /**
-     * DOMElement::getOuterHTML() — serialize element and descendants (php-src ext/dom/inner_html_mixin.c; #16916).
+     * DOMElement::getOuterHTML() / Dom\Element::$outerHTML — serialize element and descendants
+     * (php-src ext/dom/inner_html_mixin.c; #16916, #22773).
      */
     public static function getOuterHTML(ObjectEntry $element): string
     {
@@ -1925,7 +1932,26 @@ final class VmDom
             throw new \DOMException('Not an element node');
         }
 
-        return self::serializeHtmlElement($element);
+        $emptySelfClosing = !self::elementOwnerIsHtmlDocument($element);
+
+        return self::serializeHtmlElement($element, $emptySelfClosing);
+    }
+
+    /**
+     * Owner is Dom\HTMLDocument or legacy DOMDocument after loadHTML
+     * (php-src: context_document->type == XML_HTML_DOCUMENT_NODE; #22773).
+     */
+    private static function elementOwnerIsHtmlDocument(ObjectEntry $element): bool
+    {
+        $owner = self::ownerDocumentEntry($element);
+        if (null === $owner || !self::isDocument($owner)) {
+            return false;
+        }
+        if (self::isLivingHtmlDocument($owner)) {
+            return true;
+        }
+
+        return DomRegistry::state($owner)->isHtmlDocument;
     }
 
     /**
@@ -8264,11 +8290,11 @@ final class VmDom
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
             if ($emptySelfClosing) {
-                // Living getOuterHTML / innerHTML child serialize (#18618): XML-style <tag/>.
+                // XMLDocument / XML context (#18618, #22773): empty-element form <tag/>.
                 return '<'.$name.$attrPart.'/>';
             }
 
-            // saveHTML dump (#20625 / re-#18668): HTML_EMPTY → <br>; else <tag></tag>.
+            // HTML document / saveHTML (#20625 / #22773): HTML_EMPTY → <br>; else <tag></tag>.
             return self::formatHtmlEmptyElementDump($name, $attrPart);
         }
         $parts = [];

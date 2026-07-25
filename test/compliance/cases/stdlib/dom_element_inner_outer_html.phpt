@@ -15,4 +15,4 @@ echo $empty->getOuterHTML(), "\n";
 <b>hi</b><i>!</i>
 <div id="x"><b>hi</b><i>!</i></div>
 
-<span/>
+<span></span>
