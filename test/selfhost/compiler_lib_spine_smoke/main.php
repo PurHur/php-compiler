@@ -6574,6 +6574,7 @@ require_once __DIR__.'/../../../ext/mysqli/mysqli_async_api.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_autocommit.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_begin_transaction.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_close.php';
+require_once __DIR__.'/../../../ext/mysqli/mysqli_get_links_stats.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_commit.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_conn_info_api.php';
 require_once __DIR__.'/../../../ext/mysqli/mysqli_connect.php';
