@@ -28,9 +28,8 @@ final class boolval extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('boolval() requires exactly one argument');
-        }
+        // php-src ext/standard/type.c — ArgumentCountError (#23165).
+        $this->requireExactArgCount($frame, 'boolval', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -43,8 +42,9 @@ final class boolval extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('boolval() requires exactly one argument');
+        // php-src ext/standard/type.c — ArgumentCountError (#23165).
+        if (!$this->requireExactJitArgCount($context, $args, 'boolval', 1)) {
+            return $context->constantFromBool(false);
         }
         switch ($args[0]->type) {
             case JITVariable::TYPE_NATIVE_LONG:

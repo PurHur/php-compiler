@@ -31,9 +31,8 @@ final class strval extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('strval() requires exactly one argument');
-        }
+        // php-src ext/standard/type.c — ArgumentCountError (#23165).
+        $this->requireExactArgCount($frame, 'strval', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         // Zend runs strval() side effects even when the return value is discarded (#5615).
         $vm = VM::running();
@@ -55,8 +54,9 @@ final class strval extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('strval() requires exactly one argument');
+        // php-src ext/standard/type.c — ArgumentCountError (#23165).
+        if (!$this->requireExactJitArgCount($context, $args, 'strval', 1)) {
+            return $context->builder->load($context->constantStringFromString(''));
         }
         switch ($args[0]->type) {
             case JITVariable::TYPE_STRING:

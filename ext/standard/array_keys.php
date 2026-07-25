@@ -27,10 +27,9 @@ final class array_keys extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        $this->requireArgCountRange($frame, 'array_keys', 1, 3);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('array_keys() requires one to three arguments');
-        }
         // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (not soft-coerce).
         // Zend 8.2 reference matches; do not gate on caller strict_types (#21915, re-#21771).
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_keys');
@@ -54,10 +53,11 @@ final class array_keys extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('array_keys() requires one to three arguments');
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        if (!$this->requireArgCountRangeJit($context, $args, 'array_keys', 1, 3)) {
+            return HashTableHelper::emptyVariable($context)->value;
         }
+        $argc = \count($args);
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             // php-src 8.0+: always TypeError on null (#21915).
             JitArrayElem::requireArrayArg($context, $args[0], 'array_keys');

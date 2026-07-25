@@ -29,9 +29,8 @@ final class array_flip extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_flip() requires exactly one argument');
-        }
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        $this->requireExactArgCount($frame, 'array_flip', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -43,8 +42,9 @@ final class array_flip extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('array_flip() requires exactly one argument');
+        // php-src ext/standard/array.c — ArgumentCountError (#23165).
+        if (!$this->requireExactJitArgCount($context, $args, 'array_flip', 1)) {
+            return HashTableHelper::emptyVariable($context)->value;
         }
         TypeErrorRaise::ensureLinked($context);
         // php-src 8.0+: Z_PARAM_ARRAY — always TypeError on null (#21916, re-#21771).
