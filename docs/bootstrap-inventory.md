@@ -28893,7 +28893,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackEngineEncode.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 19 class method(s)
 
 ### `ext/standard/PackJitEngine.php`
 
