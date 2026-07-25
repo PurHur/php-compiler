@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** UndefinedPropertyFetch routes warnings through UndefinedPropertyFetchJitHelper PHP (#15752). */
+/**
+ * UndefinedPropertyFetch NestedJIT via JitVmHelperLink::ensureCompiled (#23174 / peer #23143).
+ */
 final class UndefinedPropertyFetchRuntimeShrinkTest extends TestCase
 {
     public function testUndefinedPropertyFetchHelperUsesRuntimeNotInlineTriggerError(): void
@@ -18,12 +20,18 @@ final class UndefinedPropertyFetchRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ErrorReporter::E_WARNING', $helper);
     }
 
-    public function testUndefinedPropertyFetchRuntimeCompilesJitHelper(): void
+    public function testUndefinedPropertyFetchRuntimeUsesJitVmHelperLink(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/UndefinedPropertyFetchRuntime.php');
         $this->assertStringContainsString('UndefinedPropertyFetchJitHelper', $runtime);
-        $this->assertStringContainsString('ensureJitHelperCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
         $this->assertStringContainsString('emitWarning', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('parseAndCompile', $runtime);
+        $this->assertStringNotContainsString('new JIT(', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
     }
 
     public function testUndefinedPropertyFetchJitHelperDefinesEmitWarning(): void
