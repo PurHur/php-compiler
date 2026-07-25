@@ -13165,6 +13165,9 @@ restart:
     /**
      * ReflectionProperty::setValue — PHP 8.4 final property write guard (#22450, #22451).
      *
+     * Asymmetric set visibility (incl. implicit-final private(set), #23068/#23110) is governed by
+     * the set-visibility path, not the plain final write ban.
+     *
      * @throws \Error
      */
     private function assertFinalPropertyWriteAllowedForReflection(
@@ -13173,6 +13176,9 @@ restart:
     ): void {
         $meta = $this->classPropertyMeta($object, $propName);
         if (null === $meta || !$meta->propertyFinal) {
+            return;
+        }
+        if ($this->classPropertyHasDistinctAsymmetricSetVisibility($meta)) {
             return;
         }
         if (!$object->constructed) {
@@ -13294,6 +13300,9 @@ restart:
      *
      * php-src: Zend/zend_object_handlers.c — "Cannot modify final property %s::$%s".
      * Construction (including promoted ctor assignment) may still initialize the slot.
+     *
+     * Implicit-final from private(set) (#23068) must not use this path: in-class writes are
+     * allowed and external denies use the asymmetric message (#23110).
      */
     private function enforceFinalPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
@@ -13304,6 +13313,10 @@ restart:
         $prop = $this->resolvePropertyWriteName($lvalue) ?? 'property';
         $meta = $this->classPropertyMeta($owner, $prop);
         if (null === $meta || !$meta->propertyFinal) {
+            return null;
+        }
+        // Asymmetric set visibility owns write checks (not "Cannot modify final property").
+        if ($this->classPropertyHasDistinctAsymmetricSetVisibility($meta)) {
             return null;
         }
         if (!$owner->constructed) {
@@ -13329,6 +13342,15 @@ restart:
         $this->raiseUncaughtException($thrown);
 
         return null;
+    }
+
+    /**
+     * True when set visibility differs from the property's read visibility flags (#3165, #23110).
+     */
+    private function classPropertyHasDistinctAsymmetricSetVisibility(VM\ClassProperty $meta): bool
+    {
+        return PropertyVisibility::effectiveSetVisibility($meta->visibility, $meta->setVisibility)
+            !== MethodVisibility::mask($meta->visibility);
     }
 
     /** Zend zend_readonly_property_modification_error — init vs modify wording (#5463). */
@@ -13973,12 +13995,18 @@ restart:
         if ($setVis === $readVis) {
             return null;
         }
+        // Use declaring class (not runtime object class) so private(set) denies child scopes (#23110).
+        $declaringLc = '' !== $meta->declaringClassLc
+            ? $meta->declaringClassLc
+            : strtolower($owner->class->name);
+        $declaringDisplay = $this->context->classes[$declaringLc]->name
+            ?? $owner->class->name;
         try {
             PropertyVisibility::assertWritable(
                 $setVis,
                 $this->callerClassLc($frame),
-                strtolower($owner->class->name),
-                $owner->class->name,
+                $declaringLc,
+                $declaringDisplay,
                 $propName,
                 fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
                 MethodVisibility::mask($readVis),

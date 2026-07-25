@@ -41,10 +41,18 @@ final class ReadonlyClassGuard
             return;
         }
 
+        // Asymmetric set visibility (incl. implicit-final private(set)) must not use the plain
+        // final write ban — set-visibility guard runs next (#23110, Zend/zend_object_handlers.c).
+        $finalIds = [];
+        foreach ($objectType->finalPropertyClassIdsForProperty($propName) as $finalId) {
+            if (!$objectType->propertyHasDistinctAsymmetricSetVisibility($finalId, $propName)) {
+                $finalIds[] = $finalId;
+            }
+        }
         $guardClassIds = array_values(array_unique(array_merge(
             $objectType->readonlyClassIds(),
             $objectType->readonlyPropertyClassIdsForProperty($propName),
-            $objectType->finalPropertyClassIdsForProperty($propName)
+            $finalIds
         )));
         if ([] === $guardClassIds) {
             return;
