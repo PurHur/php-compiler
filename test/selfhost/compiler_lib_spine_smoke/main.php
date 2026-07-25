@@ -4170,6 +4170,7 @@ require_once __DIR__.'/../../../ext/xml/XmlConstants.php';
 require_once __DIR__.'/../../../ext/xml/XmlFunction.php';
 require_once __DIR__.'/../../../ext/xml/XmlHandlerDeprecation.php';
 require_once __DIR__.'/../../../ext/xml/XmlParserHandlers.php';
+require_once __DIR__.'/../../../ext/xml/XmlParserSerializeDeny.php';
 require_once __DIR__.'/../../../ext/xml/XmlParserSupport.php';
 require_once __DIR__.'/../../../ext/xml/XmlSetHandlerFunction.php';
 require_once __DIR__.'/../../../ext/xml/xml_error_string.php';

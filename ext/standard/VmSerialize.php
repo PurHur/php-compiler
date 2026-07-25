@@ -24,6 +24,7 @@ use PHPCompiler\ext\spl\SplDllistSerializeSupport;
 use PHPCompiler\ext\spl\SplFileIteratorSerializeDeny;
 use PHPCompiler\ext\spl\SplFixedArraySerializeSupport;
 use PHPCompiler\ext\spl\SplObjectStorageSerializeSupport;
+use PHPCompiler\ext\xml\XmlParserSerializeDeny;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -190,6 +191,8 @@ final class VmSerialize
             OpensslSerializeDeny::rejectUnserialization($className);
             // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
             ZlibContextSerializeDeny::rejectUnserialization($className);
+            // php-src ext/xml/xml.stub.php — @not-serializable XMLParser (#23111).
+            XmlParserSerializeDeny::rejectUnserialization($className);
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
             // php-src ext/simplexml/sxe.c — zend_class_unserialize_deny (#23072).
             SimpleXmlSerializeDeny::rejectUnserialization($className, $ctx);
@@ -551,6 +554,8 @@ final class VmSerialize
         OpensslSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
         ZlibContextSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/xml/xml.stub.php — @not-serializable XMLParser (#23111).
+        XmlParserSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/simplexml/sxe.c — zend_class_serialize_deny (#23072).
         SimpleXmlSerializeDeny::rejectSerialization($entry->class->name, $ctx);
         // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
@@ -956,6 +961,7 @@ final class VmSerialize
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
             OpensslSerializeDeny::rejectSerialization($value->toObject()->class->name);
             ZlibContextSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            XmlParserSerializeDeny::rejectSerialization($value->toObject()->class->name);
             SimpleXmlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
         }
         $enumRef = self::enumCaseRefFromVariable($value);
