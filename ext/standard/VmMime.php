@@ -251,7 +251,8 @@ final class VmMime
     private static function looksLikePlainText(string $data): bool
     {
         $len = \strlen($data);
-        if (0 === $len) {
+        // libmagic: samples shorter than 3 bytes stay application/octet-stream (#23200).
+        if ($len < 3) {
             return false;
         }
         $checkLen = \min($len, 8192);
