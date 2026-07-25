@@ -16,6 +16,7 @@ use PHPCompiler\ext\curl\CurlFileSerializeDeny;
 use PHPCompiler\ext\dom\DomXPathSerializeDeny;
 use PHPCompiler\ext\fileinfo\FinfoSerializeDeny;
 use PHPCompiler\ext\intl\IntlSerializeDeny;
+use PHPCompiler\ext\openssl\OpensslSerializeDeny;
 use PHPCompiler\ext\simplexml\SimpleXmlSerializeDeny;
 use PHPCompiler\ext\sockets\SocketSerializeDeny;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
@@ -185,6 +186,8 @@ final class VmSerialize
             IntlSerializeDeny::rejectUnserialization($className, $ctx);
             // php-src ext/sockets/sockets.stub.php — @not-serializable (#23094).
             SocketSerializeDeny::rejectUnserialization($className);
+            // php-src ext/openssl/openssl.stub.php — @not-serializable (#23100).
+            OpensslSerializeDeny::rejectUnserialization($className);
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
             // php-src ext/simplexml/sxe.c — zend_class_unserialize_deny (#23072).
             SimpleXmlSerializeDeny::rejectUnserialization($className, $ctx);
@@ -542,6 +545,8 @@ final class VmSerialize
         IntlSerializeDeny::rejectSerialization($entry->class->name, $ctx);
         // php-src ext/sockets/sockets.stub.php — @not-serializable (#23094).
         SocketSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/openssl/openssl.stub.php — @not-serializable (#23100).
+        OpensslSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/simplexml/sxe.c — zend_class_serialize_deny (#23072).
         SimpleXmlSerializeDeny::rejectSerialization($entry->class->name, $ctx);
         // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
@@ -945,6 +950,7 @@ final class VmSerialize
             FinfoSerializeDeny::rejectSerialization($value->toObject()->class->name);
             IntlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            OpensslSerializeDeny::rejectSerialization($value->toObject()->class->name);
             SimpleXmlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
         }
         $enumRef = self::enumCaseRefFromVariable($value);

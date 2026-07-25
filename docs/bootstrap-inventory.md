@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6538 |
-| Phase A inventory files (M2 ratio SSOT) | 6538 |
+| PHP files on vm.php path | 6539 |
+| Phase A inventory files (M2 ratio SSOT) | 6539 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21000 |
+| Source constructs flagged (warnings) | 21004 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1443,6 +1443,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
 | `ext/openssl/OpensslFunction.php` | 0 | 1 |
 | `ext/openssl/OpensslMethodsJitHelper.php` | 0 | 1 |
+| `ext/openssl/OpensslSerializeDeny.php` | 0 | 3 |
 | `ext/openssl/OpensslSignJitHelper.php` | 0 | 1 |
 | `ext/openssl/VmOpenssl.php` | 0 | 7 |
 | `ext/openssl/VmOpensslCipherNative.php` | 0 | 1 |
@@ -3298,7 +3299,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSapiHeaderGuard.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 6 |
 | `ext/standard/VmScope.php` | 0 | 6 |
-| `ext/standard/VmSerialize.php` | 0 | 56 |
+| `ext/standard/VmSerialize.php` | 0 | 59 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 17 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 5 |
@@ -4785,7 +4786,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ArrayCountValuesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayDiffAssocRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayDiffKeyRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/ArrayDiffRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ArrayDiffRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayElemRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFillKeysRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFillRuntime.php` | 0 | 1 |
@@ -17916,6 +17917,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/openssl/OpensslSerializeDeny.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 24)
+- new Exception (line 31)
+- 4 class method(s)
 
 ### `ext/openssl/OpensslSignJitHelper.php`
 
@@ -31790,60 +31798,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmSerializeRefState (line 52)
-- new Exception (line 157)
-- new Exception (line 161)
-- new Exception (line 165)
-- new Exception (line 169)
-- new Exception (line 172)
-- new Variable (line 201)
-- new Variable (line 224)
-- new Variable (line 234)
-- new Variable (line 244)
-- new Variable (line 254)
-- new Variable (line 264)
-- new Variable (line 274)
-- new VmSerializeRefState (line 366)
-- new Exception (line 510)
-- new Exception (line 514)
-- new Exception (line 518)
-- new Exception (line 522)
+- new VmSerializeRefState (line 53)
+- new Exception (line 158)
+- new Exception (line 162)
+- new Exception (line 166)
+- new Exception (line 170)
+- new Exception (line 173)
+- new Exception (line 177)
+- new Variable (line 208)
+- new Variable (line 231)
+- new Variable (line 241)
+- new Variable (line 251)
+- new Variable (line 261)
+- new Variable (line 271)
+- new Variable (line 281)
+- new VmSerializeRefState (line 373)
+- new Exception (line 517)
+- new Exception (line 521)
 - new Exception (line 525)
-- new ObjectEntry (line 728)
-- new Variable (line 729)
-- new ObjectEntry (line 776)
-- new Variable (line 780)
-- new ObjectEntry (line 792)
-- new Variable (line 798)
-- new Variable (line 808)
-- new ObjectEntry (line 826)
-- new Variable (line 827)
-- new Variable (line 829)
-- new Variable (line 886)
-- new Exception (line 912)
-- new Exception (line 916)
-- new Exception (line 920)
-- new Exception (line 924)
-- new Exception (line 928)
-- new VmSerializeEnumCaseRef (line 986)
-- new VmSerializeEnumCaseRef (line 991)
-- new Variable (line 1066)
-- new VmSerializeRefState (line 1116)
-- new Variable (line 1133)
-- new VmSerializeRefState (line 1155)
-- new Variable (line 1165)
-- new Variable (line 1215)
-- new Variable (line 1228)
-- new Variable (line 1334)
-- new ObjectEntry (line 1364)
-- new Variable (line 1368)
-- new Frame (line 1387)
-- new Variable (line 1390)
-- new Variable (line 1419)
-- new Variable (line 1435)
-- new Variable (line 1440)
-- new Variable (line 1455)
-- new Exception (line 1478)
+- new Exception (line 529)
+- new Exception (line 532)
+- new Exception (line 536)
+- new ObjectEntry (line 741)
+- new Variable (line 742)
+- new ObjectEntry (line 789)
+- new Variable (line 793)
+- new ObjectEntry (line 805)
+- new Variable (line 811)
+- new Variable (line 821)
+- new ObjectEntry (line 839)
+- new Variable (line 840)
+- new Variable (line 842)
+- new Variable (line 899)
+- new Exception (line 925)
+- new Exception (line 929)
+- new Exception (line 933)
+- new Exception (line 937)
+- new Exception (line 941)
+- new Exception (line 945)
+- new VmSerializeEnumCaseRef (line 1004)
+- new VmSerializeEnumCaseRef (line 1009)
+- new Variable (line 1084)
+- new VmSerializeRefState (line 1134)
+- new Variable (line 1151)
+- new VmSerializeRefState (line 1173)
+- new Variable (line 1183)
+- new Variable (line 1233)
+- new Variable (line 1246)
+- new Variable (line 1352)
+- new ObjectEntry (line 1382)
+- new Variable (line 1386)
+- new Frame (line 1405)
+- new Variable (line 1408)
+- new Variable (line 1437)
+- new Variable (line 1453)
+- new Variable (line 1458)
+- new Variable (line 1473)
+- new Exception (line 1496)
 - 60 class method(s)
 - 1 closure(s)
 
@@ -42146,9 +42157,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayDiffRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 220)
 - 14 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/ArrayElemRuntime.php`
 
