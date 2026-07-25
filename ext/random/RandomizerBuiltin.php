@@ -633,22 +633,15 @@ final class RandomizerConstruct extends VmClassMethod
         RandomizerStorage::setEngine($object, $frame->calledArgs[1]);
     }
 
+    /**
+     * php-src Randomizer default engine is Random\Engine\Secure (CSPRNG),
+     * not Mt19937 — see ext/random/randomizer.c php_random_randomizer_construct (#23163).
+     */
     private static function createDefaultEngineObject(Frame $frame): ObjectEntry
     {
-        $engine = new Mt19937Instance();
-        try {
-            $bytes = VmString::randomBytes(8);
-            $seed = \unpack('P', $bytes)[1];
-            if (!\is_int($seed)) {
-                $seed = \time();
-            }
-        } catch (\Throwable) {
-            $seed = \time();
-        }
-        $engine->seed($seed & 0xFFFFFFFF);
-        $engineObject = new ObjectEntry($frame->vmContext->classes[RandomizerBuiltin::MT19937_LC]);
+        $engineObject = new ObjectEntry($frame->vmContext->classes[AdditionalEnginesBuiltin::SECURE_LC]);
         $engineObject->constructed = true;
-        RandomEngineStorage::attachMt19937($engineObject, $engine);
+        RandomEngineStorage::attachSecure($engineObject, new SecureInstance());
 
         return $engineObject;
     }
