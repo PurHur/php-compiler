@@ -26,10 +26,18 @@ class Module extends ModuleAbstract
         return [
             new apcu_store(),
             new apcu_fetch(),
+            new apcu_add(),
+            new apcu_inc(),
+            new apcu_dec(),
+            new apcu_cas(),
+            new apcu_entry(),
             new apcu_delete(),
             new apcu_clear_cache(),
             new apcu_exists(),
             new apcu_cache_info(),
+            new apcu_sma_info(),
+            new apcu_key_info(),
+            new apcu_enabled(),
         ];
     }
 }

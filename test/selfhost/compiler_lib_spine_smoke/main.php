@@ -80,6 +80,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -6636,6 +6637,14 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetName.ph
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetURL.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionGetVersion.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionZendExtensionToString.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_add.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_cas.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_dec.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_enabled.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_entry.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_inc.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_key_info.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_sma_info.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
