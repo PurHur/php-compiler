@@ -120,20 +120,25 @@ final class VmLocale
     }
 
     /**
-     * Locale::getDisplayName() — English display label without ICU (#6696).
+     * Locale::getDisplayName() — ICU uloc_getDisplayName (#6696, #22901).
      *
-     * php-src uses ICU uloc_getDisplayName(); v1 returns a deterministic English approximation
-     * so bootstrap/i18n callers get a non-empty string for common language/region tags.
+     * Falls back to a deterministic English approximation when libicu FFI is unavailable.
      *
      * @return string|false
      */
     public static function getDisplayName(string $locale, ?string $displayLocale = null): string|false
     {
-        unset($displayLocale); // ICU display-locale selection deferred with full ext/intl (#11472).
         $id = self::resolveLocaleOperand($locale);
         $tags = self::parseBcp47Tags($id);
         if ('' === $tags['language']) {
             return false;
+        }
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayField('uloc_getDisplayName', $id, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
         }
         $language = self::englishLanguageName($tags['language']);
         if (null === $language) {
@@ -149,73 +154,95 @@ final class VmLocale
     }
 
     /**
-     * Locale::getDisplayLanguage() — English language display (#20755).
-     *
-     * php-src: uloc_getDisplayLanguage(); unknown codes return the language subtag itself.
+     * Locale::getDisplayLanguage() — ICU uloc_getDisplayLanguage (#20755, #22901).
      *
      * @return string|false
      */
     public static function getDisplayLanguage(string $locale, ?string $displayLocale = null): string|false
     {
-        unset($displayLocale);
         $id = self::resolveLocaleOperand($locale);
         $tags = self::parseBcp47Tags($id);
         if ('' === $tags['language']) {
             return false;
+        }
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayField('uloc_getDisplayLanguage', $id, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
         }
 
         return self::englishLanguageName($tags['language']) ?? $tags['language'];
     }
 
     /**
-     * Locale::getDisplayRegion() — English region display (#20755).
+     * Locale::getDisplayRegion() — ICU uloc_getDisplayCountry (#20755, #22901).
      *
      * @return string|false
      */
     public static function getDisplayRegion(string $locale, ?string $displayLocale = null): string|false
     {
-        unset($displayLocale);
         $id = self::resolveLocaleOperand($locale);
         $tags = self::parseBcp47Tags($id);
         if ('' === $tags['region']) {
             return '';
+        }
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayField('uloc_getDisplayCountry', $id, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
         }
 
         return self::englishRegionName($tags['region']) ?? $tags['region'];
     }
 
     /**
-     * Locale::getDisplayScript() — English script display (#20755).
+     * Locale::getDisplayScript() — ICU uloc_getDisplayScript (#20755, #22901).
      *
      * @return string|false
      */
     public static function getDisplayScript(string $locale, ?string $displayLocale = null): string|false
     {
-        unset($displayLocale);
         $id = self::resolveLocaleOperand($locale);
         $tags = self::parseBcp47Tags($id);
         if ('' === $tags['script']) {
             return '';
+        }
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayField('uloc_getDisplayScript', $id, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
         }
 
         return self::englishScriptName($tags['script']) ?? $tags['script'];
     }
 
     /**
-     * Locale::getDisplayVariant() — English variant display (#20755).
+     * Locale::getDisplayVariant() — ICU uloc_getDisplayVariant (#20755, #22901).
      *
      * Single known variants get ICU-shaped English labels; multi-variant tags return
-     * the underscore-joined raw codes (php-src / ICU).
+     * the underscore-joined raw codes when ICU is unavailable (php-src / ICU).
      *
      * @return string|false
      */
     public static function getDisplayVariant(string $locale, ?string $displayLocale = null): string|false
     {
-        unset($displayLocale);
         $id = self::resolveLocaleOperand($locale);
         $variants = self::variantSubtags($id);
         if ([] === $variants) {
             return '';
+        }
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayField('uloc_getDisplayVariant', $id, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
         }
         if (1 === \count($variants)) {
             return self::englishVariantName($variants[0]) ?? $variants[0];
@@ -1236,6 +1263,16 @@ C;
     }
 
     /**
+     * Locale display field via ICU (name/language/country/script/variant) — #22901.
+     *
+     * @return string|false|null null = ICU unavailable; false = ICU error
+     */
+    private static function ulocGetDisplayField(string $baseFn, string $locale, string $displayLocale): string|false|null
+    {
+        return self::ulocDisplayKeywordCall($baseFn, [$locale, $displayLocale]);
+    }
+
+    /**
      * @return string|false|null null = ICU unavailable; false = ICU error
      */
     private static function ulocGetDisplayKeywordValue(
@@ -1637,6 +1674,11 @@ int32_t uloc_addLikelySubtags{$suffix}(const char *localeID, char *maximizedLoca
 int32_t uloc_minimizeSubtags{$suffix}(const char *localeID, char *minimizedLocaleID, int32_t minimizedLocaleIDCapacity, UErrorCode *err);
 int32_t uloc_getDisplayKeyword{$suffix}(const char *keyword, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
 int32_t uloc_getDisplayKeywordValue{$suffix}(const char *locale, const char *keyword, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
+int32_t uloc_getDisplayName{$suffix}(const char *localeID, const char *inLocaleID, UChar *result, int32_t maxResultSize, UErrorCode *err);
+int32_t uloc_getDisplayLanguage{$suffix}(const char *locale, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
+int32_t uloc_getDisplayCountry{$suffix}(const char *locale, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
+int32_t uloc_getDisplayScript{$suffix}(const char *locale, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
+int32_t uloc_getDisplayVariant{$suffix}(const char *locale, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
 UEnumeration *uloc_openKeywords{$suffix}(const char *localeID, UErrorCode *status);
 const char *uenum_next{$suffix}(UEnumeration *en, int32_t *resultLength, UErrorCode *status);
 void uenum_close{$suffix}(UEnumeration *en);

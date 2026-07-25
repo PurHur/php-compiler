@@ -726,7 +726,9 @@ class JITTest extends BaseTest {
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsLocaleCompliance($name)
                 && (str_contains($name, 'locale_get_default')
                     || str_contains($name, 'locale_class')
-                    || str_contains($name, 'locale_set_default'))
+                    || str_contains($name, 'locale_set_default')
+                    || str_contains($name, 'locale_display')
+                    || str_contains($name, 'locale_get_display'))
                 && !str_contains($name, 'locale_gated')
                 && !str_contains($name, 'intl_phantom')) {
                 continue;
