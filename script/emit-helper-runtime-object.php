@@ -296,11 +296,22 @@ if ($emitJobs < 1) {
     $emitJobs = $nproc > 2 ? $nproc - 2 : 1;
 }
 $emitJobs = max(1, min($emitJobs, max(1, count($pendingUnits))));
+
+// A unit whose lowering never finishes must not hang the corpus. Without a cap the reap loop
+// below waits on it forever, so `warmForUserAotBuild()` — and therefore every cold `phpc build`
+// — blocks with no diagnostic and no failed.json to remember it by (#22843 PackJitHelper).
+// 0 disables the cap and restores the old unbounded wait.
+$emitUnitTimeout = getenv('PHP_COMPILER_EMIT_UNIT_TIMEOUT');
+$emitUnitTimeout = false === $emitUnitTimeout || '' === $emitUnitTimeout
+    ? 600
+    : max(0, (int) $emitUnitTimeout);
+
 if ([] !== $pendingUnits) {
     fwrite(STDOUT, sprintf(
-        "helper-runtime-emit: lowering %d unit(s) across %d job(s)\n",
+        "helper-runtime-emit: lowering %d unit(s) across %d job(s)%s\n",
         count($pendingUnits),
-        $emitJobs
+        $emitJobs,
+        $emitUnitTimeout > 0 ? ", {$emitUnitTimeout}s/unit cap" : ', no per-unit cap'
     ));
 }
 
@@ -325,13 +336,28 @@ while ([] !== $queue || [] !== $running) {
 
             continue;
         }
-        $running[$slug] = ['proc' => $proc, 'unit' => $unit];
+        $running[$slug] = ['proc' => $proc, 'unit' => $unit, 'started' => time()];
     }
 
     $reaped = false;
     foreach ($running as $slug => $entry) {
         $status = proc_get_status($entry['proc']);
         if ($status['running']) {
+            if ($emitUnitTimeout > 0 && (time() - $entry['started']) >= $emitUnitTimeout) {
+                // SIGKILL: this child is wedged in LLVM lowering and will not honour SIGTERM.
+                proc_terminate($entry['proc'], 9);
+                proc_close($entry['proc']);
+                fwrite(STDERR, sprintf(
+                    "helper-runtime-emit: TIMEOUT %s after %ds — recorded as failed so the corpus can finish"
+                    ." (raise PHP_COMPILER_EMIT_UNIT_TIMEOUT, or 0 to disable)\n",
+                    $entry['unit']['path'],
+                    $emitUnitTimeout
+                ));
+                $recordUnitResult($slug, $entry['unit'], 124);
+                unset($running[$slug]);
+                $reaped = true;
+            }
+
             continue;
         }
         $rc = proc_close($entry['proc']);
