@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringVarDump: embed + standalone php-in-PHP bridge (#9195, #13241, #16565). */
+/**
+ * StringVarDump NestedJIT via JitVmHelperLink::ensureCompiled (#23143 / peer #22668).
+ */
 final class VarDumpRuntimeShrinkTest extends TestCase
 {
     public function testStringVarDumpUsesVarDumpJitHelperForEmbedAndStandalone(): void
@@ -15,6 +17,13 @@ final class VarDumpRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VarDumpJitHelper', $source);
         $this->assertStringNotContainsString('StringVarDumpJit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringVarDumpJit.php');
     }
 
