@@ -358,23 +358,17 @@ final class VmDebugBacktrace
         return null;
     }
 
-    private static function frameFunction(Frame $frame): string
+    /**
+     * php-cfg stores anon closures/arrows as `{anonymous}#N`; Zend backtraces use `{closure}`
+     * (zend_closures.c / zend_builtin_functions.c, #23184). Keep `{main}` for empty top-level.
+     */
+    private static function zendBacktraceFunctionName(string $name, bool $hasClass): string
     {
-        if ($frame->hasHandler()) {
-            return $frame->handler->getName();
-        }
-        if (null === $frame->block || null === $frame->block->func) {
-            return '';
-        }
-        $func = $frame->block->func;
-        $name = $func->name;
-        if ('' === $name && null === $func->class) {
+        if (preg_match('/^\{anonymous\}#\d+$/', $name)) {
             return '{closure}';
         }
-        if (null !== $func->class) {
-            $class = $func->class->value ?? $func->class->name ?? '';
-
-            return '' !== $class ? $class.'::'.$name : $name;
+        if ('' === $name && !$hasClass) {
+            return '{main}';
         }
 
         return $name;
@@ -464,12 +458,8 @@ final class VmDebugBacktrace
             return '';
         }
         $func = $frame->block->func;
-        $name = $func->name;
-        if ('' === $name && null === $func->class) {
-            return '{main}';
-        }
 
-        return $name;
+        return self::zendBacktraceFunctionName($func->name, null !== $func->class);
     }
 
     private static function frameClass(Frame $frame): string
