@@ -1697,10 +1697,16 @@ restart:
 
     /**
      * Zend _convert_to_string() array branch (zend_operators.c, issue #5266).
+     *
+     * $fallbackContext covers string-offset assign where the offset slot holds Context
+     * but not a live VM (#22925 / zend_assign_to_string_offset).
      */
-    private static function emitArrayToStringWarning(?\PHPCompiler\VM $vm, ?\PHPCompiler\Frame $frame): void
-    {
-        $context = $vm?->context ?? $frame?->vmContext;
+    private static function emitArrayToStringWarning(
+        ?\PHPCompiler\VM $vm,
+        ?\PHPCompiler\Frame $frame,
+        ?Context $fallbackContext = null
+    ): void {
+        $context = $vm?->context ?? $frame?->vmContext ?? $fallbackContext;
         if (null === $context) {
             return;
         }
@@ -3129,8 +3135,15 @@ restart:
                 return $s[0];
             case self::TYPE_INTEGER:
                 return chr($value->integer & 0xff);
+            case self::TYPE_ARRAY:
+                // Zend zend_assign_to_string_offset → convert_to_string → Array warning (#22925).
+                self::emitArrayToStringWarning(null, $this->stringOffsetFrame, $this->stringOffsetContext);
+                $s = 'Array';
+                $this->warnIfMultiByteStringOffsetAssign($s);
+
+                return $s[0];
             default:
-                $s = $value->toString();
+                $s = $value->toString(null, $this->stringOffsetFrame);
                 if ('' === $s) {
                     throw new \Error(self::STRING_OFFSET_EMPTY_ASSIGN_ERROR);
                 }

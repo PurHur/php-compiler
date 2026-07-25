@@ -303,6 +303,9 @@ final class StringOffsetRuntime
                     $chars = $context->builder->structGep($str, $map['value']);
 
                     return $context->builder->load($chars);
+                case JitVariable::TYPE_HASHTABLE:
+                    // Nested leaf: skip user-visible warnings (same as OOR path).
+                    return $i8->constInt(\ord('A'), false);
                 default:
                     throw new \LogicException(
                         'String offset assignment supports int or string RHS in JIT (got type '.$value->type.')'
@@ -330,11 +333,40 @@ final class StringOffsetRuntime
                 );
 
                 return $context->builder->truncOrBitCast($byteInt, $i8);
+            case JitVariable::TYPE_HASHTABLE:
+                // Zend: Array→string warning then first-byte warning → 'A' (#22925).
+                self::emitAssignEwarning($context, StringOffsetJitHelper::ARRAY_TO_STRING_WARNING);
+                self::emitAssignEwarning($context, StringOffsetJitHelper::FIRST_BYTE_WARNING);
+
+                return $i8->constInt(\ord('A'), false);
             default:
                 throw new \LogicException(
                     'String offset assignment supports int or string RHS in JIT (got type '.$value->type.')'
                 );
         }
+    }
+
+    /** E_WARNING during string-offset assign (Array→string / first-byte, #22925). */
+    private static function emitAssignEwarning(Context $context, string $message): void
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringTriggerError::ensureLinked($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(\PHPCompiler\VM\ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     /**

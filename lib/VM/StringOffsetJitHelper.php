@@ -22,6 +22,9 @@ final class StringOffsetJitHelper
     /** @see Variable::STRING_OFFSET_FIRST_BYTE_WARNING (#22380) */
     public const FIRST_BYTE_WARNING = 'Only the first byte will be assigned to the string offset';
 
+    /** Zend _convert_to_string() array branch before string-offset assign (#22925). */
+    public const ARRAY_TO_STRING_WARNING = 'Array to string conversion';
+
     /** @see Variable::STRING_OFFSET_REF_ERROR (#21910) */
     public const REF_ERROR = 'Cannot create references to/from string offsets';
 
