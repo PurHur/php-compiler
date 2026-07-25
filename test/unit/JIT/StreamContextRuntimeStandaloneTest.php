@@ -8,7 +8,7 @@ use PHPCompiler\JIT\Builtin\StreamContextRuntime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5392 / #9340 / #19817: stream_context LLVM routes through StreamContextJitHelper PHP.
+ * Issue #5392 / #9340 / #19817 / #23049: stream_context LLVM routes through StreamContextJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -22,7 +22,8 @@ final class StreamContextRuntimeStandaloneTest extends TestCase
         $kernel = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitStreamContextKernel.php');
         $this->assertStringContainsString('__phpc_stream_context_create', $kernel);
         $this->assertStringContainsString('StreamContextJitHelper', $kernel);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $kernel);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $kernel);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $kernel);
         $this->assertStringNotContainsString('implementMergeOptions', $kernel);
         $orchestrator = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StreamContextRuntime.php');
         $this->assertStringContainsString('JitStreamContextKernel::implement', $orchestrator);
