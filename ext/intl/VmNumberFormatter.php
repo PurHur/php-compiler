@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -122,7 +123,9 @@ final class VmNumberFormatter
     public const ROUND_HALFEVEN = 4;
     public const ROUND_HALFDOWN = 5;
     public const ROUND_HALFUP = 6;
+    /** ICU UNUM_ROUND_UNNECESSARY — internal only; never registered (#22704, absent from php-src stubs). */
     public const ROUND_UNNECESSARY = 7;
+    /** PHP 8.4+ only when advertised — see {@see CompilerVersion::supportsNumberFormatterPhp84RoundConsts()}. */
     public const ROUND_HALFODD = 8;
     public const ROUND_TOWARD_ZERO = 2;
     public const ROUND_AWAY_FROM_ZERO = 3;
@@ -216,13 +219,16 @@ final class VmNumberFormatter
             'ROUND_FLOOR' => self::ROUND_FLOOR,
             'ROUND_DOWN' => self::ROUND_DOWN,
             'ROUND_UP' => self::ROUND_UP,
-            'ROUND_TOWARD_ZERO' => self::ROUND_TOWARD_ZERO,
-            'ROUND_AWAY_FROM_ZERO' => self::ROUND_AWAY_FROM_ZERO,
             'ROUND_HALFEVEN' => self::ROUND_HALFEVEN,
-            'ROUND_HALFODD' => self::ROUND_HALFODD,
             'ROUND_HALFDOWN' => self::ROUND_HALFDOWN,
             'ROUND_HALFUP' => self::ROUND_HALFUP,
-            'ROUND_UNNECESSARY' => self::ROUND_UNNECESSARY,
+            // PHP 8.4+ ROUND_HALFODD / TOWARD_ZERO / AWAY_FROM_ZERO — withhold on 8.2 (#22704).
+            // ROUND_UNNECESSARY never advertised (absent from php-src formatter.stub.php).
+            ...(CompilerVersion::supportsNumberFormatterPhp84RoundConsts() ? [
+                'ROUND_TOWARD_ZERO' => self::ROUND_TOWARD_ZERO,
+                'ROUND_AWAY_FROM_ZERO' => self::ROUND_AWAY_FROM_ZERO,
+                'ROUND_HALFODD' => self::ROUND_HALFODD,
+            ] : []),
         ];
     }
 
