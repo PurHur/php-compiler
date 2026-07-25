@@ -113,7 +113,7 @@ final class VmEmptyDimension
                 return null;
             }
             try {
-                $index = Variable::stringOffsetIndexFromDim(
+                $rawIndex = Variable::stringOffsetIndexFromDim(
                     $dim,
                     $vm->context->errors,
                     $vm->context,
@@ -123,7 +123,13 @@ final class VmEmptyDimension
             } catch (\TypeError $e) {
                 return $vm->propagateEmptyDimensionTypeError($e, $frame);
             }
-            $char = $container->string[$index] ?? '';
+            // Private Variable::$string is invisible here; ?? treated the read as null (#23071).
+            $str = $container->toString();
+            $index = $rawIndex;
+            if ($index < 0) {
+                $index += \strlen($str);
+            }
+            $char = $str[$index];
             $charVar = new Variable();
             $charVar->string($char);
             $dst->bool(!boolval::isTruthy($charVar));
