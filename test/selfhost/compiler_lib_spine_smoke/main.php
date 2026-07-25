@@ -1907,6 +1907,7 @@ require_once __DIR__.'/../../../ext/spl/InternalIteratorLiveHandler.php';
 require_once __DIR__.'/../../../ext/spl/InternalIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/sqlite3/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/sqlite3/Module.php';
+require_once __DIR__.'/../../../ext/sqlite3/Sqlite3SerializeDeny.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3Backup.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3BusyTimeout.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3Changes.php';
