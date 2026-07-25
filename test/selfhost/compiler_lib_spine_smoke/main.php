@@ -899,6 +899,7 @@ require_once __DIR__.'/../../../ext/inotify/inotify_read.php';
 require_once __DIR__.'/../../../ext/inotify/inotify_rm_watch.php';
 require_once __DIR__.'/../../../ext/intl/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/intl/GraphemeStrSplitJitHelper.php';
+require_once __DIR__.'/../../../ext/intl/IcuDateFormat.php';
 require_once __DIR__.'/../../../ext/intl/IdnFunction.php';
 require_once __DIR__.'/../../../ext/intl/IntlClassMethod.php';
 require_once __DIR__.'/../../../ext/intl/IntlConstants.php';

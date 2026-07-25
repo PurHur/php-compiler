@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6518 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20929 |
+| Source constructs flagged (warnings) | 20928 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -468,7 +468,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 17 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
-| `ext/dom/VmDomXPath.php` | 0 | 53 |
+| `ext/dom/VmDomXPath.php` | 0 | 52 |
 | `ext/dom/XPathConstruct.php` | 0 | 2 |
 | `ext/dom/XPathEvaluate.php` | 0 | 1 |
 | `ext/dom/XPathQuery.php` | 0 | 1 |
@@ -9745,55 +9745,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 69)
 - new DomNodeState (line 72)
-- new Variable (line 237)
-- new Variable (line 243)
-- new Variable (line 249)
-- new Variable (line 294)
-- new DOMException (line 313)
-- new DOMException (line 319)
-- new DOMException (line 467)
-- new DOMException (line 518)
-- new DOMException (line 991)
-- new DOMException (line 1461)
-- new DOMException (line 1593)
-- new DOMException (line 1602)
-- new DOMException (line 1612)
-- new DOMException (line 1656)
-- new DOMException (line 1682)
+- new Variable (line 251)
+- new Variable (line 257)
+- new Variable (line 263)
+- new Variable (line 308)
+- new DOMException (line 327)
+- new DOMException (line 333)
+- new DOMException (line 481)
+- new DOMException (line 532)
+- new DOMException (line 1005)
+- new DOMException (line 1475)
+- new DOMException (line 1607)
+- new DOMException (line 1616)
+- new DOMException (line 1626)
+- new DOMException (line 1670)
 - new DOMException (line 1696)
-- new DOMException (line 1705)
-- new DOMException (line 1714)
-- new DOMException (line 1771)
-- new DOMException (line 1788)
-- new DOMException (line 1818)
-- new DOMException (line 1833)
+- new DOMException (line 1710)
+- new DOMException (line 1719)
+- new DOMException (line 1728)
+- new DOMException (line 1785)
+- new DOMException (line 1802)
+- new DOMException (line 1832)
 - new DOMException (line 1847)
-- new DOMException (line 1860)
+- new DOMException (line 1861)
 - new DOMException (line 1874)
-- new DOMException (line 1889)
-- new DOMException (line 1904)
+- new DOMException (line 1888)
+- new DOMException (line 1903)
 - new DOMException (line 1918)
-- new DOMException (line 1927)
-- new DOMException (line 1931)
-- new DOMException (line 1955)
-- new Variable (line 2649)
-- new DOMException (line 2655)
-- new Error (line 2668)
-- new Variable (line 2672)
-- new Variable (line 2682)
-- new Variable (line 2810)
-- new DOMException (line 2817)
-- new Error (line 2871)
-- new Variable (line 2906)
-- new Variable (line 2912)
-- new Variable (line 2924)
+- new DOMException (line 1932)
+- new DOMException (line 1941)
+- new DOMException (line 1945)
+- new DOMException (line 1969)
+- new Variable (line 2664)
+- new DOMException (line 2670)
+- new Error (line 2683)
+- new Variable (line 2687)
+- new Variable (line 2697)
+- new Variable (line 2829)
+- new DOMException (line 2836)
+- new Error (line 2895)
+- new Variable (line 2930)
 - new Variable (line 2936)
-- new Variable (line 2957)
-- new HashTable (line 2968)
-- new Variable (line 2974)
-- new Variable (line 2978)
-- new Variable (line 2995)
-- new Variable (line 3004)
+- new Variable (line 2948)
+- new Variable (line 2960)
+- new Variable (line 2981)
+- new HashTable (line 2992)
+- new Variable (line 2998)
+- new Variable (line 3002)
+- new Variable (line 3040)
 - 93 class method(s)
 - 4 closure(s)
 
@@ -25066,7 +25065,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/IncludeBindingJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Literal (line 345)
+- new Literal (line 355)
 - 14 class method(s)
 
 ### `ext/standard/IncludeJitHelper.php`
