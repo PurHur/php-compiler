@@ -254,12 +254,19 @@ final class VmSimpleXml
         }
         // Property access is always a live named-sibling selection under the context
         // parent (php-src sxe.c; #20483) — never a frozen snapshot or bare single node.
+        // From a children() view, inherit the NS filter so `$ch->localName` matches by
+        // local name within that filter (#22728 / #22829).
+        $childrenFilter = SimpleXmlRegistry::isChildrenView($entry)
+            ? SimpleXmlRegistry::childrenViewFilter($entry)
+            : null;
+
         return self::wrapNamedChildView(
             $ctx,
             $entry->class,
             self::propertyAccessParent($entry),
             $name,
-            $docKey
+            $docKey,
+            $childrenFilter
         );
     }
 
@@ -805,12 +812,12 @@ final class VmSimpleXml
         if (SimpleXmlRegistry::isView($entry) && !SimpleXmlRegistry::isChildrenView($entry)) {
             $elements = self::directElementChildren($entry);
             $scope = self::inScopeNamespacesForEntry($entry);
-            if (null === $namespaceOrPrefix) {
+            if (null === $namespaceOrPrefix || '' === $namespaceOrPrefix) {
                 $elements = array_values(array_filter(
                     $elements,
                     static fn (SimpleXmlNodeState $element): bool => '' === self::resolveElementNamespaceUri($element, $scope)
                 ));
-            } elseif ('' !== $namespaceOrPrefix) {
+            } else {
                 $elements = self::filterChildrenByNamespace($elements, $namespaceOrPrefix, $isPrefix, $entry, $scope);
             }
 
@@ -1313,9 +1320,10 @@ final class VmSimpleXml
             return $matches[0]->elementsNamed($name);
         }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
+            // Match local name among the namespace-filtered children (php-src sxe.c; #22728).
             $out = [];
             foreach (self::childrenViewElements($entry) as $node) {
-                if ($node->name === $name) {
+                if (self::localNameFromQualified($node->name) === $name) {
                     $out[] = $node;
                 }
             }
@@ -1510,12 +1518,13 @@ final class VmSimpleXml
         ClassEntry $class,
         SimpleXmlNodeState $parent,
         string $childName,
-        ?int $documentKey = null
+        ?int $documentKey = null,
+        ?array $childrenFilter = null
     ): ObjectEntry {
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $docKey = $documentKey ?? $entry->id;
-        SimpleXmlRegistry::attachNamedChildView($entry, $parent, $childName, $docKey);
+        SimpleXmlRegistry::attachNamedChildView($entry, $parent, $childName, $docKey, $childrenFilter);
 
         return $entry;
     }
@@ -1562,8 +1571,21 @@ final class VmSimpleXml
     {
         $parent = SimpleXmlRegistry::state($entry);
         $name = SimpleXmlRegistry::namedChildViewName($entry);
+        $filter = SimpleXmlRegistry::namedChildViewFilter($entry);
+        if (null === $filter) {
+            return $parent->elementsNamed($name);
+        }
 
-        return $parent->elementsNamed($name);
+        // Inherited children() NS filter: match local name within the filtered set
+        // (php-src sxe_prop_dim_read; #22728 / #22829).
+        $out = [];
+        foreach (self::filterParentChildren($entry, $parent, $filter) as $node) {
+            if (self::localNameFromQualified($node->name) === $name) {
+                $out[] = $node;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -1575,26 +1597,40 @@ final class VmSimpleXml
     {
         $parent = SimpleXmlRegistry::state($entry);
         $filter = SimpleXmlRegistry::childrenViewFilter($entry);
+
+        return self::filterParentChildren($entry, $parent, $filter);
+    }
+
+    /**
+     * Apply a children() namespace filter to a parent node's direct children.
+     *
+     * @param array{ns: ?string, isPrefix: bool} $filter
+     *
+     * @return list<SimpleXmlNodeState>
+     */
+    private static function filterParentChildren(
+        ObjectEntry $entry,
+        SimpleXmlNodeState $parent,
+        array $filter
+    ): array {
         $elements = $parent->children;
         $scope = self::inScopeNamespacesForEntry($entry);
         $namespaceOrPrefix = $filter['ns'];
-        if (null === $namespaceOrPrefix) {
+        // php-src: null or '' ⇒ no-namespace children only; non-empty ⇒ URI/prefix filter.
+        if (null === $namespaceOrPrefix || '' === $namespaceOrPrefix) {
             return array_values(array_filter(
                 $elements,
                 static fn (SimpleXmlNodeState $element): bool => '' === self::resolveElementNamespaceUri($element, $scope)
             ));
         }
-        if ('' !== $namespaceOrPrefix) {
-            return self::filterChildrenByNamespace(
-                $elements,
-                $namespaceOrPrefix,
-                $filter['isPrefix'],
-                $entry,
-                $scope
-            );
-        }
 
-        return $elements;
+        return self::filterChildrenByNamespace(
+            $elements,
+            $namespaceOrPrefix,
+            $filter['isPrefix'],
+            $entry,
+            $scope
+        );
     }
 
     /** Detached xpath/node handles throw like php-src "not properly initialized" (#20483). */
@@ -1826,8 +1862,10 @@ final class VmSimpleXml
 
         $docKey = SimpleXmlRegistry::documentKey($entry);
         $root = SimpleXmlRegistry::rootState($docKey);
-        // Live children() views share the parent element — use that node for xmlns scope (#20331).
-        if (SimpleXmlRegistry::isChildrenView($entry)) {
+        // Live children() / named-child views share the parent element — use that node for
+        // xmlns scope (#20331). Do not call viewElements() here: named-child resolution
+        // re-enters filterParentChildren → inScopeNamespacesForEntry (#22728).
+        if (SimpleXmlRegistry::isChildrenView($entry) || SimpleXmlRegistry::isNamedChildView($entry)) {
             $nodes = [SimpleXmlRegistry::state($entry)];
         } else {
             $nodes = SimpleXmlRegistry::isView($entry) ? self::viewElements($entry) : [SimpleXmlRegistry::state($entry)];
