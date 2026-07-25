@@ -57,6 +57,8 @@ final class VmMysqliStmt
             'result_metadata' => new MysqliStmtResultMetadata(),
             'more_results' => new MysqliStmtMoreResults(),
             'next_result' => new MysqliStmtNextResult(),
+            'attr_get' => new MysqliStmtAttrGet(),
+            'attr_set' => new MysqliStmtAttrSet(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -344,6 +346,118 @@ final class VmMysqliStmt
     public static function nextResult(ObjectEntry $stmt): bool
     {
         return self::requireNative($stmt)->next_result();
+    }
+
+    /**
+     * mysqli_stmt_attr_get() — php-src ext/mysqli/mysqli_api.c (#22175).
+     *
+     * @param int $attributeArgPos 1-based user-visible argument index for ValueError messages
+     */
+    public static function attrGet(
+        ObjectEntry $stmt,
+        int $attribute,
+        string $funcLabel = 'mysqli_stmt_attr_get',
+        int $attributeArgPos = 2
+    ): int {
+        self::validateStmtAttribute($funcLabel, $attribute, $attributeArgPos);
+        $native = self::requireNative($stmt);
+        if (!\method_exists($native, 'attr_get')) {
+            throw new \Error($funcLabel.'() requires host ext/mysqli');
+        }
+
+        return (int) $native->attr_get($attribute);
+    }
+
+    /**
+     * mysqli_stmt_attr_set() — php-src ext/mysqli/mysqli_api.c (#22175).
+     *
+     * @param int $attributeArgPos 1-based user-visible argument index for ValueError messages
+     * @param int $valueArgPos     1-based user-visible argument index for ValueError messages
+     */
+    public static function attrSet(
+        ObjectEntry $stmt,
+        int $attribute,
+        int $value,
+        string $funcLabel = 'mysqli_stmt_attr_set',
+        int $attributeArgPos = 2,
+        int $valueArgPos = 3
+    ): bool {
+        self::validateStmtAttributeForSet($funcLabel, $attribute, $value, $attributeArgPos, $valueArgPos);
+        $native = self::requireNative($stmt);
+        if (!\method_exists($native, 'attr_set')) {
+            throw new \Error($funcLabel.'() requires host ext/mysqli');
+        }
+
+        return (bool) $native->attr_set($attribute, $value);
+    }
+
+    /** php-src 8.2 mysqli_stmt_attr_get unknown-attr ValueError. */
+    private static function validateStmtAttribute(string $funcLabel, int $attribute, int $attributeArgPos): void
+    {
+        if (
+            $attribute !== MysqliConstants::MYSQLI_STMT_ATTR_UPDATE_MAX_LENGTH
+            && $attribute !== MysqliConstants::MYSQLI_STMT_ATTR_CURSOR_TYPE
+            && $attribute !== MysqliConstants::MYSQLI_STMT_ATTR_PREFETCH_ROWS
+        ) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($attribute) must be one of MYSQLI_STMT_ATTR_UPDATE_MAX_LENGTH, MYSQLI_STMT_ATTR_PREFETCH_ROWS, or STMT_ATTR_CURSOR_TYPE',
+                $funcLabel,
+                $attributeArgPos
+            ));
+        }
+    }
+
+    /** php-src 8.2 mysqli_stmt_attr_set validation before mysql_stmt_attr_set. */
+    private static function validateStmtAttributeForSet(
+        string $funcLabel,
+        int $attribute,
+        int $value,
+        int $attributeArgPos,
+        int $valueArgPos
+    ): void {
+        switch ($attribute) {
+            case MysqliConstants::MYSQLI_STMT_ATTR_UPDATE_MAX_LENGTH:
+                if ($value !== 0 && $value !== 1) {
+                    throw new \ValueError(\sprintf(
+                        '%s(): Argument #%d ($value) must be 0 or 1 for attribute MYSQLI_STMT_ATTR_UPDATE_MAX_LENGTH',
+                        $funcLabel,
+                        $valueArgPos
+                    ));
+                }
+
+                return;
+            case MysqliConstants::MYSQLI_STMT_ATTR_CURSOR_TYPE:
+                if (
+                    $value !== MysqliConstants::MYSQLI_CURSOR_TYPE_NO_CURSOR
+                    && $value !== MysqliConstants::MYSQLI_CURSOR_TYPE_READ_ONLY
+                    && $value !== MysqliConstants::MYSQLI_CURSOR_TYPE_FOR_UPDATE
+                    && $value !== MysqliConstants::MYSQLI_CURSOR_TYPE_SCROLLABLE
+                ) {
+                    throw new \ValueError(\sprintf(
+                        '%s(): Argument #%d ($value) must be one of the MYSQLI_CURSOR_TYPE_* constants for attribute MYSQLI_STMT_ATTR_CURSOR_TYPE',
+                        $funcLabel,
+                        $valueArgPos
+                    ));
+                }
+
+                return;
+            case MysqliConstants::MYSQLI_STMT_ATTR_PREFETCH_ROWS:
+                if ($value < 1) {
+                    throw new \ValueError(\sprintf(
+                        '%s(): Argument #%d ($value) must be greater than 0 for attribute MYSQLI_STMT_ATTR_PREFETCH_ROWS',
+                        $funcLabel,
+                        $valueArgPos
+                    ));
+                }
+
+                return;
+            default:
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($attribute) must be one of MYSQLI_STMT_ATTR_UPDATE_MAX_LENGTH, MYSQLI_STMT_ATTR_PREFETCH_ROWS, or STMT_ATTR_CURSOR_TYPE',
+                    $funcLabel,
+                    $attributeArgPos
+                ));
+        }
     }
 }
 
@@ -750,6 +864,50 @@ final class MysqliStmtNextResult extends MysqliClassMethod
         $receiver = $this->receiver($frame, 'mysqli_stmt::next_result()');
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmMysqliStmt::nextResult($receiver));
+        }
+    }
+}
+
+/** mysqli_stmt::attr_get() — php-src ext/mysqli/mysqli.stub.php (#22175). */
+final class MysqliStmtAttrGet extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('attr_get');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::attr_get()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli_stmt::attr_get() expects exactly 1 argument, 0 given');
+        }
+        $attribute = $this->intArg($frame->calledArgs[1], 'mysqli_stmt::attr_get', 0, 'attribute');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqliStmt::attrGet($receiver, $attribute, 'mysqli_stmt::attr_get', 1));
+        }
+    }
+}
+
+/** mysqli_stmt::attr_set() — php-src ext/mysqli/mysqli.stub.php (#22175). */
+final class MysqliStmtAttrSet extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('attr_set');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::attr_set()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError('mysqli_stmt::attr_set() expects exactly 2 arguments, '.$argc.' given');
+        }
+        $attribute = $this->intArg($frame->calledArgs[1], 'mysqli_stmt::attr_set', 0, 'attribute');
+        $value = $this->intArg($frame->calledArgs[2], 'mysqli_stmt::attr_set', 1, 'value');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::attrSet($receiver, $attribute, $value, 'mysqli_stmt::attr_set', 1, 2));
         }
     }
 }

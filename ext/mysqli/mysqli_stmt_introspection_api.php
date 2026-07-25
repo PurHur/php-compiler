@@ -273,3 +273,86 @@ final class mysqli_stmt_result_metadata extends MysqliStmtIntrospectionBuiltin
         }
     }
 }
+
+/** mysqli_stmt_attr_get() — php-src ext/mysqli/mysqli_api.c (#22175). */
+final class mysqli_stmt_attr_get extends MysqliStmtIntrospectionBuiltin
+{
+    public function __construct()
+    {
+        parent::__construct('mysqli_stmt_attr_get');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $stmt = $this->stmt($frame);
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli_stmt_attr_get() expects exactly 2 arguments, 1 given');
+        }
+        $attributeVar = $frame->calledArgs[1]->resolveIndirect();
+        $attribute = match ($attributeVar->type) {
+            Variable::TYPE_INTEGER => $attributeVar->toInt(),
+            Variable::TYPE_FLOAT => (int) $attributeVar->toFloat(),
+            Variable::TYPE_BOOLEAN => $attributeVar->toBool() ? 1 : 0,
+            Variable::TYPE_STRING => is_numeric($attributeVar->toString()) ? (int) $attributeVar->toString() : 0,
+            default => throw new \TypeError(\sprintf(
+                'mysqli_stmt_attr_get(): Argument #2 ($attribute) must be of type int, %s given',
+                MysqliClassMethod::typeLabelPublic($attributeVar)
+            )),
+        };
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqliStmt::attrGet($stmt, $attribute, 'mysqli_stmt_attr_get', 2));
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \Error($this->getName().'() is not implemented for JIT (issue #22175)');
+    }
+}
+
+/** mysqli_stmt_attr_set() — php-src ext/mysqli/mysqli_api.c (#22175). */
+final class mysqli_stmt_attr_set extends MysqliStmtIntrospectionBuiltin
+{
+    public function __construct()
+    {
+        parent::__construct('mysqli_stmt_attr_set');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $stmt = $this->stmt($frame);
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'mysqli_stmt_attr_set() expects exactly 3 arguments, '.\count($frame->calledArgs).' given'
+            );
+        }
+        $attribute = $this->intParam($frame->calledArgs[1], 2, 'attribute');
+        $value = $this->intParam($frame->calledArgs[2], 3, 'value');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::attrSet($stmt, $attribute, $value, 'mysqli_stmt_attr_set', 2, 3));
+        }
+    }
+
+    private function intParam(Variable $var, int $argPos, string $name): int
+    {
+        $resolved = $var->resolveIndirect();
+
+        return match ($resolved->type) {
+            Variable::TYPE_INTEGER => $resolved->toInt(),
+            Variable::TYPE_FLOAT => (int) $resolved->toFloat(),
+            Variable::TYPE_BOOLEAN => $resolved->toBool() ? 1 : 0,
+            Variable::TYPE_STRING => is_numeric($resolved->toString()) ? (int) $resolved->toString() : 0,
+            default => throw new \TypeError(\sprintf(
+                'mysqli_stmt_attr_set(): Argument #%d ($%s) must be of type int, %s given',
+                $argPos,
+                $name,
+                MysqliClassMethod::typeLabelPublic($resolved)
+            )),
+        };
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \Error($this->getName().'() is not implemented for JIT (issue #22175)');
+    }
+}

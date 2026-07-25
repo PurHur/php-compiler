@@ -55,6 +55,19 @@ final class MysqliConstants
     public const MYSQLI_OPT_INT_AND_FLOAT_NATIVE = 17;
     public const MYSQLI_OPT_SSL_VERIFY_SERVER_CERT = 21;
 
+    /**
+     * Statement attributes — php-src ext/mysqlnd/mysqlnd_enum_n_def.h enum mysqlnd_stmt_attr (#22175).
+     * PHP 8.2 profile includes PREFETCH_ROWS (removed in php-src 8.4+).
+     */
+    public const MYSQLI_STMT_ATTR_UPDATE_MAX_LENGTH = 0;
+    public const MYSQLI_STMT_ATTR_CURSOR_TYPE = 1;
+    public const MYSQLI_STMT_ATTR_PREFETCH_ROWS = 2;
+
+    public const MYSQLI_CURSOR_TYPE_NO_CURSOR = 0;
+    public const MYSQLI_CURSOR_TYPE_READ_ONLY = 1;
+    public const MYSQLI_CURSOR_TYPE_FOR_UPDATE = 2;
+    public const MYSQLI_CURSOR_TYPE_SCROLLABLE = 4;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -95,6 +108,13 @@ final class MysqliConstants
             'MYSQLI_OPT_NET_READ_BUFFER_SIZE' => self::MYSQLI_OPT_NET_READ_BUFFER_SIZE,
             'MYSQLI_OPT_INT_AND_FLOAT_NATIVE' => self::MYSQLI_OPT_INT_AND_FLOAT_NATIVE,
             'MYSQLI_OPT_SSL_VERIFY_SERVER_CERT' => self::MYSQLI_OPT_SSL_VERIFY_SERVER_CERT,
+            'MYSQLI_STMT_ATTR_UPDATE_MAX_LENGTH' => self::MYSQLI_STMT_ATTR_UPDATE_MAX_LENGTH,
+            'MYSQLI_STMT_ATTR_CURSOR_TYPE' => self::MYSQLI_STMT_ATTR_CURSOR_TYPE,
+            'MYSQLI_STMT_ATTR_PREFETCH_ROWS' => self::MYSQLI_STMT_ATTR_PREFETCH_ROWS,
+            'MYSQLI_CURSOR_TYPE_NO_CURSOR' => self::MYSQLI_CURSOR_TYPE_NO_CURSOR,
+            'MYSQLI_CURSOR_TYPE_READ_ONLY' => self::MYSQLI_CURSOR_TYPE_READ_ONLY,
+            'MYSQLI_CURSOR_TYPE_FOR_UPDATE' => self::MYSQLI_CURSOR_TYPE_FOR_UPDATE,
+            'MYSQLI_CURSOR_TYPE_SCROLLABLE' => self::MYSQLI_CURSOR_TYPE_SCROLLABLE,
         ];
     }
 
