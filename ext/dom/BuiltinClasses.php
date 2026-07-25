@@ -16,6 +16,8 @@ final class BuiltinClasses
     {
         VmDom::registerClasses($ctx);
         DomLivingBuiltinClasses::register($ctx);
+        // php-src ext/dom/php_dom.c — XML_*_NODE + DOM_PHP_ERR globals (#23138).
+        DomConstants::registerGlobals($ctx);
         self::registerDomExceptionConstants($ctx);
         self::syncDeclaredMethodNames($ctx);
     }
