@@ -1408,6 +1408,7 @@ require_once __DIR__.'/../../../ext/phar/Module.php';
 require_once __DIR__.'/../../../ext/phar/PharDataBuiltin.php';
 require_once __DIR__.'/../../../ext/phar/PharDefaultStubTemplate.php';
 require_once __DIR__.'/../../../ext/phar/PharExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/phar/PharSerializeDeny.php';
 require_once __DIR__.'/../../../ext/phar/VmPhar.php';
 require_once __DIR__.'/../../../ext/phar/VmPharData.php';
 require_once __DIR__.'/../../../ext/phar/VmPharFileInfo.php';
