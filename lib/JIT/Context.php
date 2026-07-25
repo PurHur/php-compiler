@@ -784,6 +784,44 @@ class Context {
     }
 
     /**
+     * Surface methods that lowered to a silent null because their class is not in this module (#579).
+     *
+     * {@see Call\ExternalMethod} turns such a call into `__value__writeNull` with no diagnostic, so a
+     * module that is missing a class miscompiles quietly rather than failing to build. The record was
+     * write-only until now; this makes it readable, which is what any split-module work needs in order
+     * to tell "compiled into another unit" apart from "silently became null".
+     *
+     * PHP_COMPILER_REPORT_EXTERNAL_STUBS=1 logs them; PHP_COMPILER_FAIL_ON_EXTERNAL_STUBS=1 makes it
+     * an error. Both are opt-in — some stubs are legitimate on bundles that intentionally exclude a
+     * class, so this reports rather than assuming a defect.
+     */
+    public function reportExternalMethodStubs(): void
+    {
+        if ([] === $this->externalMethodStubs) {
+            return;
+        }
+        $strict = '1' === getenv('PHP_COMPILER_FAIL_ON_EXTERNAL_STUBS');
+        if (!$strict && '1' !== getenv('PHP_COMPILER_REPORT_EXTERNAL_STUBS')) {
+            return;
+        }
+
+        $names = array_keys($this->externalMethodStubs);
+        sort($names, SORT_STRING);
+        $summary = sprintf(
+            '%d method call(s) lowered to a silent null — class not in this module (#579): %s',
+            count($names),
+            implode(', ', array_slice($names, 0, 40)).(count($names) > 40 ? ', …' : '')
+        );
+
+        if ($strict) {
+            throw new \RuntimeException('external method stubs: '.$summary);
+        }
+        if (\defined('STDERR') && \is_resource(STDERR)) {
+            fwrite(STDERR, 'phpc: external method stubs — '.$summary."\n");
+        }
+    }
+
+    /**
      * Whether a function name resolves to a builtin or user function in this compile unit (issue #1216).
      */
     public function functionIsRegistered(string $name): bool
@@ -1207,6 +1245,9 @@ class Context {
                 $file
             ));
         }
+
+        // Silent-null method lowerings are invisible without this (#579); opt-in via env.
+        $this->reportExternalMethodStubs();
 
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isThinStandaloneAotMain()) {
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
