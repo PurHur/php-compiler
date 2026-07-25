@@ -1574,6 +1574,7 @@ require_once __DIR__.'/../../../ext/simplexml/SimpleXmlNodeState.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlRegistry.php';
 require_once __DIR__.'/../../../ext/simplexml/VmSimpleXml.php';
 require_once __DIR__.'/../../../ext/simplexml/VmSimpleXmlIterator.php';
+require_once __DIR__.'/../../../ext/simplexml/SimpleXmlSerializeDeny.php';
 require_once __DIR__.'/../../../ext/simplexml/simplexml_import_dom.php';
 require_once __DIR__.'/../../../ext/simplexml/simplexml_load_file.php';
 require_once __DIR__.'/../../../ext/simplexml/simplexml_load_string.php';
