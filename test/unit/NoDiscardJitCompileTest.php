@@ -20,10 +20,16 @@ final class NoDiscardJitCompileTest extends TestCase
     protected function setUp(): void
     {
         $this->repoRoot = dirname(__DIR__, 2);
+        putenv('PHP_COMPILER_PROFILE=8.4');
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
             $this->markTestSkipped($reason.' — NoDiscard JIT compile test needs LLVM (#5663)');
         }
+    }
+
+    protected function tearDown(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
     }
 
     public function testDiscardedCallLowersCompilerTriggerError(): void

@@ -1,5 +1,7 @@
 --TEST--
 Language: #[\NoDiscard] warns when return value is discarded (JIT, #5663)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 ini_set('error_reporting', '32767');
