@@ -65,6 +65,15 @@ final class SimpleXmlRegistry
     /** @var array<int, string> */
     private static array $namedChildViewNames = [];
 
+    /**
+     * When set, `$parent->name` was taken from a children() view — resolve by local name
+     * within that namespace filter (php-src sxe.c; #22728 / #22829). Absent ⇒ exact QName
+     * match among the parent's children (non-namespaced property access).
+     *
+     * @var array<int, array{ns: ?string, isPrefix: bool}>
+     */
+    private static array $namedChildViewFilters = [];
+
     /** @var array<int, int> */
     private static array $documentKeys = [];
 
@@ -83,6 +92,7 @@ final class SimpleXmlRegistry
         self::$childrenViewFilters = [];
         self::$namedChildViews = [];
         self::$namedChildViewNames = [];
+        self::$namedChildViewFilters = [];
         self::$documentKeys = [];
         self::$xpathNamespaces = [];
     }
@@ -164,20 +174,34 @@ final class SimpleXmlRegistry
         return self::$childrenViewFilters[$entry->id] ?? ['ns' => null, 'isPrefix' => true];
     }
 
+    /**
+     * @param array{ns: ?string, isPrefix: bool}|null $childrenFilter Namespace filter
+     *        inherited from a live children() view, or null for exact QName property access.
+     */
     public static function attachNamedChildView(
         ObjectEntry $entry,
         SimpleXmlNodeState $parent,
         string $childName,
-        ?int $documentKey = null
+        ?int $documentKey = null,
+        ?array $childrenFilter = null
     ): void {
         self::attach($entry, $parent, $documentKey);
         self::$namedChildViews[$entry->id] = true;
         self::$namedChildViewNames[$entry->id] = $childName;
+        if (null !== $childrenFilter) {
+            self::$namedChildViewFilters[$entry->id] = $childrenFilter;
+        }
     }
 
     public static function namedChildViewName(ObjectEntry $entry): string
     {
         return self::$namedChildViewNames[$entry->id] ?? '';
+    }
+
+    /** @return array{ns: ?string, isPrefix: bool}|null */
+    public static function namedChildViewFilter(ObjectEntry $entry): ?array
+    {
+        return self::$namedChildViewFilters[$entry->id] ?? null;
     }
 
     public static function state(ObjectEntry $entry): SimpleXmlNodeState
