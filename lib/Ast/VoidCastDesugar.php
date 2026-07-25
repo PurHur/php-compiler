@@ -7,9 +7,10 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Desugar PHP 8.4+ `(void)` cast for nikic/php-parser on PHP < 8.5 hosts (#7346).
+ * Desugar PHP 8.4+ `(void)` cast for nikic/php-parser on PHP < 8.5 hosts (#7346, #23037).
  *
  * php-src: Zend/zend_language_scanner.l — T_VOID_CAST; pairs #[\NoDiscard] suppression.
+ * Gated on {@see CompilerVersion::supportsVoidCast()} (language profile), not bare VERSION.
  */
 final class VoidCastDesugar
 {
@@ -17,7 +18,7 @@ final class VoidCastDesugar
 
     public static function desugar(string $code): string
     {
-        if (!CompilerVersion::supportsNoDiscardAttribute()) {
+        if (!CompilerVersion::supportsVoidCast()) {
             return $code;
         }
         if (false === stripos($code, '(void)')) {

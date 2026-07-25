@@ -692,10 +692,26 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4', '>=');
     }
 
-    /** PHP 8.4+ #[\NoDiscard] builtin attribute class (Zend/zend_attributes.c, issue #6992). */
+    /**
+     * PHP 8.4+ #[\NoDiscard] attribute semantics / discarded-call warnings (Zend/zend_attributes.c, #6992).
+     *
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference / PROFILE=8.2 match Zend 8.2
+     * (attribute inert / no (void) cast). Forward profile: `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
+     */
     public static function supportsNoDiscardAttribute(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ `(void)` cast (`T_VOID_CAST`) — Zend/zend_language_scanner.l (#23037, re-#9779).
+     *
+     * Withheld on 8.4.0-dev reference / PROFILE=8.2 (parse error like Zend ≤8.3). Enable via
+     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsVoidCast(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class (Zend/zend_attributes.c, issue #7101). */

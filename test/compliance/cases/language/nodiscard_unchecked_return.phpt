@@ -1,5 +1,7 @@
 --TEST--
 Language: #[\NoDiscard] unchecked return warns; (void) cast suppresses (#7346)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 ini_set('error_reporting', '32767');
@@ -20,8 +22,8 @@ $last = error_get_last();
 echo null === $last ? "none\n" : "warn\n";
 
 echo "ok\n";
---EXPECT--
-PHP Warning:  The return value of function f() should either be used or intentionally ignored by casting it as (void)
+--EXPECTF--
+PHP Warning:  The return value of function f() should either be used or intentionally ignored by casting it as (void)%A
 The return value of function f() should either be used or intentionally ignored by casting it as (void)
 warn
 none

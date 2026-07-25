@@ -11,6 +11,16 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #5078 */
 final class NoDiscardAttributeTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+    }
+
+    protected function tearDown(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+    }
+
     public function testFormatFunctionMessage(): void
     {
         $meta = new NoDiscardMetadata(null);
