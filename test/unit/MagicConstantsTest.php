@@ -25,6 +25,27 @@ PHP;
         $this->assertSame('C::id', $this->runVm($code));
     }
 
+    public function testFunctionAndMethodInsideClosures(): void
+    {
+        $code = <<<'PHP'
+<?php
+$free = (function () {
+    return __FUNCTION__ . '|' . __METHOD__;
+})();
+$arrow = (fn () => __FUNCTION__ . '|' . __METHOD__)();
+class C {
+    public function m(): string {
+        $inner = function () {
+            return __FUNCTION__ . '|' . __METHOD__ . '|' . __CLASS__;
+        };
+        return $inner();
+    }
+}
+echo $free, "\n", $arrow, "\n", (new C)->m(), "\n";
+PHP;
+        $this->assertSame("{closure}|{closure}\n{closure}|{closure}\n{closure}|{closure}|C\n", $this->runVm($code));
+    }
+
     public function testPropertyMagicConstInHook(): void
     {
         $code = <<<'PHP'

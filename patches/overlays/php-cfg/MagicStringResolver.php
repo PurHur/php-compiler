@@ -117,7 +117,11 @@ class MagicStringResolver extends NodeVisitorAbstract
                     $this->markTypeHintPreserveLexical($param->type);
                 }
             }
-        } elseif ($node instanceof Node\Expr\Closure) {
+        } elseif ($node instanceof Node\Expr\Closure || $node instanceof Node\Expr\ArrowFunction) {
+            // Zend/zend_compile.c — T_FUNC_C / T_METHOD_C inside closures are "{closure}" (#22832).
+            // Push on both stacks so a method-nested closure does not inherit enclosing names.
+            $this->functionStack[] = '{closure}';
+            $this->methodStack[] = '{closure}';
             if (null !== $node->returnType) {
                 $this->markTypeHintPreserveLexical($node->returnType);
             }
@@ -242,6 +246,11 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (null !== $this->propertyNameFromHookMethod($node->name->name)) {
                 array_pop($this->propertyStack);
             }
+        } elseif ($node instanceof Node\Expr\Closure || $node instanceof Node\Expr\ArrowFunction) {
+            assert(end($this->functionStack) === '{closure}');
+            assert(end($this->methodStack) === '{closure}');
+            array_pop($this->functionStack);
+            array_pop($this->methodStack);
         } elseif ($node instanceof Node\Expr\StaticCall) {
             $this->inStaticCallClassName = false;
         }
