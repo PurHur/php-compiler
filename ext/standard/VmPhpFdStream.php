@@ -432,9 +432,7 @@ final class VmPhpFdStream
         if (null === $state || !$state->canRead) {
             return false;
         }
-        if ($offset < -1) {
-            return false;
-        }
+        // php-src file.c: only offset >= 0 seeks; negative (incl. < -1) keeps current pos (#23190).
         if ($offset >= 0 && 0 !== self::seek($handle, $offset, self::SEEK_SET)) {
             VmFs::warnStreamGetContentsSeekFailed($offset);
 
