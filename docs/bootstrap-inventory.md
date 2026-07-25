@@ -4274,6 +4274,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sysvsem/sem_remove.php` | 0 | 2 |
 | `ext/sysvshm/Module.php` | 0 | 14 |
 | `ext/sysvshm/ShmopArgs.php` | 0 | 2 |
+| `ext/sysvshm/SysvIpcSerializeDeny.php` | 0 | 3 |
 | `ext/sysvshm/SysvShmArgs.php` | 0 | 2 |
 | `ext/sysvshm/VmShmop.php` | 0 | 4 |
 | `ext/sysvshm/VmSysvShm.php` | 0 | 4 |
@@ -37640,6 +37641,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 20)
 - 10 class method(s)
+
+### `ext/sysvshm/SysvIpcSerializeDeny.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 30)
+- new Exception (line 37)
+- 4 class method(s)
 
 ### `ext/sysvshm/SysvShmArgs.php`
 

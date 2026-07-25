@@ -1729,6 +1729,7 @@
         "ext/random/Mt19937Instance.php",
         "ext/random/PcgOneseq128XslRr64Instance.php",
         "ext/random/RandomConstants.php",
+        "ext/random/RandomSecureSerializeDeny.php",
         "ext/random/RandomU64.php",
         "ext/random/RandomUint128.php",
         "ext/random/RandomizerBuiltin.php",
@@ -4325,6 +4326,7 @@
         "ext/sysvsem/sem_remove.php",
         "ext/sysvshm/Module.php",
         "ext/sysvshm/ShmopArgs.php",
+        "ext/sysvshm/SysvIpcSerializeDeny.php",
         "ext/sysvshm/SysvShmArgs.php",
         "ext/sysvshm/VmShmop.php",
         "ext/sysvshm/VmSysvShm.php",
@@ -6776,9 +6778,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6542,
+        "inventory_files": 6544,
         "excluded": 0,
-        "eligible": 6542,
+        "eligible": 6544,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

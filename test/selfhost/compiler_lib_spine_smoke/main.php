@@ -4090,6 +4090,7 @@ require_once __DIR__.'/../../../ext/sysvsem/sem_release.php';
 require_once __DIR__.'/../../../ext/sysvsem/sem_remove.php';
 require_once __DIR__.'/../../../ext/sysvshm/Module.php';
 require_once __DIR__.'/../../../ext/sysvshm/ShmopArgs.php';
+require_once __DIR__.'/../../../ext/sysvshm/SysvIpcSerializeDeny.php';
 require_once __DIR__.'/../../../ext/sysvshm/SysvShmArgs.php';
 require_once __DIR__.'/../../../ext/sysvshm/VmShmop.php';
 require_once __DIR__.'/../../../ext/sysvshm/VmSysvShm.php';
