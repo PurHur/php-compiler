@@ -2773,7 +2773,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamSocketPair.php` | 0 | 1 |
 | `ext/standard/JitStreamSupports.php` | 0 | 1 |
 | `ext/standard/JitStreamSupportsFeatureArg.php` | 0 | 1 |
-| `ext/standard/JitStreamSyncKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamSyncKernel.php` | 0 | 2 |
 | `ext/standard/JitStreamWrapperRegistry.php` | 0 | 1 |
 | `ext/standard/JitStringConcat.php` | 0 | 1 |
 | `ext/standard/JitStringIndex.php` | 0 | 1 |
@@ -5744,7 +5744,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
 | `lib/TryCatchElseSyntaxRejector.php` | 0 | 2 |
 | `lib/TypedFunctionStaticSyntaxRejector.php` | 0 | 2 |
-| `lib/VM.php` | 0 | 292 |
+| `lib/VM.php` | 0 | 293 |
 | `lib/VM/AbstractPropertyHookCheck.php` | 0 | 1 |
 | `lib/VM/ArrayAccessDimension.php` | 0 | 3 |
 | `lib/VM/ArraySpread.php` | 0 | 2 |
@@ -27493,9 +27493,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamSyncKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 229)
 - 9 class method(s)
-- 3 closure(s)
+- 2 closure(s)
 
 ### `ext/standard/JitStreamWrapperRegistry.php`
 
@@ -48046,47 +48045,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\ClassProperty (line 16479)
 - new Variable (line 16799)
 - new CompileError (line 16817)
-- new Variable (line 17022)
-- new Variable (line 17024)
-- new ClassEntry (line 17067)
-- new Func\PHP (line 17074)
-- new VM\ClassProperty (line 17169)
-- new Func\PHP (line 17377)
-- new Variable (line 17453)
+- new Variable (line 17029)
+- new Variable (line 17031)
+- new ClassEntry (line 17074)
+- new Func\PHP (line 17081)
+- new VM\ClassProperty (line 17176)
+- new Func\PHP (line 17384)
 - new Variable (line 17460)
-- new Variable (line 17466)
-- new Variable (line 17503)
-- new Variable (line 17532)
-- new Variable (line 17720)
-- new Variable (line 17766)
-- new VM\ClassProperty (line 17831)
-- new Error (line 17878)
-- new Error (line 17913)
-- new Error (line 17916)
-- new Error (line 17919)
-- new Error (line 17922)
-- new ObjectEntry (line 17924)
-- new Error (line 17937)
-- new Error (line 17940)
-- new Error (line 17943)
-- new Error (line 17964)
-- new ObjectEntry (line 17969)
-- new Variable (line 17971)
-- new Variable (line 17989)
-- new Variable (line 18002)
-- new Variable (line 18023)
-- new Variable (line 18036)
-- new Error (line 18166)
-- new Error (line 18171)
-- new VM\ObjectEntry (line 18175)
-- new Variable (line 18319)
-- new Variable (line 18337)
-- new NoDiscardMetadata (line 18506)
-- new Variable (line 18706)
-- new Variable (line 18708)
-- new CompileError (line 18736)
-- new Variable (line 18839)
-- 521 class method(s)
+- new Variable (line 17467)
+- new Variable (line 17473)
+- new Variable (line 17510)
+- new Variable (line 17539)
+- new Variable (line 17727)
+- new Variable (line 17773)
+- new VM\ClassProperty (line 17838)
+- new Error (line 17885)
+- new Error (line 17920)
+- new Error (line 17923)
+- new Error (line 17926)
+- new Error (line 17929)
+- new ObjectEntry (line 17931)
+- new Error (line 17944)
+- new Error (line 17947)
+- new Error (line 17950)
+- new Error (line 17971)
+- new ObjectEntry (line 17976)
+- new Variable (line 17978)
+- new Variable (line 17996)
+- new Variable (line 18009)
+- new Variable (line 18030)
+- new Variable (line 18043)
+- new Error (line 18173)
+- new Error (line 18178)
+- new VM\ObjectEntry (line 18182)
+- new Variable (line 18326)
+- new Variable (line 18344)
+- new NoDiscardMetadata (line 18513)
+- new Variable (line 18713)
+- new Variable (line 18715)
+- new CompileError (line 18743)
+- new CompileError (line 18770)
+- new Variable (line 18871)
+- 522 class method(s)
 - 25 closure(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
