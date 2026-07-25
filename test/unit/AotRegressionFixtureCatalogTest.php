@@ -130,7 +130,6 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'chop_pos_aliases.php' => ['chop_pos_aliases.php'],
             'strcoll_strxfrm.php' => ['strcoll_strxfrm.php'],
             'stream_copy_to_stream.php' => ['stream_copy_to_stream.php'],
-            'stream_copy_to_string.php' => ['stream_copy_to_string.php'],
             'stream_meta_blocking.php' => ['stream_meta_blocking.php'],
         ];
     }

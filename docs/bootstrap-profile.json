@@ -2818,7 +2818,6 @@
         "ext/standard/JitStreamContextSetOptions.php",
         "ext/standard/JitStreamContextSetParams.php",
         "ext/standard/JitStreamCopyToStream.php",
-        "ext/standard/JitStreamCopyToString.php",
         "ext/standard/JitStreamEnableCrypto.php",
         "ext/standard/JitStreamFilter.php",
         "ext/standard/JitStreamFilterKernel.php",
@@ -4187,7 +4186,6 @@
         "ext/standard/stream_context_set_options.php",
         "ext/standard/stream_context_set_params.php",
         "ext/standard/stream_copy_to_stream.php",
-        "ext/standard/stream_copy_to_string.php",
         "ext/standard/stream_filter_append.php",
         "ext/standard/stream_filter_prepend.php",
         "ext/standard/stream_filter_register.php",
@@ -6797,9 +6795,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6563,
+        "inventory_files": 6561,
         "excluded": 0,
-        "eligible": 6563,
+        "eligible": 6561,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

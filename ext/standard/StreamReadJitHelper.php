@@ -108,14 +108,4 @@ final class StreamReadJitHelper
 
         return (int) $result;
     }
-
-    public static function streamCopyToStringArgv(int $handle, int $maxlength, int $offset): ?string
-    {
-        $result = VmFs::streamCopyToString($handle, $maxlength, $offset);
-        if (false === $result) {
-            return null;
-        }
-
-        return (string) $result;
-    }
 }
