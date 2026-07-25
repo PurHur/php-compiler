@@ -13,6 +13,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\ext\curl\CurlFileSerializeDeny;
+use PHPCompiler\ext\fileinfo\FinfoSerializeDeny;
 use PHPCompiler\ext\simplexml\SimpleXmlSerializeDeny;
 use PHPCompiler\ext\sockets\SocketSerializeDeny;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
@@ -170,6 +171,8 @@ final class VmSerialize
             }
             // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
             CurlFileSerializeDeny::rejectUnserialization($className);
+            // php-src ext/fileinfo/fileinfo.stub.php — @not-serializable (#23093).
+            FinfoSerializeDeny::rejectUnserialization($className);
             // php-src ext/sockets/sockets.stub.php — @not-serializable (#23094).
             SocketSerializeDeny::rejectUnserialization($className);
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
@@ -517,6 +520,8 @@ final class VmSerialize
         }
         // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
         CurlFileSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/fileinfo/fileinfo.stub.php — @not-serializable (#23093).
+        FinfoSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/sockets/sockets.stub.php — @not-serializable (#23094).
         SocketSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/simplexml/sxe.c — zend_class_serialize_deny (#23072).
@@ -906,6 +911,7 @@ final class VmSerialize
         }
         if (Variable::TYPE_OBJECT === $value->type) {
             CurlFileSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            FinfoSerializeDeny::rejectSerialization($value->toObject()->class->name);
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
             SimpleXmlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
         }
