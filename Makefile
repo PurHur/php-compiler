@@ -111,7 +111,7 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast release-readiness bootstrap-vendor-native-rebuild-audit
+.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast release-readiness bootstrap-gen0-staleness bootstrap-vendor-native-rebuild-audit
 web-smoke:
 	./script/web-smoke.sh
 
@@ -137,6 +137,11 @@ north-star5-verify-fast:
 	./script/north-star5-verify.sh --fast
 release-readiness:
 	./script/release-readiness.sh $(ARGS)
+# Git-derived gen-0 seed age — a manifest stamp cannot satisfy it (#22642).
+# Informational, matching how release-readiness consumes it: reports without failing.
+# Call the script directly for the verdict as an exit code (0 fresh / 1 stale / 2 unknown).
+bootstrap-gen0-staleness:
+	@php script/bootstrap-gen0-staleness.php $(ARGS) || true
 bootstrap-vendor-native-rebuild-audit:
 	./script/bootstrap-vendor-native-rebuild-audit.sh
 

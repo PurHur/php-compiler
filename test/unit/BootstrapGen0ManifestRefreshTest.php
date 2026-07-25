@@ -87,8 +87,19 @@ final class BootstrapGen0ManifestRefreshTest extends TestCase
 
         try {
             $fake = str_repeat('ab', 32);
+
+            // No build receipt covers the committed blobs at $fake, so the honest path refuses (#22642).
+            try {
+                bootstrap_gen0_manifest_stamp_lowering_fingerprint(self::$root, $fake);
+                $this->fail('stamp without a build receipt must throw');
+            } catch (\RuntimeException $e) {
+                $this->assertStringContainsString('build receipt', $e->getMessage());
+            }
+
+            putenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP=1');
             $stamped = bootstrap_gen0_manifest_stamp_lowering_fingerprint(self::$root, $fake);
             $this->assertSame($fake, $stamped['lowering_source_fingerprint'] ?? null);
+            $this->assertSame('unverified-restamp', $stamped['provenance'] ?? null);
             $read = bootstrap_gen0_manifest_read(self::$root);
             $this->assertSame($fake, $read['lowering_source_fingerprint'] ?? null);
             $this->assertSame($fake, trim((string) file_get_contents($stampPath)));
@@ -101,6 +112,7 @@ final class BootstrapGen0ManifestRefreshTest extends TestCase
             $errors = bootstrap_gen0_manifest_lowering_fingerprint_errors(self::$root);
             $this->assertNotSame([], $errors, 'fake fingerprint must fail live check');
         } finally {
+            putenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP');
             file_put_contents($manifestPath, $origManifest);
             if (null === $origStamp) {
                 @unlink($stampPath);
