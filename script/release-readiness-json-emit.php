@@ -30,6 +30,15 @@ if (false !== $honestJson && '' !== $honestJson) {
     }
 }
 
+$gen0Provenance = null;
+$gen0Json = getenv('_RR_GEN0_PROVENANCE_JSON');
+if (false !== $gen0Json && '' !== $gen0Json) {
+    $decoded = json_decode($gen0Json, true);
+    if (is_array($decoded)) {
+        $gen0Provenance = $decoded;
+    }
+}
+
 $payload = [
     'user_release_ready' => getenv('_RR_READY') ?: 'no',
     'mode' => getenv('_RR_MODE') ?: 'quick',
@@ -37,6 +46,9 @@ $payload = [
 ];
 if (null !== $honestCompile) {
     $payload['honest_compile'] = $honestCompile;
+}
+if (null !== $gen0Provenance) {
+    $payload['gen0_provenance'] = $gen0Provenance;
 }
 
 echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), "\n";

@@ -68,6 +68,7 @@ GATE_NAMES=()
 GATE_STATUSES=()
 GATE_MESSAGES=()
 HONEST_COMPILE_JSON=""
+GEN0_PROVENANCE_JSON=""
 
 log() {
   if [[ "${JSON_OUT}" -eq 1 ]]; then
@@ -262,6 +263,28 @@ release_readiness_collect_honest_compile_metric() {
   return 0
 }
 
+# Git-derived gen-0 seed age (#22642). Informational: does not fail the bundle, but a stale
+# seed is reported instead of being implied fresh by a green manifest stamp.
+release_readiness_collect_gen0_provenance() {
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    GEN0_PROVENANCE_JSON='{"status":"skip","message":"dry-run"}'
+    return 0
+  fi
+  local out
+  out="$("$PHP_BIN" "${PHP_OPTS[@]}" "${_CI_SCRIPT_DIR}/bootstrap-gen0-staleness.php" --json 2>/dev/null)" || true
+  if [[ -n "${out}" ]] && php -r 'exit(json_decode($argv[1], true) === null ? 1 : 0);' "${out}"; then
+    GEN0_PROVENANCE_JSON="${out}"
+    local status
+    status="$(php -r 'echo json_decode($argv[1], true)["status"] ?? "unknown";' "${out}")"
+    if [[ "${status}" == "stale" ]]; then
+      log "WARNING: gen-0 seed is stale — $(php -r 'echo json_decode($argv[1], true)["message"] ?? "";' "${out}")"
+    fi
+    return 0
+  fi
+  GEN0_PROVENANCE_JSON='{"status":"unknown","message":"gen-0 staleness check unavailable"}'
+  return 0
+}
+
 FAILED=0
 
 # --- Quick bundle ---
@@ -309,6 +332,7 @@ if [[ "${FULL_MODE}" -eq 1 ]]; then
 fi
 
 release_readiness_collect_honest_compile_metric
+release_readiness_collect_gen0_provenance
 
 USER_RELEASE_READY=no
 if [[ "${FAILED}" -eq 0 ]]; then
@@ -333,6 +357,7 @@ if [[ "${JSON_OUT}" -eq 1 ]]; then
   export _RR_MODE="${MODE}"
   export _RR_READY="${USER_RELEASE_READY}"
   export _RR_HONEST_COMPILE_JSON="${HONEST_COMPILE_JSON}"
+  export _RR_GEN0_PROVENANCE_JSON="${GEN0_PROVENANCE_JSON}"
   export _RR_GATE_COUNT="${#GATE_NAMES[@]}"
   for i in "${!GATE_NAMES[@]}"; do
     export "_RR_GATE_NAME_${i}=${GATE_NAMES[$i]}"

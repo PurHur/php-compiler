@@ -186,6 +186,15 @@ make bootstrap-gen0-refresh-sidecar
 
 This runs a full spine link (`BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1`), copies `build/.m3_*` into `prelinked/bootstrap-gen0/`, updates `manifest.json`, and runs `check-bootstrap-gen0-manifest-sync.php` ([#8704](https://github.com/PurHur/php-compiler/issues/8704)).
 
+**Provenance is earned by the link, not by the stamp** ([#22642](https://github.com/PurHur/php-compiler/issues/22642)). The link writes `build/.gen0-build-receipt.json` recording the fingerprint it built at and the sha256 of every artifact it produced. Stamping `lowering_source_fingerprint` afterwards requires that receipt to still match the committed blobs, so restamping over bytes that were never rebuilt fails instead of silently claiming fresh provenance. `BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP=1` overrides it and records `"provenance": "unverified-restamp"` in the manifest, so the claim stays visible in the artifact.
+
+Check how far the committed seed has drifted from the sources it claims — this reads git history, not the manifest, so it cannot be satisfied by a stamp:
+
+```bash
+php script/bootstrap-gen0-staleness.php          # exit 0 fresh / 1 stale / 2 unknown
+php script/bootstrap-gen0-staleness.php --json   # also in release-readiness --json as gen0_provenance
+```
+
 On Runforge / harness hosts (do **not** use raw `docker run -v "$(pwd):/compiler"`):
 
 ```bash

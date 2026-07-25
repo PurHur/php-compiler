@@ -28,6 +28,9 @@ build/lint-cache
 # Per-unit split-compilation cache (#15889); committed variant lives in prelinked/helper-runtime
 build/helper-runtime-cache
 build/.m3_*
+# Gen-0 build receipt (#22642) — proves a local link produced the blobs being stamped.
+# Never commit it: a committed receipt would keep authorising those bytes forever.
+build/.gen0-build-receipt.json
 build/.last-jit-*
 build/.bootstrap-*
 script/diag-*.php

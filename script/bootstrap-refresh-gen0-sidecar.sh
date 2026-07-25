@@ -33,11 +33,20 @@ Options:
   --skip-link  Copy sidecars + refresh manifest only (build/ already linked).
                Refuses when build/.bootstrap_lowering_source.sha is stale (#21905).
 
-After a verified-fresh copy, stamps lowering_source_fingerprint into
-prelinked/bootstrap-gen0/manifest.json (never via size/sha-only refresh).
-Refuses fingerprint restamp when compiler_lib blob bytes did not move (#22642).
+Provenance is earned by the link, at two levels:
 
-See docs/bootstrap-m5-fast-path.md and GETTING-STARTED §7b (#8704, #21905).
+  1. This script refuses a fingerprint restamp when the compiler_lib blob bytes did
+     not move — the spine ran but produced identical output, or a sidecar fallback
+     copied the seed (#22642).
+  2. The link records build/.gen0-build-receipt.json over the artifacts it produced,
+     and bootstrap_gen0_manifest_stamp_lowering_fingerprint() requires that receipt to
+     still match the committed blobs. That one binds at the function level, so it also
+     covers stamping invoked directly (php -r ...) rather than through this script —
+     which is how the manifest accumulated 225 restamps past its last real build.
+     BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP=1 overrides it, recording
+     `provenance: unverified-restamp` in the manifest so the claim ships with the artifact.
+
+See docs/bootstrap-m5-fast-path.md and GETTING-STARTED §7b (#8704, #21905, #22642).
 
 On Runforge harness hosts, long Zend full-spine refreshes must run in a Docker
 container whose *name* matches HARNESS_SPAWNED_CLEANUP_PROTECT_NAMES (e.g.
@@ -141,6 +150,15 @@ if [[ "${SKIP_LINK}" -eq 0 ]]; then
     unset BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER BOOTSTRAP_ALLOW_STALE_SIDECAR
   fi
   bootstrap_lowering_source_write_build_stamp
+  # Receipt over the artifacts this link produced; the later stamp verifies against it (#22642).
+  echo "==> record gen-0 build receipt (build/.gen0-build-receipt.json)"
+  php -r '
+require $argv[1]."/script/bootstrap-gen0-manifest-lib.php";
+$r = bootstrap_gen0_write_build_receipt($argv[1]);
+fwrite(STDOUT, "bootstrap-refresh-gen0-sidecar: receipt fingerprint="
+    .substr((string) $r["lowering_source_fingerprint"], 0, 16)."… artifacts="
+    .count($r["artifacts"])."\n");
+' "${ROOT}"
 else
   bootstrap_lowering_source_refuse_stale_reuse \
     "$(bootstrap_lowering_source_build_stamp)" \
@@ -218,7 +236,7 @@ fi
 echo "==> refresh prelinked/bootstrap-gen0/manifest.json (size/sha only — no provenance stamp)"
 php "${ROOT}/script/bootstrap-gen0-manifest-refresh.php"
 
-echo "==> stamp lowering_source_fingerprint (verified-fresh copy only — #21905)"
+echo "==> stamp lowering_source_fingerprint (build-receipt verified — #21905, #22642)"
 php -r '
 require $argv[1]."/script/bootstrap-gen0-manifest-lib.php";
 $m = bootstrap_gen0_manifest_stamp_lowering_fingerprint($argv[1]);
