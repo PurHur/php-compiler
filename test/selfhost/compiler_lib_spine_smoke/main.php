@@ -3730,7 +3730,6 @@ require_once __DIR__.'/../../../ext/standard/phpc_clone_with_end.php';
 require_once __DIR__.'/../../../ext/standard/phpc_clone_with_reinit.php';
 require_once __DIR__.'/../../../ext/standard/phpc_deploy_path.php';
 require_once __DIR__.'/../../../ext/standard/phpc_destruct_try_invoke_native.php';
-require_once __DIR__.'/../../../ext/standard/phpc_file_get_contents_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_file_put_contents_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_fpow_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_getenv_kernel.php';
