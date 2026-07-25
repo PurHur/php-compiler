@@ -485,8 +485,19 @@ final class VmNumberFormatter
         $body = self::formatDecimalFromState($state, $amount, 2);
         self::clearObjectError($formatter);
         IntlError::clear();
+        // CURRENCY_ACCOUNTING negatives use parentheses like format() / ICU
+        // unum_formatDoubleCurrency (php-src formatter_format.c; #22699).
+        $accountingNeg = self::CURRENCY_ACCOUNTING === (int) ($state['style'] ?? self::DECIMAL)
+            && $amount < 0;
         if ('$' === $symbol || '£' === $symbol || '€' === $symbol || '¥' === $symbol) {
+            if ($accountingNeg) {
+                return '('.$symbol.$body.')';
+            }
+
             return ($amount < 0 ? '-' : '').$symbol.$body;
+        }
+        if ($accountingNeg) {
+            return '('.$body.' '.$currency.')';
         }
 
         return ($amount < 0 ? '-' : '').$body.' '.$currency;
