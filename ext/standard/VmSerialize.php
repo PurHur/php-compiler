@@ -156,6 +156,10 @@ final class VmSerialize
             if (0 === strcasecmp($className, 'Fiber')) {
                 throw new \Exception("Unserialization of 'Fiber' is not allowed");
             }
+            // php-src Zend/zend_generators.c — zend_class_unserialize_deny (#23044).
+            if (0 === strcasecmp($className, 'Generator')) {
+                throw new \Exception("Unserialization of 'Generator' is not allowed");
+            }
             // php-src Zend/zend_weakrefs.c — ZEND_ACC_NOT_SERIALIZABLE (#23062).
             if (0 === strcasecmp($className, 'WeakMap')) {
                 throw new \Exception("Unserialization of 'WeakMap' is not allowed");
@@ -493,6 +497,10 @@ final class VmSerialize
         // php-src Zend/zend_fibers.c — zend_class_serialize_deny (#23043).
         if (0 === strcasecmp($entry->class->name, 'Fiber')) {
             throw new \Exception("Serialization of 'Fiber' is not allowed");
+        }
+        // php-src Zend/zend_generators.c — zend_class_serialize_deny (#23044).
+        if (0 === strcasecmp($entry->class->name, 'Generator')) {
+            throw new \Exception("Serialization of 'Generator' is not allowed");
         }
         // php-src Zend/zend_weakrefs.c — ZEND_ACC_NOT_SERIALIZABLE (#23062).
         if (0 === strcasecmp($entry->class->name, 'WeakMap')) {
@@ -872,6 +880,10 @@ final class VmSerialize
         if (Variable::TYPE_OBJECT === $value->type
             && 0 === strcasecmp($value->toObject()->class->name, 'Fiber')) {
             throw new \Exception("Serialization of 'Fiber' is not allowed");
+        }
+        if (Variable::TYPE_OBJECT === $value->type
+            && 0 === strcasecmp($value->toObject()->class->name, 'Generator')) {
+            throw new \Exception("Serialization of 'Generator' is not allowed");
         }
         if (Variable::TYPE_OBJECT === $value->type
             && 0 === strcasecmp($value->toObject()->class->name, 'WeakMap')) {
