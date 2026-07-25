@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6519 |
-| Phase A inventory files (M2 ratio SSOT) | 6519 |
+| PHP files on vm.php path | 6529 |
+| Phase A inventory files (M2 ratio SSOT) | 6529 |
 | Phase A ratio-deferred paths | 0 |
-| Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20927 |
+| Source constructs flagged (blockers) | 0 |
+| Source constructs flagged (warnings) | 20958 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4337,12 +4337,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uri/UriClassMethods.php` | 0 | 71 |
 | `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
 | `ext/uri/VmUri.php` | 0 | 9 |
-| `ext/uuid/Module.php` | 0 | 4 |
+| `ext/uuid/Module.php` | 0 | 13 |
 | `ext/uuid/UuidConstants.php` | 0 | 1 |
 | `ext/uuid/UuidFunction.php` | 0 | 1 |
+| `ext/uuid/UuidStringArg.php` | 0 | 2 |
 | `ext/uuid/VmUuid.php` | 0 | 1 |
+| `ext/uuid/uuid_compare.php` | 0 | 2 |
 | `ext/uuid/uuid_create.php` | 0 | 2 |
 | `ext/uuid/uuid_generate.php` | 0 | 3 |
+| `ext/uuid/uuid_is_null.php` | 0 | 2 |
+| `ext/uuid/uuid_is_valid.php` | 0 | 2 |
+| `ext/uuid/uuid_mac.php` | 0 | 2 |
+| `ext/uuid/uuid_parse.php` | 0 | 2 |
+| `ext/uuid/uuid_time.php` | 0 | 2 |
+| `ext/uuid/uuid_type.php` | 0 | 2 |
+| `ext/uuid/uuid_unparse.php` | 0 | 2 |
+| `ext/uuid/uuid_variant.php` | 0 | 2 |
 | `ext/wddx/Module.php` | 0 | 4 |
 | `ext/wddx/VmWddx.php` | 0 | 5 |
 | `ext/wddx/WddxExtensionPolicy.php` | 0 | 1 |
@@ -6340,7 +6350,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/SensitiveParamJitHelper.php` | 0 | 1 |
 | `lib/VM/SensitiveParamSupport.php` | 0 | 18 |
 | `lib/VM/ShutdownQueue.php` | 0 | 1 |
-| `lib/VM/SplArrayCastJitHelper.php` | 1 | 0 |
+| `lib/VM/SplArrayCastJitHelper.php` | 0 | 2 |
 | `lib/VM/StringOffsetJitHelper.php` | 0 | 1 |
 | `lib/VM/StringableSupport.php` | 0 | 3 |
 | `lib/VM/TickQueue.php` | 0 | 2 |
@@ -38303,6 +38313,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\Variable (line 20)
 - new uuid_create (line 29)
 - new uuid_generate (line 30)
+- new uuid_is_valid (line 31)
+- new uuid_parse (line 32)
+- new uuid_unparse (line 33)
+- new uuid_compare (line 34)
+- new uuid_is_null (line 35)
+- new uuid_type (line 36)
+- new uuid_variant (line 37)
+- new uuid_time (line 38)
+- new uuid_mac (line 39)
 - 2 class method(s)
 
 ### `ext/uuid/UuidConstants.php`
@@ -38315,10 +38334,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/uuid/UuidStringArg.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 19)
+- 1 class method(s)
+
 ### `ext/uuid/VmUuid.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 16 class method(s)
+
+### `ext/uuid/uuid_compare.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
 
 ### `ext/uuid/uuid_create.php`
 
@@ -38331,6 +38362,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
 - new Variable (line 29)
+- 1 class method(s)
+
+### `ext/uuid/uuid_is_null.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/uuid/uuid_is_valid.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/uuid/uuid_mac.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/uuid/uuid_parse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/uuid/uuid_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/uuid/uuid_type.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/uuid/uuid_unparse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/uuid/uuid_variant.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/wddx/Module.php`
@@ -52388,8 +52467,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 ### `lib/VM/SplArrayCastJitHelper.php`
 
-**Blockers** (likely prevent AOT bootstrap compile):
-- parse error: Syntax error, unexpected '*' on line 13
+**Warnings** (review for bootstrap subset):
+- new Variable (line 24)
+- 1 class method(s)
 
 ### `lib/VM/StringOffsetJitHelper.php`
 

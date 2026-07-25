@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * uuid extension module entry (php/pecl-networking-uuid; issue #5910).
+ * uuid extension module entry (php/pecl-networking-uuid; #5910 / #22228).
  */
 class Module extends ModuleAbstract
 {
@@ -28,6 +28,15 @@ class Module extends ModuleAbstract
         return [
             new uuid_create(),
             new uuid_generate(),
+            new uuid_is_valid(),
+            new uuid_parse(),
+            new uuid_unparse(),
+            new uuid_compare(),
+            new uuid_is_null(),
+            new uuid_type(),
+            new uuid_variant(),
+            new uuid_time(),
+            new uuid_mac(),
         ];
     }
 }
