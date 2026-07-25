@@ -4,36 +4,58 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-/** DOM node type constants (php-src ext/dom/dom_ce.h; issue #6140). */
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\Variable;
+
+/**
+ * DOM node type constants (php-src ext/dom/dom_ce.h, php_dom.c; issues #6140, #23138).
+ *
+ * Global PHP names match php-src REGISTER_LONG_CONSTANT (XML_PI_NODE for PI).
+ */
 final class DomConstants
 {
     public const XML_ELEMENT_NODE = 1;
+
+    public const XML_ATTRIBUTE_NODE = 2;
 
     public const XML_TEXT_NODE = 3;
 
     public const XML_CDATA_SECTION_NODE = 4;
 
-    public const XML_COMMENT_NODE = 8;
-
-    public const XML_ATTRIBUTE_NODE = 2;
-
     public const XML_ENTITY_REF_NODE = 5;
 
-    /** General entity declaration in doctype (php-src XML_ENTITY_DECL_NODE; #6320). */
-    public const XML_ENTITY_DECL_NODE = 17;
+    public const XML_ENTITY_NODE = 6;
+
+    public const XML_PROCESSING_INSTRUCTION_NODE = 7;
+
+    public const XML_COMMENT_NODE = 8;
 
     public const XML_DOCUMENT_NODE = 9;
 
     public const XML_DOCUMENT_TYPE_NODE = 10;
 
-    public const XML_PROCESSING_INSTRUCTION_NODE = 7;
-
     public const XML_DOCUMENT_FRAG_NODE = 11;
 
     public const XML_NOTATION_NODE = 12;
 
+    public const XML_HTML_DOCUMENT_NODE = 13;
+
+    public const XML_DTD_NODE = 14;
+
+    public const XML_ELEMENT_DECL_NODE = 15;
+
+    public const XML_ATTRIBUTE_DECL_NODE = 16;
+
+    /** General entity declaration in doctype (php-src XML_ENTITY_DECL_NODE; #6320). */
+    public const XML_ENTITY_DECL_NODE = 17;
+
     /** Namespace declaration node (libxml XML_NAMESPACE_DECL; php-src DOMNameSpaceNode; #20097). */
     public const XML_NAMESPACE_DECL_NODE = 18;
+
+    /**
+     * php-src DOM_PHP_ERR (0) — internal/generic DOM error; registered as global (#23138).
+     */
+    public const DOM_PHP_ERR = 0;
 
     /** Built-in xml prefix namespace URI (http://www.w3.org/XML/1998/namespace). */
     public const XML_NS_URI = 'http://www.w3.org/XML/1998/namespace';
@@ -80,4 +102,46 @@ final class DomConstants
     public const DOCUMENT_POSITION_CONTAINED_BY = 0x10;
 
     public const DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20;
+
+    /**
+     * Libxml node-type globals + DOM_PHP_ERR (php-src ext/dom/php_dom.c; #23138).
+     *
+     * @return array<string, int>
+     */
+    public static function globalConstants(): array
+    {
+        return [
+            'XML_ELEMENT_NODE' => self::XML_ELEMENT_NODE,
+            'XML_ATTRIBUTE_NODE' => self::XML_ATTRIBUTE_NODE,
+            'XML_TEXT_NODE' => self::XML_TEXT_NODE,
+            'XML_CDATA_SECTION_NODE' => self::XML_CDATA_SECTION_NODE,
+            'XML_ENTITY_REF_NODE' => self::XML_ENTITY_REF_NODE,
+            'XML_ENTITY_NODE' => self::XML_ENTITY_NODE,
+            // php-src global name is XML_PI_NODE (not XML_PROCESSING_INSTRUCTION_NODE).
+            'XML_PI_NODE' => self::XML_PROCESSING_INSTRUCTION_NODE,
+            'XML_COMMENT_NODE' => self::XML_COMMENT_NODE,
+            'XML_DOCUMENT_NODE' => self::XML_DOCUMENT_NODE,
+            'XML_DOCUMENT_TYPE_NODE' => self::XML_DOCUMENT_TYPE_NODE,
+            'XML_DOCUMENT_FRAG_NODE' => self::XML_DOCUMENT_FRAG_NODE,
+            'XML_NOTATION_NODE' => self::XML_NOTATION_NODE,
+            'XML_HTML_DOCUMENT_NODE' => self::XML_HTML_DOCUMENT_NODE,
+            'XML_DTD_NODE' => self::XML_DTD_NODE,
+            'XML_ELEMENT_DECL_NODE' => self::XML_ELEMENT_DECL_NODE,
+            'XML_ATTRIBUTE_DECL_NODE' => self::XML_ATTRIBUTE_DECL_NODE,
+            'XML_ENTITY_DECL_NODE' => self::XML_ENTITY_DECL_NODE,
+            'XML_NAMESPACE_DECL_NODE' => self::XML_NAMESPACE_DECL_NODE,
+            // Alias of XML_NAMESPACE_DECL_NODE (php-src REGISTER_LONG_CONSTANT).
+            'XML_LOCAL_NAMESPACE' => self::XML_NAMESPACE_DECL_NODE,
+            'DOM_PHP_ERR' => self::DOM_PHP_ERR,
+        ];
+    }
+
+    public static function registerGlobals(Context $ctx): void
+    {
+        foreach (self::globalConstants() as $name => $value) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int($value);
+            $ctx->defineConstant($name, $var);
+        }
+    }
 }
