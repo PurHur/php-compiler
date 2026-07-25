@@ -32,6 +32,7 @@ use PHPCompiler\ext\sockets\SocketSerializeDeny;
 use PHPCompiler\ext\sysvshm\SysvIpcSerializeDeny;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
 use PHPCompiler\ext\spl\SplDllistSerializeSupport;
+use PHPCompiler\ext\spl\InternalIteratorSerializeDeny;
 use PHPCompiler\ext\spl\SplFileIteratorSerializeDeny;
 use PHPCompiler\ext\spl\SplFixedArraySerializeSupport;
 use PHPCompiler\ext\spl\SplObjectStorageSerializeSupport;
@@ -216,6 +217,8 @@ final class VmSerialize
             XmlParserSerializeDeny::rejectUnserialization($className);
             // php-src ext/reflection/php_reflection.stub.php — @not-serializable (#23087).
             ReflectionSerializeDeny::rejectUnserialization($className);
+            // php-src Zend/zend_interfaces.stub.php — @not-serializable InternalIterator (#23167).
+            InternalIteratorSerializeDeny::rejectUnserialization($className);
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
             // php-src ext/simplexml/sxe.c — zend_class_unserialize_deny (#23072).
             SimpleXmlSerializeDeny::rejectUnserialization($className, $ctx);
@@ -613,6 +616,8 @@ final class VmSerialize
         FfiSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/enchant/enchant.stub.php — @not-serializable (#23112).
         EnchantSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src Zend/zend_interfaces.stub.php — @not-serializable InternalIterator (#23167).
+        InternalIteratorSerializeDeny::rejectSerialization($entry->class->name);
         // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
         if ($entry->lazyPending && LazyObjectSupport::shouldInitializeOnSerialize($entry)) {
             $vm = $ctx->runtime->vm ?? null;
@@ -1029,6 +1034,7 @@ final class VmSerialize
             PharSerializeDeny::rejectSerialization($value->toObject()->class->name);
             FfiSerializeDeny::rejectSerialization($value->toObject()->class->name);
             EnchantSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            InternalIteratorSerializeDeny::rejectSerialization($value->toObject()->class->name);
         }
         $enumRef = self::enumCaseRefFromVariable($value);
         if (null !== $enumRef) {

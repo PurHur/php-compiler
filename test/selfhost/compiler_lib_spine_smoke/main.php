@@ -1907,6 +1907,7 @@ require_once __DIR__.'/../../../ext/spl/VmSplRegistry.php';
 require_once __DIR__.'/../../../ext/spl/spl_classes.php';
 require_once __DIR__.'/../../../ext/spl/InternalIteratorLiveHandler.php';
 require_once __DIR__.'/../../../ext/spl/InternalIteratorBuiltin.php';
+require_once __DIR__.'/../../../ext/spl/InternalIteratorSerializeDeny.php';
 require_once __DIR__.'/../../../ext/sqlite3/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/sqlite3/Module.php';
 require_once __DIR__.'/../../../ext/sqlite3/Sqlite3SerializeDeny.php';
