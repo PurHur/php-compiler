@@ -31,9 +31,8 @@ final class bin2hex extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('bin2hex() requires exactly one argument');
-        }
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireExactArgCount($frame, 'bin2hex', 1);
         $data = self::vmStringArg($frame);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($data): void {
             $ret->string(VmString::bin2hex($data));
@@ -42,8 +41,8 @@ final class bin2hex extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('bin2hex() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'bin2hex', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
 
         StringBin2hex::ensureLinked($context);

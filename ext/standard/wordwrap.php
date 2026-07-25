@@ -29,10 +29,9 @@ final class wordwrap extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'wordwrap', 1, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('wordwrap() requires one to four arguments in this compiler build');
-        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -65,10 +64,10 @@ final class wordwrap extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('wordwrap() requires one to four arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'wordwrap', 1, 4)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             $width = self::compileTimeWidth($args, $argc);

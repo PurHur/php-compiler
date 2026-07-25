@@ -22,9 +22,8 @@ final class quoted_printable_encode extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('quoted_printable_encode() requires exactly one argument in this compiler build');
-        }
+        // php-src ext/standard/quot_print.c — ArgumentCountError (#23164).
+        $this->requireExactArgCount($frame, 'quoted_printable_encode', 1);
         $data = self::vmStringArg($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;
@@ -34,8 +33,8 @@ final class quoted_printable_encode extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('quoted_printable_encode() requires exactly one argument in this compiler build');
+        if (!$this->requireExactJitArgCount($context, $args, 'quoted_printable_encode', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
 
         return JitQuotedPrintableEncode::encode(

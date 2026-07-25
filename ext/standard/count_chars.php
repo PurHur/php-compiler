@@ -30,10 +30,9 @@ final class count_chars extends Internal
 
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'count_chars', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('count_chars() accepts one or two arguments in this compiler build');
-        }
         $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'count_chars', 0, 'string');
         $mode = 0;
         if (2 === $argc) {
@@ -66,10 +65,10 @@ final class count_chars extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('count_chars() accepts one or two arguments in this compiler build');
+        if (!$this->requireArgCountRangeJit($context, $args, 'count_chars', 1, 2)) {
+            return $context->getTypeFromString('__value__*')->constNull();
         }
+        $argc = \count($args);
         if (2 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
             JitInternalStrictArg::requireInt($context, $args[1], 'count_chars', 'mode', 2);
             throw new \LogicException('count_chars() argument #2 must be an integer in this compiler build');

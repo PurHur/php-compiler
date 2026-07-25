@@ -19,6 +19,8 @@ final class strtr extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'strtr', 2, 3);
         $argc = \count($frame->calledArgs);
         if (2 === $argc) {
             $string = self::vmStringArg($frame, 0, 'string');
@@ -55,11 +57,13 @@ final class strtr extends Internal
 
             return;
         }
-        throw new \LogicException('strtr() expects 2 or 3 arguments, '.(string) $argc.' given');
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        if (!$this->requireArgCountRangeJit($context, $args, 'strtr', 2, 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         if (\count($args) >= 2 && self::isReplacePairsArg($args[1])) {
             return JitStrtr::translateArray($context, $args[0], $args[1]);
         }
@@ -75,7 +79,8 @@ final class strtr extends Internal
             );
         }
 
-        throw new \LogicException('strtr() expects 2 or 3 arguments, '.\count($args).' given');
+        // 2-arg form without array replace_pairs — type path below translateArray.
+        return JitStrtr::translateArray($context, $args[0], $args[1]);
     }
 
     /**

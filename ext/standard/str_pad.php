@@ -34,10 +34,9 @@ final class str_pad extends Internal
 {
     public function execute(Frame $frame): void
     {
+        // php-src ext/standard/string.c — ArgumentCountError (#23164).
+        $this->requireArgCountRange($frame, 'str_pad', 2, 4);
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('str_pad() requires two to four arguments');
-        }
         $input = self::vmStringArg($frame, 0, 'string');
         $padLength = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_pad', 2, 'length');
         $padString = ' ';
@@ -61,10 +60,10 @@ final class str_pad extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 4) {
-            throw new \LogicException('str_pad() requires two to four arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'str_pad', 2, 4)) {
+            return $context->getTypeFromString('__string__*')->constNull();
         }
+        $argc = \count($args);
         $input = self::jitStringArg($context, $args[0], 0, 'string');
         $padLength = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_pad', 2, 'length');
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
