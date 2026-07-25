@@ -13,6 +13,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\ext\curl\CurlFileSerializeDeny;
+use PHPCompiler\ext\dom\DomXPathSerializeDeny;
 use PHPCompiler\ext\fileinfo\FinfoSerializeDeny;
 use PHPCompiler\ext\intl\IntlSerializeDeny;
 use PHPCompiler\ext\simplexml\SimpleXmlSerializeDeny;
@@ -172,6 +173,8 @@ final class VmSerialize
             }
             // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
             CurlFileSerializeDeny::rejectUnserialization($className);
+            // php-src ext/dom/php_dom.stub.php — @not-serializable DOMXPath / Dom\XPath (#23088).
+            DomXPathSerializeDeny::rejectUnserialization($className);
             // php-src ext/fileinfo/fileinfo.stub.php — @not-serializable (#23093).
             FinfoSerializeDeny::rejectUnserialization($className);
             // php-src ext/intl/*.stub.php — @not-serializable (#23092).
@@ -523,6 +526,8 @@ final class VmSerialize
         }
         // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
         CurlFileSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/dom/php_dom.stub.php — @not-serializable DOMXPath / Dom\XPath (#23088).
+        DomXPathSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/fileinfo/fileinfo.stub.php — @not-serializable (#23093).
         FinfoSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/intl/*.stub.php — @not-serializable (#23092).
@@ -924,6 +929,7 @@ final class VmSerialize
         }
         if (Variable::TYPE_OBJECT === $value->type) {
             CurlFileSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            DomXPathSerializeDeny::rejectSerialization($value->toObject()->class->name);
             FinfoSerializeDeny::rejectSerialization($value->toObject()->class->name);
             IntlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
