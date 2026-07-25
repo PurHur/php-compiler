@@ -170,6 +170,10 @@ final class VmSerialize
             if (0 === strcasecmp($className, 'WeakReference')) {
                 throw new \Exception("Unserialization of 'WeakReference' is not allowed");
             }
+            // php-src Zend/zend_exceptions.c — @not-serializable SensitiveParameterValue (#23086).
+            if (0 === strcasecmp($className, 'SensitiveParameterValue')) {
+                throw new \Exception("Unserialization of 'SensitiveParameterValue' is not allowed");
+            }
             // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
             CurlFileSerializeDeny::rejectUnserialization($className);
             // php-src ext/fileinfo/fileinfo.stub.php — @not-serializable (#23093).
@@ -520,6 +524,10 @@ final class VmSerialize
         }
         if (0 === strcasecmp($entry->class->name, 'WeakReference')) {
             throw new \Exception("Serialization of 'WeakReference' is not allowed");
+        }
+        // php-src Zend/zend_exceptions.c — @not-serializable SensitiveParameterValue (#23086).
+        if (0 === strcasecmp($entry->class->name, 'SensitiveParameterValue')) {
+            throw new \Exception("Serialization of 'SensitiveParameterValue' is not allowed");
         }
         // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
         CurlFileSerializeDeny::rejectSerialization($entry->class->name);
@@ -921,6 +929,10 @@ final class VmSerialize
         if (Variable::TYPE_OBJECT === $value->type
             && 0 === strcasecmp($value->toObject()->class->name, 'WeakReference')) {
             throw new \Exception("Serialization of 'WeakReference' is not allowed");
+        }
+        if (Variable::TYPE_OBJECT === $value->type
+            && 0 === strcasecmp($value->toObject()->class->name, 'SensitiveParameterValue')) {
+            throw new \Exception("Serialization of 'SensitiveParameterValue' is not allowed");
         }
         if (Variable::TYPE_OBJECT === $value->type) {
             CurlFileSerializeDeny::rejectSerialization($value->toObject()->class->name);
