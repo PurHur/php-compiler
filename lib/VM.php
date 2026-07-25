@@ -3147,10 +3147,32 @@ class VM {
         $fiber->pendingThrow->copyFrom($exception->resolveIndirect());
         $fiber->hasPendingThrow = true;
         $fiber->resumeArgument->null();
-
+        // Mirror resumeFiber: RUNNING so catch→suspend stays legal; returnSlot is wired
+        // onto the catch/entry frames inside runFiberExecution after throw dispatch (#23041).
+        if (null === $fiber->frame) {
+            throw new \LogicException('Fiber throw missing suspended frame');
+        }
+        $fiber->status = FiberState::STATUS_RUNNING;
         $returnSlot = new Variable();
 
         return $this->runFiberExecution($fiber, $returnSlot);
+    }
+
+    /**
+     * Point suspended/catch CFG frames at this invocation's return slot through the fiber entry.
+     *
+     * Fiber::throw() catch bodies are getFrame()-d from the fiber-entry frame (fiberState),
+     * which may be a parent of the suspended try-body frame — wiring only the suspended
+     * frame leaves getReturn() empty (Zend/zend_fibers.c, #23041).
+     */
+    private function wireFiberReturnSlot(FiberState $fiber, Variable $returnSlot): void
+    {
+        for ($frame = $fiber->frame; null !== $frame; $frame = $frame->parent) {
+            $frame->returnVar = $returnSlot;
+            if ($frame->fiberState === $fiber) {
+                break;
+            }
+        }
     }
 
     private function runFiberExecution(FiberState $fiber, Variable $returnSlot): Variable
@@ -3194,6 +3216,7 @@ class VM {
             if (null === $child) {
                 throw new \LogicException('Fiber execution missing frame after throw dispatch');
             }
+            $this->wireFiberReturnSlot($fiber, $returnSlot);
             $this->context->push($child);
             try {
                 $result = $this->runFrames();
