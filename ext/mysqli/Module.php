@@ -168,6 +168,8 @@ class Module extends ModuleAbstract
             new mysqli_stmt_get_result(),
             new mysqli_stmt_free_result(),
             new mysqli_stmt_result_metadata(),
+            new mysqli_stmt_attr_get(),
+            new mysqli_stmt_attr_set(),
             new mysqli_autocommit(),
             new mysqli_begin_transaction(),
             new mysqli_commit(),
