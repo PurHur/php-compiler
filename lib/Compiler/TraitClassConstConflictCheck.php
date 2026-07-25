@@ -14,6 +14,11 @@ use PHPCompiler\VM\Variable;
  * Compile-time check: incompatible trait/class constant composition (#8882, #7012, #5385).
  *
  * php-src: Zend/zend_traits.c — zend_traits_compile_role_constants
+ *
+ * Incremental AOT ({@see \PHPCompiler\JIT\IncludeHelper}) compiles each include as its
+ * own {@see Script}. A class that `use`s a trait defined only in a prior unit must not
+ * fatal here — const conflict checks simply do not apply without that trait's AST
+ * (#22642 ClassConstFetchHelper / ClassConstFetchHelperTrait spine split).
  */
 final class TraitClassConstConflictCheck
 {
@@ -177,7 +182,15 @@ final class TraitClassConstConflictCheck
                 if (LazyGhostTraitSupport::isLazyGhostTrait($traitUse['display'])) {
                     continue;
                 }
-                $this->throwTraitNotFound($traitUse['display'], $traitUse['file'], $traitUse['line']);
+                // Class/enum in this Script used as a trait (#12868, class_use_self_not_trait).
+                if (isset($this->compositions[$traitLc])) {
+                    $this->throwTraitNotFound($traitUse['display'], $traitUse['file'], $traitUse['line']);
+                }
+                // Trait lives in another include unit (incremental AOT / spine). Const
+                // composition checks need the trait AST in *this* Script; skip when
+                // absent so e.g. ClassConstFetchHelper.php can compile after
+                // ClassConstFetchHelperTrait.php (#22642). Same-file conflicts still run.
+                continue;
             }
             foreach ($this->effectiveTraitConstants($traitLc) as $constLc => $traitConst) {
                 if (null === $traitConst['value']) {
