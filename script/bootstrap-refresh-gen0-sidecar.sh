@@ -23,7 +23,8 @@ for arg in "$@"; do
 Usage: script/bootstrap-refresh-gen0-sidecar.sh [--skip-link]
 
 After test/selfhost/compiler_lib_spine_smoke/main.php changes:
-  1. Full native spine link (BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1)
+  1. Full spine link (Zend honest compile when lowering fingerprint is stale — #22642;
+     otherwise BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 native path)
   2. Copy build/.m3_* sidecars + compiler_lib_aot_blob into prelinked/bootstrap-gen0/
   3. Refresh prelinked/bootstrap-gen0/manifest.json size/sha fields
   4. Run check-bootstrap-gen0-manifest-sync.php
@@ -34,8 +35,14 @@ Options:
 
 After a verified-fresh copy, stamps lowering_source_fingerprint into
 prelinked/bootstrap-gen0/manifest.json (never via size/sha-only refresh).
+Refuses fingerprint restamp when compiler_lib blob bytes did not move (#22642).
 
 See docs/bootstrap-m5-fast-path.md and GETTING-STARTED §7b (#8704, #21905).
+
+On Runforge harness hosts, long Zend full-spine refreshes must run in a Docker
+container whose *name* matches HARNESS_SPAWNED_CLEANUP_PROTECT_NAMES (e.g.
+contains agent-harness) or the harness kills the job at 30 minutes (#22642).
+Use: ./script/bootstrap-gen0-refresh-exclusive-docker.sh
 EOF
       exit 0
       ;;
@@ -57,32 +64,84 @@ source "$(dirname "$0")/bootstrap-lowering-freshness.sh"
 
 ci_apply_llvm_memory_env
 
+PRELINKED="${ROOT}/prelinked/bootstrap-gen0"
+SPINE_ENTRY="${ROOT}/test/selfhost/compiler_lib_spine_smoke/main.php"
+SPINE_OUT="${ROOT}/build/selfhost-lib-spine-smoke"
+LIB_BLOB="${ROOT}/build/.m3_compiler_lib_aot_blob"
+STAMP="${ROOT}/build/.m3_compiler_lib_sidecar.sha"
+
+old_lib_sha=""
+if [[ -f "${PRELINKED}/compiler_lib_aot_blob" ]]; then
+  old_lib_sha="$(sha256sum "${PRELINKED}/compiler_lib_aot_blob" | awk '{print $1}')"
+fi
+old_fp=""
+if [[ -f "${PRELINKED}/manifest.json" ]]; then
+  old_fp="$(php -r '
+    $m = json_decode((string) file_get_contents($argv[1]), true);
+    echo is_array($m) ? strtolower(trim((string) ($m["lowering_source_fingerprint"] ?? ""))) : "";
+  ' "${PRELINKED}/manifest.json" 2>/dev/null || true)"
+fi
+live_fp="$(bootstrap_lowering_source_fingerprint)" || live_fp=""
+
 if [[ "${SKIP_LINK}" -eq 0 ]]; then
   if [[ -z "${PHP_COMPILER_LLVM_PATH:-}" || ! -f "${PHP_COMPILER_LLVM_PATH}/libLLVM-9.so.1" ]]; then
     echo "bootstrap-refresh-gen0-sidecar: LLVM 9 not found (install via script/install-llvm9.sh)" >&2
     exit 2
   fi
-  # Cold-tree deadlock (#22642): refreshing gen-0 needs a compile driver, but the committed
-  # seed is refused once it is stale (#21855) and BOOTSTRAP_NO_ZEND_FALLBACK=1 forbids Zend —
-  # so the refresh dies after ~8s with "failed to build compiled driver" and the caller has to
-  # rediscover BOOTSTRAP_GEN0_ZEND_ONLY=1 from a log line. On a tree with no usable driver,
-  # bootstrapping through Zend is not a compromise, it is what gen-0 means. Select it here.
-  if [[ -z "${BOOTSTRAP_GEN0_ZEND_ONLY:-}" ]]; then
-    if [[ ! -x "${ROOT}/build/bin-compile-aot" ]] \
-      || ! bootstrap_lowering_source_stamp_matches "$(bootstrap_lowering_source_build_stamp)"; then
-      echo "==> no compile driver in this tree matches current lowering sources — bootstrapping via Zend"
-      echo "    (BOOTSTRAP_GEN0_ZEND_ONLY=1 selected automatically; export BOOTSTRAP_GEN0_ZEND_ONLY=0 to refuse and fail instead)"
-      export BOOTSTRAP_GEN0_ZEND_ONLY=1
-    fi
-  fi
 
-  echo "==> M2 full spine link (BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1)"
-  BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 \
-    bash "${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
-  # Honest build stamp: spine link just ran against current lib/ext/patches (#21905).
+  if [[ -n "${live_fp}" && -n "${old_fp}" && "${live_fp}" != "${old_fp}" ]] \
+    || [[ "${BOOTSTRAP_GEN0_FORCE_ZEND_SPINE:-0}" == "1" ]]; then
+    echo "==> Zend honest full-spine compile (lowering fingerprint stale or BOOTSTRAP_GEN0_FORCE_ZEND_SPINE=1 — #22642)"
+    # Fail-fast nikic parse of every spine PHP file before multi-hour AOT (#22642 r9:
+    # DateTime*/ in a docblock aborted parseAndCompile after ~226m).
+    if ! php "${ROOT}/script/bootstrap-spine-nikic-preflight.php"; then
+      echo "bootstrap-refresh-gen0-sidecar: spine nikic preflight failed — fix syntax before Zend AOT" >&2
+      exit 1
+    fi
+    # Default CI ulimit -v is 8 GiB (#436). Zend full-spine AOT grows virtual size (mmap/LLVM)
+    # far ahead of RSS — a finite -v cap SIGKILLs (exit 137) around ~1 GiB RSS while still in
+    # parseAndCompileFile (#22642). Disable virtual-memory ulimit here; Docker cgroup + PHP
+    # memory_limit remain the real budgets.
+    export PHP_COMPILER_CI_RAM_GB=0
+    if command -v ci_apply_resource_limits >/dev/null 2>&1; then
+      ci_apply_resource_limits || true
+    fi
+    ulimit -v unlimited 2>/dev/null || ulimit -v 0 2>/dev/null || true
+    echo "bootstrap-refresh-gen0-sidecar: ulimit -v=$(ulimit -v) for Zend spine (#22642)"
+    # Prefer at least 16G PHP heap for TypeReconstructor on the full spine.
+    if [[ -z "${PHP_COMPILER_MEMORY_LIMIT:-}" ]] || [[ "${PHP_COMPILER_MEMORY_LIMIT}" == "1536M" ]] \
+      || [[ "${PHP_COMPILER_MEMORY_LIMIT}" == "8192M" ]]; then
+      export PHP_COMPILER_MEMORY_LIMIT=16384M
+    fi
+    # Match exclusive launcher defaults: flat include slots + no cold helper NestedJIT (#22642).
+    export PHP_COMPILER_INCLUDE_SCOPE_REMAP="${PHP_COMPILER_INCLUDE_SCOPE_REMAP:-0}"
+    export PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-0}"
+    mkdir -p "${ROOT}/build"
+    rm -f "${SPINE_OUT}" "${LIB_BLOB}"
+    if ! bootstrap_compiler_lib_honest_zend_compile "${SPINE_OUT}" "${SPINE_ENTRY}" full; then
+      echo "bootstrap-refresh-gen0-sidecar: Zend honest spine compile failed" >&2
+      exit 1
+    fi
+    if [[ ! -x "${SPINE_OUT}" ]]; then
+      echo "bootstrap-refresh-gen0-sidecar: Zend spine compile produced no executable ${SPINE_OUT}" >&2
+      exit 1
+    fi
+    cp -f "${SPINE_OUT}" "${LIB_BLOB}"
+    chmod +x "${LIB_BLOB}"
+    want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || true
+    if [[ -n "${want_sha:-}" ]]; then
+      printf '%s' "${want_sha}" >"${STAMP}"
+    fi
+  else
+    export BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER=1
+    export BOOTSTRAP_ALLOW_STALE_SIDECAR=1
+    echo "==> M2 full spine link (BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1; stale gen-0 seed allowed for refresh)"
+    BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1 \
+      bash "${ROOT}/script/bootstrap-selfhost-lib-spine-smoke-link.sh"
+    unset BOOTSTRAP_ALLOW_STALE_COMPILED_DRIVER BOOTSTRAP_ALLOW_STALE_SIDECAR
+  fi
   bootstrap_lowering_source_write_build_stamp
 else
-  # --skip-link: refuse to copy/stamp from a stale build/ artifact (#21905 / #21855).
   bootstrap_lowering_source_refuse_stale_reuse \
     "$(bootstrap_lowering_source_build_stamp)" \
     "build/ artifact for gen-0 sidecar refresh" \
@@ -91,10 +150,6 @@ else
       exit 1
     }
 fi
-
-SPINE_OUT="${ROOT}/build/selfhost-lib-spine-smoke"
-LIB_BLOB="${ROOT}/build/.m3_compiler_lib_aot_blob"
-STAMP="${ROOT}/build/.m3_compiler_lib_sidecar.sha"
 
 if [[ ! -x "${SPINE_OUT}" ]]; then
   echo "bootstrap-refresh-gen0-sidecar: missing ${SPINE_OUT} (run link first)" >&2
@@ -109,7 +164,6 @@ if [[ ! -f "${STAMP}" ]]; then
   exit 1
 fi
 
-PRELINKED="${ROOT}/prelinked/bootstrap-gen0"
 mkdir -p "${PRELINKED}"
 
 echo "==> copy spine sidecars build/ → prelinked/bootstrap-gen0/"
@@ -151,6 +205,15 @@ if [[ -f "${ROOT}/build/.m3_compiler_minimal_aot_blob" ]]; then
 fi
 
 echo "bootstrap-refresh-gen0-sidecar: copied ${copied} build/.m3_* blobs + compiler_lib sidecar"
+
+new_lib_sha="$(sha256sum "${PRELINKED}/compiler_lib_aot_blob" | awk '{print $1}')"
+if [[ -n "${live_fp}" && -n "${old_fp}" && "${live_fp}" != "${old_fp}" ]]; then
+  if [[ -n "${old_lib_sha}" && "${new_lib_sha}" == "${old_lib_sha}" ]]; then
+    echo "bootstrap-refresh-gen0-sidecar: refusing restamp-only fingerprint update — compiler_lib blob sha unchanged (${new_lib_sha})" >&2
+    echo "bootstrap-refresh-gen0-sidecar: need an honest spine rebuild (Zend path ran but produced identical bytes, or sidecar fallback copied the seed — #22642)" >&2
+    exit 1
+  fi
+fi
 
 echo "==> refresh prelinked/bootstrap-gen0/manifest.json (size/sha only — no provenance stamp)"
 php "${ROOT}/script/bootstrap-gen0-manifest-refresh.php"
