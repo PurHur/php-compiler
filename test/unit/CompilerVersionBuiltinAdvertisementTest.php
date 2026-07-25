@@ -115,6 +115,44 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    public function testSpoofcheckerSetAllowedCharsWithheldOnDefault84DevReference(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsSpoofcheckerSetAllowedChars());
+        $this->assertFalse(CompilerVersion::advertisesSpoofcheckerSetAllowedChars());
+    }
+
+    public function testSpoofcheckerSetAllowedCharsWithheldOn82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsSpoofcheckerSetAllowedChars());
+            $this->assertFalse(CompilerVersion::advertisesSpoofcheckerSetAllowedChars());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSpoofcheckerSetAllowedCharsAdvertisedOnForward84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsSpoofcheckerSetAllowedChars());
+            $this->assertTrue(CompilerVersion::advertisesSpoofcheckerSetAllowedChars());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testJsonValidateWithheldOnDefault84DevReference(): void
     {
         $this->assertFalse(CompilerVersion::supportsJsonValidate());

@@ -23,12 +23,51 @@ final class VmSpoofcheckerTest extends TestCase
         self::assertFalse(VmReflection::classExists($runtime->vmContext, 'Spoofchecker'));
     }
 
+    public function test_set_allowed_chars_withheld_on_default_profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            self::assertFalse(CompilerVersion::supportsSpoofcheckerSetAllowedChars());
+            $runtime = new Runtime();
+            BuiltinClasses::registerSpoofchecker($runtime->vmContext);
+
+            $code = <<<'PHP'
+<?php
+$s = new Spoofchecker();
+echo 'set=', (int) method_exists($s, 'setAllowedChars'), "\n";
+echo 'get=', (int) method_exists($s, 'getAllowedChars'), "\n";
+echo 'ignore=', defined('Spoofchecker::IGNORE_SPACE') ? '1' : '0', "\n";
+try {
+    $s->setAllowedChars('[a-z]');
+    echo "call=ok\n";
+} catch (Error $e) {
+    echo "call=undefined\n";
+}
+PHP;
+            $block = $runtime->parseAndCompile($code, 'spoofchecker_profile_default.php');
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+            self::assertSame("set=0\nget=0\nignore=0\ncall=undefined\n", $out);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function test_issuspicious_and_confusable_forced_registration(): void
     {
-        $runtime = new Runtime();
-        BuiltinClasses::registerSpoofchecker($runtime->vmContext);
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            BuiltinClasses::registerSpoofchecker($runtime->vmContext);
 
-        $code = <<<'PHP'
+            $code = <<<'PHP'
 <?php
 echo 'class=', (int) class_exists('Spoofchecker'), "\n";
 $s = new Spoofchecker();
@@ -52,15 +91,22 @@ echo 'allowed_clean=', (int) $s->isSuspicious('hello'), "\n";
 echo 'allowed_accent=', (int) $s->isSuspicious("h\xC3\xA9llo"), "\n";
 echo 'ok', "\n";
 PHP;
-        $block = $runtime->parseAndCompile($code, 'spoofchecker_basic.php');
-        ob_start();
-        $runtime->run($block);
-        $out = ob_get_clean();
-        self::assertMatchesRegularExpression(
-            '/^class=1\nclean=0\nmixed=1\nbits=\d+\nconst_ss=16\nconf=1\nignore=1\nallowed_clean=0\nallowed_accent=1\nok\n$/',
-            $out
-        );
-        self::assertSame(16, VmSpoofchecker::SINGLE_SCRIPT);
+            $block = $runtime->parseAndCompile($code, 'spoofchecker_basic.php');
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+            self::assertMatchesRegularExpression(
+                '/^class=1\nclean=0\nmixed=1\nbits=\d+\nconst_ss=16\nconf=1\nignore=1\nallowed_clean=0\nallowed_accent=1\nok\n$/',
+                $out
+            );
+            self::assertSame(16, VmSpoofchecker::SINGLE_SCRIPT);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function test_set_restriction_level_rejects_invalid(): void
@@ -87,10 +133,13 @@ PHP;
 
     public function test_set_allowed_chars_rejects_invalid_pattern(): void
     {
-        $runtime = new Runtime();
-        BuiltinClasses::registerSpoofchecker($runtime->vmContext);
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            BuiltinClasses::registerSpoofchecker($runtime->vmContext);
 
-        $code = <<<'PHP'
+            $code = <<<'PHP'
 <?php
 $s = new Spoofchecker();
 try {
@@ -106,10 +155,17 @@ try {
     echo "opts_value_error\n";
 }
 PHP;
-        $block = $runtime->parseAndCompile($code, 'spoofchecker_allowed.php');
-        ob_start();
-        $runtime->run($block);
-        $out = ob_get_clean();
-        self::assertSame("value_error\nopts_value_error\n", $out);
+            $block = $runtime->parseAndCompile($code, 'spoofchecker_allowed.php');
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+            self::assertSame("value_error\nopts_value_error\n", $out);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }

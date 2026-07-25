@@ -1,9 +1,14 @@
 --TEST--
-Spoofchecker::setAllowedChars() UnicodeSet restrict (#20823)
+Spoofchecker::setAllowedChars() UnicodeSet restrict (#20823, #23157)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
 if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsIntlOopCompliance(basename(__FILE__))) {
     echo 'skip Spoofchecker withheld until extension_loaded(\'intl\') (#19670/#20823)';
+}
+if (!\PHPCompiler\CompilerVersion::supportsSpoofcheckerSetAllowedChars()) {
+    echo 'skip setAllowedChars requires PHP_COMPILER_PROFILE=8.4 (#23157)';
 }
 ?>
 --FILE--
