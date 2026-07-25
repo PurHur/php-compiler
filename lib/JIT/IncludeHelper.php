@@ -122,8 +122,18 @@ final class IncludeHelper
         $context = $jit->context;
 
         // Remap colliding parent slots — callee opcodes keep their indices; parent
-        // locals are name-bound via IncludeBindingJitHelper (#22845).
-        $included->inheritScopeFrom($callerBlock, true);
+        // locals are name-bound via IncludeBindingJitHelper (#22845 MiniWebApp).
+        // Zend full-spine may opt out via PHP_COMPILER_INCLUDE_SCOPE_REMAP=0: always-on
+        // remapping made honest gen-0 refresh ~25× slower (r14 vs r13 @ gmp, #22642).
+        $remapCollidingSlots = true;
+        $remapFlag = getenv('PHP_COMPILER_INCLUDE_SCOPE_REMAP');
+        if (is_string($remapFlag)) {
+            $remapLc = strtolower($remapFlag);
+            if ('0' === $remapFlag || 'false' === $remapLc || 'off' === $remapLc) {
+                $remapCollidingSlots = false;
+            }
+        }
+        $included->inheritScopeFrom($callerBlock, $remapCollidingSlots);
         $included->inheritUndefinedLocals = true;
 
         $context->inlineIncludeCallerBlocks[] = $callerBlock;

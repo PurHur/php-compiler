@@ -60,7 +60,12 @@ final class IncludeBindingNestedAppNameTest extends TestCase
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/IncludeHelper.php');
         $this->assertStringContainsString('Remap colliding parent slots', $source);
-        $this->assertStringContainsString('inheritScopeFrom($callerBlock, true)', $source);
+        // Default remaps; PHP_COMPILER_INCLUDE_SCOPE_REMAP=0 opts out for Zend spine pace (#22642).
+        $this->assertStringContainsString('$remapCollidingSlots = true', $source);
+        $this->assertStringContainsString(
+            'inheritScopeFrom($callerBlock, $remapCollidingSlots)',
+            $source
+        );
         $this->assertStringNotContainsString(
             'count($context->inlineIncludeCallerBlocks) - 2',
             $source

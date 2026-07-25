@@ -217,7 +217,20 @@ bootstrap_compiler_lib_honest_zend_compile() {
   mkdir -p "$(dirname "${out}")"
   rm -f "${out}"
   # ci_apply_llvm_memory_env pins 4096M; full-spine sidecar host-compile OOMs below 8GB (#8559).
+  # Honor a higher PHP_COMPILER_MEMORY_LIMIT / PHP_COMPILER_LLVM_MEMORY_LIMIT when callers raise
+  # the Docker budget for verified-fresh gen-0 refresh (#22642) — never drop below 8192M.
   local mem_limit="8192M"
+  local cand="" cand_num=0 mem_num=8192
+  mem_num="${mem_limit%[MmGg]}"
+  for cand in "${PHP_COMPILER_LLVM_MEMORY_LIMIT:-}" "${PHP_COMPILER_MEMORY_LIMIT:-}"; do
+    if [[ -n "${cand}" ]]; then
+      cand_num="${cand%[MmGg]}"
+      if [[ "${cand_num}" =~ ^[0-9]+$ && "${mem_num}" =~ ^[0-9]+$ && "${cand_num}" -gt "${mem_num}" ]]; then
+        mem_limit="${cand}"
+        mem_num="${cand_num}"
+      fi
+    fi
+  done
   if [[ "${mode}" == "sidecar" ]]; then
     env PHP_COMPILER_M3_EMIT_SIDECAR_RECURSION_GUARD=1 \
       PHP_COMPILER_SELFHOST_AOT=1 \
