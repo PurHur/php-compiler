@@ -795,6 +795,7 @@ class Runtime {
         $this->compiler->setPropertyHookRegistry($this->vmContext->propertyHookRegistry);
         $this->compiler->setKnownClassReadonly(self::knownClassReadonlyForCompileCheck($this->vmContext->classes));
         $this->compiler->setRuntimeEnumCaseConsts(self::runtimeEnumCaseConstsForCompile($this->vmContext->classes));
+        $this->compiler->setVmContext($this->vmContext);
         /** @var mixed $block */
         $block = $this->compiler->compile($script);
         if (!$block instanceof Block) {
