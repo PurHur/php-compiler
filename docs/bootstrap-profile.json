@@ -1754,6 +1754,7 @@
         "ext/reflection/IsAnonymousClassJitHelper.php",
         "ext/reflection/JitIsAnonymousClass.php",
         "ext/reflection/Module.php",
+        "ext/reflection/ReflectionSerializeDeny.php",
         "ext/reflection/is_anonymous_class.php",
         "ext/session/Module.php",
         "ext/session/SessionConstants.php",
@@ -3442,6 +3443,7 @@
         "ext/standard/WordwrapJitHelper.php",
         "ext/standard/XslConstants.php",
         "ext/standard/ZendSort.php",
+        "ext/standard/ZlibContextSerializeDeny.php",
         "ext/standard/ZlibEncodeJitHelper.php",
         "ext/standard/ZlibIncrementalFunction.php",
         "ext/standard/ZlibJitHelper.php",
@@ -4435,6 +4437,7 @@
         "ext/xml/XmlFunction.php",
         "ext/xml/XmlHandlerDeprecation.php",
         "ext/xml/XmlParserHandlers.php",
+        "ext/xml/XmlParserSerializeDeny.php",
         "ext/xml/XmlParserSupport.php",
         "ext/xml/XmlSetHandlerFunction.php",
         "ext/xml/xml_error_string.php",
@@ -6773,9 +6776,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6539,
+        "inventory_files": 6542,
         "excluded": 0,
-        "eligible": 6539,
+        "eligible": 6542,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
