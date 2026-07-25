@@ -23,6 +23,21 @@ final class DeprecatedAttributeTest extends TestCase
         $this->assertSame('Class Old is deprecated', $meta->formatClass('Old'));
     }
 
+    public function testFormatTraitUseMessage(): void
+    {
+        $meta = new DeprecatedMetadata('old trait', null);
+        $this->assertSame(
+            'Trait Tr used by C is deprecated, old trait',
+            $meta->formatTraitUse('Tr', 'C')
+        );
+
+        $meta = new DeprecatedMetadata(null, null);
+        $this->assertSame(
+            'Trait DemoTrait used by DemoClass is deprecated',
+            $meta->formatTraitUse('DemoTrait', 'DemoClass')
+        );
+    }
+
     public function testFormatEnumMessages(): void
     {
         $meta = new DeprecatedMetadata('Legacy enum', '8.4');
