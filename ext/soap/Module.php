@@ -26,8 +26,11 @@ class Module extends ModuleAbstract
 
     public function init(Runtime $runtime): void
     {
-        require_once __DIR__.'/bootstrap_soapfault.php';
         parent::init($runtime);
+        if (!SoapExtensionPolicy::advertisesExtension()) {
+            return;
+        }
+        require_once __DIR__.'/bootstrap_soapfault.php';
         // php-src SOAP_RINIT: use_soap_error_handler = 0
         SoapExtensionPolicy::setUseSoapErrorHandler(false);
         foreach (SoapConstants::registeredConstants() as $name => $value) {
@@ -44,6 +47,10 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        if (!SoapExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
         return [
             new is_soap_fault(),
             new use_soap_error_handler(),

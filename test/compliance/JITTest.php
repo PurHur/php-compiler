@@ -28,6 +28,11 @@ class JITTest extends BaseTest {
                 && \PHPCompiler\ext\gd\GdExtensionPolicy::isGdComplianceCase($name)) {
                 continue;
             }
+            // Host/profile without soap: withhold functional soap_* cases; keep phantom (#22859).
+            if (!\PHPCompiler\ext\soap\SoapExtensionPolicy::runsSoapCompliance($name)
+                && \PHPCompiler\ext\soap\SoapExtensionPolicy::isSoapComplianceCase($name)) {
+                continue;
+            }
             // VM-first (#6212/#6248/#6064): JIT hangs/OOM on create_listen / datagram accept scripts; defer JIT PHPT.
             if (str_contains($name, 'socket_create_listen')
                 || str_contains($name, 'socket_datagram')
