@@ -150,6 +150,10 @@ final class VmSerialize
             if (0 === strcasecmp($className, 'Closure')) {
                 throw new \Exception("Unserialization of 'Closure' is not allowed");
             }
+            // php-src Zend/zend_fibers.c — zend_class_unserialize_deny (#23043).
+            if (0 === strcasecmp($className, 'Fiber')) {
+                throw new \Exception("Unserialization of 'Fiber' is not allowed");
+            }
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
             if (!self::isClassAllowedForUnserialize($className, $options)) {
                 $parsed = self::parseCustomObjectPayload($payload);
@@ -475,6 +479,10 @@ final class VmSerialize
     ): string {
         if (0 === strcasecmp($entry->class->name, 'Closure')) {
             throw new \Exception("Serialization of 'Closure' is not allowed");
+        }
+        // php-src Zend/zend_fibers.c — zend_class_serialize_deny (#23043).
+        if (0 === strcasecmp($entry->class->name, 'Fiber')) {
+            throw new \Exception("Serialization of 'Fiber' is not allowed");
         }
         // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
         if ($entry->lazyPending && LazyObjectSupport::shouldInitializeOnSerialize($entry)) {
@@ -842,6 +850,10 @@ final class VmSerialize
         $value = $value->resolveIndirect();
         if (VmClosureCall::isClosure($value)) {
             throw new \Exception("Serialization of 'Closure' is not allowed");
+        }
+        if (Variable::TYPE_OBJECT === $value->type
+            && 0 === strcasecmp($value->toObject()->class->name, 'Fiber')) {
+            throw new \Exception("Serialization of 'Fiber' is not allowed");
         }
         $enumRef = self::enumCaseRefFromVariable($value);
         if (null !== $enumRef) {
