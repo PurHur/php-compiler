@@ -4108,8 +4108,8 @@ final class VmGd
      */
     public static function encodedGd2Bytes(
         ObjectEntry $image,
-        int $chunkSize = VmGdGd::GD2_CHUNKSIZE,
-        int $mode = VmGdGd::GD2_FMT_RAW
+        int $chunkSize = 128, // VmGdGd::GD2_CHUNKSIZE — literal default (#3803 / #22642 spine AOT)
+        int $mode = 1 // VmGdGd::GD2_FMT_RAW
     ): string {
         $state = GdRegistry::state($image);
         if (null === $state || !$state->hasRaster()) {
@@ -4122,8 +4122,8 @@ final class VmGd
     public static function writeGd2ToOutput(
         Frame $frame,
         ObjectEntry $image,
-        int $chunkSize = VmGdGd::GD2_CHUNKSIZE,
-        int $mode = VmGdGd::GD2_FMT_RAW
+        int $chunkSize = 128, // VmGdGd::GD2_CHUNKSIZE — literal default (#3803 / #22642 spine AOT)
+        int $mode = 1 // VmGdGd::GD2_FMT_RAW
     ): bool {
         OutputBuffer::append(self::encodedGd2Bytes($image, $chunkSize, $mode), $frame->scriptPath ?: null);
 
