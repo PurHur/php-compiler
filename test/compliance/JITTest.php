@@ -1853,6 +1853,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_class_property_function_tostring')) {
                 continue;
             }
+            // ReflectionType::__toString DNF/?T: VM-only (#23065); MCJIT lacks ReflectionFunction::getParameters.
+            if (str_contains($name, 'reflection_type_tostring_dnf_null')) {
+                continue;
+            }
             // ReflectionClass::getExtension() / ReflectionExtension are VM-only (#11462).
             if (str_contains($name, 'reflection_extension_class')) {
                 continue;
