@@ -36,7 +36,7 @@ final class PackJitEngine
             throw new \ValueError('integer overflow in format string');
         }
 
-        $output = \str_repeat("\0", $outputSize > 0 ? $outputSize : 0);
+        $output = PackEngineEncode::zeros($outputSize > 0 ? $outputSize : 0);
         $outputPos = 0;
         $currentArg = 0;
 
@@ -87,7 +87,7 @@ final class PackJitEngine
                 $str = self::argString($args[$currentArg++], $valueIdx);
                 $argCp = 'Z' !== $code ? $arg : ($arg > 0 ? $arg - 1 : 0);
                 $pad = 'A' === $code ? ' ' : "\0";
-                $chunk = \str_pad(\substr($str, 0, $argCp), $arg, $pad);
+                $chunk = PackEngineEncode::padRight(\substr($str, 0, $argCp), $arg, $pad);
                 $output = PackEngineEncode::writeAt($output, $outputPos, $chunk);
 
                 return [$output, $outputPos + $arg, $currentArg];
@@ -154,7 +154,7 @@ final class PackJitEngine
             case 'E':
                 return self::emitDoubleRepeat($output, $outputPos, $args, $currentArg, $arg, false);
             case 'x':
-                $output = PackEngineEncode::writeAt($output, $outputPos, \str_repeat("\0", $arg));
+                $output = PackEngineEncode::writeAt($output, $outputPos, PackEngineEncode::zeros($arg));
 
                 return [$output, $outputPos + $arg, $currentArg];
             case 'X':
@@ -163,7 +163,7 @@ final class PackJitEngine
                 return [$output, $outputPos, $currentArg];
             case '@':
                 if ($arg > $outputPos) {
-                    $output = PackEngineEncode::writeAt($output, $outputPos, \str_repeat("\0", $arg - $outputPos));
+                    $output = PackEngineEncode::writeAt($output, $outputPos, PackEngineEncode::zeros($arg - $outputPos));
                 }
 
                 return [$output, $arg, $currentArg];
@@ -480,7 +480,7 @@ final class PackJitEngine
 
             return 0;
         }
-        if (\is_string($value) && is_numeric($value)) {
+        if (\is_string($value) && self::stringLooksNumeric($value)) {
             return (int) $value;
         }
 
@@ -500,11 +500,65 @@ final class PackJitEngine
 
             return 0.0;
         }
-        if (\is_string($value) && is_numeric($value)) {
+        if (\is_string($value) && self::stringLooksNumeric($value)) {
             return (float) $value;
         }
 
         return 0.0;
+    }
+
+    /**
+     * Lean numeric-string check for NestedJIT (#22981).
+     *
+     * Avoid host {@see is_numeric()} — its JIT lowering pulls stream-filter ABI
+     * that helper-unit emit does not link (`__compiler_is_stream_filter_resource`).
+     */
+    private static function stringLooksNumeric(string $value): bool
+    {
+        $len = \strlen($value);
+        if (0 === $len) {
+            return false;
+        }
+        $i = 0;
+        if ('+' === $value[0] || '-' === $value[0]) {
+            if (1 === $len) {
+                return false;
+            }
+            $i = 1;
+        }
+        $sawDigit = false;
+        $sawDot = false;
+        for (; $i < $len; ++$i) {
+            $c = $value[$i];
+            if ($c >= '0' && $c <= '9') {
+                $sawDigit = true;
+                continue;
+            }
+            if ('.' === $c && !$sawDot) {
+                $sawDot = true;
+                continue;
+            }
+            if (('e' === $c || 'E' === $c) && $sawDigit) {
+                ++$i;
+                if ($i < $len && ('+' === $value[$i] || '-' === $value[$i])) {
+                    ++$i;
+                }
+                if ($i >= $len) {
+                    return false;
+                }
+                for (; $i < $len; ++$i) {
+                    if ($value[$i] < '0' || $value[$i] > '9') {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        return $sawDigit;
     }
 
     /** php-src ext/standard/pack.c — null value operands TypeError on 8.4 forward profile (#18992, #19388). */
