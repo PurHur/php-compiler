@@ -48,7 +48,8 @@ final class SimpleXmlRegistry
 
     /**
      * Namespace filter for live children() views.
-     * null ⇒ no-namespace children only; `''` ⇒ all; non-empty ⇒ URI/prefix filter.
+     * null / `''` ⇒ unprefixed element children only (default xmlns included; #22737);
+     * non-empty ⇒ URI/prefix filter.
      *
      * @var array<int, array{ns: ?string, isPrefix: bool}>
      */
