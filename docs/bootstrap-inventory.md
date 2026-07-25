@@ -13042,9 +13042,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlSerializeDeny.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 34)
-- new Exception (line 41)
-- 4 class method(s)
+- new Exception (line 47)
+- new Exception (line 54)
+- 5 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
