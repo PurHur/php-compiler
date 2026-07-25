@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6538 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21000 |
+| Source constructs flagged (warnings) | 21003 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -298,7 +298,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomUserScriptLiveTagListLlvm.php` | 0 | 1 |
 | `ext/dom/DomXPathEvaluateJitHelper.php` | 0 | 1 |
 | `ext/dom/DomXPathQueryJitHelper.php` | 0 | 1 |
-| `ext/dom/DomXPathSerializeDeny.php` | 0 | 3 |
 | `ext/dom/ElementAppendChild.php` | 0 | 1 |
 | `ext/dom/ElementClosest.php` | 0 | 3 |
 | `ext/dom/ElementConstruct.php` | 0 | 2 |
@@ -1443,6 +1442,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
 | `ext/openssl/OpensslFunction.php` | 0 | 1 |
 | `ext/openssl/OpensslMethodsJitHelper.php` | 0 | 1 |
+| `ext/openssl/OpensslSerializeDeny.php` | 0 | 3 |
 | `ext/openssl/OpensslSignJitHelper.php` | 0 | 1 |
 | `ext/openssl/VmOpenssl.php` | 0 | 7 |
 | `ext/openssl/VmOpensslCipherNative.php` | 0 | 1 |
@@ -3298,7 +3298,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSapiHeaderGuard.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 6 |
 | `ext/standard/VmScope.php` | 0 | 6 |
-| `ext/standard/VmSerialize.php` | 0 | 56 |
+| `ext/standard/VmSerialize.php` | 0 | 59 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 17 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 5 |
@@ -8339,13 +8339,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `ext/dom/DomXPathSerializeDeny.php`
-
-**Warnings** (review for bootstrap subset):
-- new Exception (line 23)
-- new Exception (line 30)
-- 4 class method(s)
 
 ### `ext/dom/ElementAppendChild.php`
 
@@ -17916,6 +17909,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/openssl/OpensslSerializeDeny.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 24)
+- new Exception (line 31)
+- 4 class method(s)
 
 ### `ext/openssl/OpensslSignJitHelper.php`
 
@@ -31796,54 +31796,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 165)
 - new Exception (line 169)
 - new Exception (line 172)
-- new Variable (line 201)
-- new Variable (line 224)
-- new Variable (line 234)
-- new Variable (line 244)
-- new Variable (line 254)
-- new Variable (line 264)
-- new Variable (line 274)
-- new VmSerializeRefState (line 366)
-- new Exception (line 510)
+- new Exception (line 176)
+- new Variable (line 205)
+- new Variable (line 228)
+- new Variable (line 238)
+- new Variable (line 248)
+- new Variable (line 258)
+- new Variable (line 268)
+- new Variable (line 278)
+- new VmSerializeRefState (line 370)
 - new Exception (line 514)
 - new Exception (line 518)
 - new Exception (line 522)
-- new Exception (line 525)
-- new ObjectEntry (line 728)
-- new Variable (line 729)
-- new ObjectEntry (line 776)
-- new Variable (line 780)
-- new ObjectEntry (line 792)
-- new Variable (line 798)
-- new Variable (line 808)
-- new ObjectEntry (line 826)
-- new Variable (line 827)
-- new Variable (line 829)
-- new Variable (line 886)
-- new Exception (line 912)
-- new Exception (line 916)
+- new Exception (line 526)
+- new Exception (line 529)
+- new Exception (line 533)
+- new ObjectEntry (line 736)
+- new Variable (line 737)
+- new ObjectEntry (line 784)
+- new Variable (line 788)
+- new ObjectEntry (line 800)
+- new Variable (line 806)
+- new Variable (line 816)
+- new ObjectEntry (line 834)
+- new Variable (line 835)
+- new Variable (line 837)
+- new Variable (line 894)
 - new Exception (line 920)
 - new Exception (line 924)
 - new Exception (line 928)
-- new VmSerializeEnumCaseRef (line 986)
-- new VmSerializeEnumCaseRef (line 991)
-- new Variable (line 1066)
-- new VmSerializeRefState (line 1116)
-- new Variable (line 1133)
-- new VmSerializeRefState (line 1155)
-- new Variable (line 1165)
-- new Variable (line 1215)
-- new Variable (line 1228)
-- new Variable (line 1334)
-- new ObjectEntry (line 1364)
-- new Variable (line 1368)
-- new Frame (line 1387)
-- new Variable (line 1390)
-- new Variable (line 1419)
-- new Variable (line 1435)
-- new Variable (line 1440)
-- new Variable (line 1455)
-- new Exception (line 1478)
+- new Exception (line 932)
+- new Exception (line 936)
+- new Exception (line 940)
+- new VmSerializeEnumCaseRef (line 998)
+- new VmSerializeEnumCaseRef (line 1003)
+- new Variable (line 1078)
+- new VmSerializeRefState (line 1128)
+- new Variable (line 1145)
+- new VmSerializeRefState (line 1167)
+- new Variable (line 1177)
+- new Variable (line 1227)
+- new Variable (line 1240)
+- new Variable (line 1346)
+- new ObjectEntry (line 1376)
+- new Variable (line 1380)
+- new Frame (line 1399)
+- new Variable (line 1402)
+- new Variable (line 1431)
+- new Variable (line 1447)
+- new Variable (line 1452)
+- new Variable (line 1467)
+- new Exception (line 1490)
 - 60 class method(s)
 - 1 closure(s)
 

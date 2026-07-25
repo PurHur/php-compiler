@@ -1239,6 +1239,7 @@ require_once __DIR__.'/../../../ext/openssl/OpensslEncryptJitHelper.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslFunction.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslMethodsJitHelper.php';
+require_once __DIR__.'/../../../ext/openssl/OpensslSerializeDeny.php';
 require_once __DIR__.'/../../../ext/openssl/OpensslSignJitHelper.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpenssl.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslCipherNative.php';

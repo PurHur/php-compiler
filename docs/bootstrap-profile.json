@@ -1449,6 +1449,7 @@
         "ext/openssl/OpensslExtensionPolicy.php",
         "ext/openssl/OpensslFunction.php",
         "ext/openssl/OpensslMethodsJitHelper.php",
+        "ext/openssl/OpensslSerializeDeny.php",
         "ext/openssl/OpensslSignJitHelper.php",
         "ext/openssl/VmOpenssl.php",
         "ext/openssl/VmOpensslCipherNative.php",
