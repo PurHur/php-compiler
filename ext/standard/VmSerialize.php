@@ -198,7 +198,7 @@ final class VmSerialize
                 return $var;
             }
             $class = self::resolveClassEntryForUnserialize($ctx, $className);
-            if (null !== $class && self::hasInstanceMethod($class, '__unserialize')) {
+            if (null !== $class && self::hasInstanceMethod($ctx, $class, '__unserialize')) {
                 $magicData = self::decodeMagicSerializePropertyBag($ctx, $payload, $options, $frame);
                 if (false === $magicData) {
                     return false;
@@ -277,7 +277,7 @@ final class VmSerialize
 
                 return self::instantiateIncompleteObject($ctx, $className, $data);
             }
-            if (self::hasInstanceMethod($class, '__wakeup')) {
+            if (self::hasInstanceMethod($ctx, $class, '__wakeup')) {
                 if (!\is_array($data)) {
                     return false;
                 }
@@ -578,7 +578,7 @@ final class VmSerialize
 
             return self::encodeIncompleteObjectWire($ctx, $entry, $state, $frame);
         }
-        if (self::hasInstanceMethod($entry->class, '__serialize')) {
+        if (self::hasInstanceMethod($ctx, $entry->class, '__serialize')) {
             if (null !== $ctx->magicSerializeBeingInvoked || 1 !== $state->nextIndex) {
                 $state->assignObjectIndex($entry);
             }
@@ -616,7 +616,7 @@ final class VmSerialize
             }
         }
         $state->assignObjectIndex($entry);
-        if (self::hasInstanceMethod($entry->class, '__sleep')) {
+        if (self::hasInstanceMethod($ctx, $entry->class, '__sleep')) {
             return self::encodeSleepObject($ctx, $entry, $frame);
         }
 
@@ -781,7 +781,15 @@ final class VmSerialize
     ): Variable {
         $entry = new ObjectEntry($class);
         self::restoreObjectProperties($ctx, $entry, $data, $frame);
-        $method = $class->methods['__wakeup'] ?? null;
+        $method = self::resolveInstanceMethod($ctx, $class, '__wakeup');
+        if ($method instanceof VmClassMethod) {
+            self::invokeBuiltinClassMethod($ctx, $method, $entry);
+
+            $recv = new Variable();
+            $recv->object($entry);
+
+            return $recv;
+        }
         if (!$method instanceof PhpFunc) {
             throw new \LogicException(
                 'Class '.$class->name.'::__wakeup() must be a user method in this compiler build'
@@ -1006,7 +1014,38 @@ final class VmSerialize
      */
     private static function collectSleepPropertyNames(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): ?array
     {
-        $method = $entry->class->methods['__sleep'] ?? null;
+        $method = self::resolveInstanceMethod($ctx, $entry->class, '__sleep');
+        if ($method instanceof VmClassMethod) {
+            // Builtin __sleep (e.g. DOMNode) may throw; otherwise must return string[].
+            $result = self::invokeBuiltinClassMethod($ctx, $method, $entry);
+            if (Variable::TYPE_ARRAY !== $result->type) {
+                $ctx->errors->triggerError(
+                    'serialize(): '.$entry->class->name.'::__sleep() should return an array only containing the names of instance-variables to serialize',
+                    ErrorReporter::E_WARNING,
+                    null,
+                    $ctx,
+                    $frame
+                );
+
+                return null;
+            }
+            $names = [];
+            foreach ($result->toArray()->iterateKeyed(true) as [, $elem]) {
+                $elem = $elem->resolveIndirect();
+                if (Variable::TYPE_STRING !== $elem->type) {
+                    $ctx->errors->triggerError(
+                        'serialize(): '.$entry->class->name.'::__sleep() should return an array only containing the names of instance-variables to serialize',
+                        ErrorReporter::E_WARNING,
+                        null,
+                        $ctx,
+                        $frame
+                    );
+                }
+                $names[] = $elem->toString();
+            }
+
+            return $names;
+        }
         if (!$method instanceof PhpFunc) {
             throw new \LogicException(
                 'Class '.$entry->class->name.'::__sleep() must be a user method in this compiler build'
@@ -1351,7 +1390,7 @@ final class VmSerialize
 
     private static function invokeSerialize(Context $ctx, ObjectEntry $entry): Variable
     {
-        $method = $entry->class->methods['__serialize'] ?? null;
+        $method = self::resolveInstanceMethod($ctx, $entry->class, '__serialize');
         if ($method instanceof VmClassMethod) {
             $result = self::invokeBuiltinClassMethod($ctx, $method, $entry);
             if (Variable::TYPE_ARRAY !== $result->type) {
@@ -1428,9 +1467,45 @@ final class VmSerialize
         }
     }
 
-    private static function hasInstanceMethod(ClassEntry $class, string $methodName): bool
+    /**
+     * Resolve an instance method including parent ClassEntry tables (builtin DOMNode::__sleep, #23073).
+     */
+    private static function resolveInstanceMethod(Context $ctx, ClassEntry $class, string $methodName): mixed
     {
-        return isset($class->methods[strtolower($methodName)]);
+        $methodLc = strtolower($methodName);
+        $vm = $ctx->runtime->vm ?? null;
+        if (null !== $vm) {
+            try {
+                [$decl] = $vm->resolveInstanceMethod($class, $methodLc);
+
+                return $decl->methods[$methodLc] ?? null;
+            } catch (\LogicException) {
+                return null;
+            }
+        }
+        $lcClass = strtolower($class->name);
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            $entry = $ctx->classes[$lcClass] ?? null;
+            if (null === $entry) {
+                return null;
+            }
+            if (isset($entry->methods[$methodLc])) {
+                return $entry->methods[$methodLc];
+            }
+            if (null === $entry->parentLc || '' === $entry->parentLc) {
+                return null;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        return null;
+    }
+
+    private static function hasInstanceMethod(Context $ctx, ClassEntry $class, string $methodName): bool
+    {
+        return null !== self::resolveInstanceMethod($ctx, $class, $methodName);
     }
 
     /** php-src zend_class_serialize() — __serialize() must return array (TypeError). */
