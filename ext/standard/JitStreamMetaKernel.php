@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StreamModeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for stream meta via StreamMetaJitHelper PHP (#6007, #13846, #19678).
+ * JIT/AOT ABI bridges for stream meta via StreamMetaJitHelper PHP (#6007, #13846, #19678, #22994).
  *
  * Quarantined from lib/JIT/Builtin/StreamMetaJit — {@see \PHPCompiler\JIT\Builtin\StreamMeta}
- * stays the thin orchestrator.
+ * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
+ * (peer StreamBuffer #22979 / StreamMode #22968).
  *
  * Replaces ~424-line feof/fcntl/strncmp LLVM; SSOT {@see StreamMetaJitHelper}
  * php-src: ext/standard/streamsfuncs.c — stream_get_meta_data / stream_set_blocking
@@ -178,44 +178,18 @@ final class JitStreamMetaKernel
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamMetaJitHelper compile (#13846)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#22994');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamMetaJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StreamMetaJitHelper.php parseAndCompile failed (#13846)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#13846)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#22994'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
