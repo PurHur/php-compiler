@@ -574,6 +574,7 @@ require_once __DIR__.'/../../../ext/filter/filter_var_array.php';
 require_once __DIR__.'/../../../ext/ftp/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/ftp/FtpConstants.php';
 require_once __DIR__.'/../../../ext/ftp/FtpExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/ftp/FtpSerializeDeny.php';
 require_once __DIR__.'/../../../ext/ftp/Module.php';
 require_once __DIR__.'/../../../ext/ftp/VmFtpArg.php';
 require_once __DIR__.'/../../../ext/ftp/VmFtpConnection.php';

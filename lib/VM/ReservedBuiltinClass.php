@@ -21,6 +21,7 @@ final class ReservedBuiltinClass
         'curlsharepersistenthandle' => 'Cannot directly construct CurlSharePersistentHandle, use curl_share_init_persistent() instead',
         'directory' => 'Cannot directly construct Directory, use dir() instead',
         'xmlparser' => 'Cannot directly construct XMLParser, use xml_parser_create() or xml_parser_create_ns() instead',
+        'ftp\\connection' => 'Cannot directly construct FTP\Connection, use ftp_connect() or ftp_ssl_connect() instead',
     ];
 
     /** @var array<string, string> lc => display name — runtime implements guard (#13327, #15445, #18781) */

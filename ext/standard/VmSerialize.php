@@ -15,6 +15,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\ext\curl\CurlFileSerializeDeny;
 use PHPCompiler\ext\dom\DomXPathSerializeDeny;
 use PHPCompiler\ext\fileinfo\FinfoSerializeDeny;
+use PHPCompiler\ext\ftp\FtpSerializeDeny;
 use PHPCompiler\ext\intl\IntlSerializeDeny;
 use PHPCompiler\ext\openssl\OpensslSerializeDeny;
 use PHPCompiler\ext\pdo\PdoSerializeDeny;
@@ -187,6 +188,8 @@ final class VmSerialize
             DomXPathSerializeDeny::rejectUnserialization($className);
             // php-src ext/fileinfo/fileinfo.stub.php — @not-serializable (#23093).
             FinfoSerializeDeny::rejectUnserialization($className);
+            // php-src ext/ftp/ftp.stub.php — @not-serializable (#23134).
+            FtpSerializeDeny::rejectUnserialization($className);
             // php-src ext/intl/*.stub.php — @not-serializable (#23092).
             IntlSerializeDeny::rejectUnserialization($className, $ctx);
             // php-src ext/sockets/sockets.stub.php — @not-serializable (#23094).
@@ -558,6 +561,8 @@ final class VmSerialize
         DomXPathSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/fileinfo/fileinfo.stub.php — @not-serializable (#23093).
         FinfoSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/ftp/ftp.stub.php — @not-serializable (#23134).
+        FtpSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/intl/*.stub.php — @not-serializable (#23092).
         IntlSerializeDeny::rejectSerialization($entry->class->name, $ctx);
         // php-src ext/sockets/sockets.stub.php — @not-serializable (#23094).
@@ -977,6 +982,7 @@ final class VmSerialize
             CurlFileSerializeDeny::rejectSerialization($value->toObject()->class->name);
             DomXPathSerializeDeny::rejectSerialization($value->toObject()->class->name);
             FinfoSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            FtpSerializeDeny::rejectSerialization($value->toObject()->class->name);
             IntlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
             SysvIpcSerializeDeny::rejectSerialization($value->toObject()->class->name);
