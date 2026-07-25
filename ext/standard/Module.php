@@ -24,7 +24,7 @@ class Module extends ModuleAbstract
 {
     public function getAdditionalExtensionNames(): array
     {
-        return ['json', 'date', 'pcre', 'zlib', 'readline'];
+        return ['json', 'date', 'pcre', 'zlib', 'readline', 'random'];
     }
 
     /**
