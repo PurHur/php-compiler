@@ -1240,6 +1240,21 @@ class Object_ extends Type {
     }
 
     /**
+     * True when set visibility differs from read visibility (#3165, #23110).
+     * Implicit-final private(set) properties use this path for writes, not the plain final ban.
+     */
+    public function propertyHasDistinctAsymmetricSetVisibility(int $classId, string $name): bool
+    {
+        $readVis = $this->propertyVisibility($classId, $name);
+        $setVis = \PHPCompiler\PropertyVisibility::effectiveSetVisibility(
+            $readVis,
+            $this->propertySetVisibility($classId, $name)
+        );
+
+        return $setVis !== \PHPCompiler\MethodVisibility::mask($readVis);
+    }
+
+    /**
      * @return list<int> class ids declaring $name as a final instance property (#22451)
      */
     public function finalPropertyClassIdsForProperty(string $name): array
