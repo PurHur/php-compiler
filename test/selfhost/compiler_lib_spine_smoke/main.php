@@ -6253,6 +6253,7 @@ require_once __DIR__.'/../../../ext/posix/posix_sysconf.php';
 require_once __DIR__.'/../../../ext/gmp/gmp_binomial.php';
 require_once __DIR__.'/../../../ext/enchant/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/enchant/EnchantExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/enchant/EnchantSerializeDeny.php';
 require_once __DIR__.'/../../../ext/enchant/Module.php';
 require_once __DIR__.'/../../../ext/enchant/VmEnchantArg.php';
 require_once __DIR__.'/../../../ext/enchant/VmEnchantBroker.php';

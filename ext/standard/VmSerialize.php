@@ -15,6 +15,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\ext\curl\CurlFileSerializeDeny;
 use PHPCompiler\ext\dba\DbaSerializeDeny;
 use PHPCompiler\ext\dom\DomXPathSerializeDeny;
+use PHPCompiler\ext\enchant\EnchantSerializeDeny;
 use PHPCompiler\ext\fileinfo\FinfoSerializeDeny;
 use PHPCompiler\ext\ffi\FfiSerializeDeny;
 use PHPCompiler\ext\ftp\FtpSerializeDeny;
@@ -226,6 +227,8 @@ final class VmSerialize
             PharSerializeDeny::rejectUnserialization($className);
             // php-src ext/ffi/ffi.stub.php — @not-serializable (#23133).
             FfiSerializeDeny::rejectUnserialization($className);
+            // php-src ext/enchant/enchant.stub.php — @not-serializable (#23112).
+            EnchantSerializeDeny::rejectUnserialization($className);
             if (!self::isClassAllowedForUnserialize($className, $options)) {
                 $parsed = self::parseCustomObjectPayload($payload);
                 if (null === $parsed || !\is_array($parsed[1])) {
@@ -608,6 +611,8 @@ final class VmSerialize
         PharSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/ffi/ffi.stub.php — @not-serializable (#23133).
         FfiSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/enchant/enchant.stub.php — @not-serializable (#23112).
+        EnchantSerializeDeny::rejectSerialization($entry->class->name);
         // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
         if ($entry->lazyPending && LazyObjectSupport::shouldInitializeOnSerialize($entry)) {
             $vm = $ctx->runtime->vm ?? null;
@@ -1023,6 +1028,7 @@ final class VmSerialize
             DbaSerializeDeny::rejectSerialization($value->toObject()->class->name);
             PharSerializeDeny::rejectSerialization($value->toObject()->class->name);
             FfiSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            EnchantSerializeDeny::rejectSerialization($value->toObject()->class->name);
         }
         $enumRef = self::enumCaseRefFromVariable($value);
         if (null !== $enumRef) {
