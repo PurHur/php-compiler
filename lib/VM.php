@@ -2288,6 +2288,11 @@ class VM {
         if (DatePeriodSupport::CLASS_DATEPERIOD === $lc) {
             return DatePeriodSupport::varExportPropertyMap($object);
         }
+        // Zend zend_exceptions.c — SensitiveParameterValue get_properties_for(VAR_EXPORT) is empty (#23042).
+        if (VM\SensitiveParamSupport::CLASS_NAME === $object->class->name
+            || strtolower(VM\SensitiveParamSupport::CLASS_NAME) === $lc) {
+            return [];
+        }
 
         return $this->collectObjectPropertiesForBuiltin($object, $frame, true);
     }

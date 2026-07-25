@@ -180,6 +180,10 @@ final class CastSupport
 
             return;
         }
+        // Zend SensitiveParameterValue — (array) cast yields empty (get_properties handler, #23042).
+        if (strtolower($obj->class->name) === strtolower(SensitiveParamSupport::CLASS_NAME)) {
+            return;
+        }
 
         $declared = [];
         foreach ($obj->class->properties as $meta) {
