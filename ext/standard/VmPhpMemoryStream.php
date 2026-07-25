@@ -378,9 +378,7 @@ final class VmPhpMemoryStream
         if (null === $state || !$state->canRead) {
             return false;
         }
-        if ($offset < -1) {
-            return false;
-        }
+        // php-src file.c: only offset >= 0 seeks; negative (incl. < -1) keeps current pos (#23190).
         if ($offset >= 0 && 0 !== self::seek($handle, $offset, \SEEK_SET)) {
             // php-src ext/standard/file.c — PHP_FUNCTION(stream_get_contents) (#21986).
             VmFs::warnStreamGetContentsSeekFailed($offset);

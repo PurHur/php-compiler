@@ -89,9 +89,7 @@ final class StreamReadJitHelper
 
     public static function streamGetContentsArgv(int $handle, int $maxlength, int $offset): ?string
     {
-        if ($offset < -1) {
-            return null;
-        }
+        // Negative offset (incl. < -1) is not a seek failure — VmFs matches php-src (#23190).
         $result = VmFs::streamGetContents($handle, $maxlength, $offset);
         if (false === $result) {
             return null;

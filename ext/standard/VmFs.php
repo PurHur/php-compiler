@@ -2282,9 +2282,7 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
-        if ($offset < -1) {
-            return false;
-        }
+        // php-src file.c: only offset >= 0 seeks; negative (incl. < -1) keeps current pos (#23190).
         if ($offset >= 0 && 0 !== @\fseek($fp, $offset, \SEEK_SET)) {
             self::warnStreamGetContentsSeekFailed($offset);
 
