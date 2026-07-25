@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6517 |
-| Phase A inventory files (M2 ratio SSOT) | 6517 |
+| PHP files on vm.php path | 6518 |
+| Phase A inventory files (M2 ratio SSOT) | 6518 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20930 |
+| Source constructs flagged (warnings) | 20929 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -889,6 +889,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
 | `ext/intl/BuiltinClasses.php` | 0 | 53 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
+| `ext/intl/IcuDateFormat.php` | 0 | 1 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlConstants.php` | 0 | 1 |
@@ -2756,7 +2757,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamLibcHandleKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamLifecycleKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamMetaKernel.php` | 0 | 3 |
-| `ext/standard/JitStreamModeKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamModeKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
 | `ext/standard/JitStreamPath.php` | 0 | 1 |
 | `ext/standard/JitStreamReadBridgeKernel.php` | 0 | 1 |
@@ -12812,6 +12813,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 26)
 - 1 class method(s)
 
+### `ext/intl/IcuDateFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- 10 class method(s)
+
 ### `ext/intl/IdnFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13774,27 +13780,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 147)
 - new HashTable (line 588)
 - new Variable (line 601)
-- new ArgumentCountError (line 1650)
-- new Error (line 1658)
-- new ArgumentCountError (line 1686)
-- new Error (line 1694)
-- new ArgumentCountError (line 1724)
-- new Error (line 1732)
-- new ArgumentCountError (line 1759)
-- new Error (line 1767)
-- new ArgumentCountError (line 1794)
-- new Error (line 1802)
-- new ArgumentCountError (line 1823)
-- new Error (line 1831)
-- new ArgumentCountError (line 1853)
-- new Error (line 1861)
+- new ArgumentCountError (line 1715)
+- new Error (line 1723)
+- new ArgumentCountError (line 1751)
+- new Error (line 1759)
+- new ArgumentCountError (line 1789)
+- new Error (line 1797)
+- new ArgumentCountError (line 1824)
+- new Error (line 1832)
+- new ArgumentCountError (line 1859)
+- new Error (line 1867)
 - new ArgumentCountError (line 1888)
 - new Error (line 1896)
 - new ArgumentCountError (line 1918)
 - new Error (line 1926)
 - new ArgumentCountError (line 1953)
 - new Error (line 1961)
-- 62 class method(s)
+- new ArgumentCountError (line 1983)
+- new Error (line 1991)
+- new ArgumentCountError (line 2018)
+- new Error (line 2026)
+- 64 class method(s)
 
 ### `ext/intl/VmIntlDatePatternGenerator.php`
 
@@ -27405,9 +27411,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamModeKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 153)
 - 8 class method(s)
-- 1 closure(s)
 
 ### `ext/standard/JitStreamNotificationCallback.php`
 

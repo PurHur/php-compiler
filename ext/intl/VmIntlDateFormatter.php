@@ -184,7 +184,7 @@ final class VmIntlDateFormatter
             self::clearObjectError($formatter);
             IntlError::clear();
 
-            return self::formatIcuPattern($pattern, $timestamp, $microsecond, $state['timezone']);
+            return self::formatResolved($state, $pattern, $timestamp, $microsecond);
         }
         $resolved = self::resolveFormatInstant($datetimeArg, $frame->vmContext);
         if (null === $resolved) {
@@ -193,7 +193,7 @@ final class VmIntlDateFormatter
         [$timestamp, $microsecond] = $resolved;
         IntlError::clear();
 
-        return self::formatIcuPattern($pattern, $timestamp, $microsecond, $state['timezone']);
+        return self::formatResolved($state, $pattern, $timestamp, $microsecond);
     }
 
     /**
@@ -704,8 +704,64 @@ final class VmIntlDateFormatter
         if (null !== $explicit && '' !== $explicit) {
             return $explicit;
         }
+        // TRADITIONAL + @calendar= → ICU udat_toPattern (hebrew/islamic/japanese/buddhist) (#22877).
+        if (self::usesLocaleCalendarKeyword($state)) {
+            $icu = IcuDateFormat::patternFromStyles(
+                $state['locale'],
+                $state['dateType'],
+                $state['timeType'],
+                $state['timezone']
+            );
+            if (null !== $icu && '' !== $icu) {
+                return $icu;
+            }
+        }
 
         return self::patternFromStyles($state['locale'], $state['dateType'], $state['timeType']);
+    }
+
+    /**
+     * php-src dateformat_create: calendar TRADITIONAL honors locale {@code @calendar=} (#22877).
+     *
+     * @param array{locale: string, calendar: int, pattern: ?string, dateType: int, timeType: int, timezone: string} $state
+     */
+    private static function usesLocaleCalendarKeyword(array $state): bool
+    {
+        if (self::TRADITIONAL !== (int) $state['calendar']) {
+            return false;
+        }
+        $explicit = $state['pattern'] ?? null;
+        if (null !== $explicit && '' !== $explicit) {
+            return false;
+        }
+
+        return IcuDateFormat::localeHasCalendarKeyword($state['locale']);
+    }
+
+    /**
+     * @param array{locale: string, dateType: int, timeType: int, timezone: string, calendar: int, pattern: ?string} $state
+     */
+    private static function formatResolved(
+        array $state,
+        string $pattern,
+        int $timestamp,
+        int $microsecond
+    ): string {
+        if (self::usesLocaleCalendarKeyword($state)) {
+            $millis = ($timestamp * 1000.0) + ($microsecond / 1000.0);
+            $icu = IcuDateFormat::formatStyles(
+                $state['locale'],
+                $state['dateType'],
+                $state['timeType'],
+                $state['timezone'],
+                $millis
+            );
+            if (null !== $icu) {
+                return $icu;
+            }
+        }
+
+        return self::formatIcuPattern($pattern, $timestamp, $microsecond, $state['timezone']);
     }
 
     /**
@@ -746,6 +802,15 @@ final class VmIntlDateFormatter
     private static function normalizeLocaleKey(string $locale): string
     {
         $locale = str_replace('-', '_', trim($locale));
+        // Strip Unicode locale extensions (@calendar=… / -u-ca-…) for style table lookup (#22877).
+        $at = strpos($locale, '@');
+        if (false !== $at) {
+            $locale = substr($locale, 0, $at);
+        }
+        $uExt = stripos($locale, '_u_');
+        if (false !== $uExt) {
+            $locale = substr($locale, 0, $uExt);
+        }
         if ('' === $locale) {
             return 'en_US';
         }
