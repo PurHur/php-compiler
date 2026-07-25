@@ -874,9 +874,11 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'extension_loaded_wddx')) {
                 continue;
             }
+            // yaml_parse_url_forward_84 sets PROFILE via --ENV--; always include (#22252).
             if (!CompilerVersion::supportsYaml()
                 && str_contains($name, 'yaml')
-                && !str_contains($name, 'yaml_phantom')) {
+                && !str_contains($name, 'yaml_phantom')
+                && !str_contains($name, 'yaml_parse_url_forward_84')) {
                 continue;
             }
             if (CompilerVersion::supportsYaml()

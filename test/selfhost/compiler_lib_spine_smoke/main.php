@@ -4362,6 +4362,7 @@ require_once __DIR__.'/../../../ext/yaml/yaml_emit.php';
 require_once __DIR__.'/../../../ext/yaml/yaml_emit_file.php';
 require_once __DIR__.'/../../../ext/yaml/yaml_parse.php';
 require_once __DIR__.'/../../../ext/yaml/yaml_parse_file.php';
+require_once __DIR__.'/../../../ext/yaml/yaml_parse_url.php';
 require_once __DIR__.'/../../../ext/zip/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/zip/Module.php';
 require_once __DIR__.'/../../../ext/zip/VmZipArchive.php';

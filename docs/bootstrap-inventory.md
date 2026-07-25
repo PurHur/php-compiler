@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6529 |
-| Phase A inventory files (M2 ratio SSOT) | 6529 |
+| PHP files on vm.php path | 6530 |
+| Phase A inventory files (M2 ratio SSOT) | 6530 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 20958 |
+| Source constructs flagged (warnings) | 20960 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4565,7 +4565,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltProcessorTransformToUri.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToXml.php` | 0 | 3 |
 | `ext/xsl/XsltRegistry.php` | 0 | 1 |
-| `ext/yaml/Module.php` | 0 | 5 |
+| `ext/yaml/Module.php` | 0 | 6 |
 | `ext/yaml/VmYaml.php` | 0 | 23 |
 | `ext/yaml/YamlExtensionPolicy.php` | 0 | 1 |
 | `ext/yaml/YamlFunction.php` | 0 | 1 |
@@ -4573,6 +4573,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_emit_file.php` | 0 | 1 |
 | `ext/yaml/yaml_parse.php` | 0 | 1 |
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
+| `ext/yaml/yaml_parse_url.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 11 |
 | `ext/zip/VmZipArchive.php` | 0 | 71 |
@@ -39956,36 +39957,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new yaml_parse (line 33)
 - new yaml_parse_file (line 34)
-- new yaml_emit (line 35)
-- new yaml_emit_file (line 36)
+- new yaml_parse_url (line 35)
+- new yaml_emit (line 36)
+- new yaml_emit_file (line 37)
 - 2 class method(s)
 
 ### `ext/yaml/VmYaml.php`
 
 **Warnings** (review for bootstrap subset):
-- new YamlSubsetParser (line 25)
-- new YamlParseException (line 234)
-- new YamlParseException (line 259)
-- new YamlParseException (line 267)
-- new YamlParseException (line 299)
-- new YamlParseException (line 339)
+- new YamlSubsetParser (line 27)
+- new YamlParseException (line 258)
+- new YamlParseException (line 283)
+- new YamlParseException (line 291)
+- new YamlParseException (line 323)
 - new YamlParseException (line 363)
-- new YamlParseException (line 368)
-- new YamlParseException (line 400)
-- new YamlParseException (line 404)
-- new YamlParseException (line 411)
-- new YamlFlowParser (line 445)
-- new YamlParseException (line 448)
-- new YamlParseException (line 507)
-- new YamlParseException (line 535)
-- new YamlParseException (line 546)
-- new YamlParseException (line 567)
-- new YamlParseException (line 573)
-- new YamlParseException (line 584)
-- new YamlParseException (line 595)
-- new YamlParseException (line 652)
-- new YamlParseException (line 668)
-- 27 class method(s)
+- new YamlParseException (line 387)
+- new YamlParseException (line 392)
+- new YamlParseException (line 424)
+- new YamlParseException (line 428)
+- new YamlParseException (line 435)
+- new YamlFlowParser (line 469)
+- new YamlParseException (line 472)
+- new YamlParseException (line 531)
+- new YamlParseException (line 559)
+- new YamlParseException (line 570)
+- new YamlParseException (line 591)
+- new YamlParseException (line 597)
+- new YamlParseException (line 608)
+- new YamlParseException (line 619)
+- new YamlParseException (line 676)
+- new YamlParseException (line 692)
+- 28 class method(s)
 
 ### `ext/yaml/YamlExtensionPolicy.php`
 
@@ -40013,6 +40015,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/yaml/yaml_parse_file.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/yaml/yaml_parse_url.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -46808,10 +46815,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/IncludeHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Temporary (line 143)
-- new Variable (line 150)
-- new Variable (line 194)
-- new Variable (line 342)
+- new Temporary (line 153)
+- new Variable (line 160)
+- new Variable (line 204)
+- new Variable (line 352)
 - 7 class method(s)
 
 ### `lib/JIT/InstanceOfHelper.php`

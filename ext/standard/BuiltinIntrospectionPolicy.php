@@ -186,7 +186,7 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['wddx_serialize_value', 'wddx_serialize_vars', 'wddx_deserialize'], true)) {
             return \PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
         }
-        if (\in_array($lc, ['yaml_parse', 'yaml_parse_file', 'yaml_emit', 'yaml_emit_file'], true)) {
+        if (\in_array($lc, ['yaml_parse', 'yaml_parse_file', 'yaml_parse_url', 'yaml_emit', 'yaml_emit_file'], true)) {
             return \PHPCompiler\ext\yaml\YamlExtensionPolicy::advertisesExtension();
         }
         if (\in_array($lc, [

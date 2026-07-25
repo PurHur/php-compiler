@@ -10,9 +10,7 @@
         "passthru()"
     ],
     "compiler_cfg_gaps": [],
-    "excluded_files": [
-        "lib/VM/SplArrayCastJitHelper.php"
-    ],
+    "excluded_files": [],
     "eligible_files": [
         "bin/vm.php",
         "ext/apcu/ApcuFunction.php",
@@ -4399,9 +4397,19 @@
         "ext/uuid/Module.php",
         "ext/uuid/UuidConstants.php",
         "ext/uuid/UuidFunction.php",
+        "ext/uuid/UuidStringArg.php",
         "ext/uuid/VmUuid.php",
+        "ext/uuid/uuid_compare.php",
         "ext/uuid/uuid_create.php",
         "ext/uuid/uuid_generate.php",
+        "ext/uuid/uuid_is_null.php",
+        "ext/uuid/uuid_is_valid.php",
+        "ext/uuid/uuid_mac.php",
+        "ext/uuid/uuid_parse.php",
+        "ext/uuid/uuid_time.php",
+        "ext/uuid/uuid_type.php",
+        "ext/uuid/uuid_unparse.php",
+        "ext/uuid/uuid_variant.php",
         "ext/wddx/Module.php",
         "ext/wddx/VmWddx.php",
         "ext/wddx/WddxExtensionPolicy.php",
@@ -4625,6 +4633,7 @@
         "ext/yaml/yaml_emit_file.php",
         "ext/yaml/yaml_parse.php",
         "ext/yaml/yaml_parse_file.php",
+        "ext/yaml/yaml_parse_url.php",
         "ext/zip/BuiltinClasses.php",
         "ext/zip/Module.php",
         "ext/zip/VmZipArchive.php",
@@ -6437,6 +6446,7 @@
         "lib/VM/SensitiveParamJitHelper.php",
         "lib/VM/SensitiveParamSupport.php",
         "lib/VM/ShutdownQueue.php",
+        "lib/VM/SplArrayCastJitHelper.php",
         "lib/VM/StringOffsetJitHelper.php",
         "lib/VM/StringableSupport.php",
         "lib/VM/TickQueue.php",
@@ -6754,9 +6764,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6519,
-        "excluded": 1,
-        "eligible": 6518,
+        "inventory_files": 6530,
+        "excluded": 0,
+        "eligible": 6530,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
