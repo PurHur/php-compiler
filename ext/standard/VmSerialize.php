@@ -188,6 +188,8 @@ final class VmSerialize
             SocketSerializeDeny::rejectUnserialization($className);
             // php-src ext/openssl/openssl.stub.php — @not-serializable (#23100).
             OpensslSerializeDeny::rejectUnserialization($className);
+            // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
+            ZlibContextSerializeDeny::rejectUnserialization($className);
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
             // php-src ext/simplexml/sxe.c — zend_class_unserialize_deny (#23072).
             SimpleXmlSerializeDeny::rejectUnserialization($className, $ctx);
@@ -547,6 +549,8 @@ final class VmSerialize
         SocketSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/openssl/openssl.stub.php — @not-serializable (#23100).
         OpensslSerializeDeny::rejectSerialization($entry->class->name);
+        // php-src ext/zlib/zlib.stub.php — @not-serializable (#23101).
+        ZlibContextSerializeDeny::rejectSerialization($entry->class->name);
         // php-src ext/simplexml/sxe.c — zend_class_serialize_deny (#23072).
         SimpleXmlSerializeDeny::rejectSerialization($entry->class->name, $ctx);
         // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
@@ -951,6 +955,7 @@ final class VmSerialize
             IntlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
             SocketSerializeDeny::rejectSerialization($value->toObject()->class->name);
             OpensslSerializeDeny::rejectSerialization($value->toObject()->class->name);
+            ZlibContextSerializeDeny::rejectSerialization($value->toObject()->class->name);
             SimpleXmlSerializeDeny::rejectSerialization($value->toObject()->class->name, $ctx);
         }
         $enumRef = self::enumCaseRefFromVariable($value);

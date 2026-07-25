@@ -3207,6 +3207,7 @@ require_once __DIR__.'/../../../ext/standard/WeakRefRegistryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/WordwrapJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/XslConstants.php';
 require_once __DIR__.'/../../../ext/standard/ZendSort.php';
+require_once __DIR__.'/../../../ext/standard/ZlibContextSerializeDeny.php';
 require_once __DIR__.'/../../../ext/standard/ZlibEncodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ZlibIncrementalFunction.php';
 require_once __DIR__.'/../../../ext/standard/ZlibJitHelper.php';
