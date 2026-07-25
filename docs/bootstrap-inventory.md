@@ -25724,13 +25724,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDebugBacktrace.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 102)
-- new JITVariable (line 163)
-- new JITVariable (line 180)
-- new JITVariable (line 186)
-- new JITVariable (line 192)
-- new JITVariable (line 211)
-- new JITVariable (line 223)
+- new JITVariable (line 105)
+- new JITVariable (line 166)
+- new JITVariable (line 183)
+- new JITVariable (line 189)
+- new JITVariable (line 195)
+- new JITVariable (line 214)
+- new JITVariable (line 226)
 - 10 class method(s)
 
 ### `ext/standard/JitDebugPrintBacktrace.php`
@@ -40997,8 +40997,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 792)
-- 15 class method(s)
+- new ArgumentCountError (line 819)
+- 16 class method(s)
 - 1 closure(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -52606,19 +52606,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new AttributeEntry (line 1839)
 - new Variable (line 2366)
 - new ParameterMetadata (line 2372)
-- new Variable (line 3156)
-- new ObjectEntry (line 3331)
-- new SourceLocation (line 3359)
-- new ParameterMetadata (line 3839)
-- new ObjectEntry (line 3907)
-- new ObjectEntry (line 3924)
-- new ObjectEntry (line 4142)
-- new ObjectEntry (line 4155)
-- new Variable (line 4235)
-- new ObjectEntry (line 4357)
-- new ObjectEntry (line 4377)
-- new Variable (line 4564)
-- new Variable (line 4749)
+- new Variable (line 3164)
+- new ObjectEntry (line 3339)
+- new SourceLocation (line 3367)
+- new ParameterMetadata (line 3847)
+- new ObjectEntry (line 3915)
+- new ObjectEntry (line 3932)
+- new ObjectEntry (line 4150)
+- new ObjectEntry (line 4163)
+- new Variable (line 4243)
+- new ObjectEntry (line 4365)
+- new ObjectEntry (line 4385)
+- new Variable (line 4572)
+- new Variable (line 4757)
 - 248 class method(s)
 - 2 closure(s)
 

@@ -53,6 +53,42 @@ final class BuiltinInternalDefaultValues
         'array_search' => [
             2 => ['kind' => 'bool', 'value' => false],
         ],
+        // php-src stubs — InternalArgInfo types omit nullability / non-zero sentinels (#23181)
+        'substr' => [
+            2 => ['kind' => 'null'],
+        ],
+        'json_encode' => [
+            1 => ['kind' => 'int', 'value' => 0],
+            2 => ['kind' => 'int', 'value' => 512],
+        ],
+        'json_decode' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'int', 'value' => 512],
+            3 => ['kind' => 'int', 'value' => 0],
+        ],
+        'explode' => [
+            2 => ['kind' => 'int', 'value' => \PHP_INT_MAX],
+        ],
+        'preg_match' => [
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'int', 'value' => 0],
+            4 => ['kind' => 'int', 'value' => 0],
+        ],
+        'hash' => [
+            2 => ['kind' => 'bool', 'value' => false],
+            3 => ['kind' => 'array'],
+        ],
+        'openssl_encrypt' => [
+            3 => ['kind' => 'int', 'value' => 0],
+            4 => ['kind' => 'string', 'value' => ''],
+            5 => ['kind' => 'null'],
+            6 => ['kind' => 'string', 'value' => ''],
+            7 => ['kind' => 'int', 'value' => 16],
+        ],
+        'array_slice' => [
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'bool', 'value' => false],
+        ],
     ];
 
     public static function isAvailable(

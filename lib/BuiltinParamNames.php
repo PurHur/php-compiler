@@ -658,13 +658,23 @@ final class BuiltinParamNames
         }
         $names = self::forFunction($name);
         if (null !== $names) {
-            $required = self::requiredParamCountFromNames(array_values($names));
-            $variadic = self::variadicParamIndexForFunction($name);
-            if (null !== $variadic) {
-                $required = min($required, $variadic);
+            // Bare name tables are for named-arg dispatch; optionality lives in
+            // InternalArgInfo (`=` markers). Only trust names when they encode optionals (#23181).
+            if (self::namesEncodeOptionalParams(array_values($names))) {
+                $required = self::requiredParamCountFromNames(array_values($names));
+                $variadic = self::variadicParamIndexForFunction($name);
+                if (null !== $variadic) {
+                    $required = min($required, $variadic);
+                }
+
+                return $required;
+            }
+            $fromArgInfo = BuiltinInternalArgInfo::requiredParamCountForFunction($name);
+            if (null !== $fromArgInfo) {
+                return $fromArgInfo;
             }
 
-            return $required;
+            return self::requiredParamCountFromNames(array_values($names));
         }
 
         return BuiltinInternalArgInfo::requiredParamCountForFunction($name);
@@ -695,6 +705,23 @@ final class BuiltinParamNames
         }
 
         return $required;
+    }
+
+    /**
+     * True when the name table marks optionals with trailing `=` or a `...` variadic (#23181).
+     *
+     * @param list<int|string> $names
+     */
+    private static function namesEncodeOptionalParams(array $names): bool
+    {
+        foreach ($names as $name) {
+            $label = (string) $name;
+            if (str_ends_with($label, '=') || str_starts_with($label, '...')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

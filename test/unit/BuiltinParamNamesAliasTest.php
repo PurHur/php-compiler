@@ -231,6 +231,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertNull(BuiltinParamNames::variadicParamIndexForFunction('strlen'));
     }
 
+    /** @covers issue #23181 */
+    public function testInternalRequiredCountsPreferArgInfoOverBareNameTables(): void
+    {
+        $cases = [
+            'substr' => 2,
+            'json_encode' => 1,
+            'json_decode' => 1,
+            'explode' => 2,
+            'preg_match' => 2,
+            'hash' => 2,
+            'openssl_encrypt' => 3,
+            'array_slice' => 2,
+        ];
+        foreach ($cases as $fn => $required) {
+            self::assertSame(
+                $required,
+                BuiltinParamNames::requiredParamCountForInternalFunction($fn),
+                $fn.' required'
+            );
+        }
+    }
+
     /** @covers issue #10042 */
     public function testArrayColumnNamedParamsResolve(): void
     {
