@@ -100,8 +100,12 @@ final class ExtensionConstantGroups
         // Module buckets for extensions that register into Context::$constants (#22337 / re-#19113).
         $groups['ftp'] = FtpConstants::registeredConstants();
         $groups['mysqli'] = MysqliConstants::registeredConstants();
-        $groups['gmp'] = GmpConstants::registeredConstants();
-        $groups['soap'] = SoapConstants::registeredConstants();
+        if (\PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension()) {
+            $groups['gmp'] = GmpConstants::registeredConstants();
+        }
+        if (\PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension()) {
+            $groups['soap'] = SoapConstants::registeredConstants();
+        }
         $groups['tidy'] = TidyConstants::registeredConstants();
         $groups['pgsql'] = PgsqlConstants::registeredConstants();
         $groups['pspell'] = PspellConstants::registeredConstants();

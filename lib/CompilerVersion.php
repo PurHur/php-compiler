@@ -2792,6 +2792,18 @@ final class CompilerVersion
 
 
     /**
+     * ext/gmp GMP object + gmp_* — withheld on reference profile (#22860 / #3341).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
+     * Zend 8.2 phantom gate (host php-gmp absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`
+     * or install host ext/gmp ({@see \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension()}).
+     */
+    public static function supportsGmp(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/soap SoapClient/SoapServer/SoapFault — withheld on reference profile (#22859 / #3724).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches

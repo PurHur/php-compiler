@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6518 |
-| Phase A inventory files (M2 ratio SSOT) | 6518 |
+| PHP files on vm.php path | 6519 |
+| Phase A inventory files (M2 ratio SSOT) | 6519 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 20930 |
+| Source constructs flagged (warnings) | 20931 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -738,6 +738,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/ngettext.php` | 0 | 1 |
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/gmp/GmpConstants.php` | 0 | 1 |
+| `ext/gmp/GmpExtensionPolicy.php` | 0 | 1 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
 | `ext/gmp/Module.php` | 0 | 52 |
@@ -11691,6 +11692,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/gmp/GmpExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/gmp/GmpFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11704,57 +11710,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gmp/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 20)
-- new gmp_init (line 34)
-- new gmp_add (line 35)
-- new gmp_sub (line 36)
-- new gmp_mul (line 37)
-- new gmp_cmp (line 38)
-- new gmp_strval (line 39)
-- new gmp_pow (line 40)
-- new gmp_mod (line 41)
-- new gmp_div_q (line 42)
-- new gmp_div_r (line 43)
-- new gmp_div_qr (line 44)
-- new gmp_abs (line 45)
-- new gmp_neg (line 46)
-- new gmp_and (line 47)
-- new gmp_or (line 48)
-- new gmp_xor (line 49)
-- new gmp_intval (line 50)
-- new gmp_powm (line 51)
-- new gmp_fact (line 52)
-- new gmp_binomial (line 53)
-- new gmp_gcd (line 54)
-- new gmp_lcm (line 55)
-- new gmp_sqrt (line 56)
-- new gmp_sqrtrem (line 57)
-- new gmp_perfect_square (line 58)
-- new gmp_com (line 59)
-- new gmp_random_seed (line 60)
-- new gmp_random_bits (line 61)
-- new gmp_random_range (line 62)
-- new gmp_import (line 63)
-- new gmp_export (line 64)
-- new gmp_sign (line 65)
-- new gmp_prob_prime (line 66)
-- new gmp_nextprime (line 67)
-- new gmp_invert (line 68)
-- new gmp_jacobi (line 69)
-- new gmp_legendre (line 70)
-- new gmp_kronecker (line 71)
-- new gmp_divexact (line 72)
-- new gmp_gcdext (line 73)
-- new gmp_root (line 74)
-- new gmp_rootrem (line 75)
-- new gmp_perfect_power (line 76)
-- new gmp_testbit (line 77)
-- new gmp_setbit (line 78)
-- new gmp_clrbit (line 79)
-- new gmp_scan0 (line 80)
-- new gmp_scan1 (line 81)
-- new gmp_popcount (line 82)
-- new gmp_hamdist (line 83)
+- new VM\Variable (line 23)
+- new gmp_init (line 44)
+- new gmp_add (line 45)
+- new gmp_sub (line 46)
+- new gmp_mul (line 47)
+- new gmp_cmp (line 48)
+- new gmp_strval (line 49)
+- new gmp_pow (line 50)
+- new gmp_mod (line 51)
+- new gmp_div_q (line 52)
+- new gmp_div_r (line 53)
+- new gmp_div_qr (line 54)
+- new gmp_abs (line 55)
+- new gmp_neg (line 56)
+- new gmp_and (line 57)
+- new gmp_or (line 58)
+- new gmp_xor (line 59)
+- new gmp_intval (line 60)
+- new gmp_powm (line 61)
+- new gmp_fact (line 62)
+- new gmp_binomial (line 63)
+- new gmp_gcd (line 64)
+- new gmp_lcm (line 65)
+- new gmp_sqrt (line 66)
+- new gmp_sqrtrem (line 67)
+- new gmp_perfect_square (line 68)
+- new gmp_com (line 69)
+- new gmp_random_seed (line 70)
+- new gmp_random_bits (line 71)
+- new gmp_random_range (line 72)
+- new gmp_import (line 73)
+- new gmp_export (line 74)
+- new gmp_sign (line 75)
+- new gmp_prob_prime (line 76)
+- new gmp_nextprime (line 77)
+- new gmp_invert (line 78)
+- new gmp_jacobi (line 79)
+- new gmp_legendre (line 80)
+- new gmp_kronecker (line 81)
+- new gmp_divexact (line 82)
+- new gmp_gcdext (line 83)
+- new gmp_root (line 84)
+- new gmp_rootrem (line 85)
+- new gmp_perfect_power (line 86)
+- new gmp_testbit (line 87)
+- new gmp_setbit (line 88)
+- new gmp_clrbit (line 89)
+- new gmp_scan0 (line 90)
+- new gmp_scan1 (line 91)
+- new gmp_popcount (line 92)
+- new gmp_hamdist (line 93)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
@@ -41583,7 +41589,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 250 class method(s)
+- 251 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
