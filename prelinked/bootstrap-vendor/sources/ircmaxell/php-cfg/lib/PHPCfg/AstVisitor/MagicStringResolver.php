@@ -21,6 +21,9 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     private const PROPERTY_SET_HOOK_PREFIX = '__phpc_property_set_';
 
+    /** Zend/zend_compile.c — __PROPERTY__ (T_PROPERTY_C) requires active property hook (#18815, re-#5978). */
+    private const PROPERTY_MAGIC_OUTSIDE_HOOK = 'Cannot use __PROPERTY__ outside of a property hook';
+
     protected $classStack = [];
 
     protected $parentStack = [];
@@ -37,6 +40,11 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     /** @var list<string> */
     protected $traitStack = [];
+
+    /** True while visiting StaticCall::class — preserve `parent` for runtime dispatch (#6735). */
+    protected bool $inStaticCallClassName = false;
+
+    private const PRESERVE_LEXICAL_TYPE = 'phpcPreserveLexicalType';
 
     /** @var string */
     protected $compilationUnitFile = '';
@@ -87,27 +95,89 @@ class MagicStringResolver extends NodeVisitorAbstract
         $this->repairComments($node);
         if ($node instanceof Node\Stmt\Function_) {
             $this->functionStack[] = $node->namespacedName->toString();
+            if (null !== $node->returnType) {
+                $this->markTypeHintPreserveLexical($node->returnType);
+            }
+            foreach ($node->params as $param) {
+                if (null !== $param->type) {
+                    $this->markTypeHintPreserveLexical($param->type);
+                }
+            }
         } elseif ($node instanceof Node\Stmt\ClassMethod) {
             $this->methodStack[] = end($this->classStack).'::'.$node->name;
             $prop = $this->propertyNameFromHookMethod($node->name->name);
             if (null !== $prop) {
                 $this->propertyStack[] = $prop;
             }
+            if (null !== $node->returnType) {
+                $this->markTypeHintPreserveLexical($node->returnType);
+            }
+            foreach ($node->params as $param) {
+                if (null !== $param->type) {
+                    $this->markTypeHintPreserveLexical($param->type);
+                }
+            }
+        } elseif ($node instanceof Node\Expr\Closure || $node instanceof Node\Expr\ArrowFunction) {
+            // Zend/zend_compile.c — T_FUNC_C / T_METHOD_C inside closures are "{closure}" (#22832).
+            // Push on both stacks so a method-nested closure does not inherit enclosing names.
+            $this->functionStack[] = '{closure}';
+            $this->methodStack[] = '{closure}';
+            if (null !== $node->returnType) {
+                $this->markTypeHintPreserveLexical($node->returnType);
+            }
+            foreach ($node->params as $param) {
+                if (null !== $param->type) {
+                    $this->markTypeHintPreserveLexical($param->type);
+                }
+            }
+        } elseif ($node instanceof Node\Stmt\Property) {
+            if (null !== $node->type) {
+                $this->markTypeHintPreserveLexical($node->type);
+            }
+        } elseif ($node instanceof Node\Stmt\ClassConst) {
+            if (null !== $node->type) {
+                $this->markTypeHintPreserveLexical($node->type);
+            }
+        } elseif ($node instanceof Node\Expr\StaticCall) {
+            $this->inStaticCallClassName = true;
         } elseif ($node instanceof Node\Expr\ConstFetch) {
             if ('__property__' === strtolower($node->name->toString())) {
-                $name = $this->propertyStack !== [] ? end($this->propertyStack) : '';
+                if ($this->propertyStack === []) {
+                    if ($this->propertyHooksProfileEnabled()) {
+                        throw new \CompileError(self::PROPERTY_MAGIC_OUTSIDE_HOOK);
+                    }
 
-                return new Node\Scalar\String_($name, $node->getAttributes());
+                    // Default profile: leave ConstFetch — runtime Undefined constant (Zend 8.2+, #18900).
+                    return null;
+                }
+
+                return new Node\Scalar\String_(end($this->propertyStack), $node->getAttributes());
             }
         } elseif ($node instanceof Node\Name) {
+            if ($node->getAttribute(self::PRESERVE_LEXICAL_TYPE)) {
+                return null;
+            }
             switch (strtolower($node->toString())) {
                 case 'self':
+                    // Keep lexical `self` inside traits so VM/JIT bind to the composing class
+                    // (#19629, #18879, Zend/zend_traits.c) — methods, constants, and ::class.
+                    if ([] !== $this->traitStack) {
+                        break;
+                    }
+                    // Preserve `self` on StaticCall class so late-static scope is not clobbered
+                    // the way a named ClassName::call would be (#21983, peer of parent #6735/#12245).
+                    if ($this->inStaticCallClassName) {
+                        break;
+                    }
                     if (! empty($this->classStack)) {
                         return new Node\Name\FullyQualified(end($this->classStack), $node->getAttributes());
                     }
 
                     break;
                 case 'parent':
+                    if ($this->inStaticCallClassName) {
+                        break;
+                    }
                     if (! empty($this->parentStack) && '' !== end($this->parentStack)) {
                         return new Node\Name\FullyQualified(end($this->parentStack), $node->getAttributes());
                     }
@@ -116,6 +186,9 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (! empty($this->classStack)) {
                 return new Node\Scalar\String_(end($this->classStack), $node->getAttributes());
             }
+
+            // Global scope — Zend resolves T_CLASS_C to '' (#11910, zend_compile.c).
+            return new Node\Scalar\String_('', $node->getAttributes());
         } elseif ($node instanceof Node\Scalar\MagicConst\Trait_) {
             if (! empty($this->traitStack)) {
                 return new Node\Scalar\String_(end($this->traitStack), $node->getAttributes());
@@ -138,6 +211,9 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (! empty($this->functionStack)) {
                 return new Node\Scalar\String_($this->shortFunctionName(end($this->functionStack)), $node->getAttributes());
             }
+
+            // Class/trait const and other non-function contexts — Zend resolves to '' (#10125).
+            return new Node\Scalar\String_('', $node->getAttributes());
         } elseif ($node instanceof Node\Scalar\MagicConst\Method) {
             if (! empty($this->methodStack)) {
                 return new Node\Scalar\String_(end($this->methodStack), $node->getAttributes());
@@ -145,6 +221,8 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (! empty($this->functionStack)) {
                 return new Node\Scalar\String_(end($this->functionStack), $node->getAttributes());
             }
+
+            return new Node\Scalar\String_('', $node->getAttributes());
         }
     }
 
@@ -168,6 +246,32 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (null !== $this->propertyNameFromHookMethod($node->name->name)) {
                 array_pop($this->propertyStack);
             }
+        } elseif ($node instanceof Node\Expr\Closure || $node instanceof Node\Expr\ArrowFunction) {
+            assert(end($this->functionStack) === '{closure}');
+            assert(end($this->methodStack) === '{closure}');
+            array_pop($this->functionStack);
+            array_pop($this->methodStack);
+        } elseif ($node instanceof Node\Expr\StaticCall) {
+            $this->inStaticCallClassName = false;
+        }
+    }
+
+    private function markTypeHintPreserveLexical(Node $type): void
+    {
+        if ($type instanceof Node\NullableType) {
+            $this->markTypeHintPreserveLexical($type->type);
+
+            return;
+        }
+        if ($type instanceof Node\UnionType || $type instanceof Node\IntersectionType) {
+            foreach ($type->types as $sub) {
+                $this->markTypeHintPreserveLexical($sub);
+            }
+
+            return;
+        }
+        if ($type instanceof Node\Name || $type instanceof Node\Identifier) {
+            $type->setAttribute(self::PRESERVE_LEXICAL_TYPE, true);
         }
     }
 
@@ -181,6 +285,27 @@ class MagicStringResolver extends NodeVisitorAbstract
         }
 
         return null;
+    }
+
+    /**
+     * Forward 8.4 profile gate — mirrors PHPCompiler\CompilerVersion::supportsPropertyHooks() without coupling namespaces.
+     */
+    private function propertyHooksProfileEnabled(): bool
+    {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+        $raw = trim($raw);
+        if (preg_match('/^\d+\.\d+$/', $raw)) {
+            $version = $raw.'.0';
+        } elseif (preg_match('/^\d+\.\d+\.\d+/', $raw, $m)) {
+            $version = $m[0];
+        } else {
+            return false;
+        }
+
+        return version_compare($version, '8.4.0', '>=');
     }
 
     private function stripClass($class)
