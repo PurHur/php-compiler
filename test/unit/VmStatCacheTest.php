@@ -23,11 +23,12 @@ final class VmStatCacheTest extends TestCase
         $cache = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStatCache.php');
         $this->assertStringContainsString('VmStatNative::stat', $cache);
         $this->assertStringContainsString('VmStatNative::lstat', $cache);
+        $this->assertStringContainsString('invalidateNegative', $cache);
         $this->assertStringNotContainsString('syncHostClearstatcache', $cache);
 
         $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStatNative.php');
-        $this->assertStringContainsString('int stat(const char *pathname', $native);
-        $this->assertStringContainsString('$ffi->stat($path', $native);
+        $this->assertStringContainsString('VmStatPure::stat', $native);
+        $this->assertStringNotContainsString('FFI::cdef', $native);
     }
 
     public function testClearstatcacheBuiltinDelegatesToVmStatCache(): void
@@ -79,10 +80,53 @@ final class VmStatCacheTest extends TestCase
             $this->assertFalse(VmStatCache::stat($path));
             $this->assertFalse(VmStatCache::stat($path));
             $this->assertTrue(touch($path));
-            VmStatCache::invalidatePath($path);
+            VmStatCache::invalidateNegative($path);
             $fresh = VmStatCache::stat($path);
             $this->assertIsArray($fresh);
             $this->assertGreaterThan(0, $fresh['atime'] ?? 0);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function testPositiveCacheRetainedAcrossRewriteUntilClear(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'phpc_vm_statcache_pos_');
+        $this->assertNotFalse($path);
+        try {
+            \PHPCompiler\ext\standard\VmFs::filePutContents($path, 'x');
+            VmStatCache::reset();
+            $first = VmStatCache::stat($path);
+            $this->assertIsArray($first);
+            $this->assertSame(1, (int) $first['size']);
+
+            \PHPCompiler\ext\standard\VmFs::filePutContents($path, 'hello');
+            // Content write must not drop a positive hit (Zend/php-src #22841).
+            $stale = VmStatCache::stat($path);
+            $this->assertIsArray($stale);
+            $this->assertSame(1, (int) $stale['size']);
+
+            VmStatCache::clear(true, $path);
+            $fresh = VmStatCache::stat($path);
+            $this->assertIsArray($fresh);
+            $this->assertSame(5, (int) $fresh['size']);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function testInvalidateNegativeLeavesPositiveHits(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'phpc_vm_statcache_negonly_');
+        $this->assertNotFalse($path);
+        try {
+            file_put_contents($path, 'ab');
+            VmStatCache::reset();
+            $this->assertIsArray(VmStatCache::stat($path));
+            VmStatCache::invalidateNegative($path);
+            $still = VmStatCache::stat($path);
+            $this->assertIsArray($still);
+            $this->assertSame(2, (int) $still['size']);
         } finally {
             @unlink($path);
         }

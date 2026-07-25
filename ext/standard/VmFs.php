@@ -325,7 +325,7 @@ final class VmFs
         );
         if (null !== $wrapperOk) {
             if ($wrapperOk) {
-                VmStatCache::invalidatePath($path);
+                VmStatCache::invalidateNegative($path);
             }
 
             return $wrapperOk;
@@ -333,7 +333,8 @@ final class VmFs
 
         $ok = VmFsDirNative::chmod($path, $permissions);
         if ($ok) {
-            VmStatCache::invalidatePath($path);
+            // php-src keeps positive stats until clearstatcache; only clear misses (#22841).
+            VmStatCache::invalidateNegative($path);
         }
 
         return $ok;
@@ -540,7 +541,8 @@ final class VmFs
 
         $ok = VmFsPathNative::copy($from, $to);
         if ($ok) {
-            VmStatCache::invalidatePath($to);
+            // Overwrite keeps Zend positive cache; creation after a miss must refresh (#22841).
+            VmStatCache::invalidateNegative($to);
         }
 
         return $ok;
@@ -575,7 +577,7 @@ final class VmFs
         if (false === $copied) {
             return false;
         }
-        VmStatCache::invalidatePath($to);
+        VmStatCache::invalidateNegative($to);
 
         return true;
     }
@@ -589,7 +591,8 @@ final class VmFs
         );
         if (null !== $wrapperOk) {
             if ($wrapperOk) {
-                VmStatCache::invalidatePath($path);
+                // #7436: clear negative miss so new file is visible; keep positive stale (#22841).
+                VmStatCache::invalidateNegative($path);
             }
 
             return $wrapperOk;
@@ -597,7 +600,7 @@ final class VmFs
 
         $ok = VmFsTouchNative::touch($path, $mtime, $atime);
         if ($ok) {
-            VmStatCache::invalidatePath($path);
+            VmStatCache::invalidateNegative($path);
         }
 
         return $ok;
@@ -855,11 +858,9 @@ final class VmFs
 
         $written = VmFsWriteNative::write($path, $data, $flags);
         if (false !== $written) {
-            VmStatCache::invalidatePath($path);
-            $parent = \dirname($path);
-            if ('' !== $parent && '.' !== $parent && $parent !== $path) {
-                VmStatCache::invalidatePath($parent);
-            }
+            // Zend keeps successful filesize/filemtime until clearstatcache (#22841).
+            // Only drop a prior negative miss so create-after-stat-fail stays visible (#7436).
+            VmStatCache::invalidateNegative($path);
         }
 
         return $written;
