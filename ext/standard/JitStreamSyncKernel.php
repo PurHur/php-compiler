@@ -4,22 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\LastErrorRuntime;
 use PHPCompiler\JIT\Builtin\SilenceRuntime;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync via StreamSyncJitHelper PHP (#9815, #19660).
+ * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync via StreamSyncJitHelper PHP (#9815, #19660, #23004).
  *
  * Quarantined from lib/JIT/Builtin/StreamSyncJit — {@see \PHPCompiler\JIT\Builtin\StreamSync}
- * stays the thin orchestrator.
+ * stays the thin orchestrator. Helper compile: {@see JitVmHelperLink::ensureCompiled}
+ * (peer StreamMeta #22994 / StreamBuffer #22979 / StreamMode #22968).
  *
  * php-src: ext/standard/file.c — PHP_FUNCTION(fsync) / fdatasync
  */
@@ -193,13 +193,8 @@ final class JitStreamSyncKernel
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamSyncJitHelper compile (#9815)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23004');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -219,22 +214,12 @@ final class JitStreamSyncKernel
         SilenceRuntime::ensureLinked($context);
         StringTriggerError::ensureLinked($context);
 
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamSyncJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StreamSyncJitHelper.php parseAndCompile failed (#9815)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9815)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23004'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void

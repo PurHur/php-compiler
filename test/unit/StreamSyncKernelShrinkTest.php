@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * fsync/fdatasync ABI bridges quarantined in ext/standard (#9815, #19660).
+ * fsync/fdatasync NestedJIT via JitVmHelperLink (#9815, #19660, #23004).
  */
 final class StreamSyncKernelShrinkTest extends TestCase
 {
@@ -21,15 +21,23 @@ final class StreamSyncKernelShrinkTest extends TestCase
         $this->assertStringNotContainsString('StreamSyncJit', $runtime);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelUsesJitVmHelperLinkNotHandRolledNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitStreamSyncKernel', $source);
         $this->assertStringContainsString('__compiler_fsync', $source);
         $this->assertStringContainsString('__compiler_fdatasync', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringContainsString('StreamSyncJitHelper', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertLessThan(250, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelNotBuiltinJit(): void
