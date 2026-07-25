@@ -18227,6 +18227,16 @@ class Compiler {
         if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
             return null;
         }
+        // Encapsed/concat dead temps must not ordinal-steal a later ClassConstFetch (#22971).
+        if ($callArg instanceof Operand && $this->callArgOpsContainConcatList($callArg)) {
+            return null;
+        }
+        // new C(...) — only bind ClassConstFetch onto args that write that fetch (#22971).
+        if ($callOp instanceof Op\Expr\New_ && $callArg instanceof Operand) {
+            if (null === $this->classConstFetchWriterForNewArg($callArg, $block)) {
+                return null;
+            }
+        }
         if (
             $this->nestedFuncCallFeedsDeadInlineCallArgZero($block, $callOp, $argIndex)
             || $this->nestedFuncCallFeedsDeadInlineCallArg($block, $callOp, $argIndex)
@@ -18299,6 +18309,10 @@ class Compiler {
     /**
      * `new C(..., Class::CONST)` — materialize foldable ClassConstFetch on a fresh slot so
      * echo `?:` merge temps cannot supply the ctor arg (#22576).
+     *
+     * Bind only when this New_ arg is written by ClassConstFetch (via `$arg->ops` / result
+     * identity). Ordinal mapping across dead temps steals the const onto an earlier encapsed
+     * ConcatList arg (`new T("x$v", Class::CONST)` → args `[const, const, …]`, #22971).
      */
     private function slotForFoldedClassConstFetchNewArg(
         Op\Expr\New_ $new,
@@ -18308,24 +18322,8 @@ class Compiler {
         if (null === $block->orig || !\is_array($new->args) || !isset($new->args[$argIndex])) {
             return null;
         }
-        $fetch = $this->precedingClassConstFetchForCallArgIndex(
-            $new,
-            $argIndex,
-            $this->precedingCallArgClassConstFetchesBeforeCfgOp($block->orig->children, $new, $block)
-        );
-        if (!$fetch instanceof Op\Expr\ClassConstFetch) {
-            $callArg = $new->args[$argIndex];
-            foreach ($block->orig->children as $child) {
-                if (
-                    $child instanceof Op\Expr\ClassConstFetch
-                    && null !== $child->result
-                    && $this->operandsReferToSameVariable($child->result, $callArg)
-                ) {
-                    $fetch = $child;
-                    break;
-                }
-            }
-        }
+        $callArg = $new->args[$argIndex];
+        $fetch = $this->classConstFetchWriterForNewArg($callArg, $block);
         if (!$fetch instanceof Op\Expr\ClassConstFetch) {
             return null;
         }
@@ -18335,6 +18333,52 @@ class Compiler {
         }
 
         return (string) $block->registerConstant(new Operand\Temporary(), $folded);
+    }
+
+    /**
+     * ClassConstFetch that writes a New_ call-arg temp — never ordinal-steal (#22971, #22576).
+     */
+    private function classConstFetchWriterForNewArg(Operand $callArg, Block $block): ?Op\Expr\ClassConstFetch
+    {
+        $writer = $this->soleWriteExprForOperand($callArg);
+        if ($writer instanceof Op\Expr\ClassConstFetch) {
+            return $writer;
+        }
+        foreach ($callArg->ops ?? [] as $op) {
+            if ($op instanceof Op\Expr\ClassConstFetch) {
+                return $op;
+            }
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\ClassConstFetch
+                && null !== $child->result
+                && $this->operandsReferToSameVariable($child->result, $callArg)
+            ) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /** True when php-cfg linked this dead call-arg temp to ConcatList / BinaryOp\Concat (#22971). */
+    private function callArgOpsContainConcatList(Operand $callArg): bool
+    {
+        $writer = $this->soleWriteExprForOperand($callArg);
+        if ($writer instanceof Op\Expr\ConcatList || $writer instanceof Op\Expr\BinaryOp\Concat) {
+            return true;
+        }
+        foreach ($callArg->ops ?? [] as $op) {
+            if ($op instanceof Op\Expr\ConcatList || $op instanceof Op\Expr\BinaryOp\Concat) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -42097,6 +42141,17 @@ class Compiler {
             return null;
         }
         $callArg = \is_array($callOp->args ?? null) ? ($callOp->args[$argIndex] ?? $arg) : $arg;
+        // php-cfg links dead New_/call arg temps via $arg->ops even when ClassConstFetch sits
+        // between ConcatList and the call (`new T("x$v", C::K)`, #22971 / #13466).
+        $writer = $this->soleWriteExprForOperand($callArg);
+        if ($writer instanceof Op\Expr\ConcatList) {
+            return $writer;
+        }
+        foreach ($callArg->ops ?? [] as $op) {
+            if ($op instanceof Op\Expr\ConcatList) {
+                return $op;
+            }
+        }
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
             if ($child instanceof Op\Expr\Assign) {
@@ -42138,10 +42193,16 @@ class Compiler {
 
                 return null;
             }
-            if ($child instanceof Op\Expr\PropertyFetch || $child instanceof Op\Expr\ArrayDimFetch) {
-                continue;
-            }
-            if ($child instanceof Op\Expr\BinaryOp\Concat) {
+            // Sibling ClassConstFetch / ConstFetch / UnaryMinus between ConcatList and New_ (#22971).
+            if (
+                $child instanceof Op\Expr\ClassConstFetch
+                || $child instanceof Op\Expr\ConstFetch
+                || $child instanceof Op\Expr\UnaryMinus
+                || $child instanceof Op\Expr\UnaryPlus
+                || $child instanceof Op\Expr\PropertyFetch
+                || $child instanceof Op\Expr\ArrayDimFetch
+                || $child instanceof Op\Expr\BinaryOp\Concat
+            ) {
                 continue;
             }
             break;
@@ -43351,6 +43412,19 @@ class Compiler {
                         $block
                     )) instanceof Op\Expr\ClassConstFetch
                 ) {
+                    $callArgForClassConstPrelude = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                    if (
+                        $callArgForClassConstPrelude instanceof Operand
+                        && (
+                            $this->callArgOpsContainConcatList($callArgForClassConstPrelude)
+                            || (
+                                $cfgCallOp instanceof Op\Expr\New_
+                                && null === $this->classConstFetchWriterForNewArg($callArgForClassConstPrelude, $block)
+                            )
+                        )
+                    ) {
+                        // Skip — ConcatList / non-ClassConst New_ arg (#22971).
+                    } else {
                     $callIndexForEnumPrelude = array_search($cfgCallOp, $block->orig->children, true);
                     $enumFeedsTrailingArgOnly = \is_int($callIndexForEnumPrelude)
                         && 0 === (int) $argIndex
@@ -43377,6 +43451,7 @@ class Compiler {
                             continue;
                         }
                     }
+                    }
                 }
             }
             if (
@@ -43389,6 +43464,19 @@ class Compiler {
                     $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
                     if ($immediatePrelude instanceof Op\Expr\ClassConstFetch) {
                         $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                        // new T("x$v", Class::CONST) — immediate ClassConstFetch feeds arg1, not arg0 (#22971).
+                        if (
+                            $callArg instanceof Operand
+                            && (
+                                $this->callArgOpsContainConcatList($callArg)
+                                || (
+                                    $cfgCallOp instanceof Op\Expr\New_
+                                    && null === $this->classConstFetchWriterForNewArg($callArg, $block)
+                                )
+                            )
+                        ) {
+                            // Fall through — ConcatList / non-const arg0 must not steal the prelude.
+                        } else {
                         $enumFeedsTrailingArgOnly = $callArg instanceof Operand
                             && $this->callArgIsDeadInlineTemporary($callArg)
                             && null !== $this->nestedFuncCallProducerBeforeTrailingConstFetchPreludes(
@@ -43433,6 +43521,7 @@ class Compiler {
                                 );
                                 continue;
                             }
+                        }
                         }
                     }
                 }

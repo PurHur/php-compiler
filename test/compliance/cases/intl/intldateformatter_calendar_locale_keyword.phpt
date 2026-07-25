@@ -9,9 +9,9 @@ if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsIntlOopCompliance(basename(_
 --FILE--
 <?php
 foreach (['hebrew', 'islamic', 'japanese', 'buddhist'] as $cal) {
-    $loc = "en_US@calendar=$cal";
+    // Inline encapsed locale + class consts — ARG_SEND must keep ConcatList (#22971 / #22877).
     $df = new IntlDateFormatter(
-        $loc,
+        "en_US@calendar=$cal",
         IntlDateFormatter::FULL,
         IntlDateFormatter::NONE,
         'UTC',
