@@ -487,6 +487,8 @@ require_once __DIR__.'/../../../ext/dom/NodeRemoveChild.php';
 require_once __DIR__.'/../../../ext/dom/NodeReplaceChild.php';
 require_once __DIR__.'/../../../ext/dom/NodeReplaceChildren.php';
 require_once __DIR__.'/../../../ext/dom/NodeReplaceWith.php';
+require_once __DIR__.'/../../../ext/dom/NodeSleep.php';
+require_once __DIR__.'/../../../ext/dom/NodeWakeup.php';
 require_once __DIR__.'/../../../ext/dom/TextIsElementContentWhitespace.php';
 require_once __DIR__.'/../../../ext/dom/TextIsWhitespaceInElementContent.php';
 require_once __DIR__.'/../../../ext/dom/TextSplitText.php';

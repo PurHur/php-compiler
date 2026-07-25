@@ -320,6 +320,11 @@ final class VmDom
         $node->methods['c14nfile'] = new NodeC14NFile();
         $node->methodVisibility['c14nfile'] = $pub;
         $node->methodNames['c14nfile'] = 'C14NFile';
+        // php-src ext/dom/node.c — DOMNode::__sleep/__wakeup subclass-serializable deny (#23073, GH-8996).
+        $node->methods['__sleep'] = new NodeSleep();
+        $node->methodVisibility['__sleep'] = $pub;
+        $node->methods['__wakeup'] = new NodeWakeup();
+        $node->methodVisibility['__wakeup'] = $pub;
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $text = new ClassEntry('DOMText');
@@ -427,6 +432,11 @@ final class VmDom
         $nsNode->properties[] = new ClassProperty(self::PROP_NAMESPACE_URI, $nullProto, $strProto);
         $nsNode->properties[] = new ClassProperty(self::PROP_OWNER_DOCUMENT, $nullProto, $objProto);
         $nsNode->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
+        // php-src php_dom.stub.php — @implementation-alias DOMNode::__sleep/__wakeup (#23073).
+        $nsNode->methods['__sleep'] = new NodeSleep();
+        $nsNode->methodVisibility['__sleep'] = $pub;
+        $nsNode->methods['__wakeup'] = new NodeWakeup();
+        $nsNode->methodVisibility['__wakeup'] = $pub;
         $ctx->classes[self::CLASS_NAMESPACE_NODE] = $nsNode;
 
         // IteratorAggregate + Countable (php-src php_dom.stub.php; #21298) — not Iterator.
