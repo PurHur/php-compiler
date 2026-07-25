@@ -39,7 +39,9 @@ final class VmDomSimpleXmlBridge
         $nodeState = self::resolveExportElementState($sxe, $label);
 
         $document = self::createEmptyDocument($ctx, $modern);
-        $root = self::domElementFromSimpleXmlState($ctx, $document, $nodeState);
+        // Ancestor xmlns must stay in scope when exporting a child node (#22738).
+        $parentScope = self::parentNamespaceScopeForExport($sxe, $nodeState);
+        $root = self::domElementFromSimpleXmlState($ctx, $document, $nodeState, $parentScope);
         VmDom::appendChild($ctx, $document, $root);
 
         return $root;
@@ -280,12 +282,70 @@ final class VmDomSimpleXmlBridge
         return $document;
     }
 
+    /**
+     * In-scope xmlns map on the parent of $target (empty when $target is the document root).
+     *
+     * @return array<string, string> prefix => URI
+     */
+    private static function parentNamespaceScopeForExport(
+        ObjectEntry $sxe,
+        SimpleXmlNodeState $target
+    ): array {
+        $docKey = SimpleXmlRegistry::documentKey($sxe);
+        try {
+            $root = SimpleXmlRegistry::rootState($docKey);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return self::parentNamespaceScopeWalk($root, $target, []) ?? [];
+    }
+
+    /**
+     * @param array<string, string> $parentScope
+     *
+     * @return array<string, string>|null
+     */
+    private static function parentNamespaceScopeWalk(
+        SimpleXmlNodeState $node,
+        SimpleXmlNodeState $target,
+        array $parentScope
+    ): ?array {
+        if ($node === $target) {
+            return $parentScope;
+        }
+        $scopeAtNode = self::scopeAfterSimpleXmlNode($node, $parentScope);
+        foreach ($node->children as $child) {
+            $found = self::parentNamespaceScopeWalk($child, $target, $scopeAtNode);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Build a DOMElement whose namespaceURI / localName / prefix match the SXE node
+     * (php-src shares the libxml xmlNode; #22738).
+     *
+     * @param array<string, string> $parentScope prefix => URI in scope on the parent
+     */
     private static function domElementFromSimpleXmlState(
         Context $ctx,
         ObjectEntry $document,
-        SimpleXmlNodeState $node
+        SimpleXmlNodeState $node,
+        array $parentScope = []
     ): ObjectEntry {
-        $element = VmDom::createElement($ctx, $node->name, $document)->toObject();
+        $scope = self::scopeAfterSimpleXmlNode($node, $parentScope);
+        $namespaceUri = self::resolveSimpleXmlElementNamespaceUri($node, $scope);
+        if ('' !== $namespaceUri) {
+            // Prefixed or default-NS elements must use createElementNS so localName/prefix
+            // split correctly (createElement stores the QName as localName).
+            $element = VmDom::createElementNS($ctx, $namespaceUri, $node->name, $document)->toObject();
+        } else {
+            $element = VmDom::createElement($ctx, $node->name, $document)->toObject();
+        }
 
         foreach ($node->attributes as $name => $value) {
             VmDom::setAttributeNS($ctx, $element, null, $name, $value);
@@ -309,11 +369,61 @@ final class VmDomSimpleXmlBridge
         }
 
         foreach ($node->children as $child) {
-            $childElement = self::domElementFromSimpleXmlState($ctx, $document, $child);
+            $childElement = self::domElementFromSimpleXmlState($ctx, $document, $child, $scope);
             VmDom::appendChild($ctx, $element, $childElement);
         }
 
         return $element;
+    }
+
+    /**
+     * Merge xmlns / xmlns:* decls on $node into the parent in-scope map
+     * (php-src xmlGetNsList / sxe scope walk).
+     *
+     * @param array<string, string> $parentScope
+     *
+     * @return array<string, string>
+     */
+    private static function scopeAfterSimpleXmlNode(SimpleXmlNodeState $node, array $parentScope): array
+    {
+        $scope = $parentScope;
+        foreach ($node->attributes as $name => $value) {
+            if ('xmlns' === $name) {
+                $scope[''] = $value;
+            } elseif (str_starts_with($name, 'xmlns:')) {
+                $scope[substr($name, 6)] = $value;
+            }
+        }
+
+        return $scope;
+    }
+
+    /**
+     * Namespace URI for an SXE element in the given in-scope xmlns map
+     * (mirrors VmSimpleXml::resolveElementNamespaceUri).
+     *
+     * @param array<string, string> $inScope
+     */
+    private static function resolveSimpleXmlElementNamespaceUri(
+        SimpleXmlNodeState $element,
+        array $inScope
+    ): string {
+        if (isset($element->attributes['xmlns'])) {
+            return $element->attributes['xmlns'];
+        }
+        $colon = strpos($element->name, ':');
+        if (false !== $colon) {
+            $prefix = substr($element->name, 0, $colon);
+            if ('' !== $prefix) {
+                if (isset($element->attributes['xmlns:'.$prefix])) {
+                    return $element->attributes['xmlns:'.$prefix];
+                }
+
+                return $inScope[$prefix] ?? '';
+            }
+        }
+
+        return $inScope[''] ?? '';
     }
 
     private static function simpleXmlStateFromDomElement(ObjectEntry $element): SimpleXmlNodeState

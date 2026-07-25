@@ -30,5 +30,8 @@ final class DomSimpleXmlBridgeTest extends TestCase
         $this->assertStringContainsString('linkPeers', $source);
         $this->assertStringContainsString('syncSimpleXmlTextFromDom', $source);
         $this->assertStringContainsString('resolveExportElementState', $source);
+        // #22738 — NS identity fields via createElementNS + ancestor xmlns scope
+        $this->assertStringContainsString('createElementNS', $source);
+        $this->assertStringContainsString('parentNamespaceScopeForExport', $source);
     }
 }
