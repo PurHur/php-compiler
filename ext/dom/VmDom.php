@@ -270,22 +270,7 @@ final class VmDom
             $node->methods['getrootnode'] = new NodeGetRootNode();
             $node->methodVisibility['getrootnode'] = $pub;
         }
-        $node->methods['append'] = new NodeAppend();
-        $node->methodVisibility['append'] = $pub;
-        if (CompilerVersion::supportsDomNodeReplaceChildren()) {
-            $node->methods['replacechildren'] = new NodeReplaceChildren();
-            $node->methodVisibility['replacechildren'] = $pub;
-        }
-        $node->methods['prepend'] = new NodePrepend();
-        $node->methodVisibility['prepend'] = $pub;
-        $node->methods['before'] = new NodeBefore();
-        $node->methodVisibility['before'] = $pub;
-        $node->methods['after'] = new NodeAfter();
-        $node->methodVisibility['after'] = $pub;
-        $node->methods['replacewith'] = new NodeReplaceWith();
-        $node->methodVisibility['replacewith'] = $pub;
-        $node->methods['remove'] = new NodeRemove();
-        $node->methodVisibility['remove'] = $pub;
+        // ParentNode / ChildNode mutators are NOT on DOMNode — php_dom.stub.php (#23155).
         $node->methods['lookupprefix'] = new NodeLookupPrefix();
         $node->methodVisibility['lookupprefix'] = $pub;
         $node->methods['lookupnamespaceuri'] = new NodeLookupNamespaceURI();
@@ -374,6 +359,8 @@ final class VmDom
         $characterData->methods['substringdata'] = new CharacterDataSubstringData();
         $characterData->methodVisibility['substringdata'] = $pub;
         $characterData->methodNames['substringdata'] = 'substringData';
+        // DOMChildNode — Element + CharacterData only (php_dom.stub.php; #23155).
+        self::registerChildNodeMutationMethods($characterData, $pub);
         $ctx->classes[self::CLASS_CHARACTER_DATA] = $characterData;
 
         $comment = new ClassEntry('DOMComment');
@@ -700,6 +687,8 @@ final class VmDom
         $document->methodNames['relaxngvalidatesource'] = 'relaxNGValidateSource';
         $document->methods['validate'] = new DocumentValidate();
         $document->methodVisibility['validate'] = $pub;
+        // DOMParentNode — Document / Element / DocumentFragment only (php_dom.stub.php; #23155).
+        self::registerParentNodeMutationMethods($document, $pub);
         $ctx->classes[self::CLASS_DOCUMENT] = $document;
 
         $element = new ClassEntry('DOMElement');
@@ -807,6 +796,9 @@ final class VmDom
         if (CompilerVersion::supportsDomTokenList()) {
             $element->properties[] = new ClassProperty(self::PROP_CLASS_LIST, $nullProto, $objProto);
         }
+        // DOMParentNode + DOMChildNode (php_dom.stub.php; #23155).
+        self::registerParentNodeMutationMethods($element, $pub);
+        self::registerChildNodeMutationMethods($element, $pub);
         $ctx->classes[self::CLASS_ELEMENT] = $element;
 
         $fragment = new ClassEntry('DOMDocumentFragment');
@@ -828,7 +820,41 @@ final class VmDom
         $fragment->methods['appendxml'] = new FragmentAppendXML();
         $fragment->methodVisibility['appendxml'] = $pub;
         $fragment->methodNames['appendxml'] = 'appendXML';
+        // DOMParentNode only — not ChildNode (php_dom.stub.php; #23155).
+        self::registerParentNodeMutationMethods($fragment, $pub);
         $ctx->classes[self::CLASS_DOCUMENT_FRAGMENT] = $fragment;
+    }
+
+    /**
+     * DOMParentNode mutators — Document / Element / DocumentFragment (php_dom.stub.php; #23155).
+     */
+    private static function registerParentNodeMutationMethods(ClassEntry $entry, int $pub): void
+    {
+        $entry->methods['append'] = new NodeAppend();
+        $entry->methodVisibility['append'] = $pub;
+        $entry->methods['prepend'] = new NodePrepend();
+        $entry->methodVisibility['prepend'] = $pub;
+        if (CompilerVersion::supportsDomNodeReplaceChildren()) {
+            $entry->methods['replacechildren'] = new NodeReplaceChildren();
+            $entry->methodVisibility['replacechildren'] = $pub;
+            $entry->methodNames['replacechildren'] = 'replaceChildren';
+        }
+    }
+
+    /**
+     * DOMChildNode mutators — Element + CharacterData only (php_dom.stub.php; #23155).
+     */
+    private static function registerChildNodeMutationMethods(ClassEntry $entry, int $pub): void
+    {
+        $entry->methods['before'] = new NodeBefore();
+        $entry->methodVisibility['before'] = $pub;
+        $entry->methods['after'] = new NodeAfter();
+        $entry->methodVisibility['after'] = $pub;
+        $entry->methods['replacewith'] = new NodeReplaceWith();
+        $entry->methodVisibility['replacewith'] = $pub;
+        $entry->methodNames['replacewith'] = 'replaceWith';
+        $entry->methods['remove'] = new NodeRemove();
+        $entry->methodVisibility['remove'] = $pub;
     }
 
     public static function createDocumentType(

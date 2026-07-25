@@ -63,8 +63,17 @@ final class DomInstanceMethodJit
         'domnode::appendchild' => true,
         'domdocumentfragment::appendchild' => true,
         'domnode::append' => true,
+        'domelement::append' => true,
+        'domdocument::append' => true,
+        'domdocumentfragment::append' => true,
         'domnode::prepend' => true,
+        'domelement::prepend' => true,
+        'domdocument::prepend' => true,
+        'domdocumentfragment::prepend' => true,
         'domnode::replacechildren' => true,
+        'domelement::replacechildren' => true,
+        'domdocument::replacechildren' => true,
+        'domdocumentfragment::replacechildren' => true,
         'domnode::removechild' => true,
         'domelement::removechild' => true,
         'domnode::replacechild' => true,
@@ -276,17 +285,29 @@ final class DomInstanceMethodJit
 
                 return;
             }
-            if ('domnode::append' === $lc) {
+            if ('domnode::append' === $lc
+                || 'domelement::append' === $lc
+                || 'domdocument::append' === $lc
+                || 'domdocumentfragment::append' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomNodeAppend();
 
                 return;
             }
-            if ('domnode::prepend' === $lc) {
+            if ('domnode::prepend' === $lc
+                || 'domelement::prepend' === $lc
+                || 'domdocument::prepend' === $lc
+                || 'domdocumentfragment::prepend' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomNodePrepend();
 
                 return;
             }
-            if ('domnode::replacechildren' === $lc) {
+            if ('domnode::replacechildren' === $lc
+                || 'domelement::replacechildren' === $lc
+                || 'domdocument::replacechildren' === $lc
+                || 'domdocumentfragment::replacechildren' === $lc
+            ) {
                 $context->functionProxies[$lc] = new Call\DomNodeReplaceChildren();
 
                 return;
@@ -460,8 +481,17 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domnode::appendchild');
             self::ensureProxy($context, 'domdocumentfragment::appendchild');
             self::ensureProxy($context, 'domnode::append');
+            self::ensureProxy($context, 'domelement::append');
+            self::ensureProxy($context, 'domdocument::append');
+            self::ensureProxy($context, 'domdocumentfragment::append');
             self::ensureProxy($context, 'domnode::prepend');
+            self::ensureProxy($context, 'domelement::prepend');
+            self::ensureProxy($context, 'domdocument::prepend');
+            self::ensureProxy($context, 'domdocumentfragment::prepend');
             self::ensureProxy($context, 'domnode::replacechildren');
+            self::ensureProxy($context, 'domelement::replacechildren');
+            self::ensureProxy($context, 'domdocument::replacechildren');
+            self::ensureProxy($context, 'domdocumentfragment::replacechildren');
             self::ensureProxy($context, 'domelement::toggleattribute');
             self::ensureProxy($context, 'domnode::contains');
             self::ensureProxy($context, 'domnode::getrootnode');
