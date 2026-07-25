@@ -22,6 +22,9 @@ final class ReservedBuiltinClass
         'directory' => 'Cannot directly construct Directory, use dir() instead',
         'xmlparser' => 'Cannot directly construct XMLParser, use xml_parser_create() or xml_parser_create_ns() instead',
         'ftp\\connection' => 'Cannot directly construct FTP\Connection, use ftp_connect() or ftp_ssl_connect() instead',
+        'pgsql\\connection' => 'Cannot directly construct PgSql\Connection, use pg_connect() or pg_pconnect() instead',
+        'pgsql\\result' => 'Cannot directly construct PgSql\Result, use a dedicated function instead',
+        'pgsql\\lob' => 'Cannot directly construct PgSql\Lob, use pg_lo_open() instead',
     ];
 
     /** @var array<string, string> lc => display name — runtime implements guard (#13327, #15445, #18781) */

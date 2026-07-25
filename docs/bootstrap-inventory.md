@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6547 |
-| Phase A inventory files (M2 ratio SSOT) | 6547 |
+| PHP files on vm.php path | 6548 |
+| Phase A inventory files (M2 ratio SSOT) | 6548 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21028 |
+| Source constructs flagged (warnings) | 21031 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1575,6 +1575,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/Module.php` | 0 | 123 |
 | `ext/pgsql/PgsqlConstants.php` | 0 | 1 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
+| `ext/pgsql/PgsqlSerializeDeny.php` | 0 | 3 |
 | `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlConnection.php` | 0 | 6 |
 | `ext/pgsql/VmPgsqlCore.php` | 0 | 27 |
@@ -19104,6 +19105,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/pgsql/PgsqlSerializeDeny.php`
+
+**Warnings** (review for bootstrap subset):
+- new Exception (line 23)
+- new Exception (line 30)
+- 4 class method(s)
+
 ### `ext/pgsql/VmPgsqlArg.php`
 
 **Warnings** (review for bootstrap subset):
@@ -31841,63 +31849,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmSerializeRefState (line 60)
-- new Exception (line 165)
-- new Exception (line 169)
-- new Exception (line 173)
-- new Exception (line 177)
-- new Exception (line 180)
-- new Exception (line 184)
-- new Variable (line 231)
-- new Variable (line 254)
-- new Variable (line 264)
-- new Variable (line 274)
-- new Variable (line 284)
-- new Variable (line 294)
-- new Variable (line 304)
-- new VmSerializeRefState (line 396)
-- new Exception (line 540)
-- new Exception (line 544)
-- new Exception (line 548)
-- new Exception (line 552)
+- new VmSerializeRefState (line 61)
+- new Exception (line 166)
+- new Exception (line 170)
+- new Exception (line 174)
+- new Exception (line 178)
+- new Exception (line 181)
+- new Exception (line 185)
+- new Variable (line 234)
+- new Variable (line 257)
+- new Variable (line 267)
+- new Variable (line 277)
+- new Variable (line 287)
+- new Variable (line 297)
+- new Variable (line 307)
+- new VmSerializeRefState (line 399)
+- new Exception (line 543)
+- new Exception (line 547)
+- new Exception (line 551)
 - new Exception (line 555)
-- new Exception (line 559)
-- new ObjectEntry (line 780)
-- new Variable (line 781)
-- new ObjectEntry (line 828)
-- new Variable (line 832)
-- new ObjectEntry (line 844)
-- new Variable (line 850)
-- new Variable (line 860)
-- new ObjectEntry (line 878)
-- new Variable (line 879)
-- new Variable (line 881)
-- new Variable (line 938)
-- new Exception (line 964)
-- new Exception (line 968)
-- new Exception (line 972)
-- new Exception (line 976)
-- new Exception (line 980)
-- new Exception (line 984)
-- new VmSerializeEnumCaseRef (line 1051)
-- new VmSerializeEnumCaseRef (line 1056)
-- new Variable (line 1131)
-- new VmSerializeRefState (line 1181)
-- new Variable (line 1198)
-- new VmSerializeRefState (line 1220)
-- new Variable (line 1230)
-- new Variable (line 1280)
-- new Variable (line 1293)
-- new Variable (line 1399)
-- new ObjectEntry (line 1429)
-- new Variable (line 1433)
-- new Frame (line 1452)
-- new Variable (line 1455)
-- new Variable (line 1484)
-- new Variable (line 1500)
-- new Variable (line 1505)
-- new Variable (line 1520)
-- new Exception (line 1543)
+- new Exception (line 558)
+- new Exception (line 562)
+- new ObjectEntry (line 785)
+- new Variable (line 786)
+- new ObjectEntry (line 833)
+- new Variable (line 837)
+- new ObjectEntry (line 849)
+- new Variable (line 855)
+- new Variable (line 865)
+- new ObjectEntry (line 883)
+- new Variable (line 884)
+- new Variable (line 886)
+- new Variable (line 943)
+- new Exception (line 969)
+- new Exception (line 973)
+- new Exception (line 977)
+- new Exception (line 981)
+- new Exception (line 985)
+- new Exception (line 989)
+- new VmSerializeEnumCaseRef (line 1057)
+- new VmSerializeEnumCaseRef (line 1062)
+- new Variable (line 1137)
+- new VmSerializeRefState (line 1187)
+- new Variable (line 1204)
+- new VmSerializeRefState (line 1226)
+- new Variable (line 1236)
+- new Variable (line 1286)
+- new Variable (line 1299)
+- new Variable (line 1405)
+- new ObjectEntry (line 1435)
+- new Variable (line 1439)
+- new Frame (line 1458)
+- new Variable (line 1461)
+- new Variable (line 1490)
+- new Variable (line 1506)
+- new Variable (line 1511)
+- new Variable (line 1526)
+- new Exception (line 1549)
 - 60 class method(s)
 - 1 closure(s)
 
@@ -52568,7 +52576,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReservedBuiltinClass.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 44)
+- new Error (line 47)
 - 4 class method(s)
 
 ### `lib/VM/ResourceSupport.php`
