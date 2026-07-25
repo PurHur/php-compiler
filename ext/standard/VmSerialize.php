@@ -156,6 +156,10 @@ final class VmSerialize
             if (0 === strcasecmp($className, 'Fiber')) {
                 throw new \Exception("Unserialization of 'Fiber' is not allowed");
             }
+            // php-src Zend/zend_weakrefs.c — ZEND_ACC_NOT_SERIALIZABLE (#23062).
+            if (0 === strcasecmp($className, 'WeakMap')) {
+                throw new \Exception("Unserialization of 'WeakMap' is not allowed");
+            }
             // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
             CurlFileSerializeDeny::rejectUnserialization($className);
             SplFileIteratorSerializeDeny::rejectUnserialization($className);
@@ -489,6 +493,10 @@ final class VmSerialize
         // php-src Zend/zend_fibers.c — zend_class_serialize_deny (#23043).
         if (0 === strcasecmp($entry->class->name, 'Fiber')) {
             throw new \Exception("Serialization of 'Fiber' is not allowed");
+        }
+        // php-src Zend/zend_weakrefs.c — ZEND_ACC_NOT_SERIALIZABLE (#23062).
+        if (0 === strcasecmp($entry->class->name, 'WeakMap')) {
+            throw new \Exception("Serialization of 'WeakMap' is not allowed");
         }
         // php-src ext/curl/curl_file.stub.php — @not-serializable (#23064).
         CurlFileSerializeDeny::rejectSerialization($entry->class->name);
@@ -864,6 +872,10 @@ final class VmSerialize
         if (Variable::TYPE_OBJECT === $value->type
             && 0 === strcasecmp($value->toObject()->class->name, 'Fiber')) {
             throw new \Exception("Serialization of 'Fiber' is not allowed");
+        }
+        if (Variable::TYPE_OBJECT === $value->type
+            && 0 === strcasecmp($value->toObject()->class->name, 'WeakMap')) {
+            throw new \Exception("Serialization of 'WeakMap' is not allowed");
         }
         if (Variable::TYPE_OBJECT === $value->type) {
             CurlFileSerializeDeny::rejectSerialization($value->toObject()->class->name);
