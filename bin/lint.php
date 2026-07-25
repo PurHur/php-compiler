@@ -22,13 +22,13 @@ require __DIR__.'/../src/yay-php8-compat.php';
 require __DIR__.'/../vendor/autoload.php';
 require __DIR__.'/../script/bootstrap-lib.php';
 
-// Fast frontend paths (use-chain Simplifier, worklist type resolver) change
-// internal visit/resolution ORDER, which is observable in AOT codegen but not
-// in lint issues — proven output-identical across the full 4037-file
-// inventory. Opt in for lint only; compiles keep the legacy paths (#16077).
-// PHP_COMPILER_LINT_FRONTEND_FAST=0 opts out (workers inherit via putenv).
+// Fast frontend paths: use-chain Simplifier is now the compile default (#23056);
+// still force it here so lint stays fast even if PHPCFG_SIMPLIFIER_LEGACY=1 is
+// set in the environment. Worklist type resolver remains lint-only (#16077) —
+// resolution ORDER can affect AOT. PHP_COMPILER_LINT_FRONTEND_FAST=0 opts out.
 if ('0' !== getenv('PHP_COMPILER_LINT_FRONTEND_FAST')) {
     putenv('PHPCFG_SIMPLIFIER_USECHAIN=1');
+    putenv('PHPCFG_SIMPLIFIER_LEGACY');
     putenv('PHPTYPES_RESOLVER_WORKLIST=1');
 }
 

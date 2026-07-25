@@ -125,6 +125,10 @@ if [[ "${SKIP_LINK}" -eq 0 ]]; then
     # Match exclusive launcher defaults: flat include slots + no cold helper NestedJIT (#22642).
     export PHP_COMPILER_INCLUDE_SCOPE_REMAP="${PHP_COMPILER_INCLUDE_SCOPE_REMAP:-0}"
     export PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-0}"
+    # Use-chain Simplifier is compile default (#23056); clear LEGACY so a bisect env cannot
+    # silently re-enable the O(phis×blocks) CFG walk on the multi-hour Zend spine.
+    export PHPCFG_SIMPLIFIER_USECHAIN="${PHPCFG_SIMPLIFIER_USECHAIN:-1}"
+    unset PHPCFG_SIMPLIFIER_LEGACY
     mkdir -p "${ROOT}/build"
     rm -f "${SPINE_OUT}" "${LIB_BLOB}"
     if ! bootstrap_compiler_lib_honest_zend_compile "${SPINE_OUT}" "${SPINE_ENTRY}" full; then

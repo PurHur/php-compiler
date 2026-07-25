@@ -206,6 +206,9 @@ docker run -d \
     # HELPER_RUNTIME_O=1 with stale core fingerprint → ~1 file/min). Opt in with
     # BOOTSTRAP_GEN0_HELPER_RUNTIME_O=1 after warming script/emit-helper-runtime-object.php.
     export PHP_COMPILER_HELPER_RUNTIME_O=\${BOOTSTRAP_GEN0_HELPER_RUNTIME_O:-0}
+    # Use-chain Simplifier default (#23056) — ~3× less CPU on full-spine parseAndCompile.
+    export PHPCFG_SIMPLIFIER_USECHAIN=\${PHPCFG_SIMPLIFIER_USECHAIN:-1}
+    unset PHPCFG_SIMPLIFIER_LEGACY
     # Flat spine requires: keep shared include slots (pre-#22845 pace). MiniWebApp keeps
     # default remapping when this env is unset (#22642 r14 vs r13).
     export PHP_COMPILER_INCLUDE_SCOPE_REMAP=\${BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP:-0}
