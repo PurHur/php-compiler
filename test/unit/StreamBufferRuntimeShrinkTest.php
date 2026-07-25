@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Stream buffer NestedJIT ABI bridges quarantined in ext/standard (#14462, #19788).
+ * Stream buffer NestedJIT via JitVmHelperLink::ensureCompiled (#14462, #19788, #22979).
  */
 final class StreamBufferRuntimeShrinkTest extends TestCase
 {
@@ -43,17 +43,22 @@ final class StreamBufferRuntimeShrinkTest extends TestCase
         $this->assertLessThan(55, \substr_count($orchestrator, "\n") + 1);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelUsesJitVmHelperLinkNotHandRolledNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamBufferKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitStreamBufferKernel', $source);
         $this->assertStringContainsString('__compiler_stream_set_chunk_size', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringContainsString('StreamBufferJitHelper', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(260, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(230, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void
