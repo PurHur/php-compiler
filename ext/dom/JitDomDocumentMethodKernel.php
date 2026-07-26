@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomC14NRuntime;
 use PHPCompiler\JIT\Builtin\DomCreateElementNSRuntime;
@@ -35,15 +34,15 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
 
 /**
- * Thin standalone AOT: DOM document-method bridges in the main module (#17954, #19496, #20214).
+ * Thin standalone AOT: DOM document-method bridges in the main module (#17954, #19496, #20214, #23325).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ProgressNote #23311).
  * Gate: {@see Context::isThinStandaloneAotMain()} (peer #20200 / #20178 — no NestedJit defer).
  * Housed in ext/dom (not lib/JIT/Builtin) — same kernel-move pattern as #19430 / #19471.
  */
@@ -1402,35 +1401,12 @@ final class JitDomDocumentMethodKernel
         string $relativePath,
         array $compiledHelpers
     ): void {
-        $missing = false;
-        foreach ($compiledHelpers as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        // File lives in ext/dom/ — two levels up is repo root (was 3 when under lib/JIT/Builtin/; #19496).
-        $path = \dirname(__DIR__, 2).$relativePath;
-        NestedVmActiveContextLlvm::ensureMethod($context);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), \basename($path));
-            if (null === $block) {
-                throw new \LogicException(\basename($path).' parseAndCompile failed (#17954)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach ($compiledHelpers as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for user-script DOM loadHTML bridge (#17954)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            $relativePath,
+            $compiledHelpers,
+            '#23325'
+        );
     }
 
     /**
