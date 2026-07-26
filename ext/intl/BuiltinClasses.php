@@ -12,10 +12,10 @@ use PHPCompiler\VM\Context;
  * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696, #19549, #6151, #19670).
  *
  * Locale / IntlDateFormatter / IntlDatePatternGenerator / IntlCalendar / IntlTimeZone /
- * NumberFormatter / Normalizer / Collator / MessageFormatter / Transliterator / ResourceBundle /
- * IntlBreakIterator / IntlCodePointBreakIterator / IntlChar / UConverter / Spoofchecker / IntlException
- * all gate on {@see IntlExtensionPolicy} advertisement (no phantom class_exists; #6366, #6171, #6139,
- * #6188, #20035, #20740, #20822).
+ * NumberFormatter / Normalizer / Collator / MessageFormatter / IntlListFormatter /
+ * Transliterator / ResourceBundle / IntlBreakIterator / IntlCodePointBreakIterator /
+ * IntlChar / UConverter / Spoofchecker / IntlException all gate on {@see IntlExtensionPolicy}
+ * advertisement (no phantom class_exists; #6366, #6171, #6139, #6188, #20035, #20740, #20822, #23229).
  */
 final class BuiltinClasses
 {
@@ -69,6 +69,9 @@ final class BuiltinClasses
         VmNumberFormatter::registerClass($ctx);
         VmCollator::registerClass($ctx);
         VmMessageFormatter::registerClass($ctx);
+        if (IntlExtensionPolicy::advertisesIntlListFormatter()) {
+            VmIntlListFormatter::registerClass($ctx);
+        }
         VmTransliterator::registerClass($ctx);
         VmResourceBundle::registerClass($ctx);
         VmBreakIterator::registerClass($ctx);
@@ -253,6 +256,17 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         VmMessageFormatter::registerClass($ctx);
+        self::registerIntlException($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
+    }
+
+    /** IntlListFormatter — PHP 8.5+ + host intl (#23229). */
+    public static function registerIntlListFormatter(Context $ctx): void
+    {
+        $before = array_keys($ctx->classes);
+        VmIntlListFormatter::registerClass($ctx);
         self::registerIntlException($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;

@@ -212,6 +212,17 @@ final class IntlExtensionPolicy
     }
 
     /**
+     * IntlListFormatter — PHP 8.5+ + loaded ext/intl (php-src ext/intl/listformatter; #23229).
+     *
+     * Withheld when host intl is off or language profile &lt; 8.5 (no phantom class_exists).
+     */
+    public static function advertisesIntlListFormatter(): bool
+    {
+        return self::advertisesBuiltins()
+            && CompilerVersion::advertisesIntlListFormatter();
+    }
+
+    /**
      * Transliterator / transliterator_* — require loaded ext/intl (php-src transliterator; #6139, #19670).
      */
     public static function advertisesTransliterator(): bool

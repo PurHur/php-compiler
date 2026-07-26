@@ -60,6 +60,9 @@ class Module extends ModuleAbstract
         if (IntlExtensionPolicy::advertisesMessageFormatter()) {
             BuiltinClasses::registerMessageFormatter($runtime->vmContext);
         }
+        if (IntlExtensionPolicy::advertisesIntlListFormatter()) {
+            BuiltinClasses::registerIntlListFormatter($runtime->vmContext);
+        }
         if (IntlExtensionPolicy::advertisesTransliterator()) {
             BuiltinClasses::registerTransliterator($runtime->vmContext);
         }
