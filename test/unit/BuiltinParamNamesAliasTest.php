@@ -1251,6 +1251,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'alias_name', 'class_alias'));
     }
 
+    /** @covers issue #23434 */
+    public function testConstantDefinedZendStubNamedParams(): void
+    {
+        $constant = BuiltinParamNames::forFunction('constant');
+        self::assertSame(['name'], $constant);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($constant, 'name', 'constant'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $const_name)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($constant, 'const_name', 'constant'));
+
+        $defined = BuiltinParamNames::forFunction('defined');
+        self::assertSame(['constant_name'], $defined);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($defined, 'constant_name', 'defined'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $name)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($defined, 'name', 'defined'));
+    }
+
     /** @covers issue #23407 */
     public function testXmlWriterStubNamedParamsResolve(): void
     {
