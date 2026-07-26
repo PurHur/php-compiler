@@ -66,7 +66,8 @@ final class VmMinMax
     private static function reduce(Frame $frame, string $name, bool $pickMin): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
+        // String-key unpack / unknown named must not look like a single array arg (#23449).
+        if ($argc < 1 || !\array_key_exists(0, $frame->calledArgs)) {
             throw new \ArgumentCountError($name.'() expects at least 1 argument, 0 given');
         }
 
