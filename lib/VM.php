@@ -2175,6 +2175,65 @@ class VM {
     }
 
     /**
+     * array_walk / array_walk_recursive object property keys — Zend-mangled (#23552).
+     *
+     * @return list<string>
+     */
+    public function collectObjectArrayWalkPropertyKeys(ObjectEntry $object, Frame $frame): array
+    {
+        $ctx = $this->context;
+        $keys = [];
+        $seenLc = [];
+        $seenPrivate = [];
+        $seenDeclaredLc = [];
+        foreach (array_reverse(\PHPCompiler\ext\standard\VmReflection::classHierarchyChain($object->class, $ctx)) as $class) {
+            foreach ($class->properties as $meta) {
+                if ($meta->phpInvisible) {
+                    continue;
+                }
+                $lc = strtolower($meta->name);
+                $seenDeclaredLc[$lc] = true;
+                $isPrivate = ($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
+                if ($isPrivate) {
+                    $privKey = ($meta->declaringClassLc !== '' ? $meta->declaringClassLc : strtolower($class->name))."\0".$lc;
+                    if (isset($seenPrivate[$privKey])) {
+                        continue;
+                    }
+                    $seenPrivate[$privKey] = true;
+                } else {
+                    if (isset($seenLc[$lc])) {
+                        continue;
+                    }
+                    $seenLc[$lc] = true;
+                }
+                if (DateTimeSupport::isInternalStorageProperty($meta->name)) {
+                    continue;
+                }
+                if ($meta->propertyHookVirtual && null === $meta->getHookMethodLc) {
+                    continue;
+                }
+                // Presence only — avoid resolveIndirect during key listing (keeps by-ref slots healthy).
+                if (!$object->hasPropertyForMeta($meta) && $meta->prototype->hasDeclaredTypeConstraint()) {
+                    continue;
+                }
+                $keys[] = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
+            }
+        }
+        foreach ($object->getRawProperties() as $name => $_) {
+            $nameLc = strtolower($name);
+            if (isset($seenDeclaredLc[$nameLc]) || isset($seenLc[$nameLc])) {
+                continue;
+            }
+            if (DateTimeSupport::isInternalStorageProperty((string) $name)) {
+                continue;
+            }
+            $keys[] = (string) $name;
+        }
+
+        return $keys;
+    }
+
+    /**
      * var_dump()/print_r() property list — mangled keys, get hooks invoked (#6604).
      *
      * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_DEBUG) + zend_read_property_ex
