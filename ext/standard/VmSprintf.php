@@ -566,7 +566,9 @@ final class VmSprintf
             return 'NaN';
         }
         if (\is_infinite($value)) {
-            return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
+            // php-src formatted_print.c (PHP 8.2): appends "INF" with is_negative; space/+
+            // padding does not emit a sign — -INF and +INF both print as INF (#23607).
+            return self::formatInfinity(true);
         }
 
         return self::applyFloatSignPrefix($value, VmFloatDtoa::formatSprintfF($value, $precision), $showSign);
@@ -579,7 +581,7 @@ final class VmSprintf
             return 'NaN';
         }
         if (\is_infinite($value)) {
-            return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
+            return self::formatInfinity(true);
         }
         $sign = $value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign);
         $abs = \abs($value);
@@ -604,7 +606,7 @@ final class VmSprintf
             return 'NaN';
         }
         if (\is_infinite($value)) {
-            return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
+            return self::formatInfinity(true);
         }
         $abs = \abs($value);
         if (0.0 === $abs) {
@@ -643,7 +645,7 @@ final class VmSprintf
             return 'NaN';
         }
         if (\is_infinite($value)) {
-            return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
+            return self::formatInfinity(true);
         }
         $abs = \abs($value);
         if (0.0 === $abs) {
@@ -677,6 +679,18 @@ final class VmSprintf
         $p = 0 === $precision ? 1 : $precision;
 
         return max(0, $p - 1);
+    }
+
+    /**
+     * php-src formatted_print.c — INF token for float conversions (#23607).
+     *
+     * PHP 8.2 passes "INF" into php_sprintf_appendstring with is_negative set; with
+     * default space padding the leading sign is never emitted, so -INF prints as INF.
+     * Uppercase INF for %f/%F/%e/%E/%g/%G/%h/%H; lowercase for %a (see formatHexFloat).
+     */
+    private static function formatInfinity(bool $upper): string
+    {
+        return $upper ? 'INF' : 'inf';
     }
 
     /** php-src ext/standard/sprintf.c — SIGN flag on float conversions (#11779). */
@@ -734,7 +748,8 @@ final class VmSprintf
             return $upper ? 'NAN' : 'nan';
         }
         if (\is_infinite($value)) {
-            return ($value < 0 ? '-' : '').($upper ? 'INF' : 'inf');
+            // Same unsigned INF token as %f family (#23607); %a/%A case follows C99.
+            return self::formatInfinity($upper);
         }
 
         $prec = $precision ?? 13;
