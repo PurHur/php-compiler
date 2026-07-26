@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Monotonic clock for VM/JIT/AOT (issue #7315, #5174, #9018, #10859, #12144, #12225, #12236).
+ * Monotonic clock for VM/JIT/AOT (issue #7315, #5174, #9018, #10859, #12144, #12225, #12236, #23420).
  *
  * php-src: ext/standard/hrtime.c — clock_gettime(CLOCK_MONOTONIC).
  * Pure PHP: /proc/uptime (Linux monotonic, µs) + microtime(true) (realtime).
@@ -18,6 +18,9 @@ final class VmHrtimeNative
     public const CLOCK_REALTIME = 0;
 
     public const CLOCK_MONOTONIC = 1;
+
+    /** Last emitted monotonic total ns — clamps microtime overlay so readings never decrease (#23420). */
+    private static ?int $lastMonotonicTotalNs = null;
 
     /**
      * @return array{0: int, 1: int} seconds and nanoseconds
@@ -87,10 +90,11 @@ final class VmHrtimeNative
     }
 
     /**
-     * CLOCK_MONOTONIC via /proc/uptime + microtime sub-ms refinement (#7315, #12144, #12236, #12279).
+     * CLOCK_MONOTONIC via /proc/uptime + microtime sub-ms refinement (#7315, #12144, #12236, #12279, #23420).
      *
      * /proc/uptime is coarse (µs–cs); overlay microtime(true) sub-microsecond digits for
-     * hrtime()[1] % 1000 parity without libc clock_gettime FFI.
+     * hrtime()[1] % 1000 parity without libc clock_gettime FFI. Realtime fractions are not
+     * monotonic vs the uptime base, so clamp the composite to never decrease (#23420).
      *
      * @return array{0: int, 1: int}|null
      */
@@ -119,15 +123,22 @@ final class VmHrtimeNative
     public static function refineMonotonicNanoseconds(array $pair): array
     {
         [$sec, $nsec] = $pair;
-        if (!\function_exists('microtime')) {
-            return [$sec, $nsec];
+        if (\function_exists('microtime')) {
+            $micro = \microtime(true);
+            $microNsec = (int) \round(fmod($micro, 1.0) * (float) self::NS_PER_SEC);
+            $nsec = ($nsec & ~999) + ($microNsec % 1000);
+            if ($nsec >= self::NS_PER_SEC) {
+                ++$sec;
+                $nsec -= self::NS_PER_SEC;
+            }
         }
-        $micro = \microtime(true);
-        $microNsec = (int) \round(fmod($micro, 1.0) * (float) self::NS_PER_SEC);
-        $nsec = ($nsec & ~999) + ($microNsec % 1000);
-        if ($nsec >= self::NS_PER_SEC) {
-            ++$sec;
-            $nsec -= self::NS_PER_SEC;
+        $total = $sec * self::NS_PER_SEC + $nsec;
+        if (null !== self::$lastMonotonicTotalNs && $total < self::$lastMonotonicTotalNs) {
+            $total = self::$lastMonotonicTotalNs;
+            $sec = \intdiv($total, self::NS_PER_SEC);
+            $nsec = $total % self::NS_PER_SEC;
+        } else {
+            self::$lastMonotonicTotalNs = $total;
         }
 
         return [$sec, $nsec];

@@ -26,7 +26,7 @@ final class VmHrtimeTest extends TestCase
         }
         $this->assertGreaterThan(0, $a);
         $this->assertGreaterThan(0, $b);
-        $this->assertGreaterThanOrEqual($a - 1_000_000, $b, 'monotonic within 1ms refinement slack');
+        $this->assertGreaterThanOrEqual($a, $b, 'hrtime(true) must be monotonic (#23420)');
 
         $pair = VmHrtime::hrtime(false);
         $this->assertIsArray($pair);
