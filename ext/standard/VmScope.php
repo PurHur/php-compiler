@@ -130,7 +130,8 @@ final class VmScope
         Frame $builtinFrame,
     ): int {
         $imported = 0;
-        foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
+        // EXTR_REFS must alias live HashTable buckets (php_extract ZVAL_MAKE_REF), not resolved copies (#23572).
+        foreach ($table->iterateKeyed(!$refs) as [$keyVar, $valueVar]) {
             $keyResolved = $keyVar->resolveIndirect();
             $stringKey = null;
             if (Variable::TYPE_STRING === $keyResolved->type) {

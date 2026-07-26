@@ -32,4 +32,11 @@ final class VmScopeExtractFlagsTest extends TestCase
         $this->assertSame(6, VmScope::EXTR_IF_EXISTS);
         $this->assertSame(0x100, VmScope::EXTR_REFS);
     }
+
+    public function testExtractArrayArgIsByRef(): void
+    {
+        $this->assertSame([0], \PHPCompiler\BuiltinByRefParams::forFunction('extract'));
+        $this->assertTrue(\PHPCompiler\BuiltinByRefParams::isByRefArg('extract', 0));
+        $this->assertFalse(\PHPCompiler\BuiltinByRefParams::isByRefArg('extract', 1));
+    }
 }
