@@ -27,6 +27,12 @@ final class ClosureWithBinding implements Call
         return $this->inner;
     }
 
+    /** Bound $this snapshot (may be null-capture for unbound). */
+    public function boundThis(): Variable
+    {
+        return $this->boundThis;
+    }
+
     public function call(Context $context, Variable ...$args): Value
     {
         $savedCalled = $context->scope->calledClassName;

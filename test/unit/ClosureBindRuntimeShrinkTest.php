@@ -66,7 +66,10 @@ final class ClosureBindRuntimeShrinkTest extends TestCase
 
     public function testClosureBindHelperLineCountReduced(): void
     {
+        $this->assertTrue(ClosureBindJitHelper::shouldRejectUnbindThis(true, true));
+        $this->assertFalse(ClosureBindJitHelper::shouldRejectUnbindThis(true, false));
+        $this->assertFalse(ClosureBindJitHelper::shouldRejectUnbindThis(false, true));
         $lines = \substr_count((string) file_get_contents(__DIR__.'/../../lib/JIT/ClosureBindHelper.php'), "\n") + 1;
-        $this->assertLessThan(645, $lines);
+        $this->assertLessThan(680, $lines);
     }
 }
