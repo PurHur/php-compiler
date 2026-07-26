@@ -711,6 +711,35 @@ final class HashTable {
     }
 
     /**
+     * Zend is_identical_function() / zend_hash_compare(..., identical) for arrays (#23485).
+     * Element values (and keys) must be identical — no type juggling.
+     */
+    public function compareIdentical(self $other): bool
+    {
+        if ($this === $other) {
+            return true;
+        }
+        if ($this->getNumElements() !== $other->getNumElements()) {
+            return false;
+        }
+
+        $leftItems = iterator_to_array($this->iterateKeyed(true));
+        $rightItems = iterator_to_array($other->iterateKeyed(true));
+        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
+            [$leftKey, $leftVal] = $leftItems[$i];
+            [$rightKey, $rightVal] = $rightItems[$i];
+            if (!$leftKey->identicalTo($rightKey)) {
+                return false;
+            }
+            if (!$leftVal->identicalTo($rightVal)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Remove and return the last element of a packed list array (no holes).
      * Returns null when the array is empty.
      */

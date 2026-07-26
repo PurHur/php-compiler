@@ -1596,12 +1596,13 @@ final class Variable {
             return $self->object === $other->object;
         }
         // Same HashTable → identical (self-ref `$a[0]=&$a` / unserialize R:; #22652).
+        // Deep compare uses identical element semantics (zend_hash_compare identical; #23485).
         if (self::TYPE_ARRAY === $self->type) {
             if ($self->array === $other->array) {
                 return true;
             }
 
-            return $self->toArray()->compareLooseEqual($other->toArray());
+            return $self->toArray()->compareIdentical($other->toArray());
         }
         if (self::TYPE_STRING === $self->type) {
             return $self->string === $other->string;
