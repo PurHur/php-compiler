@@ -170,6 +170,34 @@ if (!function_exists('php_compiler_cli_sync_host_error_reporting')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_sync_host_exception_ignore_args')) {
+    /**
+     * Inherit host {@code php -d zend.exception_ignore_args=...} into the guest VM (#23408).
+     *
+     * Guest argv {@code bin/vm.php -d zend.exception_ignore_args=0} wins via
+     * {@see php_compiler_cli_apply_ini_overrides}; otherwise mirror host {@code ini_get}
+     * so issue repros that pass {@code -d} to the host PHP binary match Zend.
+     *
+     * @param array<string, mixed> $options
+     */
+    function php_compiler_cli_sync_host_exception_ignore_args(\PHPCompiler\VM\Context $ctx, array $options): void
+    {
+        $overrides = $options['-d'] ?? null;
+        if (is_array($overrides)) {
+            foreach ($overrides as $key => $_) {
+                if (is_string($key) && 0 === strcasecmp($key, 'zend.exception_ignore_args')) {
+                    return;
+                }
+            }
+        }
+        $raw = @\ini_get('zend.exception_ignore_args');
+        if (false === $raw) {
+            return;
+        }
+        \PHPCompiler\ext\standard\VmIni::set($ctx, 'zend.exception_ignore_args', (string) $raw);
+    }
+}
+
 if (!function_exists('php_compiler_cli_resolve_user_path')) {
     /**
      * Resolve a user-supplied relative path against the pre-chdir invocation cwd.
