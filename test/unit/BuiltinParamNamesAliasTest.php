@@ -814,4 +814,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'repl', 'substr_replace'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'start', 'substr_replace'));
     }
+
+    /** @covers issue #23204 */
+    public function testStrRepeatZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('str_repeat');
+        self::assertSame(['string', 'times'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'str_repeat'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'times', 'str_repeat'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $input / $mult)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'input', 'str_repeat'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mult', 'str_repeat'));
+    }
 }
