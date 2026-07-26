@@ -271,6 +271,9 @@ if (null !== $unitPath) {
         // does not fall through to an empty NestedJIT stub.
         // Peer always-helper (#20589); keep off HELPER_RUNTIME_O until unit.o green.
         '/ext/standard/VarExportJitHelper.php' => true,
+        // var_dump/print_r need consumer-module NestedJIT + live VM (#16075 / #23540).
+        '/ext/standard/VarDumpJitHelper.php' => true,
+        '/ext/standard/PrintRJitHelper.php' => true,
     ];
     file_put_contents($dir.'/manifest.json', json_encode([
         'fingerprint' => $unitFingerprint,

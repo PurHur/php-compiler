@@ -18,6 +18,7 @@ final class VarDumpRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringVarDumpJit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NESTED_HELPER_SOURCES', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
@@ -33,6 +34,16 @@ final class VarDumpRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmVarDump::dumpVariable', $source);
         $this->assertStringContainsString('formatVariableValue', $source);
         $this->assertStringNotContainsString('function dumpValue', $source);
+        // Standalone AOT resolves sg_vm_context — Superglobals alone is null (#17391 / #23540).
+        $this->assertStringContainsString('VmActiveContextJitHelper::resolve', $source);
+    }
+
+    public function testStringVarDumpPublishesActiveContextAbi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringVarDump.php');
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('VmActiveContextLlvm::ensureAbi', $source);
+        $this->assertStringContainsString('NestedVmActiveContextLlvm::ensureMethod', $source);
     }
 
     public function testVarDumpBuiltinUsesStringVarDumpBridge(): void

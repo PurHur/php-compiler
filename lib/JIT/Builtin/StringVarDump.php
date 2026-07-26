@@ -8,13 +8,17 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241, #16565, #23143).
+ * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241, #16565, #23143, #23540).
  *
  * Embed and standalone AOT compile the same PHP bridge; no var_dump LLVM monolith.
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringPrintR #22668).
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
+ * Thin standalone AOT publishes sg_vm_context before NestedJIT (#17391 / #23540).
  * php-src: ext/standard/var.c — php_var_dump_ex
  */
 final class StringVarDump
@@ -48,6 +52,12 @@ final class StringVarDump
         if (NestedJitCompileScope::isActive()) {
             return;
         }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of VarDumpJitHelper (#17391 / #23540).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
 
         $probe = $context->module->getNamedFunction('__compiler_var_dump');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -109,7 +119,7 @@ final class StringVarDump
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#23143'
+            '#23540'
         );
     }
 

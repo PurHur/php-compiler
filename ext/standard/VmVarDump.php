@@ -28,7 +28,8 @@ final class VmVarDump
     ): void {
         TypedPropertyCheck::assertReadable($var);
         if ($level > 1) {
-            self::write(str_repeat(' ', $level - 1));
+            // Avoid \str_repeat — NestedJIT of this SSOT may lack __compiler_str_repeat (#23540 / peer #22981).
+            self::write(self::spaces($level - 1));
         }
         if ($showRefMarker && Variable::TYPE_INDIRECT === $var->type) {
             self::write('&');
@@ -98,12 +99,12 @@ final class VmVarDump
         }
         self::write('array('.$count.") {\n");
         foreach ($table->iterateKeyed(false) as [$key, $value]) {
-            self::write(str_repeat(' ', $level));
+            self::write(self::spaces($level));
             self::write(self::formatKey($key)."\n");
             self::dumpVariable($vm, $value, $level + 1, true, $frame);
         }
         if ($level > 1) {
-            self::write(str_repeat(' ', $level - 1));
+            self::write(self::spaces($level - 1));
         }
         self::write("}\n");
     }
@@ -120,14 +121,28 @@ final class VmVarDump
         $className = VmObjectDebugType::fromClassName($object->class->name);
         self::write('object('.$className.')#'.$object->id.' ('.$count.") {\n");
         foreach ($props as $name => $value) {
-            self::write(str_repeat(' ', $level));
+            self::write(self::spaces($level));
             self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
             self::dumpVariable($vm, $value, $level + 1, true, $frame);
         }
         if ($level > 1) {
-            self::write(str_repeat(' ', $level - 1));
+            self::write(self::spaces($level - 1));
         }
         self::write("}\n");
+    }
+
+    /** NestedJIT-safe spaces without \str_repeat (#23540 / peer PackEngineEncode #22981). */
+    private static function spaces(int $n): string
+    {
+        if ($n <= 0) {
+            return '';
+        }
+        $out = '';
+        while ($n-- > 0) {
+            $out .= ' ';
+        }
+
+        return $out;
     }
 
     private static function formatKey(Variable $key): string
