@@ -142,4 +142,34 @@ PHP;
         $rt->run($block);
         self::assertSame("bool(false)\nu\n", ob_get_clean());
     }
+
+    /** Issue #23339 / re-#17260 — initialized null distinct backing still invokes get for isset/empty. */
+    public function testVmIssetEmptyOnNullDistinctBackingInvokesGetHook(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    private ?string $_n = null;
+    public string $name {
+        get => $this->_n ?? "anon";
+        set(?string $v) => $this->_n = $v;
+    }
+}
+$c = new C();
+echo "isset=".(isset($c->name)?"1":"0")."\n";
+echo "empty=".(empty($c->name)?"1":"0")."\n";
+$c->name = null;
+echo "afternull isset=".(isset($c->name)?"1":"0")." empty=".(empty($c->name)?"1":"0")."\n";
+unset($c->name);
+echo "afterunset isset=".(isset($c->name)?"1":"0")." empty=".(empty($c->name)?"1":"0")."\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        self::assertSame(
+            "isset=1\nempty=0\nafternull isset=1 empty=0\nafterunset isset=0 empty=1\n",
+            ob_get_clean()
+        );
+    }
 }
