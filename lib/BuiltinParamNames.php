@@ -560,6 +560,9 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/repl/start (#23183)
             case 'substr_replace':
                 return ['string', 'replace', 'offset', 'length'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says input/mult (#23204)
+            case 'str_repeat':
+                return ['string', 'times'];
             case 'file_exists':
             case 'filesize':
             case 'filemtime':
