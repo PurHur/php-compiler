@@ -106,6 +106,15 @@ final class BuiltinParamNames
             'xmlreader::next' => ['name'],
             'xmlreader::open' => ['uri', 'encoding', 'flags'],
             'xmlreader::xml' => ['source', 'encoding', 'flags'],
+            // php-src ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo still has pre-stub names (#23407)
+            'xmlwriter::setindent' => ['enable'],
+            'xmlwriter::setindentstring' => ['indentation'],
+            'xmlwriter::flush' => ['empty'],
+            'xmlwriter::outputmemory' => ['flush'],
+            'xmlwriter::startattributens' => ['prefix', 'name', 'namespace'],
+            'xmlwriter::writeattributens' => ['prefix', 'name', 'namespace', 'value'],
+            'xmlwriter::startelementns' => ['prefix', 'name', 'namespace'],
+            'xmlwriter::writeelementns' => ['prefix', 'name', 'namespace', 'content'],
             default => null,
         };
     }
@@ -787,6 +796,23 @@ final class BuiltinParamNames
                 return ['id', 'direction'];
             case 'transliterator_transliterate':
                 return ['transliterator', 'string', 'start', 'end'];
+            // php-src ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo still has xmlwriter/indent* (#23407)
+            case 'xmlwriter_set_indent':
+                return ['writer', 'enable'];
+            case 'xmlwriter_set_indent_string':
+                return ['writer', 'indentation'];
+            case 'xmlwriter_flush':
+                return ['writer', 'empty'];
+            case 'xmlwriter_output_memory':
+                return ['writer', 'flush'];
+            case 'xmlwriter_start_attribute_ns':
+                return ['writer', 'prefix', 'name', 'namespace'];
+            case 'xmlwriter_write_attribute_ns':
+                return ['writer', 'prefix', 'name', 'namespace', 'value'];
+            case 'xmlwriter_start_element_ns':
+                return ['writer', 'prefix', 'name', 'namespace'];
+            case 'xmlwriter_write_element_ns':
+                return ['writer', 'prefix', 'name', 'namespace', 'content'];
         }
 
         return null;
