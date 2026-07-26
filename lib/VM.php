@@ -14677,25 +14677,13 @@ restart:
         }
 
         if (null !== $frame->magicCallMethodName) {
+            // Zend: __call/__callStatic receive ($name, $arguments) where $arguments
+            // preserves named-arg string keys — do not resolve against __call params (#23336).
             $methodName = $frame->magicCallMethodName;
             $frame->magicCallMethodName = null;
-            [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call, $frame);
-            $userArgs = $this->resolveUserCallArgs(
-                $frame,
-                $paramNames,
-                $variadicIndex,
-                $this->internalBuiltinFunctionName($frame->call, $frame)
-            );
             $nameVar = new Variable(Variable::TYPE_STRING);
             $nameVar->string($methodName);
-            $argsVar = new Variable();
-            $argsVar->newArray();
-            $packed = $argsVar->toArray();
-            foreach ($userArgs as $i => $arg) {
-                $copy = new Variable();
-                $copy->copyFrom($arg);
-                $packed->addIndex($i, $copy);
-            }
+            $argsVar = VM\MagicCallArgs::packUserArguments($this, $frame);
 
             $args = array_merge($frame->callArgs, [$nameVar, $argsVar]);
             $this->separateInternalByRefArgsForWrite(

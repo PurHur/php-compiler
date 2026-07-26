@@ -6094,6 +6094,7 @@ require_once __DIR__.'/../../../lib/VM/LazyGhostTraitSupport.php';
 require_once __DIR__.'/../../../lib/VM/LazyObjectSupport.php';
 require_once __DIR__.'/../../../lib/VM/LazyPropertySupport.php';
 require_once __DIR__.'/../../../lib/VM/ListUnpackJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/MagicCallArgs.php';
 require_once __DIR__.'/../../../lib/VM/MagicMethodInvocationAborted.php';
 require_once __DIR__.'/../../../lib/VM/MagicMethodJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/MemoryAccounting.php';
