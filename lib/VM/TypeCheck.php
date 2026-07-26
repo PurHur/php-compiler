@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
 use PHPCompiler\GenericArrayTypeSpec;
+use PHPCompiler\ext\standard\VmMath;
 
 /**
  * Scalar type coercion for typed parameters (issue #156) and typed properties (#169).
@@ -817,8 +818,19 @@ final class TypeCheck
             case Variable::TYPE_BOOLEAN:
                 return $value->toBool() ? 1 : 0;
             case Variable::TYPE_FLOAT:
-                // Zend weak mode: truncate toward zero (zend_types.c, #12347).
-                return (int) $value->toFloat();
+                // Zend weak mode: truncate toward zero; precision loss → E_DEPRECATED
+                // (zend_dval_to_lval_safe / zend_operators.c, #23533).
+                $float = $value->toFloat();
+                $vm = \PHPCompiler\VM::running();
+                if (null !== $vm) {
+                    VmMath::warnFloatToIntPrecisionLoss(
+                        $float,
+                        $vm->context,
+                        $vm->currentExecutingFrame()
+                    );
+                }
+
+                return VmMath::floatToZendLong($float);
             case Variable::TYPE_STRING:
                 $s = $value->toString();
                 if (!is_numeric($s)) {
