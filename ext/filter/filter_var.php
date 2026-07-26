@@ -52,13 +52,13 @@ final class filter_var extends Internal
         self::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options, $frame));
     }
 
-    public static function triggerUnknownFilterWarning(Frame $frame, int $filterId): void
+    public static function triggerUnknownFilterWarning(Frame $frame, int $filterId, string $function = 'filter_var'): void
     {
         if (null === $frame->vmContext) {
             return;
         }
         $frame->vmContext->errors->triggerError(
-            VmFilter::unknownFilterWarningMessage($filterId),
+            VmFilter::unknownFilterWarningMessage($filterId, $function),
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,

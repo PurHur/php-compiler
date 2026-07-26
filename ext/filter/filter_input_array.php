@@ -37,7 +37,15 @@ final class filter_input_array extends Internal
         if ($argc >= 2) {
             $definition = self::resolveDefinition($frame->calledArgs[1]);
         }
-        $addEmpty = 0;
+        // php-src Z_PARAM_ARRAY_HT_OR_LONG — unknown int filter ID fails before empty-source NULL (#23369).
+        if (\is_int($definition) && !VmFilter::isSupportedFilter($definition)) {
+            filter_var::triggerUnknownFilterWarning($frame, $definition, 'filter_input_array');
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        // php-src stub default add_empty=true (ext/filter/filter.stub.php).
+        $addEmpty = 1;
         if (3 === $argc) {
             $addEmpty = InternalStrictArg::requireBuiltinTypedInt($frame, 2, 'filter_input_array', 'add_empty')->toInt();
         }
@@ -59,23 +67,29 @@ final class filter_input_array extends Internal
         if (!isset($args[1]) || NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             throw new \LogicException('filter_input_array() requires a definition array in this compiler build');
         }
-        $addEmpty = 0;
+        $addEmpty = 1;
         if (3 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             JitInternalStrictArg::requireInt($context, $args[2], 'filter_input_array', 'add_empty', 3);
-            $addEmpty = self::compileTimeInt($context, $args[2]) ?? 0;
+            $addEmpty = self::compileTimeInt($context, $args[2]) ?? 1;
         }
 
         return FilterInputArrayRuntime::filter($context, $args[0], $args[1], $addEmpty);
     }
 
-    /** @return \PHPCompiler\VM\HashTable|int|null */
+    /**
+     * php-src Z_PARAM_ARRAY_HT_OR_LONG — array, or scalar coerced to filter ID (bool/float → int; #23369).
+     *
+     * @return \PHPCompiler\VM\HashTable|int|null
+     */
     private static function resolveDefinition(Variable $arg): \PHPCompiler\VM\HashTable|int|null
     {
         $defArg = $arg->resolveIndirect();
         if ($defArg->isUndefined() || Variable::TYPE_NULL === $defArg->type) {
             return null;
         }
-        if (Variable::TYPE_INTEGER === $defArg->type) {
+        if (Variable::TYPE_INTEGER === $defArg->type
+            || Variable::TYPE_BOOLEAN === $defArg->type
+            || Variable::TYPE_FLOAT === $defArg->type) {
             return $defArg->toInt();
         }
         if (Variable::TYPE_ARRAY === $defArg->type) {
