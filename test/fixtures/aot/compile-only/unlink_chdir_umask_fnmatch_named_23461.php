@@ -1,3 +1,4 @@
 <?php
-// AOT lint: named args for fnmatch (#23461) — unlink/chdir/umask AOT segfaults pre-exist for positional too
+// AOT lint: fnmatch named args (#23461). unlink/chdir/umask AOT are pre-existing
+// positional failures (umask structGep / FS segfault); VM covers all four.
 fnmatch(pattern: 'a*', filename: 'abc');
