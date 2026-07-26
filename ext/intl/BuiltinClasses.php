@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
@@ -222,9 +223,12 @@ final class BuiltinClasses
         $entry->methods['parse'] = new IntlDateFormatterParse();
         $entry->methodVisibility['parse'] = $pub;
         $entry->methodNames['parse'] = 'parse';
-        $entry->methods['parsetocalendar'] = new IntlDateFormatterParseToCalendar();
-        $entry->methodVisibility['parsetocalendar'] = $pub;
-        $entry->methodNames['parsetocalendar'] = 'parseToCalendar';
+        // PHP 8.4+ only — Zend 8.2 method_exists false (#22621, re-#20729).
+        if (CompilerVersion::supportsIntlDateFormatterParseToCalendar()) {
+            $entry->methods['parsetocalendar'] = new IntlDateFormatterParseToCalendar();
+            $entry->methodVisibility['parsetocalendar'] = $pub;
+            $entry->methodNames['parsetocalendar'] = 'parseToCalendar';
+        }
         $entry->methods['localtime'] = new IntlDateFormatterLocaltime();
         $entry->methodVisibility['localtime'] = $pub;
         $entry->methodNames['localtime'] = 'localtime';

@@ -1,5 +1,7 @@
 --TEST--
 IntlDateFormatter::parseToCalendar updates &$offset like parse (#22622)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $fmt = new IntlDateFormatter('en_US', IntlDateFormatter::SHORT, IntlDateFormatter::NONE, 'UTC');
