@@ -59,6 +59,7 @@ final class VmMysqliStmt
             'next_result' => new MysqliStmtNextResult(),
             'attr_get' => new MysqliStmtAttrGet(),
             'attr_set' => new MysqliStmtAttrSet(),
+            'send_long_data' => new MysqliStmtSendLongData(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -346,6 +347,21 @@ final class VmMysqliStmt
     public static function nextResult(ObjectEntry $stmt): bool
     {
         return self::requireNative($stmt)->next_result();
+    }
+
+    /**
+     * mysqli_stmt_send_long_data() — php-src ext/mysqli/mysqli_api.c (#22182).
+     *
+     * Streams chunked parameter data for BLOB/TEXT binds (mysql_stmt_send_long_data).
+     */
+    public static function sendLongData(ObjectEntry $stmt, int $paramNum, string $data): bool
+    {
+        $native = self::requireNative($stmt);
+        if (!\method_exists($native, 'send_long_data')) {
+            return false;
+        }
+
+        return (bool) $native->send_long_data($paramNum, $data);
     }
 
     /**
@@ -864,6 +880,30 @@ final class MysqliStmtNextResult extends MysqliClassMethod
         $receiver = $this->receiver($frame, 'mysqli_stmt::next_result()');
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmMysqliStmt::nextResult($receiver));
+        }
+    }
+}
+
+/** mysqli_stmt::send_long_data() — php-src ext/mysqli/mysqli.stub.php (#22182). */
+final class MysqliStmtSendLongData extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('send_long_data');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::send_long_data()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'mysqli_stmt::send_long_data() expects exactly 2 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $paramNum = $this->intArg($frame->calledArgs[1], 'mysqli_stmt::send_long_data', 0, 'param_num');
+        $data = $this->stringArg($frame->calledArgs[2], 'mysqli_stmt::send_long_data', 1, 'data');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::sendLongData($receiver, $paramNum, $data));
         }
     }
 }
