@@ -8,26 +8,26 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::startElementNS() — open namespaced element (php-src ext/xmlwriter/php_xmlwriter.c; #19446). */
+/** XMLWriter::startElementNs() — open namespaced element (php-src ext/xmlwriter/php_xmlwriter.c; #19446). */
 final class XmlWriterStartElementNS extends XmlWriterClassMethod
 {
     public function __construct()
     {
-        parent::__construct('startElementNS');
+        parent::__construct('startElementNs');
     }
 
     public function execute(Frame $frame): void
     {
-        $entry = $this->receiver($frame, 'XMLWriter::startElementNS()');
+        $entry = $this->receiver($frame, 'XMLWriter::startElementNs()');
         $argc = \count($frame->calledArgs);
         if ($argc < 4) {
             throw new \ArgumentCountError(
-                'XMLWriter::startElementNS() expects at least 4 arguments, '.$argc.' given'
+                'XMLWriter::startElementNs() expects at least 4 arguments, '.$argc.' given'
             );
         }
-        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::startElementNS()', 0, 'prefix');
-        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::startElementNS()', 1, 'name');
-        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::startElementNS()', 2, 'uri');
+        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::startElementNs()', 0, 'prefix');
+        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::startElementNs()', 1, 'name');
+        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::startElementNs()', 2, 'uri');
         $ok = VmXmlWriter::startElementNS($entry, $prefix, $name, $uri);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

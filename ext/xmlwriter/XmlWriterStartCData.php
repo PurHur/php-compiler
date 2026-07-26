@@ -8,17 +8,17 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::startCData() — open CDATA section (php-src ext/xmlwriter/php_xmlwriter.c; #19457). */
+/** XMLWriter::startCdata() — open CDATA section (php-src ext/xmlwriter/php_xmlwriter.c; #19457). */
 final class XmlWriterStartCData extends XmlWriterClassMethod
 {
     public function __construct()
     {
-        parent::__construct('startCData');
+        parent::__construct('startCdata');
     }
 
     public function execute(Frame $frame): void
     {
-        $entry = $this->receiver($frame, 'XMLWriter::startCData()');
+        $entry = $this->receiver($frame, 'XMLWriter::startCdata()');
         $ok = VmXmlWriter::startCData($entry);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
