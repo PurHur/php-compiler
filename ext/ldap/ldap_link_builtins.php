@@ -169,6 +169,69 @@ final class ldap_sasl_bind extends Internal
     }
 }
 
+/**
+ * ldap_set_rebind_proc() — referral rebind callback (php-src HAVE_3ARG_SETREBINDPROC; #22226).
+ *
+ * ldap_set_rebind_proc(LDAP\Connection $ldap, ?callable $callback): bool
+ */
+final class ldap_set_rebind_proc extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_set_rebind_proc');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_set_rebind_proc() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_set_rebind_proc', 1);
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ldap_set_rebind_proc() requires a VM context');
+        }
+        $cbVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_NULL === $cbVar->type) {
+            VmLdapConnection::setRebindProc($conn, null, $ctx);
+        } else {
+            if (!\PHPCompiler\ext\standard\VmCallable::isCallable($ctx, $cbVar, false, null, $frame)) {
+                throw new \TypeError(\sprintf(
+                    'ldap_set_rebind_proc(): Argument #2 ($callback) must be of type ?callable, %s given',
+                    self::vmTypeName($cbVar->type)
+                ));
+            }
+            VmLdapConnection::setRebindProc($conn, $cbVar, $ctx);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+
+    private static function vmTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_set_rebind_proc() is not implemented for JIT in this compiler build (issue #22226)');
+    }
+}
+
 final class ldap_unbind extends Internal
 {
     public function __construct()
