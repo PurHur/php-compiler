@@ -9,6 +9,8 @@ use PHPCfg\Operand;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ExternalMethod;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\VariableFunctionCall;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -190,6 +192,9 @@ final class VariableFunctionCallHelper
         if (str_contains($lc, '::') || str_starts_with($lc, '__')) {
             return null;
         }
+        if (VariableFunctionCall::isForbiddenWhenDynamic($lc)) {
+            return null;
+        }
         if (!$context->functionIsRegistered($lc)) {
             return null;
         }
@@ -207,6 +212,7 @@ final class VariableFunctionCallHelper
     public static function dispatch(Context $context, Variable $nameVar, array $hintedNames = [], Variable ...$args): Value
     {
         $nameStr = JitStringArg::lower($context, $nameVar, 'variable function name');
+        self::emitForbiddenWhenDynamicGuards($context, $nameStr);
         $candidates = self::dispatchCandidates($context, $hintedNames);
         if ([] === $candidates) {
             $context->builder->call($context->lookupFunction('abort'));
@@ -215,5 +221,36 @@ final class VariableFunctionCallHelper
         }
 
         return VariableFunctionCallRuntime::dispatch($context, $nameStr, $candidates, ...$args);
+    }
+
+    /** Runtime $fn() — ZEND_ACC_FORBIDDEN_WHEN_DYNAMIC (#23591). */
+    private static function emitForbiddenWhenDynamicGuards(Context $context, Value $nameStr): void
+    {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        if (null === $fn) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        foreach (VariableFunctionCall::forbiddenWhenDynamicNames() as $forbidden) {
+            $entry = $context->builder->getInsertBlock();
+            if (null === $entry || null !== $entry->getTerminator()) {
+                return;
+            }
+            $lit = $context->builder->load($context->constantStringFromString($forbidden));
+            $cmp = JitStringCompare::strcmp($context, $nameStr, $lit);
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $zero);
+            $raise = $fn->appendBasicBlock('vf_forbidden_'.$forbidden);
+            $cont = $fn->appendBasicBlock('vf_forbidden_ok_'.$forbidden);
+            $context->builder->branchIf($isMatch, $raise, $cont);
+            $context->builder->positionAtEnd($raise);
+            ErrorBridge::emitError(
+                $context,
+                VariableFunctionCall::forbiddenWhenDynamicMessage($forbidden)
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->branch($cont);
+            $context->builder->positionAtEnd($cont);
+        }
     }
 }

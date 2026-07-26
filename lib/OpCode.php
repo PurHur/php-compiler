@@ -345,6 +345,12 @@ class OpCode {
     public bool $staticCallParentScope = false;
     /** TYPE_FROM_CALLABLE: `parent::instanceMethod(...)` bound closure (#17655, zend_compile.c). */
     public bool $fromCallableParentScope = false;
+    /**
+     * TYPE_FUNCCALL_INIT: callee was a variable/expression, not a literal name (#23591).
+     *
+     * Zend ZEND_ACC_FORBIDDEN_WHEN_DYNAMIC — even when the name folds to a compile-time string.
+     */
+    public bool $funcCallDynamic = false;
 
     /** TYPE_INCLUDE: include/require + once/non-once semantics (issue #4426). */
     public int $includeKind = self::INCLUDE_KIND_INCLUDE_ONCE;
