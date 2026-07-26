@@ -840,6 +840,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ascii', 'chr'));
     }
 
+    /** @covers issue #23205 */
+    public function testHashEqualsZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash_equals');
+        self::assertSame(['known_string', 'user_string'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'known_string', 'hash_equals'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'user_string', 'hash_equals'));
+    }
+
     /** @covers issue #23263 */
     public function testTypeIntrospectionZendStubNamedParams(): void
     {
