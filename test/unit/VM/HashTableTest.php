@@ -283,6 +283,35 @@ class HashTableTest extends TestCase
         $this->assertSame('tail', $atZero->toString());
     }
 
+    /** Issue #23485 — array === requires identical element types (no == juggling). */
+    public function testCompareIdenticalRejectsJuggledElementTypes(): void
+    {
+        $left = new HashTable();
+        $left->append($this->int(1));
+        $left->append($this->int(2));
+
+        $right = new HashTable();
+        $right->append($this->int(1));
+        $strTwo = new Variable();
+        $strTwo->string('2');
+        $right->append($strTwo);
+
+        $this->assertTrue($left->compareLooseEqual($right));
+        $this->assertFalse($left->compareIdentical($right));
+
+        $leftVar = new Variable();
+        $leftVar->array($left);
+        $rightVar = new Variable();
+        $rightVar->array($right);
+        $this->assertTrue($leftVar->equals($rightVar));
+        $this->assertFalse($leftVar->identicalTo($rightVar));
+
+        $same = new HashTable();
+        $same->append($this->int(1));
+        $same->append($this->int(2));
+        $this->assertTrue($left->compareIdentical($same));
+    }
+
     private function int(int $value): Variable
     {
         $var = new Variable();
