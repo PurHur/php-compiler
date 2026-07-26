@@ -145,7 +145,27 @@ final class AttributeTargetValidator
         return 'attribute' === $lc || str_ends_with($lc, '\\attribute');
     }
 
-    private static function formatAllowedTargets(int $flags): string
+    /** Short name for Zend Error / CompileError attribute messages. */
+    public static function messageName(string $name): string
+    {
+        $name = ltrim($name, '\\');
+        $pos = strrpos($name, '\\');
+
+        return false !== $pos ? substr($name, $pos + 1) : $name;
+    }
+
+    /** Human label for a single Attribute::TARGET_* bit (declaration site). */
+    public static function labelForTargetFlag(int $targetFlag): string
+    {
+        return self::targetLabels()[$targetFlag] ?? 'unknown';
+    }
+
+    /**
+     * Comma-separated allowed-target labels (IS_REPEATABLE bit ignored).
+     *
+     * php-src: zend_attributes.c / ReflectionAttribute::newInstance Error text.
+     */
+    public static function formatAllowedTargets(int $flags): string
     {
         $names = [];
         foreach (self::targetLabels() as $flag => $label) {
@@ -157,11 +177,15 @@ final class AttributeTargetValidator
         return [] !== $names ? implode(', ', $names) : 'none';
     }
 
-    private static function messageName(string $name): string
+    /**
+     * Zend Error message when ReflectionAttribute::newInstance() sees a wrong target (#23528).
+     *
+     * php-src: ext/reflection/php_reflection.c — ZEND_METHOD(ReflectionAttribute, newInstance)
+     */
+    public static function runtimeWrongTargetMessage(string $attrName, int $siteTarget, int $allowedFlags): string
     {
-        $name = ltrim($name, '\\');
-        $pos = strrpos($name, '\\');
-
-        return false !== $pos ? substr($name, $pos + 1) : $name;
+        return 'Attribute "'.self::messageName($attrName).'" cannot target '
+            .self::labelForTargetFlag($siteTarget)
+            .' (allowed targets: '.self::formatAllowedTargets($allowedFlags).')';
     }
 }

@@ -12,6 +12,7 @@ use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Compiler\AttributeClassRegistry;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
+use PHPCompiler\Compiler\AttributeTargetValidator;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Compiler\CompileTimeEnumCase;
 use PHPCompiler\Compiler\CompileTimeNew;
@@ -766,6 +767,36 @@ final class ReflectionSupport
         }
 
         return $obj;
+    }
+
+    /**
+     * ReflectionAttribute::newInstance() — reject wrong Attribute::TARGET_* (#23528).
+     *
+     * php-src: ext/reflection/php_reflection.c ZEND_METHOD(ReflectionAttribute, newInstance)
+     * checks (attr->flags & target) after resolving the attribute class's #[Attribute] mask.
+     * Compile-time AttributeTargetValidator covers some paths; Reflection must still enforce.
+     */
+    public static function assertAttributeNewInstanceTargetAllowed(
+        ObjectEntry $receiver,
+        ClassEntry $attributeClass,
+    ): void {
+        $flags = AttributeClassRegistry::extractSelfAttributeFlags($attributeClass->attributeEntries);
+        if (null === $flags) {
+            // No #[Attribute] meta — non-attribute-class Error is a separate gap; skip here.
+            return;
+        }
+        $allowed = $flags & AttributeSupport::targetAll();
+        $targetVar = $receiver->getProperty(self::PROP_ATTR_TARGET)->resolveIndirect();
+        $siteTarget = Variable::TYPE_INTEGER === $targetVar->type ? $targetVar->toInt() : 0;
+        if (0 === $siteTarget || 0 !== ($allowed & $siteTarget)) {
+            return;
+        }
+        $nameVar = $receiver->getProperty(self::PROP_ATTR_NAME)->resolveIndirect();
+        $name = Variable::TYPE_STRING === $nameVar->type
+            ? $nameVar->toString()
+            : $attributeClass->name;
+
+        throw new \Error(AttributeTargetValidator::runtimeWrongTargetMessage($name, $siteTarget, $allowed));
     }
 
     /**
