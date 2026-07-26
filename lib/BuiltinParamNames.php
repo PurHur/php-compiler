@@ -598,8 +598,9 @@ final class BuiltinParamNames
             case 'mb_strrchr':
             case 'mb_strrichr':
                 return ['haystack', 'needle', 'before_needle', 'encoding'];
+            // php-src ext/mbstring/mbstring.stub.php — string $trim_marker (#23351)
             case 'mb_strimwidth':
-                return ['string', 'start', 'width', 'trimmarker', 'encoding'];
+                return ['string', 'start', 'width', 'trim_marker', 'encoding'];
             case 'mb_convert_encoding':
                 return ['string', 'to_encoding', 'from_encoding'];
             // php-src ext/mbstring/mbstring.stub.php — Reflection had empty params (#23291)

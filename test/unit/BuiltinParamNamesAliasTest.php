@@ -902,6 +902,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'allowable_tags', 'strip_tags'));
     }
 
+    /** @covers issue #23351 */
+    public function testMbStrimwidthZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('mb_strimwidth');
+        self::assertSame(['string', 'start', 'width', 'trim_marker', 'encoding'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'mb_strimwidth'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'start', 'mb_strimwidth'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'width', 'mb_strimwidth'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'trim_marker', 'mb_strimwidth'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'encoding', 'mb_strimwidth'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $trimmarker)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'trimmarker', 'mb_strimwidth'));
+    }
+
     /** @covers issue #23206 */
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {
