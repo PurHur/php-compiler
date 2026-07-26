@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\StatCacheRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT NestedJIT bridges for path predicates + stat fields (#9112, #19849, #20086, #20742).
+ * JIT/AOT NestedJIT bridges for path predicates + stat fields (#9112, #19849, #20086, #20742, #23297).
  *
  * Quarantined from lib/JIT/Builtin/StatPathRuntime — {@see \PHPCompiler\JIT\Builtin\StatPathRuntime}
  * stays the thin orchestrator. Embed + thin standalone AOT: NestedJIT → {@see StatPathJitHelper}
  * (Rename #20603 shape — no thin libc ABI fork). Nested leaf: {@see JitStatKernel} via
  * {@see phpc_stat_mode_kernel} / {@see phpc_access_kernel}.
+ *
+ * Helper compile: bundled {@see JitVmHelperLink::ensureCompiledBundle} (peer Pack #22842 /
+ * SessionStorage #23284).
  *
  * SSOT: {@see StatPathJitHelper}, {@see StatFieldsJitHelper}
  * php-src: ext/standard/filestat.c
@@ -27,6 +29,16 @@ final class JitStatPathKernel
     private const PATH_HELPER_PATH = '/ext/standard/StatPathJitHelper.php';
 
     private const FIELDS_HELPER_PATH = '/ext/standard/StatFieldsJitHelper.php';
+
+    /**
+     * Ordered NestedJIT sources for path predicates + stat fields (#23297).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        self::PATH_HELPER_PATH,
+        self::FIELDS_HELPER_PATH,
+    ];
 
     public const FN_EXISTS = '__phpc_jit_path_exists';
 
@@ -305,47 +317,19 @@ final class JitStatPathKernel
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelpersCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after StatPathJitHelper compile (#9112)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23297');
     }
 
     private static function ensureJitHelpersCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
         StatCacheRuntime::ensureLinked($context);
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 2);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            foreach ([self::PATH_HELPER_PATH, self::FIELDS_HELPER_PATH] as $rel) {
-                $path = $root.$rel;
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), \basename($path));
-                if (null === $block) {
-                    throw new \LogicException(\basename($path).' parseAndCompile failed (#9112)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9112)');
-            }
-        }
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            self::HELPER_BUNDLE,
+            self::COMPILED_HELPERS,
+            '#23297'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void

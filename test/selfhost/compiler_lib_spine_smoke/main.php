@@ -4357,6 +4357,7 @@ require_once __DIR__.'/../../../ext/xsl/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/xsl/JitXsltMethod.php';
 require_once __DIR__.'/../../../ext/xsl/JitXsltUserScript.php';
 require_once __DIR__.'/../../../ext/xsl/Module.php';
+require_once __DIR__.'/../../../ext/xsl/XsltPhpFunctionBridge.php';
 require_once __DIR__.'/../../../ext/xsl/VmXsl.php';
 require_once __DIR__.'/../../../ext/xsl/VmXslDomBridge.php';
 require_once __DIR__.'/../../../ext/xsl/XslExtensionPolicy.php';

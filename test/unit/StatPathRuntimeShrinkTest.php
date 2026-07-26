@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * StatPath NestedJIT ABI bridges quarantined in ext/standard (#9112, #19849, #20742).
+ * StatPath NestedJIT via JitVmHelperLink::ensureCompiledBundle (#23297 / peer #23284).
  */
 final class StatPathRuntimeShrinkTest extends TestCase
 {
@@ -40,26 +40,31 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $orchestrator);
         $this->assertStringNotContainsString('implementPathBoolBridge', $orchestrator);
         $this->assertStringNotContainsString('StatPathJitHelper', $orchestrator);
+        $this->assertStringNotContainsString('ensureJitHelpersCompiled', $orchestrator);
         $this->assertLessThan(60, \substr_count($orchestrator, "\n") + 1);
     }
 
-    public function testKernelAlwaysUsesHelperBridge(): void
+    public function testKernelUsesJitVmHelperLinkBundle(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStatPathKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitStatPathKernel', $source);
         $this->assertStringContainsString('__phpc_jit_path_exists', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringContainsString('StatPathJitHelper', $source);
         $this->assertStringContainsString('StatFieldsJitHelper', $source);
         $this->assertStringContainsString('helperFunction', $source);
+        $this->assertStringContainsString('StatCacheRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('kernelPathBool', $source);
         $this->assertStringNotContainsString('kernelModeType', $source);
         $this->assertStringNotContainsString('LibcExtern', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
         $this->assertLessThan(360, \substr_count($source, "\n") + 1);
     }
 
@@ -76,6 +81,7 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('JitStatPathKernel.php', $spine);
         $this->assertStringContainsString('StatPathRuntime.php', $spine);
+        $this->assertStringContainsString('XsltPhpFunctionBridge.php', $spine);
         $kernelPos = strpos($spine, 'JitStatPathKernel.php');
         $orchPos = strpos($spine, 'lib/JIT/Builtin/StatPathRuntime.php');
         $this->assertNotFalse($kernelPos);
