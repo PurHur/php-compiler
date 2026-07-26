@@ -34,7 +34,7 @@ final class ObjectInstancePropertyLlvm
             return \PHPCompiler\ext\dom\JitDomElementNavigationProperty::fetch($object, $obj, $name);
         }
         if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, strtolower($name))) {
-            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetch($object, $obj);
+            return \PHPCompiler\ext\dom\JitDomElementTextContent::fetchNamed($object, $obj, $name);
         }
         if (\PHPCompiler\ext\dom\JitDomNodeListLength::isDomNodeListLength($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj);
