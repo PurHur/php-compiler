@@ -1321,6 +1321,8 @@ class Context {
         $this->compileCommon();
         Progress::noteFunction('jit_context_compile_common_done');
 
+        $this->runModuleOptimizationPasses();
+
         Progress::noteFunction('jit_context_create_execution_engine');
         $engine = $this->module->createExecutionEngine();
         $machine = $engine->getTargetMachine();
@@ -1555,6 +1557,51 @@ class Context {
         }
         $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);   
         Progress::noteFunction('jit_context_verify_done');
+    }
+
+    /**
+     * Run the LLVM IR optimization pipeline before codegen (#23483).
+     *
+     * Nothing in the tree used PassManager, so the module went straight from lowering to
+     * `emitToFile`, which runs backend codegen passes only. Every IR-level optimisation was
+     * therefore absent: locals stayed in memory, the type-tag switch inlined from
+     * `__value__readLong` was never folded away even where the tag is a compile-time constant, and
+     * branches that cannot be taken (e.g. the `strtol` string path for a value known to be a long)
+     * survived into the binary. That is the shape behind an untyped `++$a` loop running ~12x slower
+     * than Zend.
+     *
+     * Opt-in while it is measured: PHP_COMPILER_OPT_LEVEL=0 (default) keeps the previous behaviour,
+     * 1-3 selects the pipeline. Set PHP_COMPILER_OPT_SIZE_LEVEL to bias for size.
+     */
+    private function runModuleOptimizationPasses(): void
+    {
+        $level = getenv('PHP_COMPILER_OPT_LEVEL');
+        $level = is_string($level) && ctype_digit($level) ? (int) $level : 0;
+        if ($level <= 0) {
+            return;
+        }
+        $level = min($level, 3);
+        $sizeLevel = getenv('PHP_COMPILER_OPT_SIZE_LEVEL');
+        $sizeLevel = is_string($sizeLevel) && ctype_digit($sizeLevel) ? min((int) $sizeLevel, 2) : 0;
+
+        Progress::noteFunction('jit_context_opt_passes_begin');
+        $builder = $this->llvm->createPassManagerBuilder();
+        $builder->setOptLevel($level);
+        $builder->setSizeLevel($sizeLevel);
+        // The value accessors are alwaysinline and tiny; a real inliner is what lets the tag switch
+        // fold once the caller knows the tag.
+        $builder->useInlineWithThreshold($level >= 3 ? 275 : 225);
+
+        // Module pipeline only: the LLVM 9 FFI header does not declare
+        // LLVMCreatePassManagerForModule, so a function pass manager cannot be built here. The
+        // module pipeline populated at O2/O3 already contains the function passes that matter
+        // (mem2reg, instcombine, SCCP, GVN, loop passes), so nothing is lost.
+        $modulePasses = $this->llvm->createPassManager();
+        $builder->populateModulePassManager($modulePasses);
+        $modulePasses->run($this->module);
+        $modulePasses->dispose();
+        $builder->dispose();
+        Progress::noteFunction('jit_context_opt_passes_done');
     }
 
     private function debugScanForPostTerminatorInstructions(): void
