@@ -16362,8 +16362,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/JitMbSearch.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
-- 3 closure(s)
+- 13 class method(s)
+- 4 closure(s)
 
 ### `ext/mbstring/JitMbStrPad.php`
 
@@ -41242,7 +41242,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 933)
+- new ArgumentCountError (line 934)
 - 16 class method(s)
 - 1 closure(s)
 

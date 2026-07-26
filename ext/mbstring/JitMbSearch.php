@@ -75,6 +75,21 @@ final class JitMbSearch
     /**
      * @param JITVariable[] $args
      */
+    public static function tryStrstrFold(Context $context, array $args): ?Value
+    {
+        return self::tryStrchrFamilyFold($context, $args, static function (
+            string $hay,
+            string $needle,
+            bool $part,
+            string $encoding
+        ) {
+            return VmMbstring::strstr($hay, $needle, $part, $encoding);
+        });
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
     public static function tryStristrFold(Context $context, array $args): ?Value
     {
         return self::tryStrchrFamilyFold($context, $args, static function (

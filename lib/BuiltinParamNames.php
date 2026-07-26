@@ -527,11 +527,12 @@ final class BuiltinParamNames
             case 'mb_strripos':
             case 'mb_strrpos':
                 return ['haystack', 'needle', 'offset', 'encoding'];
+            // php-src ext/mbstring/mbstring.stub.php — bool $before_needle (#23350)
             case 'mb_strstr':
             case 'mb_stristr':
             case 'mb_strrchr':
             case 'mb_strrichr':
-                return ['haystack', 'needle', 'part', 'encoding'];
+                return ['haystack', 'needle', 'before_needle', 'encoding'];
             case 'mb_strimwidth':
                 return ['string', 'start', 'width', 'trimmarker', 'encoding'];
             case 'mb_convert_encoding':
