@@ -1233,4 +1233,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($proc, 'xmlwriter', 'xmlwriter_set_indent'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($proc, 'indent', 'xmlwriter_set_indent'));
     }
+
+    /** @covers issue #23455 */
+    public function testSimpleXmlLoadStubNamedParamsResolve(): void
+    {
+        $string = BuiltinParamNames::forFunction('simplexml_load_string');
+        self::assertSame(
+            ['data', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'],
+            $string
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($string, 'data', 'simplexml_load_string'));
+        self::assertSame(
+            3,
+            BuiltinParamNames::lookupNamedParamIndex($string, 'namespace_or_prefix', 'simplexml_load_string')
+        );
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($string, 'ns', 'simplexml_load_string'));
+
+        $file = BuiltinParamNames::forFunction('simplexml_load_file');
+        self::assertSame(
+            ['filename', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'],
+            $file
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($file, 'filename', 'simplexml_load_file'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($file, 'ns', 'simplexml_load_file'));
+    }
 }

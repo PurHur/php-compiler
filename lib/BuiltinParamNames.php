@@ -813,6 +813,11 @@ final class BuiltinParamNames
                 return ['writer', 'prefix', 'name', 'namespace'];
             case 'xmlwriter_write_element_ns':
                 return ['writer', 'prefix', 'name', 'namespace', 'content'];
+            // php-src ext/simplexml/simplexml.stub.php — InternalArgInfo still has ns (#23455)
+            case 'simplexml_load_string':
+                return ['data', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
+            case 'simplexml_load_file':
+                return ['filename', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
         }
 
         return null;
