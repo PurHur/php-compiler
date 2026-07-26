@@ -1,5 +1,7 @@
 --TEST--
-stdlib ldap_exop/ldap_exop_sync/ldap_parse_exop/ldap_exop_whoami/ldap_exop_refresh (#8688, #21835, ext/ldap/ldap.c)
+stdlib ldap_exop/ldap_exop_sync/ldap_parse_exop/ldap_exop_whoami/ldap_exop_refresh (#8688, #21835, #22731)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 declare(strict_types=1);
