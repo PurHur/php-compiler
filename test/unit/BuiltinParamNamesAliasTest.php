@@ -799,4 +799,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'time', 'strtotime'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'now', 'strtotime'));
     }
+
+    /** @covers issue #23183 */
+    public function testSubstrReplaceZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('substr_replace');
+        self::assertSame(['string', 'replace', 'offset', 'length'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'substr_replace'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'replace', 'substr_replace'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'substr_replace'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'substr_replace'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $str / $repl / $start)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'substr_replace'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'repl', 'substr_replace'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'start', 'substr_replace'));
+    }
 }
