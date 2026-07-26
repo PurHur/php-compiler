@@ -257,7 +257,8 @@ final class InheritanceVariance
                 $child->params[$i],
                 $parent->ownerLc,
                 $child->ownerLc,
-                $isClassSubtypeOf
+                $isClassSubtypeOf,
+                $classImplementsInterface
             )) {
                 return self::formatDeclarationError($childClass, $methodLc, $child, $parentClass, $parent);
             }
@@ -295,14 +296,19 @@ final class InheritanceVariance
     }
 
     /**
+     * Parameter contravariance (zend_inheritance.c): parent args must be passable to the child
+     * parameter type — child type is a supertype of the parent type.
+     *
      * @param callable(string, string): bool $isClassSubtypeOf
+     * @param callable(string, string): bool $classImplementsInterface
      */
     private static function isParameterCompatibleStatic(
         ?TypeSig $parent,
         ?TypeSig $child,
         string $parentOwnerLc,
         string $childOwnerLc,
-        callable $isClassSubtypeOf
+        callable $isClassSubtypeOf,
+        ?callable $classImplementsInterface = null
     ): bool {
         if (null === $parent || $parent->isMixed()) {
             return true;
@@ -310,22 +316,21 @@ final class InheritanceVariance
         if (null === $child || $child->isMixed()) {
             return true;
         }
+        // Child must accept null if parent does (cannot narrow away nullability).
         if ($parent->nullable && !$child->nullable) {
             return false;
         }
-        if ($parent->builtinScalar !== null || $child->builtinScalar !== null) {
-            return $parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc);
-        }
-        $parentClass = $parent->resolveClassName($parentOwnerLc);
-        $childClass = $child->resolveClassName($childOwnerLc);
-        if (null === $parentClass || null === $childClass) {
-            return $parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc);
-        }
-        if ($parentClass === $childClass) {
-            return true;
-        }
+        $implements = $classImplementsInterface ?? static fn (string $a, string $b): bool => false;
 
-        return $isClassSubtypeOf($parentClass, $childClass);
+        // Parent type must be a subtype of child type (child is wider / contravariant).
+        return self::isSubtypeOfStatic(
+            $parent,
+            $child,
+            $parentOwnerLc,
+            $childOwnerLc,
+            $isClassSubtypeOf,
+            $implements
+        );
     }
 
     /**
@@ -376,68 +381,136 @@ final class InheritanceVariance
         if ($parent->isNever()) {
             return $child->isNever();
         }
+        // Return covariance: cannot widen nullability (parent string, child ?string).
         if (!$parent->nullable && $child->nullable) {
-            return true;
-        }
-        if ($parent->nullable && !$child->nullable && !$child->isVoid() && !$child->isNever()) {
             return false;
         }
+        // Parent ?T, child T is fine; continue with inner assignability.
         if ($parent->static && !$child->static) {
             return false;
         }
-        if ($parent->builtinScalar !== null || $child->builtinScalar !== null) {
-            if ($parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc)) {
-                return true;
-            }
 
-            return self::isBuiltinReturnCovariant($parent, $child, $childOwnerLc, $classImplementsInterface);
-        }
-        $parentClass = $parent->resolveClassName($parentOwnerLc);
-        $childClass = $child->resolveClassName($childOwnerLc);
-        if (null === $parentClass || null === $childClass) {
-            return $parent->signatureKey($parentOwnerLc) === $child->signatureKey($childOwnerLc);
-        }
-        if ($parentClass === $childClass) {
-            return true;
-        }
-        if ($parent->self && $child->static) {
-            if ($isClassSubtypeOf($childClass, $parentClass)) {
-                return true;
-            }
-
-            return $classImplementsInterface($childClass, $parentClass);
-        }
-        if ($isClassSubtypeOf($childClass, $parentClass)) {
-            return true;
-        }
-
-        return $classImplementsInterface($childClass, $parentClass);
+        // Child return must be a subtype of parent return (covariant).
+        return self::isSubtypeOfStatic(
+            $child,
+            $parent,
+            $childOwnerLc,
+            $parentOwnerLc,
+            $isClassSubtypeOf,
+            $classImplementsInterface
+        );
     }
 
     /**
-     * Return-type covariance for built-in parent types (Zend zend_inheritance.c, issue #6710).
+     * True when a value of $sub is always acceptable where $super is declared
+     * (zend_type assignability / LSP subtype). Nullability is checked by callers
+     * for variance direction; here nullable flags on either side are ignored for
+     * the structural comparison (inners only).
      *
+     * @param callable(string, string): bool $isClassSubtypeOf
      * @param callable(string, string): bool $classImplementsInterface
      */
-    private static function isBuiltinReturnCovariant(
-        TypeSig $parent,
-        ?TypeSig $child,
-        string $childOwnerLc,
+    private static function isSubtypeOfStatic(
+        TypeSig $sub,
+        TypeSig $super,
+        string $subOwnerLc,
+        string $superOwnerLc,
+        callable $isClassSubtypeOf,
         callable $classImplementsInterface
     ): bool {
-        if (null === $child || null === $parent->builtinScalar) {
+        if ($super->isIntersection()) {
+            foreach ($super->intersectionMembers as $member) {
+                if (!self::isSubtypeOfStatic(
+                    $sub,
+                    $member,
+                    $subOwnerLc,
+                    $superOwnerLc,
+                    $isClassSubtypeOf,
+                    $classImplementsInterface
+                )) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        if ($sub->isIntersection()) {
+            foreach ($sub->intersectionMembers as $member) {
+                if (self::isSubtypeOfStatic(
+                    $member,
+                    $super,
+                    $subOwnerLc,
+                    $superOwnerLc,
+                    $isClassSubtypeOf,
+                    $classImplementsInterface
+                )) {
+                    return true;
+                }
+            }
+
             return false;
         }
-        if ('object' === $parent->builtinScalar) {
-            return null !== $child->resolveClassName($childOwnerLc) || $child->self || $child->static;
+
+        if ($super->isVoid() || $super->isNever() || $sub->isVoid() || $sub->isNever()) {
+            return $sub->signatureKey($subOwnerLc) === $super->signatureKey($superOwnerLc);
         }
-        if ('iterable' === $parent->builtinScalar) {
-            if ('array' === $child->builtinScalar) {
+
+        if (null !== $super->builtinScalar) {
+            return self::isBuiltinSuperType($super, $sub, $subOwnerLc, $classImplementsInterface);
+        }
+        if (null !== $sub->builtinScalar) {
+            // Sub is a builtin, super is a class-like — only iterable/object cases above apply.
+            return false;
+        }
+
+        $superClass = $super->resolveClassName($superOwnerLc);
+        $subClass = $sub->resolveClassName($subOwnerLc);
+        if (null === $superClass || null === $subClass) {
+            return $sub->signatureKey($subOwnerLc) === $super->signatureKey($superOwnerLc);
+        }
+        if ($superClass === $subClass) {
+            return true;
+        }
+        if ($super->self && $sub->static) {
+            if ($isClassSubtypeOf($subClass, $superClass)) {
                 return true;
             }
-            $childClass = $child->resolveClassName($childOwnerLc);
-            if (null !== $childClass) {
-                return $classImplementsInterface($childClass, 'traversable');
+
+            return $classImplementsInterface($subClass, $superClass);
+        }
+        if ($isClassSubtypeOf($subClass, $superClass)) {
+            return true;
+        }
+
+        return $classImplementsInterface($subClass, $superClass);
+    }
+
+    /**
+     * @param callable(string, string): bool $classImplementsInterface
+     */
+    private static function isBuiltinSuperType(
+        TypeSig $super,
+        TypeSig $sub,
+        string $subOwnerLc,
+        callable $classImplementsInterface
+    ): bool {
+        if (null !== $sub->builtinScalar) {
+            if ($super->builtinScalar === $sub->builtinScalar) {
+                return true;
+            }
+            if ('iterable' === $super->builtinScalar && 'array' === $sub->builtinScalar) {
+                return true;
+            }
+
+            return false;
+        }
+        if ('object' === $super->builtinScalar) {
+            return null !== $sub->resolveClassName($subOwnerLc) || $sub->self || $sub->static;
+        }
+        if ('iterable' === $super->builtinScalar) {
+            $subClass = $sub->resolveClassName($subOwnerLc);
+            if (null !== $subClass) {
+                return $classImplementsInterface($subClass, 'traversable');
             }
         }
 
@@ -455,7 +528,8 @@ final class InheritanceVariance
             $child,
             $parentOwnerLc,
             $childOwnerLc,
-            fn (string $subtype, string $supertype): bool => $this->isClassSubtypeOf($subtype, $supertype)
+            fn (string $subtype, string $supertype): bool => $this->isClassSubtypeOf($subtype, $supertype),
+            fn (string $classLc, string $interfaceLc): bool => $this->classImplementsInterface($classLc, $interfaceLc)
         );
     }
 
@@ -727,6 +801,9 @@ final class TypeSig
 
     public bool $never = false;
 
+    /** @var list<TypeSig>|null Intersection members (A&B); mutually exclusive with scalar/class. */
+    public ?array $intersectionMembers = null;
+
     public static function fromCfgType(?Op\Type $type): ?self
     {
         if (null === $type) {
@@ -751,6 +828,22 @@ final class TypeSig
             $inner->nullable = true;
 
             return $inner;
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            $members = [];
+            foreach ($type->types as $memberType) {
+                $member = self::fromCfgType($memberType);
+                if (null === $member || $member->isMixed()) {
+                    return null;
+                }
+                $members[] = $member;
+            }
+            if ([] === $members) {
+                return null;
+            }
+            $sig->intersectionMembers = $members;
+
+            return $sig;
         }
         if ($type instanceof Op\Type\Literal) {
             $name = strtolower($type->name);
@@ -807,9 +900,15 @@ final class TypeSig
         return null;
     }
 
+    public function isIntersection(): bool
+    {
+        return null !== $this->intersectionMembers && [] !== $this->intersectionMembers;
+    }
+
     public function isMixed(): bool
     {
-        return !$this->void && !$this->never && null === $this->builtinScalar && null === $this->classLc && !$this->self && !$this->static;
+        return !$this->void && !$this->never && null === $this->builtinScalar && null === $this->classLc
+            && !$this->self && !$this->static && !$this->isIntersection();
     }
 
     public function isVoid(): bool
@@ -839,6 +938,15 @@ final class TypeSig
         if ($this->never) {
             return 'never';
         }
+        if ($this->isIntersection()) {
+            $parts = [];
+            foreach ($this->intersectionMembers as $member) {
+                $parts[] = $member->signatureKey($ownerLc);
+            }
+            sort($parts);
+
+            return '('.implode('&', $parts).')'.($this->nullable ? '?' : '');
+        }
         if (null !== $this->builtinScalar) {
             return $this->builtinScalar.($this->nullable ? '?' : '');
         }
@@ -854,6 +962,14 @@ final class TypeSig
         }
         if ($this->never) {
             return 'never';
+        }
+        if ($this->isIntersection()) {
+            $parts = [];
+            foreach ($this->intersectionMembers as $member) {
+                $parts[] = $member->format();
+            }
+
+            return ($this->nullable ? '?' : '').implode('&', $parts);
         }
         if (null !== $this->builtinScalar) {
             return ($this->nullable ? '?' : '').$this->builtinScalar;

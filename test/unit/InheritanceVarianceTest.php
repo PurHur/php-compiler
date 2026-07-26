@@ -10,7 +10,7 @@ use PHPCompiler\Compiler\TypeSig;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #3323 */
+/** @covers issue #3323, #23504 */
 final class InheritanceVarianceTest extends TestCase
 {
     public function testInterfaceExtendsIncompatibleStaticReturnFailsAtCompileTime(): void
@@ -344,5 +344,103 @@ PHP;
             static fn (string $sub, string $super): bool => false,
             static fn (string $class, string $iface): bool => 'c' === $class && 'i' === $iface
         ));
+    }
+
+    /** Zend: child may widen param nullability (string → ?string), #23504. */
+    public function testNullableParamWidenAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(string $x): void {} }
+class B extends A { public function f(?string $x): void {} }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'null_param_widen.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Zend: child may widen class param to object, #23504. */
+    public function testObjectParamWidenAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(\stdClass $x): void {} }
+class B extends A { public function f(object $x): void {} }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'object_param_widen.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Zend: child may narrow return nullability (?string → string), #23504. */
+    public function testNullableReturnNarrowAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(): ?string { return null; } }
+class B extends A { public function f(): string { return "x"; } }
+echo (new B())->f(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'null_return_narrow.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("x\n", ob_get_clean());
+    }
+
+    /** Zend: child may narrow return to intersection subtype, #23504. */
+    public function testIntersectionReturnNarrowAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {}
+interface J {}
+class A { public function f(): I { return new class implements I {}; } }
+class B extends A { public function f(): I&J { return new class implements I, J {}; } }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intersect_return.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Zend: child must not widen return nullability (string → ?string), #23504. */
+    public function testNullableReturnWidenFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(): string { return "x"; } }
+class B extends A { public function f(): ?string { return null; } }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::f(): ?string must be compatible with A::f(): string');
+        $runtime->parseAndCompile($code, 'null_return_widen.php');
+    }
+
+    /** Zend: child must not narrow object param to class, #23504. */
+    public function testObjectParamNarrowFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public function f(object $x): void {} }
+class B extends A { public function f(\stdClass $x): void {} }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Declaration of B::f(stdClass $x): void must be compatible with A::f(object $x): void');
+        $runtime->parseAndCompile($code, 'object_param_narrow.php');
     }
 }
