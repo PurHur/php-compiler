@@ -19,6 +19,10 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        // php-src ext/hash/hash.stub.php — HASH_HMAC (#23585)
+        $hmac = new VM\Variable();
+        $hmac->int(VmHashContext::HASH_HMAC);
+        $runtime->vmContext->defineConstant('HASH_HMAC', $hmac);
         foreach (MhashRegistry::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);

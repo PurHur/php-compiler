@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Builtin\StringBin2hex;
 use PHPCompiler\JIT\Builtin\StringHashCrypto;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -46,15 +47,33 @@ final class JitHashContext
 
     public static function init(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('hash_init() requires exactly one argument in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                $argc < 1
+                    ? 'hash_init() expects at least 1 argument, %d given'
+                    : 'hash_init() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
         HashContextEmbedBridge::ensureLinked($context);
         // Z_PARAM_STR $algo — non-strict null is E_DEPRECATED + '' then ValueError (#21572).
         $algoStr = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_init', 0, 'algo')
             : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'hash_init', 0, 'algo');
-        $handle = self::callHelper($context, self::INIT_HELPER, $algoStr);
+        $i64 = $context->getTypeFromString('int64');
+        $flagsLong = $i64->constInt(0, false);
+        if (isset($args[1])) {
+            $flagsLong = JitLongArg::lower($context, $args[1], 'hash_init(): Argument #2 ($flags)');
+        }
+        $keyStr = self::emptyString($context);
+        if (isset($args[2])) {
+            $keyStr = $context->callerStrictTypes
+                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'hash_init', 2, 'key')
+                : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[2], 'hash_init', 2, 'key');
+        }
+        // $options (arg 4) accepted for arity/stub parity — unused for sha256/sha1/md5.
+        $handle = self::callHelper($context, self::INIT_HELPER, $algoStr, $flagsLong, $keyStr);
 
         $objectType = $context->type->object;
         $className = HashContextJitSupport::CLASS_NAME;
@@ -68,6 +87,13 @@ final class JitHashContext
             $obj,
             HashContextJitSupport::PROP_BUF,
             self::emptyString($context)
+        );
+        self::storeStringProperty($context, $obj, HashContextJitSupport::PROP_KEY, $keyStr);
+        self::storeNativeLongProperty(
+            $context,
+            $obj,
+            HashContextJitSupport::PROP_HMAC,
+            $context->builder->and($flagsLong, $i64->constInt(VmHashContext::HASH_HMAC, false))
         );
 
         return self::boxObject($context, $obj);
@@ -161,8 +187,8 @@ final class JitHashContext
 
     /**
      * Thin standalone AOT (`isThinStandaloneAotMain`, #20200): HashContextJitHelper::finalize
-     * segfaults at execute (#3357). One-shot __compiler_hash on buffered data + inline bin2hex
-     * when $binary is false.
+     * segfaults at execute (#3357). One-shot __compiler_hash / __compiler_hash_hmac on buffered
+     * data + inline bin2hex when $binary is false.
      */
     private static function finalLoweringStandaloneAot(
         Context $context,
@@ -176,9 +202,12 @@ final class JitHashContext
         $handle = self::loadHandle($context, $obj);
         $algoPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_ALGO);
         $dataPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_BUF);
+        $keyPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_KEY);
+        $hmacFlag = self::loadNativeLongProperty($context, $obj, HashContextJitSupport::PROP_HMAC);
         $map = $context->structFieldMap['__string__'];
         $charPtr = $context->getTypeFromString('char*');
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $dataLen = $context->builder->load($context->builder->structGep($dataPtr, $map['length']));
         $dataBytes = $context->builder->structGep($dataPtr, $map['value']);
         $dataForHash = $context->builder->call(
@@ -186,12 +215,40 @@ final class JitHashContext
             $dataLen,
             $context->builder->pointerCast($dataBytes, $charPtr)
         );
-        $digestBinary = $context->builder->call(
+        $isHmac = $context->builder->icmp(
+            Builder::INT_NE,
+            $hmacFlag,
+            $i64->constInt(0, false)
+        );
+        $hmacBb = BasicBlockHelper::append($context, 'hc_final_hmac');
+        $plainBb = BasicBlockHelper::append($context, 'hc_final_plain');
+        $digestBb = BasicBlockHelper::append($context, 'hc_final_digest');
+        $context->builder->branchIf($isHmac, $hmacBb, $plainBb);
+
+        $context->builder->positionAtEnd($hmacBb);
+        $digestHmac = $context->builder->call(
+            $context->lookupFunction('__compiler_hash_hmac'),
+            $algoPtr,
+            $dataForHash,
+            $keyPtr,
+            $i32->constInt(1, false)
+        );
+        $context->builder->branch($digestBb);
+
+        $context->builder->positionAtEnd($plainBb);
+        $digestPlain = $context->builder->call(
             $context->lookupFunction('__compiler_hash'),
             $algoPtr,
             $dataForHash,
             $i32->constInt(1, false)
         );
+        $context->builder->branch($digestBb);
+
+        $context->builder->positionAtEnd($digestBb);
+        $strPtrType = $context->getTypeFromString('__string__*');
+        $digestBinary = $context->builder->phi($strPtrType);
+        $digestBinary->addIncoming($digestHmac, $hmacBb);
+        $digestBinary->addIncoming($digestPlain, $plainBb);
         self::callHelper($context, self::MARK_FINAL_HELPER, $handle);
 
         $wantRawBb = BasicBlockHelper::append($context, 'hc_final_raw');
@@ -210,7 +267,6 @@ final class JitHashContext
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
-        $strPtrType = $context->getTypeFromString('__string__*');
         $digestStr = $context->builder->phi($strPtrType);
         $digestStr->addIncoming($digestBinary, $wantRawBb);
         $digestStr->addIncoming($digestHex, $hexBb);
@@ -260,6 +316,18 @@ final class JitHashContext
             $dst,
             HashContextJitSupport::PROP_BUF,
             self::loadStringProperty($context, $src, HashContextJitSupport::PROP_BUF)
+        );
+        self::storeStringProperty(
+            $context,
+            $dst,
+            HashContextJitSupport::PROP_KEY,
+            self::loadStringProperty($context, $src, HashContextJitSupport::PROP_KEY)
+        );
+        self::storeNativeLongProperty(
+            $context,
+            $dst,
+            HashContextJitSupport::PROP_HMAC,
+            self::loadNativeLongProperty($context, $src, HashContextJitSupport::PROP_HMAC)
         );
 
         return self::boxObject($context, $dst);
@@ -331,31 +399,45 @@ final class JitHashContext
         return $context->helper->loadValue($strVar);
     }
 
-    private static function storeHandle(Context $context, Value $obj, Value $handleI64): void
-    {
+    private static function storeNativeLongProperty(
+        Context $context,
+        Value $obj,
+        string $prop,
+        Value $longVal
+    ): void {
         $handleVar = new JITVariable(
             $context,
             JITVariable::TYPE_NATIVE_LONG,
             JITVariable::KIND_VALUE,
-            $handleI64
+            $longVal
         );
         $context->type->object->storeInstanceProperty(
             $obj,
             HashContextJitSupport::CLASS_NAME,
-            HashContextJitSupport::PROP_ID,
+            $prop,
             $handleVar
         );
     }
 
-    private static function loadHandle(Context $context, Value $obj): Value
+    private static function loadNativeLongProperty(Context $context, Value $obj, string $prop): Value
     {
         $handleVar = $context->type->object->propertyFetch(
             $obj,
             HashContextJitSupport::CLASS_NAME,
-            HashContextJitSupport::PROP_ID
+            $prop
         );
 
         return $context->helper->loadValue($handleVar);
+    }
+
+    private static function storeHandle(Context $context, Value $obj, Value $handleI64): void
+    {
+        self::storeNativeLongProperty($context, $obj, HashContextJitSupport::PROP_ID, $handleI64);
+    }
+
+    private static function loadHandle(Context $context, Value $obj): Value
+    {
+        return self::loadNativeLongProperty($context, $obj, HashContextJitSupport::PROP_ID);
     }
 
     private static function callHelper(Context $context, string $logical, Value ...$args): Value

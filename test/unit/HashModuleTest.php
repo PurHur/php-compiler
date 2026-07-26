@@ -67,6 +67,35 @@ PHP;
         );
     }
 
+    public function test_hash_init_hmac_and_reflection(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$rf = new ReflectionFunction('hash_init');
+echo $rf->getNumberOfParameters(), "\n";
+foreach ($rf->getParameters() as $p) {
+    echo $p->getName(), "\n";
+}
+echo defined('HASH_HMAC') ? HASH_HMAC : 'missing', "\n";
+$c = hash_init('sha256', HASH_HMAC, 'secret');
+hash_update($c, 'msg');
+echo hash_final($c), "\n";
+$c2 = hash_init(algo: 'md5', flags: 0);
+hash_update($c2, 'x');
+echo hash_final($c2), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'hash_init_hmac.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "4\nalgo\nflags\nkey\noptions\n1\n"
+            .'fe4f9c418f683f034f6af90d1dd5b86ac0355dd96332c59cc74598d0736107f6'."\n"
+            .'9dd4e461268c8034f5c8564e155c67a6'."\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_hash_init_invalid_algo_value_error(): void
     {
         $runtime = new Runtime();

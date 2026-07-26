@@ -45,6 +45,9 @@ final class HashContextSerializeSupport
             );
         }
         $algoName = VmHashNative::resolveAlgoName($state['algo']);
+        if (0 !== ($state['flags'] & VmHashContext::HASH_HMAC) || null !== $state['hmacKey']) {
+            throw new \Exception('HashContext with HASH_HMAC option cannot be serialized');
+        }
         $ctxBag = self::exportContextState($state['algo'], $state['ctx']);
         if (null === $ctxBag) {
             throw new \Exception(
@@ -54,7 +57,7 @@ final class HashContextSerializeSupport
 
         return VmJson::import([
             0 => $algoName,
-            1 => 0, // options (HASH_HMAC not supported for incremental serialize)
+            1 => $state['flags'],
             2 => $ctxBag,
             3 => self::MAGIC_SPEC,
             4 => [],

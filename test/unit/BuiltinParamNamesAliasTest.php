@@ -964,6 +964,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23585 */
+    public function testHashInitZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash_init');
+        self::assertSame(['algo', 'flags', 'key', 'options'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'algo', 'hash_init'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'hash_init'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'key', 'hash_init'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'hash_init'));
+    }
+
     /** @covers issue #23490 */
     public function testArrayFillKeysZendStubNamedParams(): void
     {

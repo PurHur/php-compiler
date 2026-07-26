@@ -17,4 +17,10 @@ final class HashContextJitSupport
 
     /** Mirrored update buffer for standalone AOT final (#3357). */
     public const PROP_BUF = '__hcBuf';
+
+    /** Original HMAC key for standalone AOT final via __compiler_hash_hmac (#23585). */
+    public const PROP_KEY = '__hcKey';
+
+    /** Non-zero when HASH_HMAC was requested (standalone AOT; #23585). */
+    public const PROP_HMAC = '__hcHmac';
 }
