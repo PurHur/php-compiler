@@ -187,6 +187,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23350 */
+    public function testMbStrstrFamilyBeforeNeedleNamedParamsResolve(): void
+    {
+        foreach (['mb_strstr', 'mb_stristr', 'mb_strrchr', 'mb_strrichr'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['haystack', 'needle', 'before_needle', 'encoding'], $names, $fn);
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'before_needle', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'part', $fn), $fn);
+        }
+    }
+
     /** @covers issue #10027 #23224 */
     public function testTrimCharactersNamedParamResolves(): void
     {

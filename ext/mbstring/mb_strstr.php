@@ -61,6 +61,10 @@ final class mb_strstr extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('mb_strstr() requires two to four arguments');
         }
+        $folded = JitMbSearch::tryStrstrFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
 
         throw new \LogicException('mb_strstr() is not lowered for JIT/AOT in this compiler build');
     }
