@@ -83,6 +83,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_info.php';
         require_once __DIR__.'/mysqli_stat.php';
         require_once __DIR__.'/mysqli_conn_lifecycle_api.php';
+        require_once __DIR__.'/mysqli_debug_api.php';
         parent::init($runtime);
         if (!MysqliExtensionPolicy::advertisesExtension()) {
             return;
@@ -207,6 +208,8 @@ class Module extends ModuleAbstract
             new mysqli_thread_id(),
             new mysqli_kill(),
             new mysqli_get_client_stats(),
+            new mysqli_dump_debug_info(),
+            new mysqli_debug(),
         ];
     }
 }
