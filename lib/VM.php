@@ -3857,6 +3857,10 @@ restart:
                             $stored = VM\EnumCaseSupport::materializeGlobalVariableValue($this->context, $arg3);
                             $arg2->copyFrom($stored);
                             $arg1->copyFrom($stored);
+                            // materializeGlobalVariableValue returns a non-scope Variable; its
+                            // object/array ref must be dropped or script-global assign leaks and
+                            // defers __destruct until shutdown (#23484, re-#6456).
+                            $stored->reset();
                         } else {
                             $arg2->copyFrom($arg3);
                             $arg1->copyFrom($arg3);
@@ -19272,7 +19276,8 @@ restart:
             if (OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $next->type) {
                 continue;
             }
-            foreach ([$next->arg1, $next->arg2, $next->arg3] as $arg) {
+            // Skip startLine / call-site line immediates — same rule as Block::opCodeReadsScopeSlot (#23484).
+            foreach ($block->opCodeValueScopeArgs($next) as $arg) {
                 if (is_int($arg) && $arg === $slot) {
                     return true;
                 }
