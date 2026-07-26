@@ -53,6 +53,59 @@ final class ldap_bind extends Internal
     }
 }
 
+final class ldap_bind_ext extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_bind_ext');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_bind_ext() expects between 1 and 4 arguments, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_bind_ext', 1);
+        $dn = null;
+        if ($argc >= 2 && Variable::TYPE_NULL !== $frame->calledArgs[1]->resolveIndirect()->type) {
+            $dn = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'ldap_bind_ext', 1, 'dn');
+            if (str_contains($dn, "\0")) {
+                throw new \TypeError('ldap_bind_ext(): Argument #2 ($dn) must not contain null bytes');
+            }
+        }
+        $password = null;
+        if ($argc >= 3 && Variable::TYPE_NULL !== $frame->calledArgs[2]->resolveIndirect()->type) {
+            $password = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'ldap_bind_ext', 2, 'password');
+            if (str_contains($password, "\0")) {
+                throw new \TypeError('ldap_bind_ext(): Argument #3 ($password) must not contain null bytes');
+            }
+        }
+        // arg 4 ($controls) accepted; ignored in v1 (same as ldap_exop / modify_ext).
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ldap_bind_ext() requires a VM context');
+        }
+        $result = VmLdapCore::bindExt($conn, $dn, $password, $ctx);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->copyFrom($result);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_bind_ext() is not implemented for JIT in this compiler build (issue #22164)');
+    }
+}
+
 final class ldap_unbind extends Internal
 {
     public function __construct()

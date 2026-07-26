@@ -50,6 +50,34 @@ final class VmLdapCore
     }
 
     /**
+     * ldap_bind_ext → LDAP\Result|false (php-src ext/ldap/ldap.c; #22164).
+     *
+     * @return Variable|false
+     */
+    public static function bindExt(
+        ObjectEntry $connection,
+        ?string $dn,
+        ?string $password,
+        Context $ctx
+    ): Variable|false {
+        $ld = VmLdapConnection::native($connection);
+        $info = VmLdapNative::bindExtAsync($ld, $dn, $password);
+        $rc = $info['errno'];
+        VmLdapConnection::setErrno($connection, $rc);
+        if (null === $info['result']) {
+            @\trigger_error(\sprintf(
+                'ldap_bind_ext(): Unable to bind to server: %s (%d)',
+                -1 === $rc ? 'Bind operation failed' : VmLdapNative::err2string($rc),
+                $rc
+            ), \E_USER_WARNING);
+
+            return false;
+        }
+
+        return VmLdapResult::wrapResult($info['result'], $ctx, $connection);
+    }
+
+    /**
      * @param list<string> $attributes
      * @return Variable|false
      */
