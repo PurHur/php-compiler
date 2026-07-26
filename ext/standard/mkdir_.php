@@ -12,7 +12,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mkdir() — VM via VmFs; JIT/AOT via MkdirJitHelper PHP (#15586). */
+/**
+ * mkdir() — VM via VmFs; JIT/AOT via MkdirJitHelper PHP (#15586, #23453).
+ *
+ * php-src: ext/standard/filestat.c — PHP_FUNCTION(mkdir) / php_stream_mkdir with optional context.
+ * Stream $context is accepted and type-checked; wrapper contexts that change mkdir semantics
+ * are not yet applied (same accept/ignore shape as unlink/copy/rename).
+ */
 final class mkdir_ extends Internal
 {
     public function __construct()
@@ -23,11 +29,21 @@ final class mkdir_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                'mkdir() expects at least 1 argument, '.$argc.' given'
+            );
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(
+                'mkdir() expects at most 4 arguments, '.$argc.' given'
+            );
         }
         if (!isset($frame->calledArgs[0])) {
             throw new \ArgumentCountError('mkdir(): Argument #1 ($directory) not passed');
+        }
+        if (isset($frame->calledArgs[3])) {
+            VmStreamContext::validateOptionalContextArg($frame->calledArgs[3], 'mkdir', 4);
         }
         $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'mkdir', 0, 'directory', $frame);
         $mode = 0777;
@@ -59,8 +75,18 @@ final class mkdir_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                'mkdir() expects at least 1 argument, '.$argc.' given'
+            );
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(
+                'mkdir() expects at most 4 arguments, '.$argc.' given'
+            );
+        }
+        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
+            JitStreamContextOptionalArg::validate($context, $args[3], 'mkdir', 4);
         }
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'mkdir', 0, 'directory');
         $i64 = $context->getTypeFromString('int64');

@@ -273,7 +273,8 @@ final class BuiltinParamNames
             case 'clearstatcache':
                 return ['clear_realpath_cache', 'filename'];
             case 'mkdir':
-                return ['directory', 'permissions', 'recursive'];
+                // php-src ext/standard/basic_functions.stub.php / filestat.c (#23453)
+                return ['directory', 'permissions', 'recursive', 'context'];
             case 'sem_get':
                 // php-src ext/sysvsem/sysvsem.stub.php (#19515)
                 return ['key', 'max_acquire', 'permissions', 'auto_release'];

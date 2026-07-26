@@ -181,7 +181,7 @@ final class VmStreamContext
         return $resolved;
     }
 
-    /** Optional stream-context parameter on copy/rename/unlink (ext/standard/file.c). */
+    /** Optional stream-context parameter on copy/rename/unlink/mkdir/rmdir (ext/standard/file.c / filestat.c). */
     public static function validateOptionalContextArg(
         Variable $var,
         string $functionName,
