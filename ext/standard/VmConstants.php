@@ -28,6 +28,19 @@ final class VmConstants
             return self::lookupClassConstant($ctx, $name);
         }
 
+        return self::globalConstantLookup($ctx, $name);
+    }
+
+    /**
+     * Global-only constant fetch — zend_get_constant_ptr semantics (#23604).
+     * Never resolves Class::CONST (that is constant() / ReflectionClassConstant).
+     */
+    public static function globalConstantLookup(Context $ctx, string $name): ?Variable
+    {
+        if (str_contains($name, '::')) {
+            return null;
+        }
+
         return $ctx->constantFetchBuiltin(VmReflection::normalizeGlobalIntrospectionName($name));
     }
 
@@ -38,6 +51,19 @@ final class VmConstants
     {
         if (str_contains($name, '::')) {
             return self::isClassConstantDefined($ctx, $name);
+        }
+
+        return self::globalConstantDefined($ctx, $name);
+    }
+
+    /**
+     * Global-only defined() — ReflectionConstant::__construct (#23604, php_reflection.c).
+     * Class::CONST names are not global constants (use ReflectionClassConstant).
+     */
+    public static function globalConstantDefined(Context $ctx, string $name): bool
+    {
+        if (str_contains($name, '::')) {
+            return false;
         }
 
         return $ctx->constantDefinedBuiltin(VmReflection::normalizeGlobalIntrospectionName($name));

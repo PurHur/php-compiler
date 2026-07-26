@@ -36,7 +36,8 @@ final class ReflectionConstantConstruct extends VmClassMethod
             }
             $ctx = VmReflection::requireContext($frame);
             $constant = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionConstant::__construct() name', 1);
-            if (!VmConstants::constantDefined($ctx, $constant)) {
+            // php-src: zend_get_constant_ptr — globals only; Class::CONST is ReflectionClassConstant (#23604).
+            if (!VmConstants::globalConstantDefined($ctx, $constant)) {
                 ReflectionSupport::throwReflectionException(
                     ReflectionSupport::globalConstantNotFoundMessage($constant)
                 );
