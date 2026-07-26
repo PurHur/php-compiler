@@ -450,7 +450,14 @@ class ObjectEntry {
             $clone->shadowedPrivateProperties[$shadowKey]->copyFromForClone($var);
         }
         $clone->constructed = $this->constructed;
-        $clone->closureState = $this->closureState;
+        // zend_closure_clone → zend_create_closure: zend_array_dup(static_variables) (#23489).
+        // Sharing ClosureState made clone and original keep one static table (a1/b2/c3).
+        if (null !== $this->closureState) {
+            $clone->closureState = $this->closureState->cloneForObjectClone();
+            $clone->closureState->ownerObject = $clone;
+        } else {
+            $clone->closureState = null;
+        }
         $clone->lazyInitializer = $this->lazyInitializer;
         $clone->lazyPending = $this->lazyPending;
         $clone->lazyGhost = $this->lazyGhost;
