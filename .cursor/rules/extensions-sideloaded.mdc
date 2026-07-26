@@ -1,0 +1,60 @@
+---
+description: Extensions are side-loaded, not compiled in — keep the core small and the ext boundary clean
+globs: ext/**/*,lib/Runtime.php,lib/JIT/Context.php,bin/**/*
+alwaysApply: false
+---
+
+# Extensions are side-loaded
+
+**Direction (2026-07-26):** the compiler core must not include every extension by default.
+Extensions are separate, discoverable, side-loadable modules. Third parties must be able to add one
+without patching the core.
+
+## Where we are starting from
+
+- `Runtime::loadCoreModules()` hardcodes **75** `$this->load(new ext\X\Module)` calls. Every
+  extension is instantiated on every run, whether or not the script touches it.
+- `ext/` is **4,715 files** against `lib/`'s 1,853 — extensions are ~72% of the tree.
+- The gen-0 spine is 6,519 files, i.e. essentially `lib + ext`. Extensions are therefore the bulk of
+  the translation unit that takes ~4.6 h and OOMs (#22642).
+- `phpc build` on `<?php echo "hello";` produces a **14.8 MB** binary, because everything links in.
+
+So this is not only an architecture preference — the extension boundary is the biggest single lever
+on build time, binary size and the gen-0 rebuild problem.
+
+## Rules for new work
+
+1. **Do not add an entry to `loadCoreModules()`.** New extensions register through discovery, not by
+   editing a hardcoded list. If discovery does not exist yet for your case, say so rather than
+   appending to the list.
+2. **No core → ext imports.** `lib/` must not reference `ext\<name>\…` for any non-core extension.
+   Dependencies point ext → core, never the reverse. Core-level hooks belong in `lib/`, with the
+   extension implementing an interface.
+3. **Each extension owns its surface**: its `Module.php`, its builtins, its JIT handlers, its
+   capability-matrix rows, its tests. Adding an extension should touch only `ext/<name>/**` plus
+   generated matrices.
+4. **A script that never calls into an extension must not pay for it** — not in link time, not in
+   binary size, not in startup. That is the acceptance test for this work.
+5. **Keep the ext boundary honest**: an unbound cross-module call lowers to `__value__writeNull` with
+   no diagnostic (#579). Run with `PHP_COMPILER_REPORT_EXTERNAL_STUBS=1` when changing module
+   boundaries — a silent null is a miscompile, not a missing feature.
+
+## Direction of travel
+
+- **Discovery over hardcoding**: a manifest per extension (name, provided symbols, dependencies,
+  capability rows), enumerated at build time — not 75 constructor calls.
+- **Opt-in linking**: the set of extensions is a property of the build (`phpc.json` / CLI), with a
+  small default set. `--with-ext=` / `--without-ext=` rather than all-or-nothing.
+- **Bundle only what is reachable**: prefer linking extensions the program actually references, with
+  an explicit override for dynamic use (`$fn = 'curl_init'`).
+- **The spine follows the same partition.** Per-extension translation units make the gen-0 build
+  incremental and parallel, which is the same shape as the helper-runtime cache
+  (`lib/AOT/HelperRuntimeCache.php` + `script/emit-helper-runtime-object.php`) — a crash resumes at
+  the failing unit and one edit re-emits one unit. The spine is already ~96% partitionable: only
+  3–4% of intra-spine class references cross a directory boundary (#23018, #23033).
+
+## When touching this area
+
+Measure and report all three, before and after: **gen-0/spine file count**, **hello-world binary
+size**, **cold `phpc build` wall time**. Those are the numbers that justify the churn, and they are
+cheap to collect.

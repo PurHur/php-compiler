@@ -16,6 +16,18 @@ When an issue is about **compilation** (language features, builtins, AOT):
 
 ## Tests
 
+**Differential sweep first** for anything touching argument handling, call lowering, operand/slot
+resolution or CFG shape — the compliance suite only checks recorded expectations, so it misses
+silent wrong output:
+
+```bash
+script/differential-sweep.sh          # VM
+script/differential-sweep.sh --aot    # AOT — least-covered path
+```
+
+See `correctness-gates.mdc` for how to compare compliance suites (by failing case **name**, never by
+count — neither suite is green on master) and for the flaky quarantine list.
+
 - VM: `test/compliance/` — `JITTest` / `VMTest`
 - AOT: `test/aot/AotTest.php` + `test/fixtures/aot/cases/*.phpt`
 - Web: `test/real/`, `test/unit/Web/`, `@group serve` (needs loopback TCP)
@@ -33,6 +45,10 @@ Filter locally:
 - PHP implementation: `ext/standard/*.php`
 - Register in `ext/standard/Module.php`
 - JIT: add `lib/JIT/Builtin/` handler or mark VM-only in capability matrix
+
+**Do not add entries to `Runtime::loadCoreModules()`.** It already hardcodes 75 module loads, which
+is why every binary links every extension (`echo "hello"` → 14.8 MB). Extensions are moving to
+side-loaded discovery — see `extensions-sideloaded.mdc`.
 
 ## Patches
 

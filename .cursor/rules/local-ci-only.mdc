@@ -7,6 +7,12 @@ alwaysApply: true
 
 This project **does not use GitHub Actions for CI** (billing limits). Do **not** create, edit, or depend on `.github/workflows/*` to build or test. Implement and verify everything **on the developer machine** (or Runforge harness with Docker).
 
+> **Corollary — `CLEAN` is not green.** The one workflow that exists carries a `paths:` filter that
+> excludes `lib/JIT/**`, `lib/VM/**` and `ext/**`, so a PR touching lowering gets **no checks at
+> all** and `gh pr view` still reports `MERGEABLE` / `CLEAN`. That means "no checks configured".
+> Never cite it as evidence — name the gate you ran locally, and say what you did not cover.
+> For lowering changes the minimum is `script/differential-sweep.sh` (see `correctness-gates.mdc`).
+
 ## Required verification
 
 From repo root, after `composer install`:

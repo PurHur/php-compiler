@@ -1,0 +1,50 @@
+---
+description: Never make a gate green without making the thing work — restamps, copy-fallbacks, and unearned claims
+alwaysApply: true
+---
+
+# Artifact honesty
+
+The recurring failure mode in this repo is not a hard bug, it is a **cheap green**: it has repeatedly
+been easier to satisfy a gate than to make the artifact work. Treat that as the thing to guard
+against.
+
+Documented instances:
+
+- The committed gen-0 driver cannot compile **any** input, including hello-world (#23468), while
+  every freshness gate reports green — because the gates compare a stamp, not behaviour. Its bytes
+  are from 2026-06-15 with 6441 lowering commits since and **272 manifest restamps**.
+- The M3/M4 ladder reported prelinked blob **copies** as native emits via a hardcoded
+  `emit_path=native` string, a copy-fallback branch that set the success flag, and a substring match
+  on `native-prelinked-sidecar` (#21860). The resulting "byte-identical fixpoint" claim had to be
+  retracted.
+- The committed helper-runtime cache sat fingerprint-stale for **20 days**, silently disabling
+  itself, and nothing noticed (#23457, #23458).
+
+## Rules
+
+1. **Never restamp to make a gate green.** Updating `.bootstrap_lowering_source.sha`, a manifest
+   fingerprint, or any freshness marker without a build that produced the artifact is falsifying a
+   claim. If a gate is red because an artifact is stale, either rebuild it or report it stale —
+   `script/bootstrap-gen0-staleness.php` derives age from git history precisely so a stamp cannot
+   satisfy it.
+2. **A gate must exercise function, not existence.** "The file is there" and "the string says
+   native" are not evidence. The check should fail if the artifact stopped working.
+3. **When a gate reports success, ask two questions**: is the success string *computed or
+   hardcoded*, and is the "OK" branch actually the *fallback* branch? Both have shipped here.
+4. **An empty result set is not a pass.** A glob matching zero units, a filter selecting zero tests
+   ("No tests executed!" exits **0**), a scan finding zero files — all read as green. Assert the
+   expected count.
+5. **Do not quote a number you cannot regenerate.** Benchmark claims must trace to a committed table
+   produced by `script/bench.php` or `script/rebuild-examples.php`, on a quiet machine, in the
+   pinned container — and every runtime must have produced **identical output** first. A fast wrong
+   binary is not a benchmark: `mandelbrot` currently renders all `_` under AOT (#23471) and
+   `Ack(3,8)` segfaults (#23472), so those columns cannot honestly be filled today.
+6. **`n/a` with a reason beats a number you do not trust.** The benchmark harness degrades a column
+   and says why (timeout vs mismatch vs build failure); keep that property.
+
+## Reporting
+
+Say what you verified, how, and what you did not cover. If a result is partial — a shard timed out,
+a suite was not run, a column is `n/a` — state it plainly in the PR. A claim that overstates
+coverage costs more than the work it saved, because the next person builds on it.
