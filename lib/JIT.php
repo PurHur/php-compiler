@@ -17068,6 +17068,13 @@ class JIT {
 
                 return;
             }
+            if (JIT\MagicMethodDispatch::tryInitMagicCallStatic(
+                $this->context,
+                $declaringClassLc,
+                $nameOp->value
+            )) {
+                return;
+            }
             throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
         }
         // parent:: / self:: dispatch to resolved code but must not clobber late-static scope

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6570 |
-| Phase A inventory files (M2 ratio SSOT) | 6570 |
+| PHP files on vm.php path | 6571 |
+| Phase A inventory files (M2 ratio SSOT) | 6571 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21229 |
+| Source constructs flagged (warnings) | 21239 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5689,7 +5689,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/ListUnpackHelper.php` | 0 | 1 |
 | `lib/JIT/M3EmitTuTrivialEchoAot.php` | 0 | 2 |
 | `lib/JIT/MagicMethodDispatch.php` | 0 | 1 |
-| `lib/JIT/MagicMethodLlvm.php` | 0 | 8 |
+| `lib/JIT/MagicMethodLlvm.php` | 0 | 14 |
 | `lib/JIT/McjitEmbedHostEcho.php` | 0 | 2 |
 | `lib/JIT/McjitEmbedRuntime.php` | 0 | 1 |
 | `lib/JIT/NamedArgs.php` | 0 | 6 |
@@ -5796,7 +5796,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/TraitMethodFunctionStatic.php` | 0 | 4 |
 | `lib/TryCatchElseSyntaxRejector.php` | 0 | 2 |
 | `lib/TypedFunctionStaticSyntaxRejector.php` | 0 | 2 |
-| `lib/VM.php` | 0 | 293 |
+| `lib/VM.php` | 0 | 291 |
 | `lib/VM/AbstractPropertyHookCheck.php` | 0 | 1 |
 | `lib/VM/ArrayAccessDimension.php` | 0 | 3 |
 | `lib/VM/ArraySpread.php` | 0 | 2 |
@@ -6349,6 +6349,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/LazyObjectSupport.php` | 0 | 13 |
 | `lib/VM/LazyPropertySupport.php` | 0 | 1 |
 | `lib/VM/ListUnpackJitHelper.php` | 0 | 1 |
+| `lib/VM/MagicCallArgs.php` | 0 | 6 |
 | `lib/VM/MagicMethodJitHelper.php` | 0 | 1 |
 | `lib/VM/MemoryAccounting.php` | 0 | 1 |
 | `lib/VM/NamedArgs.php` | 0 | 10 |
@@ -31403,9 +31404,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInternalCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- new Frame (line 490)
-- new Variable (line 492)
-- new Variable (line 513)
+- new Frame (line 482)
+- new Variable (line 484)
+- new Variable (line 505)
 - 47 class method(s)
 
 ### `ext/standard/VmIptc.php`
@@ -41245,7 +41246,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 934)
+- new ArgumentCountError (line 936)
 - 16 class method(s)
 - 1 closure(s)
 
@@ -42404,12 +42405,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16487)
 - new JIT\Call\VmCoerceVariableToString (line 16611)
 - new JIT\Call\IncludePathResolverResolve (line 16881)
-- new Variable (line 17939)
-- new VM (line 17983)
-- new VM\Variable (line 17992)
-- new Variable (line 18013)
-- new Variable (line 18059)
-- new Variable (line 18583)
+- new Variable (line 17946)
+- new VM (line 17990)
+- new VM\Variable (line 17999)
+- new Variable (line 18020)
+- new Variable (line 18066)
+- new Variable (line 18590)
 - 372 class method(s)
 - 7 closure(s)
 
@@ -47542,7 +47543,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/MagicMethodDispatch.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 11 class method(s)
 
 ### `lib/JIT/MagicMethodLlvm.php`
 
@@ -47550,10 +47551,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 156)
 - new Variable (line 190)
 - new Variable (line 196)
-- new Variable (line 329)
-- new Variable (line 343)
-- new Operand\Literal (line 359)
-- 12 class method(s)
+- new Operand\Literal (line 424)
+- new Operand\Literal (line 430)
+- new Operand\Literal (line 439)
+- new Operand\Literal (line 445)
+- new Variable (line 460)
+- new Error (line 473)
+- new Error (line 479)
+- new Variable (line 517)
+- new Operand\Literal (line 527)
+- 17 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/McjitEmbedHostEcho.php`
@@ -48585,65 +48592,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\GeneratorUncaughtThrow (line 14488)
 - new Variable (line 14587)
 - new VM\GeneratorUncaughtThrow (line 14610)
-- new Variable (line 14689)
-- new Variable (line 14691)
-- new Variable (line 14695)
-- new Variable (line 14825)
-- new Variable (line 14867)
-- new Variable (line 15038)
-- new Variable (line 15054)
-- new Variable (line 15099)
-- new Variable (line 15240)
-- new Variable (line 15314)
-- new Variable (line 15478)
-- new VM\PropertyIsInitializedHandler (line 15487)
-- new Error (line 15628)
-- new VM\EnumFromHandler (line 15654)
-- new CompileError (line 16391)
-- new VM\ClassProperty (line 16616)
-- new Variable (line 16936)
-- new CompileError (line 16954)
-- new Variable (line 17166)
-- new Variable (line 17168)
-- new ClassEntry (line 17211)
-- new Func\PHP (line 17218)
-- new VM\ClassProperty (line 17313)
-- new Func\PHP (line 17525)
-- new Variable (line 17601)
-- new Variable (line 17608)
-- new Variable (line 17614)
-- new Variable (line 17651)
-- new Variable (line 17680)
-- new Variable (line 17868)
-- new Variable (line 17914)
-- new VM\ClassProperty (line 17979)
-- new Error (line 18030)
-- new Error (line 18065)
-- new Error (line 18068)
-- new Error (line 18071)
-- new Error (line 18074)
-- new ObjectEntry (line 18076)
-- new Error (line 18089)
-- new Error (line 18092)
-- new Error (line 18095)
-- new Error (line 18116)
-- new ObjectEntry (line 18121)
-- new Variable (line 18123)
-- new Variable (line 18141)
-- new Variable (line 18154)
-- new Variable (line 18175)
-- new Variable (line 18188)
-- new Error (line 18318)
-- new Error (line 18323)
-- new VM\ObjectEntry (line 18327)
-- new Variable (line 18471)
-- new Variable (line 18489)
-- new NoDiscardMetadata (line 18658)
-- new Variable (line 18858)
-- new Variable (line 18860)
-- new CompileError (line 18888)
-- new CompileError (line 18915)
-- new Variable (line 19016)
+- new Variable (line 14684)
+- new Variable (line 14813)
+- new Variable (line 14855)
+- new Variable (line 15026)
+- new Variable (line 15042)
+- new Variable (line 15087)
+- new Variable (line 15228)
+- new Variable (line 15302)
+- new Variable (line 15466)
+- new VM\PropertyIsInitializedHandler (line 15475)
+- new Error (line 15616)
+- new VM\EnumFromHandler (line 15642)
+- new CompileError (line 16379)
+- new VM\ClassProperty (line 16604)
+- new Variable (line 16924)
+- new CompileError (line 16942)
+- new Variable (line 17154)
+- new Variable (line 17156)
+- new ClassEntry (line 17199)
+- new Func\PHP (line 17206)
+- new VM\ClassProperty (line 17301)
+- new Func\PHP (line 17513)
+- new Variable (line 17589)
+- new Variable (line 17596)
+- new Variable (line 17602)
+- new Variable (line 17639)
+- new Variable (line 17668)
+- new Variable (line 17856)
+- new Variable (line 17902)
+- new VM\ClassProperty (line 17967)
+- new Error (line 18018)
+- new Error (line 18053)
+- new Error (line 18056)
+- new Error (line 18059)
+- new Error (line 18062)
+- new ObjectEntry (line 18064)
+- new Error (line 18077)
+- new Error (line 18080)
+- new Error (line 18083)
+- new Error (line 18104)
+- new ObjectEntry (line 18109)
+- new Variable (line 18111)
+- new Variable (line 18129)
+- new Variable (line 18142)
+- new Variable (line 18163)
+- new Variable (line 18176)
+- new Error (line 18306)
+- new Error (line 18311)
+- new VM\ObjectEntry (line 18315)
+- new Variable (line 18459)
+- new Variable (line 18477)
+- new NoDiscardMetadata (line 18646)
+- new Variable (line 18846)
+- new Variable (line 18848)
+- new CompileError (line 18876)
+- new CompileError (line 18903)
+- new Variable (line 19004)
 - 526 class method(s)
 - 26 closure(s)
 
@@ -52617,6 +52622,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ListUnpackJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `lib/VM/MagicCallArgs.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 27)
+- new Error (line 38)
+- new Variable (line 42)
+- new Error (line 52)
+- new Variable (line 56)
 - 3 class method(s)
 
 ### `lib/VM/MagicMethodJitHelper.php`

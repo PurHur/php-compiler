@@ -88,6 +88,14 @@ final class MagicMethodDispatch
         return MagicMethodLlvm::tryInitMagicCall($context, $declaringClassLc, $methodName, $receiverVar);
     }
 
+    public static function tryInitMagicCallStatic(
+        Context $context,
+        string $declaringClassLc,
+        string $methodName
+    ): bool {
+        return MagicMethodLlvm::tryInitMagicCallStatic($context, $declaringClassLc, $methodName);
+    }
+
     /**
      * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
      * @param list<Operand|null>                                                          $argOperands

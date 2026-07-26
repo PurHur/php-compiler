@@ -256,6 +256,31 @@ final class MagicMethodLlvm
     }
 
     /**
+     * Bind a missing static call to `__callStatic` (Zend zend_std_get_static_method, #23336).
+     */
+    public static function tryInitMagicCallStatic(
+        Context $context,
+        string $declaringClassLc,
+        string $methodName
+    ): bool {
+        $proxy = self::resolveInstanceMethodProxy($context, $declaringClassLc, '__callstatic');
+        if (null === $proxy) {
+            return false;
+        }
+        $context->scope->magicCallMethodName = $methodName;
+        $context->scope->toCall = $context->resolveFunctionProxy($proxy);
+        $context->scope->args = [];
+
+        return true;
+    }
+
+    /**
+     * Rewrite instance `__call` outgoing args to `($this, $name, $arguments)`.
+     *
+     * Named args and compile-time named unpacks are packed into `$arguments` with
+     * string keys preserved (Zend zend_object_handlers.c / #23336). Runtime unpack
+     * that cannot be folded returns null so the caller keeps a non-magic path.
+     *
      * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
      * @param list<Operand|null>                                                          $argOperands
      *
@@ -268,35 +293,198 @@ final class MagicMethodLlvm
         array $argOperands
     ): ?array {
         if ([] === $argEntries) {
-            return null;
+            // Static `__callStatic` with no user args: still pass ($name, []).
+            $nameVar = self::stringVariable($context, $methodName);
+            $argsVar = self::packMagicArgumentsArray($context, []);
+
+            return [
+                [$nameVar, $argsVar],
+                [null, null],
+            ];
         }
         $receiver = $argEntries[0];
         if (!($receiver instanceof Variable)) {
-            return null;
+            // Static `__callStatic`: no receiver prefix — pack all entries as user args.
+            return self::rewriteOutgoingMagicCallArgsStatic($context, $methodName, $argEntries, $argOperands);
         }
         $userEntries = \array_slice($argEntries, 1);
         $userOperands = \array_slice($argOperands, 1);
-        $packed = [];
-        $packedOperands = [];
-        foreach ($userEntries as $i => $entry) {
-            if (\is_array($entry) && isset($entry['unpack'])) {
-                return null;
-            }
-            if (\is_array($entry) && isset($entry['named'])) {
-                return null;
-            }
-            if ($entry instanceof Variable) {
-                $packed[] = $entry;
-                $packedOperands[] = $userOperands[$i] ?? null;
-            }
+        $argsVar = self::packMagicUserArgs($context, $userEntries, $userOperands);
+        if (null === $argsVar) {
+            return null;
         }
         $nameVar = self::stringVariable($context, $methodName);
-        $argsVar = self::packPositionalArgs($context, $packed);
 
         return [
             [$receiver, $nameVar, $argsVar],
             [$argOperands[0] ?? null, null, null],
         ];
+    }
+
+    /**
+     * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $argEntries
+     * @param list<Operand|null>                                                          $argOperands
+     *
+     * @return array{0: list<Variable>, 1: list<Operand|null>}|null
+     */
+    private static function rewriteOutgoingMagicCallArgsStatic(
+        Context $context,
+        string $methodName,
+        array $argEntries,
+        array $argOperands
+    ): ?array {
+        $argsVar = self::packMagicUserArgs($context, $argEntries, $argOperands);
+        if (null === $argsVar) {
+            return null;
+        }
+        $nameVar = self::stringVariable($context, $methodName);
+
+        return [
+            [$nameVar, $argsVar],
+            [null, null],
+        ];
+    }
+
+    /**
+     * Pack user call args into `__call`/`__callStatic` `$arguments` (named keys preserved).
+     *
+     * @param list<Variable|array{unpack: Variable}|array{named: string, value: Variable}> $userEntries
+     * @param list<Operand|null>                                                          $userOperands
+     */
+    private static function packMagicUserArgs(Context $context, array $userEntries, array $userOperands): ?Variable
+    {
+        /** @var list<array{0: ?string, 1: Variable}> $parts name or null for positional */
+        $parts = [];
+        foreach ($userEntries as $i => $entry) {
+            if (\is_array($entry) && isset($entry['unpack'])) {
+                $operand = $userOperands[$i] ?? null;
+                $expanded = self::tryExpandCompileTimeMagicUnpack($context, $operand);
+                if (null === $expanded) {
+                    return null;
+                }
+                foreach ($expanded as $part) {
+                    $parts[] = $part;
+                }
+                continue;
+            }
+            if (\is_array($entry) && isset($entry['named'])) {
+                $parts[] = [(string) $entry['named'], $entry['value']];
+                continue;
+            }
+            if ($entry instanceof Variable) {
+                $parts[] = [null, $entry];
+            }
+        }
+
+        return self::packMagicArgumentsArray($context, $parts);
+    }
+
+    /**
+     * @return list<array{0: ?string, 1: Variable}>|null
+     */
+    private static function tryExpandCompileTimeMagicUnpack(Context $context, mixed $operand): ?array
+    {
+        if (!$operand instanceof Operand) {
+            return null;
+        }
+        $block = $context->jitEnclosingBlock;
+        if (null === $block) {
+            return null;
+        }
+        $vmArray = CallUnpackCompileTime::tryCompileTimeArrayFromOperand($block, $operand);
+        if (null === $vmArray) {
+            return null;
+        }
+        // Open variadic so string keys become named entries (no callee lookup) — #23336.
+        $entries = \PHPCompiler\VM\CallUnpack::expandArrayEntries($vmArray, [], 0, null);
+        $parts = [];
+        foreach ($entries as $entry) {
+            if ('p' === $entry[0]) {
+                $jitVal = self::vmVariableToJitLiteral($context, $entry[1]);
+                if (null === $jitVal) {
+                    return null;
+                }
+                $parts[] = [null, $jitVal];
+                continue;
+            }
+            $jitVal = self::vmVariableToJitLiteral($context, $entry[2]);
+            if (null === $jitVal) {
+                return null;
+            }
+            $parts[] = [(string) $entry[1], $jitVal];
+        }
+
+        return $parts;
+    }
+
+    private static function vmVariableToJitLiteral(Context $context, \PHPCompiler\VM\Variable $vm): ?Variable
+    {
+        $vm = $vm->resolveIndirect();
+        if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $vm->type) {
+            $lit = new Operand\Literal($vm->toInt());
+            $lit->type = \PHPTypes\Type::int();
+
+            return Variable::fromLiteral($context, $lit);
+        }
+        if (\PHPCompiler\VM\Variable::TYPE_FLOAT === $vm->type) {
+            $lit = new Operand\Literal($vm->toFloat());
+            $lit->type = \PHPTypes\Type::float();
+
+            return Variable::fromLiteral($context, $lit);
+        }
+        if (\PHPCompiler\VM\Variable::TYPE_STRING === $vm->type) {
+            return self::stringVariable($context, $vm->toString());
+        }
+        if (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $vm->type) {
+            $lit = new Operand\Literal($vm->toBool());
+            $lit->type = \PHPTypes\Type::bool();
+
+            return Variable::fromLiteral($context, $lit);
+        }
+        if (\PHPCompiler\VM\Variable::TYPE_NULL === $vm->type) {
+            $lit = new Operand\Literal(null);
+            $lit->type = \PHPTypes\Type::null();
+
+            return Variable::fromLiteral($context, $lit);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array{0: ?string, 1: Variable}> $parts
+     */
+    private static function packMagicArgumentsArray(Context $context, array $parts): Variable
+    {
+        $slot = JitValueBox::alloc($context);
+        $array = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        HashTableHelper::initArray($context, $array);
+        $hadNamed = false;
+        /** @var array<string, true> $namedFilled */
+        $namedFilled = [];
+        foreach ($parts as [$name, $value]) {
+            if (null === $name) {
+                if ($hadNamed) {
+                    throw new \Error('Cannot use positional argument after named argument');
+                }
+                HashTableHelper::addElement($context, $array, $value);
+                continue;
+            }
+            if (isset($namedFilled[$name])) {
+                throw new \Error("Named parameter \${$name} overwrites previous argument");
+            }
+            $namedFilled[$name] = true;
+            $hadNamed = true;
+            $keyVar = self::stringVariable($context, $name);
+            HashTableHelper::addElement($context, $array, $value, $keyVar);
+        }
+
+        return $array;
     }
 
     /**
@@ -332,26 +520,6 @@ final class MagicMethodLlvm
             Variable::KIND_VALUE,
             $strPtr
         );
-    }
-
-    /**
-     * @param list<Variable> $args
-     */
-    private static function packPositionalArgs(Context $context, array $args): Variable
-    {
-        $slot = JitValueBox::alloc($context);
-        $array = new Variable(
-            $context,
-            Variable::TYPE_VALUE,
-            Variable::KIND_VARIABLE,
-            $slot
-        );
-        HashTableHelper::initArray($context, $array);
-        foreach ($args as $arg) {
-            HashTableHelper::addElement($context, $array, $arg);
-        }
-
-        return $array;
     }
 
     private static function stringVariable(Context $context, string $value): Variable
