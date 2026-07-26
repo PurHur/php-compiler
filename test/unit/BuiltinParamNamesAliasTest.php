@@ -860,6 +860,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'user_string', 'hash_equals'));
     }
 
+    /** @covers issue #23192 */
+    public function testCtypeZendStubTextNamedParams(): void
+    {
+        foreach ([
+            'ctype_alnum', 'ctype_alpha', 'ctype_cntrl', 'ctype_digit', 'ctype_graph',
+            'ctype_lower', 'ctype_print', 'ctype_punct', 'ctype_space', 'ctype_upper',
+            'ctype_xdigit',
+        ] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['text'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'text', $fn), $fn);
+            // Legacy InternalArgInfo name must not resolve (Zend rejects $c)
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'c', $fn), $fn);
+        }
+    }
+
     /** @covers issue #23263 */
     public function testTypeIntrospectionZendStubNamedParams(): void
     {
