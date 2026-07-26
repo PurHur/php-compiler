@@ -4362,6 +4362,7 @@ require_once __DIR__.'/../../../ext/xsl/VmXslDomBridge.php';
 require_once __DIR__.'/../../../ext/xsl/XslExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/xsl/XsltClassMethod.php';
 require_once __DIR__.'/../../../ext/xsl/XsltHostBridge.php';
+require_once __DIR__.'/../../../ext/xsl/XsltPhpFunctionBridge.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorConstruct.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorGetParameter.php';
 require_once __DIR__.'/../../../ext/xsl/XsltProcessorGetSecurityPrefs.php';

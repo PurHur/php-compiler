@@ -526,6 +526,15 @@ final class BuiltinParamNames
                 return ['string', 'start', 'width', 'trimmarker', 'encoding'];
             case 'mb_convert_encoding':
                 return ['string', 'to_encoding', 'from_encoding'];
+            // php-src ext/mbstring/mbstring.stub.php — Reflection had empty params (#23291)
+            case 'mb_chr':
+                return ['codepoint', 'encoding'];
+            case 'mb_ord':
+                return ['string', 'encoding'];
+            case 'mb_scrub':
+                return ['string', 'encoding'];
+            case 'mb_str_split':
+                return ['string', 'length', 'encoding'];
             case 'mb_trim':
             case 'mb_ltrim':
             case 'mb_rtrim':
