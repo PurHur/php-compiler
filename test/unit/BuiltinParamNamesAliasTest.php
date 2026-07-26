@@ -916,6 +916,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'trimmarker', 'mb_strimwidth'));
     }
 
+    /** @covers issue #23227 */
+    public function testMd5Sha1ZendStubNamedParams(): void
+    {
+        foreach (['md5', 'sha1'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string', 'binary'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'binary', $fn));
+            // Legacy InternalArgInfo names must not resolve (Zend rejects $str / $raw_output)
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', $fn));
+        }
+    }
+
     /** @covers issue #23206 */
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {
