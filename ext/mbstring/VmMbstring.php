@@ -549,6 +549,177 @@ final class VmMbstring
     }
 
     /**
+     * mb_convert_encoding() with array|comma-list $from_encoding (#23562).
+     *
+     * php-src php_mb_convert_encoding(): single candidate converts directly; multiple candidates
+     * run mb_guess_encoding (same algorithm as mb_detect_encoding) then convert. Detect failure
+     * emits E_WARNING "Unable to detect character encoding" and returns false.
+     *
+     * @param list<string> $fromList non-empty resolved encoding names
+     */
+    public static function convertEncodingWithFromList(
+        string $source,
+        string $to,
+        array $fromList,
+        ?Frame $frame = null
+    ): string|false {
+        if ([] === $fromList) {
+            throw new \ValueError(
+                'mb_convert_encoding(): Argument #3 ($from_encoding) must specify at least one encoding'
+            );
+        }
+        if (1 === \count($fromList)) {
+            return self::convertEncoding($source, $to, $fromList[0]);
+        }
+        // MBSTRG(strict_detection) is Off in this build (MbstringState::getInfo).
+        $detected = self::detectEncoding($source, $fromList, false);
+        if (false === $detected) {
+            if (null !== $frame?->vmContext) {
+                $frame->vmContext->errors->triggerError(
+                    'mb_convert_encoding(): Unable to detect character encoding',
+                    ErrorReporter::E_WARNING,
+                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                    $frame->vmContext,
+                    $frame
+                );
+            }
+
+            return false;
+        }
+
+        return self::convertEncoding($source, $to, $detected);
+    }
+
+    /**
+     * Parse mb_convert_encoding() $from_encoding (array|string) into a non-empty list (#23562).
+     *
+     * php-src: php_mb_parse_encoding_array / php_mb_parse_encoding_list (arg_num 3 → $from_encoding).
+     *
+     * @return list<string>
+     */
+    public static function coerceMbConvertFromEncodingList(
+        Variable $var,
+        string $function = 'mb_convert_encoding',
+        int $argIndex = 2
+    ): array {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            return self::parseMbConvertFromEncodingString($var->toString(), $function, $argIndex);
+        }
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            if (EnumCaseSupport::isEnumCaseVariable($var)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($from_encoding) must be of type array|string|null, %s given',
+                    $function,
+                    $argIndex + 1,
+                    EnumCaseSupport::typeNameForVariable($var)
+                ));
+            }
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($from_encoding) must be of type array|string|null, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        $list = [];
+        foreach ($var->toArray()->iterateKeyed(true) as [, $elem]) {
+            $elem = $elem->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($elem)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($from_encoding) must be of type array|string|null, %s given',
+                    $function,
+                    $argIndex + 1,
+                    EnumCaseSupport::typeNameForVariable($elem)
+                ));
+            }
+            if (Variable::TYPE_STRING !== $elem->type) {
+                // zend zval_try_get_tmp_string — non-string array elems are coerced when possible;
+                // objects without __toString and enums TypeError at the array|string boundary.
+                if (
+                    Variable::TYPE_NULL === $elem->type
+                    || Variable::TYPE_BOOLEAN === $elem->type
+                    || Variable::TYPE_INTEGER === $elem->type
+                    || Variable::TYPE_FLOAT === $elem->type
+                ) {
+                    $name = $elem->toString();
+                } else {
+                    throw new \TypeError(sprintf(
+                        '%s(): Argument #%d ($from_encoding) must be of type array|string|null, %s given',
+                        $function,
+                        $argIndex + 1,
+                        self::typeLabel($elem)
+                    ));
+                }
+            } else {
+                $name = $elem->toString();
+            }
+            $list[] = self::assertMbConvertFromEncodingName($name, $function, $argIndex);
+        }
+        if ([] === $list) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #%d ($from_encoding) must specify at least one encoding',
+                $function,
+                $argIndex + 1
+            ));
+        }
+
+        return $list;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function parseMbConvertFromEncodingString(
+        string $list,
+        string $function,
+        int $argIndex
+    ): array {
+        $parts = preg_split('/\s*,\s*/', $list) ?: [];
+        $order = [];
+        foreach ($parts as $part) {
+            if ('' === $part) {
+                continue;
+            }
+            $order[] = self::assertMbConvertFromEncodingName($part, $function, $argIndex);
+        }
+        if ([] === $order) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #%d ($from_encoding) must specify at least one encoding',
+                $function,
+                $argIndex + 1
+            ));
+        }
+
+        return $order;
+    }
+
+    private static function assertMbConvertFromEncodingName(
+        string $name,
+        string $function,
+        int $argIndex
+    ): string {
+        if (self::isHtmlEntitiesEncoding($name)) {
+            return 'HTML-ENTITIES';
+        }
+        $canonical = MbstringEncodingRegistry::resolve($name);
+        if (null !== $canonical && null !== CharsetEngine::parseEncodingSpec($canonical)) {
+            return $canonical;
+        }
+        // Fall back to CharsetEngine aliases not in the mbstring registry.
+        if (null === $canonical && null !== CharsetEngine::parseEncodingSpec($name)) {
+            return $name;
+        }
+        throw new \ValueError(sprintf(
+            '%s(): Argument #%d ($from_encoding) contains invalid encoding "%s"',
+            $function,
+            $argIndex + 1,
+            $name
+        ));
+    }
+
+    /**
      * libmbfl HTML-ENTITIES output for a UTF-8 string (php-src ext/mbstring; #22631).
      */
     public static function encodeToHtmlEntities(string $utf8): string
@@ -581,18 +752,21 @@ final class VmMbstring
 
     /**
      * mb_convert_encoding() array operand — convert string elements, preserve other types (#3222).
+     *
+     * @param list<string> $fromList
      */
     public static function convertEncodingSourceArray(
         HashTable $table,
         string $to,
-        string $from
+        array $fromList,
+        ?Frame $frame = null
     ): HashTable|false {
         $out = new HashTable();
         foreach ($table->iterateKeyed(true) as [$key, $value]) {
             $value = $value->resolveIndirect();
             $elem = new Variable();
             if (Variable::TYPE_STRING === $value->type) {
-                $converted = self::convertEncoding($value->toString(), $to, $from);
+                $converted = self::convertEncodingWithFromList($value->toString(), $to, $fromList, $frame);
                 if (false === $converted) {
                     return false;
                 }
