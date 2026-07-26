@@ -3161,6 +3161,7 @@ class Object_ extends Type {
             $this->defineProperty($id, FiberHelper::TARGET_PROPERTY, Variable::TYPE_STRING);
             $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_THIS_PROPERTY, Variable::TYPE_VALUE);
             $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::BOUND_SCOPE_PROPERTY, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\JIT\ClosureBindHelper::IS_METHOD_PROPERTY, Variable::TYPE_NATIVE_BOOL);
             if (\PHPCompiler\CompilerVersion::supportsClosureGetCurrent()) {
                 $this->defineMethodVisibility(
                     $id,

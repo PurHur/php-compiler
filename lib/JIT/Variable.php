@@ -182,6 +182,9 @@ final class Variable {
     /** Anonymous `static function` — cannot bind $this (Zend zend_closures.c, #4613). */
     public bool $closureIsStatic = false;
 
+    /** fromCallable / FCC method wrapper — unbind uses method warning (#23421). */
+    public bool $closureIsMethodFake = false;
+
     /** Heap {@see __generator_state__*} for JIT Generator objects (#3074). */
     public ?\PHPLLVM\Value $generatorStatePtr = null;
 

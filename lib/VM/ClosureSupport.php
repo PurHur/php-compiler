@@ -162,6 +162,14 @@ final class ClosureSupport
             return null;
         }
         if (null !== $state->wrappedFunc || null !== $state->methodName) {
+            // Fake method closures: unbind warns with the method-specific text (#23421).
+            if (
+                Variable::TYPE_NULL === $newThis->type
+                && $state->isNonStaticMethodFakeClosure()
+            ) {
+                self::warnCannotUnbindThisOfMethod($ctx, $frame);
+            }
+
             return null;
         }
         if (Variable::TYPE_OBJECT === $newThis->type && $state->isStaticClosure()) {
@@ -327,7 +335,21 @@ final class ClosureSupport
         ?Frame $frame
     ): void {
         $ctx->errors->triggerError(
-            'Cannot unbind $this of closure using $this',
+            ClosureBindJitHelper::UNBIND_THIS_WARNING,
+            ErrorReporter::E_WARNING,
+            null,
+            $ctx,
+            $frame
+        );
+    }
+
+    /** php-src zend_closures.c — fake non-static method unbind (#23421). */
+    private static function warnCannotUnbindThisOfMethod(
+        Context $ctx,
+        ?Frame $frame
+    ): void {
+        $ctx->errors->triggerError(
+            ClosureBindJitHelper::UNBIND_THIS_OF_METHOD_WARNING,
             ErrorReporter::E_WARNING,
             null,
             $ctx,

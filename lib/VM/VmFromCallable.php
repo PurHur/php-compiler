@@ -8,6 +8,7 @@ use PHPCompiler\Block;
 use PHPCompiler\VM\VmBoundMethodCallable;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithBinding;
+use PHPCompiler\JIT\ClosureBindHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\MethodVisibility;
 use PHPCompiler\JIT\Variable as JitVariable;
@@ -144,6 +145,12 @@ final class VmFromCallable
         $boundScope->compileTimeString = (string) $scopeName;
         $closureCall = new ClosureWithBinding($inner, $receiverVar, $boundScope);
         $closureVar = self::wrapCallableProxy($context, $closureCall);
+        $closureVar->closureIsMethodFake = true;
+        ClosureBindHelper::ensureClosureBindingProperties($context);
+        ClosureBindHelper::storeMethodFakeClosureFlag(
+            $context,
+            $context->helper->loadValue($closureVar)
+        );
 
         return $closureVar;
     }

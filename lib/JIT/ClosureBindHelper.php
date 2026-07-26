@@ -26,6 +26,9 @@ final class ClosureBindHelper
 
     public const IS_STATIC_PROPERTY = '__closure_is_static';
 
+    /** Marks fromCallable/FCC method wrappers (zend ZEND_ACC_FAKE_CLOSURE, #23421). */
+    public const IS_METHOD_PROPERTY = '__closure_is_method';
+
     public static function registerJitMethods(Context $context): void
     {
         $context->functionProxies['closure::bindto'] = new Call\ClosureBindTo();
@@ -44,6 +47,9 @@ final class ClosureBindHelper
         }
         if (!$objectType->hasProperty($classId, self::IS_STATIC_PROPERTY)) {
             $objectType->defineProperty($classId, self::IS_STATIC_PROPERTY, Variable::TYPE_NATIVE_BOOL);
+        }
+        if (!$objectType->hasProperty($classId, self::IS_METHOD_PROPERTY)) {
+            $objectType->defineProperty($classId, self::IS_METHOD_PROPERTY, Variable::TYPE_NATIVE_BOOL);
         }
     }
 
@@ -64,6 +70,9 @@ final class ClosureBindHelper
         }
 
         $inner = self::resolveInnerCall($context, $closure);
+        if (self::emitMethodFakeUnbindFailure($context, $closure, $inner, $newThis)) {
+            return self::nullResult($context);
+        }
         if (self::emitUnbindThisFailure($context, $closure, $inner, $newThis)) {
             return self::nullResult($context);
         }
@@ -257,6 +266,17 @@ final class ClosureBindHelper
             self::IS_STATIC_PROPERTY,
             $staticFlag
         );
+        $methodFlag = $context->type->object->propertyFetch(
+            $srcObj,
+            'Closure',
+            self::IS_METHOD_PROPERTY
+        );
+        $context->type->object->storeInstanceProperty(
+            $dest,
+            'Closure',
+            self::IS_METHOD_PROPERTY,
+            $methodFlag
+        );
 
         return $dest;
     }
@@ -272,6 +292,22 @@ final class ClosureBindHelper
             $closureObj,
             'Closure',
             self::IS_STATIC_PROPERTY,
+            $trueVar
+        );
+    }
+
+    /** Mark FCC / fromCallable method wrappers for unbind diagnostics (#23421). */
+    public static function storeMethodFakeClosureFlag(Context $context, Value $closureObj): void
+    {
+        self::ensureClosureBindingProperties($context);
+        $i1 = $context->getTypeFromString('int1');
+        $trueLit = $context->builder->load($i1->constInt(1, false));
+        $trueVar = new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $trueLit);
+        $trueVar->addref();
+        $context->type->object->storeInstanceProperty(
+            $closureObj,
+            'Closure',
+            self::IS_METHOD_PROPERTY,
             $trueVar
         );
     }
@@ -591,6 +627,28 @@ final class ClosureBindHelper
     }
 
     /**
+     * Zend zend_closure_bind_to(): fake non-static method cannot unbind $this (#23421).
+     *
+     * @return bool true when bind() should return null
+     */
+    private static function emitMethodFakeUnbindFailure(
+        Context $context,
+        Variable $closure,
+        ?Call $inner,
+        Variable $newThis
+    ): bool {
+        if (Variable::TYPE_NULL !== $newThis->type && !($newThis->isNullConstant ?? false)) {
+            return false;
+        }
+        if (!self::isMethodFakeClosure($context, $closure, $inner)) {
+            return false;
+        }
+        self::emitBindWarning($context, ClosureBindJitHelper::UNBIND_THIS_OF_METHOD_WARNING);
+
+        return true;
+    }
+
+    /**
      * Zend zend_closure_bind_to(): cannot unbind when this_ptr is set AND USES_THIS (#23387).
      *
      * @return bool true when bind() should return null
@@ -613,9 +671,50 @@ final class ClosureBindHelper
         ) {
             return false;
         }
-        self::emitBindWarning($context, ClosureBindJitHelper::UNBIND_THIS_WARNING);
+        self::emitBindWarning(
+            $context,
+            ClosureBindJitHelper::unbindThisWarning(
+                self::isMethodFakeClosure($context, $closure, $inner)
+            )
+        );
 
         return true;
+    }
+
+    /** Compile-time / object-flag detection of ZEND_ACC_FAKE_CLOSURE methods (#23421). */
+    private static function isMethodFakeClosure(Context $context, Variable $closure, ?Call $inner): bool
+    {
+        if ($closure->closureIsMethodFake) {
+            return true;
+        }
+        if ($closure->closureIsStatic) {
+            return false;
+        }
+        $call = $closure->closureCall ?? null;
+        if ($call instanceof ClosureWithBinding) {
+            $unwrapped = self::unwrapInnerCall($call);
+            if (self::callLooksLikeClassMethod($unwrapped)) {
+                return true;
+            }
+        }
+        if (null !== $inner && self::callLooksLikeClassMethod($inner)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function callLooksLikeClassMethod(Call $call): bool
+    {
+        if (!$call instanceof Native) {
+            return false;
+        }
+        $name = strtolower($call->name);
+        if (!str_contains($name, '::')) {
+            return false;
+        }
+
+        return !str_contains($name, '{closure}');
     }
 
     /** Compile-time this_ptr set? Matches ClosureState::hasBoundThis() for known bindings. */
