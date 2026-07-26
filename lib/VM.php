@@ -13337,6 +13337,10 @@ restart:
         if (VM\CloneWithSupport::consumeReinit($object, $propName)) {
             return;
         }
+        // First write after construction from declaring-class scope is initialization (#23475).
+        if ($this->allowReadonlyPropertyFirstInit($object, $propName, $frame)) {
+            return;
+        }
 
         throw new \Error($this->readonlyPropertyWriteErrorMessage($object, $propName, $declaringClass, $frame));
     }
@@ -13456,6 +13460,10 @@ restart:
         if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
             return null;
         }
+        // First write after construction from declaring-class scope is initialization (#23475).
+        if ($this->allowReadonlyPropertyFirstInit($owner, $prop, $frame)) {
+            return null;
+        }
 
         $thrown = VM\BuiltinExceptionSupport::materializeError(
             $this->context,
@@ -13472,6 +13480,26 @@ restart:
         $this->raiseUncaughtException($thrown);
 
         return null;
+    }
+
+    /**
+     * Zend allows the first assignment to an uninitialized readonly property from any
+     * instance method of the declaring class — not only `__construct` (#23475).
+     *
+     * php-src: Zend/zend_object_handlers.c / Zend/zend_readonly.c
+     */
+    private function allowReadonlyPropertyFirstInit(ObjectEntry $owner, string $prop, Frame $frame): bool
+    {
+        $declaringClassLc = $this->readonlyPropertyDeclaringClassLc($owner, $prop);
+        $callerClassLc = $this->callerClassLc($frame);
+        if (null === $declaringClassLc || null === $callerClassLc || $callerClassLc !== $declaringClassLc) {
+            return false;
+        }
+        if (!$owner->hasProperty($prop)) {
+            return true;
+        }
+
+        return VM\TypedPropertyCheck::isUninitialized($owner->getProperty($prop));
     }
 
     /**
