@@ -330,6 +330,12 @@ final class BuiltinParamNames
                 return ['option'];
             case 'ini_set':
                 return ['option', 'value'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says new_error_level (#23436)
+            case 'error_reporting':
+                return ['error_level'];
+            // php-src ext/session/session.stub.php — InternalArgInfo still says newname (#23436)
+            case 'session_name':
+                return ['name'];
             case 'define':
                 return ['constant_name', 'value', 'case_insensitive'];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says const_name/name (#23434)
