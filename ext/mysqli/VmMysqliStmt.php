@@ -60,6 +60,7 @@ final class VmMysqliStmt
             'attr_get' => new MysqliStmtAttrGet(),
             'attr_set' => new MysqliStmtAttrSet(),
             'send_long_data' => new MysqliStmtSendLongData(),
+            'prepare' => new MysqliStmtPrepare(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -220,6 +221,42 @@ final class VmMysqliStmt
         }
 
         return self::wrap($ctx, $nativeStmt);
+    }
+
+    /**
+     * mysqli_stmt_init() — allocate unprepared statement handle (#22215).
+     *
+     * php-src: mysql_stmt_init → MYSQLI_STATUS_INITIALIZED
+     */
+    public static function initOnLink(ObjectEntry $link): ObjectEntry|false
+    {
+        if (!MysqliExtensionPolicy::hasNativeDriver()) {
+            return false;
+        }
+        $state = VmMysqli::state($link);
+        $ctx = $state->ctx ?? throw new \LogicException('No VM context');
+        $nativeLink = VmMysqli::requireNative($link, $ctx);
+        if (!\method_exists($nativeLink, 'stmt_init')) {
+            return false;
+        }
+        $nativeStmt = $nativeLink->stmt_init();
+        if (false === $nativeStmt) {
+            return false;
+        }
+
+        return self::wrap($ctx, $nativeStmt);
+    }
+
+    /**
+     * mysqli_stmt_prepare() — bind SQL onto an initialized statement (#22215).
+     *
+     * php-src: mysql_stmt_prepare → MYSQLI_STATUS_VALID
+     */
+    public static function prepareOnStmt(ObjectEntry $stmt, string $sql): bool
+    {
+        $native = self::requireNative($stmt);
+
+        return (bool) $native->prepare($sql);
     }
 
     public static function fieldCount(ObjectEntry $stmt): int
@@ -904,6 +941,27 @@ final class MysqliStmtSendLongData extends MysqliClassMethod
         $data = $this->stringArg($frame->calledArgs[2], 'mysqli_stmt::send_long_data', 1, 'data');
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmMysqliStmt::sendLongData($receiver, $paramNum, $data));
+        }
+    }
+}
+
+/** mysqli_stmt::prepare() — php-src ext/mysqli/mysqli.stub.php (#22215). */
+final class MysqliStmtPrepare extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('prepare');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::prepare()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli_stmt::prepare() expects exactly 1 argument, 0 given');
+        }
+        $query = $this->stringArg($frame->calledArgs[1], 'mysqli_stmt::prepare', 0, 'query');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::prepareOnStmt($receiver, $query));
         }
     }
 }
