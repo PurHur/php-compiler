@@ -274,6 +274,58 @@ final class mysqli_stmt_result_metadata extends MysqliStmtIntrospectionBuiltin
     }
 }
 
+/** mysqli_stmt_send_long_data() — php-src ext/mysqli/mysqli_api.c (#22182). */
+final class mysqli_stmt_send_long_data extends MysqliStmtIntrospectionBuiltin
+{
+    public function __construct()
+    {
+        parent::__construct('mysqli_stmt_send_long_data');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $stmt = $this->stmt($frame);
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'mysqli_stmt_send_long_data() expects exactly 3 arguments, '.\count($frame->calledArgs).' given'
+            );
+        }
+        $paramNum = $this->intParam($frame->calledArgs[1], 2, 'param_num');
+        $data = \PHPCompiler\ext\standard\VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[2],
+            'mysqli_stmt_send_long_data',
+            2,
+            'data'
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqliStmt::sendLongData($stmt, $paramNum, $data));
+        }
+    }
+
+    private function intParam(Variable $var, int $argPos, string $name): int
+    {
+        $resolved = $var->resolveIndirect();
+
+        return match ($resolved->type) {
+            Variable::TYPE_INTEGER => $resolved->toInt(),
+            Variable::TYPE_FLOAT => (int) $resolved->toFloat(),
+            Variable::TYPE_BOOLEAN => $resolved->toBool() ? 1 : 0,
+            Variable::TYPE_STRING => is_numeric($resolved->toString()) ? (int) $resolved->toString() : 0,
+            default => throw new \TypeError(\sprintf(
+                'mysqli_stmt_send_long_data(): Argument #%d ($%s) must be of type int, %s given',
+                $argPos,
+                $name,
+                MysqliClassMethod::typeLabelPublic($resolved)
+            )),
+        };
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \Error($this->getName().'() is not implemented for JIT (issue #22182)');
+    }
+}
+
 /** mysqli_stmt_attr_get() — php-src ext/mysqli/mysqli_api.c (#22175). */
 final class mysqli_stmt_attr_get extends MysqliStmtIntrospectionBuiltin
 {
