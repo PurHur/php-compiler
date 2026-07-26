@@ -490,7 +490,8 @@ final class BuiltinParamNames
             case 'trim':
             case 'ltrim':
             case 'rtrim':
-                return ['string', 'characters', 'mode'];
+                // php-src basic_functions.stub.php — no $mode; StringTrimMode is not in php-src (#23224)
+                return ['string', 'characters'];
             case 'mb_strlen':
                 return ['string', 'encoding'];
             case 'mb_substr':

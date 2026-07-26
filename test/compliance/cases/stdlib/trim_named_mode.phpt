@@ -1,14 +1,19 @@
 --TEST--
-stdlib trim/ltrim/rtrim() PHP 8.4 named characters + mode (#13045, ext/standard/string.c)
+stdlib trim/ltrim/rtrim() reject phantom named mode (issue #23224; reverts #13045 vs php-src)
 --FILE--
 <?php
 $s = '  a  ';
-echo trim($s, characters: ' ', mode: StringTrimMode::Both), "\n";
-echo ltrim($s, characters: ' ', mode: StringTrimMode::Left), "\n";
-echo rtrim($s, characters: ' ', mode: StringTrimMode::Right), "\n";
-echo trim('  a  ', ' ', StringTrimMode::Both), "\n";
+echo trim($s, characters: ' '), "\n";
+echo ltrim($s, characters: ' '), "\n";
+echo rtrim($s, characters: ' '), "\n";
+try {
+    trim($s, characters: ' ', mode: 1);
+    echo "mode_accepted\n";
+} catch (Throwable $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
 a
 a  
   a
-a
+Unknown named parameter $mode
