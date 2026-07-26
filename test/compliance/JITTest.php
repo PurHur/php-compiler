@@ -252,8 +252,9 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsSortingEnum()
-                && str_contains($name, 'sort_sorting_enum')
-                && !str_contains($name, 'sorting_enum_phantom')) {
+                && (str_contains($name, 'sort_sorting_enum') || str_contains($name, 'usort_sort_direction'))
+                && !str_contains($name, 'sorting_enum_phantom')
+                && !str_contains($name, 'usort_phantom_direction')) {
                 continue;
             }
             if (CompilerVersion::supportsSortingEnum()

@@ -185,6 +185,7 @@ final class BuiltinParamNames
             case 'usort':
             case 'uasort':
             case 'uksort':
+                // php-src array.stub.php — SortDirection only when Sorting enum profile is on (#17429, #23385).
                 return \PHPCompiler\CompilerVersion::supportsSortingEnum()
                     ? ['array', 'callback', 'direction']
                     : ['array', 'callback'];

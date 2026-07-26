@@ -420,7 +420,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'depth', 'json_encode'));
     }
 
-    /** @covers issue #10048 #23225 */
+    /** @covers issue #10048 #23225 #23385 */
     public function testUsortNamedCallbackParameters(): void
     {
         foreach (['usort', 'uasort', 'uksort'] as $fn) {
@@ -428,6 +428,8 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame(['array', 'callback'], $names, $fn);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', $fn));
+            // #23385 — withhold phantom direction unless Sorting/SortDirection profile gate is on.
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'direction', $fn), $fn);
         }
         // #23225 — sort/rsort are Zend array/flags only (no phantom direction).
         foreach (['sort', 'rsort'] as $fn) {
