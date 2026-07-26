@@ -410,9 +410,8 @@ final class BuiltinParamNames
                     ? ['exclude_disabled']
                     : [];
             case 'fdiv':
-                return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
-                    ? ['num1', 'num2', 'rounding_mode']
-                    : ['num1', 'num2'];
+                // php-src basic_functions.stub.php — exactly num1, num2 (#23576; no rounding_mode).
+                return ['num1', 'num2'];
             case 'bcadd':
             case 'bcsub':
             case 'bcmul':

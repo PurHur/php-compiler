@@ -11,20 +11,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\MathRound;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitRoundModeArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * fdiv() — IEEE-754 float division (PHP 8.0, ext/standard/math.c / zend_fdiv).
+ * fdiv() — IEEE-754 float division (PHP 8.0+, ext/standard/math.c / zend_fdiv).
  *
- * PHP 8.4+: optional rounding_mode (RoundingMode|int) rounds quotient to integer (#9918).
+ * Exactly two arguments — no rounding_mode overload in php-src (#23576; reverts #9918).
  */
 final class fdiv extends Internal
 {
@@ -32,15 +28,7 @@ final class fdiv extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 3 : 2;
-        if ($argc < 2 || $argc > $maxArgs) {
-            throw new \LogicException(
-                3 === $maxArgs
-                    ? 'fdiv() requires two or three arguments'
-                    : 'fdiv() requires exactly two arguments'
-            );
-        }
+        $this->requireExactArgCount($frame, self::FUNCTION, 2);
         $a = VmMath::parseDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             self::FUNCTION,
@@ -56,41 +44,16 @@ final class fdiv extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $quotient = \fdiv($a, $b);
-        if ($argc < 3) {
-            $frame->returnVar->float($quotient);
-
-            return;
-        }
-        $mode = VmRoundMode::resolveRoundModeArg(
-            $frame->calledArgs[2]->resolveIndirect(),
-            self::FUNCTION,
-            'rounding_mode'
-        );
-        $numVar = new Variable();
-        $numVar->float($quotient);
-        VmRound::apply($frame->returnVar, $numVar, 0, $mode);
+        $frame->returnVar->float(\fdiv($a, $b));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 3 : 2;
-        if ($argc < 2 || $argc > $maxArgs) {
-            throw new \LogicException(
-                3 === $maxArgs
-                    ? 'fdiv() requires two or three arguments'
-                    : 'fdiv() requires exactly two arguments'
-            );
+        if (!$this->requireExactJitArgCount($context, $args, self::FUNCTION, 2)) {
+            return $context->getTypeFromString('double')->constReal(0.0);
         }
         [$left, $right] = JitFdiv::lowerOperands($context, $args[0], $args[1]);
-        $quotient = $context->builder->fdiv($left, $right);
-        if ($argc < 3) {
-            return $quotient;
-        }
-        $mode = JitRoundModeArg::lower($context, $args[2], self::FUNCTION, 'rounding_mode');
-        $zero = $context->getTypeFromString('int64')->constInt(0, false);
 
-        return MathRound::invoke($context, $quotient, $zero, $mode);
+        return $context->builder->fdiv($left, $right);
     }
 }

@@ -658,18 +658,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($reduce, 'initial', 'array_reduce'));
     }
 
-    /** @covers issue #9918 */
-    public function testFdivRoundingModeNamedParameters(): void
+    /** @covers issue #23576 — fdiv has no rounding_mode in php-src (reverts #9918) */
+    public function testFdivHasNoRoundingModeNamedParameter(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $names = BuiltinParamNames::forFunction('fdiv');
-            self::assertSame(['num1', 'num2', 'rounding_mode'], $names);
+            self::assertSame(['num1', 'num2'], $names);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num1', 'fdiv'));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'num2', 'fdiv'));
-            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'rounding_mode', 'fdiv'));
-            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('fdiv'));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'rounding_mode', 'fdiv'));
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('fdiv'));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
