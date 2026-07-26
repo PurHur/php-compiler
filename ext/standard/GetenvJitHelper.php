@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Lowered into JIT/AOT modules for getenv()/putenv() overlay (#9092, #8992, #20644 php-in-PHP).
+ * Lowered into JIT/AOT modules for getenv()/putenv() overlay (#9092, #8992, #20644, #23414 php-in-PHP).
  *
  * Overlay mutations in PHP; inherited environ via {@see GetenvLookupJitHelper} /
- * {@see phpc_getenv_kernel} under thin AOT NestedJIT.
+ * {@see phpc_getenv_kernel} under thin AOT NestedJIT. Process-environ setenv mirror
+ * via {@see phpc_putenv_kernel} (no caller-side LibcExtern in JitEnv).
  * php-src: ext/standard/basic_functions.c — zif_getenv, zif_putenv
  */
 final class GetenvJitHelper
@@ -34,6 +35,9 @@ final class GetenvJitHelper
         if (null === $name) {
             return false;
         }
+        if (PutenvJitHelper::hasOverlay($name)) {
+            return PutenvJitHelper::lookupOverlay($name);
+        }
         if (\array_key_exists($name, self::$local)) {
             return self::$local[$name];
         }
@@ -53,24 +57,19 @@ final class GetenvJitHelper
                 $all[$name] = $value;
             }
         }
+        foreach (PutenvJitHelper::localOverlayEntries() as $name => $value) {
+            if ('' !== $name) {
+                $all[$name] = $value;
+            }
+        }
 
         return $all;
     }
 
     public static function putenv(?string $assignment): bool
     {
-        if (null === $assignment) {
-            return false;
-        }
-        VmEnv::assertValidPutenvSyntax($assignment);
-        [$name, $value] = self::parseAssignment($assignment);
-        if (null === $value) {
-            unset(self::$local[$name]);
-        } else {
-            self::$local[$name] = $value;
-        }
-
-        return true;
+        // Delegate to slim PutenvJitHelper NestedJIT leaf (#23414).
+        return PutenvJitHelper::putenv($assignment);
     }
 
     public static function apacheSetenv(?string $variable, ?string $value): bool
@@ -91,6 +90,12 @@ final class GetenvJitHelper
             }
             phpc_native_ht_set_string_key($htPtr, $name, $value);
         }
+        foreach (PutenvJitHelper::localOverlayEntries() as $name => $value) {
+            if ('' === $name) {
+                continue;
+            }
+            phpc_native_ht_set_string_key($htPtr, $name, $value);
+        }
     }
 
     /** Populate a native hashtable with inherited environ + local putenv overlay (JIT getenv argc==0, #5075, #20758). */
@@ -104,7 +109,7 @@ final class GetenvJitHelper
     /** @return array<string, string> VM overlay map for interpreter-side merge helpers. */
     public static function localOverlayEntries(): array
     {
-        return self::$local;
+        return self::$local + PutenvJitHelper::localOverlayEntries();
     }
 
     /** Merge process-local putenv overlay into a VM hashtable (interpreter path, #9814). */

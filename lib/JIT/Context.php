@@ -760,6 +760,8 @@ class Context {
             'phpc_chdir_kernel',
             'phpc_gethostname_kernel',
             'phpc_getenv_kernel',
+            // putenv setenv mirror NestedJIT leaf (#23414) — peer getenv (#20644).
+            'phpc_putenv_kernel',
             // Stat path always-helper NestedJIT leaves (#20742) — peer rename (#20603).
             'phpc_stat_mode_kernel',
             'phpc_access_kernel',

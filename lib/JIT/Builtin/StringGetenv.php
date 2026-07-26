@@ -27,7 +27,9 @@ final class StringGetenv
 
     private const OVERLAY_HELPER_PATH = '/ext/standard/GetenvJitHelper.php';
 
-    private const PUTENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv';
+    private const PUTENV_HELPER_PATH = '/ext/standard/PutenvJitHelper.php';
+
+    private const PUTENV_HELPER = 'PHPCompiler\\ext\\standard\\PutenvJitHelper::putenv';
 
     private const APACHE_SETENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::apacheSetenv';
 
@@ -45,8 +47,18 @@ final class StringGetenv
     /** @var list<string> */
     private const OVERLAY_COMPILED = [
         self::OVERLAY_GETENV_HELPER,
-        self::PUTENV_HELPER,
         self::APACHE_SETENV_HELPER,
+    ];
+
+    /** Slim putenv NestedJIT leaf (#23414) — separate TU from GetenvJitHelper. */
+    private const PUTENV_COMPILED = [
+        self::PUTENV_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const APACHE_SETENV_COMPILED = [
+        self::APACHE_SETENV_HELPER,
+        self::PUTENV_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -85,13 +97,23 @@ final class StringGetenv
 
     public static function ensurePutenvLinked(Context $context): void
     {
-        self::ensureOverlayHelperCompiled($context);
+        self::ensureNativeHtInternalProxies($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::PUTENV_HELPER_PATH,
+            self::PUTENV_COMPILED,
+            '#23414'
+        );
     }
 
     public static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         if (self::LOOKUP_HELPER === $logical) {
             self::ensureLookupHelperCompiled($context);
+        } elseif (self::PUTENV_HELPER === $logical) {
+            self::ensurePutenvLinked($context);
+        } elseif (self::APACHE_SETENV_HELPER === $logical) {
+            self::ensureApacheSetenvLinked($context);
         } else {
             self::ensureOverlayHelperCompiled($context);
         }
@@ -121,6 +143,18 @@ final class StringGetenv
         );
     }
 
+    public static function ensureApacheSetenvLinked(Context $context): void
+    {
+        self::ensurePutenvLinked($context);
+        self::ensureNativeHtInternalProxies($context);
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            [self::PUTENV_HELPER_PATH, self::OVERLAY_HELPER_PATH],
+            self::APACHE_SETENV_COMPILED,
+            '#23414'
+        );
+    }
+
     public static function ensureJitHelperCompiled(Context $context): void
     {
         self::ensureLookupHelperCompiled($context);
@@ -131,6 +165,7 @@ final class StringGetenv
         $internals = [
             new \PHPCompiler\ext\standard\phpc_native_ht_set_string_key(),
             new \PHPCompiler\ext\standard\phpc_getenv_kernel(),
+            new \PHPCompiler\ext\standard\phpc_putenv_kernel(),
             new \PHPCompiler\ext\standard\phpc_native_environ_mirror_into_ht(),
         ];
         foreach ($internals as $internal) {
