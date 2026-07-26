@@ -91,4 +91,28 @@ PHP;
             ob_get_clean()
         );
     }
+
+    /** @covers issue #23487 */
+    public function testReflectionUnionTypeToStringCanonicalOrder(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Foo {}
+function f(int|string|float $x): void {}
+function g(string|int|float $x): void {}
+function h(Foo|int|string $x): void {}
+echo (string) (new ReflectionFunction('f'))->getParameters()[0]->getType(), "\n";
+echo (string) (new ReflectionFunction('g'))->getParameters()[0]->getType(), "\n";
+echo (string) (new ReflectionFunction('h'))->getParameters()[0]->getType(), "\n";
+$types = (new ReflectionFunction('f'))->getParameters()[0]->getType()->getTypes();
+echo implode(',', array_map(strval(...), $types)), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'reflection_union_order.php'));
+        $this->assertSame(
+            "string|int|float\nstring|int|float\nFoo|string|int\nstring,int,float\n",
+            ob_get_clean()
+        );
+    }
 }
