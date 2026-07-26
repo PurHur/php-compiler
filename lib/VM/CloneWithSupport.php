@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\CompilerVersion;
+
 /**
- * PHP 8.3+ readonly property reinit during clone-with and __clone (#7250, #15365).
+ * PHP 8.3+ readonly property reinit during clone-with and __clone (#7250, #15365, #23526).
  *
  * php-src unlocks IS_PROP_REINITABLE in zend_objects_clone_obj_with() before applying
  * the with property list, then clears after the block (Zend/zend_objects.c).
  * Readonly amendments allow one reinit per explicit `readonly` property during __clone()
- * (zend_readonly.c); `readonly class` properties are not reinitable in __clone() (#15409).
+ * (zend_readonly.c) only on PHP 8.3+; `readonly class` properties are not reinitable
+ * in __clone() (#15409). Default / PROFILE=8.2 must match Zend 8.2 (no reinit window).
  */
 final class CloneWithSupport
 {
@@ -38,6 +41,10 @@ final class CloneWithSupport
      */
     public static function beginCloneMagicReinit(ObjectEntry $object, callable $isReadonlyProperty): void
     {
+        // zend_readonly.c: __clone reinit window is PHP 8.3+ only (#23526).
+        if (!CompilerVersion::supportsReadonlyCloneReinit()) {
+            return;
+        }
         // zend_readonly.c: readonly-class instance props stay immutable in __clone() (#15409).
         if ($object->class->readonly) {
             return;
