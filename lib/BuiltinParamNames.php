@@ -36,6 +36,9 @@ final class BuiltinParamNames
             'messageformatter::setpattern' => ['pattern'],
             'messageformatter::getpattern' => [],
             'messageformatter::formatmessage' => ['locale', 'pattern', 'args'],
+            // php-src ext/intl/formatter/formatter.stub.php — InternalArgInfo still has num/str/position (#23409)
+            'numberformatter::formatcurrency' => ['amount', 'currency'],
+            'numberformatter::parsecurrency' => ['string', 'currency', 'offset'],
             'transliterator::create' => ['id', 'direction'],
             'transliterator::transliterate' => ['string', 'start', 'end'],
             'resourcebundle::create' => ['locale', 'bundlename', 'fallback'],
@@ -810,6 +813,11 @@ final class BuiltinParamNames
                 return ['formatter', 'args'];
             case 'msgfmt_format_message':
                 return ['locale', 'pattern', 'args'];
+            // php-src ext/intl/formatter/formatter.stub.php — InternalArgInfo still has value/fmt/position (#23409)
+            case 'numfmt_format_currency':
+                return ['formatter', 'amount', 'currency'];
+            case 'numfmt_parse_currency':
+                return ['formatter', 'string', 'currency', 'offset'];
             case 'transliterator_create':
                 return ['id', 'direction'];
             case 'transliterator_transliterate':
