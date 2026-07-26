@@ -2557,22 +2557,42 @@ final class VmReflection
     }
 
     /**
-     * Public (etc.) method names including parents — php-src get_class_methods (#22789).
+     * Public (etc.) method names including parents — php-src get_class_methods (#22789, #23530).
      *
      * Walks `parentLc` like {@see collectClassMethodsForReflection()} so builtin SPL
      * subclasses (SplFileObject → SplFileInfo, SplStack → SplDoublyLinkedList, …) list
      * inherited methods. Interfaces keep {@see interfaceDeclarationChain()}.
      *
+     * When `$frame` is set, visibility follows zend_get_executed_scope() /
+     * zend_check_method_accessible (outside a class: public only; inside: private of the
+     * declaring CE + protected via zend_check_protected).
+     *
      * @return list<string>
      */
-    public static function classMethodsList(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): array
-    {
+    public static function classMethodsList(
+        ClassEntry $entry,
+        int $filter = 7,
+        ?Context $ctx = null,
+        ?Frame $frame = null
+    ): array {
         $entries = [$entry];
+        $scopeClass = null;
+        if (null !== $frame) {
+            if (null === $ctx) {
+                $ctx = self::requireContext($frame);
+            }
+            $callerLc = self::callerClassLcFromFrame($frame);
+            if (null !== $callerLc && isset($ctx->classes[$callerLc])) {
+                $scopeClass = $ctx->classes[$callerLc];
+            }
+        }
         if (null !== $ctx) {
             $entries = $entry->isInterface
                 ? self::interfaceDeclarationChain($entry, $ctx)
                 : self::classHierarchyChain($entry, $ctx);
         }
+        // Scope-aware listing ignores the bitmask and uses accessibility (#23530).
+        $useScopeFilter = null !== $frame;
         $names = [];
         /** @var array<string, true> */
         $seenMethodLcs = [];
@@ -2586,17 +2606,26 @@ final class VmReflection
                     $methodLcs[] = $abstractLc;
                 }
             }
+            $declaringLc = strtolower(ltrim($scan->name, '\\'));
             foreach ($methodLcs as $methodLc) {
                 if (isset($seenMethodLcs[$methodLc])) {
                     continue;
                 }
                 $vis = $scan->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
-                    continue;
-                }
-                // Parent-private methods are not visible on the child (zend_get_class_methods).
-                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $scan !== $entry) {
-                    continue;
+                if ($useScopeFilter) {
+                    if (null === $ctx
+                        || !self::methodAccessibleFromExecutedScope($ctx, $scopeClass, $vis, $declaringLc)
+                    ) {
+                        continue;
+                    }
+                } else {
+                    if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+                        continue;
+                    }
+                    // Parent-private methods are not visible on the child (zend_get_class_methods).
+                    if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 && $scan !== $entry) {
+                        continue;
+                    }
                 }
                 // PDO_*_Ext / similar parent-only methods are not inherited (#21552).
                 if ($scan !== $entry && isset($scan->methodNotInherited[$methodLc])) {
@@ -2610,7 +2639,10 @@ final class VmReflection
                     $names[] = $scan->methodNames[$methodLc] ?? $methodLc;
                 }
             }
-            foreach (self::syntheticEnumMethodNames($scan, $filter) as $methodName) {
+            $synthFilter = $useScopeFilter
+                ? (\PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_PROTECTED | \PHPCfg\Func::FLAG_PRIVATE)
+                : $filter;
+            foreach (self::syntheticEnumMethodNames($scan, $synthFilter) as $methodName) {
                 if (!in_array($methodName, $names, true)) {
                     $names[] = $methodName;
                 }
@@ -2618,6 +2650,36 @@ final class VmReflection
         }
 
         return $names;
+    }
+
+    /**
+     * php-src zend_check_method_accessible / get_class_methods visibility (#23530).
+     *
+     * Public always; private when scope === declaring CE; protected via zend_check_protected
+     * (either CE is the other or an ancestor — Zend/zend_object_handlers.c).
+     */
+    private static function methodAccessibleFromExecutedScope(
+        Context $ctx,
+        ?ClassEntry $scopeClass,
+        int $visibility,
+        string $declaringClassLc
+    ): bool {
+        if (MethodVisibility::isPublic($visibility)) {
+            return true;
+        }
+        if (null === $scopeClass) {
+            return false;
+        }
+        $scopeLc = strtolower(ltrim($scopeClass->name, '\\'));
+        if (($visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+            return $scopeLc === $declaringClassLc;
+        }
+        if (($visibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+            return self::isSameOrSubclassOf($ctx, $scopeLc, $declaringClassLc)
+                || self::isSameOrSubclassOf($ctx, $declaringClassLc, $scopeLc);
+        }
+
+        return true;
     }
 
     /**
@@ -2660,12 +2722,16 @@ final class VmReflection
         return ['from', 'tryFrom'];
     }
 
-    public static function classMethodsArray(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): Variable
-    {
+    public static function classMethodsArray(
+        ClassEntry $entry,
+        int $filter = 7,
+        ?Context $ctx = null,
+        ?Frame $frame = null
+    ): Variable {
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach (self::classMethodsList($entry, $filter, $ctx) as $methodName) {
+        foreach (self::classMethodsList($entry, $filter, $ctx, $frame) as $methodName) {
             $value = new Variable();
             $value->string($methodName);
             $ht->append($value);
