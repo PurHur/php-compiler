@@ -35085,6 +35085,13 @@ class Compiler {
         return null;
     }
 
+    /**
+     * Wire a dead call-arg temp to an adjacent nested FuncCall/MethodCall EXEC_RETURN.
+     *
+     * Must not bind every dead temp to the adjacent call: `Ack($m - 1, Ack($m, $n - 1))` hoists a
+     * BinaryOp for arg #0 and a nested FuncCall for arg #1; stealing the nested result for both
+     * produced `Ack(r, r)` and AOT segfaults (#23472; same class as #23354 exact producer link).
+     */
     private function resolveAdjacentNestedFuncCallArgSlot(
         Block $block,
         Op $cfgCallOp,
@@ -35097,6 +35104,24 @@ class Compiler {
         $callArg = $args[$argIndex] ?? null;
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
+        }
+        // php-cfg records the real producer as the arg temp's sole writer. When that writer is a
+        // non-call inline expr (BinaryOp, UnaryMinus, …), leave the slot for exactHoisted (#23472).
+        if ($callArg instanceof Operand && 1 === \count($callArg->ops ?? [])) {
+            $soleWriter = $callArg->ops[0];
+            if (
+                $soleWriter instanceof Op\Expr
+                && $this->isInlineExprCallArgProducer($soleWriter)
+                && !(
+                    $soleWriter instanceof Op\Expr\FuncCall
+                    || $soleWriter instanceof Op\Expr\NsFuncCall
+                    || $soleWriter instanceof Op\Expr\MethodCall
+                    || $soleWriter instanceof Op\Expr\StaticCall
+                    || $soleWriter instanceof Op\Expr\New_
+                )
+            ) {
+                return null;
+            }
         }
         if (
             0 === $argIndex
