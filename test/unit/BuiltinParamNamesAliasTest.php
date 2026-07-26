@@ -871,6 +871,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ascii', 'chr'));
     }
 
+    /** @covers issue #23291 */
+    public function testMbChrOrdZendStubNamedParams(): void
+    {
+        $chr = BuiltinParamNames::forFunction('mb_chr');
+        self::assertSame(['codepoint', 'encoding'], $chr);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($chr, 'codepoint', 'mb_chr'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($chr, 'encoding', 'mb_chr'));
+
+        $ord = BuiltinParamNames::forFunction('mb_ord');
+        self::assertSame(['string', 'encoding'], $ord);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ord, 'string', 'mb_ord'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ord, 'encoding', 'mb_ord'));
+
+        $scrub = BuiltinParamNames::forFunction('mb_scrub');
+        self::assertSame(['string', 'encoding'], $scrub);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($scrub, 'string', 'mb_scrub'));
+
+        $split = BuiltinParamNames::forFunction('mb_str_split');
+        self::assertSame(['string', 'length', 'encoding'], $split);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($split, 'string', 'mb_str_split'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($split, 'length', 'mb_str_split'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($split, 'encoding', 'mb_str_split'));
+    }
+
     /** @covers issue #23205 */
     public function testHashEqualsZendStubNamedParams(): void
     {
