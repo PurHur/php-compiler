@@ -109,7 +109,9 @@ final class BuiltinParamNames
                 return ['hostname', 'mxhosts', 'weight'];
             case 'sort':
             case 'rsort':
-                return ['array', 'flags', 'direction'];
+                // php-src ext/standard/basic_functions.stub.php — array, flags only (#23225).
+                // SortDirection enum (PHP 8.6) is not a sort()/rsort() parameter.
+                return ['array', 'flags'];
             case 'asort':
             case 'arsort':
             case 'ksort':

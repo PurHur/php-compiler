@@ -1,5 +1,5 @@
 --TEST--
-stdlib sort()/rsort() accept Sorting enum and SortDirection named param (#9947, ext/standard/array.c)
+stdlib sort()/rsort() accept Sorting enum as flags (#9947; no phantom direction — #23225)
 --SKIPIF--
 <?php die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
@@ -15,7 +15,7 @@ sort($b, Sorting::Ascending);
 echo implode(',', $b), "\n";
 
 $c = [3, 1, 2];
-sort($c, direction: SortDirection::Ascending);
+sort($c, flags: Sorting::Ascending);
 echo implode(',', $c), "\n";
 
 $d = [3, 1, 2];

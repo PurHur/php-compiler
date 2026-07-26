@@ -131,6 +131,7 @@ final class AotRegressionFixtureCatalogTest extends TestCase
             'strcoll_strxfrm.php' => ['strcoll_strxfrm.php'],
             'stream_copy_to_stream.php' => ['stream_copy_to_stream.php'],
             'stream_meta_blocking.php' => ['stream_meta_blocking.php'],
+            'sort_named_params_23225.php' => ['sort_named_params_23225.php'],
         ];
     }
 
