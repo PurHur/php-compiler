@@ -1185,4 +1185,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'user_class_name', 'class_alias'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'alias_name', 'class_alias'));
     }
+
+    /** @covers issue #23407 */
+    public function testXmlWriterStubNamedParamsResolve(): void
+    {
+        $setIndent = BuiltinParamNames::forClassMethod('XMLWriter::setIndent');
+        self::assertSame(['enable'], $setIndent);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($setIndent, 'enable', 'XMLWriter::setIndent'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($setIndent, 'indent', 'XMLWriter::setIndent'));
+
+        $setIndentString = BuiltinParamNames::forClassMethod('XMLWriter::setIndentString');
+        self::assertSame(['indentation'], $setIndentString);
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($setIndentString, 'indentstring', 'XMLWriter::setIndentString'));
+
+        self::assertSame(['empty'], BuiltinParamNames::forClassMethod('XMLWriter::flush'));
+        self::assertSame(['flush'], BuiltinParamNames::forClassMethod('XMLWriter::outputMemory'));
+        self::assertSame(
+            ['prefix', 'name', 'namespace', 'value'],
+            BuiltinParamNames::forClassMethod('XMLWriter::writeAttributeNs')
+        );
+        self::assertSame(
+            ['prefix', 'name', 'namespace'],
+            BuiltinParamNames::forClassMethod('XMLWriter::startElementNs')
+        );
+
+        $proc = BuiltinParamNames::forFunction('xmlwriter_set_indent');
+        self::assertSame(['writer', 'enable'], $proc);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($proc, 'writer', 'xmlwriter_set_indent'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($proc, 'xmlwriter', 'xmlwriter_set_indent'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($proc, 'indent', 'xmlwriter_set_indent'));
+    }
 }
