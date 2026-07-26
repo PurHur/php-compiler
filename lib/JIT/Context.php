@@ -2214,6 +2214,34 @@ class Context {
         return false;
     }
 
+    /**
+     * Resolve a CFG return/phi operand against the arm block's scope slots (#8555, #23482).
+     *
+     * Arm-tail ?: returns pass the merge RETURN operand while {@see $jitCurrentBlock} may
+     * already have moved on; use $cfgBlock for slot aliasing. Null means the caller should
+     * fall back to {@see getVariableFromOp}.
+     */
+    public function functionScopeBindingVariable(Operand $op, Block $cfgBlock): ?Variable
+    {
+        if ($this->scope->variables->contains($op)) {
+            return $this->scope->variables[$op];
+        }
+        if ($this->aliasVariableOpFromSlot($cfgBlock, $op)) {
+            return $this->scope->variables[$op];
+        }
+        $name = OperandName::resolve($op);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->resolveRefAliasName($name);
+            if (isset($this->namedVariableBindings[$resolved])) {
+                $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
+
+                return $this->namedVariableBindings[$resolved];
+            }
+        }
+
+        return null;
+    }
+
     public function hasVariableOp(Operand $op): bool {
         if ($this->scope->variables->contains($op)) {
             return true;
