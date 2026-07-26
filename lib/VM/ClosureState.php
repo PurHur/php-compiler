@@ -247,6 +247,20 @@ final class ClosureState
         return null === $this->wrappedFunc && null === $this->methodName;
     }
 
+    /**
+     * ZEND_ACC_FAKE_CLOSURE for a non-static method (fromCallable / FCC / getClosure).
+     *
+     * php-src zend_closures.c: unbind uses "Cannot unbind $this of method" (#23421).
+     */
+    public function isNonStaticMethodFakeClosure(): bool
+    {
+        if ($this->isUserClosure() || $this->isStaticClosure()) {
+            return false;
+        }
+
+        return null !== $this->methodName && '' !== $this->methodName;
+    }
+
     /** Zend zend_closure_bind(): static closures cannot receive a bound $this. */
     public function isStaticClosure(): bool
     {

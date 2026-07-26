@@ -14934,6 +14934,12 @@ class JIT {
         if (null !== $src->closureCall) {
             $dest->closureCall = $src->closureCall;
         }
+        if ($src->closureIsStatic) {
+            $dest->closureIsStatic = true;
+        }
+        if ($src->closureIsMethodFake) {
+            $dest->closureIsMethodFake = true;
+        }
         if (null !== $src->fiberResumeName) {
             $dest->fiberResumeName = $src->fiberResumeName;
             $dest->fiberStatePtr = $src->fiberStatePtr;
@@ -14949,6 +14955,8 @@ class JIT {
         $dest->objectPropertyClassName = $src->objectPropertyClassName;
         $dest->objectPropertyDnfArms = $src->objectPropertyDnfArms;
         $dest->closureCall = $src->closureCall;
+        $dest->closureIsStatic = $src->closureIsStatic;
+        $dest->closureIsMethodFake = $src->closureIsMethodFake;
         $dest->generatorStatePtr = $src->generatorStatePtr;
         $dest->generatorResumeName = $src->generatorResumeName;
         $dest->isJitGenerator = $src->isJitGenerator;

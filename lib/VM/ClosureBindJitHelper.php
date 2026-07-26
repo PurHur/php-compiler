@@ -27,6 +27,9 @@ final class ClosureBindJitHelper
     /** Emitted only when this_ptr is set AND USES_THIS (zend_closures.c, #23387). */
     public const UNBIND_THIS_WARNING = 'Cannot unbind $this of closure using $this';
 
+    /** Fake non-static method / FCC unbind (zend_closures.c, #23421). */
+    public const UNBIND_THIS_OF_METHOD_WARNING = 'Cannot unbind $this of method';
+
     /**
      * Whether bindTo(null)/bind(..., null) must warn+null (php-src-strict).
      *
@@ -35,6 +38,14 @@ final class ClosureBindJitHelper
     public static function shouldRejectUnbindThis(bool $usesThis, bool $hasBoundThis): bool
     {
         return $usesThis && $hasBoundThis;
+    }
+
+    /** Pick Zend unbind warning text for user closure vs method fake closure (#23421). */
+    public static function unbindThisWarning(bool $isMethodFakeClosure): string
+    {
+        return $isMethodFakeClosure
+            ? self::UNBIND_THIS_OF_METHOD_WARNING
+            : self::UNBIND_THIS_WARNING;
     }
 
     /**
