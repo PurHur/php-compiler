@@ -170,8 +170,65 @@ final class DnfType
     }
 
     /**
-     * Zend zend_type_to_string() pure-mask member order (PHP-8.2 Zend/zend_compile.c).
+     * Zend zend_type_to_string() / ReflectionUnionType member order
+     * (Zend/zend_compile.c zend_type_to_string_resolved; php_reflection.c getTypes).
      *
+     * List/complex types (classes, intersections, self/parent/static names) stay in
+     * declaration order first; pure builtins follow the MAY_BE_* mask walk order.
+     *
+     * @return array<string, int>
+     */
+    public static function zendBuiltinUnionOrder(): array
+    {
+        return [
+            'static' => 0,
+            'callable' => 1,
+            'object' => 2,
+            'array' => 3,
+            'string' => 4,
+            'int' => 5,
+            'integer' => 5,
+            'float' => 6,
+            'double' => 6,
+            'bool' => 7,
+            'boolean' => 7,
+            // false before true matches zend_type_to_string_resolved; mutually exclusive with bool.
+            'false' => 8,
+            'true' => 9,
+            'void' => 10,
+            'never' => 11,
+            'null' => 12,
+        ];
+    }
+
+    /**
+     * @param list<string> $memberNames
+     * @return list<string>
+     */
+    public static function zendSortUnionMemberNames(array $memberNames): array
+    {
+        if (\count($memberNames) <= 1) {
+            return $memberNames;
+        }
+        $order = self::zendBuiltinUnionOrder();
+        $list = [];
+        $builtins = [];
+        foreach ($memberNames as $name) {
+            if (isset($order[strtolower($name)])) {
+                $builtins[] = $name;
+            } else {
+                $list[] = $name;
+            }
+        }
+        usort(
+            $builtins,
+            static fn (string $a, string $b): int => $order[strtolower($a)] <=> $order[strtolower($b)]
+        );
+
+        return array_merge($list, $builtins);
+    }
+
+    /**
      * @param list<string> $memberNames
      */
     public static function zendCanonicalUnionLabel(array $memberNames): string
@@ -179,30 +236,7 @@ final class DnfType
         if ([] === $memberNames) {
             return '';
         }
-        if (1 === \count($memberNames)) {
-            return $memberNames[0];
-        }
-        $order = [
-            'static' => 0,
-            'callable' => 1,
-            'object' => 2,
-            'array' => 3,
-            'string' => 4,
-            'int' => 5,
-            'float' => 6,
-            'bool' => 7,
-            'void' => 8,
-            'never' => 9,
-            'null' => 10,
-            'true' => 11,
-            'false' => 12,
-        ];
-        $sorted = $memberNames;
-        usort(
-            $sorted,
-            static fn (string $a, string $b): int => ($order[strtolower($a)] ?? 99) <=> ($order[strtolower($b)] ?? 99)
-        );
 
-        return implode('|', $sorted);
+        return implode('|', self::zendSortUnionMemberNames($memberNames));
     }
 }

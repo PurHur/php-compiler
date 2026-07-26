@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\DnfType;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Op\Type as CfgType;
@@ -95,7 +96,8 @@ final class ReflectionTypeSupport
         }
         if ($type instanceof CfgType\Union_) {
             $parts = [];
-            foreach ($type->types as $member) {
+            // php-src zend_type_to_string_resolved — list types then MAY_BE_* order (#23487).
+            foreach (self::sortUnionMembersLikeZend($type->types) as $member) {
                 // DNF parentheses around intersection groups in a union (#23065).
                 $parts[] = self::formatUnionMember($member);
             }
@@ -293,11 +295,54 @@ final class ReflectionTypeSupport
         self::storeCommonTypeProps($obj, $typeString, self::allowsNullFromCfg(
             new CfgType\Union_($members)
         ));
+        // getTypes() matches zend_type_to_string / ReflectionUnionType order (#23487).
         $obj->getProperty(ReflectionSupport::PROP_TYPE_MEMBERS)->copyFrom(
-            self::membersArray($ctx, $members)
+            self::membersArray($ctx, self::sortUnionMembersLikeZend($members))
         );
 
         return $obj;
+    }
+
+    /**
+     * @param list<CfgType> $members
+     * @return list<CfgType>
+     */
+    private static function sortUnionMembersLikeZend(array $members): array
+    {
+        if (\count($members) <= 1) {
+            return $members;
+        }
+        $order = DnfType::zendBuiltinUnionOrder();
+        $list = [];
+        $builtins = [];
+        foreach ($members as $member) {
+            $rank = self::zendBuiltinUnionMemberRank($member, $order);
+            if (null === $rank) {
+                $list[] = $member;
+            } else {
+                $builtins[] = [$rank, $member];
+            }
+        }
+        usort(
+            $builtins,
+            static fn (array $a, array $b): int => $a[0] <=> $b[0]
+        );
+
+        return array_merge($list, array_column($builtins, 1));
+    }
+
+    /** @param array<string, int> $order */
+    private static function zendBuiltinUnionMemberRank(CfgType $member, array $order): ?int
+    {
+        if ($member instanceof CfgType\Literal) {
+            return $order[strtolower($member->name)] ?? null;
+        }
+        if ($member instanceof CfgType\Mixed_) {
+            // mixed is MAY_BE_ANY — not a multi-member union in php-src.
+            return null;
+        }
+
+        return null;
     }
 
     /**
