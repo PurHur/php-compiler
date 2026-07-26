@@ -106,6 +106,69 @@ final class ldap_bind_ext extends Internal
     }
 }
 
+/**
+ * ldap_sasl_bind() — SASL interactive bind (php-src HAVE_LDAP_SASL; #22176).
+ *
+ * ldap_sasl_bind(
+ *   LDAP\Connection $ldap,
+ *   ?string $dn = null,
+ *   ?string $password = null,
+ *   ?string $mech = null,
+ *   ?string $realm = null,
+ *   ?string $authc_id = null,
+ *   ?string $authz_id = null,
+ *   ?string $props = null
+ * ): bool
+ */
+final class ldap_sasl_bind extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_sasl_bind');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 8) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_sasl_bind() expects between 1 and 8 arguments, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_sasl_bind', 1);
+        $dn = self::optionalStringArg($frame, 1, 'ldap_sasl_bind', 'dn');
+        $password = self::optionalStringArg($frame, 2, 'ldap_sasl_bind', 'password');
+        $mech = self::optionalStringArg($frame, 3, 'ldap_sasl_bind', 'mech');
+        $realm = self::optionalStringArg($frame, 4, 'ldap_sasl_bind', 'realm');
+        $authcId = self::optionalStringArg($frame, 5, 'ldap_sasl_bind', 'authc_id');
+        $authzId = self::optionalStringArg($frame, 6, 'ldap_sasl_bind', 'authz_id');
+        $props = self::optionalStringArg($frame, 7, 'ldap_sasl_bind', 'props');
+        $ok = VmLdapCore::saslBind($conn, $dn, $password, $mech, $realm, $authcId, $authzId, $props);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+
+    private static function optionalStringArg(Frame $frame, int $idx, string $fn, string $name): ?string
+    {
+        if (!isset($frame->calledArgs[$idx])) {
+            return null;
+        }
+        $var = $frame->calledArgs[$idx]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return VmString::coerceStringBuiltinArg($frame->calledArgs[$idx], $fn, $idx, $name);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_sasl_bind() is not implemented for JIT in this compiler build (issue #22176)');
+    }
+}
+
 final class ldap_unbind extends Internal
 {
     public function __construct()

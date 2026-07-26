@@ -50,6 +50,40 @@ final class VmLdapCore
     }
 
     /**
+     * ldap_sasl_bind (php-src HAVE_LDAP_SASL; #22176).
+     */
+    public static function saslBind(
+        ObjectEntry $connection,
+        ?string $dn,
+        ?string $password,
+        ?string $mech,
+        ?string $realm,
+        ?string $authcId,
+        ?string $authzId,
+        ?string $props
+    ): bool {
+        $ld = VmLdapConnection::native($connection);
+        $rc = VmLdapNative::saslInteractiveBind(
+            $ld,
+            $dn,
+            $mech,
+            $realm,
+            $authcId,
+            $password,
+            $authzId,
+            $props
+        );
+        VmLdapConnection::setErrno($connection, $rc);
+        if (VmLdapNative::LDAP_SUCCESS !== $rc) {
+            @\trigger_error('ldap_sasl_bind(): Unable to bind to server: '.VmLdapNative::err2string($rc), \E_USER_WARNING);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * ldap_bind_ext → LDAP\Result|false (php-src ext/ldap/ldap.c; #22164).
      *
      * @return Variable|false
