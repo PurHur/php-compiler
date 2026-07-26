@@ -1023,21 +1023,40 @@ final class VmSimpleXml
             throw new \LogicException('SimpleXMLElement::addChild() cannot be called on a view in this compiler build');
         }
 
-        $child = new SimpleXmlNodeState($qualifiedName);
+        // php-src zim_SimpleXMLElement_addChild: xmlNewChild uses localname only; ns is
+        // attached via xmlSearchNsByHref on the parent, else xmlNewNs on the new child
+        // (php-src ext/simplexml/simplexml.c; #19906, #22734).
+        $localName = self::localNameFromQualified($qualifiedName);
+        $colon = strpos($qualifiedName, ':');
+        $prefixFromName = (false !== $colon) ? substr($qualifiedName, 0, $colon) : null;
+        if (null !== $prefixFromName && '' === $prefixFromName) {
+            $prefixFromName = null;
+        }
+
+        $childName = $localName;
+        $childAttrs = [];
+        if (null !== $namespace && '' !== $namespace) {
+            $docKey = SimpleXmlRegistry::documentKey($entry);
+            $root = SimpleXmlRegistry::rootState($docKey);
+            $parent = SimpleXmlRegistry::state($entry);
+            $existingPrefix = self::searchNsPrefixByHref($root, $parent, $namespace);
+            if (null !== $existingPrefix) {
+                // Reuse in-scope ns node — no redundant xmlns on the child (#22734).
+                $childName = '' === $existingPrefix ? $localName : $existingPrefix.':'.$localName;
+            } else {
+                if (null !== $prefixFromName) {
+                    $childAttrs['xmlns:'.$prefixFromName] = $namespace;
+                    $childName = $prefixFromName.':'.$localName;
+                } else {
+                    $childAttrs['xmlns'] = $namespace;
+                    $childName = $localName;
+                }
+            }
+        }
+
+        $child = new SimpleXmlNodeState($childName, $childAttrs);
         if (null !== $value && '' !== $value) {
             $child->text = $value;
-        }
-        // php-src zim_simplexmlelement_addChild: default xmlns on new element (#19906).
-        if (null !== $namespace && '' !== $namespace) {
-            $colon = strpos($qualifiedName, ':');
-            if (false !== $colon) {
-                $prefix = substr($qualifiedName, 0, $colon);
-                if ('' !== $prefix) {
-                    $child->attributes['xmlns:'.$prefix] = $namespace;
-                }
-            } else {
-                $child->attributes['xmlns'] = $namespace;
-            }
         }
         SimpleXmlRegistry::state($entry)->children[] = $child;
 
@@ -2227,6 +2246,69 @@ final class VmSimpleXml
     private static function parentScopeForNode(SimpleXmlNodeState $root, SimpleXmlNodeState $target): ?array
     {
         return self::parentScopeForNodeWalk($root, $target, []);
+    }
+
+    /**
+     * php-src / libxml xmlSearchNsByHref — first xmlns declaration for $href on $from
+     * or an ancestor (declaration order on each node). Returns prefix ('' = default) or null.
+     */
+    private static function searchNsPrefixByHref(SimpleXmlNodeState $root, SimpleXmlNodeState $from, string $href): ?string
+    {
+        $chain = self::ancestorChainInclusive($root, $from);
+        if (null === $chain) {
+            return null;
+        }
+        for ($i = \count($chain) - 1; $i >= 0; --$i) {
+            foreach ($chain[$i]->attributes as $name => $value) {
+                if ($value !== $href) {
+                    continue;
+                }
+                if ('xmlns' === $name) {
+                    return '';
+                }
+                if (str_starts_with($name, 'xmlns:')) {
+                    return substr($name, 6);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Path from $root to $target inclusive, or null if $target is not in the tree.
+     *
+     * @return list<SimpleXmlNodeState>|null
+     */
+    private static function ancestorChainInclusive(SimpleXmlNodeState $root, SimpleXmlNodeState $target): ?array
+    {
+        if ($root === $target) {
+            return [$root];
+        }
+
+        return self::ancestorChainInclusiveWalk($root, $target, [$root]);
+    }
+
+    /**
+     * @param list<SimpleXmlNodeState> $path
+     *
+     * @return list<SimpleXmlNodeState>|null
+     */
+    private static function ancestorChainInclusiveWalk(SimpleXmlNodeState $node, SimpleXmlNodeState $target, array $path): ?array
+    {
+        foreach ($node->children as $child) {
+            $next = $path;
+            $next[] = $child;
+            if ($child === $target) {
+                return $next;
+            }
+            $found = self::ancestorChainInclusiveWalk($child, $target, $next);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
     }
 
     /**
