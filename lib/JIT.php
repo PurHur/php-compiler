@@ -13035,6 +13035,47 @@ class JIT {
     }
 
     /**
+     * Rebind a NATIVE_LONG lvalue to a {@see __value__} stack slot and store $value.
+     *
+     * php-src locals are dynamically typed; keeping an int64 alloca and fpToSi-truncating
+     * float assigns made `$n = 0; $n = 0.7` store 0 (#23471).
+     */
+    private function promoteNativeLongLvalueToValueBox(
+        Operand $resultOp,
+        Variable $result,
+        Variable $value
+    ): void {
+        if (!$result->includeBinding) {
+            $result->free();
+        }
+        $slot = JIT\JitValueBox::alloc($this->context);
+        JIT\JitValueBox::assignToPointer(
+            $this->context,
+            JIT\JitValueBox::pointer($this->context, $slot),
+            $value
+        );
+        $promoted = new Variable(
+            $this->context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $promoted->compileTimeConstantName = $value->compileTimeConstantName;
+        $promoted->compileTimeEnumCase = $value->compileTimeEnumCase;
+        $promoted->compileTimeFloat = $value->compileTimeFloat;
+        $promoted->compileTimeLong = $value->compileTimeLong;
+        $this->syncCompileTimeString($promoted, $value, false);
+        $this->context->setVariableOp($resultOp, $promoted);
+        $resolved = JIT\OperandName::resolve($resultOp);
+        if (null !== $resolved && '' !== $resolved) {
+            $this->context->bindVariableByName(
+                $this->context->resolveRefAliasName($resolved),
+                $promoted
+            );
+        }
+    }
+
+    /**
      * First assignment to a script global must populate the heap box (#1492 bootstrap-aot).
      *
      * Without this, makeVariableFromValueOp keeps an SSA rvalue while a later VAR_FETCH rebinds
@@ -14227,22 +14268,13 @@ class JIT {
                     throw new \LogicException("Source type: {$value->type}");
             }
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_VALUE === $value->type) {
-            $fp = $this->unboxValueToNativeDouble($value);
-            $longVal = $this->context->builder->fpToSi(
-                $fp,
-                $this->context->getTypeFromString('int64')
-            );
-            $result->free();
-            $this->context->builder->store($longVal, $result->value);
-            $result->addref();
+            // Untyped locals must widen on float (and other) assigns — truncating via
+            // fpToSi made `$s = 0; $s = 0.028` store 0 and broke mandelbrot AOT (#23471).
+            $this->promoteNativeLongLvalueToValueBox($resultOp, $result, $value);
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_NATIVE_DOUBLE === $value->type) {
-            $result->free();
-            $fp = $this->context->helper->loadValue($value);
-            $long = $this->context->builder->fpToSi($fp, $this->context->getTypeFromString('int64'));
-            $this->context->builder->store($long, $result->value);
-            $result->addref();
+            $this->promoteNativeLongLvalueToValueBox($resultOp, $result, $value);
 
             return;
         } elseif ($result->type === Variable::TYPE_NATIVE_LONG && Variable::TYPE_NATIVE_BOOL === $value->type) {
