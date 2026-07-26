@@ -55,6 +55,36 @@ if ($writeOk) {
     exit(1);
 }
 
+$unsetListOk = false;
+try {
+    unset($list[0]);
+    $unsetListOk = true;
+} catch (Error $e) {
+    if ($e->getMessage() !== 'Cannot use object of type DOMNodeList as array') {
+        fwrite(STDERR, "fail: unset list message: ".$e->getMessage()."\n");
+        exit(1);
+    }
+}
+if ($unsetListOk) {
+    fwrite(STDERR, "fail: unset(DOMNodeList) must Error\n");
+    exit(1);
+}
+
+$unsetMapOk = false;
+try {
+    unset($map['a']);
+    $unsetMapOk = true;
+} catch (Error $e) {
+    if ($e->getMessage() !== 'Cannot use object of type DOMNamedNodeMap as array') {
+        fwrite(STDERR, "fail: unset map message: ".$e->getMessage()."\n");
+        exit(1);
+    }
+}
+if ($unsetMapOk) {
+    fwrite(STDERR, "fail: unset(DOMNamedNodeMap) must Error\n");
+    exit(1);
+}
+
 $negOk = false;
 try {
     $map[-1];
