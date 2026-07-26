@@ -59,6 +59,43 @@ final class MysqliProceduralLink
         return $default;
     }
 
+    /** Strict int arg for php-src zpp "l" / "Ol" (TypeError on non-int-like). */
+    public static function requireIntArg(Frame $frame, int $index, string $fn, string $paramName): int
+    {
+        if (\count($frame->calledArgs) <= $index) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects at least %d arguments, %d given',
+                $fn,
+                $index + 1,
+                \count($frame->calledArgs)
+            ));
+        }
+        $resolved = $frame->calledArgs[$index]->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return $resolved->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            return (int) $resolved->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            return $resolved->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return 0;
+        }
+        if (Variable::TYPE_STRING === $resolved->type && is_numeric($resolved->toString())) {
+            return (int) $resolved->toString();
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $fn,
+            $index + 1,
+            $paramName,
+            MysqliClassMethod::typeLabelPublic($resolved)
+        ));
+    }
+
     public static function optionalStringArg(Frame $frame, int $index): ?string
     {
         if (\count($frame->calledArgs) <= $index) {

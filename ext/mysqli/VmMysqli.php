@@ -94,6 +94,11 @@ final class VmMysqli
             'get_server_version' => new MysqliGetServerVersion(),
             'get_client_info' => new MysqliGetClientInfoMethod(),
             'ssl_set' => new MysqliSslSet(),
+            'ping' => new MysqliPing(),
+            'select_db' => new MysqliSelectDb(),
+            'change_user' => new MysqliChangeUser(),
+            'thread_id' => new MysqliThreadId(),
+            'kill' => new MysqliKill(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -836,6 +841,69 @@ final class VmMysqli
         }
 
         return (string) $stat;
+    }
+
+    /** mysqli_ping() — php-src ext/mysqli/mysqli_api.c (#22174). */
+    public static function pingOnLink(ObjectEntry $entry, Context $ctx): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->ping();
+    }
+
+    /** mysqli_select_db() — php-src ext/mysqli/mysqli_api.c (#22174). */
+    public static function selectDbOnLink(ObjectEntry $entry, Context $ctx, string $database): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->select_db($database);
+    }
+
+    /** mysqli_change_user() — php-src ext/mysqli/mysqli_api.c (#22174). */
+    public static function changeUserOnLink(
+        ObjectEntry $entry,
+        Context $ctx,
+        string $username,
+        string $password,
+        ?string $database
+    ): bool {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->change_user($username, $password, $database);
+    }
+
+    /** mysqli_thread_id() — php-src ext/mysqli/mysqli_api.c (#22174). */
+    public static function threadIdOnLink(ObjectEntry $entry, Context $ctx): int
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return (int) $native->thread_id;
+    }
+
+    /** mysqli_kill() — php-src ext/mysqli/mysqli_api.c (#22174). */
+    public static function killOnLink(ObjectEntry $entry, Context $ctx, int $processId): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+
+        return $native->kill($processId);
+    }
+
+    /**
+     * mysqli_get_client_stats() — php-src ext/mysqli/mysqli_nonapi.c (#22174).
+     *
+     * @return array<string, int|float|string|null>
+     */
+    public static function clientStats(): array
+    {
+        if (!MysqliExtensionPolicy::hasNativeDriver() || !\function_exists('\\mysqli_get_client_stats')) {
+            return [];
+        }
+        $stats = \mysqli_get_client_stats();
+        if (!\is_array($stats)) {
+            return [];
+        }
+
+        return $stats;
     }
 
     /** @return int|string */
@@ -2239,6 +2307,124 @@ final class MysqliSslSet extends MysqliClassMethod
         }
 
         return $resolved->toString();
+    }
+}
+
+/** mysqli::ping() — php-src ext/mysqli/mysqli.stub.php (#22174). */
+final class MysqliPing extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('ping');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::ping()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::ping() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::pingOnLink($receiver, $ctx));
+        }
+    }
+}
+
+/** mysqli::select_db() — php-src ext/mysqli/mysqli.stub.php (#22174). */
+final class MysqliSelectDb extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('select_db');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::select_db()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::select_db() expects exactly 1 argument, 0 given');
+        }
+        $database = $this->stringArg($frame->calledArgs[1], 'mysqli::select_db', 0, 'database');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::select_db() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::selectDbOnLink($receiver, $ctx, $database));
+        }
+    }
+}
+
+/** mysqli::change_user() — php-src ext/mysqli/mysqli.stub.php (#22174). */
+final class MysqliChangeUser extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('change_user');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::change_user()');
+        if (\count($frame->calledArgs) < 4) {
+            throw new \ArgumentCountError('mysqli::change_user() expects exactly 3 arguments, '.(\count($frame->calledArgs) - 1).' given');
+        }
+        $username = $this->stringArg($frame->calledArgs[1], 'mysqli::change_user', 0, 'username');
+        $password = $this->stringArg($frame->calledArgs[2], 'mysqli::change_user', 1, 'password');
+        $database = $this->nullableStringArg($frame->calledArgs[3]);
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::change_user() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::changeUserOnLink($receiver, $ctx, $username, $password, $database));
+        }
+    }
+
+    private function nullableStringArg(Variable $var): ?string
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+
+        return $resolved->toString();
+    }
+}
+
+/**
+ * mysqli::thread_id() — getter mirror of $thread_id (#22174).
+ *
+ * php-src exposes readonly $thread_id; method form matches insert_id()/field_count() pattern in this VM.
+ */
+final class MysqliThreadId extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('thread_id');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::thread_id()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::thread_id() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmMysqli::threadIdOnLink($receiver, $ctx));
+        }
+    }
+}
+
+/** mysqli::kill() — php-src ext/mysqli/mysqli.stub.php (#22174). */
+final class MysqliKill extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('kill');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::kill()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('mysqli::kill() expects exactly 1 argument, 0 given');
+        }
+        $processId = $this->intArg($frame->calledArgs[1], 'mysqli::kill', 0, 'process_id');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::kill() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::killOnLink($receiver, $ctx, $processId));
+        }
     }
 }
 
