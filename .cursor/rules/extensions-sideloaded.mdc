@@ -39,6 +39,30 @@ on build time, binary size and the gen-0 rebuild problem.
    no diagnostic (#579). Run with `PHP_COMPILER_REPORT_EXTERNAL_STUBS=1` when changing module
    boundaries — a silent null is a miscompile, not a missing feature.
 
+## Follow the php-src shape
+
+- **Core + `ext/standard` are mandatory**, exactly as in php-src. Everything else is opt-in.
+- **Static or shared**, per extension — php-src's `--enable-foo` vs `--with-foo=shared` + `extension=`
+  in `php.ini`. Static links into the binary; shared is side-loaded at startup.
+- **A new extension is a directory, not a core edit** — php-src has `ext/ext_skel.php` and a per-ext
+  `config.m4`; we need the same: a per-extension manifest the build enumerates.
+
+Sizing: `lib/` 1,853 + `ext/standard` 2,122 + rest of the default set 126 = **4,101 core files**,
+with 2,467 files across 69 optional modules leaving the mandatory core (a 37% cut).
+
+## Granularity matters more than the boundary
+
+php-src builds a comparable amount of C in minutes because **each `.c` is its own translation unit**:
+`make -j` compiles them in parallel, touching one file rebuilds one `.o`, and a failure costs one
+object. Today the spine is **6,519 files compiled as a single LLVM module**, single-threaded, with no
+incrementality and no checkpointing — so any lowering edit invalidates everything and a failure at
+hour four discards the lot.
+
+Cutting the file count by 37% does not fix that; per-module translation units do. The template
+already exists in-repo: `lib/AOT/HelperRuntimeCache.php` + `script/emit-helper-runtime-object.php`
+emit 266 units in **4m27s parallel vs ~45 min serial** (`PHP_COMPILER_EMIT_JOBS`), and one helper
+edit re-emits one unit. Apply that to the spine rather than inventing something new.
+
 ## Direction of travel
 
 - **Discovery over hardcoding**: a manifest per extension (name, provided symbols, dependencies,
