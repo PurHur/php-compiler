@@ -179,9 +179,11 @@ final class BuiltinParamNames
             case 'arsort':
             case 'ksort':
             case 'krsort':
+                return ['array', 'flags'];
+            // php-src basic_functions.stub.php — natsort/natcasesort take only array (&$array); no $flags (#23243)
             case 'natsort':
             case 'natcasesort':
-                return ['array', 'flags'];
+                return ['array'];
             case 'usort':
             case 'uasort':
             case 'uksort':
