@@ -986,13 +986,36 @@ class Block {
         if (OpCode::TYPE_ASSIGN === $op->type) {
             return (int) $op->arg2 === $slot || (int) $op->arg3 === $slot;
         }
-        foreach ([$op->arg1, $op->arg2, $op->arg3] as $arg) {
+        // Some opcode args store source line numbers, not scope slots. Treating them as
+        // value reads keeps assign-result object temps alive until shutdown and defers
+        // __destruct past `$a = null` / reassignment (#23484, re-#6456; see OpCode.php).
+        foreach ($this->opCodeValueScopeArgs($op) as $arg) {
             if (null !== $arg && (int) $arg === $slot) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Opcode args that read/write scope values (excludes startLine / call-site line immediates).
+     *
+     * @return list<int|null>
+     */
+    public function opCodeValueScopeArgs(OpCode $op): array
+    {
+        return match ($op->type) {
+            OpCode::TYPE_ECHO => [$op->arg1],
+            OpCode::TYPE_PRINT => [$op->arg1, $op->arg2],
+            OpCode::TYPE_FUNCCALL_EXEC_RETURN => [$op->arg1],
+            OpCode::TYPE_FUNCCALL_EXEC_NORETURN => [],
+            OpCode::TYPE_NEW => [$op->arg1, $op->arg2],
+            OpCode::TYPE_RETURN => [$op->arg1],
+            OpCode::TYPE_RETURN_VOID => [],
+            OpCode::TYPE_ARRAY_SPREAD => [$op->arg1, $op->arg2],
+            default => [$op->arg1, $op->arg2, $op->arg3],
+        };
     }
 
     public function markDeferredArrayLiteralKeepSlot(int $slot): void
