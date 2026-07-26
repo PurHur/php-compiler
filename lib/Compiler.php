@@ -22329,6 +22329,37 @@ class Compiler {
 
                 return null;
             }
+            $closureProducerIndex = null;
+            foreach ($producers as $pi => $producer) {
+                if ($producer instanceof Op\Expr\ArrowFunction
+                    || $producer instanceof Op\Expr\Closure
+                    || $producer instanceof Op\Expr\FirstClassCallable) {
+                    $closureProducerIndex = $pi;
+                    break;
+                }
+            }
+            // array_reduce([...], fn(...), null|false|…) — Array_ + Closure + trailing ConstFetch (#23571).
+            // Must run before the generic Array_+ConstFetch mapper below, which would bind the
+            // Array_ onto the callback slot (nonEmbeddedArgIndices[1]) and orphan the Closure.
+            if (
+                'array_reduce' === $inlineFuncName
+                && null !== $arrayProducerIndex
+                && null !== $closureProducerIndex
+                && 1 === \count($constFetchIndices)
+                && \count($callArgs) >= 3
+            ) {
+                if (0 === $argIndex) {
+                    return $producers[$arrayProducerIndex];
+                }
+                if (1 === $argIndex) {
+                    return $producers[$closureProducerIndex];
+                }
+                if (2 === $argIndex) {
+                    return $producers[$constFetchIndices[0]];
+                }
+
+                return null;
+            }
             if (null !== $arrayProducerIndex && 1 === \count($constFetchIndices) && \count($nonEmbeddedArgIndices) >= 3) {
                 $arrayArgIndex = $nonEmbeddedArgIndices[1] ?? null;
                 $literalArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
@@ -22340,15 +22371,6 @@ class Compiler {
                 }
 
                 return null;
-            }
-            $closureProducerIndex = null;
-            foreach ($producers as $pi => $producer) {
-                if ($producer instanceof Op\Expr\ArrowFunction
-                    || $producer instanceof Op\Expr\Closure
-                    || $producer instanceof Op\Expr\FirstClassCallable) {
-                    $closureProducerIndex = $pi;
-                    break;
-                }
             }
             // array_filter($arr, fn(...) => ..., ARRAY_FILTER_USE_BOTH) — hoisted closure + trailing mode const (#10232, #9154).
             if (null !== $closureProducerIndex && 1 === \count($constFetchIndices) && \count($callArgs) >= 3) {
@@ -43645,6 +43667,16 @@ class Compiler {
                             // array_splice($a, -N, $len, null) — offset is UnaryMinus, not hoisted null (#16328).
                         } elseif ($this->mbstringUnaryOffsetNullLengthUsesDedicatedProducerWiring($cfgCallOp, (int) $argIndex, $block)) {
                             // mb_substr($s, -N, null) — offset is UnaryMinus, not hoisted null (#16481).
+                        } elseif (
+                            !$this->callArgIsNullLiteral(
+                                $callArg,
+                                $cfgCallOp,
+                                (int) $argIndex,
+                                $block
+                            )
+                        ) {
+                            // array_reduce([...], fn, null) — callback dead temp must not steal
+                            // trailing null $initial prelude (#23571).
                         } else {
                             $sends[] = new OpCode(
                                 OpCode::TYPE_ARG_SEND,
