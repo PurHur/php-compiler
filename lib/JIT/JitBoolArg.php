@@ -96,6 +96,11 @@ final class JitBoolArg
 
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
+        // Compile-time 0/1 — avoid mid-function BB diamonds after `(string)$arr[$k]` (#23427).
+        if (null !== $arg->compileTimeLong) {
+            return $context->constantFromBool(0 !== $arg->compileTimeLong);
+        }
+
         $literal = JitStringArg::compileTimeLiteral($arg);
         if (null !== $literal) {
             return $context->constantFromBool(self::coerceStringLiteral($literal, $contextLabel));

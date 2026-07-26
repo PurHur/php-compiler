@@ -95,32 +95,14 @@ final class HttpResponseRuntime
     public static function emitStandaloneStatusLine(Context $context, Value $code64): void
     {
         self::ensureLinked($context);
-        $i64 = $context->getTypeFromString('int64');
-        $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof LlvmFunction);
-        ++self::$emitSerial;
-        $sid = (string) self::$emitSerial;
-
-        $sInvalid = $fn->appendBasicBlock('hr_hdr_inv_'.$sid);
-        $sValid = $fn->appendBasicBlock('hr_hdr_ok_'.$sid);
-        $sDone = $fn->appendBasicBlock('hr_hdr_done_'.$sid);
-
-        $tooLow = $context->builder->icmp(Builder::INT_SLT, $code64, $i64->constInt(100, false));
-        $tooHigh = $context->builder->icmp(Builder::INT_SGT, $code64, $i64->constInt(599, false));
-        $bad = $context->builder->or($tooLow, $tooHigh);
-        $context->builder->branchIf($bad, $sInvalid, $sValid);
-
-        $context->builder->positionAtEnd($sInvalid);
-        $context->builder->branch($sDone);
-
-        $context->builder->positionAtEnd($sValid);
+        // HttpResponseJitHelper::setStatusValidated already gates 100–599.
+        // Do not emit a mid-function BB diamond here: after `(string)$arr[$k]` the
+        // diamond leaves AOT heap-corrupt on the next edge (#23427 SessionsWeb
+        // header(..., true, 303) flash redirect).
         $context->builder->call(
             $context->lookupFunction('__phpc_http_response_status_set_validated'),
             $context->builder->trunc($code64, $context->getTypeFromString('int32'))
         );
-        $context->builder->branch($sDone);
-
-        $context->builder->positionAtEnd($sDone);
     }
 
     public static function loadStatusRaw(Context $context): Value

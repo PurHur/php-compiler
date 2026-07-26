@@ -10016,6 +10016,17 @@ class JIT {
                     } else {
                         $sendValue = $this->context->getVariableFromOp($sendOperand);
                         if (
+                            null === $sendValue->compileTimeLong
+                            && isset($block->constants[$sendSlot])
+                            && \PHPCompiler\VM\Variable::TYPE_BOOLEAN === $block->constants[$sendSlot]->type
+                        ) {
+                            // Bool literal Temporary often lands as TYPE_VALUE without compileTimeLong;
+                            // rematerialize so header()/JitBoolArg skip mid-function BB diamonds (#23427).
+                            $sendValue = JIT\VmConstantJit::toVariable(
+                                $this->context,
+                                $block->constants[$sendSlot]
+                            );
+                        } elseif (
                             Variable::TYPE_VALUE === $sendValue->type
                             && Variable::KIND_VARIABLE === $sendValue->kind
                         ) {
@@ -14085,6 +14096,8 @@ class JIT {
                 );
                     $result->compileTimeConstantName = $value->compileTimeConstantName;
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+                    // Keep scalar immediates across value-box assign (#23427).
+                    $result->compileTimeLong = $value->compileTimeLong;
     
                     return;
                 case Variable::TYPE_NATIVE_DOUBLE:
@@ -14116,6 +14129,8 @@ class JIT {
                         $valueRef,
                         $this->context->helper->loadValue($value)
                     );
+                    // Keep scalar immediates across value-box assign (#23427).
+                    $result->compileTimeLong = $value->compileTimeLong;
 
                     return;
                 case Variable::TYPE_STRING:
@@ -14908,6 +14923,7 @@ class JIT {
         $dest->isNullConstant = $src->isNullConstant;
         $dest->compileTimeConstantName = $src->compileTimeConstantName;
         $dest->compileTimeEnumCase = $src->compileTimeEnumCase;
+        $dest->compileTimeLong = $src->compileTimeLong;
         $this->syncCompileTimeString($dest, $src, $force);
         $this->syncCompileTimeFloat($dest, $src, $force);
     }
