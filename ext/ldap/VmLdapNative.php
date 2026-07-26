@@ -578,6 +578,70 @@ final class VmLdapNative
     }
 
     /**
+     * Register OpenLDAP rebind trampoline (php-src ldap_set_rebind_proc; #22226).
+     *
+     * @param \FFI\CData $params int* holding Connection object id
+     */
+    public static function setRebindProc(\FFI\CData $ld, \FFI\CData $params): void
+    {
+        $ffi = self::requireFfi();
+        $cb = \Closure::fromCallable([self::class, 'rebindTrampoline']);
+        self::$rebindClosureKeep = $cb;
+        $ffi->ldap_set_rebind_proc($ld, $cb, $params);
+    }
+
+    public static function clearRebindProc(\FFI\CData $ld): void
+    {
+        self::requireFfi()->ldap_set_rebind_proc($ld, null, null);
+    }
+
+    /** @var \Closure|null keepalive for LDAP_REBIND_PROC */
+    private static $rebindClosureKeep = null;
+
+    /**
+     * @param mixed $ld LDAP*
+     * @param mixed $url const char*
+     * @param mixed $params int*
+     */
+    private static function rebindTrampoline($ld, $url, int $request, int $msgid, $params): int
+    {
+        $ffi = self::requireFfi();
+        $idPtr = $ffi->cast('int*', $params);
+        $id = (int) $idPtr[0];
+        $state = VmLdapConnection::rebindStateForId($id);
+        if (null === $state) {
+            @\trigger_error('ldap_set_rebind_proc(): No callback set', \E_USER_WARNING);
+
+            return 80; // LDAP_OTHER
+        }
+        $urlStr = null === $url ? '' : self::ffiString($url);
+        $linkVar = new \PHPCompiler\VM\Variable();
+        $linkVar->object($state['object']);
+        $urlVar = new \PHPCompiler\VM\Variable();
+        $urlVar->string($urlStr);
+        try {
+            $ret = \PHPCompiler\ext\standard\VmCallable::invokeAs(
+                'ldap_set_rebind_proc',
+                $state['ctx'],
+                $state['callback'],
+                $linkVar,
+                $urlVar
+            );
+            $ret = $ret->resolveIndirect();
+            if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $ret->type) {
+                return $ret->toInt();
+            }
+            if (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $ret->type) {
+                return $ret->toBool() ? self::LDAP_SUCCESS : 80;
+            }
+
+            return 80;
+        } catch (\Throwable) {
+            return 80;
+        }
+    }
+
+    /**
      * @param list<string>|null $attributes
      * @return \FFI\CData|null LDAPMessage*
      */
@@ -1205,8 +1269,12 @@ typedef struct sasl_interact {
     unsigned len;
 } sasl_interact_t;
 typedef int (*LDAP_SASL_INTERACT_PROC)(LDAP *ld, unsigned flags, void *defaults, void *interact);
+typedef unsigned long ber_tag_t;
+typedef int ber_int_t;
+typedef int (*LDAP_REBIND_PROC)(LDAP *ld, const char *url, ber_tag_t request, ber_int_t msgid, void *params);
 int ldap_initialize(LDAP **ldp, const char *url);
 int ldap_unbind_ext_s(LDAP *ld, void *serverctrls, void *clientctrls);
+int ldap_set_rebind_proc(LDAP *ld, LDAP_REBIND_PROC rebind_proc, void *params);
 char *ldap_err2string(int err);
 int ldap_set_option(LDAP *ld, int option, const void *invalue);
 int ldap_get_option(LDAP *ld, int option, void *outvalue);
