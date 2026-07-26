@@ -125,7 +125,8 @@ final class VmSerializeFormat
                 $rounded = 1.0;
                 ++$exp;
             }
-            $digits = self::trimTrailingZeros(VmNumberFormat::format($rounded, $decimals, '.', ''));
+            // zend_gcvt E-form keeps at least one fractional digit (1.0E+20, not 1E+20) (#23545).
+            $digits = self::trimScientificMantissa(VmNumberFormat::format($rounded, $decimals, '.', ''));
 
             return ($negative ? '-' : '').$digits.'E'.($exp >= 0 ? '+' : '').$exp;
         }
@@ -189,5 +190,22 @@ final class VmSerializeFormat
         $digits = rtrim($digits, '0');
 
         return rtrim($digits, '.');
+    }
+
+    /**
+     * Scientific mantissa: trim trailing zeros but keep ".0" when the fraction vanishes
+     * (php-src Zend/zend_strtod.c zend_gcvt E branch — #23545).
+     */
+    private static function trimScientificMantissa(string $digits): string
+    {
+        if (!str_contains($digits, '.')) {
+            return $digits.'.0';
+        }
+        $digits = rtrim($digits, '0');
+        if (str_ends_with($digits, '.')) {
+            return $digits.'0';
+        }
+
+        return $digits;
     }
 }

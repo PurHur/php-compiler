@@ -34,4 +34,14 @@ final class VmZendDoubleStringTest extends TestCase
         VmIni::syncPrecision(14);
         $this->assertSame('0.33333333333333', VmZendDoubleString::format(1 / 3));
     }
+
+    /** php-src zend_gcvt E-form keeps a fractional digit (#23545). */
+    public function testScientificMantissaKeepsFractionalDigit(): void
+    {
+        VmIni::syncPrecision(14);
+        $this->assertSame('1.0E+20', VmZendDoubleString::format(1e20));
+        $this->assertSame('-1.0E+20', VmZendDoubleString::format(-1e20));
+        $this->assertSame('1.0E-5', VmZendDoubleString::format(1e-5));
+        $this->assertSame('1.5E+20', VmZendDoubleString::format(1.5e20));
+    }
 }
