@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6570 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21230 |
+| Source constructs flagged (warnings) | 21228 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -371,7 +371,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 1 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
 | `ext/dom/JitDomDocumentElement.php` | 0 | 10 |
-| `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 3 |
+| `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 1 |
 | `ext/dom/JitDomElementNavigationProperty.php` | 0 | 3 |
 | `ext/dom/JitDomElementTextContent.php` | 0 | 7 |
 | `ext/dom/JitDomGetElementById.php` | 0 | 5 |
@@ -8837,9 +8837,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 1425)
 - 79 class method(s)
-- 1 closure(s)
 
 ### `ext/dom/JitDomElementNavigationProperty.php`
 
