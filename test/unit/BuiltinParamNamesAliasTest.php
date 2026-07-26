@@ -914,6 +914,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'delims', 'ucwords'));
     }
 
+    /** @covers issue #23242 */
+    public function testRangeZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('range');
+        self::assertSame(['start', 'end', 'step'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'start', 'range'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'end', 'range'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'step', 'range'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $low / $high)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'low', 'range'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'high', 'range'));
+    }
+
     /** @covers issue #23351 */
     public function testMbStrimwidthZendStubNamedParams(): void
     {
