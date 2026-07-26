@@ -15,7 +15,8 @@ if ('POST' === $method) {
 
 $flash = (string) ($_SESSION['flash'] ?? '');
 if ('' !== $flash) {
-    unset($_SESSION['flash']);
+    // Clear rather than unset(): AOT unset()+later use of $flash flakes (#23427).
+    $_SESSION['flash'] = '';
 }
 
 header('Content-Type: text/html; charset=UTF-8');

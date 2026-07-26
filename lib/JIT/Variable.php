@@ -567,6 +567,8 @@ final class Variable {
             case self::TYPE_VALUE:
                 $slot = JitValueBox::alloc($context);
                 $ptr = JitValueBox::pointer($context, $slot);
+                // Preserve scalar immediates on TYPE_VALUE boxes (#23427).
+                $boxedCompileTimeLong = null;
                 if (null === $op->value) {
                     $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
                 } elseif (is_int($op->value)) {
@@ -575,12 +577,14 @@ final class Variable {
                         $ptr,
                         $context->constantFromInteger($op->value)
                     );
+                    $boxedCompileTimeLong = (int) $op->value;
                 } elseif (is_bool($op->value)) {
                     $context->builder->call(
                         $context->lookupFunction('__value__writeBool'),
                         $ptr,
                         $context->getTypeFromString('int32')->constInt($op->value ? 1 : 0, false)
                     );
+                    $boxedCompileTimeLong = $op->value ? 1 : 0;
                 } elseif (is_float($op->value)) {
                     $context->builder->call(
                         $context->lookupFunction('__value__writeDouble'),
@@ -611,6 +615,9 @@ final class Variable {
                 }
                 if (isset($literal)) {
                     $var->compileTimeString = $literal;
+                }
+                if (null !== $boxedCompileTimeLong) {
+                    $var->compileTimeLong = $boxedCompileTimeLong;
                 }
 
                 return $var;

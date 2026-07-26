@@ -201,7 +201,10 @@ smoke_005_sessionsweb() {
   local session_dir
   session_dir="$(mktemp -d "${SMOKE_ROOT}/sess.XXXXXX")"
   echo "examples-aot-smoke: 005-SessionsWeb: phpc build --project -> ${binary}"
-  if ! PHP_COMPILER_SESSION_DIR="$session_dir" "$PHPC" build --project "${SESSIONSWEB}"; then
+  # Do not export PHP_COMPILER_SESSION_DIR during build — it is observed by
+  # compile-time session/CGI paths and leaves project AOT heap-corrupt on POST
+  # flash (#23427). Session dir is only for the CGI run below.
+  if ! "$PHPC" build --project "${SESSIONSWEB}"; then
     echo "examples-aot-smoke: 005-SessionsWeb: link failed" >&2
     rm -rf "$session_dir"
     return 1
@@ -248,6 +251,7 @@ smoke_005_sessionsweb() {
     PHP_COMPILER_SESSION_DIR="$session_dir" HTTP_COOKIE="$cookie" \
       REQUEST_METHOD='POST' SCRIPT_NAME='/example.php' REQUEST_URI='/example.php' \
       REQUEST_BODY='message=Saved' CONTENT_LENGTH='13' \
+      CONTENT_TYPE='application/x-www-form-urlencoded' \
       "$binary" 2>"$stderr_file"
   )"
   run_code=$?

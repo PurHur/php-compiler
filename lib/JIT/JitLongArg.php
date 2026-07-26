@@ -5,6 +5,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 final class JitLongArg {
     public static function lower(Context $context, Variable $arg, string $contextLabel = "argument"): Value {
+        if (null !== $arg->compileTimeLong) {
+            return $context->constantFromInteger((int) $arg->compileTimeLong);
+        }
         if (Variable::TYPE_NATIVE_LONG === $arg->type) return $context->helper->loadValue($arg);
         if (Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
             return $context->builder->fpToSi($context->helper->loadValue($arg), $context->getTypeFromString('int64'));
