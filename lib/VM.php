@@ -5793,11 +5793,21 @@ restart:
                     }
                     if (Variable::TYPE_OBJECT === $container->type) {
                         $object = $container->toObject();
-                        if (
-                            !$op->unsetOnProperty
-                            && $this->objectImplementsArrayAccess($object)
-                        ) {
-                            $catchFrame = $this->invokeArrayAccessOffsetUnset($object, $key, $frame);
+                        if (!$op->unsetOnProperty) {
+                            // unset($obj[$k]) — ArrayAccess::offsetUnset, else Zend Error
+                            // (DOMNodeList/DOMNamedNodeMap have no unset_dimension; #23304).
+                            if ($this->objectImplementsArrayAccess($object)) {
+                                $catchFrame = $this->invokeArrayAccessOffsetUnset($object, $key, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
+                            $catchFrame = $this->dispatchVmError(
+                                VM\VmUnset::cannotUseObjectAsArrayMessage($object->class->name),
+                                $frame
+                            );
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;

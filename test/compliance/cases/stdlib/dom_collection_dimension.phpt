@@ -1,5 +1,5 @@
 --TEST--
-stdlib DOMNodeList/DOMNamedNodeMap dimension handlers (#20311, ext/dom/php_dom.c)
+stdlib DOMNodeList/DOMNamedNodeMap dimension handlers (#20311, #23304, ext/dom/php_dom.c)
 --FILE--
 <?php
 $doc = new DOMDocument();
@@ -21,6 +21,18 @@ try {
     echo $e->getMessage(), "\n";
 }
 try {
+    unset($list[0]);
+    echo "unset-list-ok\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
+    unset($map['a']);
+    echo "unset-map-ok\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+try {
     $map[-1];
     echo "neg-ok\n";
 } catch (ValueError $e) {
@@ -35,4 +47,6 @@ null null
 null
 no-aa
 Cannot use object of type DOMNodeList as array
+Cannot use object of type DOMNodeList as array
+Cannot use object of type DOMNamedNodeMap as array
 must be between 0 and 2147483647

@@ -9,13 +9,14 @@ use PHPCfg\Operand\Literal;
 use PHPTypes\Type;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPCompiler\VM\VmUnset;
 use PHPLLVM\Builder;
 
 /**
- * LLVM lowering bodies for unset() — delegates semantic guards to {@see VmUnset} (#10238).
+ * LLVM lowering bodies for unset() — delegates semantic guards to {@see VmUnset} (#10238, #23304).
  */
 final class UnsetHelperLlvm
 {
@@ -30,10 +31,15 @@ final class UnsetHelperLlvm
         $container = $context->getVariableFromOp($containerOp);
         $dim = $context->getVariableFromOp($dimOp);
         if (Variable::TYPE_OBJECT === $container->type) {
+            if ($op->unsetOnProperty) {
+                self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
+
+                return;
+            }
             if (ArrayAccessHelper::tryCompileOffsetUnset($context, $container, $dim, $containerOp)) {
                 return;
             }
-            self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
+            self::emitCannotUseObjectAsArray($context, $container, $containerOp);
 
             return;
         }
@@ -48,11 +54,99 @@ final class UnsetHelperLlvm
             return;
         }
         if (Variable::TYPE_VALUE === $container->type) {
-            self::compileValueBoxOffsetUnset($context, $block, $containerOp, $dimOp, $container, $dim, $jit);
+            self::compileValueBoxOffsetUnset(
+                $context,
+                $block,
+                $containerOp,
+                $dimOp,
+                $container,
+                $dim,
+                $op->unsetOnProperty,
+                $jit
+            );
 
             return;
         }
         throw new \LogicException('unset() offset only supports arrays and objects in this compiler build');
+    }
+
+    /**
+     * unset($obj[$k]) on non-ArrayAccess — Zend Error (DOM collections; #23304).
+     */
+    private static function emitCannotUseObjectAsArray(
+        Context $context,
+        Variable $container,
+        ?Operand $containerOp
+    ): void {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        $displayName = self::objectDisplayNameForError($context, $container, $containerOp);
+        if (null !== $displayName) {
+            ErrorRaise::emitRaise($context, VmUnset::cannotUseObjectAsArrayMessage($displayName));
+
+            return;
+        }
+        self::emitCannotUseObjectAsArrayRuntime($context, $container);
+    }
+
+    private static function objectDisplayNameForError(
+        Context $context,
+        Variable $container,
+        ?Operand $containerOp
+    ): ?string {
+        unset($context, $container);
+        if (null === $containerOp || null === $containerOp->type || Type::TYPE_OBJECT !== $containerOp->type->type) {
+            return null;
+        }
+        $userType = $containerOp->type->userType ?? '';
+        if ('' === $userType || 'object' === strtolower(ltrim($userType, '\\'))) {
+            return null;
+        }
+
+        return ltrim($userType, '\\');
+    }
+
+    private static function emitCannotUseObjectAsArrayRuntime(Context $context, Variable $container): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'snprintf',
+            $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
+        );
+        $classNameStr = ReflectionBuiltinHelper::getClassName($context, $container);
+        $classCstr = $context->builder->structGep(
+            $classNameStr,
+            $context->structFieldIndex($classNameStr, 'value')
+        );
+        $buf = $context->builder->alloca($i8->arrayType(512), 1, 'unset_dim_obj_msg');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufPtr,
+            $context->constantFromInteger(512, 'size_t'),
+            $context->builder->pointerCast(
+                $context->constantFromString('Cannot use object of type %s as array'),
+                $i8p
+            ),
+            $classCstr
+        );
+        $len = $context->builder->zext(
+            $context->builder->select(
+                $context->builder->icmp(Builder::INT_SLT, $written, $i32->constInt(0, true)),
+                $i32->constInt(0, false),
+                $written
+            ),
+            $sizeT
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_error'),
+            $bufPtr,
+            $len
+        );
     }
 
     private static function emitScalarUnsetDimError(Context $context, Variable $container): void
@@ -69,6 +163,7 @@ final class UnsetHelperLlvm
         Operand $dimOp,
         Variable $container,
         Variable $dim,
+        bool $unsetOnProperty,
         ?\PHPCompiler\JIT $jit = null
     ): void {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $container);
@@ -117,10 +212,13 @@ final class UnsetHelperLlvm
             $context->lookupFunction('__value__readObject'),
             $valuePtr
         );
-        if (ArrayAccessHelper::tryCompileOffsetUnset($context, $objVar, $dim, $containerOp)) {
+        if ($unsetOnProperty) {
+            self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
+            $context->builder->returnVoid();
+        } elseif (ArrayAccessHelper::tryCompileOffsetUnset($context, $objVar, $dim, $containerOp)) {
             $context->builder->returnVoid();
         } else {
-            self::compilePropertyUnset($context, $block, $containerOp, $dimOp, $jit);
+            self::emitCannotUseObjectAsArray($context, $objVar, $containerOp);
             $context->builder->returnVoid();
         }
 

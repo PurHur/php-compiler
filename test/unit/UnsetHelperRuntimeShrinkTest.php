@@ -45,5 +45,9 @@ final class UnsetHelperRuntimeShrinkTest extends TestCase
             VmUnset::ERROR_NON_ARRAY,
             VmUnset::scalarUnsetDimErrorMessage(\PHPCompiler\JIT\Variable::TYPE_NULL)
         );
+        $this->assertSame(
+            'Cannot use object of type DOMNodeList as array',
+            VmUnset::cannotUseObjectAsArrayMessage('DOMNodeList')
+        );
     }
 }

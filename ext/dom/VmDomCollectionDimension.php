@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
  * (php-src ext/dom/php_dom.c, ext/dom/token_list.c; #20311, #23006).
  *
  * Classic collections use zend_object_handlers.read_dimension / has_dimension — not ArrayAccess.
- * Writes remain Error "Cannot use object of type … as array".
+ * Writes and unset($collection[$i]) remain Error "Cannot use object of type … as array" (#23304).
  */
 final class VmDomCollectionDimension
 {

@@ -18,6 +18,15 @@ final class VmUnset
     public const ERROR_STRING_OFFSET = 'Cannot unset string offsets';
 
     /**
+     * Zend default unset_dimension / write_dimension on non-ArrayAccess objects
+     * (zend_object_handlers.c; DOMNodeList/DOMNamedNodeMap keep read/has only — #23304, re-#20311).
+     */
+    public static function cannotUseObjectAsArrayMessage(string $className): string
+    {
+        return 'Cannot use object of type '.$className.' as array';
+    }
+
+    /**
      * Scalar JIT containers always raise on unset offset (Zend zend_unset_dim).
      */
     public static function isScalarJitContainer(JitVariable $container): bool
