@@ -1295,16 +1295,22 @@ final class VmSimpleXml
         return 1 === preg_match('/^[A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?$/', $name);
     }
 
-    /** @return HashTable string map */
+    /**
+     * Namespaces in use on the element / attributes (php-src sxe_add_namespaces; #22729).
+     * Unlike getDocNamespaces(), unused xmlns declarations are omitted; inherited default
+     * / prefixed NS on the node itself are included.
+     *
+     * @return HashTable string map
+     */
     public static function getNamespaces(ObjectEntry $entry, bool $recursive = false): HashTable
     {
-        return self::stringMapToHashTable(self::collectNamespaces($entry, $recursive, false));
+        return self::stringMapToHashTable(self::collectUsedNamespaces($entry, $recursive));
     }
 
     /** @return HashTable string map */
     public static function getDocNamespaces(ObjectEntry $entry, bool $recursive = false, bool $fromRoot = true): HashTable
     {
-        return self::stringMapToHashTable(self::collectNamespaces($entry, $recursive, $fromRoot));
+        return self::stringMapToHashTable(self::collectRegisteredNamespaces($entry, $recursive, $fromRoot));
     }
 
     public static function registerXPathNamespace(ObjectEntry $entry, string $prefix, string $namespaceUri): bool
@@ -2052,13 +2058,13 @@ final class VmSimpleXml
         $map = SimpleXmlRegistry::xpathNamespaces($entry);
         if (SimpleXmlRegistry::isAttributesView($entry) || SimpleXmlRegistry::isChildrenView($entry)) {
             // Live attributes/children views share the element node — read xmlns from that state.
-            self::collectNamespacesFromNode(SimpleXmlRegistry::state($entry), $map, false);
+            self::collectRegisteredNamespacesFromNode(SimpleXmlRegistry::state($entry), $map, false);
 
             return $map;
         }
         $nodes = SimpleXmlRegistry::isView($entry) ? self::viewElements($entry) : [SimpleXmlRegistry::state($entry)];
         foreach ($nodes as $node) {
-            self::collectNamespacesFromNode($node, $map, false);
+            self::collectRegisteredNamespacesFromNode($node, $map, false);
         }
 
         return $map;
@@ -2125,15 +2131,23 @@ final class VmSimpleXml
         return $ht;
     }
 
-    /** @return array<string, string> */
-    private static function collectNamespaces(ObjectEntry $entry, bool $recursive, bool $fromRoot): array
+    /**
+     * getDocNamespaces — xmlns declarations (php-src sxe_add_registered_namespaces).
+     *
+     * @return array<string, string>
+     */
+    private static function collectRegisteredNamespaces(ObjectEntry $entry, bool $recursive, bool $fromRoot): array
     {
-        if (SimpleXmlRegistry::isAttributesView($entry)) {
+        if (SimpleXmlRegistry::isAttributesView($entry) || SimpleXmlRegistry::isAttributeNodeView($entry)) {
             return [];
         }
 
         $nodes = [];
-        if (SimpleXmlRegistry::isView($entry)) {
+        if ($fromRoot) {
+            $nodes = [SimpleXmlRegistry::rootState(SimpleXmlRegistry::documentKey($entry))];
+        } elseif (SimpleXmlRegistry::isChildrenView($entry) || SimpleXmlRegistry::isNamedChildView($entry)) {
+            $nodes = [SimpleXmlRegistry::state($entry)];
+        } elseif (SimpleXmlRegistry::isView($entry)) {
             $nodes = self::viewElements($entry);
         } else {
             $nodes = [SimpleXmlRegistry::state($entry)];
@@ -2141,25 +2155,174 @@ final class VmSimpleXml
 
         $out = [];
         foreach ($nodes as $node) {
-            self::collectNamespacesFromNode($node, $out, $recursive);
+            self::collectRegisteredNamespacesFromNode($node, $out, $recursive);
         }
 
         return $out;
     }
 
+    /**
+     * getNamespaces — NS used by element/attrs (php-src sxe_add_namespaces; #22729).
+     *
+     * @return array<string, string>
+     */
+    private static function collectUsedNamespaces(ObjectEntry $entry, bool $recursive): array
+    {
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            return [];
+        }
+
+        if (SimpleXmlRegistry::isAttributeNodeView($entry)) {
+            $out = [];
+            $name = SimpleXmlRegistry::attributeNodeName($entry);
+            $colon = strpos($name, ':');
+            if (false === $colon) {
+                return [];
+            }
+            $prefix = substr($name, 0, $colon);
+            if ('' === $prefix) {
+                return [];
+            }
+            $owner = SimpleXmlRegistry::state($entry);
+            $docKey = SimpleXmlRegistry::documentKey($entry);
+            $root = SimpleXmlRegistry::rootState($docKey);
+            $parentScope = self::parentScopeForNode($root, $owner) ?? [];
+            $nodeScope = self::scopeAfterNode($owner, $parentScope);
+            if (isset($owner->attributes['xmlns:'.$prefix])) {
+                $out[$prefix] = $owner->attributes['xmlns:'.$prefix];
+            } elseif (isset($nodeScope[$prefix])) {
+                $out[$prefix] = $nodeScope[$prefix];
+            }
+
+            return $out;
+        }
+
+        $docKey = SimpleXmlRegistry::documentKey($entry);
+        $root = SimpleXmlRegistry::rootState($docKey);
+
+        if (SimpleXmlRegistry::isChildrenView($entry) || SimpleXmlRegistry::isNamedChildView($entry)) {
+            $nodes = self::directElementChildren($entry);
+        } elseif (SimpleXmlRegistry::isView($entry)) {
+            $nodes = self::viewElements($entry);
+        } else {
+            $nodes = [SimpleXmlRegistry::state($entry)];
+        }
+
+        $out = [];
+        foreach ($nodes as $node) {
+            $parentScope = self::parentScopeForNode($root, $node) ?? [];
+            self::collectUsedNamespacesFromNode($node, $parentScope, $out, $recursive);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Scope in effect on the parent of $target (before $target's own xmlns decls).
+     *
+     * @param array<string, string> $inScope
+     *
+     * @return array<string, string>|null
+     */
+    private static function parentScopeForNode(SimpleXmlNodeState $root, SimpleXmlNodeState $target): ?array
+    {
+        return self::parentScopeForNodeWalk($root, $target, []);
+    }
+
+    /**
+     * @param array<string, string> $inScope
+     *
+     * @return array<string, string>|null
+     */
+    private static function parentScopeForNodeWalk(SimpleXmlNodeState $node, SimpleXmlNodeState $target, array $inScope): ?array
+    {
+        if ($node === $target) {
+            return $inScope;
+        }
+        $scope = self::scopeAfterNode($node, $inScope);
+        foreach ($node->children as $child) {
+            $found = self::parentScopeForNodeWalk($child, $target, $scope);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, string> $parentScope
+     * @param array<string, string> $out
+     */
+    private static function collectUsedNamespacesFromNode(
+        SimpleXmlNodeState $node,
+        array $parentScope,
+        array &$out,
+        bool $recursive
+    ): void {
+        $nodeScope = self::scopeAfterNode($node, $parentScope);
+        $uri = self::resolveElementNamespaceUri($node, $parentScope);
+        if ('' !== $uri) {
+            $prefix = self::elementNamespacePrefix($node);
+            if (!\array_key_exists($prefix, $out)) {
+                $out[$prefix] = $uri;
+            }
+        }
+
+        foreach ($node->attributes as $name => $value) {
+            if ('xmlns' === $name || str_starts_with($name, 'xmlns:')) {
+                continue;
+            }
+            $colon = strpos($name, ':');
+            if (false === $colon) {
+                continue;
+            }
+            $prefix = substr($name, 0, $colon);
+            if ('' === $prefix || \array_key_exists($prefix, $out)) {
+                continue;
+            }
+            if (isset($node->attributes['xmlns:'.$prefix])) {
+                $out[$prefix] = $node->attributes['xmlns:'.$prefix];
+            } elseif (isset($nodeScope[$prefix])) {
+                $out[$prefix] = $nodeScope[$prefix];
+            }
+        }
+
+        if ($recursive) {
+            foreach ($node->children as $child) {
+                self::collectUsedNamespacesFromNode($child, $nodeScope, $out, true);
+            }
+        }
+    }
+
+    private static function elementNamespacePrefix(SimpleXmlNodeState $node): string
+    {
+        $colon = strpos($node->name, ':');
+        if (false === $colon) {
+            return '';
+        }
+
+        return substr($node->name, 0, $colon);
+    }
+
     /** @param array<string, string> $out */
-    private static function collectNamespacesFromNode(SimpleXmlNodeState $node, array &$out, bool $recursive): void
+    private static function collectRegisteredNamespacesFromNode(SimpleXmlNodeState $node, array &$out, bool $recursive): void
     {
         foreach ($node->attributes as $name => $value) {
             if ('xmlns' === $name) {
-                $out[''] = $value;
+                if (!\array_key_exists('', $out)) {
+                    $out[''] = $value;
+                }
             } elseif (str_starts_with($name, 'xmlns:')) {
-                $out[substr($name, 6)] = $value;
+                $prefix = substr($name, 6);
+                if (!\array_key_exists($prefix, $out)) {
+                    $out[$prefix] = $value;
+                }
             }
         }
         if ($recursive) {
             foreach ($node->children as $child) {
-                self::collectNamespacesFromNode($child, $out, true);
+                self::collectRegisteredNamespacesFromNode($child, $out, true);
             }
         }
     }
