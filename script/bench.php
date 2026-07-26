@@ -10,6 +10,10 @@ declare(strict_types=1);
  * native binary, verifies all runtimes agree on output, averages ITERATIONS
  * runs, and rewrites the table in benchmarks/README.md.
  *
+ * A per-invocation wall-clock cap (PHP_COMPILER_BENCH_TIMEOUT, default 300 s; builds get
+ * PHP_COMPILER_BENCH_BUILD_TIMEOUT, default 1800 s) keeps one unfinishable runtime from blocking
+ * the whole suite — bin/vm.php on Ack(3,10) runs >38 min where Zend takes 1.9 s.
+ *
  * Usage (pinned env):
  *   ./script/docker-exec.sh -- bash -lc 'PHP_8_2=$(command -v php) php script/bench.php'
  *
@@ -108,27 +112,41 @@ function bench(string $file, array $runtimes, string $harnessPhp, string $llvmEn
         }
     }
     $vmCmd = escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/bin/vm.php').' '.escapeshellarg($file);
-    $vmOk = trim(capture($vmCmd)) === $expected;
+    $vmOk = trim(capture($vmCmd, $vmRc)) === $expected;
     if (!$vmOk) {
-        echo "  vm.php output mismatch — vm column n/a\n";
+        echo capture_timed_out($vmRc)
+            ? "  vm.php exceeded the time cap — vm column n/a\n"
+            : "  vm.php output mismatch — vm column n/a\n";
     }
 
     $jitCmd = $llvmEnv.' '.escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/bin/jit.php').' '.escapeshellarg($file);
-    $jitOk = '' !== $llvmEnv && trim(capture($jitCmd)) === $expected;
-    if (!$jitOk) {
-        echo "  jit.php unavailable or mismatch — jit column n/a\n";
+    $jitOk = false;
+    if ('' !== $llvmEnv) {
+        $jitOk = trim(capture($jitCmd, $jitRc)) === $expected;
+        if (!$jitOk) {
+            echo capture_timed_out($jitRc)
+                ? "  jit.php exceeded the time cap — jit column n/a\n"
+                : "  jit.php unavailable or mismatch — jit column n/a\n";
+        }
+    } else {
+        echo "  no LLVM available — jit column n/a\n";
     }
 
     $binary = tempnam(sys_get_temp_dir(), 'phpcbench');
     $buildCmd = $llvmEnv.' '.escapeshellcmd($root.'/phpc').' build -o '.escapeshellarg($binary).' '.escapeshellarg($file);
     $aotOk = false;
     if ('' !== $llvmEnv) {
-        capture($buildCmd.' 2>&1', $buildRc);
+        // A compile is allowed far longer than a run: the run cap exists to bound interpreters that
+        // cannot finish, whereas `phpc build` is legitimately slow (and slower still on a cold
+        // helper-runtime cache, #23458).
+        capture($buildCmd.' 2>&1', $buildRc, buildCapSeconds());
         $aotOk = 0 === $buildRc && is_executable($binary)
             && trim(capture(escapeshellarg($binary))) === $expected;
     }
     if (!$aotOk) {
-        echo "  phpc build failed or output mismatch — AOT columns n/a (#15642)\n";
+        echo capture_timed_out($buildRc ?? null)
+            ? "  phpc build exceeded the build cap — AOT columns n/a\n"
+            : "  phpc build failed or output mismatch — AOT columns n/a (#15642)\n";
     }
 
     $times = [];
@@ -154,9 +172,47 @@ function timeCmd(string $cmd): float
     return (microtime(true) - $start) / ITERATIONS;
 }
 
-function capture(string $cmd, ?int &$rc = null): string
+/**
+ * Run a command under a wall-clock cap.
+ *
+ * Without a cap a single pathologically slow runtime blocks the whole suite: bin/vm.php is PHP
+ * interpreting PHP, so on Ack(3,10) — 1.9 s under Zend — it ran 38 minutes at 100% CPU without
+ * finishing, and the harness never reached the AOT columns anyone actually wanted. A runtime that
+ * cannot finish inside the cap gets `n/a` for that benchmark, which is the honest answer and lets
+ * the remaining columns be measured.
+ *
+ * Cap applies per invocation (verification and each timed iteration). Override with
+ * PHP_COMPILER_BENCH_TIMEOUT; 0 disables it.
+ */
+function capture(string $cmd, ?int &$rc = null, ?int $capSeconds = null): string
 {
+    if (null === $capSeconds) {
+        $timeout = getenv('PHP_COMPILER_BENCH_TIMEOUT');
+        $timeout = is_string($timeout) && ctype_digit($timeout) ? (int) $timeout : 300;
+    } else {
+        $timeout = $capSeconds;
+    }
+    if ($timeout > 0) {
+        // `env` is required: the jit/AOT commands are prefixed with VAR=value assignments, and
+        // `timeout VAR=value cmd` tries to exec "VAR=value" as a program. Without this the LLVM
+        // columns silently degrade to n/a while the underlying build is perfectly fine.
+        $cmd = 'timeout --signal=KILL '.$timeout.' env '.$cmd;
+    }
     exec($cmd.' 2>/dev/null', $lines, $rc);
 
     return implode("\n", $lines);
+}
+
+/** True when {@see capture} killed the command at the cap (timeout(1) reports 124, or 137 for KILL). */
+function capture_timed_out(?int $rc): bool
+{
+    return 124 === $rc || 137 === $rc;
+}
+
+/** Wall-clock cap for `phpc build`; override with PHP_COMPILER_BENCH_BUILD_TIMEOUT, 0 disables. */
+function buildCapSeconds(): int
+{
+    $v = getenv('PHP_COMPILER_BENCH_BUILD_TIMEOUT');
+
+    return is_string($v) && ctype_digit($v) ? (int) $v : 1800;
 }
