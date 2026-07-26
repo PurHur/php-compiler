@@ -744,6 +744,7 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'numberformatter')
                     || str_contains($name, 'intlcalendar')
                     || str_contains($name, 'msgfmt_format')
+                    || str_contains($name, 'intl_list_formatter')
                     || str_contains($name, 'transliterator')
                     || str_contains($name, 'resourcebundle')
                     || str_contains($name, 'intl_skeleton')
@@ -1594,6 +1595,10 @@ class JITTest extends BaseTest {
             // Spoofchecker::setAllowedChars: VM + bin/jit.php repro green (#20823);
             // MCJIT PHPT harness hits WeakRefNativeOpsJit::nullSlot getValue() abort (same as above).
             if (str_contains($name, 'spoofchecker_set_allowed_chars')) {
+                continue;
+            }
+            // IntlListFormatter: VM green (#23229); JIT lowering deferred (VmClassMethod VM-only).
+            if (str_contains($name, 'intl_list_formatter')) {
                 continue;
             }
             // Phar instance API: VM green (#20628); jit.php hits MathBaseConvertRuntime::constFloat

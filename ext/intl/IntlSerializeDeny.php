@@ -12,6 +12,7 @@ use PHPCompiler\VM\Context;
  * - NumberFormatter — ext/intl/formatter/formatter.stub.php (#23092)
  * - Collator — ext/intl/collator/collator.stub.php (#23092)
  * - MessageFormatter — ext/intl/msgformat/msgformat.stub.php (#23092)
+ * - IntlListFormatter — ext/intl/listformatter/listformatter.stub.php (#23229)
  * - ResourceBundle — ext/intl/resourcebundle/resourcebundle.stub.php (#23092)
  * - IntlCalendar / IntlGregorianCalendar (+ subclasses) — ext/intl/calendar/calendar.stub.php (#23092)
  * - Transliterator — ext/intl/transliterator/transliterator.stub.php (#23136)
@@ -28,6 +29,7 @@ final class IntlSerializeDeny
         VmNumberFormatter::CLASS_LC,
         VmCollator::CLASS_LC,
         VmMessageFormatter::CLASS_LC,
+        VmIntlListFormatter::CLASS_LC,
         VmResourceBundle::CLASS_LC,
         VmIntlCalendar::CLASS_LC,
         VmIntlCalendar::GREGORIAN_CLASS_LC,

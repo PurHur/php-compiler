@@ -1154,6 +1154,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ IntlListFormatter — ICU list formatting (php-src ext/intl/listformatter; #23229).
+     *
+     * php-src: listformatter.stub.php / listformatter_class.cpp (GH-18519).
+     * Enable via stable 8.5.0+ or explicit {@code PHP_COMPILER_PROFILE=8.5} forward profile.
+     */
+    public static function advertisesIntlListFormatter(): bool
+    {
+        return self::advertisesLocalePhp85Apis();
+    }
+
+    /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2 (#12508, #17197).

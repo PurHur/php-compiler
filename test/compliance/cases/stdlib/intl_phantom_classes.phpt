@@ -19,6 +19,7 @@ echo 'intliterator=', (int) class_exists('IntlIterator', false), "\n";
 echo 'intlchar=', (int) class_exists('IntlChar', false), "\n";
 echo 'uconverter=', (int) class_exists('UConverter', false), "\n";
 echo 'spoofchecker=', (int) class_exists('Spoofchecker', false), "\n";
+echo 'intllistformatter=', (int) class_exists('IntlListFormatter', false), "\n";
 echo 'locale_get_default=', (int) function_exists('locale_get_default'), "\n";
 try {
     Collator::create('en_US');
@@ -57,6 +58,7 @@ intliterator=0
 intlchar=0
 uconverter=0
 spoofchecker=0
+intllistformatter=0
 locale_get_default=0
 Error: Class "Collator" not found
 msgfmt_err=Error

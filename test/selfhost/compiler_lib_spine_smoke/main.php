@@ -953,6 +953,7 @@ require_once __DIR__.'/../../../ext/intl/VmCollator.php';
 require_once __DIR__.'/../../../ext/intl/VmGrapheme.php';
 require_once __DIR__.'/../../../ext/intl/VmIdn.php';
 require_once __DIR__.'/../../../ext/intl/VmIntlIterator.php';
+require_once __DIR__.'/../../../ext/intl/VmIntlListFormatter.php';
 require_once __DIR__.'/../../../ext/intl/VmIntlCalendar.php';
 require_once __DIR__.'/../../../ext/intl/VmIntlChar.php';
 require_once __DIR__.'/../../../ext/intl/VmIntlDateFormatter.php';
