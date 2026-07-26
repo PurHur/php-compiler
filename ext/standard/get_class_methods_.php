@@ -38,8 +38,9 @@ final class get_class_methods_ extends Internal
         $ctx = VmReflection::requireContext($frame);
         VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'get_class_methods', 'object_or_class');
         $entry = VmReflection::requireClassForGetClassMethods($ctx, $frame->calledArgs[0]);
+        // Scope via $frame — zend_get_executed_scope() (#23530).
         $frame->returnVar->copyFrom(
-            VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT, $ctx)
+            VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT, $ctx, $frame)
         );
     }
 

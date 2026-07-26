@@ -33,7 +33,7 @@ final class GetClassMethodsRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('invokeForEnumCaseValueBox', $source);
         $this->assertStringNotContainsString('invokeFromValueBox', $source);
         $this->assertStringNotContainsString('strcasecmp', $source);
-        $this->assertLessThan(260, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(160, \substr_count($source, "\n") + 1);
     }
 
     public function testStringGetClassMethodsUsesJitHelperNotInlineLlvm(): void
@@ -46,9 +46,19 @@ final class GetClassMethodsRuntimeShrinkTest extends TestCase
     public function testGetClassMethodsJitHelperDelegatesToVmReflection(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/ext/standard/GetClassMethodsJitHelper.php');
-        $this->assertStringContainsString('VmReflection::resolveClassForGetClassMethods', $source);
+        $this->assertStringContainsString('VmReflection::requireClassForGetClassMethods', $source);
         $this->assertStringContainsString('VmReflection::classMethodsArray', $source);
-        $this->assertStringContainsString('Superglobals::getActiveContext', $source);
+        $this->assertStringContainsString('VmExecutingFrame::requireFromActiveContext', $source);
+        $this->assertStringNotContainsString('Superglobals::getActiveContext', $source);
+    }
+
+    public function testJitGetClassMethodsAlwaysRoutesThroughPhpHelper(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/JitGetClassMethods.php');
+        $this->assertStringContainsString('StringGetClassMethods::invoke', $source);
+        $this->assertStringNotContainsString('allMethodNamesForClassId', $source);
+        $this->assertStringNotContainsString('invokeForClassName', $source);
+        $this->assertLessThan(160, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesGetClassMethodsJitHelper(): void
