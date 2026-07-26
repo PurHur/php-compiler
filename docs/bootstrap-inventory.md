@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6575 |
-| Phase A inventory files (M2 ratio SSOT) | 6575 |
+| PHP files on vm.php path | 6576 |
+| Phase A inventory files (M2 ratio SSOT) | 6576 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21253 |
+| Source constructs flagged (warnings) | 21257 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4799,7 +4799,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
-| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 4 |
+| `lib/JIT/ArrayBuiltinHelper.php` | 0 | 6 |
 | `lib/JIT/ArrayFilterCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ArrayFindHelper.php` | 0 | 1 |
@@ -4966,6 +4966,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/HashContextEmbedBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/HashContextRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/HashTableDuplicateRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/HashTableUnionRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/HashtableValueOutJitBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/Hebrev.php` | 0 | 1 |
 | `lib/JIT/Builtin/Hebrevc.php` | 0 | 1 |
@@ -6386,7 +6387,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/ReflectionPropertyHookSupport.php` | 0 | 5 |
 | `lib/VM/ReflectionPropertyTypeSupport.php` | 0 | 3 |
 | `lib/VM/ReflectionReferenceSupport.php` | 0 | 1 |
-| `lib/VM/ReflectionSupport.php` | 0 | 46 |
+| `lib/VM/ReflectionSupport.php` | 0 | 47 |
 | `lib/VM/ReflectionTypeSupport.php` | 0 | 16 |
 | `lib/VM/ReservedBuiltinClass.php` | 0 | 2 |
 | `lib/VM/ResourceSupport.php` | 0 | 3 |
@@ -41878,7 +41879,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new CompileError (line 96)
-- 8 class method(s)
+- 10 class method(s)
 
 ### `lib/Compiler/ClassCompileRegistry.php`
 
@@ -42459,10 +42460,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 90)
-- new Variable (line 184)
-- new Variable (line 186)
-- 9 class method(s)
+- new Variable (line 48)
+- new Variable (line 57)
+- new Variable (line 120)
+- new Variable (line 214)
+- new Variable (line 216)
+- 10 class method(s)
 
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 
@@ -43372,6 +43375,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Builtin/HashTableDuplicateRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
+### `lib/JIT/Builtin/HashTableUnionRuntime.php`
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
@@ -47288,9 +47296,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 188)
 - new Variable (line 192)
 - new Variable (line 194)
-- new Variable (line 1864)
-- new Variable (line 1868)
-- new Variable (line 2140)
+- new Variable (line 1873)
+- new Variable (line 1877)
+- new Variable (line 2149)
 - 11 class method(s)
 
 ### `lib/JIT/ImplementsHierarchyJitGuard.php`
@@ -49349,8 +49357,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 37)
-- new ObjectEntry (line 42)
-- new Variable (line 44)
+- new ObjectEntry (line 44)
+- new Variable (line 46)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionAttributeToString.php`
@@ -52548,7 +52556,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/HashTableJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/VM/HashTableRegistry.php`
 
@@ -52863,51 +52871,52 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReflectionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ReflectionException (line 260)
-- new ArgumentCountError (line 278)
-- new AttributeEntry (line 295)
-- new Variable (line 315)
-- new ObjectEntry (line 322)
-- new Variable (line 328)
-- new Variable (line 341)
-- new Variable (line 345)
-- new Variable (line 348)
-- new Variable (line 369)
-- new Variable (line 405)
-- new Variable (line 424)
-- new Variable (line 443)
-- new Error (line 469)
-- new Error (line 473)
-- new ObjectEntry (line 475)
-- new Variable (line 476)
-- new Variable (line 487)
-- new Error (line 505)
-- new Variable (line 511)
-- new Error (line 517)
-- new Error (line 535)
-- new Variable (line 537)
-- new Variable (line 656)
-- new Error (line 804)
-- new ObjectEntry (line 1219)
-- new Variable (line 1221)
-- new AttributeEntry (line 1839)
-- new Variable (line 2366)
-- new ParameterMetadata (line 2372)
-- new Variable (line 3166)
-- new Variable (line 3205)
-- new ObjectEntry (line 3450)
-- new SourceLocation (line 3478)
-- new ParameterMetadata (line 3958)
-- new ObjectEntry (line 4026)
-- new ObjectEntry (line 4043)
-- new ObjectEntry (line 4261)
-- new ObjectEntry (line 4274)
-- new Variable (line 4354)
-- new ObjectEntry (line 4476)
-- new ObjectEntry (line 4496)
-- new Variable (line 4683)
-- new Variable (line 4868)
-- 250 class method(s)
+- new ReflectionException (line 261)
+- new ArgumentCountError (line 279)
+- new AttributeEntry (line 296)
+- new Variable (line 316)
+- new ObjectEntry (line 323)
+- new Variable (line 329)
+- new Variable (line 342)
+- new Variable (line 346)
+- new Variable (line 349)
+- new Variable (line 370)
+- new Variable (line 406)
+- new Variable (line 425)
+- new Variable (line 444)
+- new Error (line 470)
+- new Error (line 474)
+- new ObjectEntry (line 476)
+- new Variable (line 477)
+- new Variable (line 488)
+- new Error (line 506)
+- new Variable (line 512)
+- new Error (line 518)
+- new Error (line 536)
+- new Variable (line 538)
+- new Variable (line 657)
+- new Error (line 799)
+- new Error (line 835)
+- new ObjectEntry (line 1250)
+- new Variable (line 1252)
+- new AttributeEntry (line 1870)
+- new Variable (line 2397)
+- new ParameterMetadata (line 2403)
+- new Variable (line 3197)
+- new Variable (line 3236)
+- new ObjectEntry (line 3481)
+- new SourceLocation (line 3509)
+- new ParameterMetadata (line 3989)
+- new ObjectEntry (line 4057)
+- new ObjectEntry (line 4074)
+- new ObjectEntry (line 4292)
+- new ObjectEntry (line 4305)
+- new Variable (line 4385)
+- new ObjectEntry (line 4507)
+- new ObjectEntry (line 4527)
+- new Variable (line 4714)
+- new Variable (line 4899)
+- 251 class method(s)
 - 3 closure(s)
 
 ### `lib/VM/ReflectionTypeSupport.php`

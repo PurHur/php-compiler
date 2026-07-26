@@ -1846,6 +1846,15 @@ restart:
         if (OpCode::TYPE_PLUS === $opcode->type && $leftIsArray && $rightIsArray) {
             return ArrayBuiltinHelper::arrayUnion($this->context, $left, $right);
         }
+        // Boxed arrays: TYPE_VALUE + hashtable / native list (bootstrap TYPE_PLUS pair 134/135).
+        if (OpCode::TYPE_PLUS === $opcode->type) {
+            if ($leftIsArray && Variable::TYPE_VALUE === $rightType) {
+                return ArrayBuiltinHelper::arrayUnion($this->context, $left, $right);
+            }
+            if (Variable::TYPE_VALUE === $leftType && $rightIsArray) {
+                return ArrayBuiltinHelper::arrayUnion($this->context, $left, $right);
+            }
+        }
         if (ArrayBuiltinHelper::isNativeArray($leftType) && $leftType === $rightType) {
             $trueVal = $this->context->getTypeFromString('int1')->constInt(1, false);
             if (OpCode::TYPE_EQUAL === $opcode->type) {
