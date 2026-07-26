@@ -36,6 +36,24 @@ final class SoapExtensionPolicy
         return self::advertisesExtension();
     }
 
+    /**
+     * Soap\Url / Soap\Sdl — php-src 8.4+ only (soap.stub.php resource→object; #23230).
+     *
+     * SoapClient may be advertised via host php-soap on 8.2; these types stay withheld until
+     * the effective language profile (or host PHP) is ≥ 8.4.
+     */
+    public static function advertisesOpaqueUrlSdlTypes(): bool
+    {
+        if (!self::advertisesExtension()) {
+            return false;
+        }
+        if (\version_compare(\PHP_VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return \version_compare(\PHPCompiler\CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
     /** Compliance filenames that exercise SoapClient / SoapServer / SoapFault. */
     public static function isSoapComplianceCase(string $testFileName): bool
     {

@@ -1647,6 +1647,7 @@ require_once __DIR__.'/../../../ext/soap/SoapExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/soap/SoapFaultConstruct.php';
 require_once __DIR__.'/../../../ext/soap/VmSoapClient.php';
 require_once __DIR__.'/../../../ext/soap/VmSoapEncoding.php';
+require_once __DIR__.'/../../../ext/soap/VmSoapOpaque.php';
 require_once __DIR__.'/../../../ext/soap/VmSoapServer.php';
 require_once __DIR__.'/../../../ext/soap/bootstrap_soapfault.php';
 require_once __DIR__.'/../../../ext/soap/is_soap_fault.php';

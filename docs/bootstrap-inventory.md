@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6562 |
-| Phase A inventory files (M2 ratio SSOT) | 6562 |
+| PHP files on vm.php path | 6563 |
+| Phase A inventory files (M2 ratio SSOT) | 6563 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21111 |
+| Source constructs flagged (warnings) | 21119 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1858,8 +1858,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/soap/SoapConstants.php` | 0 | 1 |
 | `ext/soap/SoapExtensionPolicy.php` | 0 | 1 |
 | `ext/soap/SoapFaultConstruct.php` | 0 | 1 |
-| `ext/soap/VmSoapClient.php` | 0 | 60 |
+| `ext/soap/VmSoapClient.php` | 0 | 62 |
 | `ext/soap/VmSoapEncoding.php` | 0 | 32 |
+| `ext/soap/VmSoapOpaque.php` | 0 | 6 |
 | `ext/soap/VmSoapServer.php` | 0 | 47 |
 | `ext/soap/bootstrap_soapfault.php` | 0 | 1 |
 | `ext/soap/is_soap_fault.php` | 0 | 2 |
@@ -21610,14 +21611,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 47)
-- new Variable (line 48)
 - new Variable (line 49)
-- new ClassProperty (line 57)
-- new ClassProperty (line 60)
-- new ClassProperty (line 63)
-- new ClassProperty (line 66)
-- new SoapFaultConstruct (line 69)
+- new Variable (line 50)
+- new Variable (line 51)
+- new ClassProperty (line 59)
+- new ClassProperty (line 62)
+- new ClassProperty (line 65)
+- new ClassProperty (line 68)
+- new SoapFaultConstruct (line 71)
 - 2 class method(s)
 
 ### `ext/soap/Module.php`
@@ -21640,7 +21641,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/SoapExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/soap/SoapFaultConstruct.php`
 
@@ -21650,66 +21651,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/VmSoapClient.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 48)
-- new SoapClientConstruct (line 52)
-- new SoapClientSoapCall (line 57)
-- new SoapClientDoRequest (line 58)
-- new SoapClientGetFunctions (line 59)
-- new SoapClientGetTypes (line 60)
-- new SoapClientGetLastRequest (line 61)
-- new SoapClientGetLastResponse (line 62)
-- new SoapClientGetLastRequestHeaders (line 63)
-- new SoapClientGetLastResponseHeaders (line 64)
-- new SoapClientSetCookie (line 65)
-- new SoapClientGetCookies (line 66)
-- new SoapClientSetLocation (line 67)
-- new SoapClientSetSoapHeaders (line 68)
-- new SoapClientCall (line 69)
-- new SoapClientState (line 93)
-- new SoapFault (line 195)
-- new SoapFault (line 368)
-- new SoapFault (line 379)
-- new SoapFault (line 443)
-- new SoapFault (line 970)
-- new DOMDocument (line 972)
-- new SoapFault (line 974)
-- new DOMXPath (line 976)
-- new DOMDocument (line 1749)
-- new SoapFault (line 1751)
-- new DOMXPath (line 1753)
-- new SoapFault (line 1776)
-- new SoapTypemapFromXml (line 1942)
-- new SoapMappedObject (line 1969)
-- new Variable (line 2047)
-- new Variable (line 2056)
-- new ObjectEntry (line 2077)
-- new Variable (line 2083)
-- new HashTable (line 2089)
-- new Variable (line 2099)
-- new stdClass (line 2113)
-- new ObjectEntry (line 2121)
-- new Variable (line 2128)
-- new Variable (line 2136)
-- new HashTable (line 2163)
-- new ObjectEntry (line 2181)
-- new ArgumentCountError (line 2453)
-- new Variable (line 2479)
-- new HashTable (line 2487)
-- new Variable (line 2493)
-- new Variable (line 2501)
-- new ArgumentCountError (line 2536)
-- new ArgumentCountError (line 2564)
-- new ArgumentCountError (line 2592)
-- new HashTable (line 2621)
-- new Variable (line 2624)
-- new HashTable (line 2646)
-- new Variable (line 2649)
-- new ArgumentCountError (line 2749)
-- new HashTable (line 2779)
-- new Variable (line 2781)
-- new ArgumentCountError (line 2800)
-- new ArgumentCountError (line 2830)
-- 74 class method(s)
+- new ClassEntry (line 49)
+- new Variable (line 55)
+- new ClassProperty (line 62)
+- new SoapClientConstruct (line 74)
+- new SoapClientSoapCall (line 79)
+- new SoapClientDoRequest (line 80)
+- new SoapClientGetFunctions (line 81)
+- new SoapClientGetTypes (line 82)
+- new SoapClientGetLastRequest (line 83)
+- new SoapClientGetLastResponse (line 84)
+- new SoapClientGetLastRequestHeaders (line 85)
+- new SoapClientGetLastResponseHeaders (line 86)
+- new SoapClientSetCookie (line 87)
+- new SoapClientGetCookies (line 88)
+- new SoapClientSetLocation (line 89)
+- new SoapClientSetSoapHeaders (line 90)
+- new SoapClientCall (line 91)
+- new SoapClientState (line 115)
+- new SoapFault (line 220)
+- new SoapFault (line 393)
+- new SoapFault (line 404)
+- new SoapFault (line 468)
+- new SoapFault (line 1033)
+- new DOMDocument (line 1035)
+- new SoapFault (line 1037)
+- new DOMXPath (line 1039)
+- new DOMDocument (line 1812)
+- new SoapFault (line 1814)
+- new DOMXPath (line 1816)
+- new SoapFault (line 1839)
+- new SoapTypemapFromXml (line 2005)
+- new SoapMappedObject (line 2032)
+- new Variable (line 2110)
+- new Variable (line 2119)
+- new ObjectEntry (line 2140)
+- new Variable (line 2146)
+- new HashTable (line 2152)
+- new Variable (line 2162)
+- new stdClass (line 2176)
+- new ObjectEntry (line 2184)
+- new Variable (line 2191)
+- new Variable (line 2199)
+- new HashTable (line 2226)
+- new ObjectEntry (line 2244)
+- new ArgumentCountError (line 2519)
+- new Variable (line 2545)
+- new HashTable (line 2553)
+- new Variable (line 2559)
+- new Variable (line 2567)
+- new ArgumentCountError (line 2602)
+- new ArgumentCountError (line 2630)
+- new ArgumentCountError (line 2658)
+- new HashTable (line 2687)
+- new Variable (line 2690)
+- new HashTable (line 2712)
+- new Variable (line 2715)
+- new ArgumentCountError (line 2815)
+- new HashTable (line 2845)
+- new Variable (line 2847)
+- new ArgumentCountError (line 2866)
+- new ArgumentCountError (line 2896)
+- 76 class method(s)
 
 ### `ext/soap/VmSoapEncoding.php`
 
@@ -21746,6 +21749,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 196)
 - new ArgumentCountError (line 220)
 - 10 class method(s)
+
+### `ext/soap/VmSoapOpaque.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 46)
+- new ObjectEntry (line 60)
+- new ObjectEntry (line 74)
+- new Variable (line 82)
+- new Variable (line 90)
+- 6 class method(s)
 
 ### `ext/soap/VmSoapServer.php`
 
@@ -41083,7 +41096,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 835)
+- new ArgumentCountError (line 838)
 - 16 class method(s)
 - 1 closure(s)
 
@@ -52731,7 +52744,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReservedBuiltinClass.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 47)
+- new Error (line 50)
 - 4 class method(s)
 
 ### `lib/VM/ResourceSupport.php`

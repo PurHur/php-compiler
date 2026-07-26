@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\soap;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
@@ -49,6 +50,27 @@ final class VmSoapClient
         $entry->isInternal = true;
 
         $pub = CfgFunc::FLAG_PUBLIC;
+        // php-src stub marks private; UPGRADING documents userland `$client->httpurl` / `$sdl` reads (#23246/#23247).
+        if (SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
+            $nullProto = new Variable(Variable::TYPE_NULL);
+            $have = [];
+            foreach ($entry->properties as $prop) {
+                $have[$prop->name] = true;
+            }
+            foreach (['httpurl', 'sdl'] as $propName) {
+                if (!isset($have[$propName])) {
+                    $entry->properties[] = new ClassProperty(
+                        $propName,
+                        null,
+                        $nullProto,
+                        false,
+                        $pub,
+                        self::CLASS_LC
+                    );
+                }
+            }
+        }
+
         $entry->constructor = new SoapClientConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
@@ -91,6 +113,7 @@ final class VmSoapClient
     public static function initObject(ObjectEntry $object, ?string $wsdl, array $options, Context $ctx): void
     {
         $state = new SoapClientState();
+        $state->vmContext = $ctx;
         $state->wsdl = $wsdl;
         $state->options = $options;
         $state->location = isset($options['location']) ? (string) $options['location'] : '';
@@ -176,6 +199,8 @@ final class VmSoapClient
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
+            // php-src soap.c ctor — attach Soap\Sdl after successful WSDL parse (#23247).
+            self::attachSdl($object, $ctx);
         }
         if ('' === $state->location && isset($options['location'])) {
             $state->location = (string) $options['location'];
@@ -468,8 +493,46 @@ final class VmSoapClient
                 $state->lastResponseHeaders = self::synthesizeFixtureResponseHeaders(\strlen($body));
             }
         }
+        // php-src php_http.c: attach Soap\Url on successful HTTP connect (#23246).
+        self::attachHttpUrl($object, $location);
 
         return $body;
+    }
+
+    /**
+     * php-src php_http.c — Z_CLIENT_HTTPURL gets Soap\Url after successful stream connect (#23246).
+     */
+    private static function attachHttpUrl(ObjectEntry $object, string $location): void
+    {
+        if (!SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
+            return;
+        }
+        if (!\preg_match('#^https?://#i', $location)) {
+            return;
+        }
+        if (!$object->hasProperty('httpurl')) {
+            return;
+        }
+        $state = self::state($object);
+        $ctx = $state->vmContext;
+        if (null === $ctx) {
+            return;
+        }
+        $object->getProperty('httpurl')->object(VmSoapOpaque::newUrlObject($ctx));
+    }
+
+    /**
+     * php-src soap.c SoapClient ctor — Z_CLIENT_SDL gets Soap\Sdl after WSDL load (#23247).
+     */
+    private static function attachSdl(ObjectEntry $object, Context $ctx): void
+    {
+        if (!SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
+            return;
+        }
+        if (!$object->hasProperty('sdl')) {
+            return;
+        }
+        $object->getProperty('sdl')->object(VmSoapOpaque::newSdlObject($ctx));
     }
 
     /**
@@ -2268,6 +2331,9 @@ final class VmSoapClient
 final class SoapClientState
 {
     public ?string $wsdl = null;
+
+    /** Owning VM context — Soap\Url / Soap\Sdl factories (#23246). */
+    public ?Context $vmContext = null;
 
     /** @var array<string, mixed> */
     public array $options = [];
