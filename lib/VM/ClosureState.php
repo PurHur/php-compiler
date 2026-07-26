@@ -122,6 +122,17 @@ final class ClosureState
         return $state;
     }
 
+    /**
+     * Language {@code clone $closure} — duplicate static table (Zend zend_array_dup, #23489).
+     *
+     * Same shape as {@see cloneForBind()} for statics/captures; kept separate so bind and
+     * object-clone call sites stay explicit.
+     */
+    public function cloneForObjectClone(): self
+    {
+        return $this->cloneForBind();
+    }
+
     public function cloneForBind(): self
     {
         $captures = [];
@@ -146,6 +157,7 @@ final class ClosureState
             : null;
         $clone->boundThis = null !== $this->boundThis ? $this->copyVar($this->boundThis) : null;
         $clone->boundScopeClass = $this->boundScopeClass;
+        // Value-copy statics at clone/bind time; tables then diverge (zend_array_dup).
         foreach ($this->staticVars as $name => $var) {
             $clone->staticVars[$name] = $this->copyVar($var);
         }
