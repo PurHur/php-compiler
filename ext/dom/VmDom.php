@@ -2240,10 +2240,19 @@ final class VmDom
 
             return;
         }
-        $previousIdValue = $state->attributes[$qualifiedName] ?? null;
+        $attrExisted = \array_key_exists($qualifiedName, $state->attributes);
+        $previousIdValue = $attrExisted ? ($state->attributes[$qualifiedName] ?? null) : null;
         // Apply namespace before the ID-bearing check so xml:id / namespaced id is recognized (#19870).
         $state->attributeNamespaces[$qualifiedName] = $namespace ?? '';
         $idBearing = self::elementAttributeIsIdBearing($element, $qualifiedName);
+        // HTML htmlSetProp: creating a *new* id attr stamps XML_ATTRIBUTE_ID. Value rewrite of a
+        // non-ID imported id must not promote (php-src / libxml; #23514).
+        if (!$idBearing && !$attrExisted && 'id' === $qualifiedName) {
+            $ownerDoc = self::ownerDocumentEntry($element);
+            if (null !== $ownerDoc && DomRegistry::state($ownerDoc)->isHtmlDocument) {
+                $idBearing = true;
+            }
+        }
         $state->attributes[$qualifiedName] = $value;
         if (isset($state->attributeNodeIds[$qualifiedName])) {
             $cached = DomRegistry::entry($state->attributeNodeIds[$qualifiedName]);
@@ -2560,6 +2569,9 @@ final class VmDom
     /**
      * Whether $qName is an ID-bearing attribute for this element (HTML id / xml:id / setIdAttribute / DTD).
      * Does not require the attribute to be present on the element (#19870).
+     *
+     * HTML `id` is ID-bearing only when stamped as XML_ATTRIBUTE_ID (HTML parse / new htmlSetProp /
+     * import from an ID source). Plain XML `id` imported into HTML stays non-ID (#23514).
      */
     private static function attributeQNameIsIdBearing(
         ObjectEntry $document,
@@ -2570,11 +2582,8 @@ final class VmDom
         if (null !== $nodeState->idAttributeName && $qName === $nodeState->idAttributeName) {
             return true;
         }
-        // libxml XML_ATTRIBUTE_ID stamped on the attr (survives importNode; #20830).
+        // libxml XML_ATTRIBUTE_ID stamped on the attr (survives importNode; #20830, #23514).
         if (isset($nodeState->attributeIsId[$qName])) {
-            return true;
-        }
-        if ($docState->isHtmlDocument && 'id' === $qName) {
             return true;
         }
         if (!$docState->isHtmlDocument || self::documentValidateOnParse($document)) {
@@ -4383,7 +4392,9 @@ final class VmDom
         if (null === $idAttr && null !== $nodeState->idAttributeName) {
             $idAttr = $nodeState->idAttributeName;
         }
-        // Copied libxml XML_ATTRIBUTE_ID markers (HTML→XML importNode; #20830).
+        // Copied / stamped libxml XML_ATTRIBUTE_ID markers (HTML parse, htmlSetProp, HTML→XML
+        // importNode; #20830). Do not auto-promote bare HTML `id` — XML→HTML import keeps
+        // isId=false until remove+setAttribute (#23514).
         if (null === $idAttr) {
             foreach ($nodeState->attributeIsId as $qName => $_) {
                 if (isset($nodeState->attributes[$qName]) && '' !== $nodeState->attributes[$qName]) {
@@ -4391,10 +4402,6 @@ final class VmDom
                     break;
                 }
             }
-        }
-        if (null === $idAttr && $docState->isHtmlDocument && isset($nodeState->attributes['id'])) {
-            $idAttr = 'id';
-            $nodeState->attributeIsId['id'] = true;
         }
         if (null === $idAttr && !$docState->isHtmlDocument) {
             if (isset($nodeState->attributes['xml:id'])) {
@@ -7730,6 +7737,10 @@ final class VmDom
         $state->attributes = self::decodeHtmlAttributeMap(self::parseAttributes($attrPart));
         self::applyQualifiedElementNames($state, $localName);
         self::applyParsedAttributes($state, $state->attributes);
+        // HTML parse assigns XML_ATTRIBUTE_ID to id (libxml htmlReadMemory; #23514).
+        if (isset($state->attributes['id'])) {
+            $state->attributeIsId['id'] = true;
+        }
         self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument, $frame);
 
         return $entry;
