@@ -804,6 +804,9 @@ final class TypeSig
     /** @var list<TypeSig>|null Intersection members (A&B); mutually exclusive with scalar/class. */
     public ?array $intersectionMembers = null;
 
+    /** @var list<TypeSig>|null Union members (A|B); property types (#23505). */
+    public ?array $unionMembers = null;
+
     public static function fromCfgType(?Op\Type $type): ?self
     {
         if (null === $type) {
@@ -900,15 +903,187 @@ final class TypeSig
         return null;
     }
 
+    /**
+     * Property type parsing — unlike {@see fromCfgType()}, keeps `mixed` and unions
+     * (zend_inheritance.c property invariance, #23505).
+     */
+    public static function fromCfgPropertyType(?Op\Type $type): ?self
+    {
+        if (null === $type) {
+            return null;
+        }
+        // php-cfg uses Mixed_ as the placeholder for *untyped* properties; explicit
+        // `mixed` arrives as Op\Type\Literal("mixed") below (#23505).
+        if ($type instanceof Op\Type\Mixed_) {
+            return null;
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            $inner = self::fromCfgPropertyType($type->subtype);
+            if (null === $inner) {
+                return null;
+            }
+            $inner->nullable = true;
+
+            return $inner;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            $members = [];
+            foreach ($type->types as $memberType) {
+                $member = self::fromCfgPropertyType($memberType);
+                if (null === $member || $member->isMixed()) {
+                    return null;
+                }
+                $members[] = $member;
+            }
+            if ([] === $members) {
+                return null;
+            }
+            $sig = new self();
+            $sig->unionMembers = $members;
+
+            return $sig;
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            $members = [];
+            foreach ($type->types as $memberType) {
+                $member = self::fromCfgPropertyType($memberType);
+                if (null === $member || $member->isMixed()) {
+                    return null;
+                }
+                $members[] = $member;
+            }
+            if ([] === $members) {
+                return null;
+            }
+            $sig = new self();
+            $sig->intersectionMembers = $members;
+
+            return $sig;
+        }
+        if ($type instanceof Op\Type\Literal && 'mixed' === strtolower($type->name)) {
+            $sig = new self();
+            $sig->builtinScalar = 'mixed';
+
+            return $sig;
+        }
+
+        return self::fromCfgType($type);
+    }
+
+    /**
+     * Structural key for property type invariance (keeps self/static unresolved).
+     * Union members are sorted so declaration order does not matter.
+     */
+    public function propertyInvariantKey(string $ownerLc): string
+    {
+        if ($this->void) {
+            return 'void';
+        }
+        if ($this->never) {
+            return 'never';
+        }
+        if ($this->isUnion()) {
+            $parts = [];
+            foreach ($this->unionMembers as $member) {
+                $parts[] = $member->propertyInvariantKey($ownerLc);
+            }
+            sort($parts);
+
+            return implode('|', $parts).($this->nullable ? '?' : '');
+        }
+        if ($this->isIntersection()) {
+            $parts = [];
+            foreach ($this->intersectionMembers as $member) {
+                $parts[] = $member->propertyInvariantKey($ownerLc);
+            }
+            sort($parts);
+
+            return '('.implode('&', $parts).')'.($this->nullable ? '?' : '');
+        }
+        if ($this->self) {
+            return ($this->nullable ? '?' : '').'self';
+        }
+        if ($this->static) {
+            return ($this->nullable ? '?' : '').'static';
+        }
+        if (null !== $this->builtinScalar) {
+            return ($this->nullable ? '?' : '').$this->builtinScalar;
+        }
+        if (null !== $this->classLc) {
+            return ($this->nullable ? '?' : '').$this->classLc;
+        }
+
+        return $this->signatureKey($ownerLc);
+    }
+
+    /**
+     * Like {@see propertyInvariantKey()} but resolves self/static to the declaring class
+     * so `self` on A matches an explicit `A` on a child (#23505).
+     */
+    public function propertyResolvedKey(string $ownerLc): string
+    {
+        if ($this->isUnion()) {
+            $parts = [];
+            foreach ($this->unionMembers as $member) {
+                $parts[] = $member->propertyResolvedKey($ownerLc);
+            }
+            sort($parts);
+
+            return implode('|', $parts).($this->nullable ? '?' : '');
+        }
+        if ($this->isIntersection()) {
+            $parts = [];
+            foreach ($this->intersectionMembers as $member) {
+                $parts[] = $member->propertyResolvedKey($ownerLc);
+            }
+            sort($parts);
+
+            return '('.implode('&', $parts).')'.($this->nullable ? '?' : '');
+        }
+        if ($this->self || $this->static) {
+            return ($this->nullable ? '?' : '').$ownerLc;
+        }
+
+        return $this->propertyInvariantKey($ownerLc);
+    }
+
+    /**
+     * Zend property type invariance: identical unresolved shape, or same type after
+     * resolving self/static on the declaring class (zend_inheritance.c, #23505).
+     */
+    public static function propertyTypesAreInvariant(
+        ?self $parent,
+        ?self $child,
+        string $parentOwnerLc,
+        string $childOwnerLc
+    ): bool {
+        if (null === $parent && null === $child) {
+            return true;
+        }
+        if (null === $parent || null === $child) {
+            return false;
+        }
+        if ($parent->propertyInvariantKey($parentOwnerLc) === $child->propertyInvariantKey($childOwnerLc)) {
+            return true;
+        }
+
+        return $parent->propertyResolvedKey($parentOwnerLc) === $child->propertyResolvedKey($childOwnerLc);
+    }
+
     public function isIntersection(): bool
     {
         return null !== $this->intersectionMembers && [] !== $this->intersectionMembers;
     }
 
+    public function isUnion(): bool
+    {
+        return null !== $this->unionMembers && [] !== $this->unionMembers;
+    }
+
     public function isMixed(): bool
     {
         return !$this->void && !$this->never && null === $this->builtinScalar && null === $this->classLc
-            && !$this->self && !$this->static && !$this->isIntersection();
+            && !$this->self && !$this->static && !$this->isIntersection() && !$this->isUnion();
     }
 
     public function isVoid(): bool
@@ -962,6 +1137,14 @@ final class TypeSig
         }
         if ($this->never) {
             return 'never';
+        }
+        if ($this->isUnion()) {
+            $parts = [];
+            foreach ($this->unionMembers as $member) {
+                $parts[] = $member->format();
+            }
+
+            return ($this->nullable ? '?' : '').implode('|', $parts);
         }
         if ($this->isIntersection()) {
             $parts = [];
