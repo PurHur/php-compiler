@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** DomDocumentMethod thin standalone AOT kernel quarantined in ext/dom (#19496, #20214). */
+/**
+ * DomDocumentMethod NestedJIT via JitVmHelperLink::ensureCompiled (#23325 / peer #23311).
+ */
 final class DomDocumentMethodKernelShrinkTest extends TestCase
 {
     public function testUserScriptLlvmMovedToExtKernel(): void
@@ -22,6 +24,20 @@ final class DomDocumentMethodKernelShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomLoadHTMLRuntime.php');
         $this->assertStringContainsString('JitDomDocumentMethodKernel', $runtime);
         $this->assertStringNotContainsString('DomDocumentMethodUserScriptLlvm', $runtime);
+    }
+
+    public function testKernelUsesJitVmHelperLink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomDocumentMethodKernel.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
     }
 
     public function testSpineBundleIncludesDomDocumentMethodKernelNotBuiltinUserScriptLlvm(): void
