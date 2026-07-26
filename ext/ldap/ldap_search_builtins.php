@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -301,6 +302,181 @@ final class ldap_next_entry extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException('ldap_next_entry() is not implemented for JIT in this compiler build (issue #3369)');
+    }
+}
+
+/** ldap_count_references() — php-src ext/ldap/ldap.c; #22181. */
+final class ldap_count_references extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_count_references');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_count_references() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_count_references', 1);
+        $result = VmLdapArg::requireResult($frame->calledArgs[1], 'ldap_count_references', 2);
+        $count = VmLdapNative::countReferences(
+            VmLdapConnection::native($conn),
+            VmLdapResult::resultNative($result)
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($count);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_count_references() is not implemented for JIT in this compiler build (issue #22181)');
+    }
+}
+
+/** ldap_first_reference() — php-src ext/ldap/ldap.c; #22181. */
+final class ldap_first_reference extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_first_reference');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_first_reference() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_first_reference', 1);
+        $result = VmLdapArg::requireResult($frame->calledArgs[1], 'ldap_first_reference', 2);
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ldap_first_reference() requires a VM context');
+        }
+        $entry = VmLdapNative::firstReference(
+            VmLdapConnection::native($conn),
+            VmLdapResult::resultNative($result)
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (null === $entry) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->copyFrom(VmLdapResult::wrapEntry($entry, $ctx, $conn, $result->id));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_first_reference() is not implemented for JIT in this compiler build (issue #22181)');
+    }
+}
+
+/** ldap_next_reference() — php-src ext/ldap/ldap.c; #22181. */
+final class ldap_next_reference extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_next_reference');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_next_reference() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_next_reference', 1);
+        $entryObj = VmLdapArg::requireEntry($frame->calledArgs[1], 'ldap_next_reference', 2);
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('ldap_next_reference() requires a VM context');
+        }
+        $next = VmLdapNative::nextReference(
+            VmLdapConnection::native($conn),
+            VmLdapResult::entryNative($entryObj)
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (null === $next) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->copyFrom(
+            VmLdapResult::wrapEntry($next, $ctx, $conn, VmLdapResult::entryResultId($entryObj))
+        );
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_next_reference() is not implemented for JIT in this compiler build (issue #22181)');
+    }
+}
+
+/**
+ * ldap_parse_reference() — php-src HAVE_LDAP_PARSE_REFERENCE; #22181.
+ *
+ * Signature: (LDAP\Connection, LDAP\ResultEntry, &$referrals): bool
+ */
+final class ldap_parse_reference extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('ldap_parse_reference');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ldap_parse_reference() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $conn = VmLdapArg::requireConnection($frame->calledArgs[0], 'ldap_parse_reference', 1);
+        $entryObj = VmLdapArg::requireEntry($frame->calledArgs[1], 'ldap_parse_reference', 2);
+        $refs = VmLdapNative::parseReference(
+            VmLdapConnection::native($conn),
+            VmLdapResult::entryNative($entryObj)
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (null === $refs) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($refs as $i => $url) {
+            $slot = new Variable();
+            $slot->string($url);
+            $ht->addIndex($i, $slot);
+        }
+        $frame->calledArgs[2]->resolveIndirect()->array($ht);
+        $frame->returnVar->bool(true);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('ldap_parse_reference() is not implemented for JIT in this compiler build (issue #22181)');
     }
 }
 

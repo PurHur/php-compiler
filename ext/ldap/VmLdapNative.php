@@ -500,12 +500,28 @@ final class VmLdapNative
         return (int) self::requireFfi()->ldap_count_entries($ld, $res);
     }
 
+    /** ldap_count_references (php-src; #22181). */
+    public static function countReferences(\FFI\CData $ld, \FFI\CData $res): int
+    {
+        return (int) self::requireFfi()->ldap_count_references($ld, $res);
+    }
+
     /**
      * @return \FFI\CData|null LDAPMessage*
      */
     public static function firstEntry(\FFI\CData $ld, \FFI\CData $res): ?\FFI\CData
     {
         $entry = self::requireFfi()->ldap_first_entry($ld, $res);
+
+        return null === $entry ? null : $entry;
+    }
+
+    /**
+     * @return \FFI\CData|null LDAPMessage* referral entry (#22181).
+     */
+    public static function firstReference(\FFI\CData $ld, \FFI\CData $res): ?\FFI\CData
+    {
+        $entry = self::requireFfi()->ldap_first_reference($ld, $res);
 
         return null === $entry ? null : $entry;
     }
@@ -518,6 +534,46 @@ final class VmLdapNative
         $next = self::requireFfi()->ldap_next_entry($ld, $entry);
 
         return null === $next ? null : $next;
+    }
+
+    /**
+     * @return \FFI\CData|null LDAPMessage* (#22181).
+     */
+    public static function nextReference(\FFI\CData $ld, \FFI\CData $entry): ?\FFI\CData
+    {
+        $next = self::requireFfi()->ldap_next_reference($ld, $entry);
+
+        return null === $next ? null : $next;
+    }
+
+    /**
+     * ldap_parse_reference → referral URLs (php-src HAVE_LDAP_PARSE_REFERENCE; #22181).
+     *
+     * @return list<string>|null null when OpenLDAP returns non-success
+     */
+    public static function parseReference(\FFI\CData $ld, \FFI\CData $entry): ?array
+    {
+        $ffi = self::requireFfi();
+        $refsp = $ffi->new('char**[1]');
+        $refsp[0] = null;
+        $rc = (int) $ffi->ldap_parse_reference($ld, $entry, $refsp, null, 0);
+        if (self::LDAP_SUCCESS !== $rc) {
+            return null;
+        }
+        $referrals = [];
+        if (null !== $refsp[0]) {
+            $refs = $refsp[0];
+            for ($i = 0; ; ++$i) {
+                $ptr = $refs[$i];
+                if (null === $ptr) {
+                    break;
+                }
+                $referrals[] = self::ffiString($ptr);
+            }
+            $ffi->ldap_memvfree($refs);
+        }
+
+        return $referrals;
     }
 
     public static function getDn(\FFI\CData $ld, \FFI\CData $entry): ?string
@@ -1030,8 +1086,12 @@ int ldap_sasl_bind(LDAP *ld, const char *dn, const char *mechanism, BerValue *cr
 int ldap_search_ext_s(LDAP *ld, const char *base, int scope, const char *filter, char **attrs, int attrsonly, void *serverctrls, void *clientctrls, timeval *timeout, int sizelimit, LDAPMessage **res);
 int ldap_compare_ext_s(LDAP *ld, const char *dn, const char *attr, BerValue *bvalue, void *serverctrls, void *clientctrls);
 int ldap_count_entries(LDAP *ld, LDAPMessage *res);
+int ldap_count_references(LDAP *ld, LDAPMessage *res);
 LDAPMessage *ldap_first_entry(LDAP *ld, LDAPMessage *res);
+LDAPMessage *ldap_first_reference(LDAP *ld, LDAPMessage *res);
 LDAPMessage *ldap_next_entry(LDAP *ld, LDAPMessage *entry);
+LDAPMessage *ldap_next_reference(LDAP *ld, LDAPMessage *entry);
+int ldap_parse_reference(LDAP *ld, LDAPMessage *ref, char ***referralsp, void **serverctrls, int freeit);
 char *ldap_get_dn(LDAP *ld, LDAPMessage *entry);
 char *ldap_first_attribute(LDAP *ld, LDAPMessage *entry, void **ber);
 char *ldap_next_attribute(LDAP *ld, LDAPMessage *entry, void *ber);
