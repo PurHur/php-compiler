@@ -320,6 +320,26 @@ PHP;
         );
     }
 
+    public function test_numberformatter_pattern_fraction_zeros_22579(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerNumberFormatter($runtime->vmContext);
+        $code = <<<'PHP'
+<?php
+$nf = new NumberFormatter('en_US', NumberFormatter::PATTERN_DECIMAL, '#,##0.00');
+echo 'fmt=', $nf->format(1234.5), "\n";
+$nf2 = new NumberFormatter('en_US', NumberFormatter::DECIMAL);
+$nf2->setPattern('#,##0.00');
+echo 'set_fmt=', $nf2->format(1234.5), "\n";
+echo 'min=', $nf2->getAttribute(NumberFormatter::MIN_FRACTION_DIGITS), "\n";
+echo 'max=', $nf2->getAttribute(NumberFormatter::MAX_FRACTION_DIGITS), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_numfmt_pattern_frac_22579.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("fmt=1,234.50\nset_fmt=1,234.50\nmin=2\nmax=2\n", ob_get_clean());
+    }
+
     public function test_breakiterator_word_parts_via_forced_registration(): void
     {
         $runtime = new Runtime();
