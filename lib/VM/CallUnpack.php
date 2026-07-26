@@ -34,14 +34,15 @@ final class CallUnpack
         Variable $spread,
         array $paramNames,
         ?int $variadicParamIndex,
-        ?string $functionName = null
+        ?string $functionName = null,
+        bool $fromUnpack = true
     ): array {
         $spread = $spread->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $spread->type) {
             throw new \LogicException('Expected array for call-time unpack');
         }
 
-        return self::fromArray($spread, $paramNames, $variadicParamIndex, $functionName);
+        return self::fromArray($spread, $paramNames, $variadicParamIndex, $functionName, $fromUnpack);
     }
 
     public static function expandToEntries(
@@ -55,7 +56,7 @@ final class CallUnpack
         $spread = $spread->resolveIndirect();
 
         if (Variable::TYPE_ARRAY === $spread->type) {
-            return self::fromArray($spread, $paramNames, $variadicParamIndex, $functionName);
+            return self::fromArray($spread, $paramNames, $variadicParamIndex, $functionName, true);
         }
 
         if (Variable::TYPE_OBJECT === $spread->type) {
@@ -82,8 +83,13 @@ final class CallUnpack
      *
      * @return list<array{0: string, 1?: mixed, 2?: Variable}>
      */
-    private static function fromArray(Variable $array, array $paramNames, ?int $variadicParamIndex, ?string $functionName = null): array
-    {
+    private static function fromArray(
+        Variable $array,
+        array $paramNames,
+        ?int $variadicParamIndex,
+        ?string $functionName = null,
+        bool $fromUnpack = true
+    ): array {
         $ht = $array->toArray();
         // ZEND_SEND_UNPACK (zend_vm_def.h): send the array element cell, not a resolved
         // copy. By-ref formals then write back through the bucket — including through
@@ -104,7 +110,7 @@ final class CallUnpack
             return $out;
         }
 
-        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName);
+        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName, $fromUnpack);
     }
 
     /**
@@ -130,7 +136,7 @@ final class CallUnpack
             $pairs[] = [$keyCopy, $value];
         }
 
-        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName);
+        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName, true);
     }
 
     /**
@@ -157,7 +163,7 @@ final class CallUnpack
             $vm->invokeForeachInstanceMethod($frame, $iterable, 'next');
         }
 
-        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName);
+        return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName, true);
     }
 
     /**
@@ -170,7 +176,8 @@ final class CallUnpack
         iterable $pairs,
         array $paramNames,
         ?int $variadicParamIndex,
-        ?string $functionName = null
+        ?string $functionName = null,
+        bool $fromUnpack = true
     ): array {
         $paramCount = \count($paramNames);
         $entries = [];
@@ -183,7 +190,11 @@ final class CallUnpack
             $value = $pair[1];
             if (self::isPositionalUnpackKey($key)) {
                 if ($hadNamed) {
-                    throw new \Error('Cannot use positional argument after named argument during unpacking');
+                    throw new \Error(
+                        $fromUnpack
+                            ? 'Cannot use positional argument after named argument during unpacking'
+                            : 'Cannot use positional argument after named argument'
+                    );
                 }
                 while ($nextPositional < $paramCount && isset($filled[$nextPositional])) {
                     ++$nextPositional;

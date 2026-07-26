@@ -3121,7 +3121,7 @@ final class ReflectionSupport
     }
 
     /**
-     * @param list<Variable> $invokeArgs
+     * @param array<int, Variable> $invokeArgs possibly sparse (named optionals, #23388)
      */
     public static function invokeReflectedMethod(
         VmEngine $vm,
@@ -3138,7 +3138,12 @@ final class ReflectionSupport
             throw new \LogicException("{$declaring->name}::{$methodName}() is not a user method in this compiler build");
         }
         if (self::methodIsStatic($func)) {
-            return $vm->invokeStaticWithCalledScope($declaring->name, $methodName, ...$invokeArgs);
+            return $vm->invokeDeclaredStaticWithCalledArgs(
+                $declaring->name,
+                $declaring->name,
+                $methodName,
+                $invokeArgs
+            );
         }
         $objectArg = $objectArg->resolveIndirect();
         if (Variable::TYPE_NULL === $objectArg->type) {
@@ -3158,18 +3163,34 @@ final class ReflectionSupport
             );
         }
 
-        return $vm->invokeInstanceMethod($objectArg->toObject(), $methodName, ...$invokeArgs);
+        $thisVar = new Variable();
+        $thisVar->object($objectArg->toObject());
+        // ARG_RECV shifts instance method indices by +1 for $this (see VM TYPE_ARG_RECV).
+        $calledArgs = [0 => $thisVar];
+        foreach ($invokeArgs as $idx => $value) {
+            $calledArgs[1 + (int) $idx] = $value;
+        }
+
+        return $vm->invokePhpFunctionIsolatedWithCalledArgs($func, $calledArgs);
     }
 
     /**
      * Unpack a Reflection *Args array parameter (php-src-strict Argument #N message).
      *
-     * @return list<Variable>
+     * Without param metadata, values are taken in iteration order (legacy / newInstanceArgs).
+     * With param names, string keys map to named parameters like zend_call_function (#23388).
+     *
+     * @param list<string>|null $paramNames
+     *
+     * @return array<int, Variable>
      */
     public static function invokeArgsFromArray(
         Variable $argsVar,
         string $methodLabel,
-        int $argsArgumentNumber = 2
+        int $argsArgumentNumber = 2,
+        ?array $paramNames = null,
+        ?int $variadicParamIndex = null,
+        ?string $functionName = null
     ): array {
         $argsVar = $argsVar->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $argsVar->type) {
@@ -3178,14 +3199,85 @@ final class ReflectionSupport
                 .self::valueTypeLabel($argsVar).' given'
             );
         }
-        $invokeArgs = [];
-        foreach ($argsVar->toArray()->iterate(true) as $value) {
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $invokeArgs[] = $copy;
+        if (null === $paramNames) {
+            $invokeArgs = [];
+            foreach ($argsVar->toArray()->iterate(true) as $value) {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $invokeArgs[] = $copy;
+            }
+
+            return $invokeArgs;
         }
 
-        return $invokeArgs;
+        $entries = CallUnpack::expandArrayEntries(
+            $argsVar,
+            $paramNames,
+            $variadicParamIndex,
+            $functionName,
+            false
+        );
+        $resolved = NamedArgs::resolve($entries, $paramNames, $variadicParamIndex, $functionName);
+        ksort($resolved);
+
+        return $resolved;
+    }
+
+    /**
+     * Parameter metadata for ReflectionFunction::invokeArgs named-key packing (#23388).
+     *
+     * @return array{0: list<string>, 1: ?int, 2: ?string}
+     */
+    public static function functionInvokeParamMetadata(Context $ctx, ObjectEntry $reflection): array
+    {
+        $closure = $reflection->reflectionClosureState;
+        if (null !== $closure) {
+            $block = $closure->func->block;
+
+            return [
+                array_values($block->paramNames),
+                $block->variadicParamIndex,
+                $block->func?->name,
+            ];
+        }
+        $name = self::functionNameFromReflection($reflection);
+        if (self::isReflectionInternalFunction($reflection)) {
+            return [
+                BuiltinParamNames::paramNamesForInternalFunction($name) ?? [],
+                BuiltinParamNames::variadicParamIndexForFunction($name),
+                $name,
+            ];
+        }
+        $func = self::resolveFunctionFromReflection($ctx, $reflection);
+
+        return [
+            array_values($func->block->paramNames),
+            $func->block->variadicParamIndex,
+            $func->block->func?->name ?? $name,
+        ];
+    }
+
+    /**
+     * Parameter metadata for ReflectionMethod::invokeArgs named-key packing (#23388).
+     *
+     * @return array{0: list<string>, 1: ?int, 2: ?string}
+     */
+    public static function methodInvokeParamMetadata(Context $ctx, ObjectEntry $reflection): array
+    {
+        [$declaring, $methodLc, $func] = self::resolveReflectedMethod($ctx, $reflection);
+        $methodName = $declaring->methodNames[$methodLc] ?? self::methodNameFromReflection($reflection);
+        $names = self::methodParameterNames($declaring, $methodName);
+        $variadic = null;
+        $fnName = $declaring->name.'::'.$methodName;
+        if ($func instanceof Func\PHP) {
+            $variadic = $func->block->variadicParamIndex;
+        } else {
+            $variadic = BuiltinParamNames::variadicParamIndexForFunction(
+                strtolower($declaring->name).'::'.strtolower($methodName)
+            );
+        }
+
+        return [$names, $variadic, $fnName];
     }
 
     private static function methodIsStatic(Func $func): bool
@@ -4237,7 +4329,7 @@ final class ReflectionSupport
     }
 
     /**
-     * @param list<Variable> $invokeArgs
+     * @param array<int, Variable> $invokeArgs possibly sparse (named optionals, #23388)
      */
     public static function invokeReflectionFunction(
         VmEngine $vm,
@@ -4248,7 +4340,7 @@ final class ReflectionSupport
         $ctx = VmReflection::requireContext($frame);
         $closure = $reflection->reflectionClosureState;
         if (null !== $closure) {
-            return $vm->invokeClosure($closure, ...$invokeArgs);
+            return $vm->invokeClosureWithCalledArgs($closure, $invokeArgs);
         }
         $name = self::functionNameFromReflection($reflection);
         $func = $ctx->functions[strtolower($name)] ?? null;
@@ -4269,7 +4361,7 @@ final class ReflectionSupport
             throw new \LogicException('ReflectionFunction::invoke() target is not invokable in this compiler build');
         }
 
-        return $vm->invokePhpFunction($func, ...$invokeArgs);
+        return $vm->invokePhpFunctionWithCalledArgs($func, $invokeArgs);
     }
 
     /**

@@ -242,7 +242,42 @@ class VM {
         );
         ksort($resolved);
 
-        return $this->invokePhpFunctionOnStack($func, ...array_values($resolved));
+        // Keep sparse keys so omitted optionals hit RECV defaults (php-src-strict / #23388).
+        return $this->invokePhpFunctionWithCalledArgs($func, $resolved);
+    }
+
+    /**
+     * Invoke a user PHP function with a possibly sparse calledArgs map (named optionals, #23388).
+     *
+     * @param array<int, Variable> $calledArgs
+     */
+    public function invokePhpFunctionWithCalledArgs(Func\PHP $func, array $calledArgs): Variable
+    {
+        if ($this->context->coercingObjectToString) {
+            return $this->invokePhpFunctionForCoercionWithCalledArgs($func, $calledArgs);
+        }
+
+        return $this->invokePhpFunctionOnStackWithCalledArgs($func, $calledArgs);
+    }
+
+    /**
+     * Isolated stack variant of {@see invokePhpFunctionWithCalledArgs()} (Reflection / builtins).
+     *
+     * @param array<int, Variable> $calledArgs
+     */
+    public function invokePhpFunctionIsolatedWithCalledArgs(Func\PHP $func, array $calledArgs): Variable
+    {
+        $savedStack = $this->context->swapRunStack(null);
+        $savedTryHandlers = $this->context->activeTryHandlerFrames;
+        $this->context->activeTryHandlerFrames = [];
+        $this->context->isolatedPhpFunctionInvoke = true;
+        try {
+            return $this->invokePhpFunctionOnStackWithCalledArgs($func, $calledArgs);
+        } finally {
+            $this->context->isolatedPhpFunctionInvoke = false;
+            $this->context->activeTryHandlerFrames = $savedTryHandlers;
+            $this->context->swapRunStack($savedStack);
+        }
     }
 
     /**
@@ -250,8 +285,16 @@ class VM {
      */
     private function invokePhpFunctionOnStack(Func\PHP $func, ...$args): Variable
     {
+        return $this->invokePhpFunctionOnStackWithCalledArgs($func, $args);
+    }
+
+    /**
+     * @param array<int, Variable> $args
+     */
+    private function invokePhpFunctionOnStackWithCalledArgs(Func\PHP $func, array $args): Variable
+    {
         if ($func->block->isGenerator) {
-            $state = new GeneratorState($this, $func, [...$args]);
+            $state = new GeneratorState($this, $func, $args);
             $out = new Variable();
             $out->object($state->wrapObject());
 
@@ -262,6 +305,7 @@ class VM {
         $child->calledArgs = $args;
         if (
             [] !== $args
+            && array_key_exists(0, $args)
             && null !== $func->block->func
             && null !== $func->block->func->class
             && !(($func->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
@@ -297,9 +341,17 @@ class VM {
      */
     private function invokePhpFunctionForCoercion(Func\PHP $func, ...$args): Variable
     {
+        return $this->invokePhpFunctionForCoercionWithCalledArgs($func, $args);
+    }
+
+    /**
+     * @param array<int, Variable> $args
+     */
+    private function invokePhpFunctionForCoercionWithCalledArgs(Func\PHP $func, array $args): Variable
+    {
         $savedStack = $this->context->swapRunStack(null);
         try {
-            $result = $this->invokePhpFunctionOnStack($func, ...$args);
+            $result = $this->invokePhpFunctionOnStackWithCalledArgs($func, $args);
             $this->context->swapRunStack($savedStack);
 
             return $result;
@@ -366,6 +418,23 @@ class VM {
         string $calledScopeClass,
         string $methodName,
         Variable ...$args
+    ): Variable {
+        return $this->invokeDeclaredStaticWithCalledArgs(
+            $methodOwnerClass,
+            $calledScopeClass,
+            $methodName,
+            $args
+        );
+    }
+
+    /**
+     * @param array<int, Variable> $args possibly sparse (ReflectionMethod::invokeArgs named keys, #23388)
+     */
+    public function invokeDeclaredStaticWithCalledArgs(
+        string $methodOwnerClass,
+        string $calledScopeClass,
+        string $methodName,
+        array $args
     ): Variable {
         $func = VmForwardStaticCall::resolveStaticMethod($this->context, $methodOwnerClass, $methodName);
         $savedStack = $this->context->swapRunStack(null);
@@ -2985,7 +3054,15 @@ class VM {
      */
     public function invokeClosure(ClosureState $closureState, Variable ...$args): Variable
     {
-        return $this->invokeClosureFrom(null, $closureState, true, ...$args);
+        return $this->invokeClosureWithCalledArgs($closureState, $args);
+    }
+
+    /**
+     * @param array<int, Variable> $args possibly sparse (named optionals, #23388)
+     */
+    public function invokeClosureWithCalledArgs(ClosureState $closureState, array $args): Variable
+    {
+        return $this->invokeClosureFromWithCalledArgs(null, $closureState, true, $args);
     }
 
     /**
@@ -2996,6 +3073,18 @@ class VM {
         ClosureState $closureState,
         bool $isolated,
         Variable ...$args
+    ): Variable {
+        return $this->invokeClosureFromWithCalledArgs($runParent, $closureState, $isolated, $args);
+    }
+
+    /**
+     * @param array<int, Variable> $args
+     */
+    private function invokeClosureFromWithCalledArgs(
+        ?Frame $runParent,
+        ClosureState $closureState,
+        bool $isolated,
+        array $args
     ): Variable {
         $savedStack = $isolated ? $this->context->swapRunStack(null) : null;
         try {
