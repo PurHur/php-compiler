@@ -21,6 +21,8 @@ final class PropertyExistsBuiltinTest extends BaseTest
         foreach ([
             'property_exists.phpt',
             'property_exists_jit.phpt',
+            'property_exists_case_sensitive.phpt',
+            'property_exists_case_sensitive_jit.phpt',
             'property_exists_null.phpt',
             'property_exists_null_jit.phpt',
             'property_exists_private_parent.phpt',
