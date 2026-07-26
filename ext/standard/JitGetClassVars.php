@@ -15,7 +15,7 @@ use PHPLLVM\Value;
  * JIT/AOT helper for get_class_vars() via GetClassVarsJitHelper PHP (#3159, #16713).
  *
  * Compile-time literal class names route through PHP SSOT; no inline registry LLVM.
- * php-src: ext/standard/class.c — PHP_FUNCTION(get_class_vars)
+ * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(get_class_vars)
  */
 final class JitGetClassVars
 {

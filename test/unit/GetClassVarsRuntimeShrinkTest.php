@@ -31,7 +31,7 @@ final class GetClassVarsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/GetClassVarsJitHelper.php');
         $this->assertStringContainsString('VmReflection::fetchClassEntryForGetClassVars', $source);
         $this->assertStringContainsString('VmReflection::getClassVarsArray', $source);
-        $this->assertStringContainsString('Superglobals::getActiveContext', $source);
+        $this->assertStringContainsString('VmExecutingFrame::requireFromActiveContext', $source);
     }
 
     public function testSpineBundleIncludesGetClassVarsJitHelper(): void
