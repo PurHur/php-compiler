@@ -926,6 +926,36 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'user_string', 'hash_equals'));
     }
 
+    /** @covers issue #23307 */
+    public function testIconvFamilyZendStubNamedParams(): void
+    {
+        $iconv = BuiltinParamNames::forFunction('iconv');
+        self::assertSame(['from_encoding', 'to_encoding', 'string'], $iconv);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($iconv, 'from_encoding', 'iconv'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($iconv, 'to_encoding', 'iconv'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($iconv, 'string', 'iconv'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects them)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($iconv, 'in_charset', 'iconv'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($iconv, 'out_charset', 'iconv'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($iconv, 'str', 'iconv'));
+
+        $strlen = BuiltinParamNames::forFunction('iconv_strlen');
+        self::assertSame(['string', 'encoding'], $strlen);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($strlen, 'string', 'iconv_strlen'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($strlen, 'encoding', 'iconv_strlen'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strlen, 'str', 'iconv_strlen'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($strlen, 'charset', 'iconv_strlen'));
+
+        $substr = BuiltinParamNames::forFunction('iconv_substr');
+        self::assertSame(['string', 'offset', 'length', 'encoding'], $substr);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($substr, 'string', 'iconv_substr'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($substr, 'offset', 'iconv_substr'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($substr, 'length', 'iconv_substr'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($substr, 'encoding', 'iconv_substr'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($substr, 'str', 'iconv_substr'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($substr, 'charset', 'iconv_substr'));
+    }
+
     /** @covers issue #23192 */
     public function testCtypeZendStubTextNamedParams(): void
     {
