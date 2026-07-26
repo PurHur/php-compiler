@@ -1,10 +1,12 @@
+--TEST--
+Stdlib: SoapClient::$sdl is Soap\Sdl after WSDL (#23247, ext/soap/soap.stub.php)
+--FILE--
 <?php
-// repro #23247 — SoapClient::$sdl is ?Soap\Sdl after WSDL load
 declare(strict_types=1);
 
-$dir = sys_get_temp_dir().'/phpc_soap_sdl_'.getmypid();
+$dir = sys_get_temp_dir() . '/phpc_soap_sdl_c_' . getmypid();
 @mkdir($dir);
-$wsdl = $dir.'/s.wsdl';
+$wsdl = $dir . '/s.wsdl';
 file_put_contents($wsdl, '<?xml version="1.0"?>
 <definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
   xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
@@ -17,25 +19,15 @@ file_put_contents($wsdl, '<?xml version="1.0"?>
 </definitions>');
 
 $c = new SoapClient($wsdl);
-if (!property_exists($c, 'sdl')) {
-    fwrite(STDERR, "property_exists sdl missing\n");
-    exit(1);
-}
-if (!($c->sdl instanceof Soap\Sdl)) {
-    fwrite(STDERR, "expected Soap\\Sdl, got ".get_debug_type($c->sdl)."\n");
-    exit(1);
-}
+echo 'exists=', (int) property_exists($c, 'sdl'), "\n";
+echo 'is_sdl=', (int) ($c->sdl instanceof Soap\Sdl), "\n";
 
-$non = new SoapClient(null, ['location' => 'http://127.0.0.1/', 'uri' => 'http://test/']);
-if (!property_exists($non, 'sdl')) {
-    fwrite(STDERR, "non-WSDL missing sdl property\n");
-    exit(1);
-}
-if (null !== $non->sdl) {
-    fwrite(STDERR, "non-WSDL sdl should be null\n");
-    exit(1);
-}
-
-echo "ok\n";
+$n = new SoapClient(null, ['location' => 'http://127.0.0.1/', 'uri' => 'http://test/']);
+echo 'non_null=', (int) (null === $n->sdl), "\n";
 @unlink($wsdl);
 @rmdir($dir);
+?>
+--EXPECT--
+exists=1
+is_sdl=1
+non_null=1

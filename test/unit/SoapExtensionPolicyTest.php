@@ -117,4 +117,48 @@ final class SoapExtensionPolicyTest extends TestCase
             }
         }
     }
+
+    public function testSoapClientSdlPropertyOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $entry = $ctx->classes['soapclient'] ?? null;
+            self::assertNotNull($entry);
+            $names = \array_map(static fn ($p) => $p->name, $entry->properties);
+            self::assertContains('sdl', $names);
+
+            $dir = \sys_get_temp_dir().'/phpc_soap_sdl_u_'.\getmypid();
+            @\mkdir($dir);
+            $wsdl = $dir.'/s.wsdl';
+            \file_put_contents($wsdl, '<?xml version="1.0"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/"
+  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+  xmlns:tns="http://test/" targetNamespace="http://test/" name="T">
+  <message name="mIn"/><message name="mOut"/>
+  <portType name="P"><operation name="ping"><input message="tns:mIn"/><output message="tns:mOut"/></operation></portType>
+  <binding name="B" type="tns:P"><soap:binding style="rpc" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="ping"><soap:operation soapAction="ping"/><input/><output/></operation></binding>
+  <service name="S"><port name="Port" binding="tns:B"><soap:address location="http://127.0.0.1/"/></port></service>
+</definitions>');
+
+            $object = new \PHPCompiler\VM\ObjectEntry($entry);
+            \PHPCompiler\ext\soap\VmSoapClient::initObject($object, $wsdl, [], $ctx);
+            self::assertTrue($object->hasProperty('sdl'));
+            $sdlVar = $object->getProperty('sdl');
+            self::assertSame(\PHPCompiler\VM\Variable::TYPE_OBJECT, $sdlVar->type);
+            self::assertSame('Soap\\Sdl', $sdlVar->toObject()->class->name);
+
+            @\unlink($wsdl);
+            @\rmdir($dir);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
