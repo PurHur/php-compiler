@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6561 |
-| Phase A inventory files (M2 ratio SSOT) | 6561 |
+| PHP files on vm.php path | 6562 |
+| Phase A inventory files (M2 ratio SSOT) | 6562 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21094 |
+| Source constructs flagged (warnings) | 21100 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1859,6 +1859,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/soap/SoapFaultConstruct.php` | 0 | 1 |
 | `ext/soap/VmSoapClient.php` | 0 | 60 |
 | `ext/soap/VmSoapEncoding.php` | 0 | 32 |
+| `ext/soap/VmSoapOpaque.php` | 0 | 6 |
 | `ext/soap/VmSoapServer.php` | 0 | 47 |
 | `ext/soap/bootstrap_soapfault.php` | 0 | 1 |
 | `ext/soap/is_soap_fault.php` | 0 | 2 |
@@ -21588,14 +21589,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 47)
-- new Variable (line 48)
 - new Variable (line 49)
-- new ClassProperty (line 57)
-- new ClassProperty (line 60)
-- new ClassProperty (line 63)
-- new ClassProperty (line 66)
-- new SoapFaultConstruct (line 69)
+- new Variable (line 50)
+- new Variable (line 51)
+- new ClassProperty (line 59)
+- new ClassProperty (line 62)
+- new ClassProperty (line 65)
+- new ClassProperty (line 68)
+- new SoapFaultConstruct (line 71)
 - 2 class method(s)
 
 ### `ext/soap/Module.php`
@@ -21618,7 +21619,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/SoapExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/soap/SoapFaultConstruct.php`
 
@@ -21724,6 +21725,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 196)
 - new ArgumentCountError (line 220)
 - 10 class method(s)
+
+### `ext/soap/VmSoapOpaque.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 46)
+- new ObjectEntry (line 60)
+- new ObjectEntry (line 74)
+- new Variable (line 82)
+- new Variable (line 90)
+- 6 class method(s)
 
 ### `ext/soap/VmSoapServer.php`
 
@@ -52709,7 +52720,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReservedBuiltinClass.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 47)
+- new Error (line 50)
 - 4 class method(s)
 
 ### `lib/VM/ResourceSupport.php`

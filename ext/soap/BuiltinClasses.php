@@ -23,6 +23,8 @@ final class BuiltinClasses
         VmSoapEncoding::register($ctx);
         VmSoapServer::registerClass($ctx);
         VmSoapClient::registerClass($ctx);
+        // PHP 8.4+ Soap\Url / Soap\Sdl opaque types (#23230).
+        VmSoapOpaque::register($ctx);
         foreach (\array_diff(\array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
