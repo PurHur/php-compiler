@@ -2566,11 +2566,23 @@ final class ReflectionSupport
             );
             if (null !== $override && isset($override[$index])) {
                 $info = BuiltinInternalArgInfo::paramInfoForClassMethod($className, $methodName, $index);
+                $name = rtrim(ltrim($override[$index], '&'), '=');
+                if (str_starts_with($name, '...')) {
+                    $name = substr($name, 3);
+                }
+                if (null !== $info) {
+                    return [
+                        'name' => $name,
+                        'type' => $info['type'],
+                        'isOptional' => $info['isOptional'] || str_ends_with($override[$index], '='),
+                    ];
+                }
 
+                // Zend stub has trailing optionals not present in legacy InternalArgInfo (#23391).
                 return [
-                    'name' => $override[$index],
-                    'type' => $info['type'] ?? '',
-                    'isOptional' => $info['isOptional'] ?? false,
+                    'name' => $name,
+                    'type' => '',
+                    'isOptional' => true,
                 ];
             }
 
@@ -2739,7 +2751,14 @@ final class ReflectionSupport
         }
         $override = BuiltinParamNames::forClassMethod(strtolower($entry->name).'::'.$methodLc);
         if (null !== $override) {
-            return $override;
+            return array_map(static function (string $name): string {
+                $n = ltrim($name, '&');
+                if (str_starts_with($n, '...')) {
+                    $n = substr($n, 3);
+                }
+
+                return rtrim($n, '=');
+            }, $override);
         }
         if ($entry->isInternal) {
             return BuiltinInternalArgInfo::paramNamesForClassMethod($entry->name, $method);
