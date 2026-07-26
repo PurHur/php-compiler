@@ -50,25 +50,24 @@ final class VmSoapClient
         $entry->isInternal = true;
 
         $pub = CfgFunc::FLAG_PUBLIC;
-        // php-src stub marks private; UPGRADING documents userland `$client->httpurl` reads (#23246).
+        // php-src stub marks private; UPGRADING documents userland `$client->httpurl` / `$sdl` reads (#23246/#23247).
         if (SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
             $nullProto = new Variable(Variable::TYPE_NULL);
-            $hasHttpurl = false;
+            $have = [];
             foreach ($entry->properties as $prop) {
-                if ('httpurl' === $prop->name) {
-                    $hasHttpurl = true;
-                    break;
-                }
+                $have[$prop->name] = true;
             }
-            if (!$hasHttpurl) {
-                $entry->properties[] = new ClassProperty(
-                    'httpurl',
-                    null,
-                    $nullProto,
-                    false,
-                    $pub,
-                    self::CLASS_LC
-                );
+            foreach (['httpurl', 'sdl'] as $propName) {
+                if (!isset($have[$propName])) {
+                    $entry->properties[] = new ClassProperty(
+                        $propName,
+                        null,
+                        $nullProto,
+                        false,
+                        $pub,
+                        self::CLASS_LC
+                    );
+                }
             }
         }
 
@@ -200,6 +199,8 @@ final class VmSoapClient
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
+            // php-src soap.c ctor — attach Soap\Sdl after successful WSDL parse (#23247).
+            self::attachSdl($object, $ctx);
         }
         if ('' === $state->location && isset($options['location'])) {
             $state->location = (string) $options['location'];
@@ -518,6 +519,20 @@ final class VmSoapClient
             return;
         }
         $object->getProperty('httpurl')->object(VmSoapOpaque::newUrlObject($ctx));
+    }
+
+    /**
+     * php-src soap.c SoapClient ctor — Z_CLIENT_SDL gets Soap\Sdl after WSDL load (#23247).
+     */
+    private static function attachSdl(ObjectEntry $object, Context $ctx): void
+    {
+        if (!SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
+            return;
+        }
+        if (!$object->hasProperty('sdl')) {
+            return;
+        }
+        $object->getProperty('sdl')->object(VmSoapOpaque::newSdlObject($ctx));
     }
 
     /**
