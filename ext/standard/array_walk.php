@@ -192,11 +192,16 @@ final class array_walk extends Internal
         }
         [$internal, $userFn] = VmArrayWalkCallback::resolveString($frame, $callback->toString());
         $vm = $frame->vmContext->runtime->vm();
-        $iterator = new \PHPCompiler\VM\ObjectPropertyIterator($object, $vm, $frame);
+        $iterator = new \PHPCompiler\VM\ObjectPropertyIterator(
+            $object,
+            $vm,
+            $frame,
+            \PHPCompiler\VM\ObjectPropertyIterator::PURPOSE_ARRAY_WALK
+        );
         $iterator->reset();
+        $valueByRef = null !== $userFn && isset($userFn->block->paramByRef[0]);
         while ($iterator->valid()) {
-            $propName = $iterator->currentKey()->toString();
-            $value = $iterator->currentValue(true);
+            $value = $iterator->currentValue($valueByRef);
             $keyCopy = $iterator->currentKey();
             if (null !== $userFn) {
                 $result = VmArrayWalkCallback::invokeWalkCallback(

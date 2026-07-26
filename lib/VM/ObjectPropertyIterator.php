@@ -7,15 +7,25 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Frame;
 
 /**
- * Foreach iterator over user object / stdClass instance properties (Zend zend_foreach.c).
+ * Foreach / array_walk iterator over user object instance properties.
  *
- * Property visibility matches get_object_vars() / zend_check_property_access (#23430).
- * DateTime* / DateTimeZone __dt_* storage is filtered via collectObjectVarsForBuiltin (#23432).
+ * PURPOSE_FOREACH: visibility matches get_object_vars() (#23430).
+ * PURPOSE_ARRAY_WALK: full property table with Zend-mangled keys (#23552, #23431, #23565).
+ *
+ * Values always go through {@see \PHPCompiler\VM::readObjectForeachProperty}.
+ * Pass by-ref only when the callback's first parameter is by-ref (#23552).
  */
 final class ObjectPropertyIterator
 {
+    public const PURPOSE_FOREACH = 0;
+
+    public const PURPOSE_ARRAY_WALK = 1;
+
     /** @var list<string> */
-    private array $names = [];
+    private array $keys = [];
+
+    /** @var list<string> */
+    private array $storageNames = [];
 
     private int $pos = -1;
 
@@ -23,9 +33,29 @@ final class ObjectPropertyIterator
         private readonly ObjectEntry $object,
         private readonly \PHPCompiler\VM $vm,
         private readonly Frame $frame,
+        int $purpose = self::PURPOSE_FOREACH,
     ) {
-        // Same accessible name set as get_object_vars() (php-src ZEND_PROP_PURPOSE_GET_OBJECT_VARS).
-        $this->names = array_keys($vm->collectObjectVarsForBuiltin($object, $frame));
+        if (self::PURPOSE_ARRAY_WALK === $purpose) {
+            foreach ($vm->collectObjectArrayWalkPropertyKeys($object, $frame) as $mangledKey) {
+                $this->keys[] = $mangledKey;
+                $this->storageNames[] = self::storageNameFromMangledKey($mangledKey);
+            }
+
+            return;
+        }
+        $names = array_keys($vm->collectObjectVarsForBuiltin($object, $frame));
+        $this->keys = $names;
+        $this->storageNames = $names;
+    }
+
+    private static function storageNameFromMangledKey(string $key): string
+    {
+        if (!str_contains($key, "\0")) {
+            return $key;
+        }
+        $parts = explode("\0", $key);
+
+        return $parts[\count($parts) - 1];
     }
 
     public function reset(): void
@@ -35,13 +65,13 @@ final class ObjectPropertyIterator
 
     public function valid(): bool
     {
-        return ++$this->pos < \count($this->names);
+        return ++$this->pos < \count($this->keys);
     }
 
     public function currentKey(): Variable
     {
         $key = new Variable(Variable::TYPE_STRING);
-        $key->string($this->names[$this->pos]);
+        $key->string($this->keys[$this->pos]);
 
         return $key;
     }
@@ -50,7 +80,7 @@ final class ObjectPropertyIterator
     {
         return $this->vm->readObjectForeachProperty(
             $this->object,
-            $this->names[$this->pos],
+            $this->storageNames[$this->pos],
             $this->frame,
             $byRef
         );

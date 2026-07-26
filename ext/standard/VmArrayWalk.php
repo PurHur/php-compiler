@@ -16,6 +16,31 @@ use PHPCompiler\VM\Variable;
  */
 final class VmArrayWalk
 {
+    /**
+     * Whether callback arg #0 is by-ref.
+     *
+     * Object walks must pass live property slots only for by-ref params; by-value callbacks
+     * need copies or declared properties are cleared when mangled keys are passed (#23552).
+     */
+    private static function callbackValueByRef(\PHPCompiler\VM\ClosureState|\PHPCompiler\Func\PHP $callback): bool
+    {
+        if ($callback instanceof \PHPCompiler\VM\ClosureState) {
+            return isset($callback->func->block->paramByRef[0]);
+        }
+
+        return isset($callback->block->paramByRef[0]);
+    }
+
+    private static function objectIterator(ObjectEntry $object, \PHPCompiler\VM $vm, Frame $frame): ObjectPropertyIterator
+    {
+        return new ObjectPropertyIterator(
+            $object,
+            $vm,
+            $frame,
+            ObjectPropertyIterator::PURPOSE_ARRAY_WALK
+        );
+    }
+
     public static function walkArrayRecursiveClosure(
         \PHPCompiler\VM\Context $context,
         HashTable $table,
@@ -106,11 +131,11 @@ final class VmArrayWalk
         \PHPCompiler\VM\ClosureState $closure,
         ?Variable $userdata
     ): bool {
-        $vm = $context->runtime->vm();
-        $iterator = new ObjectPropertyIterator($object, $vm, $frame);
+        $iterator = self::objectIterator($object, $context->runtime->vm(), $frame);
         $iterator->reset();
+        $valueByRef = self::callbackValueByRef($closure);
         while ($iterator->valid()) {
-            $value = $iterator->currentValue(true);
+            $value = $iterator->currentValue($valueByRef);
             if (Variable::TYPE_ARRAY === $value->type) {
                 $value->separateArrayForWrite();
                 if (!self::walkArrayRecursiveClosure($context, $value->toArray(), $closure, $userdata)) {
@@ -122,9 +147,13 @@ final class VmArrayWalk
             if (null !== $userdata) {
                 $userdataCopy = new Variable();
                 $userdataCopy->copyFrom($userdata);
-                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy, $userdataCopy);
+                $result = $valueByRef
+                    ? VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy, $userdataCopy)
+                    : VmClosureCall::invoke($context, $closure, $value, $keyCopy, $userdataCopy);
             } else {
-                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy);
+                $result = $valueByRef
+                    ? VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy)
+                    : VmClosureCall::invoke($context, $closure, $value, $keyCopy);
             }
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
@@ -139,11 +168,10 @@ final class VmArrayWalk
         Frame $frame,
         Internal $fn
     ): bool {
-        $vm = $frame->vmContext->runtime->vm();
-        $iterator = new ObjectPropertyIterator($object, $vm, $frame);
+        $iterator = self::objectIterator($object, $frame->vmContext->runtime->vm(), $frame);
         $iterator->reset();
         while ($iterator->valid()) {
-            $value = $iterator->currentValue(true);
+            $value = $iterator->currentValue(false);
             if (Variable::TYPE_ARRAY === $value->type) {
                 $value->separateArrayForWrite();
                 if (!self::walkArrayRecursiveString($value->toArray(), $fn)) {
@@ -168,11 +196,11 @@ final class VmArrayWalk
         \PHPCompiler\Func\PHP $userFn,
         ?Variable $userdata
     ): bool {
-        $vm = $context->runtime->vm();
-        $iterator = new ObjectPropertyIterator($object, $vm, $frame);
+        $iterator = self::objectIterator($object, $context->runtime->vm(), $frame);
         $iterator->reset();
+        $valueByRef = self::callbackValueByRef($userFn);
         while ($iterator->valid()) {
-            $value = $iterator->currentValue(true);
+            $value = $iterator->currentValue($valueByRef);
             if (Variable::TYPE_ARRAY === $value->type) {
                 $value->separateArrayForWrite();
                 if (!self::walkArrayRecursiveUserFunction($context, $value->toArray(), $userFn, $userdata)) {
@@ -227,18 +255,22 @@ final class VmArrayWalk
         \PHPCompiler\VM\ClosureState $closure,
         ?Variable $userdata
     ): bool {
-        $vm = $context->runtime->vm();
-        $iterator = new ObjectPropertyIterator($object, $vm, $frame);
+        $iterator = self::objectIterator($object, $context->runtime->vm(), $frame);
         $iterator->reset();
+        $valueByRef = self::callbackValueByRef($closure);
         while ($iterator->valid()) {
             $keyCopy = $iterator->currentKey();
-            $value = $iterator->currentValue(true);
+            $value = $iterator->currentValue($valueByRef);
             if (null !== $userdata) {
                 $userdataCopy = new Variable();
                 $userdataCopy->copyFrom($userdata);
-                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy, $userdataCopy);
+                $result = $valueByRef
+                    ? VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy, $userdataCopy)
+                    : VmClosureCall::invoke($context, $closure, $value, $keyCopy, $userdataCopy);
             } else {
-                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy);
+                $result = $valueByRef
+                    ? VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy)
+                    : VmClosureCall::invoke($context, $closure, $value, $keyCopy);
             }
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
