@@ -13,9 +13,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * get_class_vars() — default values for public properties declared on a class (issue #3159).
+ * get_class_vars() — default values for properties visible from the calling scope (#3159, #23531).
  *
- * php-src: ext/standard/class.c — PHP_FUNCTION(get_class_vars)
+ * php-src: Zend/zend_builtin_functions.c — PHP_FUNCTION(get_class_vars) / add_class_vars
  */
 final class get_class_vars_ extends Internal
 {
@@ -39,7 +39,7 @@ final class get_class_vars_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $entry = VmReflection::fetchClassEntryForGetClassVars($ctx, $className);
-        $frame->returnVar->copyFrom(VmReflection::getClassVarsArray($entry));
+        $frame->returnVar->copyFrom(VmReflection::getClassVarsArray($entry, $frame));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -108,6 +108,37 @@ PHP;
     }
 
     /**
+     * #23531 / php-src add_class_vars: EG(scope) includes accessible non-public defaults.
+     */
+    public function testVmGetClassVarsScopeVisibility(): void
+    {
+        $code = <<<'PHP'
+<?php
+class A23531 {
+  public $a = 1;
+  protected $b = 2;
+  private $c = 3;
+  public static $sa = 10;
+  protected static $sb = 20;
+  private static $sc = 30;
+  public function vars() { return get_class_vars(__CLASS__); }
+}
+class B23531 extends A23531 {
+  public function vars() { return get_class_vars('A23531'); }
+}
+function keys($a){ $k=array_keys($a); sort($k); return implode(',', $k); }
+echo 'out=', keys(get_class_vars('A23531')), "\n";
+echo 'in=', keys((new A23531)->vars()), "\n";
+echo 'child=', keys((new B23531)->vars()), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'get_class_vars_scope.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("out=a,sa\nin=a,b,c,sa,sb,sc\nchild=a,b,sa,sb\n", ob_get_clean());
+    }
+
+    /**
      * #22493 / php-src add_class_vars: virtual hooked props omitted; backed hooks keep defaults (#6603).
      */
     public function testVmGetClassVarsPropertyHooks(): void

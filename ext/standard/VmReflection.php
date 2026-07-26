@@ -1862,30 +1862,43 @@ final class VmReflection
     }
 
     /**
-     * get_class_vars() — default values for public properties declared on $entry (#3159).
+     * get_class_vars() — default values for properties visible from the calling scope (#3159, #23531).
      *
      * php-src: Zend/zend_builtin_functions.c — add_class_vars / PHP_FUNCTION(get_class_vars)
+     * Scope is zend_get_executed_scope(): outside a class only publics; inside a method,
+     * protected/private defaults that zend_check_protected / declaring-CE equality allow.
      */
-    public static function getClassVarsArray(ClassEntry $entry): Variable
+    public static function getClassVarsArray(ClassEntry $entry, ?Frame $frame = null): Variable
     {
+        $ctx = null;
+        $scopeClass = null;
+        if (null !== $frame) {
+            $ctx = self::requireContext($frame);
+            $callerLc = self::callerClassLcFromFrame($frame);
+            if (null !== $callerLc && isset($ctx->classes[$callerLc])) {
+                $scopeClass = $ctx->classes[$callerLc];
+            }
+        }
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
+        $entryLc = strtolower(ltrim($entry->name, '\\'));
         foreach ($entry->properties as $prop) {
-            if (!MethodVisibility::isPublic($prop->visibility)) {
-                continue;
-            }
             // php-src add_class_vars: skip ZEND_ACC_VIRTUAL — virtual hooked props have no
             // default-properties slot (#22493). Backed hooked props still appear with defaults (#6603).
             if ($prop->propertyHookVirtual) {
                 continue;
             }
+            $declaringLc = '' !== $prop->declaringClassLc ? $prop->declaringClassLc : $entryLc;
+            if (!self::classVarVisibleFromScope($ctx, $scopeClass, $prop->visibility, $declaringLc)) {
+                continue;
+            }
             $copy = new Variable();
-            // php-src add_class_vars: public backed hooked props use declared defaults, not get-hook reads (#6603).
+            // php-src add_class_vars: backed hooked props use declared defaults, not get-hook reads (#6603).
             self::copyClassVarDefault($copy, $prop);
             $ht->add($prop->name, $copy);
         }
-        self::addPublicStaticClassVars($entry, $ht);
+        self::addScopedStaticClassVars($entry, $ht, $ctx, $scopeClass);
         if ($entry->isEnum) {
             /** @var array<string, true> $seen */
             $seen = [];
@@ -1905,6 +1918,25 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * php-src add_class_vars visibility: public always; else EG(scope) vs declaring CE (#23531).
+     */
+    private static function classVarVisibleFromScope(
+        ?Context $ctx,
+        ?ClassEntry $scopeClass,
+        int $visibility,
+        string $declaringClassLc
+    ): bool {
+        if (MethodVisibility::isPublic($visibility)) {
+            return true;
+        }
+        if (null === $scopeClass || null === $ctx) {
+            return false;
+        }
+
+        return self::propertyVisibleFromScope($ctx, $scopeClass, $visibility, $declaringClassLc);
     }
 
     /** Declared default for get_class_vars() — never invoke property get hooks (#6603). */
@@ -2050,22 +2082,28 @@ final class VmReflection
     }
 
     /**
-     * Public static properties declared on $entry (php-src add_class_vars, #7397).
+     * Static properties declared on $entry visible from calling scope (php-src add_class_vars, #7397, #23531).
      *
      * @param \PHPCompiler\VM\HashTable $ht
      */
-    private static function addPublicStaticClassVars(ClassEntry $entry, $ht): void
-    {
+    private static function addScopedStaticClassVars(
+        ClassEntry $entry,
+        $ht,
+        ?Context $ctx,
+        ?ClassEntry $scopeClass
+    ): void {
         /** @var array<string, true> $seen */
         $seen = [];
         foreach ($ht->iterate(false) as $key => $_value) {
             $seen[(string) $key] = true;
         }
-        foreach (self::orderedPublicStaticPropertyKeys($entry) as $propLc) {
+        $entryLc = strtolower(ltrim($entry->name, '\\'));
+        foreach (self::orderedStaticPropertyKeys($entry) as $propLc) {
             $storage = $entry->staticProperties[$propLc];
-            // php-src add_class_vars: public static props on $entry include trait-composed
-            // and parent-inherited members already merged into staticProperties (#7420).
-            if (!MethodVisibility::isPublic($entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC)) {
+            // php-src add_class_vars: statics on $entry include trait-composed and parent-inherited (#7420).
+            $visibility = $entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            $declaringLc = $entry->staticPropertyDeclaringClassLc[$propLc] ?? $entryLc;
+            if (!self::classVarVisibleFromScope($ctx, $scopeClass, $visibility, $declaringLc)) {
                 continue;
             }
             $displayName = $storage->objectPropertyName ?? $propLc;
@@ -2089,7 +2127,7 @@ final class VmReflection
      *
      * @return list<string> lowercase property keys
      */
-    private static function orderedPublicStaticPropertyKeys(ClassEntry $entry): array
+    private static function orderedStaticPropertyKeys(ClassEntry $entry): array
     {
         $ordered = [];
         $added = [];
