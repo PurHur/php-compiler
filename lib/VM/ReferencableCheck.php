@@ -303,7 +303,12 @@ final class ReferencableCheck
      */
     public static function allowsEphemeralArrayLiteralByRef(string $fn): bool
     {
-        return self::isArrayInternalPointerReadBuiltin($fn) || 'array_multisort' === strtolower($fn);
+        $lc = strtolower($fn);
+
+        // extract(array &$array) accepts temporary arrays in php-src (#23572).
+        return self::isArrayInternalPointerReadBuiltin($fn)
+            || 'array_multisort' === $lc
+            || 'extract' === $lc;
     }
 
     /** current/key/pos — read-only internal pointer API (#4967, #11196). */

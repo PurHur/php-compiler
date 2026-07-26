@@ -40,6 +40,8 @@ final class BuiltinByRefParams
             case 'uasort':
             case 'uksort':
             case 'usort':
+            case 'extract':
+                // php-src basic_functions.stub.php — extract(array &$array, ...) (#23572)
                 return [0];
             case 'modf':
                 return [1];
