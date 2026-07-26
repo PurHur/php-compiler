@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ldap;
 
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -238,6 +239,142 @@ final class VmLdapModify
         }
 
         return true;
+    }
+
+    /**
+     * Full DN add (php-src ldap_add → ldap_add_ext_s; #22196).
+     *
+     * @param list<array{op: int, attr: string, values: list<string>|null}> $mods
+     */
+    public static function add(
+        ObjectEntry $connection,
+        string $dn,
+        array $mods,
+        string $functionName
+    ): bool {
+        $ld = VmLdapConnection::native($connection);
+        $rc = VmLdapNative::addExtSync($ld, $dn, $mods);
+        VmLdapConnection::setErrno($connection, $rc);
+        if (VmLdapNative::LDAP_SUCCESS !== $rc) {
+            @\trigger_error(\sprintf(
+                '%s(): Add: %s',
+                $functionName,
+                VmLdapNative::err2string($rc)
+            ), \E_USER_WARNING);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function delete(
+        ObjectEntry $connection,
+        string $dn,
+        string $functionName
+    ): bool {
+        $ld = VmLdapConnection::native($connection);
+        $rc = VmLdapNative::deleteExtSync($ld, $dn);
+        VmLdapConnection::setErrno($connection, $rc);
+        if (VmLdapNative::LDAP_SUCCESS !== $rc) {
+            @\trigger_error(\sprintf(
+                '%s(): Delete: %s',
+                $functionName,
+                VmLdapNative::err2string($rc)
+            ), \E_USER_WARNING);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Async modify/add returning LDAP\Result (php-src *_ext; #22196).
+     *
+     * @param list<array{op: int, attr: string, values: list<string>|null}> $mods
+     * @return Variable|false
+     */
+    public static function modifyExt(
+        ObjectEntry $connection,
+        string $dn,
+        array $mods,
+        bool $fullAdd,
+        string $functionName,
+        Context $ctx
+    ): Variable|false {
+        $ld = VmLdapConnection::native($connection);
+        $info = VmLdapNative::modifyExtAsync($ld, $dn, $mods, $fullAdd);
+        $rc = $info['errno'];
+        VmLdapConnection::setErrno($connection, $rc);
+        if (null === $info['result']) {
+            $verb = $fullAdd ? 'Add' : 'Modify';
+            @\trigger_error(\sprintf(
+                '%s(): %s: %s',
+                $functionName,
+                $verb,
+                -1 === $rc ? ($verb.' operation failed') : VmLdapNative::err2string($rc)
+            ), \E_USER_WARNING);
+
+            return false;
+        }
+
+        return VmLdapResult::wrapResult($info['result'], $ctx, $connection);
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function deleteExt(
+        ObjectEntry $connection,
+        string $dn,
+        string $functionName,
+        Context $ctx
+    ): Variable|false {
+        $ld = VmLdapConnection::native($connection);
+        $info = VmLdapNative::deleteExtAsync($ld, $dn);
+        $rc = $info['errno'];
+        VmLdapConnection::setErrno($connection, $rc);
+        if (null === $info['result']) {
+            @\trigger_error(\sprintf(
+                '%s(): Delete: %s',
+                $functionName,
+                -1 === $rc ? 'Delete operation failed' : VmLdapNative::err2string($rc)
+            ), \E_USER_WARNING);
+
+            return false;
+        }
+
+        return VmLdapResult::wrapResult($info['result'], $ctx, $connection);
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function renameExt(
+        ObjectEntry $connection,
+        string $dn,
+        string $newRdn,
+        string $newParent,
+        bool $deleteOldRdn,
+        string $functionName,
+        Context $ctx
+    ): Variable|false {
+        $ld = VmLdapConnection::native($connection);
+        $info = VmLdapNative::renameExtAsync($ld, $dn, $newRdn, $newParent, $deleteOldRdn);
+        $rc = $info['errno'];
+        VmLdapConnection::setErrno($connection, $rc);
+        if (null === $info['result']) {
+            @\trigger_error(\sprintf(
+                '%s(): Rename: %s',
+                $functionName,
+                -1 === $rc ? 'Rename operation failed' : VmLdapNative::err2string($rc)
+            ), \E_USER_WARNING);
+
+            return false;
+        }
+
+        return VmLdapResult::wrapResult($info['result'], $ctx, $connection);
     }
 
     public static function rename(

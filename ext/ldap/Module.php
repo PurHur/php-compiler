@@ -85,7 +85,17 @@ class Module extends ModuleAbstract
             new ldap_mod_add(),
             new ldap_mod_replace(),
             new ldap_mod_del(),
+            new ldap_modify(),
+            new ldap_add(),
+            new ldap_delete(),
+            new ldap_modify_batch(),
             new ldap_mod_batch(),
+            new ldap_add_ext(),
+            new ldap_delete_ext(),
+            new ldap_rename_ext(),
+            new ldap_mod_add_ext(),
+            new ldap_mod_del_ext(),
+            new ldap_mod_replace_ext(),
             new ldap_rename(),
         ];
         if (LdapExtensionPolicy::advertisesWalletConnect()) {
