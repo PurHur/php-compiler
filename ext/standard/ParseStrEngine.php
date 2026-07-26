@@ -76,18 +76,20 @@ final class ParseStrEngine
     }
 
     /**
-     * Query key decoding — php-src treats `.` and `+` in the root segment as `_` (#14150).
+     * Query key decoding — php-src treats `.`, `+`, and space in the root segment as `_`
+     * (#14150, #23529; php_register_variable / main/php_variables.c).
      *
-     * Bracket interior segments keep `+` → space (php_register_variable / parse_str parity).
+     * Bracket interior segments keep `+` → space and leave literal spaces (php_register_variable /
+     * parse_str parity).
      */
     private static function decodeQueryKey(string $value): string
     {
         $value = self::percentDecode($value);
         $bracketPos = strpos($value, '[');
         if (false === $bracketPos) {
-            return str_replace(['.', '+'], '_', $value);
+            return str_replace(['.', '+', ' '], '_', $value);
         }
-        $base = str_replace(['.', '+'], '_', substr($value, 0, $bracketPos));
+        $base = str_replace(['.', '+', ' '], '_', substr($value, 0, $bracketPos));
         $suffix = substr($value, $bracketPos);
 
         return $base.self::decodeBracketKeySuffix($suffix);

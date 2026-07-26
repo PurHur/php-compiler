@@ -184,7 +184,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         );
     }
 
-    /** Issue #14150 — parse_str() root keys map `.` and `+` to `_` (php_register_variable). */
+    /** Issue #14150 / #23529 — parse_str() root keys map `.`, `+`, and space to `_` (php_register_variable). */
     public function testParseStrEngineNormalizesDotAndPlusRootKeys(): void
     {
         $dots = \PHPCompiler\ext\standard\ParseStrEngine::parse('a.b=1&a.c=2');
@@ -193,8 +193,14 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $plus = \PHPCompiler\ext\standard\ParseStrEngine::parse('a+b=1');
         $this->assertSame(['a_b' => '1'], $plus);
 
+        $space = \PHPCompiler\ext\standard\ParseStrEngine::parse('c d=2&x%20y=5');
+        $this->assertSame(['c_d' => '2', 'x_y' => '5'], $space);
+
         $nested = \PHPCompiler\ext\standard\ParseStrEngine::parse('a[b+c]=1');
         $this->assertSame(['a' => ['b c' => '1']], $nested);
+
+        $nestedSpace = \PHPCompiler\ext\standard\ParseStrEngine::parse('p[q r]=6');
+        $this->assertSame(['p' => ['q r' => '6']], $nestedSpace);
 
         $nestedBase = \PHPCompiler\ext\standard\ParseStrEngine::parse('a.b[c]=1');
         $this->assertSame(['a_b' => ['c' => '1']], $nestedBase);
