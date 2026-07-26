@@ -110,16 +110,19 @@ final class JitSubstrReplace
 
         $context->builder->positionAtEnd($prefixBlock);
         $prefixSlice = string_trim::jitCopySlice($context, $string, $strPtr, $zero64, $normOff, 'pre');
+        // jitCopySlice ends in a fresh continue block — use that as the PHI predecessor.
+        $prefixEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($afterPrefixBlock);
 
         $context->builder->positionAtEnd($skipPrefixBlock);
         $emptyPrefix = $context->builder->call($context->lookupFunction('__string__alloc'), $zero64);
+        $skipPrefixEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($afterPrefixBlock);
 
         $context->builder->positionAtEnd($afterPrefixBlock);
         $prefixPhi = $context->builder->phi($context->getTypeFromString('__string__*'));
-        $prefixPhi->addIncoming($prefixSlice, $prefixBlock);
-        $prefixPhi->addIncoming($emptyPrefix, $skipPrefixBlock);
+        $prefixPhi->addIncoming($prefixSlice, $prefixEndBlock);
+        $prefixPhi->addIncoming($emptyPrefix, $skipPrefixEndBlock);
 
         $withReplace = JitStringConcat::concat($context, $prefixPhi, $replace);
 
@@ -132,15 +135,17 @@ final class JitSubstrReplace
         $context->builder->positionAtEnd($tailBlock);
         $tailSlice = string_trim::jitCopySlice($context, $string, $strPtr, $tailStart, $tailLen, 'tail');
         $result = JitStringConcat::concat($context, $withReplace, $tailSlice);
+        $tailEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($skipTailBlock);
+        $skipTailEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $resultPhi = $context->builder->phi($context->getTypeFromString('__string__*'));
-        $resultPhi->addIncoming($result, $tailBlock);
-        $resultPhi->addIncoming($withReplace, $skipTailBlock);
+        $resultPhi->addIncoming($result, $tailEndBlock);
+        $resultPhi->addIncoming($withReplace, $skipTailEndBlock);
 
         return $resultPhi;
     }

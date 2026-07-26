@@ -557,6 +557,9 @@ final class BuiltinParamNames
                 return ['pattern', 'flags'];
             case 'substr_compare':
                 return ['haystack', 'needle', 'offset', 'length', 'case_insensitive'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str/repl/start (#23183)
+            case 'substr_replace':
+                return ['string', 'replace', 'offset', 'length'];
             case 'file_exists':
             case 'filesize':
             case 'filemtime':
