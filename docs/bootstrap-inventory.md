@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6563 |
-| Phase A inventory files (M2 ratio SSOT) | 6563 |
+| PHP files on vm.php path | 6564 |
+| Phase A inventory files (M2 ratio SSOT) | 6564 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21140 |
+| Source constructs flagged (warnings) | 21157 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1180,7 +1180,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
 | `ext/ldap/LdapExtensionPolicy.php` | 0 | 1 |
 | `ext/ldap/LdapSerializeDeny.php` | 0 | 3 |
-| `ext/ldap/Module.php` | 0 | 47 |
+| `ext/ldap/Module.php` | 0 | 54 |
 | `ext/ldap/VmLdapArg.php` | 0 | 1 |
 | `ext/ldap/VmLdapConnection.php` | 0 | 4 |
 | `ext/ldap/VmLdapCore.php` | 0 | 4 |
@@ -1196,6 +1196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/ldap_exop_builtins.php` | 0 | 6 |
 | `ext/ldap/ldap_link_builtins.php` | 0 | 11 |
 | `ext/ldap/ldap_modify_builtins.php` | 0 | 7 |
+| `ext/ldap/ldap_result_builtins.php` | 0 | 10 |
 | `ext/ldap/ldap_search_builtins.php` | 0 | 8 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
@@ -15802,51 +15803,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 31)
-- new ldap_escape (line 57)
-- new ldap_dn2ufn (line 58)
-- new ldap_explode_dn (line 59)
-- new ldap_connect (line 60)
-- new ldap_bind (line 61)
-- new ldap_bind_ext (line 62)
-- new ldap_unbind (line 63)
-- new ldap_close (line 64)
-- new ldap_errno (line 65)
-- new ldap_error (line 66)
-- new ldap_err2str (line 67)
-- new ldap_set_option (line 68)
-- new ldap_get_option (line 69)
-- new ldap_start_tls (line 70)
-- new ldap_search (line 71)
-- new ldap_list (line 72)
-- new ldap_read (line 73)
-- new ldap_count_entries (line 74)
-- new ldap_get_entries (line 75)
-- new ldap_first_entry (line 76)
-- new ldap_next_entry (line 77)
-- new ldap_get_attributes (line 78)
-- new ldap_free_result (line 79)
-- new ldap_exop (line 80)
-- new ldap_exop_sync (line 81)
-- new ldap_parse_exop (line 82)
-- new ldap_exop_whoami (line 83)
-- new ldap_exop_refresh (line 84)
-- new ldap_exop_passwd (line 85)
-- new ldap_mod_add (line 86)
-- new ldap_mod_replace (line 87)
-- new ldap_mod_del (line 88)
-- new ldap_modify (line 89)
-- new ldap_add (line 90)
-- new ldap_delete (line 91)
-- new ldap_modify_batch (line 92)
-- new ldap_mod_batch (line 93)
-- new ldap_add_ext (line 94)
-- new ldap_delete_ext (line 95)
-- new ldap_rename_ext (line 96)
-- new ldap_mod_add_ext (line 97)
-- new ldap_mod_del_ext (line 98)
-- new ldap_mod_replace_ext (line 99)
-- new ldap_rename (line 100)
-- new ldap_connect_wallet (line 104)
+- new ldap_escape (line 58)
+- new ldap_dn2ufn (line 59)
+- new ldap_explode_dn (line 60)
+- new ldap_connect (line 61)
+- new ldap_bind (line 62)
+- new ldap_bind_ext (line 63)
+- new ldap_unbind (line 64)
+- new ldap_close (line 65)
+- new ldap_errno (line 66)
+- new ldap_error (line 67)
+- new ldap_err2str (line 68)
+- new ldap_set_option (line 69)
+- new ldap_get_option (line 70)
+- new ldap_start_tls (line 71)
+- new ldap_search (line 72)
+- new ldap_list (line 73)
+- new ldap_read (line 74)
+- new ldap_count_entries (line 75)
+- new ldap_get_entries (line 76)
+- new ldap_first_entry (line 77)
+- new ldap_next_entry (line 78)
+- new ldap_get_attributes (line 79)
+- new ldap_free_result (line 80)
+- new ldap_compare (line 81)
+- new ldap_parse_result (line 82)
+- new ldap_get_dn (line 83)
+- new ldap_first_attribute (line 84)
+- new ldap_next_attribute (line 85)
+- new ldap_get_values (line 86)
+- new ldap_get_values_len (line 87)
+- new ldap_exop (line 88)
+- new ldap_exop_sync (line 89)
+- new ldap_parse_exop (line 90)
+- new ldap_exop_whoami (line 91)
+- new ldap_exop_refresh (line 92)
+- new ldap_exop_passwd (line 93)
+- new ldap_mod_add (line 94)
+- new ldap_mod_replace (line 95)
+- new ldap_mod_del (line 96)
+- new ldap_modify (line 97)
+- new ldap_add (line 98)
+- new ldap_delete (line 99)
+- new ldap_modify_batch (line 100)
+- new ldap_mod_batch (line 101)
+- new ldap_add_ext (line 102)
+- new ldap_delete_ext (line 103)
+- new ldap_rename_ext (line 104)
+- new ldap_mod_add_ext (line 105)
+- new ldap_mod_del_ext (line 106)
+- new ldap_mod_replace_ext (line 107)
+- new ldap_rename (line 108)
+- new ldap_connect_wallet (line 112)
 - 3 class method(s)
 
 ### `ext/ldap/VmLdapArg.php`
@@ -15865,10 +15873,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/VmLdapCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 178)
-- new Variable (line 190)
-- new Variable (line 201)
-- 9 class method(s)
+- new HashTable (line 320)
+- new Variable (line 332)
+- new Variable (line 343)
+- 15 class method(s)
 
 ### `ext/ldap/VmLdapDn.php`
 
@@ -15892,7 +15900,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/VmLdapNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 42 class method(s)
+- 46 class method(s)
 
 ### `ext/ldap/VmLdapResult.php`
 
@@ -15902,8 +15910,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 48)
 - new Variable (line 55)
 - new ObjectEntry (line 64)
-- new Variable (line 71)
-- 9 class method(s)
+- new Variable (line 72)
+- 11 class method(s)
 
 ### `ext/ldap/ldap_connect.php`
 
@@ -15965,6 +15973,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 429)
 - new ArgumentCountError (line 467)
 - 43 class method(s)
+
+### `ext/ldap/ldap_result_builtins.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 69)
+- new HashTable (line 99)
+- new Variable (line 101)
+- new ArgumentCountError (line 128)
+- new ArgumentCountError (line 163)
+- new ArgumentCountError (line 198)
+- new ArgumentCountError (line 233)
+- new ArgumentCountError (line 270)
+- 14 class method(s)
 
 ### `ext/ldap/ldap_search_builtins.php`
 

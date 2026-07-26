@@ -534,6 +534,119 @@ final class VmLdapNative
     }
 
     /**
+     * ldap_compare_ext_s (php-src ldap_compare; #22177).
+     *
+     * Returns LDAP_COMPARE_TRUE (0x06), LDAP_COMPARE_FALSE (0x05), or other errno.
+     */
+    public static function compareExtSync(\FFI\CData $ld, string $dn, string $attribute, string $value): int
+    {
+        $ffi = self::requireFfi();
+        try {
+            $bv = self::newBerValue($value);
+
+            return (int) $ffi->ldap_compare_ext_s($ld, $dn, $attribute, \FFI::addr($bv), null, null);
+        } catch (\Throwable) {
+            return -1;
+        }
+    }
+
+    public const LDAP_COMPARE_FALSE = 0x05;
+
+    public const LDAP_COMPARE_TRUE = 0x06;
+
+    /**
+     * @return array{ok: bool, errno: int, errcode: int, matched_dn: string, error_message: string, referrals: list<string>}
+     */
+    public static function parseResult(\FFI\CData $ld, \FFI\CData $res, bool $wantMatched, bool $wantErrmsg, bool $wantReferrals): array
+    {
+        $ffi = self::requireFfi();
+        $errcode = $ffi->new('int');
+        $matchedp = $wantMatched ? $ffi->new('char*[1]') : null;
+        $errmsgp = $wantErrmsg ? $ffi->new('char*[1]') : null;
+        $refsp = $wantReferrals ? $ffi->new('char**[1]') : null;
+        if (null !== $matchedp) {
+            $matchedp[0] = null;
+        }
+        if (null !== $errmsgp) {
+            $errmsgp[0] = null;
+        }
+        if (null !== $refsp) {
+            $refsp[0] = null;
+        }
+        $rc = (int) $ffi->ldap_parse_result(
+            $ld,
+            $res,
+            \FFI::addr($errcode),
+            null !== $matchedp ? $matchedp : null,
+            null !== $errmsgp ? $errmsgp : null,
+            null !== $refsp ? $refsp : null,
+            null,
+            0
+        );
+        $matched = '';
+        $errmsg = '';
+        $referrals = [];
+        if (null !== $matchedp && null !== $matchedp[0]) {
+            $matched = self::ffiString($matchedp[0]);
+            $ffi->ldap_memfree($matchedp[0]);
+        }
+        if (null !== $errmsgp && null !== $errmsgp[0]) {
+            $errmsg = self::ffiString($errmsgp[0]);
+            $ffi->ldap_memfree($errmsgp[0]);
+        }
+        if (null !== $refsp && null !== $refsp[0]) {
+            $refs = $refsp[0];
+            for ($i = 0; ; ++$i) {
+                $ptr = $refs[$i];
+                if (null === $ptr) {
+                    break;
+                }
+                $referrals[] = self::ffiString($ptr);
+            }
+            $ffi->ldap_memvfree($refs);
+        }
+
+        return [
+            'ok' => self::LDAP_SUCCESS === $rc,
+            'errno' => $rc,
+            'errcode' => (int) $errcode->cdata,
+            'matched_dn' => $matched,
+            'error_message' => $errmsg,
+            'referrals' => $referrals,
+        ];
+    }
+
+    /**
+     * @return array{attr: ?string, ber: \FFI\CData} ber is void* BerElement*
+     */
+    public static function firstAttribute(\FFI\CData $ld, \FFI\CData $entry): array
+    {
+        $ffi = self::requireFfi();
+        $ber = $ffi->new('void*');
+        $attr = $ffi->ldap_first_attribute($ld, $entry, \FFI::addr($ber));
+        if (null === $attr) {
+            return ['attr' => null, 'ber' => $ber];
+        }
+        $str = self::ffiString($attr);
+        $ffi->ldap_memfree($attr);
+
+        return ['attr' => $str, 'ber' => $ber];
+    }
+
+    public static function nextAttribute(\FFI\CData $ld, \FFI\CData $entry, \FFI\CData $ber): ?string
+    {
+        $ffi = self::requireFfi();
+        $attr = $ffi->ldap_next_attribute($ld, $entry, $ber);
+        if (null === $attr) {
+            return null;
+        }
+        $str = self::ffiString($attr);
+        $ffi->ldap_memfree($attr);
+
+        return $str;
+    }
+
+    /**
      * @return list<string>
      */
     public static function getValuesLen(\FFI\CData $ld, \FFI\CData $entry, string $attribute): array
@@ -915,6 +1028,7 @@ int ldap_rename(LDAP *ld, const char *dn, const char *newrdn, const char *newpar
 int ldap_simple_bind_s(LDAP *ld, const char *who, const char *passwd);
 int ldap_sasl_bind(LDAP *ld, const char *dn, const char *mechanism, BerValue *cred, void *serverctrls, void *clientctrls, int *msgidp);
 int ldap_search_ext_s(LDAP *ld, const char *base, int scope, const char *filter, char **attrs, int attrsonly, void *serverctrls, void *clientctrls, timeval *timeout, int sizelimit, LDAPMessage **res);
+int ldap_compare_ext_s(LDAP *ld, const char *dn, const char *attr, BerValue *bvalue, void *serverctrls, void *clientctrls);
 int ldap_count_entries(LDAP *ld, LDAPMessage *res);
 LDAPMessage *ldap_first_entry(LDAP *ld, LDAPMessage *res);
 LDAPMessage *ldap_next_entry(LDAP *ld, LDAPMessage *entry);
