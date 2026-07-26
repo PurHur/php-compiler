@@ -202,9 +202,7 @@ final class PgsqlConstants
             'PGSQL_ERRORS_DEFAULT' => self::PGSQL_ERRORS_DEFAULT,
             'PGSQL_ERRORS_VERBOSE' => self::PGSQL_ERRORS_VERBOSE,
             'PGSQL_ERRORS_SQLSTATE' => self::PGSQL_ERRORS_SQLSTATE,
-            'PGSQL_SHOW_CONTEXT_NEVER' => self::PGSQL_SHOW_CONTEXT_NEVER,
-            'PGSQL_SHOW_CONTEXT_ERRORS' => self::PGSQL_SHOW_CONTEXT_ERRORS,
-            'PGSQL_SHOW_CONTEXT_ALWAYS' => self::PGSQL_SHOW_CONTEXT_ALWAYS,
+            ...self::php83ShowContextConstants(),
             'PGSQL_CONNECTION_OK' => self::PGSQL_CONNECTION_OK,
             'PGSQL_CONNECTION_BAD' => self::PGSQL_CONNECTION_BAD,
             'PGSQL_CONNECTION_STARTED' => self::PGSQL_CONNECTION_STARTED,
@@ -248,6 +246,24 @@ final class PgsqlConstants
             'PGSQL_DIAG_DATATYPE_NAME' => self::PGSQL_DIAG_DATATYPE_NAME,
             'PGSQL_DIAG_CONSTRAINT_NAME' => self::PGSQL_DIAG_CONSTRAINT_NAME,
             'PGSQL_DIAG_SEVERITY_NONLOCALIZED' => self::PGSQL_DIAG_SEVERITY_NONLOCALIZED,
+        ];
+    }
+
+    /**
+     * PHP 8.3+ PGSQL_SHOW_CONTEXT_* (#20674 / #22620).
+     *
+     * @return array<string, int>
+     */
+    private static function php83ShowContextConstants(): array
+    {
+        if (!PgsqlExtensionPolicy::advertisesPhp83ErrorContextVisibility()) {
+            return [];
+        }
+
+        return [
+            'PGSQL_SHOW_CONTEXT_NEVER' => self::PGSQL_SHOW_CONTEXT_NEVER,
+            'PGSQL_SHOW_CONTEXT_ERRORS' => self::PGSQL_SHOW_CONTEXT_ERRORS,
+            'PGSQL_SHOW_CONTEXT_ALWAYS' => self::PGSQL_SHOW_CONTEXT_ALWAYS,
         ];
     }
 }

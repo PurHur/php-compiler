@@ -157,7 +157,7 @@ class Module extends ModuleAbstract
             new pg_result_status(),
             new pg_get_pid(),
             new pg_set_error_verbosity(),
-            new pg_set_error_context_visibility(),
+            ...self::php83ErrorContextVisibilityFunctions(),
             new pg_put_line(),
             new pg_end_copy(),
             new pg_version(),
@@ -195,6 +195,20 @@ class Module extends ModuleAbstract
             new pg_num_fields(),
             new pg_num_fields('pg_numfields'), // PHP_FALIAS (#22219)
             ...self::php84Functions(),
+        ];
+    }
+
+    /**
+     * @return list<\PHPCompiler\Func\Internal>
+     */
+    private function php83ErrorContextVisibilityFunctions(): array
+    {
+        if (!PgsqlExtensionPolicy::advertisesPhp83ErrorContextVisibility()) {
+            return [];
+        }
+
+        return [
+            new pg_set_error_context_visibility(),
         ];
     }
 

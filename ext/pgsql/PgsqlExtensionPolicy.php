@@ -43,4 +43,33 @@ final class PgsqlExtensionPolicy
                 '>='
             );
     }
+
+    /**
+     * PHP 8.3+ {@code pg_set_error_context_visibility} + {@code PGSQL_SHOW_CONTEXT_*} (#20674 / #22620).
+     *
+     * Withheld on 8.4.0-dev reference / {@code PROFILE=8.2} (Zend 8.2 has neither). Enable via
+     * stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.3} / {@code 8.4}.
+     * php-src: ext/pgsql/pgsql.stub.php (@since 8.3.0).
+     */
+    public static function advertisesPhp83ErrorContextVisibility(): bool
+    {
+        if (!self::advertisesBuiltins()) {
+            return false;
+        }
+
+        if (version_compare(\PHPCompiler\CompilerVersion::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(
+            \PHPCompiler\CompilerVersion::languageProfileVersion(),
+            '8.3.0',
+            '>='
+        );
+    }
 }
