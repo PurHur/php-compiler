@@ -1,0 +1,1 @@
+{"fingerprint":"482efab3605409545108","unit":"/ext/standard/Nl2brJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\nl2brjithelper::nl2brargv":"phpcompiler_ext_standard_nl2brjithelper__nl2brargv"},"init_symbol":"__init__unit_ext_standard_Nl2brJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_Nl2brJitHelper_php","init_via_global_ctor":true,"runtime_safe":true}

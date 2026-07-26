@@ -1,0 +1,1 @@
+{"fingerprint":"5b5fff001a4716c5a868","unit":"/ext/dom/DomLoadJitHelper.php","helpers":{"phpcompiler\\ext\\dom\\domloadjithelper::loadargv":"phpcompiler_ext_dom_domloadjithelper__loadargv"},"init_symbol":"__init__unit_ext_dom_DomLoadJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_dom_DomLoadJitHelper_php","init_via_global_ctor":true,"runtime_safe":true}

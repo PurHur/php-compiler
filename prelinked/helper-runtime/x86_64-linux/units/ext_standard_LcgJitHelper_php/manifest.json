@@ -1,0 +1,1 @@
+{"fingerprint":"c28233c0b42006b86351","unit":"/ext/standard/LcgJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\lcgjithelper::value":"phpcompiler_ext_standard_lcgjithelper__value"},"init_symbol":"__init__unit_ext_standard_LcgJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_LcgJitHelper_php","init_via_global_ctor":true,"runtime_safe":true}
