@@ -34,4 +34,33 @@ final class LdapExtensionPolicy
     {
         return self::advertisesExtension() && VmLdapNative::walletAvailable();
     }
+
+    /**
+     * PHP 8.3+ {@code ldap_exop_sync} / {@code ldap_exop_passwd} (#22731, re-#8688).
+     *
+     * Withheld on 8.4.0-dev reference / {@code PROFILE=8.2} (Zend 8.2 has neither). Enable via
+     * stable 8.4.0+ or explicit {@code PHP_COMPILER_PROFILE=8.3} / {@code 8.4}.
+     * php-src: ext/ldap/ldap.stub.php (absent on 8.2 stubs).
+     */
+    public static function advertisesPhp83ExopHelpers(): bool
+    {
+        if (!self::advertisesBuiltins()) {
+            return false;
+        }
+
+        if (version_compare(\PHPCompiler\CompilerVersion::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(
+            \PHPCompiler\CompilerVersion::languageProfileVersion(),
+            '8.3.0',
+            '>='
+        );
+    }
 }

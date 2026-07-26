@@ -15795,7 +15795,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/LdapExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/ldap/LdapSerializeDeny.php`
 
@@ -15845,28 +15845,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ldap_get_values (line 92)
 - new ldap_get_values_len (line 93)
 - new ldap_exop (line 94)
-- new ldap_exop_sync (line 95)
 - new ldap_parse_exop (line 96)
 - new ldap_exop_whoami (line 97)
 - new ldap_exop_refresh (line 98)
-- new ldap_exop_passwd (line 99)
-- new ldap_mod_add (line 100)
-- new ldap_mod_replace (line 101)
-- new ldap_mod_del (line 102)
-- new ldap_modify (line 103)
-- new ldap_add (line 104)
-- new ldap_delete (line 105)
-- new ldap_modify_batch (line 106)
-- new ldap_mod_batch (line 107)
-- new ldap_add_ext (line 108)
-- new ldap_delete_ext (line 109)
-- new ldap_rename_ext (line 110)
-- new ldap_mod_add_ext (line 111)
-- new ldap_mod_del_ext (line 112)
-- new ldap_mod_replace_ext (line 113)
-- new ldap_rename (line 114)
-- new ldap_connect_wallet (line 118)
-- 3 class method(s)
+- new ldap_mod_add (line 99)
+- new ldap_mod_replace (line 100)
+- new ldap_mod_del (line 101)
+- new ldap_modify (line 102)
+- new ldap_add (line 103)
+- new ldap_delete (line 104)
+- new ldap_modify_batch (line 105)
+- new ldap_mod_batch (line 106)
+- new ldap_add_ext (line 107)
+- new ldap_delete_ext (line 108)
+- new ldap_rename_ext (line 109)
+- new ldap_mod_add_ext (line 110)
+- new ldap_mod_del_ext (line 111)
+- new ldap_mod_replace_ext (line 112)
+- new ldap_rename (line 113)
+- new ldap_connect_wallet (line 117)
+- new ldap_exop_sync (line 133)
+- new ldap_exop_passwd (line 134)
+- 4 class method(s)
 
 ### `ext/ldap/VmLdapArg.php`
 

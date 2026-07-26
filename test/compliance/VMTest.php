@@ -677,7 +677,9 @@ class VMTest extends BaseTest {
             }
             if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
                 && (str_contains($name, 'phantom_ldap')
-                    || (str_contains($name, 'ldap_') && str_contains($name, 'phantom')))) {
+                    || (str_contains($name, 'ldap_') && str_contains($name, 'phantom')
+                        && !str_contains($name, 'phantom_profile')))) {
+                // Keep PROFILE=8.2 / phantom_profile* cases when ldap FFI is present (#22731).
                 continue;
             }
             if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesWalletConnect()

@@ -92,11 +92,10 @@ class Module extends ModuleAbstract
             new ldap_get_values(),
             new ldap_get_values_len(),
             new ldap_exop(),
-            new ldap_exop_sync(),
+            ...self::php83ExopHelperFunctions(),
             new ldap_parse_exop(),
             new ldap_exop_whoami(),
             new ldap_exop_refresh(),
-            new ldap_exop_passwd(),
             new ldap_mod_add(),
             new ldap_mod_replace(),
             new ldap_mod_del(),
@@ -119,5 +118,20 @@ class Module extends ModuleAbstract
         }
 
         return $fns;
+    }
+
+    /**
+     * @return list<\PHPCompiler\Func\Internal>
+     */
+    private function php83ExopHelperFunctions(): array
+    {
+        if (!LdapExtensionPolicy::advertisesPhp83ExopHelpers()) {
+            return [];
+        }
+
+        return [
+            new ldap_exop_sync(),
+            new ldap_exop_passwd(),
+        ];
     }
 }
