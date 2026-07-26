@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** ScopeBuiltinHelper php-in-PHP shrink (#10184). */
+/** ScopeBuiltinHelper php-in-PHP shrink (#10184, NestedJIT→JitVmHelperLink #23261). */
 final class ScopeBuiltinRuntimeShrinkTest extends TestCase
 {
     private const HELPER_BASELINE_LOC = 1218;
@@ -56,7 +56,19 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('compact_invalid_int_', $source);
         $this->assertStringNotContainsString('emitStandaloneCompactInvalidArgumentWarningMessage', $source);
         $loc = substr_count($source, "\n") + 1;
-        $this->assertLessThan(530, $loc, 'ScopeBuiltinRuntime.php LOC');
+        $this->assertLessThan(500, $loc, 'ScopeBuiltinRuntime.php LOC');
+    }
+
+    public function testScopeBuiltinRuntimeHelperCompileViaJitVmHelperLink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ScopeBuiltinRuntime.php');
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
     }
 
     public function testScopeBuiltinJitHelperMatchNamedVariableIndex(): void
@@ -106,7 +118,8 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ScopeBuiltinEmitHelper.php');
         $loc = substr_count($source, "\n") + 1;
-        $this->assertLessThan(550, $loc, 'ScopeBuiltinEmitHelper.php LOC');
+        // Phase-4b baseline was ≤550 (#19043); #22136 compact-after-unset grew to ~574.
+        $this->assertLessThan(580, $loc, 'ScopeBuiltinEmitHelper.php LOC');
         $this->assertStringContainsString('HashTableReadLlvm::forEachStringKeyNode', $source);
         $this->assertStringContainsString('HashTableReadLlvm::forEachIndexedStringAt', $source);
         $this->assertStringContainsString('ScopeBuiltinDefinedLlvm::getDefinedVars', $source);
