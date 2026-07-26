@@ -10,4 +10,4 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-filter_input(): Argument #2 ($variable_name) must be of type string, K given
+filter_input(): Argument #2 ($var_name) must be of type string, K given
