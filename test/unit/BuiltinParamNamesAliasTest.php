@@ -1281,6 +1281,35 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($proc, 'indent', 'xmlwriter_set_indent'));
     }
 
+    /** @covers issue #23409 */
+    public function testNumberFormatterCurrencyStubNamedParamsResolve(): void
+    {
+        $format = BuiltinParamNames::forClassMethod('NumberFormatter::formatCurrency');
+        self::assertSame(['amount', 'currency'], $format);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($format, 'amount', 'NumberFormatter::formatCurrency'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($format, 'currency', 'NumberFormatter::formatCurrency'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($format, 'num', 'NumberFormatter::formatCurrency'));
+
+        $parse = BuiltinParamNames::forClassMethod('NumberFormatter::parseCurrency');
+        self::assertSame(['string', 'currency', 'offset'], $parse);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($parse, 'string', 'NumberFormatter::parseCurrency'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($parse, 'offset', 'NumberFormatter::parseCurrency'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($parse, 'str', 'NumberFormatter::parseCurrency'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($parse, 'position', 'NumberFormatter::parseCurrency'));
+
+        $procFormat = BuiltinParamNames::forFunction('numfmt_format_currency');
+        self::assertSame(['formatter', 'amount', 'currency'], $procFormat);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($procFormat, 'amount', 'numfmt_format_currency'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($procFormat, 'value', 'numfmt_format_currency'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($procFormat, 'fmt', 'numfmt_format_currency'));
+
+        $procParse = BuiltinParamNames::forFunction('numfmt_parse_currency');
+        self::assertSame(['formatter', 'string', 'currency', 'offset'], $procParse);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($procParse, 'string', 'numfmt_parse_currency'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($procParse, 'offset', 'numfmt_parse_currency'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($procParse, 'position', 'numfmt_parse_currency'));
+    }
+
     /** @covers issue #23455 */
     public function testSimpleXmlLoadStubNamedParamsResolve(): void
     {
