@@ -12,10 +12,7 @@ use PHPLLVM\Value;
 
 /**
  * resourcebundle_create() — procedural alias of ResourceBundle::create()
- * (php-src resourcebundle_class.c / resourcebundle.stub.php; #20814).
- *
- * Optional $fallback is accepted for php-src signature parity; v1 open path
- * matches ResourceBundle::create (ures_open / ICU default fallback).
+ * (php-src resourcebundle_class.cpp / resourcebundle.stub.php; #20814, #22854).
  */
 final class resourcebundle_create extends Internal
 {
@@ -35,12 +32,16 @@ final class resourcebundle_create extends Internal
         }
         $locale = VmResourceBundle::coerceLocaleArg($frame->calledArgs[0], 'resourcebundle_create', 0);
         $bundle = VmResourceBundle::coerceBundleArg($frame->calledArgs[1], 'resourcebundle_create', 1);
+        $fallback = true;
+        if ($argc >= 3) {
+            $fallback = LocaleLookup::coerceBool($frame->calledArgs[2], 'resourcebundle_create', 2, 'fallback');
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        $object = VmResourceBundle::create($frame->vmContext, $locale, $bundle);
+        $object = VmResourceBundle::create($frame->vmContext, $locale, $bundle, $fallback);
         if (null === $object) {
-            $frame->returnVar->bool(false);
+            $frame->returnVar->null();
 
             return;
         }

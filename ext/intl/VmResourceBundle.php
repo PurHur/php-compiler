@@ -102,43 +102,76 @@ final class VmResourceBundle
     /**
      * @return ObjectEntry|null
      */
-    public static function create(Context $ctx, ?string $locale, ?string $bundleName): ?ObjectEntry
+    public static function create(Context $ctx, ?string $locale, ?string $bundleName, bool $fallback = true): ?ObjectEntry
     {
         if (!isset($ctx->classes[self::CLASS_LC])) {
             throw new \Error('Class "ResourceBundle" not found');
         }
         $locale = null !== $locale && '' !== $locale ? $locale : VmLocale::getDefault();
-        $handle = self::openBundle($locale, $bundleName);
-        $fallback = null === $handle;
-        if ($fallback && null !== $bundleName && '' !== $bundleName) {
-            // Non-default bundles require real ICU data — fail like Zend on missing package.
+        $opened = self::openBundle($locale, $bundleName, $fallback);
+        $handle = $opened['handle'];
+        $status = $opened['status'];
+
+        // Synthetic Version-only fallback when ICU FFI unavailable (null handle, zero status).
+        if (null === $handle && 0 === $status) {
+            $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+            $object->constructed = true;
+            self::$state[$object->id] = [
+                'locale' => $locale,
+                'bundle' => $bundleName,
+                'handle' => null,
+                'fallback' => true,
+                'errorCode' => IntlError::U_USING_FALLBACK_WARNING,
+                'errorMessage' => 'resourcebundle_create: ICU data unavailable; using Version fallback: U_USING_DEFAULT_WARNING',
+            ];
             IntlError::set(
-                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
-                'resourcebundle_create: cannot locate resource data: U_MISSING_RESOURCE_ERROR'
+                IntlError::U_USING_FALLBACK_WARNING,
+                self::$state[$object->id]['errorMessage']
             );
+
+            return $object;
+        }
+
+        if (null === $handle || $status > 0) {
+            $code = $status > 0 ? $status : IntlError::U_MISSING_RESOURCE_ERROR;
+            $msg = 'Cannot load libICU resource bundle: '.IntlError::errorName($code);
+            IntlError::set($code, $msg);
 
             return null;
         }
+
+        // fallback=false + ICU used default/fallback locale → fail (php-src resourcebundle_ctor).
+        if (!$fallback && (
+            IntlError::U_USING_DEFAULT_WARNING === $status
+            || IntlError::U_USING_FALLBACK_WARNING === $status
+        )) {
+            $actual = self::uresGetLocale($handle) ?? $locale;
+            $bundleLabel = null !== $bundleName && '' !== $bundleName ? $bundleName : '(default data)';
+            $msg = \sprintf(
+                "Cannot load libICU resource '%s' without fallback from %s to %s",
+                $bundleLabel,
+                $locale,
+                $actual
+            );
+            IntlError::set($status, $msg);
+            self::uresClose($handle);
+
+            return null;
+        }
+
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
+        $errorMessage = IntlError::errorName($status);
         self::$state[$object->id] = [
             'locale' => $locale,
             'bundle' => $bundleName,
             'handle' => $handle,
-            'fallback' => $fallback,
-            'errorCode' => IntlError::U_ZERO_ERROR,
-            'errorMessage' => 'U_ZERO_ERROR',
+            'fallback' => false,
+            'errorCode' => $status,
+            'errorMessage' => $errorMessage,
         ];
-        if ($fallback) {
-            IntlError::set(
-                IntlError::U_USING_FALLBACK_WARNING,
-                'resourcebundle_create: ICU data unavailable; using Version fallback: U_USING_DEFAULT_WARNING'
-            );
-            self::$state[$object->id]['errorCode'] = IntlError::U_USING_FALLBACK_WARNING;
-            self::$state[$object->id]['errorMessage'] = IntlError::getMessage();
-        } elseif (IntlError::U_ZERO_ERROR === IntlError::getCode()) {
-            IntlError::clear();
-        }
+        // Propagate ICU warning/success to global intl error (php-src INTL_DATA_ERROR + intl_error_set_code NULL).
+        IntlError::set($status, $errorMessage);
 
         return $object;
     }
@@ -509,14 +542,18 @@ final class VmResourceBundle
         }
     }
 
-    /** @return object|null */
-    private static function openBundle(string $locale, ?string $bundleName): ?object
+    /**
+     * Open ICU resource bundle; capture UErrorCode including warnings (#22854).
+     *
+     * @return array{handle: ?object, status: int}
+     */
+    private static function openBundle(string $locale, ?string $bundleName, bool $fallback = true): array
     {
         $ffi = self::ffi();
         if (null === $ffi) {
-            return null;
+            return ['handle' => null, 'status' => 0];
         }
-        $open = 'ures_open'.self::$symSuffix;
+        $open = ($fallback ? 'ures_open' : 'ures_openDirect').self::$symSuffix;
         try {
             $status = $ffi->new('UErrorCode');
             $status->cdata = 0;
@@ -525,10 +562,33 @@ final class VmResourceBundle
             $rb = $ffi->$open($path, $locale, \FFI::addr($status));
             $code = (int) $status->cdata;
             if (null === $rb || $code > 0) {
+                return ['handle' => null, 'status' => $code > 0 ? $code : IntlError::U_MISSING_RESOURCE_ERROR];
+            }
+
+            return ['handle' => $rb, 'status' => $code];
+        } catch (\Throwable) {
+            return ['handle' => null, 'status' => 0];
+        }
+    }
+
+    /** @param object $handle */
+    private static function uresGetLocale(object $handle): ?string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'ures_getLocaleByType'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            // ULOC_ACTUAL_LOCALE = 0 (unicode/uloc.h)
+            $loc = $ffi->$fn($handle, 0, \FFI::addr($status));
+            if ((int) $status->cdata > 0 || null === $loc) {
                 return null;
             }
 
-            return $rb;
+            return \is_string($loc) ? $loc : \FFI::string($loc);
         } catch (\Throwable) {
             return null;
         }
@@ -867,7 +927,9 @@ typedef unsigned char uint8_t;
 typedef struct UResourceBundle UResourceBundle;
 typedef struct UEnumeration UEnumeration;
 UResourceBundle *ures_open{$suffix}(const char *path, const char *locale, UErrorCode *status);
+UResourceBundle *ures_openDirect{$suffix}(const char *path, const char *locale, UErrorCode *status);
 void ures_close{$suffix}(UResourceBundle *resB);
+const char *ures_getLocaleByType{$suffix}(const UResourceBundle *resB, int32_t type, UErrorCode *status);
 int32_t ures_getSize{$suffix}(const UResourceBundle *resB);
 int32_t ures_getType{$suffix}(const UResourceBundle *resB);
 const char *ures_getKey{$suffix}(const UResourceBundle *resB);
@@ -909,12 +971,16 @@ final class ResourceBundleCreate extends VmClassMethod
         if ($argc >= 2) {
             $bundle = VmResourceBundle::coerceBundleArg($frame->calledArgs[1], 'ResourceBundle::create', 1);
         }
+        $fallback = true;
+        if ($argc >= 3) {
+            $fallback = LocaleLookup::coerceBool($frame->calledArgs[2], 'ResourceBundle::create', 2, 'fallback');
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        $object = VmResourceBundle::create($frame->vmContext, $locale, $bundle);
+        $object = VmResourceBundle::create($frame->vmContext, $locale, $bundle, $fallback);
         if (null === $object) {
-            $frame->returnVar->bool(false);
+            $frame->returnVar->null();
 
             return;
         }
