@@ -31,3 +31,8 @@ PurHur/php-compiler compiles a **subset of PHP** to VM bytecode, LLVM JIT, or na
 - Capability or bootstrap changes: update `script/capability-matrix.php` / `script/bootstrap-inventory.php` checks if applicable.
 - **Self-host M5:** default to fast gates (`make north-star5-verify-fast`, VM driver probe ~20ms); full `north-star5-verify --strict` only before merging bootstrap work — see `.cursor/rules/m5-fast-development.mdc`.
 - Match existing style in the file you edit; avoid drive-by refactors.
+- **Extensions are moving to side-loaded** (not compiled into every binary) — `extensions-sideloaded.mdc`.
+- **Verification burden is on the author** — there is no CI on `lib/`/`ext/`; `correctness-gates.mdc`.
+- **Never make a gate green without making the artifact work** — `artifact-honesty.mdc`.
+
+Release plan and criteria: #23474 (`/root/plans/php-compiler-release/PLAN.md`).

@@ -1,0 +1,78 @@
+---
+description: What actually proves a lowering change is safe — differential sweep, set-difference comparison, flaky quarantine
+globs: lib/**/*,ext/**/*,bin/**/*,patches/**/*
+alwaysApply: false
+---
+
+# Proving a lowering change is safe
+
+There is **no CI on `lib/**` or `ext/**`** (see `local-ci-only.mdc` — GitHub Actions is off by
+choice). The single workflow that exists carries a `paths:` filter that excludes them. So:
+
+> **`gh pr view` reporting `MERGEABLE` / `CLEAN` means "no checks are configured", not "checks
+> passed."** Never cite it as evidence. Say which gate you ran locally.
+
+Because nothing catches you automatically, the burden is on the change author to run the right gate
+and to report honestly what was and was not covered.
+
+## The gate that catches silent wrong output
+
+The compliance suite asserts against **recorded** expectations, so it only catches what someone
+already thought to record. Differential execution asserts against **Zend**, which is what catches
+code that runs to completion and prints the wrong thing:
+
+```bash
+script/differential-sweep.sh              # VM backend
+script/differential-sweep.sh --aot        # AOT backend — slower, but the path with the least coverage
+script/differential-sweep.sh --dir DIR    # your own programs
+```
+
+Exit status is the mismatch count. **Run this for any change to argument handling, call lowering,
+operand/slot resolution, or CFG shape.** It found 24 silent-wrong-output defects that the compliance
+suite did not (#23354), and would have caught the AOT defects #23471/#23472.
+
+New cases must be **deterministic** — no clocks, no randomness, no network, no object ids, no hash
+order. A case that varies between runs makes the sweep useless as a gate.
+
+## Comparing compliance suites: names, never counts
+
+**Neither suite is green on master** (~407 `VMTest`, ~472 `JITTest` pre-existing failures). A raw
+failure count therefore proves nothing. Compare the **set difference of failing case names**,
+branch vs master, restricted to cases that completed on both sides.
+
+Run both sides. "It fails on my branch" is not a finding until you know whether it fails on master.
+
+## Making the suites runnable
+
+Serial `VMTest` is ~4 h and `JITTest` does not finish in 40 min, which is why they do not get run.
+Shard them:
+
+- split the case list N ways (24 is a good default) and run N containers with `--filter`;
+- use `--teamcity` so per-test `testStarted`/`testFailed`/`testFinished` are emitted **as they run** —
+  default output prints failures only at the end, so a stalled shard yields nothing;
+- cap each shard with `timeout`, and compare only cases that completed on both sides.
+
+Two traps that silently produce "everything passed":
+
+- `--filter` takes a PHP regex; an unescaped `/` inside it closes the delimiter early, matches
+  nothing, and prints **"No tests executed!" with exit code 0**. Escape as `\/`.
+- `--list-tests` **ignores** `--filter`, so it cannot be used to verify a shard's selection.
+
+## Flaky tests are quarantined, not tolerated
+
+These flip between runs and corrupt regression comparisons — one appeared on the *fixed* list in one
+comparison and the *regressed* list in the next:
+
+- `stdlib/hrtime*` — `hrtime()` is not monotonic here (#23420)
+- `stdlib/proc_get_status_basic`
+- `language/interface_abstract_static_call`, `types/dnf_return_type_error` — order-dependent
+- `stdlib/password_needs_rehash` — does not terminate under the interpreted VM
+
+**Before reporting any case as a regression, run it individually on both master and your branch,
+several times.** Every "regression" investigated this way so far turned out to fail on master too.
+Entry to this list is a bug to fix, not a place to park things.
+
+## Reporting
+
+State the gate you ran, the comparison basis, and what you did **not** cover. "Differential sweep
+green (43/43 VM); compliance not run" is useful. "Tests pass" is not.
