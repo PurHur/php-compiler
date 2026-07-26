@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for upload temp helpers via UploadTempJitHelper PHP (#5346, #9799, #19723).
+ * JIT/AOT ABI bridges for upload temp helpers via UploadTempJitHelper PHP (#5346, #9799, #19723, #23301).
  *
  * Quarantined from lib/JIT/Builtin/UploadTempJit — {@see \PHPCompiler\JIT\Builtin\UploadTempJit}
  * stays the thin orchestrator. Call-site lowering stays in {@see JitIsUploadedFile}/{@see JitMoveUploadedFile}.
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer EnvLocal #23211 / StatPath #23297).
  *
  * Replaces ~520-line LLVM path validation; SSOT {@see VmFs}.
  * php-src: ext/standard/basic_functions.c — is_uploaded_file, move_uploaded_file
@@ -268,45 +269,19 @@ final class JitUploadTempKernel
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after UploadTempJitHelper compile (#9799/#19723)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23301');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
         self::ensureStringInit($context);
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'UploadTempJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('UploadTempJitHelper.php parseAndCompile failed (#9799/#19723)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9799/#19723)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23301'
+        );
     }
 
     private static function ensureStringInit(Context $context): void
