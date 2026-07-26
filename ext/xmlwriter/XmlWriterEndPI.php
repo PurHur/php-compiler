@@ -8,17 +8,17 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::endPI() — close processing instruction (php-src ext/xmlwriter/php_xmlwriter.c; #19457). */
+/** XMLWriter::endPi() — close processing instruction (php-src ext/xmlwriter/php_xmlwriter.c; #19457). */
 final class XmlWriterEndPI extends XmlWriterClassMethod
 {
     public function __construct()
     {
-        parent::__construct('endPI');
+        parent::__construct('endPi');
     }
 
     public function execute(Frame $frame): void
     {
-        $entry = $this->receiver($frame, 'XMLWriter::endPI()');
+        $entry = $this->receiver($frame, 'XMLWriter::endPi()');
         $ok = VmXmlWriter::endPI($entry);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

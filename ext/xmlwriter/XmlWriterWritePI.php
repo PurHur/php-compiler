@@ -8,25 +8,25 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::writePI() — one-shot processing instruction (php-src ext/xmlwriter/php_xmlwriter.c; #19371). */
+/** XMLWriter::writePi() — one-shot processing instruction (php-src ext/xmlwriter/php_xmlwriter.c; #19371). */
 final class XmlWriterWritePI extends XmlWriterClassMethod
 {
     public function __construct()
     {
-        parent::__construct('writePI');
+        parent::__construct('writePi');
     }
 
     public function execute(Frame $frame): void
     {
-        $entry = $this->receiver($frame, 'XMLWriter::writePI()');
+        $entry = $this->receiver($frame, 'XMLWriter::writePi()');
         $argc = \count($frame->calledArgs);
         if ($argc !== 3) {
             throw new \ArgumentCountError(
-                'XMLWriter::writePI() expects exactly 3 arguments, '.$argc.' given'
+                'XMLWriter::writePi() expects exactly 3 arguments, '.$argc.' given'
             );
         }
-        $target = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writePI()', 0, 'target');
-        $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writePI()', 1, 'content');
+        $target = $this->stringArg($frame->calledArgs[1], 'XMLWriter::writePi()', 0, 'target');
+        $content = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writePi()', 1, 'content');
         $ok = VmXmlWriter::writePI($entry, $target, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

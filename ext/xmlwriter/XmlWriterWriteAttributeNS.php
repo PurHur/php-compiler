@@ -8,27 +8,27 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::writeAttributeNS() — namespaced attribute (php-src ext/xmlwriter/php_xmlwriter.c; #19371). */
+/** XMLWriter::writeAttributeNs() — namespaced attribute (php-src ext/xmlwriter/php_xmlwriter.c; #19371). */
 final class XmlWriterWriteAttributeNS extends XmlWriterClassMethod
 {
     public function __construct()
     {
-        parent::__construct('writeAttributeNS');
+        parent::__construct('writeAttributeNs');
     }
 
     public function execute(Frame $frame): void
     {
-        $entry = $this->receiver($frame, 'XMLWriter::writeAttributeNS()');
+        $entry = $this->receiver($frame, 'XMLWriter::writeAttributeNs()');
         $argc = \count($frame->calledArgs);
         if ($argc !== 5) {
             throw new \ArgumentCountError(
-                'XMLWriter::writeAttributeNS() expects exactly 5 arguments, '.$argc.' given'
+                'XMLWriter::writeAttributeNs() expects exactly 5 arguments, '.$argc.' given'
             );
         }
-        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::writeAttributeNS()', 0, 'prefix');
-        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeAttributeNS()', 1, 'name');
-        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeAttributeNS()', 2, 'uri');
-        $content = $this->stringArg($frame->calledArgs[4], 'XMLWriter::writeAttributeNS()', 3, 'content');
+        $prefix = $this->nullableStringArg($frame->calledArgs[1], 'XMLWriter::writeAttributeNs()', 0, 'prefix');
+        $name = $this->stringArg($frame->calledArgs[2], 'XMLWriter::writeAttributeNs()', 1, 'name');
+        $uri = $this->nullableStringArg($frame->calledArgs[3], 'XMLWriter::writeAttributeNs()', 2, 'uri');
+        $content = $this->stringArg($frame->calledArgs[4], 'XMLWriter::writeAttributeNs()', 3, 'content');
         $ok = VmXmlWriter::writeAttributeNS($entry, $prefix, $name, $uri, $content);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);

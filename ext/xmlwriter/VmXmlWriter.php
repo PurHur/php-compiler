@@ -34,7 +34,8 @@ final class VmXmlWriter
         $entry->methodNames['openmemory'] = 'openMemory';
         $entry->methods['openuri'] = new XmlWriterOpenURI();
         $entry->methodVisibility['openuri'] = $pub;
-        $entry->methodNames['openuri'] = 'openURI';
+        // php-src stub: openUri (not openURI) — ReflectionMethod::getName() (#23367).
+        $entry->methodNames['openuri'] = 'openUri';
         $entry->methods['setindent'] = new XmlWriterSetIndent();
         $entry->methodVisibility['setindent'] = $pub;
         $entry->methodNames['setindent'] = 'setIndent';
@@ -52,13 +53,13 @@ final class VmXmlWriter
         $entry->methodNames['writeattribute'] = 'writeAttribute';
         $entry->methods['writeattributens'] = new XmlWriterWriteAttributeNS();
         $entry->methodVisibility['writeattributens'] = $pub;
-        $entry->methodNames['writeattributens'] = 'writeAttributeNS';
+        $entry->methodNames['writeattributens'] = 'writeAttributeNs';
         $entry->methods['startelementns'] = new XmlWriterStartElementNS();
         $entry->methodVisibility['startelementns'] = $pub;
-        $entry->methodNames['startelementns'] = 'startElementNS';
+        $entry->methodNames['startelementns'] = 'startElementNs';
         $entry->methods['startattributens'] = new XmlWriterStartAttributeNS();
         $entry->methodVisibility['startattributens'] = $pub;
-        $entry->methodNames['startattributens'] = 'startAttributeNS';
+        $entry->methodNames['startattributens'] = 'startAttributeNs';
         $entry->methods['startattribute'] = new XmlWriterStartAttribute();
         $entry->methodVisibility['startattribute'] = $pub;
         $entry->methodNames['startattribute'] = 'startAttribute';
@@ -70,25 +71,25 @@ final class VmXmlWriter
         $entry->methodNames['writeelement'] = 'writeElement';
         $entry->methods['writeelementns'] = new XmlWriterWriteElementNS();
         $entry->methodVisibility['writeelementns'] = $pub;
-        $entry->methodNames['writeelementns'] = 'writeElementNS';
+        $entry->methodNames['writeelementns'] = 'writeElementNs';
         $entry->methods['writecdata'] = new XmlWriterWriteCData();
         $entry->methodVisibility['writecdata'] = $pub;
-        $entry->methodNames['writecdata'] = 'writeCData';
+        $entry->methodNames['writecdata'] = 'writeCdata';
         $entry->methods['startcdata'] = new XmlWriterStartCData();
         $entry->methodVisibility['startcdata'] = $pub;
-        $entry->methodNames['startcdata'] = 'startCData';
+        $entry->methodNames['startcdata'] = 'startCdata';
         $entry->methods['endcdata'] = new XmlWriterEndCData();
         $entry->methodVisibility['endcdata'] = $pub;
-        $entry->methodNames['endcdata'] = 'endCData';
+        $entry->methodNames['endcdata'] = 'endCdata';
         $entry->methods['startpi'] = new XmlWriterStartPI();
         $entry->methodVisibility['startpi'] = $pub;
-        $entry->methodNames['startpi'] = 'startPI';
+        $entry->methodNames['startpi'] = 'startPi';
         $entry->methods['endpi'] = new XmlWriterEndPI();
         $entry->methodVisibility['endpi'] = $pub;
-        $entry->methodNames['endpi'] = 'endPI';
+        $entry->methodNames['endpi'] = 'endPi';
         $entry->methods['writepi'] = new XmlWriterWritePI();
         $entry->methodVisibility['writepi'] = $pub;
-        $entry->methodNames['writepi'] = 'writePI';
+        $entry->methodNames['writepi'] = 'writePi';
         $entry->methods['writeraw'] = new XmlWriterWriteRaw();
         $entry->methodVisibility['writeraw'] = $pub;
         $entry->methodNames['writeraw'] = 'writeRaw';
@@ -384,19 +385,19 @@ final class VmXmlWriter
         ?string $uri,
         string $content
     ): bool {
-        $state = self::requireOpen($entry, 'XMLWriter::writeAttributeNS()');
+        $state = self::requireOpen($entry, 'XMLWriter::writeAttributeNs()');
         if (!$state->startTagOpen || [] === $state->elementStack) {
             return false;
         }
         if (!self::isValidAttributeName($name)) {
             throw new \ValueError(sprintf(
-                'XMLWriter::writeAttributeNS(): Argument #2 ($name) must be a valid attribute name, %s given',
+                'XMLWriter::writeAttributeNs(): Argument #2 ($name) must be a valid attribute name, %s given',
                 var_export($name, true)
             ));
         }
         if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
             throw new \ValueError(sprintf(
-                'XMLWriter::writeAttributeNS(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
+                'XMLWriter::writeAttributeNs(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
                 var_export($prefix, true)
             ));
         }
@@ -421,16 +422,16 @@ final class VmXmlWriter
         string $name,
         ?string $uri
     ): bool {
-        $state = self::requireOpen($entry, 'XMLWriter::startElementNS()');
+        $state = self::requireOpen($entry, 'XMLWriter::startElementNs()');
         if (!self::isValidElementName($name)) {
             throw new \ValueError(sprintf(
-                'XMLWriter::startElementNS(): Argument #2 ($name) must be a valid element name, %s given',
+                'XMLWriter::startElementNs(): Argument #2 ($name) must be a valid element name, %s given',
                 var_export($name, true)
             ));
         }
         if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
             throw new \ValueError(sprintf(
-                'XMLWriter::startElementNS(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
+                'XMLWriter::startElementNs(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
                 var_export($prefix, true)
             ));
         }
@@ -465,19 +466,19 @@ final class VmXmlWriter
         string $name,
         ?string $uri
     ): bool {
-        $state = self::requireOpen($entry, 'XMLWriter::startAttributeNS()');
+        $state = self::requireOpen($entry, 'XMLWriter::startAttributeNs()');
         if (!$state->startTagOpen || [] === $state->elementStack) {
             return false;
         }
         if (!self::isValidAttributeName($name)) {
             throw new \ValueError(sprintf(
-                'XMLWriter::startAttributeNS(): Argument #2 ($name) must be a valid attribute name, %s given',
+                'XMLWriter::startAttributeNs(): Argument #2 ($name) must be a valid attribute name, %s given',
                 var_export($name, true)
             ));
         }
         if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
             throw new \ValueError(sprintf(
-                'XMLWriter::startAttributeNS(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
+                'XMLWriter::startAttributeNs(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
                 var_export($prefix, true)
             ));
         }
@@ -556,16 +557,16 @@ final class VmXmlWriter
         ?string $uri,
         ?string $content = null
     ): bool {
-        $state = self::requireOpen($entry, 'XMLWriter::writeElementNS()');
+        $state = self::requireOpen($entry, 'XMLWriter::writeElementNs()');
         if (!self::isValidElementName($name)) {
             throw new \ValueError(sprintf(
-                'XMLWriter::writeElementNS(): Argument #2 ($name) must be a valid element name, %s given',
+                'XMLWriter::writeElementNs(): Argument #2 ($name) must be a valid element name, %s given',
                 var_export($name, true)
             ));
         }
         if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
             throw new \ValueError(sprintf(
-                'XMLWriter::writeElementNS(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
+                'XMLWriter::writeElementNs(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
                 var_export($prefix, true)
             ));
         }
@@ -600,7 +601,7 @@ final class VmXmlWriter
      */
     public static function writePI(ObjectEntry $entry, string $target, string $content): bool
     {
-        $state = self::requireOpen($entry, 'XMLWriter::writePI()');
+        $state = self::requireOpen($entry, 'XMLWriter::writePi()');
         if ('' === $target) {
             throw new \ValueError(
                 'XMLWriter::writePi(): Argument #2 ($content) must be a valid PI target, "" given'
@@ -644,7 +645,7 @@ final class VmXmlWriter
 
     public static function writeCData(ObjectEntry $entry, string $content): bool
     {
-        $state = self::requireOpen($entry, 'XMLWriter::writeCData()');
+        $state = self::requireOpen($entry, 'XMLWriter::writeCdata()');
         self::closeStartTagIfOpen($state);
         $state->buffer .= '<![CDATA['.$content.']]>';
 
@@ -656,7 +657,7 @@ final class VmXmlWriter
      */
     public static function startCData(ObjectEntry $entry): bool
     {
-        $state = self::requireOpen($entry, 'XMLWriter::startCData()');
+        $state = self::requireOpen($entry, 'XMLWriter::startCdata()');
         if ($state->inCdata) {
             @\trigger_error(
                 'XMLWriter::startCdata(): xmlTextWriterStartCDATA : CDATA not allowed in this context!',
@@ -677,7 +678,7 @@ final class VmXmlWriter
      */
     public static function endCData(ObjectEntry $entry): bool
     {
-        $state = self::requireOpen($entry, 'XMLWriter::endCData()');
+        $state = self::requireOpen($entry, 'XMLWriter::endCdata()');
         if (!$state->inCdata) {
             return false;
         }
@@ -692,7 +693,7 @@ final class VmXmlWriter
      */
     public static function startPI(ObjectEntry $entry, string $target): bool
     {
-        $state = self::requireOpen($entry, 'XMLWriter::startPI()');
+        $state = self::requireOpen($entry, 'XMLWriter::startPi()');
         if (!self::isValidPiTarget($target)) {
             throw new \ValueError(sprintf(
                 'XMLWriter::startPi(): Argument #2 must be a valid PI target, %s given',
@@ -716,7 +717,7 @@ final class VmXmlWriter
      */
     public static function endPI(ObjectEntry $entry): bool
     {
-        $state = self::requireOpen($entry, 'XMLWriter::endPI()');
+        $state = self::requireOpen($entry, 'XMLWriter::endPi()');
         if (!$state->inPi) {
             return true;
         }
