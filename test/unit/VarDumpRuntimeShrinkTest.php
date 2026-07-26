@@ -18,6 +18,7 @@ final class VarDumpRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringVarDumpJit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NESTED_HELPER_SOURCES', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
@@ -31,8 +32,29 @@ final class VarDumpRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VarDumpJitHelper.php');
         $this->assertStringContainsString('VmVarDump::dumpVariable', $source);
+        $this->assertStringContainsString('VmVarDump::tryDumpWithoutVm', $source);
         $this->assertStringContainsString('formatVariableValue', $source);
         $this->assertStringNotContainsString('function dumpValue', $source);
+        // Non-scalar path still resolves sg_vm_context (#17391 / #23540).
+        $this->assertStringContainsString('VmActiveContextJitHelper::resolve', $source);
+    }
+
+    public function testVmVarDumpExposesScalarDumpWithoutVm(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmVarDump.php');
+        $this->assertStringContainsString('tryDumpWithoutVm', $source);
+        $this->assertStringContainsString('tryWriteScalarPayload', $source);
+    }
+
+    public function testStringVarDumpPublishesActiveContextAbi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringVarDump.php');
+        // Embed path still publishes sg_vm_context; thin AOT uses scalar IR bridge (#23540).
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('VmActiveContextLlvm::ensureAbi', $source);
+        $this->assertStringContainsString('NestedVmActiveContextLlvm::ensureMethod', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('implementThinScalarBridge', $source);
     }
 
     public function testVarDumpBuiltinUsesStringVarDumpBridge(): void

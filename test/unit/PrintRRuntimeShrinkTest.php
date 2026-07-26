@@ -18,6 +18,7 @@ final class PrintRRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringPrintRJit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NESTED_HELPER_SOURCES', $source);
         $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('parseAndCompile', $source);
@@ -30,6 +31,16 @@ final class PrintRRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/PrintRJitHelper.php');
         $this->assertStringContainsString('VmPrintR::formatVariable', $source);
+        // Standalone AOT resolves sg_vm_context — Superglobals alone is null (#17391 / #23540).
+        $this->assertStringContainsString('VmActiveContextJitHelper::resolve', $source);
+    }
+
+    public function testStringPrintRPublishesActiveContextAbi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPrintR.php');
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('VmActiveContextLlvm::ensureAbi', $source);
+        $this->assertStringContainsString('NestedVmActiveContextLlvm::ensureMethod', $source);
     }
 
     public function testPrintRBuiltinUsesStringPrintRBridge(): void

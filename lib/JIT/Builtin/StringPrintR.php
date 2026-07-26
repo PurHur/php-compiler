@@ -8,13 +8,17 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240, #16565, #22668).
+ * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240, #16565, #22668, #23540).
  *
  * Embed and standalone AOT compile the same PHP bridge; no print_r LLVM monolith.
- * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer GcToggleRuntime #22644).
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringVarExport #20589).
+ * Thin standalone AOT publishes sg_vm_context before NestedJIT (#17391 / #23540).
  * php-src: ext/standard/var.c — php_print_r_ex
  */
 final class StringPrintR
@@ -48,6 +52,12 @@ final class StringPrintR
         if (NestedJitCompileScope::isActive()) {
             return;
         }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of PrintRJitHelper (#17391 / #23540).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
 
         $probe = $context->module->getNamedFunction('__compiler_print_r');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -107,7 +117,7 @@ final class StringPrintR
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#22668'
+            '#23540'
         );
     }
 

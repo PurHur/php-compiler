@@ -91,8 +91,8 @@ final class VmPrintR
         ?Frame $frame,
         \SplObjectStorage $visited
     ): string {
-        $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
-        $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
+        $openSpaces = 0 === $level ? '' : self::spaces(4 * ($level + 1));
+        $keySpaces = self::spaces(4 * (0 === $level ? 1 : $level + 2));
         $header = $case->enumClass->name.' Enum';
         if (null !== $case->enumClass->backedType) {
             $header .= ':'.$case->enumClass->backedType;
@@ -135,8 +135,8 @@ final class VmPrintR
         }
         $visited->attach($table);
         try {
-            $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
-            $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
+            $openSpaces = 0 === $level ? '' : self::spaces(4 * ($level + 1));
+            $keySpaces = self::spaces(4 * (0 === $level ? 1 : $level + 2));
             $lines = ["Array\n", "{$openSpaces}(\n"];
             foreach ($table->iterateKeyed(true) as [$key, $value]) {
                 $formatted = self::formatNested($vm, $value->resolveIndirect(), $level + 1, $frame, $visited);
@@ -165,8 +165,8 @@ final class VmPrintR
         }
         $visited->attach($object);
         try {
-            $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
-            $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
+            $openSpaces = 0 === $level ? '' : self::spaces(4 * ($level + 1));
+            $keySpaces = self::spaces(4 * (0 === $level ? 1 : $level + 2));
             $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
             $className = VmObjectDebugType::fromClassName($object->class->name);
             $lines = ["{$className} Object\n", "{$openSpaces}(\n"];
@@ -202,5 +202,19 @@ final class VmPrintR
         }
 
         return '['.$key->toString().']';
+    }
+
+    /** NestedJIT-safe spaces without \str_repeat (#23540 / peer PackEngineEncode #22981). */
+    private static function spaces(int $n): string
+    {
+        if ($n <= 0) {
+            return '';
+        }
+        $out = '';
+        while ($n-- > 0) {
+            $out .= ' ';
+        }
+
+        return $out;
     }
 }

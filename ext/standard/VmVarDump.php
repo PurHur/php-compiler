@@ -28,35 +28,14 @@ final class VmVarDump
     ): void {
         TypedPropertyCheck::assertReadable($var);
         if ($level > 1) {
-            self::write(str_repeat(' ', $level - 1));
+            // Avoid \str_repeat — NestedJIT of this SSOT may lack __compiler_str_repeat (#23540 / peer #22981).
+            self::write(self::spaces($level - 1));
         }
         if ($showRefMarker && Variable::TYPE_INDIRECT === $var->type) {
             self::write('&');
             $var = $var->resolveIndirect();
         }
-        if (Variable::TYPE_INTEGER === $var->type) {
-            self::write('int('.$var->toInt().")\n");
-
-            return;
-        }
-        if (Variable::TYPE_FLOAT === $var->type) {
-            self::write('float('.VmFloatDtoa::formatVarDump($var->toFloat()).")\n");
-
-            return;
-        }
-        if (Variable::TYPE_STRING === $var->type) {
-            self::write('string('.\strlen($var->toString()).') "'.$var->toString()."\"\n");
-
-            return;
-        }
-        if (Variable::TYPE_BOOLEAN === $var->type) {
-            self::write('bool('.($var->toBool() ? 'true' : 'false').")\n");
-
-            return;
-        }
-        if (Variable::TYPE_NULL === $var->type) {
-            self::write("NULL\n");
-
+        if (self::tryWriteScalarPayload($var)) {
             return;
         }
         $resourceDump = VmVarFormat::tryFormatVarDump($var);
@@ -85,6 +64,61 @@ final class VmVarDump
         self::write("unknown()\n");
     }
 
+    /**
+     * Scalar/null dump without Runtime->vm (#23540).
+     *
+     * Thin standalone AOT NestedJIT of VarDumpJitHelper segfaults on
+     * `$ctx->runtime->vm` (class-id layout vs consumer). Int/float/bool/null/string
+     * arms never use $vm — dump them before touching Context.
+     *
+     * @return bool true when the value was fully dumped
+     */
+    public static function tryDumpWithoutVm(Variable $var, int $level = 1, bool $showRefMarker = false): bool
+    {
+        TypedPropertyCheck::assertReadable($var);
+        if ($level > 1) {
+            self::write(self::spaces($level - 1));
+        }
+        if ($showRefMarker && Variable::TYPE_INDIRECT === $var->type) {
+            self::write('&');
+            $var = $var->resolveIndirect();
+        }
+
+        return self::tryWriteScalarPayload($var);
+    }
+
+    /** @return bool true when $var is a scalar/null arm that was written */
+    private static function tryWriteScalarPayload(Variable $var): bool
+    {
+        if (Variable::TYPE_INTEGER === $var->type) {
+            self::write('int('.$var->toInt().")\n");
+
+            return true;
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            self::write('float('.VmFloatDtoa::formatVarDump($var->toFloat()).")\n");
+
+            return true;
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            self::write('string('.\strlen($var->toString()).') "'.$var->toString()."\"\n");
+
+            return true;
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            self::write('bool('.($var->toBool() ? 'true' : 'false').")\n");
+
+            return true;
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            self::write("NULL\n");
+
+            return true;
+        }
+
+        return false;
+    }
+
     private static function write(string $chunk): void
     {
         OutputBuffer::append($chunk);
@@ -98,12 +132,12 @@ final class VmVarDump
         }
         self::write('array('.$count.") {\n");
         foreach ($table->iterateKeyed(false) as [$key, $value]) {
-            self::write(str_repeat(' ', $level));
+            self::write(self::spaces($level));
             self::write(self::formatKey($key)."\n");
             self::dumpVariable($vm, $value, $level + 1, true, $frame);
         }
         if ($level > 1) {
-            self::write(str_repeat(' ', $level - 1));
+            self::write(self::spaces($level - 1));
         }
         self::write("}\n");
     }
@@ -120,14 +154,28 @@ final class VmVarDump
         $className = VmObjectDebugType::fromClassName($object->class->name);
         self::write('object('.$className.')#'.$object->id.' ('.$count.") {\n");
         foreach ($props as $name => $value) {
-            self::write(str_repeat(' ', $level));
+            self::write(self::spaces($level));
             self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
             self::dumpVariable($vm, $value, $level + 1, true, $frame);
         }
         if ($level > 1) {
-            self::write(str_repeat(' ', $level - 1));
+            self::write(self::spaces($level - 1));
         }
         self::write("}\n");
+    }
+
+    /** NestedJIT-safe spaces without \str_repeat (#23540 / peer PackEngineEncode #22981). */
+    private static function spaces(int $n): string
+    {
+        if ($n <= 0) {
+            return '';
+        }
+        $out = '';
+        while ($n-- > 0) {
+            $out .= ' ';
+        }
+
+        return $out;
     }
 
     private static function formatKey(Variable $key): string
