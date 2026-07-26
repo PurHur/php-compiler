@@ -6031,6 +6031,7 @@ require_once __DIR__.'/../../../lib/VM/ClassReadonly.php';
 require_once __DIR__.'/../../../lib/VM/ClassSealed.php';
 require_once __DIR__.'/../../../lib/VM/ClassStatic.php';
 require_once __DIR__.'/../../../lib/VM/ClassValidator.php';
+require_once __DIR__.'/../../../lib/VM/CloneMagicCatchRedirect.php';
 require_once __DIR__.'/../../../lib/VM/CloneSupport.php';
 require_once __DIR__.'/../../../lib/VM/CloneWithSupport.php';
 require_once __DIR__.'/../../../lib/VM/ClosureBindJitHelper.php';
