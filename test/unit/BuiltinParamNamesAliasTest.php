@@ -861,6 +861,28 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mult', 'str_repeat'));
     }
 
+    /** @covers issue #23206 */
+    public function testChunkSplitStrSplitZendStubNamedParams(): void
+    {
+        $chunk = BuiltinParamNames::forFunction('chunk_split');
+        self::assertSame(['string', 'length', 'separator'], $chunk);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($chunk, 'string', 'chunk_split'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($chunk, 'length', 'chunk_split'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($chunk, 'separator', 'chunk_split'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $str / $chunklen / $ending)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($chunk, 'str', 'chunk_split'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($chunk, 'chunklen', 'chunk_split'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($chunk, 'ending', 'chunk_split'));
+
+        $split = BuiltinParamNames::forFunction('str_split');
+        self::assertSame(['string', 'length'], $split);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($split, 'string', 'str_split'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($split, 'length', 'str_split'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $str / $split_length)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($split, 'str', 'str_split'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($split, 'split_length', 'str_split'));
+    }
+
     /** @covers issue #23240 */
     public function testChrZendStubNamedParams(): void
     {
