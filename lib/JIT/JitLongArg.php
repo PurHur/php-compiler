@@ -10,7 +10,11 @@ final class JitLongArg {
         }
         if (Variable::TYPE_NATIVE_LONG === $arg->type) return $context->helper->loadValue($arg);
         if (Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
-            return $context->builder->fpToSi($context->helper->loadValue($arg), $context->getTypeFromString('int64'));
+            // zend_dval_to_lval_safe: truncate + E_DEPRECATED on precision loss (#23533).
+            return \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($arg)
+            );
         }
         if (Variable::TYPE_NATIVE_BOOL === $arg->type) return $context->builder->zExt($context->helper->loadValue($arg), $context->getTypeFromString("int64"));
         if (JitValueBox::isValueOperand($arg)) {
@@ -41,7 +45,10 @@ final class JitLongArg {
             return $context->helper->loadValue($arg);
         }
         if (Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
-            return $context->builder->fpToSi($context->helper->loadValue($arg), $context->getTypeFromString('int64'));
+            return \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($arg)
+            );
         }
         if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
             return $context->builder->zExt($context->helper->loadValue($arg), $context->getTypeFromString('int64'));
