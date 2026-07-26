@@ -6,7 +6,10 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** filter_var FILTER_VALIDATE_BOOLEAN JIT routes through FilterBooleanJitHelper PHP (#9858). */
+/**
+ * filter_var FILTER_VALIDATE_BOOLEAN JIT routes through FilterBooleanJitHelper PHP
+ * via JitVmHelperLink::ensureCompiled (#9858 / #23612 / peer #23556).
+ */
 final class FilterBooleanJitRuntimeShrinkTest extends TestCase
 {
     public function testFilterBooleanJitHelperDelegatesToVmFilter(): void
@@ -19,6 +22,13 @@ final class FilterBooleanJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilterBoolean.php');
         $this->assertStringContainsString('FilterBooleanJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('emitLengthCascade', $source);
         $this->assertStringNotContainsString('bytesMatchLiteral', $source);
         $this->assertStringNotContainsString('matchWords', $source);
