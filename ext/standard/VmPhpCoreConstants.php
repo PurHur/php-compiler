@@ -200,7 +200,7 @@ final class VmPhpCoreConstants
                 $entries[$canonical] = $var;
             }
         }
-        foreach (self::forwardProfileCoreIntConstants() as $canonical => $value) {
+        foreach (self::forwardProfileCoreConstants() as $canonical => $value) {
             $var = self::fromPhpValue($value);
             if (null !== $var) {
                 $entries[$canonical] = $var;
@@ -211,23 +211,40 @@ final class VmPhpCoreConstants
     }
 
     /**
-     * @return array<string, int>
+     * Profile-gated Core constants (TENTATIVE_RETURN on ≥8.4, PHP_BUILD_DATE on ≥8.5).
+     *
+     * @return array<string, int|string>
      */
-    private static function forwardProfileCoreIntConstants(): array
+    private static function forwardProfileCoreConstants(): array
     {
-        if (!CompilerVersion::supportsTentativeReturnConstant()) {
-            return [];
+        $out = [];
+        if (CompilerVersion::supportsTentativeReturnConstant()) {
+            $out['TENTATIVE_RETURN'] = self::TENTATIVE_RETURN;
+        }
+        if (CompilerVersion::supportsPhpBuildDateConstant()) {
+            $out['PHP_BUILD_DATE'] = CompilerVersion::phpBuildDateStamp();
         }
 
-        return [
-            'TENTATIVE_RETURN' => self::TENTATIVE_RETURN,
-        ];
+        return $out;
     }
 
-    private static function forwardProfileCoreConstantLoose(string $name): ?int
+    /** @return array<string, int> */
+    private static function forwardProfileCoreIntConstants(): array
+    {
+        $out = [];
+        foreach (self::forwardProfileCoreConstants() as $name => $value) {
+            if (\is_int($value)) {
+                $out[$name] = $value;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function forwardProfileCoreConstantLoose(string $name): int|string|null
     {
         $upper = strtoupper($name);
-        foreach (self::forwardProfileCoreIntConstants() as $canonical => $value) {
+        foreach (self::forwardProfileCoreConstants() as $canonical => $value) {
             if (strtoupper($canonical) === $upper) {
                 return $value;
             }
@@ -236,9 +253,9 @@ final class VmPhpCoreConstants
         return null;
     }
 
-    private static function forwardProfileCoreConstantExact(string $name): ?int
+    private static function forwardProfileCoreConstantExact(string $name): int|string|null
     {
-        return self::forwardProfileCoreIntConstants()[$name] ?? null;
+        return self::forwardProfileCoreConstants()[$name] ?? null;
     }
 
     public static function pathSeparatorValue(): string

@@ -1343,6 +1343,46 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsPhpBuildDateConstantFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPhpBuildDateConstant());
+    }
+
+    public function testSupportsPhpBuildDateConstantFalseWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsPhpBuildDateConstant());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsPhpBuildDateConstantTrueWhenProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhpBuildDateConstant());
+            $stamp = CompilerVersion::phpBuildDateStamp();
+            $this->assertNotFalse(
+                \DateTimeImmutable::createFromFormat('M j Y H:i:s', $stamp),
+                'PHP_BUILD_DATE stamp must parse as M j Y H:i:s'
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsDereferencableNewWithoutOuterParensFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsDereferencableNewWithoutOuterParens());

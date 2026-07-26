@@ -1088,7 +1088,7 @@ final class VmDateTimeNative
         $timeLen = \strlen($time);
         $primary = self::primaryCreateFromFormatFailureMessage($bare, $time);
 
-        if (\strlen($bare) > 1 && \preg_match('/[YymdHisuvGUeTOP]/', $bare)) {
+        if (\strlen($bare) > 1 && \preg_match('/[YymdHisuvGUeTOPM]/', $bare)) {
             $add(0, 'The format separator does not match');
             $add(0, $primary);
             $add($timeLen, 'Not enough data available to satisfy format');
@@ -1358,7 +1358,17 @@ final class VmDateTimeNative
                     $components['month'] = (int) $digits;
 
                     break;
+                case 'M':
+                    // Textual month (Jan–Dec) — php-src __DATE__ / PHP_BUILD_DATE (#23231).
+                    $month = self::readFormatTextualMonth($time, $pos, $timeLen);
+                    if (false === $month) {
+                        return false;
+                    }
+                    $components['month'] = $month;
+
+                    break;
                 case 'n':
+                    self::skipFormatWhitespace($time, $pos, $timeLen);
                     $digits = self::readDigits($time, $pos, 1, 2);
                     if (false === $digits) {
                         return false;
@@ -1375,6 +1385,8 @@ final class VmDateTimeNative
 
                     break;
                 case 'j':
+                    // timelib skips whitespace so space-padded days ("Jan  1") parse (#23231).
+                    self::skipFormatWhitespace($time, $pos, $timeLen);
                     $digits = self::readDigits($time, $pos, 1, 2);
                     if (false === $digits) {
                         return false;
@@ -2430,6 +2442,45 @@ final class VmDateTimeNative
         }
 
         return \substr($time, $start, $len);
+    }
+
+    /** Skip ASCII whitespace before a variable-width numeric createFromFormat token. */
+    private static function skipFormatWhitespace(string $time, int &$pos, int $timeLen): void
+    {
+        while ($pos < $timeLen && \ctype_space($time[$pos])) {
+            ++$pos;
+        }
+    }
+
+    /**
+     * php-src timelib textual month (`M`) — three-letter English abbreviation (#23231).
+     */
+    private static function readFormatTextualMonth(string $time, int &$pos, int $timeLen): int|false
+    {
+        if ($pos + 3 > $timeLen) {
+            return false;
+        }
+        $abbr = \strtolower(\substr($time, $pos, 3));
+        $map = [
+            'jan' => 1,
+            'feb' => 2,
+            'mar' => 3,
+            'apr' => 4,
+            'may' => 5,
+            'jun' => 6,
+            'jul' => 7,
+            'aug' => 8,
+            'sep' => 9,
+            'oct' => 10,
+            'nov' => 11,
+            'dec' => 12,
+        ];
+        if (!isset($map[$abbr])) {
+            return false;
+        }
+        $pos += 3;
+
+        return $map[$abbr];
     }
 
     /**
