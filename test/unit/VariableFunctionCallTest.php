@@ -28,6 +28,30 @@ hi bob
 
 TXT;
 
+    public function testVmForbiddenWhenDynamicScopeBuiltins(): void
+    {
+        $code = <<<'PHP'
+<?php
+function t(): void {
+    $x = 1;
+    $fn = 'compact';
+    try {
+        $fn('x');
+        echo "ALLOWED\n";
+    } catch (\Error $e) {
+        echo $e->getMessage(), "\n";
+    }
+    echo isset(compact('x')['x']) ? "direct OK\n" : "direct FAIL\n";
+}
+t();
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'forbidden_dyn.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("Cannot call compact() dynamically\ndirect OK\n", ob_get_clean());
+    }
+
     public function testVmBuiltinVariableFunctionCall(): void
     {
         $code = <<<'PHP'

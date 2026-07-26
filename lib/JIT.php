@@ -9923,6 +9923,20 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg1);
                     if ($nameOp instanceof Operand\Literal) {
                         $lcname = strtolower($nameOp->value);
+                        if (
+                            $op->funcCallDynamic
+                            && VM\VariableFunctionCall::isForbiddenWhenDynamic($lcname)
+                        ) {
+                            JIT\ErrorBridge::emitError(
+                                $this->context,
+                                VM\VariableFunctionCall::forbiddenWhenDynamicMessage($lcname)
+                            );
+                            $this->context->builder->call($this->context->lookupFunction('abort'));
+                            $this->context->scope->toCall = null;
+                            $this->context->scope->args = [];
+                            $this->context->scope->argOperands = [];
+                            break;
+                        }
                         $this->context->scope->generatorResumeCallee = JIT\GeneratorHelper::creatorResumeName(
                             $this->context,
                             $lcname
@@ -9967,6 +9981,20 @@ class JIT {
                             $this->context->scope->toCall = new JIT\Call\RuntimeVariableFunction($nameVar, $hints);
                         } else {
                             $lcname = strtolower($nameVar->compileTimeString);
+                            if (
+                                $op->funcCallDynamic
+                                && VM\VariableFunctionCall::isForbiddenWhenDynamic($lcname)
+                            ) {
+                                JIT\ErrorBridge::emitError(
+                                    $this->context,
+                                    VM\VariableFunctionCall::forbiddenWhenDynamicMessage($lcname)
+                                );
+                                $this->context->builder->call($this->context->lookupFunction('abort'));
+                                $this->context->scope->toCall = null;
+                                $this->context->scope->args = [];
+                                $this->context->scope->argOperands = [];
+                                break;
+                            }
                             if (!$this->context->functionIsRegistered($lcname)) {
                                 if (str_contains($nameVar->compileTimeString, '::')) {
                                     [$staticClass, $staticMethod] = explode('::', $nameVar->compileTimeString, 2);

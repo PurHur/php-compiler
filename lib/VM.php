@@ -6284,6 +6284,22 @@ restart:
 
                         return self::EXCEPTION;
                     }
+                    // ZEND_ACC_FORBIDDEN_WHEN_DYNAMIC — variable/$fn() calls only (#23591).
+                    if (
+                        $op->funcCallDynamic
+                        && VM\VariableFunctionCall::isForbiddenWhenDynamic($lcname)
+                    ) {
+                        $catchFrame = $this->dispatchVmError(
+                            VM\VariableFunctionCall::forbiddenWhenDynamicMessage($lcname),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
+                    }
                     $this->savePendingOutboundCallForInlineNew($frame);
                     $frame->call = $this->context->functions[$lcname];
                     $frame->callArgs = [];

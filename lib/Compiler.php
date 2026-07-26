@@ -37,6 +37,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VariableFunctionCall;
 use PHPCompiler\VM\ClassReadonly;
 use PHPCompiler\VM\ClassFinal;
 use PHPCompiler\JIT\OperandName;
@@ -53331,7 +53332,21 @@ class Compiler {
             return $folded;
         }
 
-        $callName = $this->tryFoldVariableFunctionName($name, $block) ?? $name;
+        $isDynamicCallee = null !== $cfgCallOp
+            && ($cfgCallOp instanceof Op\Expr\FuncCall || $cfgCallOp instanceof Op\Expr\NsFuncCall)
+            && $this->funcCallExprUsesVariableCallee($cfgCallOp);
+
+        // Do not fold ForbiddenWhenDynamic names — keep the dynamic flag observable (#23591).
+        $foldedName = $this->tryFoldVariableFunctionName($name, $block);
+        if (
+            null !== $foldedName
+            && $isDynamicCallee
+            && null !== ($foldedStr = $this->resolveCompileTimeStringSlot($foldedName, $block))
+            && VariableFunctionCall::isForbiddenWhenDynamic($foldedStr)
+        ) {
+            $foldedName = null;
+        }
+        $callName = $foldedName ?? $name;
         $calleeName = $this->resolveCompileTimeStringSlot($callName, $block)
             ?? ($name !== null ? $this->resolveCompileTimeStringSlot($name, $block) : null);
 
@@ -53342,6 +53357,7 @@ class Compiler {
             $callName,
             $startLine > 0 ? $startLine : null
         );
+        $init->funcCallDynamic = $isDynamicCallee;
         if (null !== $cfgCallOp) {
             $this->assignSourceMetadata($init, $cfgCallOp);
         }
