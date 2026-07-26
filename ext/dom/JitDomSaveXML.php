@@ -20,7 +20,7 @@ final class JitDomSaveXML
         }
 
         if (JitDomSaveXMLUserScript::shouldUse($context)) {
-            $us = JitDomSaveXMLUserScript::tryInvoke($context);
+            $us = JitDomSaveXMLUserScript::tryInvoke($context, ...$args);
             if (null !== $us) {
                 return $us;
             }

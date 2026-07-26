@@ -13,7 +13,7 @@ use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** User-script standalone AOT: compile-time DOMDocument::loadXML() (#18268, #19211). */
+/** User-script standalone AOT: compile-time DOMDocument::loadXML() (#18268, #19211, #23251). */
 final class JitDomLoadXMLUserScript
 {
     private const CLASS_DOCUMENT = 'DOMDocument';
@@ -24,14 +24,23 @@ final class JitDomLoadXMLUserScript
 
     private static ?string $lastCompileTimeXml = null;
 
+    /** True when loadXML used the compile-time user-script path (no DomLoadXMLRuntime tree). */
+    private static bool $lastLoadWasPureUserScript = false;
+
     public static function lastCompileTimeXml(): ?string
     {
         return self::$lastCompileTimeXml;
     }
 
+    public static function lastLoadWasPureUserScript(): bool
+    {
+        return self::$lastLoadWasPureUserScript;
+    }
+
     public static function rememberCompileTimeXml(string $xml): void
     {
         self::$lastCompileTimeXml = $xml;
+        self::$lastLoadWasPureUserScript = false;
     }
 
     public static function shouldUse(Context $context): bool
@@ -65,6 +74,16 @@ final class JitDomLoadXMLUserScript
         }
 
         self::$lastCompileTimeXml = $lit;
+        self::$lastLoadWasPureUserScript = true;
+        // Declare textContent/nodeValue on DOMElement so forWrite hasProperty skips
+        // dynamic-property deprecation (hasProperty does not walk DOMNode; #23251).
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue'] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
+            }
+        }
         foreach (DomParseSimpleXmlIdsJitHelper::parseIndexedElementIds($lit) as $parsed) {
             self::materializeIndexedElement($context, $args[0], $parsed);
         }
@@ -187,12 +206,11 @@ final class JitDomLoadXMLUserScript
 
     private static function ensureDocumentPropertyLayout(Context $context): void
     {
-        $object = $context->type->object;
-        $classId = $object->lookup(self::CLASS_DOCUMENT);
-        if ($object->hasProperty($classId, VmDom::PROP_ELEMENT_ID_MAP)) {
-            return;
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_DOCUMENT);
+        if (!$objectType->hasProperty($classId, VmDom::PROP_ELEMENT_ID_MAP)) {
+            $objectType->defineProperty($classId, VmDom::PROP_ELEMENT_ID_MAP, JITVariable::TYPE_VALUE);
         }
-        $object->defineProperty($classId, VmDom::PROP_ELEMENT_ID_MAP, JITVariable::TYPE_VALUE);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

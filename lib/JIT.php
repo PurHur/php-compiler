@@ -10851,6 +10851,15 @@ class JIT {
                     }
                     assert($obj->type->type === Type::TYPE_OBJECT);
                     $declaringClass = $this->resolvePropertyDeclaringClass($obj, $block, $propName);
+                    // User-script AOT: documentElement temps often lose DOMElement userType (#23251).
+                    if (
+                        null !== $propName
+                        && \PHPCompiler\ext\dom\JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
+                        && \in_array(strtolower($propName), ['textcontent', 'nodevalue'], true)
+                        && \in_array(strtolower($declaringClass), ['object', 'stdclass', ''], true)
+                    ) {
+                        $declaringClass = 'DOMElement';
+                    }
                     $receiver = $this->loadPropertyFetchReceiver($obj);
                     $phiDest = $this->ternaryEchoPhiPropertyFetchDest($block, $i);
                     if (null !== $phiDest) {
@@ -13559,6 +13568,14 @@ class JIT {
                 $this->context->bindVariableByName($resolved, $value);
             }
 
+            return;
+        }
+        // DOMElement::$textContent / $nodeValue — before temp promotion clears receiver (#23251).
+        if (\PHPCompiler\ext\dom\JitDomElementTextContent::tryEmitStore(
+            $this->context,
+            $result,
+            $value
+        )) {
             return;
         }
         if (

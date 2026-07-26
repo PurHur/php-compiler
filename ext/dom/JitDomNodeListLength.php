@@ -25,7 +25,10 @@ final class JitDomNodeListLength
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
     {
         $context = $objectType->jitContext();
+        // Tag-list GLOBAL_COUNT is only valid for pure ID-map / user-script live lists.
+        // After full DomLoadXMLRuntime, childNodes and query lists use DomRegistry slots (#23251).
         if (JitDomDocumentMethodKernel::shouldUse($context)
+            && JitDomLoadXMLUserScript::lastLoadWasPureUserScript()
             && null !== $context->module->getNamedGlobal(DomUserScriptLiveTagListLlvm::GLOBAL_COUNT)
         ) {
             return new JITVariable(

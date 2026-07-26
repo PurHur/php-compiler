@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6563 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21119 |
+| Source constructs flagged (warnings) | 21129 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -370,10 +370,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateElement.php` | 0 | 7 |
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 1 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
-| `ext/dom/JitDomDocumentElement.php` | 0 | 4 |
+| `ext/dom/JitDomDocumentElement.php` | 0 | 10 |
 | `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 3 |
 | `ext/dom/JitDomElementNavigationProperty.php` | 0 | 3 |
-| `ext/dom/JitDomElementTextContent.php` | 0 | 3 |
+| `ext/dom/JitDomElementTextContent.php` | 0 | 7 |
 | `ext/dom/JitDomGetElementById.php` | 0 | 5 |
 | `ext/dom/JitDomGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/JitDomGetElementsByTagNameUserScript.php` | 0 | 2 |
@@ -8117,7 +8117,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomElementTextContentJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `ext/dom/DomExceptionConstants.php`
 
@@ -8817,15 +8817,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 50)
-- new JITVariable (line 77)
-- new JITVariable (line 98)
-- 4 class method(s)
+- new JITVariable (line 88)
+- new JITVariable (line 100)
+- new JITVariable (line 106)
+- new JITVariable (line 152)
+- new JITVariable (line 163)
+- new JITVariable (line 229)
+- new JITVariable (line 235)
+- new JITVariable (line 261)
+- 9 class method(s)
 
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 1393)
-- 77 class method(s)
+- new JIT (line 1425)
+- 79 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/JitDomElementNavigationProperty.php`
@@ -8838,9 +8844,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomElementTextContent.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 37)
-- new JITVariable (line 50)
-- 3 class method(s)
+- new JITVariable (line 72)
+- new JITVariable (line 130)
+- new JITVariable (line 209)
+- new JITVariable (line 228)
+- new JITVariable (line 239)
+- new JITVariable (line 255)
+- 7 class method(s)
 
 ### `ext/dom/JitDomGetElementById.php`
 
@@ -8917,10 +8927,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLoadXMLUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 96)
-- new JITVariable (line 158)
-- new JITVariable (line 175)
-- 11 class method(s)
+- new JITVariable (line 115)
+- new JITVariable (line 177)
+- new JITVariable (line 194)
+- 12 class method(s)
 
 ### `ext/dom/JitDomNodeChildProperty.php`
 
@@ -8946,7 +8956,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomNodeListLength.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 31)
+- new JITVariable (line 34)
 - 2 class method(s)
 
 ### `ext/dom/JitDomNormalize.php`
@@ -8989,7 +8999,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomSaveXMLUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 6 class method(s)
 
 ### `ext/dom/JitDomStandaloneAotInitKernel.php`
 
@@ -42199,68 +42209,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Type (line 10652)
 - new Variable (line 10674)
 - new Type (line 10682)
-- new Variable (line 10869)
-- new Variable (line 10890)
-- new Variable (line 12043)
-- new Variable (line 12068)
-- new Variable (line 12089)
-- new CompileError (line 12836)
-- new CompileError (line 12938)
-- new Variable (line 12995)
-- new Variable (line 13378)
-- new Variable (line 13398)
-- new Variable (line 13419)
-- new Variable (line 13453)
-- new Variable (line 13488)
-- new Variable (line 13582)
-- new Variable (line 13606)
-- new Variable (line 13616)
-- new Variable (line 13790)
-- new Variable (line 13808)
-- new Variable (line 13858)
-- new Variable (line 13885)
-- new Variable (line 13911)
-- new Variable (line 14241)
-- new Variable (line 14609)
-- new Variable (line 14639)
-- new Variable (line 14658)
-- new Variable (line 14688)
-- new Variable (line 14725)
-- new Variable (line 14773)
-- new Variable (line 14816)
-- new VM\Variable (line 15161)
-- new Variable (line 15195)
-- new Variable (line 15246)
-- new Variable (line 15262)
-- new Variable (line 15281)
-- new Variable (line 15288)
-- new OpCode (line 15308)
-- new Variable (line 15309)
-- new Variable (line 15481)
-- new Variable (line 15519)
-- new OpCode (line 15533)
-- new Variable (line 15534)
-- new Variable (line 15593)
-- new OpCode (line 15614)
-- new Variable (line 15615)
-- new Variable (line 15712)
-- new Variable (line 15734)
-- new Variable (line 15802)
-- new Operand\Literal (line 15811)
-- new Variable (line 15826)
-- new Variable (line 16015)
-- new VM\PropertyIsInitializedHandler (line 16107)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16147)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16365)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16470)
-- new JIT\Call\VmCoerceVariableToString (line 16594)
-- new JIT\Call\IncludePathResolverResolve (line 16864)
-- new Variable (line 17922)
-- new VM (line 17966)
-- new VM\Variable (line 17975)
-- new Variable (line 17996)
-- new Variable (line 18042)
-- new Variable (line 18566)
+- new Variable (line 10878)
+- new Variable (line 10899)
+- new Variable (line 12052)
+- new Variable (line 12077)
+- new Variable (line 12098)
+- new CompileError (line 12845)
+- new CompileError (line 12947)
+- new Variable (line 13004)
+- new Variable (line 13387)
+- new Variable (line 13407)
+- new Variable (line 13428)
+- new Variable (line 13462)
+- new Variable (line 13497)
+- new Variable (line 13599)
+- new Variable (line 13623)
+- new Variable (line 13633)
+- new Variable (line 13807)
+- new Variable (line 13825)
+- new Variable (line 13875)
+- new Variable (line 13902)
+- new Variable (line 13928)
+- new Variable (line 14258)
+- new Variable (line 14626)
+- new Variable (line 14656)
+- new Variable (line 14675)
+- new Variable (line 14705)
+- new Variable (line 14742)
+- new Variable (line 14790)
+- new Variable (line 14833)
+- new VM\Variable (line 15178)
+- new Variable (line 15212)
+- new Variable (line 15263)
+- new Variable (line 15279)
+- new Variable (line 15298)
+- new Variable (line 15305)
+- new OpCode (line 15325)
+- new Variable (line 15326)
+- new Variable (line 15498)
+- new Variable (line 15536)
+- new OpCode (line 15550)
+- new Variable (line 15551)
+- new Variable (line 15610)
+- new OpCode (line 15631)
+- new Variable (line 15632)
+- new Variable (line 15729)
+- new Variable (line 15751)
+- new Variable (line 15819)
+- new Operand\Literal (line 15828)
+- new Variable (line 15843)
+- new Variable (line 16032)
+- new VM\PropertyIsInitializedHandler (line 16124)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16164)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16382)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16487)
+- new JIT\Call\VmCoerceVariableToString (line 16611)
+- new JIT\Call\IncludePathResolverResolve (line 16881)
+- new Variable (line 17939)
+- new VM (line 17983)
+- new VM\Variable (line 17992)
+- new Variable (line 18013)
+- new Variable (line 18059)
+- new Variable (line 18583)
 - 372 class method(s)
 - 7 closure(s)
 
@@ -42836,7 +42846,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomElementTextContentRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/DomGetElementByIdRuntime.php`
 

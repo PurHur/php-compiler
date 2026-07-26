@@ -507,6 +507,38 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    public static function ensureElementTextContentWriteBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomElementTextContentRuntime::ABI_WRITE_TEXT_CONTENT,
+            'dom_element_text_content_write_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomElementTextContentJitHelper::writeTextContentArgv',
+            '/ext/dom/DomElementTextContentJitHelper.php'
+        );
+    }
+
+    public static function ensureElementNodeValueWriteBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomElementTextContentRuntime::ABI_WRITE_NODE_VALUE,
+            'dom_element_node_value_write_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomElementTextContentJitHelper::writeNodeValueArgv',
+            '/ext/dom/DomElementTextContentJitHelper.php'
+        );
+    }
+
     public static function ensureIsConnectedBridge(Context $context): void
     {
         self::ensureBridge(

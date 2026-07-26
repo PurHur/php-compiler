@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMDocument::$documentElement in user-script AOT (#18478, #19455). */
+/** LLVM lowering for DOMDocument::$documentElement in user-script AOT (#18478, #19455, #23251). */
 final class JitDomDocumentElement
 {
     private const CLASS_DOCUMENT = 'DOMDocument';
@@ -45,7 +45,7 @@ final class JitDomDocumentElement
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_document_element_us');
         $tag = DomParseSimpleXmlJitHelper::rootTagArgv($xml);
         $element = JitDomCreateElement::materializeElementFromLiteral($context, $tag);
-        self::syncFirstChildFromXml($context, $element, $xml);
+        self::syncChildrenFromXml($context, $element, $xml);
 
         return new JITVariable(
             $context,
@@ -55,35 +55,198 @@ final class JitDomDocumentElement
         );
     }
 
-    /** Seed firstChild/lastChild slots from compile-time XML (#19455). */
-    private static function syncFirstChildFromXml(
+    /**
+     * Seed firstChild/lastChild/parentNode/sibling slots from compile-time XML (#19455, #23251).
+     *
+     * Element children are required so held references survive textContent writes (detach).
+     */
+    private static function syncChildrenFromXml(
         \PHPCompiler\JIT\Context $context,
         Value $element,
         string $xml
     ): void {
-        $node = DomParseSimpleXmlJitHelper::firstChildNodeArgv($xml);
-        if (null === $node || 'comment' !== $node['kind']) {
-            // Comment-only roots for #19455; other kinds keep prior null-slot behavior.
+        $children = self::directElementChildTags($xml);
+        if ([] === $children) {
+            $node = DomParseSimpleXmlJitHelper::firstChildNodeArgv($xml);
+            if (null === $node || 'comment' !== $node['kind']) {
+                return;
+            }
+            $child = JitDomCreateComment::materialize($context, $node['data']);
+            self::linkSingleChild($context, $element, $child);
+            self::storeChildNodesLength($context, $element, 1);
+
             return;
         }
-        $child = JitDomCreateComment::materialize($context, $node['data']);
+
+        $objectType = $context->type->object;
+        $prev = null;
+        $first = null;
+        $last = null;
+        foreach ($children as $childTag) {
+            $child = JitDomCreateElement::materializeElementFromLiteral($context, $childTag);
+            self::ensureLinkProps($context);
+            $parentJit = new JITVariable(
+                $context,
+                JITVariable::TYPE_OBJECT,
+                JITVariable::KIND_VALUE,
+                $element
+            );
+            $objectType->propertyStore(
+                $objectType->propertySlotFor($child, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+                $parentJit,
+                JITVariable::TYPE_VALUE
+            );
+            if (null !== $prev) {
+                $childJit = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_OBJECT,
+                    JITVariable::KIND_VALUE,
+                    $child
+                );
+                $prevJit = new JITVariable(
+                    $context,
+                    JITVariable::TYPE_OBJECT,
+                    JITVariable::KIND_VALUE,
+                    $prev
+                );
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($prev, 'DOMNode', VmDom::PROP_NEXT_SIBLING),
+                    $childJit,
+                    JITVariable::TYPE_VALUE
+                );
+                $objectType->propertyStore(
+                    $objectType->propertySlotFor($child, 'DOMNode', VmDom::PROP_PREVIOUS_SIBLING),
+                    $prevJit,
+                    JITVariable::TYPE_VALUE
+                );
+            }
+            if (null === $first) {
+                $first = $child;
+            }
+            $last = $child;
+            $prev = $child;
+        }
+        if (null !== $first && null !== $last) {
+            self::storeFirstLast($context, $element, $first, $last);
+        }
+        self::storeChildNodesLength($context, $element, \count($children));
+    }
+
+    /** Attach a DOMNodeList with the given length for user-script childNodes (#23251). */
+    public static function storeChildNodesLength(
+        \PHPCompiler\JIT\Context $context,
+        Value $element,
+        int $length
+    ): void {
         $objectType = $context->type->object;
         $nodeClassId = $objectType->lookup('DOMNode');
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+        $listClassId = $objectType->lookup('DOMNodeList');
+        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, JITVariable::TYPE_OBJECT);
+        }
+        if (!$objectType->hasProperty($listClassId, 'length')) {
+            $objectType->defineProperty($listClassId, 'length', JITVariable::TYPE_NATIVE_LONG);
+        }
+        $list = $objectType->allocate($listClassId);
+        $objectType->markObjectConstructed($list);
+        $lengthVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($length, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($list, 'DOMNodeList', 'length'),
+            $lengthVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
+        $listJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $list
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $listJit,
+            JITVariable::TYPE_OBJECT
+        );
+    }
+
+    /** @return list<string> */
+    private static function directElementChildTags(string $xml): array
+    {
+        if (!preg_match('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?>/', $xml, $root, PREG_OFFSET_CAPTURE)) {
+            return [];
+        }
+        $afterRoot = (int) $root[0][1] + \strlen($root[0][0]);
+        $close = stripos($xml, '</'.$root[1][0].'>', $afterRoot);
+        $inner = false === $close
+            ? substr($xml, $afterRoot)
+            : substr($xml, $afterRoot, $close - $afterRoot);
+        $tags = [];
+        if (!preg_match_all('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?\/?>/', $inner, $matches)) {
+            return [];
+        }
+        foreach ($matches[1] as $tag) {
+            $tags[] = strtolower($tag);
+        }
+
+        return $tags;
+    }
+
+    private static function ensureLinkProps(\PHPCompiler\JIT\Context $context): void
+    {
+        $objectType = $context->type->object;
+        $nodeClassId = $objectType->lookup('DOMNode');
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD, VmDom::PROP_NEXT_SIBLING, VmDom::PROP_PREVIOUS_SIBLING] as $prop) {
             if (!$objectType->hasProperty($nodeClassId, $prop)) {
                 $objectType->defineProperty($nodeClassId, $prop, JITVariable::TYPE_VALUE);
             }
         }
-        $childJit = new JITVariable(
+        if (!$objectType->hasProperty($elementClassId, VmDom::PROP_PARENT_NODE)) {
+            $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
+        }
+    }
+
+    private static function linkSingleChild(
+        \PHPCompiler\JIT\Context $context,
+        Value $element,
+        Value $child
+    ): void {
+        self::ensureLinkProps($context);
+        self::storeFirstLast($context, $element, $child, $child);
+    }
+
+    private static function storeFirstLast(
+        \PHPCompiler\JIT\Context $context,
+        Value $element,
+        Value $first,
+        Value $last
+    ): void {
+        $objectType = $context->type->object;
+        $firstJit = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
             JITVariable::KIND_VALUE,
-            $child
+            $first
         );
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+        $lastJit = new JITVariable(
+            $context,
+            JITVariable::TYPE_OBJECT,
+            JITVariable::KIND_VALUE,
+            $last
+        );
+        foreach (
+            [
+                [VmDom::PROP_FIRST_CHILD, $firstJit],
+                [VmDom::PROP_LAST_CHILD, $lastJit],
+            ] as [$prop, $jit]
+        ) {
             $objectType->propertyStore(
                 $objectType->propertySlotFor($element, 'DOMNode', $prop),
-                $childJit,
+                $jit,
                 JITVariable::TYPE_VALUE
             );
         }
