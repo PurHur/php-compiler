@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\MethodVisibility;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -176,11 +179,46 @@ final class ArrayColumnJitHelper
 
                 return EnumCaseSupport::getProperty($object, $propName);
             }
-            if (!$object->hasProperty($propName)) {
+
+            // php-src php_array_column: silent public property read — no __get (#23511).
+            return self::readPublicObjectColumnProperty($object, $propName);
+        }
+
+        return null;
+    }
+
+    /**
+     * Zend array_column object path: only public declared/dynamic properties; never __get.
+     *
+     * @see https://github.com/php/php-src/blob/master/ext/standard/array.c php_array_column
+     */
+    private static function readPublicObjectColumnProperty(ObjectEntry $object, string $propName): ?Variable
+    {
+        $meta = self::findDeclaredInstanceProperty($object, $propName);
+        if (null !== $meta) {
+            if (!MethodVisibility::isPublic($meta->visibility)) {
+                return null;
+            }
+            if (!$object->hasPropertyForMeta($meta)) {
                 return null;
             }
 
-            return $object->getProperty($propName)->resolveIndirect();
+            return $object->getPropertyForMeta($meta)->resolveIndirect();
+        }
+        // Undeclared dynamic properties are public; missing slots must not invoke __get.
+        if (!$object->hasProperty($propName)) {
+            return null;
+        }
+
+        return $object->getProperty($propName)->resolveIndirect();
+    }
+
+    private static function findDeclaredInstanceProperty(ObjectEntry $object, string $propName): ?ClassProperty
+    {
+        foreach ($object->class->properties as $prop) {
+            if ($prop->name === $propName) {
+                return $prop;
+            }
         }
 
         return null;
