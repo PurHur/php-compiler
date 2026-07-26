@@ -457,7 +457,13 @@ class Parser
         } finally {
             array_pop($this->ctx->gotoLoopSwitchStack);
         }
+        // Mark for-loop increment exprs — Zend does not tick them as statements (#23486).
+        $incrStart = \count($this->block->children);
         $this->parseExprList($node->loop, self::MODE_READ);
+        for ($i = $incrStart, $c = \count($this->block->children); $i < $c; ++$i) {
+            $forLoopIncrement = true;
+            $this->block->children[$i]->setAttribute('for_loop_increment', $forLoopIncrement);
+        }
         $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
         $loopInit->addParent($this->block);
         $this->block = $loopEnd;

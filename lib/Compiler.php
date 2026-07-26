@@ -2035,39 +2035,9 @@ class Compiler {
 
     protected function compileBlock(Block $block) {
         $this->compileOps($block->orig->children, $block);
-        if ($block->tickScopeOpened) {
-            $this->insertTickScopeLeaveBeforeBlockExit($block);
-        }
-    }
-
-    private function insertTickScopeLeaveBeforeBlockExit(Block $block): void
-    {
-        $n = $block->nOpCodes;
-        for ($i = $n - 1; $i >= 0; --$i) {
-            $op = $block->opCodes[$i];
-            if (
-                OpCode::TYPE_JUMP === $op->type
-                || OpCode::TYPE_RETURN === $op->type
-                || OpCode::TYPE_RETURN_VOID === $op->type
-            ) {
-                array_splice($block->opCodes, $i, 0, [new OpCode(OpCode::TYPE_TICK_SCOPE_LEAVE)]);
-                ++$block->nOpCodes;
-                $this->restoreActiveTickIntervalAfterImplicitLeave();
-
-                return;
-            }
-        }
-        $block->addOpCode(new OpCode(OpCode::TYPE_TICK_SCOPE_LEAVE));
-        $this->restoreActiveTickIntervalAfterImplicitLeave();
-    }
-
-    private function restoreActiveTickIntervalAfterImplicitLeave(): void
-    {
-        if ([] !== $this->activeTickIntervalStack) {
-            $this->activeTickInterval = array_pop($this->activeTickIntervalStack);
-        } else {
-            $this->activeTickInterval = 0;
-        }
+        // Do not auto-LEAVE at CFG block edges: file-level declare(ticks=N) and braced
+        // bodies that span loops/jumps must keep the interval across successor blocks.
+        // Braced scopes emit LeaveTickInterval explicitly from php-cfg (#22840, #23486).
     }
 
     private function emitTicksBeforeStatementIfNeeded(Op $op, Block $block, array $ops, int $index): void
@@ -2076,6 +2046,10 @@ class Compiler {
             return;
         }
         if ($op instanceof Op\Terminal\SetTickInterval || $op instanceof Op\Terminal\LeaveTickInterval) {
+            return;
+        }
+        // for ($i=0; $i<n; $i++) increment exprs are not Zend statement boundaries (#23486).
+        if ($op->hasAttribute('for_loop_increment') && $op->getAttribute('for_loop_increment')) {
             return;
         }
         if (
@@ -2092,7 +2066,17 @@ class Compiler {
             return;
         }
         // php-cfg lowers `$x += 1` to BinaryOp + Assign — only the Assign is tickable (#22840).
-        if ($op instanceof Op\Expr\BinaryOp || $op instanceof Op\Expr\ConcatList) {
+        if ($op instanceof Op\Expr\BinaryOp) {
+            return;
+        }
+        // echo "a$b" → ConcatList + Echo. Zend ticks at the statement start (before
+        // interpolation). Tick before ConcatList; skip the following Echo (#23486).
+        if ($op instanceof Op\Expr\ConcatList) {
+            $next = $ops[$index + 1] ?? null;
+            if ($next instanceof Op\Terminal && 'Terminal_Echo' === $next->getType()) {
+                $block->addOpCode(new OpCode(OpCode::TYPE_TICKS));
+            }
+
             return;
         }
         if ($op instanceof Op\Expr\Closure) {
@@ -2103,6 +2087,9 @@ class Compiler {
         if ($op instanceof Op\Terminal && 'Terminal_Echo' === $op->getType()) {
             $prev = $ops[$index - 1] ?? null;
             if ($prev instanceof Op\Terminal && 'Terminal_Echo' === $prev->getType()) {
+                return;
+            }
+            if ($prev instanceof Op\Expr\ConcatList) {
                 return;
             }
         }
@@ -38837,9 +38824,10 @@ class Compiler {
         }
         $interval = max(0, $terminal->interval);
         $scoped = !empty($terminal->scoped);
-        // Braced declare(ticks=N){…} always pushes so LeaveTickInterval can restore (#22840).
-        if ($scoped || !$block->tickScopeOpened) {
-            $block->tickScopeOpened = true;
+        // Braced declare(ticks=N){…} pushes so LeaveTickInterval can restore (#22840).
+        // File-level declare uses SET and must persist across CFG jumps (#23486) — never
+        // mark tickScopeOpened / auto-LEAVE at block edges (that killed for-loop ticks).
+        if ($scoped) {
             $this->activeTickIntervalStack[] = $this->activeTickInterval;
             $this->activeTickInterval = $interval;
 

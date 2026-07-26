@@ -4970,6 +4970,52 @@ print("Applied php-cfg-declare-ticks.patch (overlay)")
 PY
 }
 
+# Mark for-loop increment exprs so declare(ticks) skips them (Zend cadence, #23486).
+apply_php_cfg_for_loop_increment_ticks_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if [[ ! -f "$parser" ]]; then
+    return 0
+  fi
+  if grep -q "for_loop_increment" "$parser" 2>/dev/null; then
+    echo "Skip php-cfg-for-loop-increment-ticks.patch (already applied)"
+    return 0
+  fi
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+old = """        $this->parseExprList($node->loop, self::MODE_READ);
+        $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
+        $loopInit->addParent($this->block);
+        $this->block = $loopEnd;
+    }
+
+    protected function parseStmt_Foreach(Stmt\\Foreach_ $node)"""
+new = """        // Mark for-loop increment exprs — Zend does not tick them as statements (#23486).
+        $incrStart = \\count($this->block->children);
+        $this->parseExprList($node->loop, self::MODE_READ);
+        for ($i = $incrStart, $c = \\count($this->block->children); $i < $c; ++$i) {
+            $forLoopIncrement = true;
+            $this->block->children[$i]->setAttribute('for_loop_increment', $forLoopIncrement);
+        }
+        $this->block->children[] = new Jump($loopInit, $this->mapAttributes($node));
+        $loopInit->addParent($this->block);
+        $this->block = $loopEnd;
+    }
+
+    protected function parseStmt_Foreach(Stmt\\Foreach_ $node)"""
+old = old.replace("\\\\", "\\")
+new = new.replace("\\\\", "\\")
+if old not in text:
+    sys.stderr.write("php-cfg-for-loop-increment-ticks: parseStmt_For anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(text.replace(old, new, 1))
+print("Applied php-cfg-for-loop-increment-ticks.patch (overlay)")
+PY
+}
+
 apply_php_cfg_magic_constants_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php"
   local overlay="$PATCH_DIR/overlays/php-cfg/MagicStringResolver.php"
@@ -5987,6 +6033,7 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-declare-ticks.patch" ]]; then
     apply_php_cfg_declare_ticks_overlay
+    apply_php_cfg_for_loop_increment_ticks_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-enum.patch" ]]; then
