@@ -826,4 +826,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'input', 'str_repeat'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mult', 'str_repeat'));
     }
+
+    /** @covers issue #23240 */
+    public function testChrZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('chr');
+        self::assertSame(['codepoint'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'codepoint', 'chr'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $ascii)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ascii', 'chr'));
+    }
 }

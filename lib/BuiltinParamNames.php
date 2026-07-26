@@ -563,6 +563,9 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says input/mult (#23204)
             case 'str_repeat':
                 return ['string', 'times'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says ascii (#23240)
+            case 'chr':
+                return ['codepoint'];
             case 'file_exists':
             case 'filesize':
             case 'filemtime':
