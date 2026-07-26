@@ -75,4 +75,46 @@ final class SoapExtensionPolicyTest extends TestCase
             }
         }
     }
+
+    public function testSoapClientHttpurlPropertyOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $entry = $ctx->classes['soapclient'] ?? null;
+            self::assertNotNull($entry);
+            $names = \array_map(static fn ($p) => $p->name, $entry->properties);
+            self::assertContains('httpurl', $names);
+
+            $object = new \PHPCompiler\VM\ObjectEntry($entry);
+            \PHPCompiler\ext\soap\VmSoapClient::initObject(
+                $object,
+                null,
+                ['location' => 'http://127.0.0.1/', 'uri' => 'http://test/'],
+                $ctx
+            );
+            self::assertTrue($object->hasProperty('httpurl'));
+            self::assertSame(
+                \PHPCompiler\VM\Variable::TYPE_NULL,
+                $object->getProperty('httpurl')->type
+            );
+
+            // Simulate successful HTTP attach (php-src php_http.c).
+            $ref = new \ReflectionClass(\PHPCompiler\ext\soap\VmSoapClient::class);
+            $m = $ref->getMethod('attachHttpUrl');
+            $m->setAccessible(true);
+            $m->invoke(null, $object, 'http://127.0.0.1/soap');
+            $urlVar = $object->getProperty('httpurl');
+            self::assertSame(\PHPCompiler\VM\Variable::TYPE_OBJECT, $urlVar->type);
+            self::assertSame('Soap\\Url', $urlVar->toObject()->class->name);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
