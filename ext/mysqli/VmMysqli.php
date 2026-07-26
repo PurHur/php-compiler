@@ -100,6 +100,7 @@ final class VmMysqli
             'thread_id' => new MysqliThreadId(),
             'kill' => new MysqliKill(),
             'stmt_init' => new MysqliStmtInit(),
+            'dump_debug_info' => new MysqliDumpDebugInfo(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -907,6 +908,36 @@ final class VmMysqli
         return $stats;
     }
 
+    /**
+     * mysqli_dump_debug_info() — php-src ext/mysqli/mysqli.c (#22223).
+     *
+     * Host bridge; returns false when the native driver cannot dump.
+     */
+    public static function dumpDebugInfoOnLink(ObjectEntry $entry, Context $ctx): bool
+    {
+        $native = self::requireNative($entry, $ctx);
+        if (!\method_exists($native, 'dump_debug_info')) {
+            return false;
+        }
+
+        return (bool) $native->dump_debug_info();
+    }
+
+    /**
+     * mysqli_debug() — php-src ext/mysqli/mysqli.c (#22223).
+     *
+     * Connectionless; Zend returns true after applying mysqlnd debug options.
+     */
+    public static function debugOptions(string $options): bool
+    {
+        if (MysqliExtensionPolicy::hasNativeDriver() && \function_exists('\\mysqli_debug')) {
+            return (bool) \mysqli_debug($options);
+        }
+
+        // No host mysqlnd debug hook — still succeed like a no-op config apply.
+        return true;
+    }
+
     /** @return int|string */
     public static function insertIdOnLink(ObjectEntry $entry, Context $ctx)
     {
@@ -1631,6 +1662,24 @@ final class MysqliStmtInit extends MysqliClassMethod
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->object($result);
+        }
+    }
+}
+
+/** mysqli::dump_debug_info() — php-src ext/mysqli/mysqli.stub.php (#22223). */
+final class MysqliDumpDebugInfo extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('dump_debug_info');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::dump_debug_info()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::dump_debug_info() requires VM context');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmMysqli::dumpDebugInfoOnLink($receiver, $ctx));
         }
     }
 }
