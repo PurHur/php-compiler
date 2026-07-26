@@ -25409,7 +25409,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/IniJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 44 class method(s)
+- 46 class method(s)
 
 ### `ext/standard/IniOptionArg.php`
 
@@ -31194,14 +31194,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 935)
-- new HashTable (line 966)
-- new HashTable (line 973)
-- new Variable (line 984)
-- new Variable (line 1088)
-- new Variable (line 1096)
-- new Variable (line 1104)
-- 67 class method(s)
+- new HashTable (line 1019)
+- new HashTable (line 1050)
+- new HashTable (line 1057)
+- new Variable (line 1068)
+- new Variable (line 1177)
+- new Variable (line 1185)
+- new Variable (line 1193)
+- 69 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -41061,7 +41061,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 832)
+- new ArgumentCountError (line 835)
 - 16 class method(s)
 - 1 closure(s)
 
@@ -41974,7 +41974,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 257 class method(s)
+- 258 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

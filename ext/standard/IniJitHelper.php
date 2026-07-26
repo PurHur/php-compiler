@@ -118,6 +118,8 @@ final class IniJitHelper
 
     private const CFG_MEMORY_LIMIT = '-1';
 
+    private const CFG_MAX_MEMORY_LIMIT = '-1';
+
     private const CFG_PRECISION = '14';
 
     private const CFG_SERIALIZE_PRECISION = '-1';
@@ -146,6 +148,8 @@ final class IniJitHelper
     private static ?string $displayErrorsLocalValue = null;
 
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
+
+    private static string $maxMemoryLimit = self::CFG_MAX_MEMORY_LIMIT;
 
     private static int $precision = 14;
 
@@ -180,6 +184,18 @@ final class IniJitHelper
     public static function syncRegisterArgcArgv(bool $enabled): void
     {
         self::$registerArgcArgv = $enabled;
+    }
+
+    /** Keep NestedJIT/AOT aligned with VmIni max_memory_limit (#23232). */
+    public static function syncMaxMemoryLimit(string $value): void
+    {
+        self::$maxMemoryLimit = $value;
+    }
+
+    /** Keep NestedJIT/AOT aligned with VmIni memory_limit string (#23232). */
+    public static function syncMemoryLimitString(string $value): void
+    {
+        self::$memoryLimit = $value;
     }
 
     /** Keep NestedJIT/AOT aligned with VmIni runtime value (#21999). */
@@ -280,6 +296,9 @@ final class IniJitHelper
     public static function iniGet(string $option): ?string
     {
         $key = strtolower($option);
+        if ('max_memory_limit' === $key) {
+            return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::$maxMemoryLimit : null;
+        }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
             return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
         }
@@ -371,6 +390,9 @@ final class IniJitHelper
     public static function iniSet(string $option, string $newValue): ?string
     {
         $key = strtolower($option);
+        if ('max_memory_limit' === $key) {
+            return null;
+        }
         if (self::rejectSessionIniAfterHeadersSent($key)) {
             return null;
         }
@@ -455,6 +477,9 @@ final class IniJitHelper
     public static function iniCfgGet(string $option): ?string
     {
         $key = strtolower($option);
+        if ('max_memory_limit' === $key) {
+            return \PHPCompiler\CompilerVersion::supportsMaxMemoryLimit() ? self::CFG_MAX_MEMORY_LIMIT : null;
+        }
         if (in_array($key, self::CFG_EMPTY_STRING_KEYS, true)) {
             return '';
         }
@@ -559,7 +584,8 @@ final class IniJitHelper
                 ErrorSilenceJitHelper::setDisplayErrors(self::$displayErrors);
                 break;
             case 'memory_limit':
-                self::$memoryLimit = self::CFG_MEMORY_LIMIT;
+                self::$memoryLimit = VmIni::clampMemoryLimitToMax(self::CFG_MEMORY_LIMIT, null, true);
+                VmIni::syncMemoryLimitFromJit(self::$memoryLimit);
                 break;
             case 'precision':
                 self::$precision = VmIni::parsePrecision(self::CFG_PRECISION);
@@ -645,7 +671,9 @@ final class IniJitHelper
     private static function setMemoryLimit(string $newValue): string
     {
         $old = self::$memoryLimit;
-        self::$memoryLimit = $newValue;
+        $effective = VmIni::clampMemoryLimitToMax($newValue, null, true);
+        self::$memoryLimit = $effective;
+        VmIni::syncMemoryLimitFromJit($effective);
 
         return $old;
     }
