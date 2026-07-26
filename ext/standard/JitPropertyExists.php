@@ -223,9 +223,9 @@ final class JitPropertyExists
             $context->builder->structGep($obj, $objMap['class_id'])
         );
         if (null !== $propLiteral) {
-            $propLc = strtolower($propLiteral);
-            if ('name' === $propLc || 'value' === $propLc) {
-                $enumExists = self::existsForEnumCasePropertyLiteral($context, $classId, $propLc);
+            // Enum pseudo-props name/value are case-sensitive (#23532).
+            if ('name' === $propLiteral || 'value' === $propLiteral) {
+                $enumExists = self::existsForEnumCasePropertyLiteral($context, $classId, $propLiteral);
                 $regularExists = self::existsForClassIdLiteralProperty($context, $classId, $propLiteral);
 
                 return $context->builder->or($enumExists, $regularExists);

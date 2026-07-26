@@ -11791,11 +11791,12 @@ restart:
 
     private function linkStaticTypedPropertySlot(Variable $storage, ClassEntry $entry, string $propDisplayName): void
     {
+        // Always keep declared casing for property_exists() exact match (#23532).
+        $storage->objectPropertyName = $propDisplayName;
         if (!$storage->hasDeclaredTypeConstraint()) {
             return;
         }
         $storage->staticPropertyClassLc = strtolower($entry->name);
-        $storage->objectPropertyName = $propDisplayName;
     }
 
     private function linkStaticPropertyHooks(ClassEntry $entry): void
@@ -17104,6 +17105,17 @@ restart:
             $clone->copyUninitializedStaticPropertySlot($resolved);
         } else {
             $clone->copyFrom($resolved);
+        }
+        // Preserve declared casing for property_exists() (#23532).
+        if (null !== $source->objectPropertyName) {
+            $clone->objectPropertyName = $source->objectPropertyName;
+        } elseif (null !== $resolved->objectPropertyName) {
+            $clone->objectPropertyName = $resolved->objectPropertyName;
+        }
+        if (null !== $source->staticPropertyClassLc) {
+            $clone->staticPropertyClassLc = $source->staticPropertyClassLc;
+        } elseif (null !== $resolved->staticPropertyClassLc) {
+            $clone->staticPropertyClassLc = $resolved->staticPropertyClassLc;
         }
 
         return $clone;

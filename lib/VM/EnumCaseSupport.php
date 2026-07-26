@@ -146,17 +146,18 @@ final class EnumCaseSupport
 
     /**
      * property_exists() on enum case objects (#5612, ext/standard/basic_functions.c zif_property_exists).
+     *
+     * Pseudo-properties `name` / `value` are case-sensitive like ordinary properties (#23532).
      */
     public static function propertyExistsOnCase(ClassEntry $enum, string $property): bool
     {
         if (!$enum->isEnum) {
             return false;
         }
-        $lc = strtolower($property);
-        if ('name' === $lc) {
+        if ('name' === $property) {
             return true;
         }
-        if ('value' === $lc) {
+        if ('value' === $property) {
             return null !== $enum->backedType;
         }
 

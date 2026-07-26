@@ -953,11 +953,13 @@ final class VmReflection
     }
 
     /**
-     * property_exists() scope check — php-src ext/standard/class.c + zend_get_property_info(silent=1).
+     * property_exists() scope check — php-src zend_builtin_functions.c zif_property_exists.
+     *
+     * Property names are case-sensitive (unlike methods). Match declared casing exactly (#23532).
      */
     public static function propertyExistsOnClass(ClassEntry $class, string $property, Context $ctx): bool
     {
-        $meta = self::findClassProperty($class, $property, $ctx);
+        $meta = self::findClassPropertyExact($class, $property, $ctx);
         if (null !== $meta) {
             // C-level reflection storage is not a PHP property (#22513, #22514).
             if ($meta->phpInvisible) {
@@ -974,11 +976,54 @@ final class VmReflection
         $current = $class;
         while (true) {
             if (isset($current->staticProperties[$lc])) {
+                $storage = $current->staticProperties[$lc];
+                $declared = $storage->objectPropertyName ?? $lc;
+                if ($declared !== $property) {
+                    return false;
+                }
                 $visibility = $current->staticPropertyVisibility[$lc] ?? CfgFunc::FLAG_PUBLIC;
                 $declaringLc = $current->staticPropertyDeclaringClassLc[$lc]
                     ?? strtolower(ltrim($current->name, '\\'));
 
                 return self::propertyVisibleFromScope($ctx, $class, $visibility, $declaringLc);
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return false;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
+    /**
+     * Instance property metadata with exact name match (zend_hash_find on property table, #23532).
+     */
+    public static function findClassPropertyExact(ClassEntry $class, string $property, Context $ctx): ?ClassProperty
+    {
+        $current = $class;
+        while (true) {
+            foreach ($current->properties as $prop) {
+                if ($prop->name === $property) {
+                    return $prop;
+                }
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return null;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
+    /** True when a static property is declared under this exact casing (#23532). */
+    private static function staticPropertyDeclaredExact(ClassEntry $class, string $property, Context $ctx): bool
+    {
+        $lc = strtolower($property);
+        $current = $class;
+        while (true) {
+            if (isset($current->staticProperties[$lc])) {
+                $storage = $current->staticProperties[$lc];
+                $declared = $storage->objectPropertyName ?? $lc;
+
+                return $declared === $property;
             }
             if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
                 return false;
@@ -1276,6 +1321,12 @@ final class VmReflection
             }
             if (self::propertyExistsOnClass($object->class, $property, $ctx)) {
                 return true;
+            }
+            // Declared instance/static property (exact name) that failed scope visibility is
+            // not a dynamic — do not revive via instance slot (#4361, #23532).
+            if (null !== self::findClassPropertyExact($object->class, $property, $ctx)
+                || self::staticPropertyDeclaredExact($object->class, $property, $ctx)) {
+                return false;
             }
             // php-src zend_property_exists: dynamic instance properties (stdClass, etc.)
             // Declared phpInvisible slots still allocate storage — do not treat as dynamics (#22513).

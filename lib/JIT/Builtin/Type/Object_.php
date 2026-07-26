@@ -2634,6 +2634,8 @@ class Object_ extends Type {
 
     /**
      * property_exists() from a scope class — respects inheritance visibility (#4361).
+     *
+     * Property names are case-sensitive (zend_builtin_functions.c / #23532).
      */
     public function propertyExistsFromScope(int $scopeClassId, string $property): bool
     {
@@ -2641,7 +2643,7 @@ class Object_ extends Type {
         $currentId = $scopeClassId;
         for ($depth = 0; $depth < 64; ++$depth) {
             foreach ($this->properties[$currentId] ?? [] as $propset) {
-                if (strtolower($propset[1]) !== $lc) {
+                if ($propset[1] !== $property) {
                     continue;
                 }
                 $declId = $this->instancePropertyDeclaringClassId[$currentId][$lc] ?? $currentId;
@@ -2653,6 +2655,11 @@ class Object_ extends Type {
                 );
             }
             if (isset($this->staticPropertyGlobals[$currentId][$lc])) {
+                $entry = $this->staticPropertyGlobals[$currentId][$lc];
+                $declared = $entry['displayName'] ?? $lc;
+                if ($declared !== $property) {
+                    return false;
+                }
                 $meta = $this->staticPropertyVisibilityMeta($currentId, $property);
                 if (null === $meta) {
                     return false;
@@ -4719,7 +4726,7 @@ class Object_ extends Type {
             }
             $this->defineStaticProperty(
                 $classId,
-                $name,
+                $entry['displayName'] ?? $name,
                 $entry['type'],
                 $entry['default'] ?? null,
                 null,
@@ -4829,7 +4836,7 @@ class Object_ extends Type {
             if (!isset($this->staticPropertyGlobals[$childId][$name])) {
                 $this->defineStaticProperty(
                     $childId,
-                    $name,
+                    $entry['displayName'] ?? $name,
                     $entry['type'],
                     $entry['default'] ?? null,
                     null,
@@ -5208,6 +5215,8 @@ class Object_ extends Type {
             'default' => $default,
             'typedWithoutDefault' => $typedWithoutDefault,
             'initGlobal' => null,
+            // Declared casing for property_exists() exact match (#23532).
+            'displayName' => $name,
         ];
         if ($typedWithoutDefault) {
             $initGlobalName = 'sp_init_'.$classId.'_'.$key;
