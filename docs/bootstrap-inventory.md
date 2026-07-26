@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6570 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21231 |
+| Source constructs flagged (warnings) | 21229 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -400,7 +400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomSaveHTMLUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomSaveXML.php` | 0 | 1 |
 | `ext/dom/JitDomSaveXMLUserScript.php` | 0 | 1 |
-| `ext/dom/JitDomStandaloneAotInitKernel.php` | 0 | 3 |
+| `ext/dom/JitDomStandaloneAotInitKernel.php` | 0 | 1 |
 | `ext/dom/JitDomXPathEvaluate.php` | 0 | 1 |
 | `ext/dom/JitDomXPathEvaluateUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomXPathQuery.php` | 0 | 1 |
@@ -9007,9 +9007,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomStandaloneAotInitKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 101)
 - 4 class method(s)
-- 1 closure(s)
 
 ### `ext/dom/JitDomXPathEvaluate.php`
 
@@ -12961,58 +12959,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 89)
-- new NormalizerNormalize (line 100)
-- new NormalizerIsNormalized (line 101)
-- new NormalizerGetRawDecomposition (line 102)
-- new ClassEntry (line 118)
-- new LocaleGetDefault (line 121)
-- new LocaleSetDefault (line 122)
-- new LocaleGetPrimaryLanguage (line 123)
-- new LocaleGetRegion (line 124)
-- new LocaleGetScript (line 125)
-- new LocaleGetDisplayName (line 126)
-- new LocaleGetDisplayLanguage (line 127)
-- new LocaleGetDisplayRegion (line 128)
-- new LocaleGetDisplayScript (line 129)
-- new LocaleGetDisplayVariant (line 130)
-- new LocaleGetAllVariants (line 131)
-- new LocaleLookup (line 132)
-- new LocaleFilterMatches (line 133)
-- new LocaleAcceptFromHttp (line 134)
-- new LocaleCanonicalize (line 135)
-- new LocaleParseLocale (line 136)
-- new LocaleComposeLocale (line 137)
-- new LocaleGetKeywords (line 138)
-- new LocaleIsRightToLeft (line 141)
-- new LocaleAddLikelySubtags (line 142)
-- new LocaleMinimizeSubtags (line 143)
-- new LocaleGetDisplayKeyword (line 146)
-- new LocaleGetDisplayKeywordValue (line 147)
-- new ClassEntry (line 163)
-- new IntlDateFormatterConstruct (line 175)
-- new IntlDateFormatterCreate (line 180)
-- new IntlDateFormatterFormat (line 183)
-- new IntlDateFormatterFormatObject (line 186)
-- new IntlDateFormatterGetPattern (line 189)
-- new IntlDateFormatterSetPattern (line 192)
-- new IntlDateFormatterGetLocale (line 195)
-- new IntlDateFormatterGetDateType (line 198)
-- new IntlDateFormatterGetTimeType (line 201)
-- new IntlDateFormatterIsLenient (line 204)
-- new IntlDateFormatterSetLenient (line 207)
-- new IntlDateFormatterGetCalendar (line 210)
-- new IntlDateFormatterSetCalendar (line 213)
-- new IntlDateFormatterGetTimeZoneId (line 216)
-- new IntlDateFormatterGetCalendarObject (line 219)
-- new IntlDateFormatterParse (line 222)
-- new IntlDateFormatterParseToCalendar (line 225)
-- new IntlDateFormatterLocaltime (line 228)
-- new IntlDateFormatterGetTimeZone (line 231)
-- new IntlDateFormatterSetTimeZone (line 234)
-- new IntlDateFormatterGetErrorCode (line 237)
-- new IntlDateFormatterGetErrorMessage (line 240)
-- new ClassEntry (line 340)
+- new ClassEntry (line 90)
+- new NormalizerNormalize (line 101)
+- new NormalizerIsNormalized (line 102)
+- new NormalizerGetRawDecomposition (line 103)
+- new ClassEntry (line 119)
+- new LocaleGetDefault (line 122)
+- new LocaleSetDefault (line 123)
+- new LocaleGetPrimaryLanguage (line 124)
+- new LocaleGetRegion (line 125)
+- new LocaleGetScript (line 126)
+- new LocaleGetDisplayName (line 127)
+- new LocaleGetDisplayLanguage (line 128)
+- new LocaleGetDisplayRegion (line 129)
+- new LocaleGetDisplayScript (line 130)
+- new LocaleGetDisplayVariant (line 131)
+- new LocaleGetAllVariants (line 132)
+- new LocaleLookup (line 133)
+- new LocaleFilterMatches (line 134)
+- new LocaleAcceptFromHttp (line 135)
+- new LocaleCanonicalize (line 136)
+- new LocaleParseLocale (line 137)
+- new LocaleComposeLocale (line 138)
+- new LocaleGetKeywords (line 139)
+- new LocaleIsRightToLeft (line 142)
+- new LocaleAddLikelySubtags (line 143)
+- new LocaleMinimizeSubtags (line 144)
+- new LocaleGetDisplayKeyword (line 147)
+- new LocaleGetDisplayKeywordValue (line 148)
+- new ClassEntry (line 164)
+- new IntlDateFormatterConstruct (line 176)
+- new IntlDateFormatterCreate (line 181)
+- new IntlDateFormatterFormat (line 184)
+- new IntlDateFormatterFormatObject (line 187)
+- new IntlDateFormatterGetPattern (line 190)
+- new IntlDateFormatterSetPattern (line 193)
+- new IntlDateFormatterGetLocale (line 196)
+- new IntlDateFormatterGetDateType (line 199)
+- new IntlDateFormatterGetTimeType (line 202)
+- new IntlDateFormatterIsLenient (line 205)
+- new IntlDateFormatterSetLenient (line 208)
+- new IntlDateFormatterGetCalendar (line 211)
+- new IntlDateFormatterSetCalendar (line 214)
+- new IntlDateFormatterGetTimeZoneId (line 217)
+- new IntlDateFormatterGetCalendarObject (line 220)
+- new IntlDateFormatterParse (line 223)
+- new IntlDateFormatterParseToCalendar (line 228)
+- new IntlDateFormatterLocaltime (line 232)
+- new IntlDateFormatterGetTimeZone (line 235)
+- new IntlDateFormatterSetTimeZone (line 238)
+- new IntlDateFormatterGetErrorCode (line 241)
+- new IntlDateFormatterGetErrorMessage (line 244)
+- new ClassEntry (line 344)
 - 18 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -42160,7 +42158,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 261 class method(s)
+- 262 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

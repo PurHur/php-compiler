@@ -2238,6 +2238,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ IntlDateFormatter::parseToCalendar()
+     * (ext/intl/dateformat/dateformat.stub.php; #20729, #22621).
+     *
+     * Same profile gate as {@see supportsIntlCalendarSetDate()} / PATTERN const.
+     */
+    public static function supportsIntlDateFormatterParseToCalendar(): bool
+    {
+        return self::supportsIntlCalendarSetDate();
+    }
+
+    /**
      * PHP 8.4+ Spoofchecker::setAllowedChars() + USET pattern-option consts
      * (ext/intl/spoofchecker/spoofchecker.stub.php; #20823, #23157).
      *
