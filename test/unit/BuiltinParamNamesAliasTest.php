@@ -803,6 +803,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'now', 'strtotime'));
     }
 
+    /** @covers issue #23276 */
+    public function testDateCreateZendStubNamedParams(): void
+    {
+        foreach (['date_create', 'date_create_immutable'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['datetime', 'timezone'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timezone', $fn));
+        }
+    }
+
     /** @covers issue #23183 */
     public function testSubstrReplaceZendStubNamedParams(): void
     {

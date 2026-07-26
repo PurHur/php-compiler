@@ -78,6 +78,10 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says time/now (#23216)
             case 'strtotime':
                 return ['datetime', 'baseTimestamp'];
+            // php-src ext/date/php_date.stub.php — Reflection had empty params (#23276)
+            case 'date_create':
+            case 'date_create_immutable':
+                return ['datetime', 'timezone'];
             case 'array_all':
             case 'array_any':
             case 'array_all_key':
