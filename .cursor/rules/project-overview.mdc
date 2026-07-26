@@ -35,4 +35,4 @@ PurHur/php-compiler compiles a **subset of PHP** to VM bytecode, LLVM JIT, or na
 - **Verification burden is on the author** — there is no CI on `lib/`/`ext/`; `correctness-gates.mdc`.
 - **Never make a gate green without making the artifact work** — `artifact-honesty.mdc`.
 
-Release plan and criteria: #23474 (`/root/plans/php-compiler-release/PLAN.md`).
+Release plan and criteria: #23474 (`docs/roadmap/RELEASE-PLAN.md`).

@@ -7,7 +7,7 @@ alwaysApply: false
 # LLVM version migration (9 → 22)
 
 Target is **LLVM 22.1.x**, installable on jammy from `apt.llvm.org/jammy llvm-toolchain-jammy-22`.
-Full plan: `/root/plans/php-compiler-release/LLVM22-MIGRATION.md`.
+Full plan: `docs/roadmap/LLVM22-MIGRATION.md`.
 
 ## The one fact that shapes everything
 
