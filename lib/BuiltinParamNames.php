@@ -279,6 +279,15 @@ final class BuiltinParamNames
                 // php-src ext/standard/basic_functions.stub.php / filestat.c (#23454)
                 // Override InternalArgInfo dirname → Zend directory
                 return ['directory', 'context'];
+            // php-src file.stub.php / dir.stub.php / basic_functions.stub.php (#23461)
+            case 'unlink':
+                return ['filename', 'context'];
+            case 'chdir':
+                return ['directory'];
+            case 'umask':
+                return ['mask'];
+            case 'fnmatch':
+                return ['pattern', 'filename', 'flags'];
             case 'sem_get':
                 // php-src ext/sysvsem/sysvsem.stub.php (#19515)
                 return ['key', 'max_acquire', 'permissions', 'auto_release'];
