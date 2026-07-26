@@ -23,7 +23,8 @@ final class ReflectionConstantGetValue extends VmClassMethod
         $ctx = VmReflection::requireContext($frame);
         $constant = ReflectionSupport::constantNameFromReflection($receiver);
         if (ReflectionSupport::isGlobalReflectionConstant($receiver)) {
-            $value = VmConstants::constantLookup($ctx, $constant);
+            // Match ctor: globals only — never Class::CONST via constant() (#23604).
+            $value = VmConstants::globalConstantLookup($ctx, $constant);
             if (null === $value) {
                 ReflectionSupport::throwReflectionException(
                     ReflectionSupport::globalConstantNotFoundMessage($constant)
