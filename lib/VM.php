@@ -3642,7 +3642,8 @@ class VM {
     {
         $copy = new Variable();
         $copy->copyFrom($value);
-        $key = $key->resolveIndirect();
+        // Zend iterator_to_array / hashtable writes reject array|object|enum keys (#23573).
+        $key = HashTable::normalizeIndexKey($key->resolveIndirect());
         if (Variable::TYPE_INTEGER === $key->type) {
             $out->updateIndex($key->toInt(), $copy);
 
