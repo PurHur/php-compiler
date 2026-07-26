@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6563 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21129 |
+| Source constructs flagged (warnings) | 21127 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5430,7 +5430,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/WeakRefRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/WeakRefSetup.php` | 0 | 1 |
 | `lib/JIT/Builtin/ZendDoubleStringRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ZlibRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ZlibRuntime.php` | 0 | 1 |
 | `lib/JIT/Call.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureBind.php` | 0 | 1 |
 | `lib/JIT/Call/ClosureBindTo.php` | 0 | 1 |
@@ -41106,7 +41106,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 838)
+- new ArgumentCountError (line 841)
 - 16 class method(s)
 - 1 closure(s)
 
@@ -45841,9 +45841,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ZlibRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 244)
 - 7 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Call.php`
 
