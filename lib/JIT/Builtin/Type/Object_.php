@@ -2719,6 +2719,7 @@ class Object_ extends Type {
      * Instance properties visible to foreach from $scopeClassLc (null = global / external).
      *
      * Matches get_object_vars() / zend_check_property_access (#23430).
+     * Skips DateTime* / DateTimeZone compiler __dt_* storage (not on Zend property table) (#23432).
      *
      * @return list<array{0: int, 1: string, 2: int, 3: int}>
      */
@@ -2738,6 +2739,10 @@ class Object_ extends Type {
         $visible = [];
         foreach ($props as $propset) {
             $name = $propset[1];
+            // php-src ext/date — date state is C, not iterable PHP props (#23432).
+            if (\PHPCompiler\VM\DateTimeSupport::isInternalStorageProperty($name)) {
+                continue;
+            }
             $meta = $this->instancePropertyVisibilityMeta($classId, $name);
             if (null === $meta) {
                 $visible[] = $propset;
