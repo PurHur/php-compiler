@@ -37,14 +37,7 @@ final class BuiltinClasses
 
         self::patchMysqliSqlExceptionSqlState($ctx);
 
-        if (!isset($ctx->classes['mysqli_warning'])) {
-            $entry = new ClassEntry('mysqli_warning');
-            if (isset($ctx->classes['exception'])) {
-                $entry->parentLc = 'exception';
-            }
-            $entry->isInternal = true;
-            $ctx->classes['mysqli_warning'] = $entry;
-        }
+        VmMysqliWarning::register($ctx);
 
         if (!isset($ctx->classes['mysqli_driver'])) {
             $entry = new ClassEntry('mysqli_driver');
