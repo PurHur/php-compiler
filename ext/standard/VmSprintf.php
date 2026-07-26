@@ -391,7 +391,8 @@ final class VmSprintf
             case Variable::TYPE_INTEGER:
                 return self::intToDecimal($var->toInt());
             case Variable::TYPE_FLOAT:
-                return VmNumberFormat::format($var->toFloat(), 6, '.', '');
+                // php-src formatted_print.c — %s on float uses zval string conversion, not %f (#23545).
+                return VmZendDoubleString::format($var->toFloat());
             case Variable::TYPE_BOOLEAN:
                 return $var->toBool() ? '1' : '';
             case Variable::TYPE_NULL:

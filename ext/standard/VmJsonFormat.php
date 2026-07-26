@@ -271,6 +271,10 @@ final class VmJsonFormat
         }
 
         $text = VmFloatDtoa::formatH($num);
+        // php_json_encode_double emits lowercase exponent (1.0e+20) (#23545).
+        if (str_contains($text, 'E')) {
+            $text = str_replace('E', 'e', $text);
+        }
         if ($preserveZero && $isWhole && !self::hasDecimalOrExponent($text)) {
             $text .= '.0';
         }

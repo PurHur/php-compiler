@@ -27,6 +27,13 @@ final class VmFloatDtoaTest extends TestCase
         $this->assertSame('42', VmFloatDtoa::formatVarDump(42.0));
     }
 
+    /** zend_gcvt scientific form keeps ".0" (#23545). */
+    public function testLargeScientificKeepsFractionalDigit(): void
+    {
+        $this->assertSame('1.0E+20', VmFloatDtoa::formatVarDump(1e20));
+        $this->assertSame('1.0E+20', VmFloatDtoa::formatH(1e20));
+    }
+
     /** php-src main/snprintf.c php_fcvt parity (#10796, #10415). */
     public function testSprintfFixedRoundingMatchesZend(): void
     {

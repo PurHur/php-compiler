@@ -242,18 +242,30 @@ final class VmFloatDtoa
 
         if (\strlen($mant) > 1) {
             $body = $mant[0].'.'.\substr($mant, 1);
-            $body = self::trimTrailingZeros($body);
-            if (\str_ends_with($body, '.')) {
-                $body = \rtrim($body, '.');
-            }
+            // zend_gcvt E-form keeps at least one fractional digit (1.0E+20, not 1E+20) (#23545).
+            $body = self::trimScientificMantissa($body);
         } else {
-            $body = $mant;
+            $body = $mant.'.0';
         }
 
         $expSign = $exp >= 0 ? '+' : '-';
         $expAbs = \abs($exp);
 
         return $body.'E'.$expSign.$expAbs;
+    }
+
+    /** Trim trailing zeros but keep ".0" when the fraction vanishes (#23545). */
+    private static function trimScientificMantissa(string $digits): string
+    {
+        if (!\str_contains($digits, '.')) {
+            return $digits.'.0';
+        }
+        $digits = \rtrim($digits, '0');
+        if (\str_ends_with($digits, '.')) {
+            return $digits.'0';
+        }
+
+        return $digits;
     }
 
     private static function roundUpDigits(string $digits): string
