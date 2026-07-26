@@ -81,6 +81,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/mysqli_async_api.php';
         require_once __DIR__.'/mysqli_info.php';
         require_once __DIR__.'/mysqli_stat.php';
+        require_once __DIR__.'/mysqli_conn_lifecycle_api.php';
         parent::init($runtime);
         if (!MysqliExtensionPolicy::advertisesExtension()) {
             return;
@@ -196,6 +197,12 @@ class Module extends ModuleAbstract
             new mysqli_reap_async_query(),
             new mysqli_info(),
             new mysqli_stat(),
+            new mysqli_ping(),
+            new mysqli_select_db(),
+            new mysqli_change_user(),
+            new mysqli_thread_id(),
+            new mysqli_kill(),
+            new mysqli_get_client_stats(),
         ];
     }
 }
