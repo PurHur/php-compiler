@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
@@ -26,7 +27,15 @@ final class ObjectStaticPropertyLlvm
     {
         $entry = $object->staticPropertyGlobalEntry($classId, $name);
         if (null === $entry) {
-            throw new \LogicException("Undefined static property: {$name}");
+            $context = $object->jitContext();
+            $classLabel = $object->classNameForId($classId);
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise(
+                $context,
+                'Access to undeclared static property '.$classLabel.'::$'.$name
+            );
+
+            return;
         }
         $context = $object->jitContext();
         $global = $entry['global'];
@@ -93,7 +102,20 @@ final class ObjectStaticPropertyLlvm
     {
         $entry = $object->staticPropertyGlobalEntry($classId, $name);
         if (null === $entry) {
-            throw new \LogicException("Undefined static property: {$name}");
+            $context = $object->jitContext();
+            $classLabel = $object->classNameForId($classId);
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise(
+                $context,
+                'Access to undeclared static property '.$classLabel.'::$'.$name
+            );
+            // Unreachable after pending Error; keep a typed null for IR validity.
+            return new Variable(
+                $context,
+                Variable::TYPE_NULL,
+                Variable::KIND_VALUE,
+                $context->getTypeFromString('int8')->constInt(0, false)
+            );
         }
         $context = $object->jitContext();
         if (!empty($entry['typedWithoutDefault']) && null !== ($entry['initGlobal'] ?? null)) {
@@ -186,10 +208,7 @@ final class ObjectStaticPropertyLlvm
             $context->builder->positionAtEnd($fail);
             $classLabel = $object->classNameForId($classId);
             ErrorRaise::ensureLinked($context);
-            ErrorRaise::emitRaise(
-                $context,
-                'Access to undeclared static property '.$classLabel.'::$'
-            );
+            self::emitUndeclaredStaticPropertyRaise($context, $classLabel, $runtimeName);
             $context->builder->returnVoid();
             $context->builder->positionAtEnd($ok);
 
@@ -233,10 +252,7 @@ final class ObjectStaticPropertyLlvm
         $context->builder->positionAtEnd($fallback);
         $classLabel = $object->classNameForId($classId);
         ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise(
-            $context,
-            'Access to undeclared static property '.$classLabel.'::$'
-        );
+        self::emitUndeclaredStaticPropertyRaise($context, $classLabel, $runtimeName);
         $context->builder->returnVoid();
         $context->builder->positionAtEnd($done);
         $context->builder->branch($exit);
@@ -302,12 +318,59 @@ final class ObjectStaticPropertyLlvm
         $context->builder->positionAtEnd($fallback);
         $classLabel = $object->classNameForId($classId);
         ErrorRaise::ensureLinked($context);
-        ErrorRaise::emitRaise(
-            $context,
-            'Access to undeclared static property '.$classLabel.'::$'
-        );
+        self::emitUndeclaredStaticPropertyRaise($context, $classLabel, $runtimeName);
         $context->builder->returnVoid();
         $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * Build `Access to undeclared static property Class::$name` with a runtime name (#23606).
+     */
+    private static function emitUndeclaredStaticPropertyRaise(
+        Context $context,
+        string $classLabel,
+        Value $runtimeNameStr
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'snprintf',
+            $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
+        );
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'strlen',
+            $context->context->functionType($sizeT, false, $i8p)
+        );
+        $buf = $context->builder->alloca($i8->arrayType(512), 1, 'undecl_static_prop_msg');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $nameMap = $context->structFieldMap['__string__'];
+        $nameData = $context->builder->pointerCast(
+            $context->builder->structGep($runtimeNameStr, $nameMap['value']),
+            $i8p
+        );
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufPtr,
+            $context->constantFromInteger(512, 'size_t'),
+            $context->builder->pointerCast(
+                $context->constantFromString('Access to undeclared static property '.$classLabel.'::$%s'),
+                $i8p
+            ),
+            $nameData
+        );
+        $len = $context->builder->call(
+            $context->lookupFunction('strlen'),
+            $bufPtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_error'),
+            $bufPtr,
+            $len
+        );
     }
 
     public static function store(

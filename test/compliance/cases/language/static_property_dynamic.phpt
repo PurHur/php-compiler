@@ -1,5 +1,5 @@
 --TEST--
-Dynamic static property name — $$ / ${} and VarLikeIdentifier fallback (#3814)
+Dynamic static property name — $$ / ${} only (Zend; #3814/#23606)
 --FILE--
 <?php
 class C {
@@ -11,7 +11,11 @@ $p = 'x';
 C::${$p} = 7;
 echo C::$$p, "\n";
 $prop = 'x';
-echo C::$prop, "\n";
+try {
+    echo C::$prop, "\n";
+} catch (Throwable $e) {
+    echo get_class($e), "|", $e->getMessage(), "\n";
+}
 class Counter {
     public static int $n = 0;
 }
@@ -20,5 +24,5 @@ echo Counter::$n, "\n";
 --EXPECT--
 42
 7
-7
+Error|Access to undeclared static property C::$prop
 5

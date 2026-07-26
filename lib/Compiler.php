@@ -37626,41 +37626,17 @@ class Compiler {
     }
 
     /**
-     * VarLikeIdentifier `Class::$name` is a declared static property when `$name` exists on the class;
-     * otherwise evaluate the variable `$name` for a runtime property name (Zend zend_compile.c, #3814).
+     * Static property name operand (#23606, zend_compile.c / zend_object_handlers.c).
+     *
+     * php-cfg already distinguishes forms:
+     * - `Class::$prop` → Literal name (VarLikeIdentifier) — always the property name string
+     * - `Class::$$var` / `Class::${expr}` → Variable / expression — runtime name
+     *
+     * Do not rewrite undeclared Literals into local-variable lookups: that truncated
+     * Error messages to `Class::$` and made undeclared access look like an empty name.
      */
     protected function compileStaticPropertyNameSlot(Operand $name, Operand $class, Block $block): int
     {
-        $literalName = $this->staticNameFromOperand($name);
-        if (null !== $literalName) {
-            $lcProp = strtolower($literalName);
-            $className = $this->staticPropertyClassIsObjectExpression($class)
-                ? null
-                : $this->literalScopeClassName($class);
-            if (null !== $className) {
-                $lcClass = strtolower(ltrim($className, '\\'));
-                // self::/static::/parent:: with a literal member — property name, not a local (#4668).
-                if (in_array($lcClass, ['self', 'static', 'parent'], true)) {
-                    return $this->compileOperand($name, $block, true);
-                }
-                if (isset($this->compiledClassStaticProperties[$lcClass][$lcProp])) {
-                    return $this->compileOperand($name, $block, true);
-                }
-            } elseif ($this->staticPropertyClassIsObjectExpression($class)) {
-                // (new Class()) / $obj — literal member is a declared property name, not $local (#5477).
-                return $this->compileOperand($name, $block, true);
-            }
-            if (
-                null !== $this->compilingClassLc
-                && isset($this->compiledClassStaticProperties[$this->compilingClassLc][$lcProp])
-            ) {
-                return $this->compileOperand($name, $block, true);
-            }
-            $varOperand = new CfgVariable(new Literal($literalName));
-
-            return $this->compileOperand($varOperand, $block, true);
-        }
-
         return $this->compileOperand($name, $block, true);
     }
 
