@@ -5872,6 +5872,12 @@ restart:
                             }
                             break;
                         }
+                        // unset() follows set-visibility (zend_object_handlers.c, #23338).
+                        $catchFrame = $this->enforceAsymmetricPropertyUnset($object, $propName, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
                         $catchFrame = $this->enforceReadonlyPropertyUnset($object, $propName, $frame);
                         if (null !== $catchFrame) {
                             $frame = $catchFrame;
@@ -12633,6 +12639,61 @@ restart:
             return $catchFrame;
         }
         $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /**
+     * Reject unset() outside set-visibility scope (zend_object_handlers.c, #23338).
+     * Same gate as writes; message verb is "unset" instead of "modify".
+     */
+    private function enforceAsymmetricPropertyUnset(ObjectEntry $object, string $propName, Frame $frame): ?Frame
+    {
+        $msg = $this->asymmetricPropertyUnsetMessage($object, $propName, $frame);
+        if (null === $msg) {
+            return null;
+        }
+        $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $msg);
+        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $catchFrame) {
+            return $catchFrame;
+        }
+        $this->raiseUncaughtException($thrown);
+
+        return null;
+    }
+
+    /** Reject asymmetric set visibility for unset(); returns message or null (#23338). */
+    private function asymmetricPropertyUnsetMessage(ObjectEntry $object, string $propName, Frame $frame): ?string
+    {
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta) {
+            return null;
+        }
+        $setVis = PropertyVisibility::effectiveSetVisibility($meta->visibility, $meta->setVisibility);
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta->visibility, $meta->getVisibility);
+        if ($setVis === $readVis) {
+            return null;
+        }
+        $declaringLc = '' !== $meta->declaringClassLc
+            ? $meta->declaringClassLc
+            : strtolower($object->class->name);
+        $declaringDisplay = $this->context->classes[$declaringLc]->name
+            ?? $object->class->name;
+        try {
+            PropertyVisibility::assertUnsettable(
+                $setVis,
+                $this->callerClassLc($frame),
+                $declaringLc,
+                $declaringDisplay,
+                $propName,
+                fn (string $child, string $parent): bool => $this->isSubclassOf($child, $parent),
+                MethodVisibility::mask($readVis),
+                $meta->asymmetricExplicitRead
+            );
+        } catch (\LogicException $e) {
+            return $e->getMessage();
+        }
 
         return null;
     }

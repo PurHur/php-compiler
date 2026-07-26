@@ -28,6 +28,35 @@ final class AsymmetricVisibilityGuard
         Variable $lvalue,
         ?Block $enclosingBlock
     ): bool {
+        return self::emitBeforePropertySetOp($context, $jit, $lvalue, $enclosingBlock, 'modify');
+    }
+
+    /**
+     * unset() follows set-visibility (zend_object_handlers.c, #23338).
+     *
+     * @return bool true when unset was blocked (caller must skip propertyStore)
+     */
+    public static function emitBeforePropertyUnset(
+        Context $context,
+        \PHPCompiler\JIT $jit,
+        Variable $lvalue,
+        ?Block $enclosingBlock
+    ): bool {
+        return self::emitBeforePropertySetOp($context, $jit, $lvalue, $enclosingBlock, 'unset');
+    }
+
+    /**
+     * @param 'modify'|'unset' $verb
+     *
+     * @return bool true when the operation was blocked
+     */
+    private static function emitBeforePropertySetOp(
+        Context $context,
+        \PHPCompiler\JIT $jit,
+        Variable $lvalue,
+        ?Block $enclosingBlock,
+        string $verb
+    ): bool {
         if (null === $lvalue->objectPropertySlot || null === $lvalue->objectPropertyName) {
             return false;
         }
@@ -63,16 +92,29 @@ final class AsymmetricVisibilityGuard
 
         $callerLc = self::callerClassLc($context, $enclosingBlock);
         try {
-            PropertyVisibility::assertWritable(
-                $setVis,
-                $callerLc,
-                $declaringLc,
-                $declaringClass,
-                $propName,
-                static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
-                MethodVisibility::mask($effectiveRead),
-                $objectType->propertyAsymmetricExplicitRead($classId, $propName)
-            );
+            if ('unset' === $verb) {
+                PropertyVisibility::assertUnsettable(
+                    $setVis,
+                    $callerLc,
+                    $declaringLc,
+                    $declaringClass,
+                    $propName,
+                    static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
+                    MethodVisibility::mask($effectiveRead),
+                    $objectType->propertyAsymmetricExplicitRead($classId, $propName)
+                );
+            } else {
+                PropertyVisibility::assertWritable(
+                    $setVis,
+                    $callerLc,
+                    $declaringLc,
+                    $declaringClass,
+                    $propName,
+                    static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
+                    MethodVisibility::mask($effectiveRead),
+                    $objectType->propertyAsymmetricExplicitRead($classId, $propName)
+                );
+            }
         } catch (\LogicException $e) {
             self::emitViolation($context, $jit, $e->getMessage());
 

@@ -281,6 +281,17 @@ final class UnsetHelperLlvm
             }
             $prop = $context->type->object->propertyFetch($receiver, $declaringClass, $dimOp->value);
             if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+                if (
+                    null !== $jit
+                    && AsymmetricVisibilityGuard::emitBeforePropertyUnset(
+                        $context,
+                        $jit,
+                        $prop,
+                        $context->jitEnclosingBlock
+                    )
+                ) {
+                    return;
+                }
                 DynamicObjectReadonlyGuard::emitBeforePropertyStore(
                     $context,
                     $prop,
@@ -310,6 +321,17 @@ final class UnsetHelperLlvm
         $nameVar = $context->getVariableFromOp($dimOp);
         $prop = $context->type->object->propertyFetchDynamic($receiver, $declaringClass, $nameVar);
         if (null !== $prop->objectPropertySlot && null !== $prop->objectPropertyType) {
+            if (
+                null !== $jit
+                && AsymmetricVisibilityGuard::emitBeforePropertyUnset(
+                    $context,
+                    $jit,
+                    $prop,
+                    $context->jitEnclosingBlock
+                )
+            ) {
+                return;
+            }
             DynamicObjectReadonlyGuard::emitBeforePropertyStore(
                 $context,
                 $prop,

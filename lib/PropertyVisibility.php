@@ -106,11 +106,69 @@ final class PropertyVisibility
         int $readVisibilityFlags = 0,
         bool $explicitReadModifier = false
     ): void {
+        self::assertSetVisibility(
+            'modify',
+            $setVisibilityFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            $declaringClassDisplay,
+            $propertyName,
+            $isSubclass,
+            $readVisibilityFlags,
+            $explicitReadModifier
+        );
+    }
+
+    /**
+     * Unset follows set-visibility (php-src zend_object_handlers.c, #23338).
+     *
+     * @throws \LogicException when unset is not allowed
+     */
+    public static function assertUnsettable(
+        int $setVisibilityFlags,
+        ?string $callerClassLc,
+        string $declaringClassLc,
+        string $declaringClassDisplay,
+        string $propertyName,
+        callable $isSubclass,
+        int $readVisibilityFlags = 0,
+        bool $explicitReadModifier = false
+    ): void {
+        self::assertSetVisibility(
+            'unset',
+            $setVisibilityFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            $declaringClassDisplay,
+            $propertyName,
+            $isSubclass,
+            $readVisibilityFlags,
+            $explicitReadModifier
+        );
+    }
+
+    /**
+     * Shared set-visibility gate for assign (`modify`) and unset (`unset`).
+     *
+     * @throws \LogicException when the operation is not allowed
+     */
+    private static function assertSetVisibility(
+        string $verb,
+        int $setVisibilityFlags,
+        ?string $callerClassLc,
+        string $declaringClassLc,
+        string $declaringClassDisplay,
+        string $propertyName,
+        callable $isSubclass,
+        int $readVisibilityFlags = 0,
+        bool $explicitReadModifier = false
+    ): void {
         if (MethodVisibility::isPublic($setVisibilityFlags)) {
             return;
         }
         if (null === $callerClassLc) {
-            self::denyWrite(
+            self::denySetVisibility(
+                $verb,
                 $setVisibilityFlags,
                 $declaringClassDisplay,
                 $propertyName,
@@ -121,7 +179,8 @@ final class PropertyVisibility
         }
         if (($setVisibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {
-                self::denyWrite(
+                self::denySetVisibility(
+                    $verb,
                     $setVisibilityFlags,
                     $declaringClassDisplay,
                     $propertyName,
@@ -137,7 +196,8 @@ final class PropertyVisibility
             if ($callerClassLc === $declaringClassLc || $isSubclass($callerClassLc, $declaringClassLc)) {
                 return;
             }
-            self::denyWrite(
+            self::denySetVisibility(
+                $verb,
                 $setVisibilityFlags,
                 $declaringClassDisplay,
                 $propertyName,
@@ -172,7 +232,8 @@ final class PropertyVisibility
         throw new \LogicException("Cannot access {$kind} property {$className}::\${$propertyName}");
     }
 
-    private static function denyWrite(
+    private static function denySetVisibility(
+        string $verb,
         int $setVisibilityFlags,
         string $className,
         string $propertyName,
@@ -185,7 +246,8 @@ final class PropertyVisibility
             : Ast\AsymmetricVisibilityRewriter::setModifierLabel($setVisibilityFlags);
         throw new \LogicException(
             sprintf(
-                'Cannot modify %s property %s::$%s from %s',
+                'Cannot %s %s property %s::$%s from %s',
+                $verb,
                 $kind,
                 $className,
                 $propertyName,
