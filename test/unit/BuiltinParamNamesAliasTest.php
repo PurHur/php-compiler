@@ -420,7 +420,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'depth', 'json_encode'));
     }
 
-    /** @covers issue #10048 #23225 #23385 */
+    /** @covers issue #10048 #23225 #23385 #23243 */
     public function testUsortNamedCallbackParameters(): void
     {
         foreach (['usort', 'uasort', 'uksort'] as $fn) {
@@ -438,6 +438,13 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', $fn));
             self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'direction', $fn));
+        }
+        // #23243 — natsort/natcasesort are Zend array only (no phantom flags).
+        foreach (['natsort', 'natcasesort'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['array'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'flags', $fn));
         }
     }
 
