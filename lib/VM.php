@@ -8385,7 +8385,10 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_ARRAY !== $container->type) {
-                        throw new \LogicException('Iterator valid requires an array');
+                        // Literal scalars re-embed per block (RESET slot ≠ VALID slot), so
+                        // foreachInvalidSlots from FE_RESET is missed — treat as empty (#23452).
+                        $frame->scope[$op->arg1]->bool(false);
+                        break;
                     }
                     $frame->scope[$op->arg1]->bool($container->toArray()->iterValid());
                     break;
@@ -8418,7 +8421,8 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_ARRAY !== $container->type) {
-                        throw new \LogicException('Iterator key requires an array');
+                        // Non-traversable: FE_RESET warned; no key fetch (#23452 / zend_vm_def.h).
+                        break;
                     }
                     $frame->scope[$op->arg1]->copyFrom($container->toArray()->iterCurrentKey());
                     break;
@@ -8514,7 +8518,8 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_ARRAY !== $container->type) {
-                        throw new \LogicException('Iterator value requires an array');
+                        // Non-traversable: FE_RESET warned; no value fetch (#23452 / zend_vm_def.h).
+                        break;
                     }
                     $byRef = (bool) $op->arg3;
                     if ($byRef) {
