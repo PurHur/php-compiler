@@ -24,7 +24,18 @@ make helper-runtime-prelink-check                    # report-only freshness of 
 
 ## Fingerprints (what invalidates what)
 
-`unitFingerprint = sha256(coreFingerprint + unit source content)`. The core covers `composer.lock`, `lib/JIT.php`, `lib/JIT/Context.php`, `lib/Runtime.php`, `lib/JIT/JitVmHelperLink.php`, `script/apply-patches.sh`, and every `patches/*.patch` — all **content hashes**, so fingerprints agree across clones (that is what makes the committed tier shareable). Editing one helper re-emits one unit; editing the JIT core re-emits all. Crash markers (`failed.json`) are fingerprint-keyed: a broken unit is re-attempted only when its inputs change, and is **never** committed to the prelinked tier.
+`unitFingerprint` v2 = `sha256(globalFingerprint + unit source + deps[] content)`.
+Global covers only `composer.lock`, `script/apply-patches.sh`, `patches/*.patch`, and
+`PHP_COMPILER_LLVM_PATH` (#23458) — **not** `lib/JIT.php` / `Context.php` / `Runtime.php`.
+
+Each unit manifest records `deps[]` (NestedJIT'd paths + one-level same-dir class refs).
+Editing one helper or SSOT file re-emits the units that list it; editing the JIT core does
+**not** invalidate the corpus (run `--force` / `--prelink` after intentional IR-shape changes).
+
+Legacy manifests without `deps[]` still use the old lowering-machinery key until
+`php script/emit-helper-runtime-object.php --migrate-deps` (or a fresh emit) rewrites them.
+
+Crash markers (`failed.json`) are fingerprint-keyed: a broken unit is re-attempted only when its inputs change, and is **never** committed to the prelinked tier.
 
 ## Debugging a failing unit
 

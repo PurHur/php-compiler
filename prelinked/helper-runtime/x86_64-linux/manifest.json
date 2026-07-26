@@ -2,9 +2,12 @@
     "version": 1,
     "generated_at": "2026-07-26T14:34:29+00:00",
     "arch": "x86_64-linux",
-    "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
-    "core_fingerprint": "6497e66db01e0e5a4eae",
+    "role": "committed per-arch split-compilation helper units (#15889, #23458 per-unit deps) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
+    "core_fingerprint": "34d6fd38281359f382b3",
     "unit_count": 257,
     "total_bytes": 282546736,
-    "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env)"
+    "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env)",
+    "fingerprint_schema": 2,
+    "legacy_lowering_fingerprint": "6497e66db01e0e5a4eae",
+    "migrated_at": "2026-07-26T16:14:31+00:00"
 }

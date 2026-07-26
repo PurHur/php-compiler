@@ -58,7 +58,7 @@ foreach ($manifests as $manifestPath) {
 
         continue;
     }
-    if (HelperRuntimeCache::unitFingerprint($sourceAbs) !== $manifest['fingerprint']) {
+    if (!HelperRuntimeCache::manifestFingerprintMatches($manifest, $sourceAbs)) {
         ++$stale;
         fwrite(STDOUT, "  STALE  {$slug} ({$manifest['unit']})\n");
 

@@ -14,20 +14,20 @@ use PHPCompiler\JIT\Context;
  *   build/helper-runtime-cache/units/<slug>/
  *     unit.bc        — bitcode; per-script builds read exact function types
  *     unit.o         — object the Linker merges at the end
- *     manifest.json  — {fingerprint, unit, helpers: logical → symbol}
+ *     manifest.json  — {fingerprint, unit, deps?, helpers: logical → symbol}
  *     failed.json    — {fingerprint, rc} when the unit's lowering crashes;
  *                      re-attempted only when its fingerprint changes
  *
- * Freshness is PER UNIT: sha256(core fingerprint + unit source content).
- * The core fingerprint covers only the lowering machinery (JIT core,
- * composer.lock, LLVM path) — editing one helper re-emits one unit, a crash
- * is remembered per unit, and nothing else recompiles.
+ * Freshness is PER UNIT (#23458):
  *
- * Known approximation: a unit module may embed dependency helpers it pulled
- * in during nested lowering; an edit to a dependency does not invalidate the
- * embedding unit's fingerprint. `script/emit-helper-runtime-object.php
- * --force` re-emits everything; bumping the core (lib/JIT.php etc.) also
- * invalidates all units.
+ *   v2 (manifest has deps[]): sha256(global + unit source + each dep's content)
+ *   v1 (legacy, no deps):     sha256(legacy lowering core + unit source)
+ *
+ * Global inputs ({@see coreFingerprint}) are only composer.lock, patches, and
+ * LLVM path — editing lib/JIT.php no longer invalidates the whole corpus.
+ * Emit records the NestedJIT closure in deps[]; editing one reached lowering
+ * invalidates only units that listed it. Legacy manifests keep the old
+ * JIT-core key until re-emitted so the committed prelinked tier stays usable.
  *
  * Opt-in: PHP_COMPILER_HELPER_RUNTIME_O=1.
  */
@@ -156,19 +156,32 @@ final class HelperRuntimeCache
     }
 
     /**
-     * Lowering-machinery fingerprint: deliberately narrow so single-helper
-     * edits do not invalidate the whole cache (#15889 incrementality).
+     * Global inputs only (#23458): composer.lock, patches, LLVM path.
      *
-     * Content hashes, not mtime:size — fingerprints must agree across clones
-     * and architectures so committed prelinked units are shareable (#15889).
-     * patches/ is included: vendor patches change lowering behaviour but
-     * composer.lock cannot see them.
+     * Deliberately excludes lib/JIT.php / Context.php / Runtime.php — those change
+     * most days and were switching the whole corpus off. Per-unit deps[] cover the
+     * NestedJIT closure instead. Content hashes (not mtime) so committed prelinked
+     * units stay shareable across clones.
      */
     public static function coreFingerprint(): string
     {
         static $core = null;
         if (null !== $core) {
             return $core;
+        }
+
+        return $core = substr(hash('sha256', self::globalFingerprintMaterial()), 0, 20);
+    }
+
+    /**
+     * Pre-#23458 lowering-machinery key — must match the old coreFingerprint()
+     * byte-for-byte so committed manifests without deps[] stay fresh.
+     */
+    public static function legacyLoweringFingerprint(): string
+    {
+        static $legacy = null;
+        if (null !== $legacy) {
+            return $legacy;
         }
         $root = \dirname(__DIR__, 2);
         $parts = [(string) getenv('PHP_COMPILER_LLVM_PATH')];
@@ -188,7 +201,26 @@ final class HelperRuntimeCache
             $parts[] = substr($patch, \strlen($root)).':'.@hash_file('sha256', $patch);
         }
 
-        return $core = substr(hash('sha256', implode("\n", $parts)), 0, 20);
+        return $legacy = substr(hash('sha256', implode("\n", $parts)), 0, 20);
+    }
+
+    private static function globalFingerprintMaterial(): string
+    {
+        $root = \dirname(__DIR__, 2);
+        $parts = [(string) getenv('PHP_COMPILER_LLVM_PATH')];
+        foreach ([
+            $root.'/composer.lock',
+            $root.'/script/apply-patches.sh',
+        ] as $file) {
+            $parts[] = substr($file, \strlen($root)).':'.@hash_file('sha256', $file);
+        }
+        $patchFiles = glob($root.'/patches/*.patch') ?: [];
+        sort($patchFiles, SORT_STRING);
+        foreach ($patchFiles as $patch) {
+            $parts[] = substr($patch, \strlen($root)).':'.@hash_file('sha256', $patch);
+        }
+
+        return implode("\n", $parts);
     }
 
     /** Architecture key for shareable prelinked unit objects, e.g. "x86_64-linux". */
@@ -203,11 +235,176 @@ final class HelperRuntimeCache
         return \dirname(__DIR__, 2).'/prelinked/helper-runtime/'.self::archKey().'/units';
     }
 
-    /** Per-unit fingerprint: core + helper source + ext/dom SSOT deps when applicable (#17954). */
-    public static function unitFingerprint(string $unitSourceAbsPath): string
+    /**
+     * Repo-root relative path (/lib/… or /ext/…) for an absolute file, or null.
+     */
+    public static function repoRelPath(string $absPath): ?string
+    {
+        $root = \dirname(__DIR__, 2);
+        $real = realpath($absPath) ?: $absPath;
+        $real = str_replace('\\', '/', $real);
+        $rootNorm = str_replace('\\', '/', $root);
+        if (!str_starts_with($real, $rootNorm.'/')) {
+            return null;
+        }
+        $rel = substr($real, \strlen($rootNorm));
+        if (str_starts_with($rel, '/lib/') || str_starts_with($rel, '/ext/')) {
+            return $rel;
+        }
+
+        return null;
+    }
+
+    /**
+     * Build the NestedJIT dependency list recorded at emit time (#23458).
+     *
+     * @param list<string> $compiledAbsPaths from Context::listJitCompiledIncludePaths()
+     *
+     * @return list<string> sorted unique repo-relative paths
+     */
+    public static function dependencyRelPathsForEmit(string $unitSourceAbsPath, array $compiledAbsPaths): array
+    {
+        $rels = [];
+        $unitRel = self::repoRelPath($unitSourceAbsPath);
+        if (null !== $unitRel) {
+            $rels[$unitRel] = true;
+        }
+        foreach ($compiledAbsPaths as $abs) {
+            $rel = self::repoRelPath((string) $abs);
+            if (null !== $rel) {
+                $rels[$rel] = true;
+            }
+        }
+        foreach (self::unitExtraDependencyRelPaths($unitSourceAbsPath) as $rel) {
+            $rels[$rel] = true;
+        }
+        // One-level same-directory class refs from the unit + NestedJIT'd files only
+        // (do not recurse through VmString → half of ext/standard).
+        $seed = array_keys($rels);
+        foreach ($seed as $rel) {
+            foreach (self::sameDirClassReferenceRelPaths($rel) as $ref) {
+                $rels[$ref] = true;
+            }
+        }
+        $keys = array_keys($rels);
+        sort($keys, SORT_STRING);
+
+        return $keys;
+    }
+
+    /**
+     * @return list<string> /lib|ext/.../Foo.php paths referenced as Foo:: in $rel
+     */
+    private static function sameDirClassReferenceRelPaths(string $rel): array
+    {
+        $root = \dirname(__DIR__, 2);
+        $abs = $root.$rel;
+        if (!is_file($abs)) {
+            return [];
+        }
+        $code = (string) @file_get_contents($abs);
+        if ('' === $code || !preg_match_all('/\b([A-Z][A-Za-z0-9_]*)::/', $code, $m)) {
+            return [];
+        }
+        $dir = str_replace('\\', '/', \dirname($rel));
+        $out = [];
+        foreach (array_unique($m[1]) as $class) {
+            $candidate = $dir.'/'.$class.'.php';
+            if (is_file($root.$candidate)) {
+                $out[] = $candidate;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<string>|null $depsRelPaths repo-relative paths; null = v2 with unit-only + extras
+     */
+    public static function unitFingerprint(string $unitSourceAbsPath, ?array $depsRelPaths = null): string
+    {
+        if (null === $depsRelPaths) {
+            $depsRelPaths = self::dependencyRelPathsForEmit($unitSourceAbsPath, []);
+        }
+
+        return self::fingerprintV2($unitSourceAbsPath, $depsRelPaths);
+    }
+
+    /**
+     * Fingerprint expected for an on-disk manifest (v2 deps[] or legacy v1).
+     *
+     * @param array{fingerprint?: string, unit?: string, deps?: list<string>|mixed} $manifest
+     */
+    public static function expectedFingerprintForManifest(array $manifest, string $unitSourceAbsPath): string
+    {
+        if (isset($manifest['deps']) && \is_array($manifest['deps'])) {
+            $deps = [];
+            foreach ($manifest['deps'] as $dep) {
+                if (\is_string($dep) && '' !== $dep) {
+                    $deps[] = $dep;
+                }
+            }
+
+            return self::fingerprintV2($unitSourceAbsPath, $deps);
+        }
+
+        return self::fingerprintV1Legacy($unitSourceAbsPath);
+    }
+
+    public static function manifestFingerprintMatches(array $manifest, string $unitSourceAbsPath): bool
+    {
+        return isset($manifest['fingerprint'])
+            && $manifest['fingerprint'] === self::expectedFingerprintForManifest($manifest, $unitSourceAbsPath);
+    }
+
+    /**
+     * Rewrite a legacy (no deps[]) manifest to v2 using static NestedJIT-ish deps (#23458).
+     * Keeps unit.o / unit.bc; only updates fingerprint + deps. Returns null when not legacy-fresh.
+     *
+     * @param array<string, mixed> $manifest
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function migrateManifestToV2(array $manifest, string $unitSourceAbsPath): ?array
+    {
+        $isV2 = isset($manifest['deps']) && \is_array($manifest['deps']);
+        if (!$isV2 && !self::manifestFingerprintMatches($manifest, $unitSourceAbsPath)) {
+            return null; // stale legacy — needs full re-emit
+        }
+        // Always recompute static deps (one-level) so migrate can shrink a prior over-expansion.
+        $deps = self::dependencyRelPathsForEmit($unitSourceAbsPath, []);
+        $manifest['deps'] = $deps;
+        $manifest['fingerprint'] = self::fingerprintV2($unitSourceAbsPath, $deps);
+        $manifest['fingerprint_version'] = 2;
+
+        return $manifest;
+    }
+
+    /**
+     * @param list<string> $depsRelPaths
+     */
+    public static function fingerprintV2(string $unitSourceAbsPath, array $depsRelPaths): string
+    {
+        $root = \dirname(__DIR__, 2);
+        $source = @file_get_contents($unitSourceAbsPath);
+        $parts = [
+            self::coreFingerprint(),
+            'v2',
+            (string) $source,
+        ];
+        $deps = array_values(array_unique(array_filter($depsRelPaths, static fn ($d) => \is_string($d) && '' !== $d)));
+        sort($deps, SORT_STRING);
+        foreach ($deps as $rel) {
+            $parts[] = $rel.':'.@hash_file('sha256', $root.$rel);
+        }
+
+        return substr(hash('sha256', implode("\n", $parts)), 0, 20);
+    }
+
+    private static function fingerprintV1Legacy(string $unitSourceAbsPath): string
     {
         $source = @file_get_contents($unitSourceAbsPath);
-        $material = self::coreFingerprint()."\n".(string) $source;
+        $material = self::legacyLoweringFingerprint()."\n".(string) $source;
         $extra = self::unitDependencyFingerprintMaterial($unitSourceAbsPath);
         if ('' !== $extra) {
             $material .= "\n".$extra;
@@ -222,18 +419,20 @@ final class HelperRuntimeCache
      *
      * Float math *JitHelper units NestedJIT through {@see \PHPCompiler\ext\standard\JitFdiv}
      * boxed-double lowering — hash it so JitFdiv edits invalidate those units (#20651).
+     *
+     * @return list<string>
      */
-    private static function unitDependencyFingerprintMaterial(string $unitSourceAbsPath): string
+    private static function unitExtraDependencyRelPaths(string $unitSourceAbsPath): array
     {
-        $root = \dirname(__DIR__, 2);
         $parts = [];
+        $root = \dirname(__DIR__, 2);
         if (str_starts_with($unitSourceAbsPath, $root.'/ext/dom/')) {
             foreach ([
                 '/ext/dom/VmDom.php',
                 '/ext/dom/VmDomJitFrame.php',
                 '/ext/dom/DomRegistry.php',
             ] as $rel) {
-                $parts[] = $rel.':'.@hash_file('sha256', $root.$rel);
+                $parts[] = $rel;
             }
         }
         $base = \basename($unitSourceAbsPath);
@@ -241,7 +440,21 @@ final class HelperRuntimeCache
             '/^(Fpow|Nextafter|Sqrt|Hypot|Log|Log10|Log1p|Sin|Cos|Tan|Asin|Acos|Atan|Atan2|Sinh|Cosh|Tanh|Exp|Expm1|Floor|Ceil|Round|Fmod|Fdiv)JitHelper\.php$/',
             $base
         )) {
-            $parts[] = '/ext/standard/JitFdiv.php:'.@hash_file('sha256', $root.'/ext/standard/JitFdiv.php');
+            $parts[] = '/ext/standard/JitFdiv.php';
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Legacy v1 extra material (content hashes) — kept for fingerprintV1Legacy.
+     */
+    private static function unitDependencyFingerprintMaterial(string $unitSourceAbsPath): string
+    {
+        $root = \dirname(__DIR__, 2);
+        $parts = [];
+        foreach (self::unitExtraDependencyRelPaths($unitSourceAbsPath) as $rel) {
+            $parts[] = $rel.':'.@hash_file('sha256', $root.$rel);
         }
 
         return implode("\n", $parts);
@@ -301,7 +514,7 @@ final class HelperRuntimeCache
                     continue;
                 }
                 $sourceAbs = self::resolveUnitSource($root, (string) $manifest['unit']);
-                if (null === $sourceAbs || self::unitFingerprint($sourceAbs) !== $manifest['fingerprint']) {
+                if (null === $sourceAbs || !self::manifestFingerprintMatches($manifest, $sourceAbs)) {
                     continue; // stale — emitter will refresh it
                 }
                 if (!is_file($unitDir.'/unit.o') || !is_file($unitDir.'/unit.bc')) {
