@@ -37,6 +37,8 @@ final class ReflectionAttributeNewInstance extends VmClassMethod
             throw new \Error('Attribute class "'.$className.'" not found');
         }
         $classEntry = $ctx->classes[$lc];
+        // Wrong Attribute::TARGET_* on declaration site → Error (php-src newInstance, #23528).
+        ReflectionSupport::assertAttributeNewInstanceTargetAllowed($receiver, $classEntry);
         // Userland non-IS_REPEATABLE duplicates: Error at newInstance, not compile (#22930).
         ReflectionSupport::assertAttributeNewInstanceNotIllegalRepeat($receiver, $classEntry);
         $object = new ObjectEntry($classEntry);
