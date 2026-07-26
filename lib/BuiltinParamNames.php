@@ -625,6 +625,9 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/from/to (#23215)
             case 'strtr':
                 return ['string', 'from', 'to'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str/allowable_tags (#23217)
+            case 'strip_tags':
+                return ['string', 'allowed_tags'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/chunklen/ending (#23206)
             case 'chunk_split':
                 return ['string', 'length', 'separator'];
