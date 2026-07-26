@@ -151,6 +151,8 @@ final class ReadonlyClassGuard
      *
      * php-src: Zend/zend_object_handlers.c / Zend/zend_readonly.c — any declaring-class
      * instance method may initialize an uninitialized readonly property once.
+     * `__clone()` must not use this path: already-initialized readonly props are only
+     * writable via the PHP 8.3+ reinit window (#23526).
      */
     private static function callerMayFirstInitReadonlyProperty(
         Context $context,
@@ -158,6 +160,9 @@ final class ReadonlyClassGuard
         ?Block $enclosingBlock,
         string $propName
     ): bool {
+        if (self::isCloneBlock($enclosingBlock)) {
+            return false;
+        }
         $callerClassId = self::callerClassId($context, $enclosingBlock);
         if (null === $callerClassId) {
             return false;
@@ -311,6 +316,16 @@ final class ReadonlyClassGuard
         $name = strtolower($block->func->name);
 
         return '__construct' === $name || str_ends_with($name, '::__construct');
+    }
+
+    private static function isCloneBlock(?Block $block): bool
+    {
+        if (null === $block || null === $block->func) {
+            return false;
+        }
+        $name = strtolower($block->func->name);
+
+        return '__clone' === $name || str_ends_with($name, '::__clone');
     }
 
     private static function callerClassId(Context $context, ?Block $enclosingBlock): ?int

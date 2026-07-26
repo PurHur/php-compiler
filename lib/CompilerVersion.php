@@ -233,6 +233,31 @@ final class CompilerVersion
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 parse error). Enable via stable
      * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
+    /**
+     * PHP 8.3+ one-shot readonly property reinit during `__clone()` (#23526, #15365).
+     *
+     * Withheld on 8.4.0-dev reference / PROFILE=8.2 (Zend 8.2 throws Error). Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * php-src: Zend/zend_readonly.c IS_PROP_REINITABLE during zend_objects_clone_obj.
+     */
+    public static function supportsReadonlyCloneReinit(): bool
+    {
+        if (version_compare(self::VERSION, '8.3', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+    }
+
     public static function supportsGlobalTypedConstants(): bool
     {
         if (version_compare(self::VERSION, '8.3', '<')) {

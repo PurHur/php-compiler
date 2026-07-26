@@ -362,6 +362,41 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsReadonlyCloneReinitFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReadonlyCloneReinit());
+    }
+
+    public function testSupportsReadonlyCloneReinitTrueOnForwardProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReadonlyCloneReinit());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsReadonlyCloneReinitFalseOnExplicitProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsReadonlyCloneReinit());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsTypedFunctionStaticFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsTypedFunctionStatic());

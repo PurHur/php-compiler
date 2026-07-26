@@ -1,5 +1,7 @@
 --TEST--
 language: clone __clone may reinit readonly property once (issue #4245, PHP 8.3+ #15365)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 class Point {

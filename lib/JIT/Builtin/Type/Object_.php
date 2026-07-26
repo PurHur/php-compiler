@@ -33,6 +33,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\CloneWithReinitRuntime;
 use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitStringCompare;
@@ -2315,6 +2316,21 @@ class Object_ extends Type {
         if (!$this->context->functionIsRegistered($proxyName)) {
             return;
         }
+        // PHP 8.3+ readonly reinit window during __clone (zend_readonly.c; #23526).
+        // Readonly-class props stay immutable — mirror CloneWithSupport::beginCloneMagicReinit.
+        $reinitNames = [];
+        if (CompilerVersion::supportsReadonlyCloneReinit()
+            && !$this->isReadonlyClass($classId)) {
+            foreach ($this->properties[$classId] ?? [] as $propset) {
+                $propName = $propset[1];
+                if ($this->isPropertyReadonly($classId, $propName)) {
+                    $reinitNames[] = $propName;
+                }
+            }
+        }
+        if ([] !== $reinitNames) {
+            CloneWithReinitRuntime::emitBegin($this->context, $cloned, $reinitNames);
+        }
         $objVar = new Variable(
             $this->context,
             Variable::TYPE_OBJECT,
@@ -2326,6 +2342,9 @@ class Object_ extends Type {
         $this->context->callerStrictTypes = $block->strictTypes;
         $toCall->call($this->context, $objVar);
         $this->context->callerStrictTypes = $prevStrict;
+        if ([] !== $reinitNames) {
+            CloneWithReinitRuntime::emitEnd($this->context, $cloned);
+        }
     }
 
     /** Reset instance slots to null (lazy ghost before initializer, #4940). */
