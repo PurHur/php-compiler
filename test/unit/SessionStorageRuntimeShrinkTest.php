@@ -11,7 +11,7 @@ use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * SessionStorage NestedJIT ABI bridges quarantined in ext/standard (#9495, #19882).
+ * SessionStorage NestedJIT via JitVmHelperLink::ensureCompiled (#23284 / peer #23211).
  */
 final class SessionStorageRuntimeShrinkTest extends TestCase
 {
@@ -33,16 +33,20 @@ final class SessionStorageRuntimeShrinkTest extends TestCase
         $this->assertLessThan(50, \substr_count($orchestrator, "\n") + 1);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSessionStorageKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitSessionStorageKernel', $source);
         $this->assertStringContainsString('phpc_session_load_from_disk', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringContainsString('SessionStorageJitHelper', $source);
-        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertLessThan(1400, \substr_count($source, "\n") + 1);
     }
 
