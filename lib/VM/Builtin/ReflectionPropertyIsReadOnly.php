@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionProperty::isReadOnly() — VM (#7187, ext/reflection/php_reflection.c). */
+/** ReflectionProperty::isReadOnly() — VM (#7187/#23544, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyIsReadOnly extends VmClassMethod
 {
     public function __construct()
@@ -35,6 +35,15 @@ final class ReflectionPropertyIsReadOnly extends VmClassMethod
         }
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);
         if (null === $meta) {
+            // Static properties are never readonly (php_reflection.c / ZEND_ACC_READONLY).
+            // findClassProperty walks instance props only — do not throw for existing statics (#23544).
+            if (null !== VmReflection::findStaticPropertyKey($entry, $property, $ctx)) {
+                if (null !== $frame->returnVar) {
+                    $frame->returnVar->bool(false);
+                }
+
+                return;
+            }
             ReflectionSupport::throwReflectionException(
                 ReflectionSupport::propertyNotFoundMessage($className, $property)
             );
