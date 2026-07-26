@@ -185,27 +185,70 @@ final class CastSupport
             return;
         }
 
+        // Child ClassEntry::$properties lists own slots before inherited ones (ObjectEntry ctor).
+        // zend_std_get_properties_for emits parent→child (parent privates, then protected/public,
+        // then child privates) — same order as get_mangled_object_vars (#23451).
         $declared = [];
-        foreach ($obj->class->properties as $meta) {
-            if ($meta->phpInvisible) {
-                // Still skip raw append so (array) does not leak C-only slots (#22513).
+        /** @var array<string, true> $seenPrivate */
+        $seenPrivate = [];
+        /** @var array<string, true> $seenLc */
+        $seenLc = [];
+        foreach (self::classHierarchyParentFirst($obj->class, $classesByLc) as $class) {
+            foreach ($class->properties as $meta) {
+                $lc = strtolower($meta->name);
+                $isPrivate = ($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
+                if ($isPrivate) {
+                    $privKey = ('' !== $meta->declaringClassLc
+                        ? $meta->declaringClassLc
+                        : strtolower($class->name))."\0".$lc;
+                    if (isset($seenPrivate[$privKey])) {
+                        continue;
+                    }
+                    $seenPrivate[$privKey] = true;
+                } else {
+                    if (isset($seenLc[$lc])) {
+                        continue;
+                    }
+                    $seenLc[$lc] = true;
+                }
+                if ($meta->phpInvisible) {
+                    // Still skip raw append so (array) does not leak C-only slots (#22513).
+                    $declared[$meta->name] = true;
+                    continue;
+                }
+                if (!$obj->hasPropertyForMeta($meta)) {
+                    continue;
+                }
+                $value = $obj->getPropertyForMeta($meta)->resolveIndirect();
+                if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    continue;
+                }
                 $declared[$meta->name] = true;
-                continue;
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $ht->add(PropertyMangle::propertyKey($meta, $classesByLc), $copy);
             }
-            if (!$obj->hasPropertyForMeta($meta)) {
-                continue;
-            }
-            $value = $obj->getPropertyForMeta($meta)->resolveIndirect();
-            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
-                continue;
-            }
-            $declared[$meta->name] = true;
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $ht->add(PropertyMangle::propertyKey($meta, $classesByLc), $copy);
         }
 
         self::appendRawProperties($obj, $ht, $declared);
+    }
+
+    /**
+     * Root-most ancestor first — matches VmReflection::classHierarchyChain + array_reverse.
+     *
+     * @param array<string, ClassEntry> $classesByLc
+     * @return list<ClassEntry>
+     */
+    private static function classHierarchyParentFirst(ClassEntry $entry, array $classesByLc): array
+    {
+        $chain = [$entry];
+        $current = $entry;
+        while (null !== $current->parentLc && isset($classesByLc[$current->parentLc])) {
+            $current = $classesByLc[$current->parentLc];
+            $chain[] = $current;
+        }
+
+        return array_reverse($chain);
     }
 
     /**
