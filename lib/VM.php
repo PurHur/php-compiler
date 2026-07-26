@@ -2306,7 +2306,11 @@ class VM {
             return $dateMap;
         }
 
-        return $this->collectObjectPropertiesForBuiltin($object, $frame, false);
+        // DateTime* / DateTimeZone: Zend property table has no __dt_* storage (#23432, #22445).
+        // Base internal CE short-circuits empty above; subclasses still declare inherited slots.
+        return DateTimeSupport::filterInternalStorageFromMangledVars(
+            $this->collectObjectPropertiesForBuiltin($object, $frame, false)
+        );
     }
 
     /**

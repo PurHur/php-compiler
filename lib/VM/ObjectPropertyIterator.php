@@ -10,6 +10,7 @@ use PHPCompiler\Frame;
  * Foreach iterator over user object / stdClass instance properties (Zend zend_foreach.c).
  *
  * Property visibility matches get_object_vars() / zend_check_property_access (#23430).
+ * DateTime* / DateTimeZone __dt_* storage is filtered via collectObjectVarsForBuiltin (#23432).
  */
 final class ObjectPropertyIterator
 {

@@ -40,7 +40,7 @@ final class DateTimeSupport
     }
 
     /**
-     * Strip {@see isInternalStorageProperty()} keys from get_mangled_object_vars (#22445).
+     * Strip {@see isInternalStorageProperty()} keys from get_mangled_object_vars / get_object_vars / foreach (#22445, #23432).
      *
      * @param array<string, Variable> $props
      * @return array<string, Variable>
