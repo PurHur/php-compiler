@@ -563,6 +563,11 @@ final class BuiltinParamNames
                 return ['object'];
             case 'get_class_methods':
                 return ['object_or_class'];
+            // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says object/property_name (#23399)
+            case 'method_exists':
+                return ['object_or_class', 'method'];
+            case 'property_exists':
+                return ['object_or_class', 'property'];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says user_class_name/alias_name (#23422)
             case 'class_alias':
                 return ['class', 'alias', 'autoload'];

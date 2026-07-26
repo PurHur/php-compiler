@@ -1698,6 +1698,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'stream_resource_compare') && !str_contains($name, '_jit')) {
                 continue;
             }
+            // method_exists/property_exists named stubs (#23399): Reflection + DateTime::class MCJIT unstable — light *_jit.phpt.
+            if (str_contains($name, 'named_args_method_exists_property_exists') && !str_contains($name, '_jit')) {
+                continue;
+            }
             // DateTime format-constant ReflectionClass map: VM + AOT (#22271); MCJIT Reflection unstable — light *_jit.phpt.
             if (str_contains($name, 'datetime_format_constants_defined') && !str_contains($name, '_jit')) {
                 continue;
