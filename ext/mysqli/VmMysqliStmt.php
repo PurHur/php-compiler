@@ -61,6 +61,7 @@ final class VmMysqliStmt
             'attr_set' => new MysqliStmtAttrSet(),
             'send_long_data' => new MysqliStmtSendLongData(),
             'prepare' => new MysqliStmtPrepare(),
+            'get_warnings' => new MysqliStmtGetWarnings(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -282,6 +283,40 @@ final class VmMysqliStmt
     public static function error(ObjectEntry $stmt): string
     {
         return (string) self::requireNative($stmt)->error;
+    }
+
+    /**
+     * mysqli_stmt_get_warnings() — php-src ext/mysqli/mysqli_nonapi.c (#22224).
+     *
+     * Returns first mysqli_warning or null (caller maps to false).
+     */
+    public static function getWarnings(ObjectEntry $stmt): ?ObjectEntry
+    {
+        $state = self::state($stmt);
+        $native = self::requireNative($stmt);
+        $ctx = $state->ctx;
+        if (null === $ctx) {
+            throw new \LogicException('mysqli_stmt_get_warnings() requires VM context');
+        }
+        if (\method_exists($native, 'get_warnings')) {
+            $w = $native->get_warnings();
+            if (false === $w || null === $w) {
+                return null;
+            }
+
+            return VmMysqliWarning::fromNativeChain($ctx, $w);
+        }
+        // Host without stmt::get_warnings — fall back via connection SHOW WARNINGS when possible.
+        if (\property_exists($native, 'mysqli') && $native->mysqli instanceof \mysqli) {
+            $link = $native->mysqli;
+            if ((int) $link->warning_count < 1) {
+                return null;
+            }
+
+            return VmMysqli::warningsFromShowWarnings($ctx, $link);
+        }
+
+        return null;
     }
 
     /**
@@ -1006,6 +1041,29 @@ final class MysqliStmtAttrSet extends MysqliClassMethod
         $value = $this->intArg($frame->calledArgs[2], 'mysqli_stmt::attr_set', 1, 'value');
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmMysqliStmt::attrSet($receiver, $attribute, $value, 'mysqli_stmt::attr_set', 1, 2));
+        }
+    }
+}
+
+/** mysqli_stmt::get_warnings() — php-src ext/mysqli/mysqli.stub.php (#22224). */
+final class MysqliStmtGetWarnings extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_warnings');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_stmt::get_warnings()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $warning = VmMysqliStmt::getWarnings($receiver);
+        if (null === $warning) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($warning);
         }
     }
 }

@@ -101,6 +101,7 @@ final class VmMysqli
             'kill' => new MysqliKill(),
             'stmt_init' => new MysqliStmtInit(),
             'dump_debug_info' => new MysqliDumpDebugInfo(),
+            'get_warnings' => new MysqliGetWarnings(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -1010,6 +1011,58 @@ final class VmMysqli
         return (int) $native->warning_count;
     }
 
+    /**
+     * mysqli_get_warnings() — php-src ext/mysqli/mysqli_nonapi.c (#22224).
+     *
+     * Returns first mysqli_warning or null (caller maps to false).
+     */
+    public static function getWarningsOnLink(ObjectEntry $entry, Context $ctx): ?ObjectEntry
+    {
+        $native = self::requireNative($entry, $ctx);
+        if ((int) $native->warning_count < 1) {
+            return null;
+        }
+        if (\method_exists($native, 'get_warnings')) {
+            $w = $native->get_warnings();
+            if (false === $w || null === $w) {
+                return null;
+            }
+
+            return VmMysqliWarning::fromNativeChain($ctx, $w);
+        }
+
+        return self::warningsFromShowWarnings($ctx, $native);
+    }
+
+    /**
+     * Fallback when host lacks get_warnings(): SHOW WARNINGS (php-src php_get_warnings).
+     */
+    public static function warningsFromShowWarnings(Context $ctx, \mysqli $native): ?ObjectEntry
+    {
+        $result = @$native->query('SHOW WARNINGS');
+        if (false === $result || null === $result) {
+            return null;
+        }
+        $rows = [];
+        while ($row = $result->fetch_row()) {
+            if (!\is_array($row) || \count($row) < 3) {
+                continue;
+            }
+            // Level, Code, Message — php_new_warning hardcodes sqlstate HY000.
+            $rows[] = [
+                'errno' => (int) $row[1],
+                'message' => (string) $row[2],
+                'sqlstate' => 'HY000',
+            ];
+        }
+        $result->free();
+        if ($rows === []) {
+            return null;
+        }
+
+        return VmMysqliWarning::fromRows($ctx, $rows);
+    }
+
     public static function characterSetNameOnLink(ObjectEntry $entry, Context $ctx): string
     {
         $native = self::requireNative($entry, $ctx);
@@ -1680,6 +1733,30 @@ final class MysqliDumpDebugInfo extends MysqliClassMethod
         $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::dump_debug_info() requires VM context');
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(VmMysqli::dumpDebugInfoOnLink($receiver, $ctx));
+        }
+    }
+}
+
+/** mysqli::get_warnings() — php-src ext/mysqli/mysqli.stub.php (#22224). */
+final class MysqliGetWarnings extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('get_warnings');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::get_warnings()');
+        $ctx = $frame->vmContext ?? throw new \LogicException('mysqli::get_warnings() requires VM context');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $warning = VmMysqli::getWarningsOnLink($receiver, $ctx);
+        if (null === $warning) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($warning);
         }
     }
 }
