@@ -75,6 +75,24 @@ final class VmSqlite3Udf
     }
 
     /**
+     * Evaluate `SELECT … FROM … ORDER BY col COLLATE name` via PHP callbacks (#22332).
+     *
+     * @param array<string, array{callback: Variable, closure: ?ClosureState, ctx: Context}> $collations
+     */
+    public static function expandCollations(\FFI\CData $db, string $sql, array $collations): string
+    {
+        if ([] === $collations) {
+            return $sql;
+        }
+        $rewritten = self::tryExpandOrderByCollate($db, $sql, $collations);
+        if (null !== $rewritten) {
+            return $rewritten;
+        }
+
+        return $sql;
+    }
+
+    /**
      * @param array{
      *     step: Variable,
      *     stepClosure: ?ClosureState,
@@ -138,6 +156,133 @@ final class VmSqlite3Udf
         $result = VmCallable::invoke($entry['ctx'], $entry['final'], $context, $finalRow);
 
         return 'SELECT '.self::sqlLiteralFromVariable($result);
+    }
+
+    /**
+     * @param array<string, array{callback: Variable, closure: ?ClosureState, ctx: Context}> $collations
+     */
+    private static function tryExpandOrderByCollate(
+        \FFI\CData $db,
+        string $sql,
+        array $collations
+    ): ?string {
+        $pattern = '/^\s*SELECT\s+(.+?)\s+FROM\s+(.+?)\s+ORDER\s+BY\s+([A-Za-z_][A-Za-z0-9_]*)\s+COLLATE\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+(ASC|DESC))?\s*;?\s*$/is';
+        if (1 !== preg_match($pattern, $sql, $m)) {
+            return null;
+        }
+        $collationName = strtolower($m[4]);
+        if (!isset($collations[$collationName])) {
+            return null;
+        }
+        $entry = $collations[$collationName];
+        $orderCol = $m[3];
+        $desc = isset($m[5]) && 0 === strcasecmp((string) $m[5], 'DESC');
+        $baseSql = 'SELECT '.$m[1].' FROM '.$m[2];
+        try {
+            $fetched = self::fetchRowsWithNames($db, $baseSql);
+        } catch (\Throwable) {
+            return null;
+        }
+        $colIndex = null;
+        foreach ($fetched['names'] as $i => $name) {
+            if (0 === strcasecmp((string) $name, $orderCol)) {
+                $colIndex = $i;
+                break;
+            }
+        }
+        if (null === $colIndex) {
+            return null;
+        }
+        self::attachClosure($entry['callback'], $entry['closure']);
+        $rows = $fetched['rows'];
+        usort($rows, static function (array $a, array $b) use ($entry, $colIndex, $desc): int {
+            $left = self::cellToString($a[$colIndex] ?? null);
+            $right = self::cellToString($b[$colIndex] ?? null);
+            $lv = new Variable();
+            $lv->string($left);
+            $rv = new Variable();
+            $rv->string($right);
+            $cmpVar = VmCallable::invoke($entry['ctx'], $entry['callback'], $lv, $rv);
+            $cmp = (int) $cmpVar->resolveIndirect()->toInt();
+            if (0 === $cmp) {
+                return 0;
+            }
+
+            return $desc ? -$cmp : $cmp;
+        });
+        $tmp = '__phpc_cs_'.bin2hex(random_bytes(4));
+        try {
+            VmSqlite3Native::exec($db, 'CREATE TEMP TABLE '.$tmp.' AS '.$baseSql.' LIMIT 0');
+            foreach ($rows as $row) {
+                $literals = [];
+                foreach ($row as $cell) {
+                    $literals[] = self::sqlLiteralFromPhp($cell);
+                }
+                VmSqlite3Native::exec(
+                    $db,
+                    'INSERT INTO '.$tmp.' VALUES ('.implode(', ', $literals).')'
+                );
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return 'SELECT * FROM '.$tmp;
+    }
+
+    /**
+     * @return array{names: list<string>, rows: list<list<string|int|float|null>>}
+     */
+    private static function fetchRowsWithNames(\FFI\CData $db, string $sql): array
+    {
+        $rows = [];
+        $names = [];
+        $stmt = VmSqlite3Native::prepare($db, $sql);
+        try {
+            $colCount = VmSqlite3Native::columnCount($stmt);
+            for ($i = 0; $i < $colCount; ++$i) {
+                $names[] = VmSqlite3Native::columnName($stmt, $i);
+            }
+            while (true) {
+                $rc = VmSqlite3Native::step($stmt);
+                if (VmSqlite3Native::STEP_ROW !== $rc) {
+                    break;
+                }
+                $row = [];
+                for ($i = 0; $i < $colCount; ++$i) {
+                    $row[] = VmSqlite3Native::columnValueAt($stmt, $i);
+                }
+                $rows[] = $row;
+            }
+        } finally {
+            VmSqlite3Native::finalize($stmt);
+        }
+
+        return ['names' => $names, 'rows' => $rows];
+    }
+
+    private static function cellToString(mixed $cell): string
+    {
+        if (null === $cell) {
+            return '';
+        }
+
+        return (string) $cell;
+    }
+
+    private static function sqlLiteralFromPhp(mixed $value): string
+    {
+        if (null === $value) {
+            return 'NULL';
+        }
+        if (\is_int($value) || \is_float($value)) {
+            return (string) $value;
+        }
+        if (\is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        return VmSqlite3Native::quoteSqlLiteral((string) $value);
     }
 
     private static function attachClosure(Variable $callback, ?ClosureState $closure): void

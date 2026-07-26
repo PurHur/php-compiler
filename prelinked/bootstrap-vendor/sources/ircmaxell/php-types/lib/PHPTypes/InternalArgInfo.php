@@ -5606,6 +5606,7 @@ class InternalArgInfo
         'PDO::setAttribute' => ['bool', 'attribute' => 'int', 'value' => ''],
         'PDO::__sleep' => ['int'],
         'PDO::sqliteCreateAggregate' => ['bool', 'function_name' => 'string', 'step_func' => 'callable', 'finalize_func' => 'callable', 'num_args=' => 'int'],
+        'PDO::sqliteCreateCollation' => ['bool', 'name' => 'string', 'callback' => 'callable'],
         'PDO::sqliteCreateFunction' => ['bool', 'function_name' => 'string', 'callback' => 'callable', 'num_args=' => 'int'],
         'PDOStatement::bindColumn' => ['bool', 'column' => '', '&param' => '', 'type=' => 'int', 'maxlen=' => 'int', 'driverdata=' => ''],
         'PDOStatement::bindParam' => ['bool', 'paramno' => '', '&param' => '', 'type=' => 'int', 'maxlen=' => 'int', 'driverdata=' => ''],
