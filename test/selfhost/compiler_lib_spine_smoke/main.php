@@ -5448,6 +5448,7 @@ require_once __DIR__.'/../../../lib/JIT/JitUnaryMinus.php';
 require_once __DIR__.'/../../../lib/JIT/JitUnaryPlus.php';
 require_once __DIR__.'/../../../lib/JIT/JitValueBox.php';
 require_once __DIR__.'/../../../lib/JIT/JitValueCompare.php';
+require_once __DIR__.'/../../../lib/JIT/JitValueNumeric.php';
 require_once __DIR__.'/../../../lib/JIT/JitVmHelperLink.php';
 require_once __DIR__.'/../../../lib/JIT/LateStaticBindingHelper.php';
 require_once __DIR__.'/../../../lib/JIT/LazyBuiltins.php';
