@@ -275,6 +275,10 @@ final class BuiltinParamNames
             case 'mkdir':
                 // php-src ext/standard/basic_functions.stub.php / filestat.c (#23453)
                 return ['directory', 'permissions', 'recursive', 'context'];
+            case 'rmdir':
+                // php-src ext/standard/basic_functions.stub.php / filestat.c (#23454)
+                // Override InternalArgInfo dirname → Zend directory
+                return ['directory', 'context'];
             case 'sem_get':
                 // php-src ext/sysvsem/sysvsem.stub.php (#19515)
                 return ['key', 'max_acquire', 'permissions', 'auto_release'];
