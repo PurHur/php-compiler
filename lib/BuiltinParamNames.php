@@ -332,6 +332,11 @@ final class BuiltinParamNames
                 return ['option', 'value'];
             case 'define':
                 return ['constant_name', 'value', 'case_insensitive'];
+            // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says const_name/name (#23434)
+            case 'constant':
+                return ['name'];
+            case 'defined':
+                return ['constant_name'];
             case 'vsprintf':
                 return ['format', 'args'];
             case 'sprintf':
