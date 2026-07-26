@@ -964,6 +964,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23490 */
+    public function testArrayFillKeysZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_fill_keys');
+        self::assertSame(['keys', 'value'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'keys', 'array_fill_keys'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'value', 'array_fill_keys'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $val)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'val', 'array_fill_keys'));
+    }
+
     /** @covers issue #23206 */
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {
