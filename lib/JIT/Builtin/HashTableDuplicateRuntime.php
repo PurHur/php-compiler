@@ -4,28 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableCowLlvm;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for hashtable COW duplicate via HashTableJitHelper PHP (#18451).
+ * JIT/AOT link for hashtable COW duplicate via {@see HashTableCowLlvm} (#18451, #23548).
  *
- * SSOT: {@see \PHPCompiler\VM\HashTable::duplicate()}
+ * Emits `__hashtable__duplicate` LLVM directly — NestedJIT of HashTableJitHelper mid-cast
+ * scrambled outer CFG (module verify). Host/VM SSOT remains {@see \PHPCompiler\VM\HashTable::duplicate()}
+ * / {@see \PHPCompiler\VM\HashTableJitHelper::duplicateCopy()}.
+ *
  * php-src: Zend/zend_hash.c — zend_array_dup; convert_to_array COW in zend_operators.c
  */
 final class HashTableDuplicateRuntime
 {
     private const ABI_DUPLICATE = '__hashtable__duplicate';
-
-    private const HELPER_PATH = '/VM/HashTableJitHelper.php';
-
-    private const DUPLICATE_HELPER = 'PHPCompiler\\VM\\HashTableJitHelper::duplicateCopy';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::DUPLICATE_HELPER,
-    ];
 
     public static function duplicate(Context $context, Value $srcHt): Value
     {
@@ -56,28 +51,26 @@ final class HashTableDuplicateRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedActive = $context->activeFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_DUPLICATE,
-            'hashtable_duplicate_bridge_entry',
-            [$htPtr],
-            $htPtr,
-            self::DUPLICATE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#18451'
-        );
+        $ft = $context->context->functionType($htPtr, false, $htPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(self::ABI_DUPLICATE, $ft);
+
+        $entry = $fn->appendBasicBlock('hashtable_duplicate_entry');
+        $context->registerFunction(self::ABI_DUPLICATE, $fn);
+        $context->activeFunction = self::ABI_DUPLICATE;
+        $context->builder->positionAtEnd($entry);
+        $result = HashTableCowLlvm::duplicate($context, $fn->getParam(0));
+        $context->builder->returnValue($result);
         self::registerLinkedRuntime($context);
 
+        $context->activeFunction = $savedActive;
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }
@@ -87,7 +80,7 @@ final class HashTableDuplicateRuntime
     {
         $fn = $context->module->getNamedFunction(self::ABI_DUPLICATE);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_DUPLICATE.' missing after HashTableDuplicateRuntime bridge (#18451)');
+            throw new \LogicException(self::ABI_DUPLICATE.' missing after HashTableDuplicateRuntime (#23548)');
         }
         $context->registerFunction(self::ABI_DUPLICATE, $fn);
     }

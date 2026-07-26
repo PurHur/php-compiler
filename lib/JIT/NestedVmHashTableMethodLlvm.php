@@ -12,14 +12,14 @@ namespace PHPCompiler\JIT;
  *
  * Thin standalone AOT (`isThinStandaloneAotMain`, #20533 / #15417): skip keysCopy/valuesCopy
  * registration so ArrayKeys/ArrayValues NestedJIT is not pulled into user-script init.
+ *
+ * COW: `duplicate` / `unionCopy` (#23548) lower via {@see HashTableCowLlvm} — not the
+ * HashTable*Runtime bridges that NestedJIT-compile HashTableJitHelper (would recurse).
  */
 final class NestedVmHashTableMethodLlvm
 {
     /** @var array<string, class-string<Call>|string> */
     private const METHOD_HANDLERS = [
-        'add' => Call\HashTableAdd::class,
-        'append' => Call\HashTableAppend::class,
-        'updateindex' => Call\HashTableUpdateIndex::class,
         'getnumelements' => Call\HashTableGetNumElements::class,
         'padcopy' => Call\HashTablePadCopy::class,
         'valuescopy' => Call\HashTableValuesCopy::class,
@@ -33,6 +33,10 @@ final class NestedVmHashTableMethodLlvm
         'unshiftprepend' => Call\HashTableUnshiftPrepend::class,
         'find' => Call\HashTableFind::class,
         'findindex' => Call\HashTableFindIndex::class,
+        // COW duplicate / array union for HashTableJitHelper NestedJIT (#23548).
+        'duplicate' => Call\HashTableDuplicate::class,
+        'unioncopy' => Call\HashTableUnionCopy::class,
+        // Writes share one NestedJIT proxy (#14601).
         'add' => Call\HashTableWriteNested::class,
         'updateindex' => Call\HashTableWriteNested::class,
         'append' => Call\HashTableWriteNested::class,

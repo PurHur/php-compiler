@@ -41,8 +41,8 @@ final class HashTableDuplicateRuntimeShrinkTest extends TestCase
 
         $this->assertStringContainsString('HashTableDuplicateRuntime::duplicate', $native);
         $this->assertStringContainsString('HashTableDuplicateRuntime::duplicate', $valueBox);
-        $this->assertStringContainsString('HashTableJitHelper::duplicateCopy', $runtime);
-        $this->assertStringContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringContainsString('HashTableCowLlvm::duplicate', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::duplicateHashtable', $native);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::duplicateHashtable', $valueBox);
     }

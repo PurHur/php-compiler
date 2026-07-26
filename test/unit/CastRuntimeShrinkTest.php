@@ -45,7 +45,7 @@ final class CastRuntimeShrinkTest extends TestCase
     public function testCastArrayCowDuplicateUsesHashTableDuplicateRuntime(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/HashTableDuplicateRuntime.php');
-        $this->assertStringContainsString('HashTableJitHelper::duplicateCopy', $runtime);
+        $this->assertStringContainsString('HashTableCowLlvm::duplicate', $runtime);
         $this->assertStringContainsString('__hashtable__duplicate', $runtime);
     }
 }

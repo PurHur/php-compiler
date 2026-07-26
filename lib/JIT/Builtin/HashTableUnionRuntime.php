@@ -4,32 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\HashTableCowLlvm;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array union (`+`) via HashTableJitHelper PHP.
+ * JIT/AOT link for array union (`+`) via {@see HashTableCowLlvm} (#10533, #23548).
  *
- * Restores the bridge deleted as “dead” LLVM in #18409 while {@see \PHPCompiler\JIT\Helper}
- * still called {@see \PHPCompiler\JIT\ArrayBuiltinHelper::arrayUnion} (#10533 Pillar 1 /
- * bootstrap TYPE_PLUS HASHTABLE+VALUE).
+ * Emits `__hashtable__union` LLVM directly — NestedJIT of HashTableJitHelper during
+ * TYPE_PLUS / cast scrambled outer CFG. Host/VM SSOT remains
+ * {@see \PHPCompiler\VM\HashTable::unionCopy()} / {@see \PHPCompiler\VM\HashTableJitHelper::unionCopy()}.
  *
- * SSOT: {@see \PHPCompiler\VM\HashTable::unionCopy()}
  * php-src: Zend/zend_operators.c — add_function array union; Zend/zend_hash.c merge
  */
 final class HashTableUnionRuntime
 {
     private const ABI_UNION = '__hashtable__union';
-
-    private const HELPER_PATH = '/VM/HashTableJitHelper.php';
-
-    private const UNION_HELPER = 'PHPCompiler\\VM\\HashTableJitHelper::unionCopy';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::UNION_HELPER,
-    ];
 
     public static function union(Context $context, Value $leftHt, Value $rightHt): Value
     {
@@ -61,28 +52,26 @@ final class HashTableUnionRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+        $savedActive = $context->activeFunction;
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_UNION,
-            'hashtable_union_bridge_entry',
-            [$htPtr, $htPtr],
-            $htPtr,
-            self::UNION_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#10533'
-        );
+        $ft = $context->context->functionType($htPtr, false, $htPtr, $htPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(self::ABI_UNION, $ft);
+
+        $entry = $fn->appendBasicBlock('hashtable_union_entry');
+        $context->registerFunction(self::ABI_UNION, $fn);
+        $context->activeFunction = self::ABI_UNION;
+        $context->builder->positionAtEnd($entry);
+        $result = HashTableCowLlvm::union($context, $fn->getParam(0), $fn->getParam(1));
+        $context->builder->returnValue($result);
         self::registerLinkedRuntime($context);
 
+        $context->activeFunction = $savedActive;
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }
@@ -92,7 +81,7 @@ final class HashTableUnionRuntime
     {
         $fn = $context->module->getNamedFunction(self::ABI_UNION);
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_UNION.' missing after HashTableUnionRuntime bridge (#10533)');
+            throw new \LogicException(self::ABI_UNION.' missing after HashTableUnionRuntime (#23548)');
         }
         $context->registerFunction(self::ABI_UNION, $fn);
     }

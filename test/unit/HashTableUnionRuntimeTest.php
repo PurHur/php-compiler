@@ -24,6 +24,14 @@ final class HashTableUnionRuntimeTest extends TestCase
         $this->assertStringContainsString('Variable::TYPE_VALUE === $leftType && $rightIsArray', $helper);
     }
 
+    public function testUnionRuntimeEmitsCowLlvmNotNestedHelperLink(): void
+    {
+        $runtime = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/HashTableUnionRuntime.php');
+        $this->assertStringContainsString('HashTableCowLlvm::union', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringContainsString('__hashtable__union', $runtime);
+    }
+
     public function testVmUnionCopyLeftKeysWin(): void
     {
         $left = new \PHPCompiler\VM\HashTable();
