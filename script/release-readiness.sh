@@ -306,6 +306,14 @@ run_gate_allow_skip vm-driver-probe "bootstrap-selfhost-vm-driver-execute-probe"
   make -C "${_CI_REPO_ROOT}" bootstrap-selfhost-vm-driver-execute-probe \
   || FAILED=1
 
+# Committed gen-0 argv driver must compile a never-seen script (#23468). Opt-in via
+# BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE=1 until the seed is honestly rebuilt.
+if [[ "${BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE:-0}" == "1" ]]; then
+  run_gate gen0-driver-functional "bootstrap-gen0-driver-functional-smoke (#23468)" \
+    make -C "${_CI_REPO_ROOT}" bootstrap-gen0-driver-functional-smoke \
+    || FAILED=1
+fi
+
 if [[ "${RELEASE_READINESS_CI_FAST:-0}" == "1" ]]; then
   run_gate ci-fast-subset "ci-fast inventory/doc subset (RELEASE_READINESS_CI_FAST=1)" \
     release_readiness_ci_fast_subset \

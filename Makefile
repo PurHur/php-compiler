@@ -111,7 +111,7 @@ test-docker-fast-jit-preflight: docker-build-22
 	JIT_PREFLIGHT_GATE=1 ./script/docker-ci-local.sh fast
 
 # VM smoke: examples/001-SimpleWeb with ?name=Test
-.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast release-readiness bootstrap-gen0-staleness bootstrap-vendor-native-rebuild-audit
+.PHONY: web-smoke miniwebapp-gates miniwebapp-aot-bisect north-star1-verify north-star2-verify north-star3-verify north-star4-verify north-star5-verify north-star5-verify-fast release-readiness bootstrap-gen0-staleness bootstrap-gen0-driver-functional-smoke bootstrap-gen0-refresh-argv-driver bootstrap-vendor-native-rebuild-audit
 web-smoke:
 	./script/web-smoke.sh
 
@@ -355,6 +355,10 @@ bootstrap-selfhost-lib-spine-smoke:
 	./script/bootstrap-selfhost-lib-spine-smoke-link.sh
 bootstrap-gen0-refresh-sidecar:
 	./script/bootstrap-refresh-gen0-sidecar.sh
+bootstrap-gen0-driver-functional-smoke:
+	./script/bootstrap-gen0-driver-functional-smoke.sh
+bootstrap-gen0-refresh-argv-driver:
+	./script/bootstrap-gen0-refresh-argv-driver.sh
 helper-runtime-prelink-refresh:
 	php script/emit-helper-runtime-object.php --prelink
 helper-runtime-prelink-check:
