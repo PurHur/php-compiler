@@ -811,8 +811,10 @@ final class VmSerialize
         ClassEntry $class,
         Variable $dataVar
     ): Variable {
-        $method = $class->methods['__unserialize'] ?? null;
+        // Resolve parent tables too (SplStack/SplQueue inherit SplDoublyLinkedList::__unserialize; #23368).
+        $method = self::resolveInstanceMethod($ctx, $class, '__unserialize');
         $entry = new ObjectEntry($class);
+        $entry->constructed = true;
         $recv = new Variable();
         $recv->object($entry);
         if ($method instanceof VmClassMethod) {
