@@ -388,7 +388,11 @@ final class Superglobals
     {
         $get = $context->ensureSuperglobal('_GET');
         self::populateFormEncoded($get->toArray(), $queryString);
-        $context->captureFilterInputSnapshot('_GET', $get->toArray());
+        // php-src CLI leaves INPUT_GET storage unset when SAPI never parsed GET → filter_input_array NULL (#23369).
+        // Only snapshot non-empty tables so empty CLI/CGI matches Zend null (not []).
+        if ($get->toArray()->getNumElements() > 0) {
+            $context->captureFilterInputSnapshot('_GET', $get->toArray());
+        }
     }
 
     /** JIT/AOT standalone refresh — $_GET table (#9907). */
@@ -597,7 +601,10 @@ final class Superglobals
         $post = $context->ensureSuperglobal('_POST');
         $files = $context->ensureSuperglobal('_FILES');
         self::populatePostIntoTables($post->toArray(), $files->toArray(), $postBody);
-        $context->captureFilterInputSnapshot('_POST', $post->toArray());
+        // Mirror GET: empty INPUT_POST storage stays unset for filter_input_array (#23369).
+        if ($post->toArray()->getNumElements() > 0) {
+            $context->captureFilterInputSnapshot('_POST', $post->toArray());
+        }
     }
 
     /** JIT/AOT standalone refresh — $_POST table (#9907). */

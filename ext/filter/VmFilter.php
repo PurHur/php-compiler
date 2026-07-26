@@ -126,9 +126,9 @@ final class VmFilter
             || self::FILTER_DEFAULT === $filter;
     }
 
-    public static function unknownFilterWarningMessage(int $filter): string
+    public static function unknownFilterWarningMessage(int $filter, string $function = 'filter_var'): string
     {
-        return 'filter_var(): Unknown filter with ID '.$filter;
+        return $function.'(): Unknown filter with ID '.$filter;
     }
 
     /**
