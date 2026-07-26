@@ -2203,6 +2203,41 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ IntlCalendar::setDate() / setDateTime()
+     * (ext/intl/calendar/calendar.stub.php; #20851, #20905, #22597).
+     *
+     * Withheld on 8.4.0-dev reference profile and PROFILE=8.2 (matches Zend 8.2
+     * method_exists gate). Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsIntlCalendarSetDate(): bool
+    {
+        if (version_compare(self::VERSION, '8.4', '<')) {
+            return false;
+        }
+
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** IntlCalendar::setDate / setDateTime — stable or forward 8.4+ (#22597). */
+    public static function advertisesIntlCalendarSetDate(): bool
+    {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return self::supportsIntlCalendarSetDate();
+    }
+
+    /**
      * PHP 8.4+ Spoofchecker::setAllowedChars() + USET pattern-option consts
      * (ext/intl/spoofchecker/spoofchecker.stub.php; #20823, #23157).
      *
