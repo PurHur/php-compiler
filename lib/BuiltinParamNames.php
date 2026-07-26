@@ -70,8 +70,9 @@ final class BuiltinParamNames
                 return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
                     ? ['string', 'offset', 'length', 'truncate']
                     : ['string', 'offset', 'length'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says cut (#23191)
             case 'wordwrap':
-                return ['string', 'width', 'break', 'cut'];
+                return ['string', 'width', 'break', 'cut_long_words'];
             case 'date':
                 return ['format', 'timestamp'];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says time/now (#23216)

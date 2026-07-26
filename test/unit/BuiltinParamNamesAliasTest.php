@@ -386,15 +386,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp', 'date'));
     }
 
-    /** @covers issue #9524 */
+    /** @covers issue #9524 / #23191 */
     public function testWordwrapNamedParameters(): void
     {
         $names = BuiltinParamNames::forFunction('wordwrap');
-        self::assertSame(['string', 'width', 'break', 'cut'], $names);
+        self::assertSame(['string', 'width', 'break', 'cut_long_words'], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'wordwrap'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'width', 'wordwrap'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'break', 'wordwrap'));
-        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'cut', 'wordwrap'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'cut_long_words', 'wordwrap'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $cut)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'cut', 'wordwrap'));
     }
 
     /** @covers issue #9646 */

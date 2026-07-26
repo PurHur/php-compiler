@@ -1084,7 +1084,7 @@ final class VmString
             throw new \ValueError('wordwrap(): Argument #3 ($break) must be a non-empty string');
         }
         if (0 === $width && $cut) {
-            throw new \ValueError('wordwrap(): Argument #4 ($cut) cannot be true when argument #2 ($width) is 0');
+            throw new \ValueError('wordwrap(): Argument #4 ($cut_long_words) cannot be true when argument #2 ($width) is 0');
         }
 
         if ($cut) {
