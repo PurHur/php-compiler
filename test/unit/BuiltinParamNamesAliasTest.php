@@ -953,6 +953,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'user_string', 'hash_equals'));
     }
 
+    /** @covers issue #23290 */
+    public function testHashHkdfZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash_hkdf');
+        self::assertSame(['algo', 'key', 'length', 'info', 'salt'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'algo', 'hash_hkdf'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'key', 'hash_hkdf'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'hash_hkdf'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'info', 'hash_hkdf'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'salt', 'hash_hkdf'));
+    }
+
     /** @covers issue #23307 */
     public function testIconvFamilyZendStubNamedParams(): void
     {

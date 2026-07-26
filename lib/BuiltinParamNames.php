@@ -360,6 +360,9 @@ final class BuiltinParamNames
                 return ['algo', 'data', 'key', 'binary'];
             case 'hash_pbkdf2':
                 return ['algo', 'password', 'salt', 'iterations', 'length', 'binary'];
+            // php-src ext/hash/hash.stub.php — Reflection was empty without this map (#23290)
+            case 'hash_hkdf':
+                return ['algo', 'key', 'length', 'info', 'salt'];
             // php-src ext/hash/hash.stub.php — Reflection was empty without this map (#23205)
             case 'hash_equals':
                 return ['known_string', 'user_string'];
