@@ -290,6 +290,36 @@ PHP;
         self::assertSame("obj\nversion_ok\n1\n", ob_get_clean());
     }
 
+    /** @requires extension FFI */
+    public function test_resourcebundle_create_fallback_warning_22854(): void
+    {
+        if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::icuAvailable()) {
+            $this->markTestSkipped('ICU FFI unavailable');
+        }
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerResourceBundle($runtime->vmContext);
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\intl_get_error_code());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\intl_get_error_message());
+        $code = <<<'PHP'
+<?php
+$b = ResourceBundle::create('xx_YY', 'ICUDATA', true);
+echo is_object($b) ? "object\n" : "null\n";
+echo intl_get_error_code(), "\n";
+echo intl_get_error_message(), "\n";
+echo $b->getErrorCode(), "\n";
+echo $b->getErrorMessage(), "\n";
+$none = ResourceBundle::create('xx_YY', 'ICUDATA', false);
+echo is_object($none) ? "ff_obj\n" : "ff_null\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_resourcebundle_fallback_22854.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "object\n-127\nU_USING_DEFAULT_WARNING\n-127\nU_USING_DEFAULT_WARNING\nff_null\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_breakiterator_word_parts_via_forced_registration(): void
     {
         $runtime = new Runtime();
