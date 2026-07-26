@@ -22,5 +22,4 @@ array (
   'a' => 'urn:a',
 )
 array (
-  'a' => 'urn:a',
 )

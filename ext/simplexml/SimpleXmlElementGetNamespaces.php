@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Variable;
 
-/** SimpleXMLElement::getNamespaces — in-scope xmlns map (php-src ext/simplexml/sxe.c; #18038). */
+/** SimpleXMLElement::getNamespaces — namespaces in use (php-src sxe_add_namespaces; #22729). */
 final class SimpleXmlElementGetNamespaces extends VmClassMethod
 {
     public function __construct()
