@@ -17245,6 +17245,7 @@ restart:
         foreach ($parent->properties as $property) {
             $isPrivate = ($property->visibility & \PHPCfg\Func::FLAG_PRIVATE) !== 0;
             $exists = false;
+            $childRedeclare = null;
             foreach ($entry->properties as $existing) {
                 if ($existing->name !== $property->name) {
                     continue;
@@ -17253,11 +17254,13 @@ restart:
                 if ($isPrivate) {
                     if ($existing->declaringClassLc === $property->declaringClassLc) {
                         $exists = true;
+                        $childRedeclare = $existing;
                         break;
                     }
                     continue;
                 }
                 $exists = true;
+                $childRedeclare = $existing;
                 break;
             }
             if ($exists) {
@@ -17266,6 +17269,10 @@ restart:
                 // this runtime path (see final class const #22329).
                 if (!$isPrivate && $property->propertyFinal) {
                     $this->rejectChildOverrideOfFinalProperty($entry, $property);
+                }
+                // Typed property invariance across eval/include (#23505, zend_inheritance.c).
+                if (!$isPrivate && null !== $childRedeclare) {
+                    $this->rejectIncompatibleChildPropertyType($entry, $property, $childRedeclare);
                 }
                 continue;
             }
@@ -19092,6 +19099,125 @@ restart:
             $ownerDisplay,
             $parentProperty->name
         ));
+    }
+
+    /**
+     * php-src zend_inheritance.c — property type invariance (#23505).
+     * Same-script compile is covered by TypedPropertyInheritCheck; cross-eval needs this path.
+     */
+    private function rejectIncompatibleChildPropertyType(
+        ClassEntry $entry,
+        VM\ClassProperty $parentProperty,
+        VM\ClassProperty $childProperty
+    ): void {
+        $parentOwnerLc = $parentProperty->declaringClassLc !== ''
+            ? $parentProperty->declaringClassLc
+            : (string) ($entry->parentLc ?? '');
+        $childOwnerLc = $childProperty->declaringClassLc !== ''
+            ? $childProperty->declaringClassLc
+            : strtolower(ltrim($entry->name, '\\'));
+        if ($this->propertyTypesAreInvariant($parentProperty, $childProperty, $parentOwnerLc, $childOwnerLc)) {
+            return;
+        }
+        $ownerDisplay = $parentOwnerLc;
+        if (isset($this->context->classes[$ownerDisplay])) {
+            $ownerDisplay = $this->context->classes[$ownerDisplay]->name;
+        }
+        if ('' === $ownerDisplay) {
+            $ownerDisplay = 'parent';
+        }
+        if (!$parentProperty->hasDeclaredType() && $childProperty->hasDeclaredType()) {
+            throw new \CompileError(sprintf(
+                'Type of %s::$%s must not be defined (as in class %s)',
+                $entry->name,
+                $childProperty->name,
+                $ownerDisplay
+            ));
+        }
+        throw new \CompileError(sprintf(
+            'Type of %s::$%s must be %s (as in class %s)',
+            $entry->name,
+            $childProperty->name,
+            $this->formatPropertyTypeForInheritError($parentProperty),
+            $ownerDisplay
+        ));
+    }
+
+    private function propertyTypesAreInvariant(
+        VM\ClassProperty $parent,
+        VM\ClassProperty $child,
+        string $parentOwnerLc,
+        string $childOwnerLc
+    ): bool {
+        $parentTyped = $parent->hasDeclaredType();
+        $childTyped = $child->hasDeclaredType();
+        if (!$parentTyped && !$childTyped) {
+            return true;
+        }
+        if (!$parentTyped || !$childTyped) {
+            return false;
+        }
+        $parentKey = $this->propertyTypeInvariantKey($parent, $parentOwnerLc);
+        $childKey = $this->propertyTypeInvariantKey($child, $childOwnerLc);
+        if ($parentKey === $childKey) {
+            return true;
+        }
+
+        return $this->propertyTypeResolvedKey($parent, $parentOwnerLc)
+            === $this->propertyTypeResolvedKey($child, $childOwnerLc);
+    }
+
+    private function propertyTypeInvariantKey(VM\ClassProperty $property, string $ownerLc): string
+    {
+        $proto = $property->prototype;
+        $label = strtolower((string) ($proto->declaredTypeLabel ?? ''));
+        if ('' !== $label) {
+            return $label;
+        }
+        $class = strtolower((string) ($proto->classConstraint ?? ''));
+        if ('' !== $class) {
+            return $class;
+        }
+        if (null !== $proto->typeConstraint) {
+            return 'tc:'.(string) $proto->typeConstraint;
+        }
+        // Explicit mixed: typed UNDEFINED without label/constraint.
+        if (Variable::TYPE_UNDEFINED === $proto->type) {
+            return 'mixed';
+        }
+
+        return 'typed';
+    }
+
+    private function propertyTypeResolvedKey(VM\ClassProperty $property, string $ownerLc): string
+    {
+        $key = $this->propertyTypeInvariantKey($property, $ownerLc);
+        if ('self' === $key || 'static' === $key) {
+            return strtolower($ownerLc);
+        }
+
+        return $key;
+    }
+
+    private function formatPropertyTypeForInheritError(VM\ClassProperty $property): string
+    {
+        $proto = $property->prototype;
+        $label = (string) ($proto->declaredTypeLabel ?? '');
+        if ('' !== $label) {
+            return $label;
+        }
+        $class = (string) ($proto->classConstraint ?? '');
+        if ('' !== $class) {
+            return $class;
+        }
+        if (Variable::TYPE_UNDEFINED === $proto->type) {
+            return 'mixed';
+        }
+        if (null !== $proto->typeConstraint) {
+            return TypeCheck::typeNameForConstraint((int) $proto->typeConstraint);
+        }
+
+        return '';
     }
 
     /**

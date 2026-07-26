@@ -443,4 +443,68 @@ PHP;
         $this->expectExceptionMessage('Declaration of B::f(stdClass $x): void must be compatible with A::f(object $x): void');
         $runtime->parseAndCompile($code, 'object_param_narrow.php');
     }
+
+    /** Zend: property types are invariant — stdClass → object fatal (#23505). */
+    public function testPropertyTypeWidenFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public stdClass $x; }
+class B extends A { public object $x; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Type of B::$x must be stdClass (as in class A)');
+        $runtime->parseAndCompile($code, 'prop_type_widen.php');
+    }
+
+    /** Zend: identical property types (including self/self) inherit cleanly (#23505). */
+    public function testIdenticalPropertyTypesAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public stdClass $x; }
+class B extends A { public stdClass $x; }
+class C { public self $y; }
+class D extends C { public self $y; }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'prop_type_identical.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Zend: private parent properties may change type (#23505). */
+    public function testPrivatePropertyTypeChangeAllowed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { private stdClass $x; }
+class B extends A { public object $x; }
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'prop_private_redeclare.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Zend: adding a type to an untyped parent property fatals (#23505). */
+    public function testAddingPropertyTypeFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A { public $x; }
+class B extends A { public object $x; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Type of B::$x must not be defined (as in class A)');
+        $runtime->parseAndCompile($code, 'prop_add_type.php');
+    }
 }

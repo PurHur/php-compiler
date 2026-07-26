@@ -86,6 +86,7 @@ use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Compiler\TraitCollisionCheck;
 use PHPCompiler\Compiler\ClassConstVisibilityInheritCheck;
 use PHPCompiler\Compiler\TypedClassConstInheritCheck;
+use PHPCompiler\Compiler\TypedPropertyInheritCheck;
 use PHPCompiler\Compiler\ClassCompileRegistry;
 use PHPCompiler\Compiler\OverrideValidator;
 use PHPCompiler\Web\ConstStringFolder;
@@ -574,6 +575,7 @@ class Compiler {
         ImplementsHierarchyCompileCheck::validate($script);
         FinalMethodOverrideCheck::validate($script);
         FinalPropertyOverrideCheck::validate($script, $this->propertyHookRegistry);
+        TypedPropertyInheritCheck::validate($script);
         OverrideValidator::validateScript($script);
         FinalClassConstCheck::validate($script);
         TraitClassConstConflictCheck::validate($script);
