@@ -95,7 +95,27 @@ final class ReadonlyClassGuard
             );
             $reinitBlock = $fn->appendBasicBlock('readonly_reinit_'.$id);
             $violateBlock = $fn->appendBasicBlock('readonly_violate_'.$id);
-            $context->builder->branchIf($notConstructed, $storeBlock, $reinitBlock);
+            // Post-construction first init from declaring-class scope (#23475).
+            $firstInitBlock = null;
+            if (self::callerMayFirstInitReadonlyProperty(
+                $context,
+                $objectType,
+                $enclosingBlock,
+                $propName
+            )) {
+                $firstInitBlock = $fn->appendBasicBlock('readonly_first_init_'.$id);
+                $context->builder->branchIf($notConstructed, $storeBlock, $firstInitBlock);
+                $context->builder->positionAtEnd($firstInitBlock);
+                $isUninit = self::emitPropertySlotIsUninitialized($context, $lvalue);
+                if (null !== $isUninit) {
+                    $context->builder->branchIf($isUninit, $storeBlock, $reinitBlock);
+                } else {
+                    // Cannot inspect slot — keep post-construct deny/reinit path.
+                    $context->builder->branch($reinitBlock);
+                }
+            } else {
+                $context->builder->branchIf($notConstructed, $storeBlock, $reinitBlock);
+            }
             $context->builder->positionAtEnd($reinitBlock);
             CloneWithReinitRuntime::ensureLinked($context);
             $reinitOk = CloneWithReinitRuntime::emitTryConsumePropertyName($context, $obj, $propName);
@@ -124,6 +144,82 @@ final class ReadonlyClassGuard
         $context->builder->positionAtEnd($storeBlock);
         $context->builder->branch($exitBlock);
         $context->builder->positionAtEnd($exitBlock);
+    }
+
+    /**
+     * True when the enclosing method's class may perform first post-construct init (#23475).
+     *
+     * php-src: Zend/zend_object_handlers.c / Zend/zend_readonly.c — any declaring-class
+     * instance method may initialize an uninitialized readonly property once.
+     */
+    private static function callerMayFirstInitReadonlyProperty(
+        Context $context,
+        Object_ $objectType,
+        ?Block $enclosingBlock,
+        string $propName
+    ): bool {
+        $callerClassId = self::callerClassId($context, $enclosingBlock);
+        if (null === $callerClassId) {
+            return false;
+        }
+        $meta = $objectType->instancePropertyVisibilityMeta($callerClassId, $propName);
+        if (null === $meta || !$objectType->isPropertyReadonly($meta['declaringClassId'], $propName)) {
+            return false;
+        }
+
+        return $callerClassId === $meta['declaringClassId'];
+    }
+
+    /**
+     * Emit i1: property slot is uninitialized (null or TYPE_UNDEFINED __value__).
+     *
+     * @return \PHPLLVM\Value|null i1 predicate, or null when the slot cannot be inspected
+     */
+    private static function emitPropertySlotIsUninitialized(Context $context, Variable $lvalue): ?\PHPLLVM\Value
+    {
+        if (null === $lvalue->objectPropertySlot) {
+            return null;
+        }
+        $voidPtr = $context->getTypeFromString('void*');
+        $loaded = $context->builder->pointerCast(
+            $context->builder->load($lvalue->objectPropertySlot),
+            $voidPtr
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $loaded,
+            $voidPtr->constNull()
+        );
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        $checkType = $fn->appendBasicBlock('readonly_slot_type_check');
+        $merge = $fn->appendBasicBlock('readonly_slot_uninit_merge');
+        $entry = $context->builder->getInsertBlock();
+        $context->builder->branchIf($isNull, $merge, $checkType);
+
+        $context->builder->positionAtEnd($checkType);
+        $valuePtr = $context->builder->pointerCast(
+            $loaded,
+            $context->getTypeFromString('__value__*')
+        );
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isUndef = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_UNDEFINED, false)
+        );
+        $context->builder->branch($merge);
+
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($context->getTypeFromString('int1'));
+        $phi->addIncoming($context->getTypeFromString('int1')->constInt(1, false), $entry);
+        $phi->addIncoming($isUndef, $checkType);
+
+        return $phi;
     }
 
     /**
