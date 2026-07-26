@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
@@ -15,6 +16,9 @@ final class VmIni
 {
     /** php-src INI_ALL — user/perdir/system readable. */
     private const INI_ACCESS_ALL = 7;
+
+    /** php-src INI_SYSTEM — php.ini / -d only (main/main.c max_memory_limit, #23232). */
+    private const INI_ACCESS_SYSTEM = 4;
 
     /** Read-only boolean directives with Zend CLI defaults (ext/standard/ini.c, #11356, #14844). */
     private const READONLY_BOOL_DEFAULTS = [
@@ -167,6 +171,9 @@ final class VmIni
 
     private const CFG_MEMORY_LIMIT = '-1';
 
+    /** php-src PG(max_memory_limit) default -1 (main/main.c, #23232). */
+    private const CFG_MAX_MEMORY_LIMIT = '-1';
+
     /** php-src PG(precision) default 14 (ext/standard/ini.c, issue #11841). */
     private const CFG_PRECISION = '14';
 
@@ -185,6 +192,10 @@ final class VmIni
         if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
             return VmAssertState::iniSet($option, $newValue);
         }
+        // php-src: max_memory_limit is PHP_INI_SYSTEM — runtime ini_set() fails (#23232).
+        if ('max_memory_limit' === $key) {
+            return false;
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return false;
         }
@@ -195,7 +206,7 @@ final class VmIni
             case 'display_errors':
                 return self::setDisplayErrors($ctx, $newValue);
             case 'memory_limit':
-                return self::setMemoryLimit($newValue);
+                return self::setMemoryLimit($ctx, $newValue);
             case 'precision':
                 return self::setPrecision($newValue);
             case 'serialize_precision':
@@ -241,6 +252,9 @@ final class VmIni
     /** @return string|false */
     public static function get(Context $ctx, string $option) {
         $key = strtolower($option);
+        if ('max_memory_limit' === $key) {
+            return CompilerVersion::supportsMaxMemoryLimit() ? self::$maxMemoryLimit : false;
+        }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
             return self::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
         }
@@ -331,6 +345,9 @@ final class VmIni
     public static function getCfgVar(string $option): string|false
     {
         $key = strtolower($option);
+        if ('max_memory_limit' === $key) {
+            return CompilerVersion::supportsMaxMemoryLimit() ? self::CFG_MAX_MEMORY_LIMIT : false;
+        }
         if (in_array($key, self::CFG_EMPTY_STRING_KEYS, true)) {
             return '';
         }
@@ -395,6 +412,12 @@ final class VmIni
         self::$precision = $precision;
     }
 
+    /** Sync memory_limit string from JIT ini_set after ceiling clamp (#23232). */
+    public static function syncMemoryLimitFromJit(string $value): void
+    {
+        self::$memoryLimit = $value;
+    }
+
     /** Sync from JIT ini_set path ({@see IniJitHelper}) for getTraceAsString truncation (#21999). */
     public static function syncExceptionStringParamMaxLen(int $maxLen): void
     {
@@ -423,6 +446,9 @@ final class VmIni
     private static ?string $displayErrorsLocalValue = null;
 
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
+
+    /** php-src PG(max_memory_limit) — INI_SYSTEM ceiling for memory_limit (#23232). */
+    private static string $maxMemoryLimit = self::CFG_MAX_MEMORY_LIMIT;
 
     private static int $precision = 14;
 
@@ -503,6 +529,18 @@ final class VmIni
         }
         if ('phar.readonly' === $key) {
             \PHPCompiler\ext\phar\VmPhar::setStartupReadonly(self::parseBoolIni($value));
+
+            return true;
+        }
+        if ('max_memory_limit' === $key) {
+            if (!CompilerVersion::supportsMaxMemoryLimit()) {
+                return false;
+            }
+            // php-src OnChangeMaxMemoryLimit: sets both PG(memory_limit) and PG(max_memory_limit).
+            self::$maxMemoryLimit = $value;
+            self::$memoryLimit = $value;
+            IniJitHelper::syncMaxMemoryLimit($value);
+            IniJitHelper::syncMemoryLimitString($value);
 
             return true;
         }
@@ -607,11 +645,56 @@ final class VmIni
         return self::formatBoolIniGet($ctx->errors->getDisplayErrors());
     }
 
-    private static function setMemoryLimit(string $newValue) {
+    private static function setMemoryLimit(Context $ctx, string $newValue) {
         $old = self::$memoryLimit;
-        self::$memoryLimit = $newValue;
+        $effective = self::clampMemoryLimitToMax($newValue, $ctx, false);
+        self::$memoryLimit = $effective;
+        IniJitHelper::syncMemoryLimitString($effective);
 
         return $old;
+    }
+
+    /**
+     * Enforce max_memory_limit ceiling when setting memory_limit (main/main.c OnChangeMemoryLimit, #23232).
+     *
+     * Unlimited request (-1) above a finite ceiling clamps silently; other overshoots warn then clamp.
+     */
+    public static function clampMemoryLimitToMax(string $newValue, ?Context $ctx, bool $jitWarn): string
+    {
+        if (!CompilerVersion::supportsMaxMemoryLimit()) {
+            return $newValue;
+        }
+        $maxStr = self::$maxMemoryLimit;
+        $maxBytes = VmIniQuantity::parseQuantity($maxStr, $ctx);
+        // Default / unlimited ceiling: no restriction.
+        if ($maxBytes < 0) {
+            return $newValue;
+        }
+        $reqBytes = VmIniQuantity::parseQuantity($newValue, $ctx);
+        $exceeds = $reqBytes < 0 || $reqBytes > $maxBytes;
+        if (!$exceeds) {
+            return $newValue;
+        }
+        // php-src: warn only when the requested value is not unlimited (-1 as size_t).
+        if ($reqBytes >= 0) {
+            $message = \sprintf(
+                'Failed to set memory_limit to %d bytes. Setting to max_memory_limit instead (currently: %d bytes)',
+                $reqBytes,
+                $maxBytes
+            );
+            if ($jitWarn) {
+                TriggerErrorJitHelper::warning($message);
+            } elseif (null !== $ctx) {
+                $ctx->errors->triggerError(
+                    $message,
+                    ErrorReporter::E_WARNING,
+                    null,
+                    $ctx
+                );
+            }
+        }
+
+        return $maxStr;
     }
 
     private static function setPrecision(string $newValue) {
@@ -782,7 +865,8 @@ final class VmIni
                 $ctx->errors->setDisplayErrors(self::parseBoolIni(self::CFG_DISPLAY_ERRORS));
                 break;
             case 'memory_limit':
-                self::$memoryLimit = self::CFG_MEMORY_LIMIT;
+                self::$memoryLimit = self::clampMemoryLimitToMax(self::CFG_MEMORY_LIMIT, $ctx, false);
+                IniJitHelper::syncMemoryLimitString(self::$memoryLimit);
                 break;
             case 'precision':
                 self::$precision = self::parsePrecision(self::CFG_PRECISION);
@@ -973,7 +1057,7 @@ final class VmIni
                 $entry = new HashTable();
                 $global = self::detailGlobalValue($ctx, $key);
                 $local = self::detailLocalValue($ctx, $key);
-                $access = self::INI_ACCESS_ALL;
+                $access = 'max_memory_limit' === $key ? self::INI_ACCESS_SYSTEM : self::INI_ACCESS_ALL;
                 $registry = VmIniIntrospection::registryEntry($key);
                 if (null !== $registry) {
                     $access = $registry['access'];
@@ -1015,7 +1099,7 @@ final class VmIni
     /** Static fallback when host ini registry is unavailable (#16433). */
     private static function allStaticRegistryKeys(): array
     {
-        return array_values(array_unique(array_merge(
+        $keys = array_values(array_unique(array_merge(
             self::SUPPORTED_KEYS,
             array_keys(self::READONLY_BOOL_DEFAULTS),
             array_keys(self::READONLY_STRING_DEFAULTS),
@@ -1023,6 +1107,11 @@ final class VmIni
             VmIniIntrospection::MIRRORED_HOST_INI_KEYS,
             ['engine', 'zend.exception_ignore_args'],
         )));
+        if (CompilerVersion::supportsMaxMemoryLimit()) {
+            $keys[] = 'max_memory_limit';
+        }
+
+        return array_values(array_unique($keys));
     }
 
     private static function detailLocalValue(Context $ctx, string $key): ?string

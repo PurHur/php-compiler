@@ -2330,6 +2330,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ max_memory_limit INI (main/main.c; #23232).
+     *
+     * Ceiling for memory_limit — INI_SYSTEM, default "-1". Absent on PROFILE&lt;8.5 so
+     * ini_get() is false like Zend.
+     */
+    public static function supportsMaxMemoryLimit(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ generator_to_array() (ext/standard/array.c, issue #6025, #16723, #17118, #18084).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 phantom gate). Enable via stable
