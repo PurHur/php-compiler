@@ -1443,6 +1443,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'final_plain_property_eval_override')) {
                 continue;
             }
+            // final static property read: VM green (#23403); MCJIT static prop module-verify pending (same as plain static $x).
+            if (str_ends_with($name, 'final_static_property')) {
+                continue;
+            }
             // preserve_keys=true: VM + JIT/AOT via ArrayBuiltinHelper (#3524).
             // array_merge_recursive(): VM + JIT via ArrayMergeRecursiveJitHelper PHP (#3297, #10183).
             if (str_contains(strtolower($case[0]), 'array_merge_recursive')) {

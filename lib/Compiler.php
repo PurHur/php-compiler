@@ -7484,21 +7484,26 @@ class Compiler {
                             || $this->isReadonlyPropertyFlags($child->visibility);
                         $declare->propertyLazy = (property_exists($child, 'propertyLazy') && $child->propertyLazy)
                             || LazyPropertyRewriter::isLazyFromAttributes($child->getAttributes());
-                        // Explicit `final` vs implicit from private(set) (zend_API.c, #23068).
-                        $explicitFinal = $this->isFinalPropertyDeclaration($child);
-                        $declare->propertyFinal = $explicitFinal
-                            || PropertyVisibility::isImplicitlyFinalFromPrivateSet(
+                    }
+                    // Explicit `final` (instance + static) — recover from propertyFlags when CFG
+                    // visibility is VISIBILITY_MODIFIER_MASK-stripped (#23403, re-#23036/#22308).
+                    // php-src Zend 8.2 rejects all finals; 8.4 allows plain + static finals.
+                    $explicitFinal = $this->isFinalPropertyDeclaration($child);
+                    $declare->propertyFinal = $explicitFinal
+                        || (
+                            !$child->static
+                            && PropertyVisibility::isImplicitlyFinalFromPrivateSet(
                                 (int) $declare->propertySetVisibility
-                            );
-                        if ($explicitFinal && !CompilerVersion::supportsFinalProperties()) {
-                            // php-src Zend/zend_compile.c — pre-8.4 (#22308, re-#22241).
-                            $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
-                            $this->throwCompileError(sprintf(
-                                'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
-                                $classDisplay,
-                                $propName
-                            ));
-                        }
+                            )
+                        );
+                    if ($explicitFinal && !CompilerVersion::supportsFinalProperties()) {
+                        // php-src Zend/zend_compile.c — pre-8.4 (#22308, re-#22241, #23403).
+                        $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
+                        $this->throwCompileError(sprintf(
+                            'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
+                            $classDisplay,
+                            $propName
+                        ));
                     }
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeTargetValidator::assertEntriesForTarget(
@@ -8252,8 +8257,9 @@ class Compiler {
     }
 
     /**
-     * PHP 8.4 final property from php-parser MODIFIER_FINAL (#22241).
+     * PHP 8.4 final property from php-parser MODIFIER_FINAL (#22241, #23403).
      *
+     * CFG `visibility` is VISIBILITY_MODIFIER_MASK only — recover FINAL from `propertyFlags`.
      * Hooked finals strip `final` before parse and set registry finalProperty (#16799).
      */
     protected function isFinalPropertyDeclaration(Op\Stmt\Property $prop): bool

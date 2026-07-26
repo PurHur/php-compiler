@@ -12323,6 +12323,10 @@ class JIT {
                             $name->value
                         );
                     }
+                    // PHP 8.4 final static (#23403) — same mark as instance finals for override/write guards.
+                    if ($op->propertyFinal ?? false) {
+                        $this->context->type->object->markPropertyFinal($classId, $name->value);
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_PROPERTY:
                     $name = $block->getOperand($op->arg1);
