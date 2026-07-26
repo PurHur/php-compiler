@@ -315,6 +315,11 @@ final class VmNumberFormatter
             'errorCode' => IntlError::U_ZERO_ERROR,
             'errorMessage' => 'U_ZERO_ERROR',
         ];
+        // Explicit pattern (PATTERN_DECIMAL arg or style default with '.') drives
+        // MIN/MAX_FRACTION_DIGITS like ICU DecimalFormat.applyPattern (#22579).
+        if (null !== $pattern && '' !== $pattern) {
+            self::applyPatternDigitAttributes($object->id, $pattern);
+        }
         IntlError::clear();
     }
 
@@ -958,9 +963,10 @@ final class VmNumberFormatter
     }
 
     /**
-     * Mirror ICU DecimalFormat.applyPattern digit / grouping effects (#22919).
+     * Mirror ICU DecimalFormat.applyPattern digit / grouping effects (#22919, #22579).
      * Positive subpattern only (before ';'). Min integer digits = count of '0' in
      * the integer section; absence of ',' disables grouping.
+     * Fraction: '0' → required (min); '#' → optional; both count toward max.
      */
     private static function applyPatternDigitAttributes(int $id, string $pattern): void
     {
@@ -968,9 +974,15 @@ final class VmNumberFormatter
         self::$state[$id]['attributes'][self::GROUPING_USED] = str_contains($pos, ',') ? 1 : 0;
 
         $intPart = $pos;
+        $fracPart = '';
         $dot = strpos($pos, '.');
         if (false !== $dot) {
             $intPart = substr($pos, 0, $dot);
+            $fracPart = substr($pos, $dot + 1);
+            $eInFrac = stripos($fracPart, 'E');
+            if (false !== $eInFrac) {
+                $fracPart = substr($fracPart, 0, $eInFrac);
+            }
         } else {
             $ePos = stripos($pos, 'E');
             if (false !== $ePos) {
@@ -981,6 +993,20 @@ final class VmNumberFormatter
         if ($minZeros > 0) {
             self::$state[$id]['attributes'][self::MIN_INTEGER_DIGITS] = $minZeros;
             self::$state[$id]['attributes'][self::INTEGER_DIGITS] = $minZeros;
+        }
+
+        // Fraction digit attrs from pattern (ICU DecimalFormat; #22579).
+        if (false !== $dot) {
+            $minFrac = substr_count($fracPart, '0');
+            $maxFrac = $minFrac + substr_count($fracPart, '#');
+            self::$state[$id]['attributes'][self::MIN_FRACTION_DIGITS] = $minFrac;
+            self::$state[$id]['attributes'][self::MAX_FRACTION_DIGITS] = $maxFrac;
+            self::$state[$id]['attributes'][self::FRACTION_DIGITS] = $minFrac;
+        } elseif ('' !== $pos && !str_contains($pos, 'E') && !str_contains($pos, 'e')) {
+            // No decimal section → 0 fraction digits (e.g. '#,##0').
+            self::$state[$id]['attributes'][self::MIN_FRACTION_DIGITS] = 0;
+            self::$state[$id]['attributes'][self::MAX_FRACTION_DIGITS] = 0;
+            self::$state[$id]['attributes'][self::FRACTION_DIGITS] = 0;
         }
     }
 
