@@ -1061,6 +1061,7 @@ final class VmMysqliResult
             'fetch_assoc' => new MysqliResultFetchAssoc(),
             'fetch_array' => new MysqliResultFetchArray(),
             'fetch_row' => new MysqliResultFetchRow(),
+            'fetch_column' => new MysqliResultFetchColumn(),
             'free' => new MysqliResultFree(),
             'close' => new MysqliResultFree(),
             'free_result' => new MysqliResultFree(),
@@ -1202,6 +1203,55 @@ final class VmMysqliResult
         }
 
         return array_map('intval', $lengths);
+    }
+
+    /**
+     * mysqli_fetch_column / mysqli_result::fetch_column — php-src mysqli_nonapi.c (#22214).
+     *
+     * Returns false at EOF (not null). ValueError on negative / out-of-range $column.
+     *
+     * @return null|int|float|string|false
+     */
+    public static function fetchColumn(
+        \mysqli_result $native,
+        int $column,
+        string $funcLabel,
+        int $columnArgPos
+    ): mixed {
+        if ($column < 0) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($column) must be greater than or equal to 0',
+                $funcLabel,
+                $columnArgPos
+            ));
+        }
+        if ($column >= $native->field_count) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($column) must be less than the number of fields for this result set',
+                $funcLabel,
+                $columnArgPos
+            ));
+        }
+        if (\is_callable([$native, 'fetch_column'])) {
+            return $native->fetch_column($column);
+        }
+        $row = $native->fetch_row();
+        if (null === $row || false === $row) {
+            return false;
+        }
+
+        return \array_key_exists($column, $row) ? $row[$column] : null;
+    }
+
+    /** Assign scalar / false / null fetch_column result (#22214). */
+    public static function assignFetchColumnResult(Variable $returnVar, mixed $value): void
+    {
+        if (false === $value) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        self::assignScalarToVariable($returnVar, $value);
     }
 
     public static function requireResultObject(Variable $var, string $label): ObjectEntry
@@ -2266,6 +2316,32 @@ final class MysqliResultFetchRow extends MysqliClassMethod
         } else {
             VmMysqli::assignRow($frame->returnVar, $row);
         }
+    }
+}
+
+/** mysqli_result::fetch_column() — php-src ext/mysqli/mysqli_nonapi.c (#22214). */
+final class MysqliResultFetchColumn extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetch_column');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli_result::fetch_column()');
+        $native = VmMysqliResult::requireNative($receiver);
+        $column = 0;
+        if (\count($frame->calledArgs) >= 2) {
+            $column = $this->intArg($frame->calledArgs[1], 'mysqli_result::fetch_column', 0, 'column', 0);
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        VmMysqliResult::assignFetchColumnResult(
+            $frame->returnVar,
+            VmMysqliResult::fetchColumn($native, $column, 'mysqli_result::fetch_column', 1)
+        );
     }
 }
 
