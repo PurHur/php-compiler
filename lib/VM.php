@@ -1555,7 +1555,8 @@ class VM {
     }
 
     /**
-     * Separate backing cleared by unset/null — isset/empty probe storage only, never get hook (#11617).
+     * Separate backing cleared by unset — isset/empty probe storage only, never get hook (#11617, #23339).
+     * Initialized null backing is not "unset": Zend invokes the get hook (zend_std_has_property).
      */
     private function hookedPropertyDistinctBackingUnsetForIssetEmpty(ObjectEntry $object, string $propName): bool
     {
@@ -1568,8 +1569,7 @@ class VM {
         }
 
         return $backing->isUndefined()
-            || VM\TypedPropertyCheck::isUninitialized($backing)
-            || Variable::TYPE_NULL === $backing->type;
+            || VM\TypedPropertyCheck::isUninitialized($backing);
     }
 
     /**
@@ -1822,20 +1822,18 @@ class VM {
             $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? $propName;
         }
         if ($object->hasProperty($backingName)) {
+            // Always UNDEF after unset — distinguish from initialized null so isset/empty
+            // can invoke get for `?T $backing = null` defaults (#23339 / re-#17260).
             $slot = $object->getProperty($backingName);
-            if (VM\TypedPropertyCheck::propertyAllowsNull($slot)) {
-                $slot->null();
-            } else {
-                $slot->reset();
-                $slot->type = Variable::TYPE_UNDEFINED;
-            }
+            $slot->reset();
+            $slot->type = Variable::TYPE_UNDEFINED;
         }
         if (0 !== strcasecmp($backingName, $propName)) {
             $this->unsetObjectProperty($object, $propName);
         }
     }
 
-    /** Clear registry-recorded get/set backing field after hooked-property unset (#6471, #5191, #11617). */
+    /** Clear registry-recorded get/set backing field after hooked-property unset (#6471, #5191, #11617, #23339). */
     private function resetHookedPropertyBackingField(ObjectEntry $object, string $propName): void
     {
         $lcClass = strtolower($object->class->name);
@@ -1849,12 +1847,8 @@ class VM {
         if (null === $backingName || !$object->hasProperty($backingName)) {
             return;
         }
+        // UNDEF (not null) so nullable init-null still runs get on isset/empty (#23339).
         $slot = $object->getProperty($backingName);
-        if (VM\TypedPropertyCheck::propertyAllowsNull($slot)) {
-            $slot->null();
-
-            return;
-        }
         $slot->reset();
         $slot->type = Variable::TYPE_UNDEFINED;
     }
