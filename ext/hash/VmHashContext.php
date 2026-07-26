@@ -22,7 +22,18 @@ final class VmHashContext
 {
     public const CLASS_LC = 'hashcontext';
 
-    /** @var array<int, array{algo: int, ctx: array<string, mixed>, finalized: bool}> */
+    /** php-src PHP_HASH_HMAC / HASH_HMAC (ext/hash/php_hash.h; #23585). */
+    public const HASH_HMAC = 1;
+
+    /**
+     * @var array<int, array{
+     *     algo: int,
+     *     ctx: array<string, mixed>,
+     *     finalized: bool,
+     *     flags: int,
+     *     hmacKey: ?string
+     * }>
+     */
     private static array $store = [];
 
     public static function registerClass(Context $ctx): void
@@ -48,7 +59,7 @@ final class VmHashContext
     }
 
     /**
-     * @return array{algo: int, ctx: array<string, mixed>, finalized: bool}|null
+     * @return array{algo: int, ctx: array<string, mixed>, finalized: bool, flags: int, hmacKey: ?string}|null
      */
     public static function exportStoreState(ObjectEntry $entry): ?array
     {
@@ -67,12 +78,16 @@ final class VmHashContext
         ObjectEntry $entry,
         int $algoId,
         array $ctx,
-        bool $finalized = false
+        bool $finalized = false,
+        int $flags = 0,
+        ?string $hmacKey = null
     ): void {
         self::$store[$entry->id] = [
             'algo' => $algoId,
             'ctx' => $ctx,
             'finalized' => $finalized,
+            'flags' => $flags,
+            'hmacKey' => $hmacKey,
         ];
     }
 
@@ -86,11 +101,29 @@ final class VmHashContext
         return VmHashNative::resolveAlgoName($state['algo']);
     }
 
-    public static function init(Context $vmCtx, string $algo): Variable
+    /**
+     * hash_init() — php-src ext/hash/hash.c (#7174, #23585).
+     *
+     * @param int $flags PHP_HASH_HMAC bit and reserved flags
+     */
+    public static function init(Context $vmCtx, string $algo, int $flags = 0, string $key = ''): Variable
     {
         $algoId = VmHashNative::resolveAlgoId($algo);
         if (0 === $algoId) {
             throw new \ValueError('hash_init(): Argument #1 ($algo) must be a valid hashing algorithm');
+        }
+        $hmac = 0 !== ($flags & self::HASH_HMAC);
+        if ($hmac) {
+            if (!VmHashNative::isCryptographicAlgoId($algoId)) {
+                throw new \ValueError(
+                    'hash_init(): Argument #1 ($algo) must be a cryptographic hashing algorithm if HMAC is requested'
+                );
+            }
+            if ('' === $key) {
+                throw new \ValueError(
+                    'hash_init(): Argument #3 ($key) cannot be empty when HMAC is requested'
+                );
+            }
         }
         $class = $vmCtx->classes[self::CLASS_LC] ?? null;
         if (null === $class) {
@@ -98,11 +131,24 @@ final class VmHashContext
         }
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
-        self::$store[$entry->id] = [
-            'algo' => $algoId,
-            'ctx' => VmHashNative::incrementalCreate($algoId),
-            'finalized' => false,
-        ];
+        if ($hmac) {
+            $prepared = VmHashNative::incrementalHmacCreate($algoId, $key);
+            self::$store[$entry->id] = [
+                'algo' => $algoId,
+                'ctx' => $prepared['ctx'],
+                'finalized' => false,
+                'flags' => $flags,
+                'hmacKey' => $prepared['hmacKey'],
+            ];
+        } else {
+            self::$store[$entry->id] = [
+                'algo' => $algoId,
+                'ctx' => VmHashNative::incrementalCreate($algoId),
+                'finalized' => false,
+                'flags' => $flags,
+                'hmacKey' => null,
+            ];
+        }
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
 
@@ -172,8 +218,18 @@ final class VmHashContext
     public static function final(ObjectEntry $entry, bool $raw = false): string
     {
         $state = self::requireLiveContext($entry, 'hash_final', 1);
-        $result = VmHashNative::incrementalFinal($state['algo'], $state['ctx'], $raw);
+        if (null !== $state['hmacKey']) {
+            $result = VmHashNative::incrementalHmacFinal(
+                $state['algo'],
+                $state['ctx'],
+                $state['hmacKey'],
+                $raw
+            );
+        } else {
+            $result = VmHashNative::incrementalFinal($state['algo'], $state['ctx'], $raw);
+        }
         self::$store[$entry->id]['finalized'] = true;
+        self::$store[$entry->id]['hmacKey'] = null;
 
         return $result;
     }
@@ -188,6 +244,8 @@ final class VmHashContext
             'algo' => $state['algo'],
             'ctx' => VmHashNative::incrementalCopy($state['ctx']),
             'finalized' => false,
+            'flags' => $state['flags'],
+            'hmacKey' => $state['hmacKey'],
         ];
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($clone);
@@ -196,7 +254,7 @@ final class VmHashContext
     }
 
     /**
-     * @return array{algo: int, ctx: array<string, mixed>, finalized: bool}
+     * @return array{algo: int, ctx: array<string, mixed>, finalized: bool, flags: int, hmacKey: ?string}
      */
     private static function requireLiveContext(ObjectEntry $entry, string $function, int $argNum): array
     {

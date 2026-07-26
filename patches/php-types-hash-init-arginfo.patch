@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -2367,7 +2367,7 @@
+         'hash_final' => ['string', 'context' => '', 'raw_output=' => 'bool'],
+         'hash_hmac_file' => ['string', 'algo' => 'string', 'filename' => 'string', 'key' => 'string', 'raw_output=' => 'bool'],
+         'hash_hmac' => ['string', 'algo' => 'string', 'data' => 'string', 'key' => 'string', 'raw_output=' => 'bool'],
+-        'hash_init' => ['resource', 'algo' => 'string', 'options=' => 'int', 'key=' => 'string'],
++        'hash_init' => ['HashContext', 'algo' => 'string', 'flags=' => 'int', 'key=' => 'string', 'options=' => 'array'],
+         'hash' => ['string', 'algo' => 'string', 'data' => 'string', 'raw_output=' => 'bool'],
+         'hash_update' => ['bool', 'context' => '', 'data' => 'string'],
+         'hash_update_file' => ['bool', 'context=' => '', 'filename=' => 'string'],

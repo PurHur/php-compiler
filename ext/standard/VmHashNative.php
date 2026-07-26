@@ -936,12 +936,75 @@ final class VmHashNative
         return self::digest($algo, $outerBuf);
     }
 
-    /* --- Incremental HashContext (ext/hash/hash.c; issue #7174) --- */
+    /* --- Incremental HashContext (ext/hash/hash.c; issue #7174, #23585) --- */
 
     /** 0 unknown, 1 sha256, 2 sha1, 3 md5 */
     public static function resolveAlgoId(string $algo): int
     {
         return self::algoId($algo);
+    }
+
+    /**
+     * php-src ops->is_crypto — non-crypto digests reject HASH_HMAC on hash_init (#23585).
+     *
+     * Non-crypto ids: crc32b/crc32/adler32/fnv132/fnv1a32/xxh3/xxh128/crc32c.
+     */
+    public static function isCryptographicAlgoId(int $algoId): bool
+    {
+        return match ($algoId) {
+            0, 4, 5, 6, 7, 8, 9, 10, 11 => false,
+            default => true,
+        };
+    }
+
+    /**
+     * Prepare incremental HMAC inner context + ipad-xored key (php-src hash_init HASH_HMAC).
+     *
+     * @return array{ctx: array<string, mixed>, hmacKey: string}
+     */
+    public static function incrementalHmacCreate(int $algoId, string $key): array
+    {
+        $blockSize = self::hmacBlockSize($algoId);
+        $k = \str_repeat("\0", $blockSize);
+        if (\strlen($key) > $blockSize) {
+            $digest = self::digest($algoId, $key);
+            if (null === $digest) {
+                throw new \LogicException('Unsupported HMAC digest algorithm id: '.$algoId);
+            }
+            $bin = self::digestBytesToString($digest);
+            $k = $bin.\str_repeat("\0", $blockSize - \strlen($bin));
+        } else {
+            $k = $key.\str_repeat("\0", $blockSize - \strlen($key));
+        }
+        $ipad = '';
+        for ($i = 0; $i < $blockSize; $i++) {
+            $ipad .= \chr(\ord($k[$i]) ^ 0x36);
+        }
+        $ctx = self::incrementalCreate($algoId);
+        self::incrementalUpdate($algoId, $ctx, $ipad);
+
+        return ['ctx' => $ctx, 'hmacKey' => $ipad];
+    }
+
+    /**
+     * Finalize incremental HMAC (php-src hash_final HASH_HMAC path).
+     *
+     * @param array<string, mixed> $ctx
+     */
+    public static function incrementalHmacFinal(int $algoId, array $ctx, string $ipadKey, bool $raw = false): string
+    {
+        $inner = self::digestBytesToString(self::incrementalDigest($algoId, $ctx));
+        $blockSize = \strlen($ipadKey);
+        $opad = '';
+        for ($i = 0; $i < $blockSize; $i++) {
+            // 0x6A = 0x36 ^ 0x5C converts ipad key to opad
+            $opad .= \chr(\ord($ipadKey[$i]) ^ 0x6A);
+        }
+        $outer = self::incrementalCreate($algoId);
+        self::incrementalUpdate($algoId, $outer, $opad);
+        self::incrementalUpdate($algoId, $outer, $inner);
+
+        return self::incrementalFinal($algoId, $outer, $raw);
     }
 
     /** Canonical registered algorithm name for HashContext::__debugInfo() (php-src ops->algo). */
