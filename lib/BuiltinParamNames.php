@@ -382,7 +382,8 @@ final class BuiltinParamNames
             case 'strrpos':
                 return ['haystack', 'needle', 'offset'];
             case 'strstr':
-                // InternalArgInfo still says `part`; Zend stub is before_needle
+            case 'strchr':
+                // InternalArgInfo: strstr uses `part`, strchr omits 3rd; Zend stub is before_needle (#23218)
                 return ['haystack', 'needle', 'before_needle'];
             case 'preg_match':
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];

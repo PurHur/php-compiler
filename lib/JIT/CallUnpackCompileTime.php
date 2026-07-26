@@ -226,18 +226,48 @@ final class CallUnpackCompileTime
             return $vm;
         }
         if (Variable::TYPE_NATIVE_LONG === $var->type && Variable::KIND_VALUE === $var->kind) {
+            $n = self::nativeConstIntFromJitVariable($var);
+            if (null === $n) {
+                return null;
+            }
             $vm = new VmVariable(VmVariable::TYPE_INTEGER);
-            $vm->int((int) $var->value->constInt(false));
+            $vm->int($n);
 
             return $vm;
         }
         if (Variable::TYPE_NATIVE_BOOL === $var->type && Variable::KIND_VALUE === $var->kind) {
+            // fromLiteral stores bools as compileTimeLong 0/1; Value has no constInt() (#23218 AOT)
+            $n = self::nativeConstIntFromJitVariable($var);
+            if (null === $n) {
+                return null;
+            }
             $vm = new VmVariable(VmVariable::TYPE_BOOLEAN);
-            $vm->bool((bool) $var->value->constInt(false));
+            $vm->bool(0 !== $n);
 
             return $vm;
         }
 
         return null;
+    }
+
+    /**
+     * Read a compile-time native int/bool constant from a JIT value variable.
+     * Prefer {@see Variable::$compileTimeLong}; fall back to LLVMConstIntGetZExtValue.
+     */
+    private static function nativeConstIntFromJitVariable(Variable $var): ?int
+    {
+        if (null !== $var->compileTimeLong) {
+            return $var->compileTimeLong;
+        }
+        $llvmValue = $var->value;
+        if (!isset($llvmValue->llvm, $llvmValue->value)) {
+            return null;
+        }
+        $lib = $llvmValue->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($llvmValue->value)) {
+            return null;
+        }
+
+        return (int) $lib->LLVMConstIntGetZExtValue($llvmValue->value);
     }
 }
