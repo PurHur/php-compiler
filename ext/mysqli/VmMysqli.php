@@ -99,6 +99,7 @@ final class VmMysqli
             'change_user' => new MysqliChangeUser(),
             'thread_id' => new MysqliThreadId(),
             'kill' => new MysqliKill(),
+            'stmt_init' => new MysqliStmtInit(),
         ];
         foreach ($methods as $name => $method) {
             $lcName = strtolower($name);
@@ -1603,6 +1604,29 @@ final class MysqliPrepare extends MysqliClassMethod
         if (null === $frame->returnVar) {
             return;
         }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->object($result);
+        }
+    }
+}
+
+/** mysqli::stmt_init() — php-src ext/mysqli/mysqli.stub.php (#22215). */
+final class MysqliStmtInit extends MysqliClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('stmt_init');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'mysqli::stmt_init()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmMysqliStmt::initOnLink($receiver);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {
