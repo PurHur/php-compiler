@@ -12,11 +12,12 @@ use PHPCompiler\CompilerVersion;
  * PDO + PDOException are always advertised (Zend ships ext/pdo). The sqlite driver
  * surface needs libsqlite3 FFI ({@see \PHPCompiler\ext\sqlite3\VmSqlite3Native}).
  *
-     * PHP 8.4 {@see PDO::connect()} and driver subclasses ({@see Pdo\Mysql}, {@see Pdo\Pgsql})
-     * are advertised on language profile ≥ 8.4 ahead of native libmysql/libpq FFI
-     * (#20548, #22600). They are not listed in getAvailableDrivers() until a real
-     * connection factory exists (sqlite-style lib gate); PDO::connect('mysql:…'/'pgsql:…')
-     * therefore throws "could not find driver" like Zend when the driver module is absent.
+ * PHP 8.4 {@see PDO::connect()} and driver subclasses ({@see Pdo\Sqlite}, {@see Pdo\Mysql},
+ * {@see Pdo\Pgsql}) are advertised on language profile ≥ 8.4 (#20548, #22600, #22790).
+ * They are not listed in getAvailableDrivers() until a real connection factory exists
+ * (sqlite-style lib gate for mysql/pgsql); PDO::connect('mysql:…'/'pgsql:…') therefore
+ * throws "could not find driver" like Zend when the driver module is absent.
+ * {@see Pdo\Sqlite} additionally requires libsqlite3 ({@see advertisesSqliteSubclass()}).
  *
  * Logical {@code pdo_pgsql} follows the subclass advertise gate so
  * {@code extension_loaded('pdo_pgsql')} matches builds that ship the Pdo\Pgsql API
@@ -72,6 +73,18 @@ final class PdoExtensionPolicy
     public static function advertisesConnect(): bool
     {
         return self::advertisesExtension() && CompilerVersion::supportsPdoConnect();
+    }
+
+    /**
+     * PHP 8.4+ {@see Pdo\Sqlite} subclass (pdo_sqlite.stub.php; #20529 / #22790).
+     *
+     * Requires both the sqlite driver (libsqlite3) and the driver-specific subclass
+     * profile gate. Legacy {@see PDO::sqliteCreateFunction} etc. stay on PDO below 8.4.
+     */
+    public static function advertisesSqliteSubclass(): bool
+    {
+        return self::advertisesSqliteDriver()
+            && self::advertisesDriverSpecificSubclasses();
     }
 
     public static function advertisesMysqlSubclass(): bool
