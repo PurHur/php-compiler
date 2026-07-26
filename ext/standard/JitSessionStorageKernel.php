@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\PendingHeadersRuntime;
 use PHPCompiler\JIT\Builtin\SessionStorageGlobals;
@@ -14,17 +13,19 @@ use PHPCompiler\JIT\Builtin\StringSerialize;
 use PHPCompiler\JIT\Builtin\StringUnserialize;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT NestedJIT bridges for session file I/O (#9495, #19882).
+ * JIT/AOT NestedJIT bridges for session file I/O (#9495, #19882, #23284).
  *
  * Quarantined from lib/JIT/Builtin/SessionStorageRuntime — {@see \PHPCompiler\JIT\Builtin\SessionStorageRuntime}
  * stays the thin orchestrator.
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer EnvLocal #23211 / ScopeBuiltin #23261).
  *
  * SSOT: {@see SessionStorageJitHelper}
  * php-src: ext/session/mod_files.c
@@ -1301,44 +1302,18 @@ final class JitSessionStorageKernel
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SessionStorageJitHelper compile (#9495)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23284');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SessionStorageJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('SessionStorageJitHelper.php parseAndCompile failed (#9495)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9495)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23284'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
