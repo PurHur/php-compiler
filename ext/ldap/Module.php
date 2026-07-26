@@ -61,6 +61,7 @@ class Module extends ModuleAbstract
             new ldap_connect(),
             new ldap_bind(),
             new ldap_bind_ext(),
+            new ldap_sasl_bind(),
             new ldap_unbind(),
             new ldap_close(),
             new ldap_errno(),

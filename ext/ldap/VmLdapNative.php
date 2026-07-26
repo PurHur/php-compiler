@@ -27,6 +27,22 @@ final class VmLdapNative
 
     public const LDAP_OPT_ERROR_STRING = 0x0032;
 
+    /** OpenLDAP LDAP_OPT_X_SASL_SECPROPS (write-only). */
+    public const LDAP_OPT_X_SASL_SECPROPS = 0x6106;
+
+    /** OpenLDAP LDAP_SASL_QUIET for ldap_sasl_interactive_bind_s. */
+    public const LDAP_SASL_QUIET = 2;
+
+    private const SASL_CB_LIST_END = 0;
+
+    private const SASL_CB_USER = 0x4001;
+
+    private const SASL_CB_AUTHNAME = 0x4002;
+
+    private const SASL_CB_PASS = 0x4004;
+
+    private const SASL_CB_GETREALM = 0x4008;
+
     public const LDAP_SCOPE_BASE = 0x0000;
 
     public const LDAP_SCOPE_ONELEVEL = 0x0001;
@@ -399,6 +415,124 @@ final class VmLdapNative
     public static function simpleBind(\FFI\CData $ld, ?string $dn, ?string $password): int
     {
         return (int) self::requireFfi()->ldap_simple_bind_s($ld, $dn, $password);
+    }
+
+    /**
+     * SASL interactive bind (php-src ldap_sasl_bind / ldap_sasl_interactive_bind_s; #22176).
+     *
+     * @return int LDAP error code
+     */
+    public static function saslInteractiveBind(
+        \FFI\CData $ld,
+        ?string $dn,
+        ?string $mech,
+        ?string $realm,
+        ?string $authcId,
+        ?string $password,
+        ?string $authzId,
+        ?string $props
+    ): int {
+        $ffi = self::requireFfi();
+        if (null !== $props) {
+            $ffi->ldap_set_option($ld, self::LDAP_OPT_X_SASL_SECPROPS, $props);
+        }
+
+        self::$saslDefs = [
+            'realm' => $realm,
+            'authcid' => $authcId,
+            'passwd' => $password,
+            'authzid' => $authzId,
+        ];
+        self::$saslKeep = [];
+        // Fill missing fields from connection SASL options (php-src _php_sasl_setdefs).
+        if (null === self::$saslDefs['realm']) {
+            self::$saslDefs['realm'] = self::getOptionString($ld, 0x6101); // LDAP_OPT_X_SASL_REALM
+        }
+        if (null === self::$saslDefs['authcid']) {
+            self::$saslDefs['authcid'] = self::getOptionString($ld, 0x6102); // LDAP_OPT_X_SASL_AUTHCID
+        }
+        if (null === self::$saslDefs['authzid']) {
+            self::$saslDefs['authzid'] = self::getOptionString($ld, 0x6103); // LDAP_OPT_X_SASL_AUTHZID
+        }
+        if (null === $mech) {
+            $mech = self::getOptionString($ld, 0x6100); // LDAP_OPT_X_SASL_MECH
+        }
+
+        $cb = \Closure::fromCallable([self::class, 'saslInteract']);
+        try {
+            return (int) $ffi->ldap_sasl_interactive_bind_s(
+                $ld,
+                $dn,
+                $mech,
+                null,
+                null,
+                self::LDAP_SASL_QUIET,
+                $cb,
+                null
+            );
+        } finally {
+            self::$saslDefs = [];
+            self::$saslKeep = [];
+        }
+    }
+
+    /** @var array{realm: ?string, authcid: ?string, passwd: ?string, authzid: ?string} */
+    private static array $saslDefs = [];
+
+    /** @var list<\FFI\CData> keepalive for interact->result pointers */
+    private static array $saslKeep = [];
+
+    /**
+     * OpenLDAP LDAP_SASL_INTERACT_PROC — fill sasl_interact_t from defs (php-src _php_sasl_interact).
+     *
+     * @param mixed $ld
+     * @param mixed $defaults
+     * @param mixed $in sasl_interact_t*
+     */
+    private static function saslInteract($ld, int $flags, $defaults, $in): int
+    {
+        $ffi = self::requireFfi();
+        $interact = $ffi->cast('sasl_interact_t*', $in);
+        for ($i = 0; ; ++$i) {
+            $id = (int) $interact[$i]->id;
+            if (self::SASL_CB_LIST_END === $id) {
+                break;
+            }
+            $p = match ($id) {
+                self::SASL_CB_GETREALM => self::$saslDefs['realm'] ?? null,
+                self::SASL_CB_AUTHNAME => self::$saslDefs['authcid'] ?? null,
+                self::SASL_CB_USER => self::$saslDefs['authzid'] ?? null,
+                self::SASL_CB_PASS => self::$saslDefs['passwd'] ?? null,
+                default => null,
+            };
+            if (null === $p || '' === $p) {
+                continue;
+            }
+            $buf = $ffi->new('char['.(\strlen($p) + 1).']', false);
+            \FFI::memcpy($buf, $p, \strlen($p));
+            $buf[\strlen($p)] = "\0";
+            self::$saslKeep[] = $buf;
+            $interact[$i]->result = $buf;
+            $interact[$i]->len = \strlen($p);
+        }
+
+        return self::LDAP_SUCCESS;
+    }
+
+    public static function getOptionString(?\FFI\CData $ld, int $option): ?string
+    {
+        $ffi = self::requireFfi();
+        $box = $ffi->new('char*[1]');
+        $box[0] = null;
+        $rc = (int) $ffi->ldap_get_option($ld, $option, \FFI::addr($box));
+        if (self::LDAP_SUCCESS !== $rc || null === $box[0]) {
+            return null;
+        }
+        $out = self::ffiString($box[0]);
+        // OpenLDAP string options: caller must ldap_memfree.
+        $ffi->ldap_memfree($box[0]);
+
+        return '' === $out ? null : $out;
     }
 
     /**
@@ -1062,6 +1196,15 @@ typedef struct timeval {
     long tv_sec;
     long tv_usec;
 } timeval;
+typedef struct sasl_interact {
+    unsigned long id;
+    const char *challenge;
+    const char *prompt;
+    const char *defresult;
+    const void *result;
+    unsigned len;
+} sasl_interact_t;
+typedef int (*LDAP_SASL_INTERACT_PROC)(LDAP *ld, unsigned flags, void *defaults, void *interact);
 int ldap_initialize(LDAP **ldp, const char *url);
 int ldap_unbind_ext_s(LDAP *ld, void *serverctrls, void *clientctrls);
 char *ldap_err2string(int err);
@@ -1083,6 +1226,7 @@ int ldap_rename_s(LDAP *ld, const char *dn, const char *newrdn, const char *newp
 int ldap_rename(LDAP *ld, const char *dn, const char *newrdn, const char *newparent, int deleteoldrdn, void *serverctrls, void *clientctrls, int *msgidp);
 int ldap_simple_bind_s(LDAP *ld, const char *who, const char *passwd);
 int ldap_sasl_bind(LDAP *ld, const char *dn, const char *mechanism, BerValue *cred, void *serverctrls, void *clientctrls, int *msgidp);
+int ldap_sasl_interactive_bind_s(LDAP *ld, const char *dn, const char *mechs, void *serverctrls, void *clientctrls, unsigned flags, LDAP_SASL_INTERACT_PROC interact, void *defaults);
 int ldap_search_ext_s(LDAP *ld, const char *base, int scope, const char *filter, char **attrs, int attrsonly, void *serverctrls, void *clientctrls, timeval *timeout, int sizelimit, LDAPMessage **res);
 int ldap_compare_ext_s(LDAP *ld, const char *dn, const char *attr, BerValue *bvalue, void *serverctrls, void *clientctrls);
 int ldap_count_entries(LDAP *ld, LDAPMessage *res);
