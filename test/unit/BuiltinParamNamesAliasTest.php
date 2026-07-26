@@ -814,6 +814,26 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23275 */
+    public function testMktimeGmmktimeZendStubNamedParams(): void
+    {
+        $expected = ['hour', 'minute', 'second', 'month', 'day', 'year'];
+        foreach (['mktime', 'gmmktime'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame($expected, $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'hour', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'minute', $fn));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'second', $fn));
+            self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'month', $fn));
+            self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'day', $fn));
+            self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($names, 'year', $fn));
+            // Legacy InternalArgInfo names must not resolve (Zend rejects $min / $sec / $mon)
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'min', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'sec', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'mon', $fn));
+        }
+    }
+
     /** @covers issue #23183 */
     public function testSubstrReplaceZendStubNamedParams(): void
     {

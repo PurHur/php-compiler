@@ -82,6 +82,10 @@ final class BuiltinParamNames
             case 'date_create':
             case 'date_create_immutable':
                 return ['datetime', 'timezone'];
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still says min/sec/mon (#23275)
+            case 'mktime':
+            case 'gmmktime':
+                return ['hour', 'minute', 'second', 'month', 'day', 'year'];
             case 'array_all':
             case 'array_any':
             case 'array_all_key':
