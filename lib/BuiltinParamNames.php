@@ -555,6 +555,11 @@ final class BuiltinParamNames
                 return \PHPCompiler\CompilerVersion::supportsGetClassAllowString()
                     ? ['object_or_class', 'allow_string']
                     : ['object_or_class'];
+            // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says obj/class (#23401)
+            case 'get_object_vars':
+                return ['object'];
+            case 'get_class_methods':
+                return ['object_or_class'];
             case 'class_exists':
                 return ['class', 'autoload'];
             case 'interface_exists':

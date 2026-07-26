@@ -1147,4 +1147,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fseek, 'whence', 'fseek'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fseek, 'fp', 'fseek'));
     }
+
+    /** @covers issue #23401 */
+    public function testGetObjectVarsAndGetClassMethodsZendStubNamedParams(): void
+    {
+        $gov = BuiltinParamNames::forFunction('get_object_vars');
+        self::assertSame(['object'], $gov);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gov, 'object', 'get_object_vars'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $obj)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gov, 'obj', 'get_object_vars'));
+
+        $gcm = BuiltinParamNames::forFunction('get_class_methods');
+        self::assertSame(['object_or_class'], $gcm);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gcm, 'object_or_class', 'get_class_methods'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $class)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gcm, 'class', 'get_class_methods'));
+    }
 }
