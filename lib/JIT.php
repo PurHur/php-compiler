@@ -10018,10 +10018,14 @@ class JIT {
                         if (
                             null === $sendValue->compileTimeLong
                             && isset($block->constants[$sendSlot])
-                            && \PHPCompiler\VM\Variable::TYPE_BOOLEAN === $block->constants[$sendSlot]->type
+                            && (
+                                \PHPCompiler\VM\Variable::TYPE_BOOLEAN === $block->constants[$sendSlot]->type
+                                || \PHPCompiler\VM\Variable::TYPE_INTEGER === $block->constants[$sendSlot]->type
+                            )
                         ) {
-                            // Bool literal Temporary often lands as TYPE_VALUE without compileTimeLong;
-                            // rematerialize so header()/JitBoolArg skip mid-function BB diamonds (#23427).
+                            // Bool/int literal Temporary often lands as TYPE_VALUE without compileTimeLong;
+                            // rematerialize so header()/JitBoolArg/JitLongArg skip mid-function BB
+                            // diamonds after `(string)$arr[$k]` (#23427 SessionsWeb Location 303).
                             $sendValue = JIT\VmConstantJit::toVariable(
                                 $this->context,
                                 $block->constants[$sendSlot]
