@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6561 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21096 |
+| Source constructs flagged (warnings) | 21094 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2785,7 +2785,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamGetWrappers.php` | 0 | 2 |
 | `ext/standard/JitStreamIsLocal.php` | 0 | 1 |
 | `ext/standard/JitStreamIsatty.php` | 0 | 1 |
-| `ext/standard/JitStreamLibcHandleKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamLibcHandleKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamLifecycleKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamMetaKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamModeKernel.php` | 0 | 1 |
@@ -21293,24 +21293,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1149)
 - new Variable (line 1210)
 - new Variable (line 1236)
-- new SimpleXmlNodeState (line 1326)
-- new ObjectEntry (line 1350)
-- new SimpleXmlNodeState (line 1443)
-- new SimpleXmlNodeState (line 1453)
-- new SimpleXmlNodeState (line 1456)
-- new ObjectEntry (line 1477)
-- new ObjectEntry (line 1498)
-- new ObjectEntry (line 1588)
-- new SimpleXmlNodeState (line 1592)
-- new ObjectEntry (line 1610)
-- new ObjectEntry (line 1626)
-- new Error (line 1745)
-- new ObjectEntry (line 1757)
-- new HashTable (line 2118)
-- new Variable (line 2120)
-- new SimpleXmlNodeState (line 2179)
-- new SimpleXmlNodeState (line 2188)
-- 83 class method(s)
+- new SimpleXmlNodeState (line 1332)
+- new ObjectEntry (line 1356)
+- new SimpleXmlNodeState (line 1449)
+- new SimpleXmlNodeState (line 1459)
+- new SimpleXmlNodeState (line 1462)
+- new ObjectEntry (line 1483)
+- new ObjectEntry (line 1504)
+- new ObjectEntry (line 1594)
+- new SimpleXmlNodeState (line 1598)
+- new ObjectEntry (line 1616)
+- new ObjectEntry (line 1632)
+- new Error (line 1751)
+- new ObjectEntry (line 1763)
+- new HashTable (line 2124)
+- new Variable (line 2126)
+- new SimpleXmlNodeState (line 2342)
+- new SimpleXmlNodeState (line 2351)
+- 88 class method(s)
 - 3 closure(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
@@ -27684,9 +27684,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamLibcHandleKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 229)
 - 8 class method(s)
-- 1 closure(s)
 
 ### `ext/standard/JitStreamLifecycleKernel.php`
 
@@ -41063,7 +41061,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 831)
+- new ArgumentCountError (line 832)
 - 16 class method(s)
 - 1 closure(s)
 
@@ -46610,9 +46608,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VmVariable (line 169)
 - new VmVariable (line 218)
 - new VmVariable (line 224)
-- new VmVariable (line 229)
-- new VmVariable (line 235)
-- 9 class method(s)
+- new VmVariable (line 233)
+- new VmVariable (line 244)
+- 10 class method(s)
 
 ### `lib/JIT/CallUnpackHelper.php`
 
