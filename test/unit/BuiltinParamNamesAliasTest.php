@@ -975,6 +975,29 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'val', 'array_fill_keys'));
     }
 
+    /** @covers issue #23461 */
+    public function testUnlinkChdirUmaskFnmatchZendStubNamedParams(): void
+    {
+        $unlink = BuiltinParamNames::forFunction('unlink');
+        self::assertSame(['filename', 'context'], $unlink);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($unlink, 'filename', 'unlink'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($unlink, 'context', 'unlink'));
+
+        $chdir = BuiltinParamNames::forFunction('chdir');
+        self::assertSame(['directory'], $chdir);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($chdir, 'directory', 'chdir'));
+
+        $umask = BuiltinParamNames::forFunction('umask');
+        self::assertSame(['mask'], $umask);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($umask, 'mask', 'umask'));
+
+        $fnmatch = BuiltinParamNames::forFunction('fnmatch');
+        self::assertSame(['pattern', 'filename', 'flags'], $fnmatch);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'pattern', 'fnmatch'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'filename', 'fnmatch'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'flags', 'fnmatch'));
+    }
+
     /** @covers issue #23206 */
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {
