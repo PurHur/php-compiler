@@ -3155,6 +3155,10 @@ class Compiler {
     {
         $cont = new Block($block->orig);
         $cont->inheritScopeFrom($block);
+        // Temporaries have no name, so findVariableInParentFrames() cannot carry them across the
+        // jump; without slot inheritance every value computed before the split reads back empty
+        // in the continuation (#23354).
+        $cont->inheritUndefinedLocals = true;
         $this->inheritFuncFromParent($cont, $block);
         $jumpToCont = new OpCode(OpCode::TYPE_JUMP);
         $jumpToCont->block1 = $cont;
@@ -25273,6 +25277,67 @@ class Compiler {
         return $producer;
     }
 
+    /**
+     * Slot holding argument $argIndex's own hoisted producer, via php-cfg's exact link (#23354).
+     *
+     * The hoisted argument temporary is a distinct Operand from the producer's ->result — which is
+     * why slotForOperand($arg) misses and the shape heuristics exist — but it records that producer
+     * as its sole writer. Restricted to dead inline temporaries with exactly one writer, whose
+     * producer is a hoisted statement of this block before the call.
+     *
+     * @param list<OpCode> $sends
+     */
+    private function exactHoistedCallArgProducerSlot(
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex,
+        array &$sends
+    ): ?string {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return null;
+        }
+        if (!property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand\Temporary || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        if (1 !== \count($callArg->ops ?? [])) {
+            return null;
+        }
+        $producer = $callArg->ops[0];
+        if (!$producer instanceof Op\Expr || null === $producer->result) {
+            return null;
+        }
+        if (!$this->isInlineExprCallArgProducer($producer)) {
+            return null;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex)) {
+            return null;
+        }
+        $found = false;
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            if (($block->orig->children[$i] ?? null) === $producer) {
+                $found = true;
+                break;
+            }
+        }
+        if (!$found) {
+            return null;
+        }
+        $slot = $block->slotForOperand($producer->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $sends[] = $op;
+            }
+            $slot = $block->slotForOperand($producer->result);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
     private function isInlineExprCallArgProducer(Op $op): bool
     {
         return $op instanceof Op\Expr\Array_
@@ -36372,6 +36437,25 @@ class Compiler {
                 break;
             }
         }
+        // Exact link before positional guessing: the hoisted argument temporary is a distinct Operand
+        // from the producer's ->result, but records that producer as its sole writer, so it names the
+        // producer for THIS index directly. Positional mapping handed arg #0 the trailing producer —
+        // f($x + 1, $r['k']) printed "K|K" (#23354). Kept inside $producers so this only reorders the
+        // candidates this function already considers; the tuned callee-specific matchers above win.
+        if (
+            $callArg instanceof Operand\Temporary
+            && $this->callArgIsDeadInlineTemporary($callArg)
+            && 1 === \count($callArg->ops ?? [])
+        ) {
+            $exactProducer = $callArg->ops[0];
+            if (
+                $exactProducer instanceof Op\Expr
+                && null !== $exactProducer->result
+                && \in_array($exactProducer, $producers, true)
+            ) {
+                return $exactProducer;
+            }
+        }
         $producerSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg(
             $callOp->args,
             $argIndex,
@@ -40253,7 +40337,13 @@ class Compiler {
             if (false === $mapped) {
                 return null;
             }
-            $dimIndex = (int) $mapped;
+            // The collected fetches are the ones immediately before the call, so they belong to the
+            // LAST non-embedded arguments, not the first. Aligning them head-first gave arg #0 the
+            // trailing argument's fetch: f($x + 1, $r['k']) printed "K|K" (#23354).
+            $dimIndex = (int) $mapped - (\count($nonEmbeddedArgIndices) - \count($dimFetches));
+            if ($dimIndex < 0) {
+                return null;
+            }
         }
         if (!isset($dimFetches[$dimIndex])) {
             return null;
@@ -40283,6 +40373,12 @@ class Compiler {
         int $argIndex
     ): ?string {
         if (null === $block->orig || null === $cfgCallOp || 0 !== $argIndex) {
+            return null;
+        }
+        // The prelude read below is children[$callIndex - 1] — the TRAILING argument's producer.
+        // Handing it to arg #0 of a multi-argument call is exactly backwards: f($x + 1, $r['k'])
+        // printed "K|K" (#23354). Only valid when arg #0 IS the trailing non-embedded argument.
+        if (0 !== $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)) {
             return null;
         }
         $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
@@ -40425,6 +40521,11 @@ class Compiler {
             }
         }
         if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        // children[$callIndex - 1] is the TRAILING argument's fetch; handing it to every index made
+        // f($x + 1, $r['k']) print "K|K" (#23354).
+        if ($argIndex !== $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)) {
             return null;
         }
         $fetch = $block->orig->children[$callIndex - 1] ?? null;
@@ -48945,6 +49046,14 @@ class Compiler {
             }
             if (null !== $nullLiteralCallArgSlot) {
                 $valueSlot = $nullLiteralCallArgSlot;
+            }
+            // Last word to the exact argument->producer link (#23354). Every heuristic above resolves
+            // a hoisted argument from the statement before the call, which is only ever the TRAILING
+            // argument's producer; php-cfg records the real producer as the argument temporary's sole
+            // writer, so this is the one mapping that is right by construction rather than by shape.
+            $exactSlot = $this->exactHoistedCallArgProducerSlot($block, $cfgCallOp, (int) $argIndex, $sends);
+            if (null !== $exactSlot) {
+                $valueSlot = $exactSlot;
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
