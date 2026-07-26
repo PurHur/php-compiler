@@ -709,6 +709,9 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/allowable_tags (#23217)
             case 'strip_tags':
                 return ['string', 'allowed_tags'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str/delims (#23226)
+            case 'ucwords':
+                return ['string', 'separators'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/chunklen/ending (#23206)
             case 'chunk_split':
                 return ['string', 'length', 'separator'];
