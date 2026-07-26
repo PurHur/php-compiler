@@ -602,6 +602,19 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says ascii (#23240)
             case 'chr':
                 return ['codepoint'];
+            // php-src ext/ctype/ctype.stub.php — InternalArgInfo still says c (#23192)
+            case 'ctype_alnum':
+            case 'ctype_alpha':
+            case 'ctype_cntrl':
+            case 'ctype_digit':
+            case 'ctype_graph':
+            case 'ctype_lower':
+            case 'ctype_print':
+            case 'ctype_punct':
+            case 'ctype_space':
+            case 'ctype_upper':
+            case 'ctype_xdigit':
+                return ['text'];
             case 'file_exists':
             case 'filesize':
             case 'filemtime':
