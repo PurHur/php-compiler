@@ -2716,6 +2716,50 @@ class Object_ extends Type {
     }
 
     /**
+     * Instance properties visible to foreach from $scopeClassLc (null = global / external).
+     *
+     * Matches get_object_vars() / zend_check_property_access (#23430).
+     *
+     * @return list<array{0: int, 1: string, 2: int, 3: int}>
+     */
+    public function instancePropertySetsVisibleFromScope(int $classId, ?string $scopeClassLc): array
+    {
+        $props = $this->properties[$classId] ?? [];
+        if ([] === $props) {
+            return [];
+        }
+        $scopeId = null;
+        if (null !== $scopeClassLc && '' !== $scopeClassLc) {
+            $lc = strtolower(ltrim($scopeClassLc, '\\'));
+            if (isset($this->classes[$lc])) {
+                $scopeId = $this->classes[$lc];
+            }
+        }
+        $visible = [];
+        foreach ($props as $propset) {
+            $name = $propset[1];
+            $meta = $this->instancePropertyVisibilityMeta($classId, $name);
+            if (null === $meta) {
+                $visible[] = $propset;
+                continue;
+            }
+            $vis = $meta['visibility'];
+            if (MethodVisibility::isPublic($vis)) {
+                $visible[] = $propset;
+                continue;
+            }
+            if (null === $scopeId) {
+                continue;
+            }
+            if ($this->propertyVisibleFromScopeId($scopeId, $vis, $meta['declaringClassId'])) {
+                $visible[] = $propset;
+            }
+        }
+
+        return $visible;
+    }
+
+    /**
      * Class ids with declared instance properties — bounds get_object_vars() JIT dispatch (#4038).
      *
      * @return list<int>

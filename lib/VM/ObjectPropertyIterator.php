@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 
 /**
  * Foreach iterator over user object / stdClass instance properties (Zend zend_foreach.c).
+ *
+ * Property visibility matches get_object_vars() / zend_check_property_access (#23430).
  */
 final class ObjectPropertyIterator
 {
@@ -21,7 +23,8 @@ final class ObjectPropertyIterator
         private readonly \PHPCompiler\VM $vm,
         private readonly Frame $frame,
     ) {
-        $this->names = array_keys($object->propertiesWithNames());
+        // Same accessible name set as get_object_vars() (php-src ZEND_PROP_PURPOSE_GET_OBJECT_VARS).
+        $this->names = array_keys($vm->collectObjectVarsForBuiltin($object, $frame));
     }
 
     public function reset(): void
