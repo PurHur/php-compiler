@@ -244,6 +244,9 @@ final class BuiltinParamNames
                     : ['array', 'length', 'value'];
             case 'array_combine':
                 return ['keys', 'values'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says keys/val (#23490)
+            case 'array_fill_keys':
+                return ['keys', 'value'];
             case 'array_chunk':
                 return ['array', 'length', 'preserve_keys'];
             case 'similar_text':

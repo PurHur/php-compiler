@@ -263,6 +263,11 @@ final class NamedArgs
             $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
                 if ($internalFunction) {
+                    // Non-variadic internals: Zend Error "Unknown named parameter $x" (#23490).
+                    // Variadics defer to too-few vs "does not accept unknown named" (#23449).
+                    if (null === $variadicParamIndex) {
+                        throw new \Error("Unknown named parameter \${$name}");
+                    }
                     $unknownNamed = true;
                     continue;
                 }
