@@ -619,6 +619,9 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says input/mult (#23204)
             case 'str_repeat':
                 return ['string', 'times'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str/from/to (#23215)
+            case 'strtr':
+                return ['string', 'from', 'to'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/chunklen/ending (#23206)
             case 'chunk_split':
                 return ['string', 'length', 'separator'];
