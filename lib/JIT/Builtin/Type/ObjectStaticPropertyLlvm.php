@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
@@ -53,6 +54,14 @@ final class ObjectStaticPropertyLlvm
         if (Variable::TYPE_STRING === $entry['type']) {
             $context->builder->store(
                 $context->getTypeFromString('__string__*')->constNull(),
+                $global
+            );
+
+            return;
+        }
+        if (Variable::TYPE_HASHTABLE === $entry['type']) {
+            $context->builder->store(
+                $context->getTypeFromString('__hashtable__*')->constNull(),
                 $global
             );
 
@@ -332,7 +341,32 @@ final class ObjectStaticPropertyLlvm
 
             return;
         }
+        if (Variable::TYPE_HASHTABLE === $propertyType) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'static_prop_ht_store');
+            if (Variable::TYPE_VALUE === $value->type) {
+                $stored = $context->builder->call(
+                    $context->lookupFunction('__value__readHashtable'),
+                    JitValueBox::valuePtrFromVariable($context, $value)
+                );
+            } else {
+                $stored = $context->helper->loadValue($value);
+            }
+            $storedTy = $context->getStringFromType($stored->typeOf());
+            // NestedJIT may lower array temps as i64 pointers (#20664).
+            if ('int64' === $storedTy || 'long long' === $storedTy) {
+                $stored = JitNestedHelperCoerce::i64ToTypedPtr(
+                    $context,
+                    $stored,
+                    $context->getTypeFromString('__hashtable__*')
+                );
+            }
+            $context->builder->store($stored, $global);
+            self::markInitialized($context, $initGlobal);
+
+            return;
+        }
         if (Variable::TYPE_VALUE === $value->type) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'static_prop_scalar_from_box');
             $loaded = $context->builder->call(
                 $context->lookupFunction(
                     Variable::TYPE_NATIVE_DOUBLE === $propertyType
@@ -489,6 +523,15 @@ final class ObjectStaticPropertyLlvm
         if (Variable::TYPE_STRING === $propertyType) {
             $context->builder->call(
                 $context->lookupFunction('__value__writeString'),
+                $destPtr,
+                $fetched->value
+            );
+
+            return;
+        }
+        if (Variable::TYPE_HASHTABLE === $propertyType) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeHashtable'),
                 $destPtr,
                 $fetched->value
             );

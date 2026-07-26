@@ -71,7 +71,11 @@ final class JitHelperAbiBridge
 
         $entry = $fn->appendBasicBlock('jhab_void_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(self::helperFunction($context, $helperLogical, $issueTag));
+        JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helperLogical, $issueTag),
+            []
+        );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -124,9 +128,10 @@ final class JitHelperAbiBridge
         $entry = $fn->appendBasicBlock('jhab_obj_i64_void_entry');
         $context->builder->positionAtEnd($entry);
         $obj = $fn->getParam(0);
-        $context->builder->call(
+        JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, $helperLogical, $issueTag),
-            $context->builder->ptrToInt($obj, $i64)
+            [$context->builder->ptrToInt($obj, $i64)]
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
@@ -155,7 +160,15 @@ final class JitHelperAbiBridge
         $doneBb = $fn->appendBasicBlock($prefix.'_done');
         $context->builder->positionAtEnd($entry);
 
-        $addr = $context->builder->call(self::helperFunction($context, $helperLogical, $issueTag));
+        $addr = JitNestedHelperCoerce::extractLongFromHelperResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, $helperLogical, $issueTag),
+                []
+            ),
+            $i64
+        );
         $isZero = $context->builder->icmp(
             Builder::INT_EQ,
             $addr,
@@ -205,10 +218,13 @@ final class JitHelperAbiBridge
             $voidParam,
             $i32->constInt(0, false)
         );
-        $context->builder->call(
+        JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, $helperLogical, $issueTag),
-            $context->builder->ptrToInt($valParam, $i64),
-            $isVoid
+            [
+                $context->builder->ptrToInt($valParam, $i64),
+                $isVoid,
+            ]
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
@@ -237,7 +253,15 @@ final class JitHelperAbiBridge
         $doneBb = $fn->appendBasicBlock($prefix.'_done');
         $context->builder->positionAtEnd($entry);
 
-        $addr = $context->builder->call(self::helperFunction($context, $helperLogical, $issueTag));
+        $addr = JitNestedHelperCoerce::extractLongFromHelperResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, $helperLogical, $issueTag),
+                []
+            ),
+            $i64
+        );
         $isZero = $context->builder->icmp(
             Builder::INT_EQ,
             $addr,
