@@ -6,7 +6,9 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** zlib JIT/AOT lowering routes through ZlibJitHelper PHP, not StringZlibJit LLVM (#9879, #13347). */
+/**
+ * zlib JIT/AOT lowering routes through ZlibJitHelper PHP; NestedJIT via JitVmHelperLink (#9879, #13347, #23252).
+ */
 final class ZlibRuntimeShrinkTest extends TestCase
 {
     public function testStringZlibRoutesThroughRuntimeNotJitMonolith(): void
@@ -18,6 +20,12 @@ final class ZlibRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ZlibRuntime.php');
         $this->assertStringContainsString('ZlibJitHelper', $runtime);
         $this->assertStringContainsString('VmZlibCore', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('parseAndCompile', $runtime);
+        $this->assertStringNotContainsString('new JIT(', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
         $this->assertStringNotContainsString('deflateInit2_', $runtime);
         $this->assertStringNotContainsString('StringZlibJit', $runtime);
 
