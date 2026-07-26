@@ -2293,6 +2293,13 @@ class VM {
      */
     public function collectObjectVarsForBuiltin(ObjectEntry $object, Frame $frame): array
     {
+        // Enum cases: Zend zend_enum.c name/value pseudo-properties (foreach + get_object_vars; #23433).
+        if (VM\EnumCaseSupport::isEnumCase($object)) {
+            $caseVar = new Variable(Variable::TYPE_OBJECT);
+            $caseVar->object($object);
+
+            return VM\EnumCaseSupport::objectVarsForCaseVariable($caseVar);
+        }
         // DateInterval: Zend date_interval_get_properties — public wire despite isInternal (#22446).
         $dateMap = $this->dateIntervalObjectVarsPropertyMap($object);
         if (null !== $dateMap) {
