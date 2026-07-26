@@ -17488,6 +17488,23 @@ class Compiler {
                     }
                 }
             }
+            $ownProducer = $this->inlineProducerForHoistedCallArgIndex(
+                $block->orig->children,
+                $callOp,
+                $callIndex,
+                (int) $argIndex
+            );
+            if (null !== $ownProducer) {
+                if (null === $block->slotForOperand($ownProducer->result)) {
+                    foreach ($this->compileExpr($ownProducer, $block) as $op) {
+                        $block->addOpCode($op);
+                    }
+                }
+                $ownSlot = $block->slotForOperand($ownProducer->result);
+                if (null !== $ownSlot) {
+                    return $ownSlot;
+                }
+            }
             $prev = $block->orig->children[$callIndex - 1] ?? null;
             if ($prev instanceof Op\Expr\ConstFetch) {
                 $name = $this->staticNameFromOperand($prev->name);
@@ -25188,6 +25205,58 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * Producer statement for a specific hoisted call argument (#23354).
+     *
+     * The $prev heuristics below resolve a hoisted argument from children[$callIndex - 1] — the
+     * statement immediately before the call, which is only ever the TRAILING argument's producer.
+     * Applied to every index, that silently gave each argument the last one's value:
+     * f($x + 1, $x + 2) printed "12 12" and t2($r['a'], $r['b']) printed "BBB|BBB".
+     *
+     * No positional guessing is needed. php-cfg keeps the link: the hoisted argument temporary is a
+     * distinct Operand from the producer's ->result (which is why slotForOperand($arg) misses), but
+     * it records that producer as its sole writer. args[$argIndex]->ops[0] therefore names the
+     * producer exactly, for every producer kind and any mix of them.
+     *
+     * Restricted to dead inline temporaries with a single writer — a named variable or a
+     * multiply-written temp is not a hoisted argument and stays with the existing paths.
+     */
+    private function inlineProducerForHoistedCallArgIndex(
+        array $cfgChildren,
+        Op $callOp,
+        int $callIndex,
+        int $argIndex
+    ): ?Op\Expr {
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand\Temporary || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $writers = $callArg->ops ?? [];
+        if (1 !== \count($writers)) {
+            return null;
+        }
+        $producer = $writers[0];
+        if (!$producer instanceof Op\Expr || !$this->isInlineExprCallArgProducer($producer)) {
+            return null;
+        }
+        if (null === $producer->result) {
+            return null;
+        }
+        // The producer must be a hoisted statement of this block, sitting before the call.
+        $producerIndex = null;
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            if (($cfgChildren[$i] ?? null) === $producer) {
+                $producerIndex = $i;
+                break;
+            }
+        }
+        if (null === $producerIndex) {
+            return null;
+        }
+
+        return $producer;
     }
 
     private function isInlineExprCallArgProducer(Op $op): bool
@@ -48702,7 +48771,17 @@ class Compiler {
                         $cfgCallOp,
                         false
                     );
-                    if (null === $immediatePropertySlot) {
+                    // The pending scan returns the LAST dim-fetch read, which belongs to the trailing
+                    // argument. Applying it to every index made t2($r['a'], $r['b']) send $r['b'] twice
+                    // (#23354). Earlier arguments keep the per-index slot resolved above; the override
+                    // still runs when nothing else produced one, so it stays a fallback.
+                    if (
+                        null === $immediatePropertySlot
+                        && (
+                            null === $valueSlot
+                            || (int) $argIndex === $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)
+                        )
+                    ) {
                         $valueSlot = (string) $pendingDimFetchSlot;
                     }
                 }
