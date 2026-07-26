@@ -883,6 +883,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($split, 'split_length', 'str_split'));
     }
 
+    /** @covers issue #23207 */
+    public function testPasswordHashVerifyZendStubNamedParams(): void
+    {
+        $hash = BuiltinParamNames::forFunction('password_hash');
+        self::assertSame(['password', 'algo', 'options'], $hash);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($hash, 'password', 'password_hash'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($hash, 'algo', 'password_hash'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($hash, 'options', 'password_hash'));
+
+        $verify = BuiltinParamNames::forFunction('password_verify');
+        self::assertSame(['password', 'hash'], $verify);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($verify, 'password', 'password_verify'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($verify, 'hash', 'password_verify'));
+    }
+
     /** @covers issue #23240 */
     public function testChrZendStubNamedParams(): void
     {
