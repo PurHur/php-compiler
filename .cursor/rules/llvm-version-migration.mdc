@@ -1,0 +1,74 @@
+---
+description: LLVM 9 → 22 migration — opaque pointers, the binding boundary, and what must be regenerated
+globs: lib/JIT/**/*,lib/AOT/**/*,patches/php-llvm-*,script/install-llvm*,Docker/**/*
+alwaysApply: false
+---
+
+# LLVM version migration (9 → 22)
+
+Target is **LLVM 22.1.x**, installable on jammy from `apt.llvm.org/jammy llvm-toolchain-jammy-22`.
+Full plan: `docs/roadmap/LLVM22-MIGRATION.md`.
+
+## The one fact that shapes everything
+
+**Typed-pointer builders no longer exist.** Probed against a real LLVM 22.1.8 install:
+
+```
+LLVMBuildLoad / LLVMBuildCall / LLVMBuildGEP in Core.h  →  0 occurrences
+LLVMBuildLoad2 / Call2 / GEP2                           →  the only option
+llvm-c/Transforms/                                      →  only PassBuilder.h
+libLLVM-22.so                                           →  no ".1" suffix
+```
+
+They are **not** present as deprecated shims, so there is no "get it loading first, migrate
+gradually" path — nothing compiles until every `load`/`gep`/`call` carries an explicit type, and
+`LLVMGetElementType()` on a pointer is gone.
+
+## Where the work belongs
+
+~4,100 call sites in `lib/` need a type (`load` 1,026, `structGep` 797, `call` 2,226, `gep` 65) —
+but they all funnel through `LLVMAbstract\Builder`. **Do not edit call sites.** Track the pointee
+type on the PHP `Value` wrapper at every point a pointer is produced (alloca, GEP, global,
+bitcast/pointerCast, call return, parameter) and let the binding feed the `*2` builders.
+
+## Do the threading on LLVM 9 first
+
+Under LLVM 9 the pointee type is still derivable, so threading it is a **no-op that can be validated
+against the working compiler**. Any behaviour difference is a bug in the threading, caught while the
+old backend still works.
+
+Only switch backends once the sweep and compliance comparison are clean. This splits one large risky
+change into two verifiable ones — which matters because there is **no CI on `lib/`** (see
+`correctness-gates.mdc`).
+
+## Additive, therefore reversible
+
+`Chooser` already dispatches across `LLVM4/7/8/9`. Add `LLVM22` alongside rather than replacing —
+both stay selectable during transition, and that is the rollback. `Chooser::FILES` needs a new entry
+for `libLLVM-22.so`; the existing map only matches `.so.1` names and would silently never select it.
+
+## Regenerate every LLVM-version-specific artifact
+
+Objects built by LLVM 9 cannot be linked with LLVM 22 output and trusted:
+
+* `prelinked/helper-runtime/x86_64-linux/**` — 257 objects emitted by LLVM 9
+* `prelinked/bootstrap-gen0/**`, `prelinked/bootstrap-vendor/**`
+* pinned image `Docker/dev/ubuntu-22.04/Dockerfile`, `script/install-llvm9.sh`
+* link flags / sysroot in `lib/AOT/Linker.php`
+
+## Traps already hit
+
+* **IR text is not portable across versions.** LLVM 9 emits `void*`; clang 14+ rejects it with
+  `pointers to void are invalid - use i8*`. Expect more of this class when comparing or reusing IR.
+* `PassManagerBuilder` is gone — the replacement `LLVMRunPasses(M, "default<O2>", TM, opts)` is
+  *simpler* than the legacy plumbing added in #23503. Version-gate rather than rewrite in place.
+* MCJIT is legacy; `createExecutionEngine`/`getTargetMachine` (the object-emit path) may need
+  reworking for ORC.
+* The binding generator is `ircmaxell/ffime:dev-master` and needs `minimum-stability: dev` — a plain
+  `composer require ircmaxell/ffime` fails with a usage dump rather than a clear error.
+
+## Keep it separate from performance work
+
+A newer optimiser does **not** fix interpreter-shaped IR — enabling the O2 pipeline bought only 16%
+because boxed values and runtime dispatch defeat it. This migration is modernisation; the speculation
+experiments (#23483) are the performance lever. Do not entangle them.

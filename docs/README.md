@@ -83,3 +83,12 @@ Generated maps and large tables — **repo only**; exclude from `docs/pages/` co
 - North star (self-host): [#1492](https://github.com/PurHur/php-compiler/issues/1492) (was [#1056](https://github.com/PurHur/php-compiler/issues/1056))
 - Example integration tests (003-MiniWebApp, …): regression only — closed [#1044](https://github.com/PurHur/php-compiler/issues/1044)
 - Wave 3 batch: [#1380](https://github.com/PurHur/php-compiler/issues/1380)
+
+## Roadmap and release
+
+* [Release plan and criteria](roadmap/RELEASE-PLAN.md) — phased plan, falsifiable release criteria
+  (issue #23474).
+* [LLVM 9 → 22 migration](roadmap/LLVM22-MIGRATION.md) — opaque-pointer transition, probed facts,
+  de-risking order.
+
+Contributor and agent entry point: [AGENTS.md](../AGENTS.md).
