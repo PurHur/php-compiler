@@ -27,6 +27,8 @@ declare(strict_types=1);
  * Usage (pinned env, LLVM 9 required):
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php'
  *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --prelink'
+ *   ./script/docker-exec.sh -- bash -lc 'php script/emit-helper-runtime-object.php --migrate-deps'
+ *     # rewrite legacy manifests to v2 deps[] without re-emitting .o (#23458)
  */
 
 use PHPCompiler\AOT\HelperRuntimeCache;
@@ -42,6 +44,53 @@ $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
 $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
 
 $force = in_array('--force', $argv, true);
+$migrateDeps = in_array('--migrate-deps', $argv, true);
+
+if ($migrateDeps) {
+    $roots = [HelperRuntimeCache::unitsDir(), HelperRuntimeCache::prelinkedUnitsDir()];
+    $migrated = 0;
+    $skipped = 0;
+    foreach ($roots as $unitsRoot) {
+        if (!is_dir($unitsRoot)) {
+            continue;
+        }
+        foreach (glob($unitsRoot.'/*/manifest.json') ?: [] as $manifestPath) {
+            $unitDir = dirname($manifestPath);
+            $slug = basename($unitDir);
+            $manifest = HelperRuntimeCache::unitManifest($slug, $unitDir);
+            if (null === $manifest) {
+                ++$skipped;
+                continue;
+            }
+            $sourceAbs = HelperRuntimeCache::resolveUnitSource($root, (string) $manifest['unit']);
+            if (null === $sourceAbs) {
+                ++$skipped;
+                continue;
+            }
+            $next = HelperRuntimeCache::migrateManifestToV2($manifest, $sourceAbs);
+            if (null === $next) {
+                ++$skipped;
+                continue;
+            }
+            file_put_contents($manifestPath, json_encode($next, JSON_UNESCAPED_SLASHES)."\n");
+            ++$migrated;
+        }
+    }
+    $archManifest = dirname(HelperRuntimeCache::prelinkedUnitsDir()).'/manifest.json';
+    if (is_file($archManifest)) {
+        $arch = json_decode((string) file_get_contents($archManifest), true);
+        if (\is_array($arch)) {
+            $arch['fingerprint_schema'] = 2;
+            $arch['core_fingerprint'] = HelperRuntimeCache::coreFingerprint();
+            $arch['legacy_lowering_fingerprint'] = HelperRuntimeCache::legacyLoweringFingerprint();
+            $arch['migrated_at'] = gmdate('c');
+            $arch['role'] = 'committed per-arch split-compilation helper units (#15889, #23458 per-unit deps) — consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally';
+            file_put_contents($archManifest, json_encode($arch, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)."\n");
+        }
+    }
+    fwrite(STDOUT, "helper-runtime-migrate-deps: {$migrated} rewritten, {$skipped} skipped (#23458)\n");
+    exit($migrated > 0 ? 0 : 1);
+}
 
 // 1. Discover (helperPath, logicalNames[]) pairs via reflection.
 // Optional *HELPER_BUNDLE (list of repo-root paths) NestedJITs deps + unit in one
@@ -143,6 +192,20 @@ if (null !== $unitPath) {
         JitVmHelperLink::ensureCompiled($context, $unitPath, $names, 'helper-runtime-emit');
     }
 
+    // NestedJIT closure for per-unit deps (#23458) — before stub/main finalize.
+    $compiledAbs = [];
+    foreach ($context->jitAotIncludedCompileDone as $key => $_) {
+        $parts = explode("\0", (string) $key, 2);
+        $compiledAbs[] = $parts[1] ?? $parts[0];
+    }
+    foreach ($context->jitIncludedFiles as $included) {
+        if (\is_string($included) && '' !== $included) {
+            $compiledAbs[] = $included;
+        }
+    }
+    $deps = HelperRuntimeCache::dependencyRelPathsForEmit($sourceAbs, $compiledAbs);
+    $unitFingerprint = HelperRuntimeCache::fingerprintV2($sourceAbs, $deps);
+
     // A stub main drives the same pending-bridge completion a real script
     // build performs; the duplicate stub main per unit object is discarded by
     // -z muldefs (script object is listed first at link).
@@ -210,8 +273,10 @@ if (null !== $unitPath) {
         '/ext/standard/VarExportJitHelper.php' => true,
     ];
     file_put_contents($dir.'/manifest.json', json_encode([
-        'fingerprint' => HelperRuntimeCache::unitFingerprint($sourceAbs),
+        'fingerprint' => $unitFingerprint,
+        'fingerprint_version' => 2,
         'unit' => $unitPath,
+        'deps' => $deps,
         'helpers' => $helpers,
         'init_symbol' => '__init__'.$initSuffix,
         'shutdown_symbol' => '__shutdown__'.$initSuffix,
@@ -239,22 +304,28 @@ foreach ($sites as $path => $names) {
 
         continue;
     }
-    $fingerprint = HelperRuntimeCache::unitFingerprint($sourceAbs);
-
+    // Freshness: prefer on-disk manifest deps (v2) or legacy v1 key (#23458).
+    $fingerprint = null;
     if (!$force) {
         $manifest = HelperRuntimeCache::unitManifest($slug);
-        if (null !== $manifest && $manifest['fingerprint'] === $fingerprint
-            && is_file($dir.'/unit.o') && is_file($dir.'/unit.bc')) {
+        if (null !== $manifest && is_file($dir.'/unit.o') && is_file($dir.'/unit.bc')
+            && HelperRuntimeCache::manifestFingerprintMatches($manifest, $sourceAbs)) {
             ++$fresh;
 
             continue;
         }
+        $fingerprint = null !== $manifest
+            ? HelperRuntimeCache::expectedFingerprintForManifest($manifest, $sourceAbs)
+            : HelperRuntimeCache::unitFingerprint($sourceAbs);
         $failure = HelperRuntimeCache::unitFailure($slug);
         if (null !== $failure && $failure['fingerprint'] === $fingerprint) {
             ++$knownBroken;
 
-            continue; // remembered crash; re-attempt only on source/core change
+            continue; // remembered crash; re-attempt only on source/deps/global change
         }
+    }
+    if (null === $fingerprint) {
+        $fingerprint = HelperRuntimeCache::unitFingerprint($sourceAbs);
     }
 
     $pendingUnits[$slug] = ['path' => $path, 'dir' => $dir, 'fingerprint' => $fingerprint];
@@ -408,7 +479,7 @@ if (in_array('--prelink', $argv, true)) {
         $sourceAbs = HelperRuntimeCache::resolveUnitSource($root, $path);
         $manifest = HelperRuntimeCache::unitManifest($slug);
         if (null === $sourceAbs || null === $manifest
-            || $manifest['fingerprint'] !== HelperRuntimeCache::unitFingerprint($sourceAbs)
+            || !HelperRuntimeCache::manifestFingerprintMatches($manifest, $sourceAbs)
             || !is_file($buildDir.'/unit.o') || !is_file($buildDir.'/unit.bc')) {
             continue; // only fresh, complete units are published
         }
