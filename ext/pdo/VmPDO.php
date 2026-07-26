@@ -132,6 +132,7 @@ final class VmPDO
         if (isset($entry->methods['sqlitecreatefunction'])) {
             $entry->methodNotInherited['sqlitecreatefunction'] = true;
             $entry->methodNotInherited['sqlitecreateaggregate'] = true;
+            $entry->methodNotInherited['sqlitecreatecollation'] = true;
 
             return;
         }
@@ -139,6 +140,7 @@ final class VmPDO
         $methods = [
             'sqlitecreatefunction' => [new PDOSqliteCreateFunction(), 'sqliteCreateFunction'],
             'sqlitecreateaggregate' => [new PDOSqliteCreateAggregate(), 'sqliteCreateAggregate'],
+            'sqlitecreatecollation' => [new PDOSqliteCreateCollation(), 'sqliteCreateCollation'],
         ];
         foreach ($methods as $lc => [$method, $display]) {
             $entry->methods[$lc] = $method;
@@ -244,6 +246,7 @@ final class VmPDO
         $methods = [
             'sqlitecreatefunction' => [new PDOSqliteCreateFunction(), 'sqliteCreateFunction'],
             'sqlitecreateaggregate' => [new PDOSqliteCreateAggregate(), 'sqliteCreateAggregate'],
+            'sqlitecreatecollation' => [new PDOSqliteCreateCollation(), 'sqliteCreateCollation'],
         ];
         foreach ($methods as $lc => [$method, $display]) {
             $sqlite->methods[$lc] = $method;
@@ -309,6 +312,7 @@ final class VmPDO
         self::stripForeignDriverMethods($mysql, [
             'sqlitecreatefunction',
             'sqlitecreateaggregate',
+            'sqlitecreatecollation',
             'pgsqlcopyfromarray',
             'pgsqlcopyfromfile',
             'pgsqlcopytoarray',
@@ -379,6 +383,7 @@ final class VmPDO
         self::stripForeignDriverMethods($pgsql, [
             'sqlitecreatefunction',
             'sqlitecreateaggregate',
+            'sqlitecreatecollation',
             'getwarningcount',
         ]);
     }
@@ -621,15 +626,24 @@ final class VmPDO
         }
     }
 
-    /** Expand PDO sqliteCreateFunction UDFs in SQL (#19863 / #19862). */
+    /**
+     * Expand PDO sqliteCreateFunction / Aggregate / Collation in SQL
+     * (#19863 / #22332; shares helpers with SQLite3).
+     */
     public static function expandSql(ObjectEntry $entry, string $sql): string
     {
         $state = self::state($entry);
-        if ([] === $state->functions) {
-            return $sql;
+        if ([] !== $state->functions) {
+            $sql = VmSqlite3Udf::expandSql($sql, $state->functions);
+        }
+        if ([] !== $state->aggregates && null !== $state->db) {
+            $sql = VmSqlite3Udf::expandAggregates($state->db, $sql, $state->aggregates);
+        }
+        if ([] !== $state->collations && null !== $state->db) {
+            $sql = VmSqlite3Udf::expandCollations($state->db, $sql, $state->collations);
         }
 
-        return VmSqlite3Udf::expandSql($sql, $state->functions);
+        return $sql;
     }
 
     public static function assignScalar(Variable $returnVar, mixed $value): void
@@ -700,6 +714,27 @@ final class PdoState
      * @var array<string, array{callback: Variable, closure: ?\PHPCompiler\VM\ClosureState, argc: int, ctx: \PHPCompiler\VM\Context}>
      */
     public array $functions = [];
+
+    /**
+     * PDO::sqliteCreateAggregate registrations (#22332; share expandAggregates with SQLite3).
+     *
+     * @var array<string, array{
+     *     step: Variable,
+     *     stepClosure: ?\PHPCompiler\VM\ClosureState,
+     *     final: Variable,
+     *     finalClosure: ?\PHPCompiler\VM\ClosureState,
+     *     argc: int,
+     *     ctx: \PHPCompiler\VM\Context
+     * }>
+     */
+    public array $aggregates = [];
+
+    /**
+     * PDO::sqliteCreateCollation registrations (#22332).
+     *
+     * @var array<string, array{callback: Variable, closure: ?\PHPCompiler\VM\ClosureState, ctx: \PHPCompiler\VM\Context}>
+     */
+    public array $collations = [];
 }
 
 final class PDOConstruct extends PdoClassMethod
@@ -1246,8 +1281,8 @@ final class PDOSqliteCreateFunction extends PdoClassMethod
 }
 
 /**
- * PDO::sqliteCreateAggregate — method present (pdo_sqlite.stub.php; #19863).
- * Full step/finalize UDF needs FFI::callback (PHP ≥ 8.3); registration succeeds for method_exists.
+ * PDO::sqliteCreateAggregate — pdo_sqlite (#19863 / #22332).
+ * Stores step/final callables; SQL expansion evaluates SELECT agg(cols) FROM … (PHP 8.2 path).
  */
 final class PDOSqliteCreateAggregate extends PdoClassMethod
 {
@@ -1264,16 +1299,7 @@ final class PDOSqliteCreateAggregate extends PdoClassMethod
                 'PDO::sqliteCreateAggregate() expects at least 3 arguments, '.(\count($frame->calledArgs) - 1).' given'
             );
         }
-        // Validate name + callables so TypeErrors match Zend; execution of aggregates deferred.
         $name = $this->stringArg($frame->calledArgs[1], 'PDO::sqliteCreateAggregate', 0, 'name');
-        $ctx = $frame->vmContext;
-        if (null === $ctx) {
-            throw new \LogicException('PDO::sqliteCreateAggregate() requires a VM context');
-        }
-        if (!VmCallable::isCallable($ctx, $frame->calledArgs[2]->resolveIndirect())
-            || !VmCallable::isCallable($ctx, $frame->calledArgs[3]->resolveIndirect())) {
-            throw new \TypeError(VmCallable::invalidCallbackTypeError('PDO::sqliteCreateAggregate'));
-        }
         if ('' === $name) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
@@ -1281,6 +1307,81 @@ final class PDOSqliteCreateAggregate extends PdoClassMethod
 
             return;
         }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('PDO::sqliteCreateAggregate() requires a VM context');
+        }
+        $step = $frame->calledArgs[2]->resolveIndirect();
+        if (!VmCallable::isCallable($ctx, $step)) {
+            throw new \TypeError(VmCallable::invalidCallbackTypeError('PDO::sqliteCreateAggregate'));
+        }
+        $final = $frame->calledArgs[3]->resolveIndirect();
+        if (!VmCallable::isCallable($ctx, $final)) {
+            throw new \TypeError(VmCallable::invalidCallbackTypeError('PDO::sqliteCreateAggregate'));
+        }
+        $argc = -1;
+        if (\count($frame->calledArgs) >= 5) {
+            $argc = $this->intArg($frame->calledArgs[4], 'PDO::sqliteCreateAggregate', 3, 'numArgs', -1);
+        }
+        [$stepPinned, $stepClosure] = SplIteratorSupport::pinCallback($step);
+        [$finalPinned, $finalClosure] = SplIteratorSupport::pinCallback($final);
+        $state = VmPDO::state($receiver);
+        $state->aggregates[strtolower($name)] = [
+            'step' => $stepPinned,
+            'stepClosure' => $stepClosure,
+            'final' => $finalPinned,
+            'finalClosure' => $finalClosure,
+            'argc' => $argc,
+            'ctx' => $ctx,
+        ];
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/**
+ * PDO::sqliteCreateCollation — pdo_sqlite (#22332).
+ * Stores callable; ORDER BY … COLLATE name expanded in PHP (no FFI::callback on 8.2).
+ */
+final class PDOSqliteCreateCollation extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('sqliteCreateCollation');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::sqliteCreateCollation()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'PDO::sqliteCreateCollation() expects exactly 2 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'PDO::sqliteCreateCollation', 0, 'name');
+        if ('' === $name) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('PDO::sqliteCreateCollation() requires a VM context');
+        }
+        $callback = $frame->calledArgs[2]->resolveIndirect();
+        if (!VmCallable::isCallable($ctx, $callback)) {
+            throw new \TypeError(VmCallable::invalidCallbackTypeError('PDO::sqliteCreateCollation'));
+        }
+        [$pinned, $closureState] = SplIteratorSupport::pinCallback($callback);
+        $state = VmPDO::state($receiver);
+        $state->collations[strtolower($name)] = [
+            'callback' => $pinned,
+            'closure' => $closureState,
+            'ctx' => $ctx,
+        ];
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

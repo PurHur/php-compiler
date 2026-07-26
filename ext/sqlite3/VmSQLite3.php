@@ -312,6 +312,9 @@ final class VmSQLite3
         if ([] !== $state->aggregates && null !== $state->db && !$state->closed) {
             $sql = VmSqlite3Udf::expandAggregates($state->db, $sql, $state->aggregates);
         }
+        if ([] !== $state->collations && null !== $state->db && !$state->closed) {
+            $sql = VmSqlite3Udf::expandCollations($state->db, $sql, $state->collations);
+        }
 
         return $sql;
     }
