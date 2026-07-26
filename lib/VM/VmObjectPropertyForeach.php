@@ -19,6 +19,28 @@ use PHPLLVM\Value;
  */
 final class VmObjectPropertyForeach
 {
+    /** Caller class for visibility (null = global / external scope) (#23430). */
+    private static function foreachCallerScopeLc(Context $context): ?string
+    {
+        $name = $context->scope->className;
+        if ('' === $name) {
+            return null;
+        }
+
+        return strtolower(ltrim($name, '\\'));
+    }
+
+    /**
+     * @return list<array{0: int, 1: string, 2: int, 3: int}>
+     */
+    private static function visiblePropertySets(Context $context, int $classId): array
+    {
+        return $context->type->object->instancePropertySetsVisibleFromScope(
+            $classId,
+            self::foreachCallerScopeLc($context)
+        );
+    }
+
     public static function canLower(Context $context, JitVariable $container, ?string $containerUserType): bool
     {
         if ($container->type & JitVariable::IS_NATIVE_ARRAY) {
@@ -71,7 +93,7 @@ final class VmObjectPropertyForeach
 
         if (null !== $containerUserType && '' !== $containerUserType) {
             $classId = $context->type->object->lookup(strtolower(ltrim($containerUserType, '\\')));
-            $count = \count($context->type->object->instancePropertySets($classId));
+            $count = \count(self::visiblePropertySets($context, $classId));
 
             return $context->builder->icmp(
                 Builder::INT_ULT,
@@ -137,7 +159,7 @@ final class VmObjectPropertyForeach
         $entry = $context->builder->getInsertBlock();
         $checkBlock = $entry;
         foreach ($context->type->object->allClassNamesById() as $id => $_) {
-            $props = $context->type->object->instancePropertySets($id);
+            $props = self::visiblePropertySets($context, $id);
             if ($checkBlock !== $entry) {
                 $context->builder->positionAtEnd($checkBlock);
             }
@@ -224,13 +246,16 @@ final class VmObjectPropertyForeach
         Value $idx
     ): JitVariable {
         $classId = $context->type->object->lookup(strtolower(ltrim($className, '\\')));
-        $props = $context->type->object->instancePropertySets($classId);
+        $props = self::visiblePropertySets($context, $classId);
         $fn = $context->builder->getInsertBlock()->getParent();
         $done = $fn->appendBasicBlock('foreach_objprop_prop_done');
         $objectType = $context->type->object;
         $entry = $context->builder->getInsertBlock();
         $checkBlock = $entry;
         $fetched = null;
+        if ([] === $props) {
+            throw new \LogicException('foreach object property fetch requires at least one visible instance property');
+        }
         foreach ($props as $i => $propset) {
             if ($checkBlock !== $entry) {
                 $context->builder->positionAtEnd($checkBlock);
@@ -308,7 +333,7 @@ final class VmObjectPropertyForeach
         Value $destPtr
     ): void {
         $classId = $context->type->object->lookup(strtolower(ltrim($className, '\\')));
-        $props = $context->type->object->instancePropertySets($classId);
+        $props = self::visiblePropertySets($context, $classId);
         $fn = $context->builder->getInsertBlock()->getParent();
         $entry = $context->builder->getInsertBlock();
         $checkBlock = $entry;
