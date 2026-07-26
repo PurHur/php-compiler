@@ -25,7 +25,7 @@ final class VmLdapResult
     /** @var array<int, array{native: \FFI\CData, freed: bool, connection_id: int}> */
     private static array $results = [];
 
-    /** @var array<int, array{native: \FFI\CData, connection_id: int, result_id: int}> */
+    /** @var array<int, array{native: \FFI\CData, connection_id: int, result_id: int, ber: ?\FFI\CData}> */
     private static array $entries = [];
 
     public static function registerClasses(Context $ctx): void
@@ -67,6 +67,7 @@ final class VmLdapResult
             'native' => $native,
             'connection_id' => $connection->id,
             'result_id' => $resultId,
+            'ber' => null,
         ];
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
@@ -81,6 +82,23 @@ final class VmLdapResult
         }
 
         return (int) self::$entries[$entry->id]['result_id'];
+    }
+
+    public static function entryBer(ObjectEntry $entry): ?\FFI\CData
+    {
+        if (!isset(self::$entries[$entry->id])) {
+            return null;
+        }
+
+        return self::$entries[$entry->id]['ber'];
+    }
+
+    public static function setEntryBer(ObjectEntry $entry, ?\FFI\CData $ber): void
+    {
+        if (!isset(self::$entries[$entry->id])) {
+            return;
+        }
+        self::$entries[$entry->id]['ber'] = $ber;
     }
 
     public static function isLiveResult(ObjectEntry $object): bool

@@ -171,6 +171,148 @@ final class VmLdapCore
     }
 
     /**
+     * ldap_compare → true / false / -1 (php-src; #22177).
+     */
+    public static function compare(
+        ObjectEntry $connection,
+        string $dn,
+        string $attribute,
+        string $value
+    ): bool|int {
+        $ld = VmLdapConnection::native($connection);
+        $rc = VmLdapNative::compareExtSync($ld, $dn, $attribute, $value);
+        VmLdapConnection::setErrno($connection, $rc);
+        if (VmLdapNative::LDAP_COMPARE_TRUE === $rc) {
+            return true;
+        }
+        if (VmLdapNative::LDAP_COMPARE_FALSE === $rc) {
+            return false;
+        }
+        @\trigger_error('ldap_compare(): Compare: '.VmLdapNative::err2string($rc), \E_USER_WARNING);
+
+        return -1;
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function getDn(ObjectEntry $connection, ObjectEntry $entry): string|false
+    {
+        $ld = VmLdapConnection::native($connection);
+        $dn = VmLdapNative::getDn($ld, VmLdapResult::entryNative($entry));
+        if (null === $dn) {
+            return false;
+        }
+
+        return $dn;
+    }
+
+    /**
+     * php-src ldap_get_values / ldap_get_values_len array shape.
+     *
+     * @return Variable|false
+     */
+    public static function getValues(ObjectEntry $connection, ObjectEntry $entry, string $attribute): Variable|false
+    {
+        $ld = VmLdapConnection::native($connection);
+        $values = VmLdapNative::getValuesLen($ld, VmLdapResult::entryNative($entry), $attribute);
+        // OpenLDAP returns NULL on missing attr — treat empty as failure like php-src when errno set.
+        if ([] === $values) {
+            $errno = VmLdapNative::getOptionInt($ld, VmLdapNative::LDAP_OPT_ERROR_NUMBER)['value'];
+            if (VmLdapNative::LDAP_SUCCESS !== $errno && 0 !== $errno) {
+                @\trigger_error(
+                    'ldap_get_values(): Cannot get the value(s) of attribute '.VmLdapNative::err2string($errno),
+                    \E_USER_WARNING
+                );
+
+                return false;
+            }
+        }
+        $out = ['count' => \count($values)];
+        foreach ($values as $i => $val) {
+            $out[$i] = $val;
+        }
+
+        return self::importPhpArray($out);
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function firstAttribute(ObjectEntry $connection, ObjectEntry $entry): string|false
+    {
+        $ld = VmLdapConnection::native($connection);
+        $info = VmLdapNative::firstAttribute($ld, VmLdapResult::entryNative($entry));
+        VmLdapResult::setEntryBer($entry, $info['ber']);
+        if (null === $info['attr']) {
+            return false;
+        }
+
+        return $info['attr'];
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function nextAttribute(ObjectEntry $connection, ObjectEntry $entry): string|false
+    {
+        $ber = VmLdapResult::entryBer($entry);
+        if (null === $ber) {
+            @\trigger_error(
+                'ldap_next_attribute(): Called before calling ldap_first_attribute() or no attributes found in result entry',
+                \E_USER_WARNING
+            );
+
+            return false;
+        }
+        $ld = VmLdapConnection::native($connection);
+        $attr = VmLdapNative::nextAttribute($ld, VmLdapResult::entryNative($entry), $ber);
+        if (null === $attr) {
+            return false;
+        }
+
+        return $attr;
+    }
+
+    /**
+     * @param list<string> $referralsOut filled when wanted
+     * @return array{ok: bool, errcode: int, matched_dn: string, error_message: string, referrals: list<string>}|false
+     */
+    public static function parseResult(
+        ObjectEntry $connection,
+        ObjectEntry $result,
+        bool $wantMatched,
+        bool $wantErrmsg,
+        bool $wantReferrals
+    ): array|false {
+        $ld = VmLdapConnection::native($connection);
+        $parsed = VmLdapNative::parseResult(
+            $ld,
+            VmLdapResult::resultNative($result),
+            $wantMatched,
+            $wantErrmsg,
+            $wantReferrals
+        );
+        VmLdapConnection::setErrno($connection, $parsed['errno']);
+        if (!$parsed['ok']) {
+            @\trigger_error(
+                'ldap_parse_result(): Unable to parse result: '.VmLdapNative::err2string($parsed['errno']),
+                \E_USER_WARNING
+            );
+
+            return false;
+        }
+
+        return [
+            'ok' => true,
+            'errcode' => $parsed['errcode'],
+            'matched_dn' => $parsed['matched_dn'],
+            'error_message' => $parsed['error_message'],
+            'referrals' => $parsed['referrals'],
+        ];
+    }
+
+    /**
      * @param array<int|string, mixed> $value
      */
     private static function importPhpArray(array $value): Variable

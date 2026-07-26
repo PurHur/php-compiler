@@ -52,6 +52,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/ldap_exop_builtins.php';
         require_once __DIR__.'/ldap_modify_builtins.php';
         require_once __DIR__.'/ldap_dn_builtins.php';
+        require_once __DIR__.'/ldap_result_builtins.php';
 
         $fns = [
             new ldap_escape(),
@@ -77,6 +78,13 @@ class Module extends ModuleAbstract
             new ldap_next_entry(),
             new ldap_get_attributes(),
             new ldap_free_result(),
+            new ldap_compare(),
+            new ldap_parse_result(),
+            new ldap_get_dn(),
+            new ldap_first_attribute(),
+            new ldap_next_attribute(),
+            new ldap_get_values(),
+            new ldap_get_values_len(),
             new ldap_exop(),
             new ldap_exop_sync(),
             new ldap_parse_exop(),
