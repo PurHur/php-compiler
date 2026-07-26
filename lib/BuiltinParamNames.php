@@ -74,6 +74,9 @@ final class BuiltinParamNames
                 return ['string', 'width', 'break', 'cut'];
             case 'date':
                 return ['format', 'timestamp'];
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still says time/now (#23216)
+            case 'strtotime':
+                return ['datetime', 'baseTimestamp'];
             case 'array_all':
             case 'array_any':
             case 'array_all_key':

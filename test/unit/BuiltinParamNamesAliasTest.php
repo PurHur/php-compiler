@@ -787,4 +787,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'process_sections', 'parse_ini_file'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'scanner_mode', 'parse_ini_file'));
     }
+
+    /** @covers issue #23216 */
+    public function testStrtotimeZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('strtotime');
+        self::assertSame(['datetime', 'baseTimestamp'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', 'strtotime'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'baseTimestamp', 'strtotime'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $time / $now)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'time', 'strtotime'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'now', 'strtotime'));
+    }
 }
