@@ -76,7 +76,7 @@ final class JitMbStrwidth
         $from = JitStrictIntArg::lower($context, $args[1], 'mb_strimwidth', 2, 'start');
         $width = JitStrictIntArg::lower($context, $args[2], 'mb_strimwidth', 3, 'width');
         if ($argc >= 4) {
-            $marker = JitStringBuiltinArg::lower($context, $args[3], 'mb_strimwidth', 4, 'trimmarker');
+            $marker = JitStringBuiltinArg::lower($context, $args[3], 'mb_strimwidth', 4, 'trim_marker');
         } else {
             $marker = $context->builder->load($context->constantStringFromString(''));
         }

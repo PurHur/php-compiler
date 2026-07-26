@@ -45,7 +45,7 @@ final class mb_strimwidth extends Internal
         $from = VmMbstring::coerceStartArg($frame, 'mb_strimwidth', 1);
         $width = VmMbstring::coerceLengthArg($frame, 'mb_strimwidth', 2);
         $trimmarker = isset($frame->calledArgs[3])
-            ? VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'mb_strimwidth', 3, 'trimmarker')
+            ? VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'mb_strimwidth', 3, 'trim_marker')
             : '';
         $encoding = isset($frame->calledArgs[4])
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[4], 'mb_strimwidth', 4)
