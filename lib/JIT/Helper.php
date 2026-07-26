@@ -848,30 +848,24 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
-            if (
-                OpCode::TYPE_PLUS === $opcode->type
-                || OpCode::TYPE_MINUS === $opcode->type
-                || OpCode::TYPE_MUL === $opcode->type
-            ) {
-                $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
-                $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
-                if (OpCode::TYPE_PLUS === $opcode->type) {
-                    $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
-                } elseif (OpCode::TYPE_MINUS === $opcode->type) {
-                    $result = $this->context->builder->subNoSignedWrap($leftLong, $rightLong);
-                } else {
-                    $result = $this->context->builder->mulNoSignedWrap($leftLong, $rightLong);
-                }
-                goto return_long;
+            // Float-aware +/−/*/÷ on boxed values (#23471 mandelbrot AOT).
+            if (JitValueNumeric::isArithOpcode($opcode->type)) {
+                return JitValueNumeric::binaryValueValue(
+                    $this->context,
+                    $opcode->type,
+                    $left,
+                    $right
+                );
             }
-            if (OpCode::TYPE_DIV === $opcode->type || OpCode::TYPE_MODULO === $opcode->type) {
+            if (OpCode::TYPE_MODULO === $opcode->type) {
                 $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
-                $zeroMsg = OpCode::TYPE_MODULO === $opcode->type ? 'Modulo by zero' : 'Division by zero';
-                JitNumericDivisionGuard::emitZeroLongDivisorGuard($this->context, $rightLong, $zeroMsg);
-                $result = OpCode::TYPE_DIV === $opcode->type
-                    ? $this->context->builder->signedDiv($leftLong, $rightLong)
-                    : $this->context->builder->signedRem($leftLong, $rightLong);
+                JitNumericDivisionGuard::emitZeroLongDivisorGuard(
+                    $this->context,
+                    $rightLong,
+                    'Modulo by zero'
+                );
+                $result = $this->context->builder->signedRem($leftLong, $rightLong);
                 goto return_long;
             }
             switch ($opcode->type) {
@@ -939,6 +933,17 @@ restart:
                     $result = JitValueCompare::notIdenticalToNative($this->context, $left, $right);
                     goto return_bool;
                 }
+                if (JitValueNumeric::isArithOpcode($opcode->type)) {
+                    return JitValueNumeric::binaryNativeLongValue(
+                        $this->context,
+                        $opcode->type,
+                        $left,
+                        $right,
+                        $rightValue,
+                        $rightType,
+                        'right'
+                    );
+                }
                 $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 if (Variable::TYPE_NATIVE_BOOL === $rightType) {
                     $__right = $this->context->builder->zExt($rightValue, $leftLong->typeOf());
@@ -946,23 +951,6 @@ restart:
                     $__right = $this->context->builder->intCast($rightValue, $leftLong->typeOf());
                 }
                 switch ($opcode->type) {
-                    case OpCode::TYPE_PLUS:
-                        $result = $this->context->builder->addNoSignedWrap($leftLong, $__right);
-                        goto return_long;
-                    case OpCode::TYPE_MINUS:
-                        $result = $this->context->builder->subNoSignedWrap($leftLong, $__right);
-                        goto return_long;
-                    case OpCode::TYPE_MUL:
-                        $result = $this->context->builder->mulNoSignedWrap($leftLong, $__right);
-                        goto return_long;
-                    case OpCode::TYPE_DIV:
-                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
-                            $this->context,
-                            $__right,
-                            'Division by zero'
-                        );
-                        $result = $this->context->builder->signedDiv($leftLong, $__right);
-                        goto return_long;
                     case OpCode::TYPE_MODULO:
                         JitNumericDivisionGuard::emitZeroLongDivisorGuard(
                             $this->context,
@@ -1098,6 +1086,17 @@ restart:
                     $result = JitValueCompare::notIdenticalNativeToValue($this->context, $left, $right);
                     goto return_bool;
                 }
+                if (JitValueNumeric::isArithOpcode($opcode->type)) {
+                    return JitValueNumeric::binaryNativeLongValue(
+                        $this->context,
+                        $opcode->type,
+                        $left,
+                        $right,
+                        $leftValue,
+                        $leftType,
+                        'left'
+                    );
+                }
                 $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
                 if (Variable::TYPE_NATIVE_BOOL === $leftType) {
                     $__left = $this->context->builder->zExt($leftValue, $rightLong->typeOf());
@@ -1105,23 +1104,6 @@ restart:
                     $__left = $this->context->builder->intCast($leftValue, $rightLong->typeOf());
                 }
                 switch ($opcode->type) {
-                    case OpCode::TYPE_PLUS:
-                        $result = $this->context->builder->addNoSignedWrap($__left, $rightLong);
-                        goto return_long;
-                    case OpCode::TYPE_MINUS:
-                        $result = $this->context->builder->subNoSignedWrap($__left, $rightLong);
-                        goto return_long;
-                    case OpCode::TYPE_MUL:
-                        $result = $this->context->builder->mulNoSignedWrap($__left, $rightLong);
-                        goto return_long;
-                    case OpCode::TYPE_DIV:
-                        JitNumericDivisionGuard::emitZeroLongDivisorGuard(
-                            $this->context,
-                            $rightLong,
-                            'Division by zero'
-                        );
-                        $result = $this->context->builder->signedDiv($__left, $rightLong);
-                        goto return_long;
                     case OpCode::TYPE_MODULO:
                         JitNumericDivisionGuard::emitZeroLongDivisorGuard(
                             $this->context,
