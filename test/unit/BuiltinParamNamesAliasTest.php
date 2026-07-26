@@ -1238,6 +1238,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($pe, 'property_name', 'property_exists'));
     }
 
+    /** @covers issue #23435 */
+    public function testFunctionExistsZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('function_exists');
+        self::assertSame(['function'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'function', 'function_exists'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $function_name)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'function_name', 'function_exists'));
+    }
+
     /** @covers issue #23422 */
     public function testClassAliasZendStubNamedParams(): void
     {
