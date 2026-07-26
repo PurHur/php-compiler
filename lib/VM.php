@@ -828,7 +828,8 @@ class VM {
             return null;
         }
 
-        $resultOut->copyFrom($this->invokePhpFunction($func, $thisVar, $key));
+        // Isolated stack: nested user offset* must not resume the caller mid-opcode (#23450, #11452).
+        $resultOut->copyFrom($this->invokePhpFunctionIsolated($func, $thisVar, $key));
 
         return null;
     }
@@ -846,7 +847,8 @@ class VM {
         if ($func instanceof Func\Internal) {
             return $this->invokeVmClassMethod($func, $callerFrame, null, $thisVar, $key, $value);
         }
-        $this->invokePhpFunction($func, $thisVar, $key, $value);
+        // Isolated stack: nested user offset* must not resume the caller mid-opcode (#23450, #11452).
+        $this->invokePhpFunctionIsolated($func, $thisVar, $key, $value);
 
         return null;
     }
@@ -872,7 +874,8 @@ class VM {
 
             return;
         }
-        $this->invokePhpFunction($func, $thisVar, $key, $value);
+        // Isolated stack: nested user offset* must not resume the caller mid-opcode (#23450, #11452).
+        $this->invokePhpFunctionIsolated($func, $thisVar, $key, $value);
     }
 
     public function invokeArrayAccessOffsetExists(
@@ -896,7 +899,8 @@ class VM {
             return null;
         }
 
-        $resultOut->copyFrom($this->invokePhpFunction($func, $thisVar, $key));
+        // Isolated stack: nested user offsetExists must not resume the caller mid-isset/empty (#23450, #11452).
+        $resultOut->copyFrom($this->invokePhpFunctionIsolated($func, $thisVar, $key));
 
         return null;
     }
@@ -913,7 +917,8 @@ class VM {
         if ($func instanceof Func\Internal) {
             return $this->invokeVmClassMethod($func, $callerFrame, null, $thisVar, $key);
         }
-        $this->invokePhpFunction($func, $thisVar, $key);
+        // Isolated stack: nested user offset* must not resume the caller mid-opcode (#23450, #11452).
+        $this->invokePhpFunctionIsolated($func, $thisVar, $key);
 
         return null;
     }
