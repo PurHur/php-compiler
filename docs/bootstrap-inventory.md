@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6564 |
-| Phase A inventory files (M2 ratio SSOT) | 6564 |
+| PHP files on vm.php path | 6565 |
+| Phase A inventory files (M2 ratio SSOT) | 6565 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21171 |
+| Source constructs flagged (warnings) | 21176 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4585,6 +4585,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XslExtensionPolicy.php` | 0 | 1 |
 | `ext/xsl/XsltClassMethod.php` | 0 | 1 |
 | `ext/xsl/XsltHostBridge.php` | 0 | 2 |
+| `ext/xsl/XsltPhpFunctionBridge.php` | 0 | 5 |
 | `ext/xsl/XsltProcessorConstruct.php` | 0 | 1 |
 | `ext/xsl/XsltProcessorGetParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorGetSecurityPrefs.php` | 0 | 2 |
@@ -40229,7 +40230,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XsltProcessorSetSecurityPrefs (line 71)
 - new XsltProcessorGetSecurityPrefs (line 74)
 - new XsltProcessorSetProfiling (line 77)
-- 21 class method(s)
+- 22 class method(s)
 
 ### `ext/xsl/VmXslDomBridge.php`
 
@@ -40253,6 +40254,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new XSLTProcessor (line 26)
 - 15 class method(s)
+
+### `ext/xsl/XsltPhpFunctionBridge.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 60)
+- new Variable (line 63)
+- new Variable (line 157)
+- new HashTable (line 184)
+- 7 class method(s)
 
 ### `ext/xsl/XsltProcessorConstruct.php`
 
@@ -40350,7 +40360,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xsl/XsltRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 7 class method(s)
 
 ### `ext/yaml/Module.php`
 

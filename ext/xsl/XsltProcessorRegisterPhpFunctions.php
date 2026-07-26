@@ -18,10 +18,15 @@ final class XsltProcessorRegisterPhpFunctions extends XsltClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XSLTProcessor::registerPHPFunctions()');
+        if (null === $frame->vmContext) {
+            throw new \LogicException(
+                'XSLTProcessor::registerPHPFunctions() requires VM context in this compiler build'
+            );
+        }
         $restrict = null;
         if (isset($frame->calledArgs[1])) {
             $restrict = $frame->calledArgs[1]->resolveIndirect();
         }
-        VmXsl::registerPHPFunctions($entry, $restrict);
+        VmXsl::registerPHPFunctions($frame->vmContext, $entry, $restrict);
     }
 }

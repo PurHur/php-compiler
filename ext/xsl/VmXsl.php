@@ -126,6 +126,7 @@ final class VmXsl
     /** @return string|false */
     public static function transformToXml(ObjectEntry $entry, ObjectEntry $document)
     {
+        self::syncPhpFunctionsBeforeTransform($entry);
         $hostDoc = VmXslDomBridge::vmDocumentToHost($document);
 
         return XsltHostBridge::transformToXml(XsltRegistry::processor($entry), $hostDoc);
@@ -134,6 +135,7 @@ final class VmXsl
     /** @return ObjectEntry|false */
     public static function transformToDoc(Context $ctx, ObjectEntry $entry, ObjectEntry $document)
     {
+        self::syncPhpFunctionsBeforeTransform($entry);
         $hostDoc = VmXslDomBridge::vmDocumentToHost($document);
         $hostResult = XsltHostBridge::transformToDoc(XsltRegistry::processor($entry), $hostDoc);
         if (false === $hostResult) {
@@ -146,6 +148,7 @@ final class VmXsl
     /** @return int|false */
     public static function transformToUri(ObjectEntry $entry, ObjectEntry $document, string $uri)
     {
+        self::syncPhpFunctionsBeforeTransform($entry);
         $hostDoc = VmXslDomBridge::vmDocumentToHost($document);
 
         return XsltHostBridge::transformToUri(XsltRegistry::processor($entry), $hostDoc, $uri);
@@ -166,12 +169,30 @@ final class VmXsl
         return XsltHostBridge::removeParameter(XsltRegistry::processor($entry), $namespace, $name);
     }
 
-    public static function registerPHPFunctions(ObjectEntry $entry, ?Variable $restrict = null): void
+    public static function registerPHPFunctions(Context $ctx, ObjectEntry $entry, ?Variable $restrict = null): void
     {
+        $hostRestrict = self::hostRegisterPhpFunctionsRestrict($restrict);
+        // Materialize host-named trampolines for VM userland before host register (#22632).
+        XsltPhpFunctionBridge::sync($ctx, $hostRestrict);
+        XsltRegistry::storePhpFunctions($entry, $ctx, $hostRestrict);
         XsltHostBridge::registerPHPFunctions(
             XsltRegistry::processor($entry),
-            self::hostRegisterPhpFunctionsRestrict($restrict)
+            $hostRestrict
         );
+    }
+
+    /**
+     * Refresh php:function trampolines immediately before host transform (#22632).
+     *
+     * Covers unrestricted mode when user functions are declared after registerPHPFunctions().
+     */
+    public static function syncPhpFunctionsBeforeTransform(ObjectEntry $entry): void
+    {
+        $state = XsltRegistry::phpFunctions($entry);
+        if (null === $state) {
+            return;
+        }
+        XsltPhpFunctionBridge::sync($state['ctx'], $state['restrict']);
     }
 
     /**
