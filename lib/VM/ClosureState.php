@@ -262,7 +262,7 @@ final class ClosureState
         return (($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
     }
 
-    /** True when the closure body reads $this (Zend zend_closure_bind_to unbind reject). */
+    /** True when the closure body reads $this (ZEND_ACC_USES_THIS). */
     public function usesThis(): bool
     {
         if ($this->isStaticClosure()) {
@@ -270,6 +270,21 @@ final class ClosureState
         }
 
         return null !== $this->func->block->slotIndexForVariableName('this');
+    }
+
+    /**
+     * True when this_ptr is set (zend_closures.c !Z_ISUNDEF(closure->this_ptr)).
+     *
+     * Unbind (bindTo(null)) is rejected only when this is set and {@see usesThis()} (#23387).
+     */
+    public function hasBoundThis(): bool
+    {
+        if (null === $this->boundThis) {
+            return false;
+        }
+        $bound = $this->boundThis->resolveIndirect();
+
+        return Variable::TYPE_NULL !== $bound->type;
     }
 
     public static function register(Context $ctx): void

@@ -169,7 +169,12 @@ final class ClosureSupport
 
             return null;
         }
-        if (Variable::TYPE_NULL === $newThis->type && $state->usesThis()) {
+        // php-src zend_closures.c: reject unbind only when this_ptr is set AND USES_THIS
+        // (#23387). Free closures that read $this may still bindTo(null) → unbound Closure.
+        if (
+            Variable::TYPE_NULL === $newThis->type
+            && ClosureBindJitHelper::shouldRejectUnbindThis($state->usesThis(), $state->hasBoundThis())
+        ) {
             self::warnCannotUnbindThis($ctx, $frame);
 
             return null;

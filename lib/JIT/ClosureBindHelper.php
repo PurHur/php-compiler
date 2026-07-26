@@ -64,7 +64,7 @@ final class ClosureBindHelper
         }
 
         $inner = self::resolveInnerCall($context, $closure);
-        if (self::emitUnbindThisFailure($context, $inner, $newThis)) {
+        if (self::emitUnbindThisFailure($context, $closure, $inner, $newThis)) {
             return self::nullResult($context);
         }
         if (self::emitStaticClosureInstanceBindFailure($context, $closure, $inner, $newThis)) {
@@ -591,24 +591,44 @@ final class ClosureBindHelper
     }
 
     /**
-     * Zend zend_closure_bind_to(): cannot unbind $this when the closure body uses $this.
+     * Zend zend_closure_bind_to(): cannot unbind when this_ptr is set AND USES_THIS (#23387).
      *
      * @return bool true when bind() should return null
      */
     private static function emitUnbindThisFailure(
         Context $context,
+        Variable $closure,
         ?Call $inner,
         Variable $newThis
     ): bool {
         if (Variable::TYPE_NULL !== $newThis->type && !($newThis->isNullConstant ?? false)) {
             return false;
         }
-        if (null === $inner || !self::closureInnerUsesThis($context, $inner)) {
+        if (
+            null === $inner
+            || !ClosureBindJitHelper::shouldRejectUnbindThis(
+                self::closureInnerUsesThis($context, $inner),
+                self::closureHasBoundThis($closure)
+            )
+        ) {
             return false;
         }
         self::emitBindWarning($context, ClosureBindJitHelper::UNBIND_THIS_WARNING);
 
         return true;
+    }
+
+    /** Compile-time this_ptr set? Matches ClosureState::hasBoundThis() for known bindings. */
+    private static function closureHasBoundThis(Variable $closure): bool
+    {
+        $call = $closure->closureCall ?? null;
+        if (!$call instanceof ClosureWithBinding) {
+            return false;
+        }
+        $boundThis = $call->boundThis();
+
+        return !($boundThis->isNullConstant ?? false)
+            && Variable::TYPE_NULL !== $boundThis->type;
     }
 
     /**

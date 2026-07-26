@@ -24,7 +24,18 @@ final class ClosureBindJitHelper
 
     public const STATIC_BIND_WARNING = 'Cannot bind an instance to a static closure';
 
+    /** Emitted only when this_ptr is set AND USES_THIS (zend_closures.c, #23387). */
     public const UNBIND_THIS_WARNING = 'Cannot unbind $this of closure using $this';
+
+    /**
+     * Whether bindTo(null)/bind(..., null) must warn+null (php-src-strict).
+     *
+     * Free closures that read $this still unbind successfully when this_ptr is unset.
+     */
+    public static function shouldRejectUnbindThis(bool $usesThis, bool $hasBoundThis): bool
+    {
+        return $usesThis && $hasBoundThis;
+    }
 
     /**
      * JIT-native $newThis type is invalid for bind/bindTo (#4192).
