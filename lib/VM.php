@@ -5654,11 +5654,16 @@ restart:
                     $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
                     if (null === $storage) {
                         $classLabel = $this->context->classes[$lcClass]->name;
-
-                        return $this->raise(
+                        $catchFrame = $this->dispatchVmError(
                             "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
                     }
                     if ($mutates) {
                         $writeVisFrame = $this->enforceStaticPropertyWriteVisibility($lcClass, $propNameRaw, $frame);
@@ -5795,11 +5800,16 @@ restart:
                     $storage = $this->resolveStaticPropertyStorage($lcClass, $propName);
                     if (null === $storage) {
                         $classLabel = $this->context->classes[$lcClass]->name;
-
-                        return $this->raise(
+                        $catchFrame = $this->dispatchVmError(
                             "Access to undeclared static property {$classLabel}::\${$propNameRaw}",
                             $frame
                         );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
                     }
                     $catchFrame = $this->enforceVirtualStaticPropertyHookUnset($lcClass, $propName, $propNameRaw, $frame);
                     if (null !== $catchFrame) {
