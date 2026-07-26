@@ -18,15 +18,26 @@ final class NamedArgs
      *
      * @return array<int, Variable>
      */
-    public static function resolve(array $entries, array $paramNames, ?int $variadicParamIndex, ?string $functionName = null): array
-    {
+    public static function resolve(
+        array $entries,
+        array $paramNames,
+        ?int $variadicParamIndex,
+        ?string $functionName = null,
+        bool $internalFunction = false
+    ): array {
         if ([] === $entries) {
             return [];
         }
 
         foreach ($entries as $entry) {
             if ('n' === $entry[0]) {
-                return self::resolveMixed($entries, $paramNames, $variadicParamIndex, $functionName);
+                return self::resolveMixed(
+                    $entries,
+                    $paramNames,
+                    $variadicParamIndex,
+                    $functionName,
+                    $internalFunction
+                );
             }
         }
 
@@ -44,8 +55,13 @@ final class NamedArgs
      *
      * @return array<int, Variable>
      */
-    private static function resolveMixed(array $entries, array $paramNames, ?int $variadicParamIndex, ?string $functionName = null): array
-    {
+    private static function resolveMixed(
+        array $entries,
+        array $paramNames,
+        ?int $variadicParamIndex,
+        ?string $functionName = null,
+        bool $internalFunction = false
+    ): array {
         $paramCount = count($paramNames);
         /** @var array<int, Variable> $result */
         $result = [];
@@ -55,6 +71,8 @@ final class NamedArgs
         $variadicPositional = [];
         /** @var array<string, Variable> $variadicNamed */
         $variadicNamed = [];
+        // php-src internals reject unknown named args and naming the variadic slot (#23449).
+        $unknownNamed = false;
 
         foreach ($entries as $entry) {
             if ('p' === $entry[0]) {
@@ -95,6 +113,10 @@ final class NamedArgs
             }
             $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
+                if ($internalFunction) {
+                    $unknownNamed = true;
+                    continue;
+                }
                 if (null !== $variadicParamIndex) {
                     $key = (string) $entry[1];
                     if (isset($variadicNamed[$key])) {
@@ -106,6 +128,11 @@ final class NamedArgs
                 throw new \Error("Unknown named parameter \${$entry[1]}");
             }
             if (null !== $variadicParamIndex && $idx === $variadicParamIndex) {
+                if ($internalFunction) {
+                    // Internal variadics are positional-only; naming ...$values is unknown (#23449).
+                    $unknownNamed = true;
+                    continue;
+                }
                 $key = (string) $entry[1];
                 if (isset($variadicNamed[$key])) {
                     throw new \Error("Named parameter \${$key} overwrites previous argument");
@@ -120,6 +147,10 @@ final class NamedArgs
             $result[$idx] = $value;
         }
 
+        if ($unknownNamed && null !== $functionName) {
+            self::throwInternalUnknownNamedOrTooFew($functionName, $result, $variadicParamIndex, $variadicPositional);
+        }
+
         if (null !== $variadicParamIndex && ([] !== $variadicNamed || [] !== $variadicPositional)) {
             self::assignVariadicArray($result, $variadicParamIndex, $paramCount, $variadicPositional, $variadicNamed);
         }
@@ -127,6 +158,33 @@ final class NamedArgs
         ksort($result);
 
         return $result;
+    }
+
+    /**
+     * Zend: missing required args beat "unknown named" when nothing bound; otherwise unknown (#23449).
+     *
+     * @param array<int, Variable> $result
+     * @param list<Variable>       $variadicPositional
+     */
+    private static function throwInternalUnknownNamedOrTooFew(
+        string $functionName,
+        array $result,
+        ?int $variadicParamIndex,
+        array $variadicPositional
+    ): never {
+        $required = BuiltinParamNames::requiredParamCountForInternalFunction($functionName) ?? 0;
+        $given = 0;
+        foreach ($result as $idx => $_) {
+            if (null !== $variadicParamIndex && $idx === $variadicParamIndex) {
+                continue;
+            }
+            ++$given;
+        }
+        $given += \count($variadicPositional);
+        if ($given < $required) {
+            BuiltinParamNames::throwTooFewArgumentsError($functionName, $required, $given);
+        }
+        BuiltinParamNames::throwUnknownNamedParameterError($functionName);
     }
 
     /**

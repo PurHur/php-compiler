@@ -32,7 +32,8 @@ final class NamedArgs
         array $paramNames,
         ?int $variadicParamIndex,
         ?string $functionName = null,
-        ?Context $context = null
+        ?Context $context = null,
+        bool $internalFunction = false
     ): array {
         if ([] === $entries) {
             return [[], []];
@@ -41,7 +42,14 @@ final class NamedArgs
         $normalized = self::normalizeEntries($entries, $operands);
         foreach ($normalized as $entry) {
             if ('n' === $entry['kind']) {
-                return self::resolveMixed($normalized, $paramNames, $variadicParamIndex, $functionName, $context);
+                return self::resolveMixed(
+                    $normalized,
+                    $paramNames,
+                    $variadicParamIndex,
+                    $functionName,
+                    $context,
+                    $internalFunction
+                );
             }
         }
 
@@ -68,7 +76,8 @@ final class NamedArgs
         ?int $variadicParamIndex,
         ?string $functionName,
         JIT $jit,
-        ?Native $callee = null
+        ?Native $callee = null,
+        bool $internalFunction = false
     ): ?array {
         $normalized = self::normalizeEntries($entries, $operands);
         $vmEntries = [];
@@ -88,7 +97,18 @@ final class NamedArgs
             $vmEntries[] = ['p', $vmValue];
         }
 
-        $vmResolved = VmNamedArgs::resolve($vmEntries, $paramNames, $variadicParamIndex, $functionName);
+        try {
+            $vmResolved = VmNamedArgs::resolve(
+                $vmEntries,
+                $paramNames,
+                $variadicParamIndex,
+                $functionName,
+                $internalFunction
+            );
+        } catch (\ArgumentCountError|\Error|\TypeError|\ValueError $e) {
+            // Defer Zend call-binding errors to runtime so try/catch in user code works (#23449).
+            return null;
+        }
         if (
             null !== $variadicParamIndex
             && null !== $callee
@@ -181,7 +201,8 @@ final class NamedArgs
         array $paramNames,
         ?int $variadicParamIndex,
         ?string $functionName = null,
-        ?Context $context = null
+        ?Context $context = null,
+        bool $internalFunction = false
     ): array {
         $paramCount = \count($paramNames);
         /** @var array<int, Variable> $result */
@@ -198,6 +219,7 @@ final class NamedArgs
         $variadicNamed = [];
         /** @var array<string, Operand|null> $variadicNamedOperands */
         $variadicNamedOperands = [];
+        $unknownNamed = false;
 
         foreach ($entries as $entry) {
             if ('p' === $entry['kind']) {
@@ -240,6 +262,10 @@ final class NamedArgs
             }
             $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
+                if ($internalFunction) {
+                    $unknownNamed = true;
+                    continue;
+                }
                 if (null !== $variadicParamIndex) {
                     $key = (string) $entry['name'];
                     if (isset($variadicNamed[$key])) {
@@ -252,6 +278,10 @@ final class NamedArgs
                 throw new \Error("Unknown named parameter \${$entry['name']}");
             }
             if (null !== $variadicParamIndex && $idx === $variadicParamIndex) {
+                if ($internalFunction) {
+                    $unknownNamed = true;
+                    continue;
+                }
                 $key = (string) $entry['name'];
                 if (isset($variadicNamed[$key])) {
                     throw new \Error("Named parameter \${$key} overwrites previous argument");
@@ -266,6 +296,22 @@ final class NamedArgs
             $filled[$idx] = true;
             $result[$idx] = $value;
             $resultOperands[$idx] = $entry['operand'];
+        }
+
+        if ($unknownNamed && null !== $functionName) {
+            $required = BuiltinParamNames::requiredParamCountForInternalFunction($functionName) ?? 0;
+            $given = 0;
+            foreach ($result as $idx => $_) {
+                if (null !== $variadicParamIndex && $idx === $variadicParamIndex) {
+                    continue;
+                }
+                ++$given;
+            }
+            $given += \count($variadicPositional);
+            if ($given < $required) {
+                BuiltinParamNames::throwTooFewArgumentsError($functionName, $required, $given);
+            }
+            BuiltinParamNames::throwUnknownNamedParameterError($functionName);
         }
 
         if (null !== $variadicParamIndex && ([] !== $variadicNamed || [] !== $variadicPositional)) {

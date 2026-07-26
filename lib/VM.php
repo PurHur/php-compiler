@@ -14795,7 +14795,8 @@ restart:
             $frame,
             $paramNames,
             $variadicIndex,
-            $this->internalBuiltinFunctionName($frame->call, $frame)
+            $this->internalBuiltinFunctionName($frame->call, $frame),
+            $frame->call instanceof Func\Internal
         );
         if ([] === $frame->callArgs) {
             $this->separateInternalByRefArgsForWrite(
@@ -15046,8 +15047,13 @@ restart:
      *
      * @return list<Variable>
      */
-    private function resolveUserCallArgs(Frame $frame, array $paramNames, ?int $variadicIndex, ?string $functionName = null): array
-    {
+    private function resolveUserCallArgs(
+        Frame $frame,
+        array $paramNames,
+        ?int $variadicIndex,
+        ?string $functionName = null,
+        bool $internalFunction = false
+    ): array {
         if ([] === $frame->callArgEntries) {
             return [];
         }
@@ -15072,7 +15078,7 @@ restart:
             $entries[] = $entry;
         }
 
-        return NamedArgs::resolve($entries, $paramNames, $variadicIndex, $functionName);
+        return NamedArgs::resolve($entries, $paramNames, $variadicIndex, $functionName, $internalFunction);
     }
 
     /**

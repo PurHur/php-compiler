@@ -1073,6 +1073,25 @@ final class BuiltinParamNames
     }
 
     /**
+     * Zend internal arity message when named/unpack left required params empty (#23449).
+     *
+     * @throws \ArgumentCountError
+     */
+    public static function throwTooFewArgumentsError(string $name, int $required, int $given): never
+    {
+        $argWord = 1 === $required ? 'argument' : 'arguments';
+        throw new \ArgumentCountError(
+            sprintf(
+                '%s() expects at least %d %s, %d given',
+                strtolower($name),
+                $required,
+                $argWord,
+                $given
+            )
+        );
+    }
+
+    /**
      * PHP 8.4+ named-parameter aliases (php-src arginfo alias tables).
      *
      * @return array<string, int> lowercase alias => parameter index

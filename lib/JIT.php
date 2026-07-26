@@ -17254,14 +17254,16 @@ class JIT {
                 $userEntries = \array_slice($argEntries, $prefixLen);
                 $userOperands = \array_slice($argOperands, $prefixLen);
                 $calleeNative = $toCall instanceof JIT\Call\Native ? $toCall : null;
+                $builtinName = $this->jitInternalBuiltinFunctionName($toCall);
                 $compileTime = JIT\NamedArgs::tryCompileTimeResolveOutgoing(
                     $userEntries,
                     $userOperands,
                     $paramNames,
                     $variadicIndex,
-                    $this->jitInternalBuiltinFunctionName($toCall),
+                    $builtinName,
                     $this,
-                    $calleeNative
+                    $calleeNative,
+                    null !== $builtinName
                 );
                 if (null !== $compileTime) {
                     [$userArgs, $userOps] = $compileTime;
@@ -17271,8 +17273,9 @@ class JIT {
                         $userOperands,
                         $paramNames,
                         $variadicIndex,
-                        $this->jitInternalBuiltinFunctionName($toCall),
-                        $this->context
+                        $builtinName,
+                        $this->context,
+                        null !== $builtinName
                     );
                 }
                 $callArgs = $prefix;

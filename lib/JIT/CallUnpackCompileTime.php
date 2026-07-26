@@ -87,7 +87,20 @@ final class CallUnpackCompileTime
         $jitEntries = self::jitEntriesFromVmEntries($vmEntries, $jit);
         $jitOperands = array_fill(0, \count($jitEntries), null);
 
-        return NamedArgs::resolveOutgoing($jitEntries, $jitOperands, $paramNames, $variadicIndex, $functionName);
+        try {
+            return NamedArgs::resolveOutgoing(
+                $jitEntries,
+                $jitOperands,
+                $paramNames,
+                $variadicIndex,
+                $functionName,
+                null,
+                null !== $functionName
+            );
+        } catch (\ArgumentCountError|\Error|\TypeError|\ValueError $e) {
+            // Runtime binding errors must not abort AOT compile (#23449).
+            return null;
+        }
     }
 
     public static function tryCompileTimeArrayFromOperand(Block $block, Operand $operand): ?VmVariable
