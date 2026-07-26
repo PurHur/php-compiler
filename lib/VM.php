@@ -18970,10 +18970,10 @@ restart:
         if (!isset($declEntry->propDeprecated[$propLc])) {
             return;
         }
+        // Property targets: attribute presence is enough (bare #[\Deprecated] still emits —
+        // Zend zend_object_handlers.c / #23536). Do not reuse emitsRuntimeNotice() (#4392
+        // call/const gate), which treats bare as reflection-only.
         $meta = $declEntry->propDeprecated[$propLc];
-        if (!$meta->emitsRuntimeNotice()) {
-            return;
-        }
         $this->emitDeprecatedNotice(
             $meta->formatProperty($declEntry->name, $propName),
             $frame
@@ -18999,9 +18999,6 @@ restart:
             return;
         }
         $depMeta = $declEntry->propDeprecated[$propLc];
-        if (!$depMeta->emitsRuntimeNotice()) {
-            return;
-        }
         $this->emitDeprecatedNotice(
             $depMeta->formatProperty($meta['declaringClassDisplay'], $propNameRaw),
             $frame

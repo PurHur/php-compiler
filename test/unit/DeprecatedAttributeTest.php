@@ -135,6 +135,37 @@ PHP;
         $this->assertSame('pong', ob_get_clean());
     }
 
+    public function testBareDeprecatedPropertyAccessEmitsNotice(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+ini_set('error_reporting', '32767');
+ini_set('display_errors', '0');
+class C {
+    #[\Deprecated]
+    public int $p = 2;
+}
+$c = new C();
+$c->p;
+$last = error_get_last();
+echo $last['message'] ?? 'none';
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'bare_deprecated_property.php'));
+            $this->assertSame('Property C::$p is deprecated', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testFunctionCallRecordsDeprecation(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

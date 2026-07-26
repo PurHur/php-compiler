@@ -229,7 +229,11 @@ final class DeprecatedMetadata
     }
 
     /**
-     * Bare #[\Deprecated] (no message/since) is reflection metadata only — no E_USER_DEPRECATED (#4392, Zend zend_attributes.c).
+     * Whether call/const/class use sites emit E_USER_DEPRECATED (#4392).
+     *
+     * Bare #[\Deprecated] (no message/since) stays reflection-only on those targets.
+     * Property read/write and trait-use paths do not consult this — attribute presence
+     * alone emits (Zend zend_object_handlers.c / rfc:deprecated_traits, #23536, #22989).
      */
     public function emitsRuntimeNotice(): bool
     {
