@@ -625,6 +625,11 @@ final class BuiltinParamNames
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/split_length (#23206)
             case 'str_split':
                 return ['string', 'length'];
+            // php-src ext/standard/password.stub.php — calleeParamMetadata uses forFunction; verify missing from InternalArgInfo (#23207)
+            case 'password_hash':
+                return ['password', 'algo', 'options'];
+            case 'password_verify':
+                return ['password', 'hash'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says ascii (#23240)
             case 'chr':
                 return ['codepoint'];
