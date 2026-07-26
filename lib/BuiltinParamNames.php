@@ -363,6 +363,13 @@ final class BuiltinParamNames
             // php-src ext/hash/hash.stub.php — Reflection was empty without this map (#23205)
             case 'hash_equals':
                 return ['known_string', 'user_string'];
+            // php-src ext/iconv/iconv.stub.php — InternalArgInfo still says in_charset/str/charset (#23307)
+            case 'iconv':
+                return ['from_encoding', 'to_encoding', 'string'];
+            case 'iconv_strlen':
+                return ['string', 'encoding'];
+            case 'iconv_substr':
+                return ['string', 'offset', 'length', 'encoding'];
             case 'base64_decode':
                 return ['string', 'strict'];
             case 'resetaslazyghost':
