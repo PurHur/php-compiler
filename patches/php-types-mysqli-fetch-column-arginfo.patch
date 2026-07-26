@@ -1,0 +1,18 @@
+--- vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
++++ vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php
+@@ -4533,6 +4533,7 @@
+         'mysqli_fetch_all' => ['', 'result=' => 'object', 'resulttype=' => 'int'],
+         'mysqli_fetch_array' => ['', 'result=' => 'object', 'resulttype=' => 'int'],
+         'mysqli_fetch_assoc' => ['array', 'result' => 'mysqli_result'],
++        'mysqli_fetch_column' => ['null|int|float|string|false', 'result' => 'mysqli_result', 'column=' => 'int'],
+         'mysqli_fetch_field_direct' => ['', 'link' => '', 'offset' => 'int'],
+         'mysqli_fetch_field' => ['object', 'result' => 'mysqli_result'],
+         'mysqli_fetch_fields' => ['array', 'result' => 'mysqli_result'],
+@@ -4608,6 +4609,7 @@
+         'mysqli_result::fetch_all' => ['', 'resulttype=' => 'int'],
+         'mysqli_result::fetch_array' => ['', 'resulttype=' => 'int'],
+         'mysqli_result::fetch_assoc' => ['array'],
++        'mysqli_result::fetch_column' => ['null|int|float|string|false', 'column=' => 'int'],
+         'mysqli_result::fetch_field_direct' => ['object', 'fieldnr' => 'int'],
+         'mysqli_result::fetch_field' => ['object'],
+         'mysqli_result::fetch_fields' => ['array'],

@@ -112,6 +112,7 @@ class Module extends ModuleAbstract
             new mysqli_fetch_assoc(),
             new mysqli_fetch_array(),
             new mysqli_fetch_row(),
+            new mysqli_fetch_column(),
             new mysqli_fetch_all(),
             new mysqli_fetch_object(),
             new mysqli_fetch_field(),

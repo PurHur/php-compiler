@@ -86,6 +86,32 @@ abstract class MysqliResultProceduralBuiltin extends Internal
     }
 }
 
+/** mysqli_fetch_column() — php-src ext/mysqli/mysqli_nonapi.c (#22214). */
+final class mysqli_fetch_column extends MysqliResultProceduralBuiltin
+{
+    public function __construct()
+    {
+        parent::__construct('mysqli_fetch_column');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $this->requireArgCountRange($frame, 'mysqli_fetch_column', 1, 2);
+        $native = $this->resultNative($frame);
+        $column = 0;
+        if (\count($frame->calledArgs) >= 2) {
+            $column = $this->intArgAt($frame, 1, 'column');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        VmMysqliResult::assignFetchColumnResult(
+            $frame->returnVar,
+            VmMysqliResult::fetchColumn($native, $column, 'mysqli_fetch_column', 2)
+        );
+    }
+}
+
 /** mysqli_fetch_all() — php-src ext/mysqli/mysqli_api.c (#22195). */
 final class mysqli_fetch_all extends MysqliResultProceduralBuiltin
 {
