@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_microtime_* via MicrotimeJitHelper PHP (#9181).
+ * JIT/AOT link for __compiler_microtime_* via MicrotimeJitHelper PHP (#9181, #23556).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer MathModf #22519).
  * Replaces gettimeofday/snprintf LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(microtime)
  */
@@ -103,44 +103,18 @@ final class StringMicrotime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after MicrotimeJitHelper compile (#9181)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23556');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'MicrotimeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('MicrotimeJitHelper.php parseAndCompile failed (#9181)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9181)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23556'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -148,7 +122,7 @@ final class StringMicrotime
         foreach (['__compiler_microtime_string', '__compiler_microtime_float'] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringMicrotime bridge (#9181)');
+                throw new \LogicException($name.' missing after StringMicrotime bridge (#23556)');
             }
             $context->registerFunction($name, $fn);
         }
