@@ -1634,6 +1634,12 @@ restart:
                 if (null !== $resourceCmp) {
                     return $resourceCmp;
                 }
+                // php-src bcmath_number_obj_handlers.compare / gmp handlers — == shares
+                // compare with <=>, not property-string equality (#23602).
+                $extCmp = self::tryRegisteredNumericObjectCompare($self, $other);
+                if (null !== $extCmp) {
+                    return 0 === $extCmp;
+                }
 
                 return $self->object->looseEquals($other->object);
             case TYPE_PAIR_ENUM_CASE_ENUM_CASE:
@@ -1943,6 +1949,11 @@ restart:
 
             return false;
         }
+        // BcMath\Number / GMP == int|string|Number — php-src compare handlers (#23602).
+        $extCmp = self::tryRegisteredNumericObjectCompare($self, $other);
+        if (null !== $extCmp) {
+            return 0 === $extCmp;
+        }
         if ($self->type === self::TYPE_BOOLEAN && $other->type === self::TYPE_INTEGER) {
             return ($other->integer !== 0) === $self->bool;
         }
@@ -2047,6 +2058,21 @@ restart:
         }
         $className = $var->object->class->name;
         throw new \TypeError("Object of class {$className} could not be converted to number");
+    }
+
+    /**
+     * php-src object handlers.compare for BcMath\Number / GMP — shared by == and <=> (#23602).
+     *
+     * @return int|null -1/0/1 when a registered handler applies; null otherwise
+     */
+    private static function tryRegisteredNumericObjectCompare(Variable $left, Variable $right): ?int
+    {
+        $cmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($left, $right);
+        if (null === $cmp) {
+            $cmp = \PHPCompiler\ext\gmp\VmGmpObject::tryCompare($left, $right);
+        }
+
+        return $cmp;
     }
 
     public function compareOp(int $opCode, Variable $left, Variable $right, ?\PHPCompiler\VM $vm = null): void {
