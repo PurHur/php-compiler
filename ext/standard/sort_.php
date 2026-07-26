@@ -35,8 +35,8 @@ final class sort_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 3) {
-            throw new \LogicException('sort() requires one to three arguments');
+        if ($argc < 1 || $argc > 2) {
+            throw new \LogicException('sort() requires one or two arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         $ht = VmArray::requireArray($frame->calledArgs[0], 'sort');

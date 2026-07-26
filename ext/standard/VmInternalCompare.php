@@ -89,30 +89,22 @@ final class VmInternalCompare
     }
 
     /**
-     * sort()/rsort() flags + optional SortDirection (#9947, PHP 8.4 Sorting / SortDirection).
+     * sort()/rsort() flags (php-src basic_functions.stub.php — no $direction; #23225).
+     * Sorting enum remains accepted as the flags operand when advertised (#9947).
      */
     public static function resolveSortFunctionFlags(Frame $frame, string $function): int
     {
-        $flags = StdlibConstants::SORT_REGULAR;
-        if (isset($frame->calledArgs[1])) {
-            $flags = self::resolveFrameSortFlagsOperand(
-                $frame->calledArgs[1]->resolveIndirect(),
-                $function,
-                2,
-                '$flags',
-                true
-            );
-        } elseif (isset($frame->calledArgs[2])) {
-            $order = VmArraySort::trySortDirectionOrderInt($frame->calledArgs[2]->resolveIndirect());
-            if (null !== $order) {
-                return $order;
-            }
-        }
-        if (isset($frame->calledArgs[2])) {
-            $flags = VmArraySort::applySortDirectionToFlags($flags, $frame->calledArgs[2], $function);
+        if (!isset($frame->calledArgs[1])) {
+            return StdlibConstants::SORT_REGULAR;
         }
 
-        return $flags;
+        return self::resolveFrameSortFlagsOperand(
+            $frame->calledArgs[1]->resolveIndirect(),
+            $function,
+            2,
+            '$flags',
+            true
+        );
     }
 
     /**
