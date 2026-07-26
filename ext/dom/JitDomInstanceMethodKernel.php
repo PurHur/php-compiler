@@ -4,22 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin standalone AOT: compile DOM instance bridge in the main module (#17391, #19487, #20214).
+ * Thin standalone AOT: compile DOM instance bridge in the main module (#17391, #19487, #20214, #23361).
  *
  * Split-compilation helper TUs lack per-unit ctor init for ObjectEntry reads (#16075); nested
  * VmDomInstanceInvoke also needs {@see VmActiveContextLlvm} because Superglobals is unset.
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer DomDocumentMethod #23325).
  * Gate: {@see Context::isThinStandaloneAotMain()} (peer #20200 / #20178 — no NestedJit defer).
  * Housed in ext/dom (not lib/JIT/Builtin) — same kernel-move pattern as #19430 / #19389.
  */
@@ -106,32 +105,11 @@ final class JitDomInstanceMethodKernel
 
     private static function ensureMainModuleHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'VmDomInstanceInvoke.php');
-            if (null === $block) {
-                throw new \LogicException('VmDomInstanceInvoke.php parseAndCompile failed (#17391)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for user-script DOM bridge (#17391)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23361'
+        );
     }
 }

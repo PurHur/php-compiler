@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6570 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21228 |
+| Source constructs flagged (warnings) | 21226 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -379,7 +379,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomGetElementsByTagNameUserScript.php` | 0 | 2 |
 | `ext/dom/JitDomImportNode.php` | 0 | 3 |
 | `ext/dom/JitDomInsertBefore.php` | 0 | 1 |
-| `ext/dom/JitDomInstanceMethodKernel.php` | 0 | 3 |
+| `ext/dom/JitDomInstanceMethodKernel.php` | 0 | 1 |
 | `ext/dom/JitDomLoad.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTML.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTMLFile.php` | 0 | 1 |
@@ -8892,9 +8892,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomInstanceMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 127)
 - 5 class method(s)
-- 1 closure(s)
 
 ### `ext/dom/JitDomLoad.php`
 
@@ -41244,7 +41242,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 930)
+- new ArgumentCountError (line 933)
 - 16 class method(s)
 - 1 closure(s)
 
