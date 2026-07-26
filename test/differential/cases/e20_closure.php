@@ -1,0 +1,1 @@
+<?php $f=function($a,$b){return "$a+$b";}; $x=1; echo $f($x+1,$x+2), "\n"; $g=fn($a,$b)=>"$a*$b"; echo $g($x+3,$x+4), "\n";
