@@ -4,22 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for libc stream handle table + __phpc_resolve_stream (#9442, #19745).
+ * JIT/AOT embed link for libc stream handle table + __phpc_resolve_stream (#9442, #19745, #23234).
  *
  * Quarantined from lib/JIT/Builtin/StreamLibcHandleRuntime — {@see \PHPCompiler\JIT\Builtin\StreamLibcHandleRuntime}
  * stays the thin orchestrator. Mirrors {@see \PHPCompiler\JIT\Builtin\StreamIoJit} handle registration into PHP.
  * Standalone keeps LLVM globals in {@see StreamGlobalsJit}.
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StreamCaps #23012 / EnvLocal #23211).
  *
  * php-src: main/streams/streams.c — stream handle lookup / resolve (reference only)
  */
@@ -197,13 +198,8 @@ final class JitStreamLibcHandleKernel
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamLibcHandleJitHelper compile (#9442)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23234');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -219,21 +215,11 @@ final class JitStreamLibcHandleKernel
             return;
         }
 
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamLibcHandleJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StreamLibcHandleJitHelper.php parseAndCompile failed (#9442)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT libc handles (#9442)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23234'
+        );
     }
 }
