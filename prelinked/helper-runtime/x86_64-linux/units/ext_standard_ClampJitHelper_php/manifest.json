@@ -1,0 +1,1 @@
+{"fingerprint":"cd185e7a68f20a8d7681","unit":"/ext/standard/ClampJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\clampjithelper::clampargv":"phpcompiler_ext_standard_clampjithelper__clampargv"},"init_symbol":"__init__unit_ext_standard_ClampJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_ClampJitHelper_php","init_via_global_ctor":true,"runtime_safe":true}

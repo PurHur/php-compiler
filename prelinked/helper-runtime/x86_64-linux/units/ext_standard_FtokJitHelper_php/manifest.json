@@ -1,0 +1,1 @@
+{"fingerprint":"8057feb80ced27cecce4","unit":"/ext/standard/FtokJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\ftokjithelper::ftokargv":"phpcompiler_ext_standard_ftokjithelper__ftokargv"},"init_symbol":"__init__unit_ext_standard_FtokJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_FtokJitHelper_php","init_via_global_ctor":true,"runtime_safe":true}

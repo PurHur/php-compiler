@@ -1,0 +1,1 @@
+{"fingerprint":"310ea942851c0d51d7c5","unit":"/ext/standard/CopyJitHelper.php","helpers":{"phpcompiler\\ext\\standard\\copyjithelper::copyargv":"phpcompiler_ext_standard_copyjithelper__copyargv"},"init_symbol":"__init__unit_ext_standard_CopyJitHelper_php","shutdown_symbol":"__shutdown__unit_ext_standard_CopyJitHelper_php","init_via_global_ctor":true,"runtime_safe":true}
