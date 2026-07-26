@@ -35,5 +35,44 @@ final class SoapExtensionPolicyTest extends TestCase
         self::assertFalse(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'SoapFault')
         );
+        self::assertFalse(
+            ext\standard\VmReflection::classExists($runtime->vmContext, 'Soap\\Url')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::classExists($runtime->vmContext, 'Soap\\Sdl')
+        );
+        self::assertFalse(SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes());
+    }
+
+    public function testSoapUrlSdlOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            self::assertTrue(SoapExtensionPolicy::advertisesExtension());
+            self::assertTrue(SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes());
+
+            $runtime = new Runtime();
+            self::assertTrue(
+                ext\standard\VmReflection::classExists($runtime->vmContext, 'Soap\\Url')
+            );
+            self::assertTrue(
+                ext\standard\VmReflection::classExists($runtime->vmContext, 'Soap\\Sdl')
+            );
+            $url = $runtime->vmContext->classes['soap\\url'] ?? null;
+            $sdl = $runtime->vmContext->classes['soap\\sdl'] ?? null;
+            self::assertNotNull($url);
+            self::assertNotNull($sdl);
+            self::assertTrue($url->isFinal);
+            self::assertTrue($url->isInternal);
+            self::assertTrue($sdl->isFinal);
+            self::assertTrue($sdl->isInternal);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }

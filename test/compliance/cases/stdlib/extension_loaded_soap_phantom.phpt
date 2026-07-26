@@ -12,6 +12,8 @@ echo 'use_soap_error_handler=', (int) function_exists('use_soap_error_handler'),
 echo 'SoapClient=', (int) class_exists('SoapClient', false), "\n";
 echo 'SoapServer=', (int) class_exists('SoapServer', false), "\n";
 echo 'SoapFault=', (int) class_exists('SoapFault', false), "\n";
+echo 'SoapUrl=', (int) class_exists('Soap\\Url', false), "\n";
+echo 'SoapSdl=', (int) class_exists('Soap\\Sdl', false), "\n";
 ?>
 --EXPECT--
 loaded=0
@@ -22,3 +24,5 @@ use_soap_error_handler=0
 SoapClient=0
 SoapServer=0
 SoapFault=0
+SoapUrl=0
+SoapSdl=0

@@ -25,6 +25,9 @@ final class ReservedBuiltinClass
         'pgsql\\connection' => 'Cannot directly construct PgSql\Connection, use pg_connect() or pg_pconnect() instead',
         'pgsql\\result' => 'Cannot directly construct PgSql\Result, use a dedicated function instead',
         'pgsql\\lob' => 'Cannot directly construct PgSql\Lob, use pg_lo_open() instead',
+        // php-src ext/soap/soap.c soap_url/sdl_object_get_constructor (#23230)
+        'soap\\url' => 'Cannot directly construct Soap\\Url',
+        'soap\\sdl' => 'Cannot directly construct Soap\\Sdl',
     ];
 
     /** @var array<string, string> lc => display name — runtime implements guard (#13327, #15445, #18781) */
