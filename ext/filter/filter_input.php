@@ -32,7 +32,7 @@ final class filter_input extends Internal
             $frame->calledArgs[1],
             'filter_input',
             1,
-            'variable_name'
+            'var_name'
         );
         if ($argc >= 3) {
             $filterId = VmFilter::parseFilterIdArg($frame, 2, 'filter_input', 'filter', 3);
@@ -86,7 +86,7 @@ final class filter_input extends Internal
             );
         }
         // Fourth $options arg accepted; full options parsing deferred (#4404).
-        $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_input', 1, 'variable_name');
+        $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_input', 1, 'var_name');
         $keyVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
 
         $typeVal = JitFilterInputTypeArg::lower($context, $args[0]);

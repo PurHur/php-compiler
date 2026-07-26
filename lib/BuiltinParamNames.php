@@ -499,8 +499,9 @@ final class BuiltinParamNames
                 return ['json', 'associative', 'depth', 'flags'];
             case 'filter_var':
                 return ['value', 'filter', 'options'];
+            // php-src ext/filter/filter.stub.php — Zend stub uses var_name (#23383)
             case 'filter_input':
-                return ['type', 'variable_name', 'filter', 'options'];
+                return ['type', 'var_name', 'filter', 'options'];
             case 'explode':
                 return ['separator', 'string', 'limit'];
             case 'implode':

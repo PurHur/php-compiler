@@ -1069,6 +1069,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($split, 'encoding', 'mb_str_split'));
     }
 
+    /** @covers issue #23383 */
+    public function testFilterInputZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('filter_input');
+        self::assertSame(['type', 'var_name', 'filter', 'options'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'type', 'filter_input'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'var_name', 'filter_input'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'filter', 'filter_input'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'filter_input'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $variable_name)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'variable_name', 'filter_input'));
+    }
+
     /** @covers issue #23205 */
     public function testHashEqualsZendStubNamedParams(): void
     {
