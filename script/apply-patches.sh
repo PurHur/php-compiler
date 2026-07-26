@@ -35,6 +35,12 @@ patch_already_applied() {
     php-llvm-chooser.patch)
       grep -q 'PHP_COMPILER_LLVM_PATH' "$ROOT/vendor/ircmaxell/php-llvm/lib/Chooser.php" 2>/dev/null
       ;;
+    php-llvm-passmanagerbuilder-signature.patch)
+      grep -q 'CorePassManagerIface' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/PassManagerBuilder.php" 2>/dev/null
+      ;;
+    php-llvm-module-createfunctionpassmanager.patch)
+      grep -q 'this->llvm->lib->LLVMCreatePassManagerForModule' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Module.php" 2>/dev/null
+      ;;
     php-llvm-mcjit-libc-mem.patch)
       grep -q 'Emit libc memset' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Intrinsic.php" 2>/dev/null
       ;;

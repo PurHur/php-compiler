@@ -1,0 +1,11 @@
+--- a/lib/LLVMAbstract/Module.php
++++ b/lib/LLVMAbstract/Module.php
+@@ -110,7 +110,7 @@
+     }
+ 
+     public function createFunctionPassManager(): CorePassManager {
+-        return $this->llvm->factory->passManager($this->lib->LLVMCreatePassManagerForModule($this->module));
++        return $this->llvm->factory->passManager($this->llvm->lib->LLVMCreatePassManagerForModule($this->module));
+     }
+ 
+     public function getModuleDataLayout(): CoreTargetData {
