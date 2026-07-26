@@ -1,5 +1,7 @@
 --TEST--
 IntlCalendar::setDateTime() sets date+time; null/omit second → 0 (#20905)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $c = IntlCalendar::createInstance('UTC', 'en_US');

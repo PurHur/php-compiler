@@ -1,5 +1,7 @@
 --TEST--
 IntlCalendar before/after/setDate/bounds/weekend/wall-time (#20851)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 $a = IntlCalendar::createInstance('UTC', 'en_US');

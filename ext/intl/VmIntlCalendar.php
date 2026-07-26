@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
 use PHPCompiler\ext\standard\VmFs;
@@ -218,8 +219,6 @@ final class VmIntlCalendar
             'fielddifference' => [new IntlCalendarFieldDifference(), 'fieldDifference', $pub],
             'before' => [new IntlCalendarBefore(), 'before', $pub],
             'after' => [new IntlCalendarAfter(), 'after', $pub],
-            'setdate' => [new IntlCalendarSetDate(), 'setDate', $pub],
-            'setdatetime' => [new IntlCalendarSetDateTime(), 'setDateTime', $pub],
             'settimezone' => [new IntlCalendarSetTimeZone(), 'setTimeZone', $pub],
             'getmaximum' => [new IntlCalendarGetMaximum(), 'getMaximum', $pub],
             'getminimum' => [new IntlCalendarGetMinimum(), 'getMinimum', $pub],
@@ -248,6 +247,11 @@ final class VmIntlCalendar
             'getskippedwalltimeoption' => [new IntlCalendarGetSkippedWallTimeOption(), 'getSkippedWallTimeOption', $pub],
             'setskippedwalltimeoption' => [new IntlCalendarSetSkippedWallTimeOption(), 'setSkippedWallTimeOption', $pub],
         ];
+        // PHP 8.4+ only — Zend 8.2 method_exists false (#22597, re-#20851/#20905).
+        if (CompilerVersion::supportsIntlCalendarSetDate()) {
+            $methods['setdate'] = [new IntlCalendarSetDate(), 'setDate', $pub];
+            $methods['setdatetime'] = [new IntlCalendarSetDateTime(), 'setDateTime', $pub];
+        }
         foreach ($methods as $lc => [$handler, $name, $vis]) {
             $entry->methods[$lc] = $handler;
             $entry->methodVisibility[$lc] = $vis;
