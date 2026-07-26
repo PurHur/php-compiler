@@ -192,6 +192,9 @@ final class BuiltinParamNames
             case 'array_sum':
             case 'array_product':
                 return ['array'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says low/high (#23242)
+            case 'range':
+                return ['start', 'end', 'step'];
             case 'array_push':
                 return ['array', 'values'];
             case 'array_unshift':
