@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6563 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21127 |
+| Source constructs flagged (warnings) | 21138 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1180,7 +1180,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
 | `ext/ldap/LdapExtensionPolicy.php` | 0 | 1 |
 | `ext/ldap/LdapSerializeDeny.php` | 0 | 3 |
-| `ext/ldap/Module.php` | 0 | 36 |
+| `ext/ldap/Module.php` | 0 | 46 |
 | `ext/ldap/VmLdapArg.php` | 0 | 1 |
 | `ext/ldap/VmLdapConnection.php` | 0 | 4 |
 | `ext/ldap/VmLdapCore.php` | 0 | 4 |
@@ -1195,7 +1195,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ldap/ldap_escape.php` | 0 | 2 |
 | `ext/ldap/ldap_exop_builtins.php` | 0 | 6 |
 | `ext/ldap/ldap_link_builtins.php` | 0 | 10 |
-| `ext/ldap/ldap_modify_builtins.php` | 0 | 4 |
+| `ext/ldap/ldap_modify_builtins.php` | 0 | 7 |
 | `ext/ldap/ldap_search_builtins.php` | 0 | 8 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
@@ -5116,7 +5116,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/RewriteVarsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/RoundingModeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ScalarDimFetchRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ScopeBuiltinRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ScopeBuiltinRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ScriptExit.php` | 0 | 1 |
 | `lib/JIT/Builtin/SensitiveParamRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/SessionAbort.php` | 0 | 1 |
@@ -15833,9 +15833,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ldap_mod_add (line 85)
 - new ldap_mod_replace (line 86)
 - new ldap_mod_del (line 87)
-- new ldap_mod_batch (line 88)
-- new ldap_rename (line 89)
-- new ldap_connect_wallet (line 93)
+- new ldap_modify (line 88)
+- new ldap_add (line 89)
+- new ldap_delete (line 90)
+- new ldap_modify_batch (line 91)
+- new ldap_mod_batch (line 92)
+- new ldap_add_ext (line 93)
+- new ldap_delete_ext (line 94)
+- new ldap_rename_ext (line 95)
+- new ldap_mod_add_ext (line 96)
+- new ldap_mod_del_ext (line 97)
+- new ldap_mod_replace_ext (line 98)
+- new ldap_rename (line 99)
+- new ldap_connect_wallet (line 103)
 - 3 class method(s)
 
 ### `ext/ldap/VmLdapArg.php`
@@ -15876,12 +15886,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/VmLdapModify.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 12 class method(s)
 
 ### `ext/ldap/VmLdapNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 33 class method(s)
+- 41 class method(s)
 
 ### `ext/ldap/VmLdapResult.php`
 
@@ -15946,10 +15956,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/ldap_modify_builtins.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
-- new ArgumentCountError (line 122)
-- new ArgumentCountError (line 159)
-- 14 class method(s)
+- new ArgumentCountError (line 45)
+- new ArgumentCountError (line 293)
+- new ArgumentCountError (line 359)
+- new ArgumentCountError (line 390)
+- new ArgumentCountError (line 429)
+- new ArgumentCountError (line 467)
+- 43 class method(s)
 
 ### `ext/ldap/ldap_search_builtins.php`
 
@@ -41106,7 +41119,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 841)
+- new ArgumentCountError (line 844)
 - 16 class method(s)
 - 1 closure(s)
 
@@ -44087,9 +44100,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ScopeBuiltinRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 512)
 - 21 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/ScriptExit.php`
 

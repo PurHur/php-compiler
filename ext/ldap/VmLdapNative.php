@@ -173,39 +173,105 @@ final class VmLdapNative
      */
     public static function modifyExtSync(\FFI\CData $ld, string $dn, array $mods): int
     {
-        if ([] === $mods) {
-            return self::LDAP_SUCCESS;
-        }
-        $ffi = self::requireFfi();
-        $n = \count($mods);
-        $modPtrs = $ffi->new('LDAPMod*['.($n + 1).']');
-        $allocated = [];
-        try {
-            for ($i = 0; $i < $n; ++$i) {
-                $spec = $mods[$i];
-                $mod = $ffi->new('LDAPMod');
-                $mod->mod_op = $spec['op'] | self::LDAP_MOD_BVALUES;
-                $mod->mod_type = $spec['attr'];
-                $values = $spec['values'];
-                if (null === $values) {
-                    $mod->mod_bvalues = null;
-                } else {
-                    $vc = \count($values);
-                    $bvs = $ffi->new('BerValue*['.($vc + 1).']');
-                    for ($vi = 0; $vi < $vc; ++$vi) {
-                        $bvs[$vi] = \FFI::addr(self::newBerValue($values[$vi]));
-                    }
-                    $bvs[$vc] = null;
-                    $mod->mod_bvalues = $bvs;
-                }
-                $modPtrs[$i] = \FFI::addr($mod);
-                $allocated[] = $mod;
-            }
-            $modPtrs[$n] = null;
+        return self::applyModsSync($ld, $dn, $mods, false);
+    }
 
-            return (int) $ffi->ldap_modify_ext_s($ld, $dn, $modPtrs, null, null);
+    /**
+     * Full entry add (php-src PHP_LD_FULL_ADD → ldap_add_ext_s; #22196).
+     *
+     * @param list<array{op: int, attr: string, values: list<string>|null}> $mods
+     */
+    public static function addExtSync(\FFI\CData $ld, string $dn, array $mods): int
+    {
+        return self::applyModsSync($ld, $dn, $mods, true);
+    }
+
+    public static function deleteExtSync(\FFI\CData $ld, string $dn): int
+    {
+        try {
+            return (int) self::requireFfi()->ldap_delete_ext_s($ld, $dn, null, null);
         } catch (\Throwable) {
             return -1;
+        }
+    }
+
+    /**
+     * Async modify/add → LDAPMessage* (php-src *_ext; #22196).
+     *
+     * @param list<array{op: int, attr: string, values: list<string>|null}> $mods
+     * @return array{result: ?\FFI\CData, errno: int}
+     */
+    public static function modifyExtAsync(\FFI\CData $ld, string $dn, array $mods, bool $fullAdd): array
+    {
+        if ([] === $mods) {
+            return ['result' => null, 'errno' => -1];
+        }
+        $ffi = self::requireFfi();
+        try {
+            $built = self::buildModPtrs($mods);
+            $msgid = $ffi->new('int');
+            if ($fullAdd) {
+                $rc = (int) $ffi->ldap_add_ext($ld, $dn, $built['ptrs'], null, null, \FFI::addr($msgid));
+            } else {
+                $rc = (int) $ffi->ldap_modify_ext($ld, $dn, $built['ptrs'], null, null, \FFI::addr($msgid));
+            }
+            // Keep $built alive until ldap_result returns (OpenLDAP reads mods during op).
+            $out = self::awaitMsgid($ld, $rc, $msgid);
+            unset($built);
+
+            return $out;
+        } catch (\Throwable) {
+            return ['result' => null, 'errno' => -1];
+        }
+    }
+
+    /**
+     * @return array{result: ?\FFI\CData, errno: int}
+     */
+    public static function deleteExtAsync(\FFI\CData $ld, string $dn): array
+    {
+        $ffi = self::requireFfi();
+        try {
+            $msgid = $ffi->new('int');
+            $rc = (int) $ffi->ldap_delete_ext($ld, $dn, null, null, \FFI::addr($msgid));
+
+            return self::awaitMsgid($ld, $rc, $msgid);
+        } catch (\Throwable) {
+            return ['result' => null, 'errno' => -1];
+        }
+    }
+
+    /**
+     * @return array{result: ?\FFI\CData, errno: int}
+     */
+    public static function renameExtAsync(
+        \FFI\CData $ld,
+        string $dn,
+        string $newRdn,
+        ?string $newParent,
+        bool $deleteOldRdn
+    ): array {
+        $ffi = self::requireFfi();
+        $parent = $newParent;
+        if (null === $parent || '' === $parent) {
+            $parent = null;
+        }
+        try {
+            $msgid = $ffi->new('int');
+            $rc = (int) $ffi->ldap_rename(
+                $ld,
+                $dn,
+                $newRdn,
+                $parent,
+                $deleteOldRdn ? 1 : 0,
+                null,
+                null,
+                \FFI::addr($msgid)
+            );
+
+            return self::awaitMsgid($ld, $rc, $msgid);
+        } catch (\Throwable) {
+            return ['result' => null, 'errno' => -1];
         }
     }
 
@@ -230,6 +296,83 @@ final class VmLdapNative
             null,
             null
         );
+    }
+
+    /**
+     * @param list<array{op: int, attr: string, values: list<string>|null}> $mods
+     */
+    private static function applyModsSync(\FFI\CData $ld, string $dn, array $mods, bool $fullAdd): int
+    {
+        if ([] === $mods) {
+            return self::LDAP_SUCCESS;
+        }
+        $ffi = self::requireFfi();
+        try {
+            $built = self::buildModPtrs($mods);
+            if ($fullAdd) {
+                return (int) $ffi->ldap_add_ext_s($ld, $dn, $built['ptrs'], null, null);
+            }
+
+            return (int) $ffi->ldap_modify_ext_s($ld, $dn, $built['ptrs'], null, null);
+        } catch (\Throwable) {
+            return -1;
+        }
+    }
+
+    /**
+     * @param list<array{op: int, attr: string, values: list<string>|null}> $mods
+     * @return array{ptrs: \FFI\CData, keep: list<\FFI\CData>}
+     */
+    private static function buildModPtrs(array $mods): array
+    {
+        $ffi = self::requireFfi();
+        $n = \count($mods);
+        $modPtrs = $ffi->new('LDAPMod*['.($n + 1).']');
+        $keep = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $spec = $mods[$i];
+            $mod = $ffi->new('LDAPMod');
+            $mod->mod_op = $spec['op'] | self::LDAP_MOD_BVALUES;
+            $mod->mod_type = $spec['attr'];
+            $values = $spec['values'];
+            if (null === $values) {
+                $mod->mod_bvalues = null;
+            } else {
+                $vc = \count($values);
+                $bvs = $ffi->new('BerValue*['.($vc + 1).']');
+                for ($vi = 0; $vi < $vc; ++$vi) {
+                    $bvs[$vi] = \FFI::addr(self::newBerValue($values[$vi]));
+                }
+                $bvs[$vc] = null;
+                $mod->mod_bvalues = $bvs;
+                $keep[] = $bvs;
+            }
+            $modPtrs[$i] = \FFI::addr($mod);
+            $keep[] = $mod;
+        }
+        $modPtrs[$n] = null;
+
+        return ['ptrs' => $modPtrs, 'keep' => $keep];
+    }
+
+    /**
+     * @param \FFI\CData $msgid int*
+     * @return array{result: ?\FFI\CData, errno: int}
+     */
+    private static function awaitMsgid(\FFI\CData $ld, int $rc, \FFI\CData $msgid): array
+    {
+        if (self::LDAP_SUCCESS !== $rc) {
+            return ['result' => null, 'errno' => $rc];
+        }
+        $ffi = self::requireFfi();
+        $res = $ffi->new('LDAPMessage*[1]');
+        $res[0] = null;
+        $rrc = (int) $ffi->ldap_result($ld, (int) $msgid->cdata, 1, null, $res);
+        if (-1 === $rrc || null === $res[0]) {
+            return ['result' => null, 'errno' => -1];
+        }
+
+        return ['result' => $res[0], 'errno' => self::LDAP_SUCCESS];
     }
 
     public static function setOptionInt(?\FFI\CData $ld, int $option, int $value): int
@@ -725,7 +868,13 @@ typedef struct ldapmod {
     BerValue **mod_bvalues;
 } LDAPMod;
 int ldap_modify_ext_s(LDAP *ld, const char *dn, LDAPMod *mods[], void *serverctrls, void *clientctrls);
+int ldap_modify_ext(LDAP *ld, const char *dn, LDAPMod *mods[], void *serverctrls, void *clientctrls, int *msgidp);
+int ldap_add_ext_s(LDAP *ld, const char *dn, LDAPMod *mods[], void *serverctrls, void *clientctrls);
+int ldap_add_ext(LDAP *ld, const char *dn, LDAPMod *mods[], void *serverctrls, void *clientctrls, int *msgidp);
+int ldap_delete_ext_s(LDAP *ld, const char *dn, void *serverctrls, void *clientctrls);
+int ldap_delete_ext(LDAP *ld, const char *dn, void *serverctrls, void *clientctrls, int *msgidp);
 int ldap_rename_s(LDAP *ld, const char *dn, const char *newrdn, const char *newparent, int deleteoldrdn, void *serverctrls, void *clientctrls);
+int ldap_rename(LDAP *ld, const char *dn, const char *newrdn, const char *newparent, int deleteoldrdn, void *serverctrls, void *clientctrls, int *msgidp);
 int ldap_simple_bind_s(LDAP *ld, const char *who, const char *passwd);
 int ldap_search_ext_s(LDAP *ld, const char *base, int scope, const char *filter, char **attrs, int attrsonly, void *serverctrls, void *clientctrls, timeval *timeout, int sizelimit, LDAPMessage **res);
 int ldap_count_entries(LDAP *ld, LDAPMessage *res);
