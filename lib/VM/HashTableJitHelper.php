@@ -22,6 +22,14 @@ final class HashTableJitHelper
         return $ht->duplicate();
     }
 
+    /**
+     * Array union ($left + $right) — left keys win (Zend add_function; #3690, #10533).
+     */
+    public static function unionCopy(HashTable $left, HashTable $right): HashTable
+    {
+        return $left->unionCopy($right);
+    }
+
     public static function unsupportedStringKeyElementTypeMessage(int $jitTypeByte): string
     {
         return 'String-key array element type not supported for JIT: '

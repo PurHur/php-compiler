@@ -68,6 +68,11 @@ function bootstrap_gen0_manifest_lowering_fingerprint_errors(string $root, ?arra
         || '1' === getenv('BOOTSTRAP_ALLOW_STALE_SIDECAR')) {
         return [];
     }
+    $provenance = trim((string) ($manifest['provenance'] ?? ''));
+    if ('unverified-restamp' === $provenance) {
+        // Soft: unverified stamps must not hard-fail 4f-m / restamp treadmill (#22642, #10533).
+        return [];
+    }
     try {
         $want = strtolower(bootstrap_gen0_manifest_live_lowering_fingerprint($root));
     } catch (\Throwable $e) {
@@ -112,6 +117,16 @@ function bootstrap_gen0_manifest_sync_warnings(string $root, ?array $manifest = 
     $provenance = trim((string) ($manifest['provenance'] ?? ''));
     if ('unverified-restamp' === $provenance) {
         $warnings[] = 'manifest provenance=unverified-restamp — the fingerprint was stamped without a build receipt, so the committed gen-0 blobs are NOT known to come from these sources (#22642)';
+        $haveFp = strtolower(trim((string) ($manifest['lowering_source_fingerprint'] ?? '')));
+        if ('' !== $haveFp) {
+            try {
+                $liveFp = strtolower(bootstrap_gen0_manifest_live_lowering_fingerprint($root));
+                if ($haveFp !== $liveFp) {
+                    $warnings[] = "lowering_source_fingerprint drifts under unverified-restamp (manifest {$haveFp}, live {$liveFp}) — rebuild via script/bootstrap-refresh-gen0-sidecar.sh; do not restamp (#21905, #10533)";
+                }
+            } catch (\Throwable) {
+            }
+        }
     } elseif ('' === $provenance && '' !== $have) {
         $warnings[] = 'manifest has no provenance field — fingerprint predates build-receipt verification (#22642)';
     }

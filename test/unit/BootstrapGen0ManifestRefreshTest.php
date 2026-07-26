@@ -109,8 +109,12 @@ final class BootstrapGen0ManifestRefreshTest extends TestCase
             $preserved = bootstrap_gen0_manifest_read(self::$root);
             $this->assertSame($fake, $preserved['lowering_source_fingerprint'] ?? null);
 
+            // Unverified restamps must not hard-fail 4f-m (restamp treadmill); drift is a warning (#10533).
             $errors = bootstrap_gen0_manifest_lowering_fingerprint_errors(self::$root);
-            $this->assertNotSame([], $errors, 'fake fingerprint must fail live check');
+            $this->assertSame([], $errors, 'unverified-restamp fingerprint drift is warning-only');
+            $warnings = bootstrap_gen0_manifest_sync_warnings(self::$root);
+            $this->assertNotSame([], $warnings);
+            $this->assertStringContainsString('unverified-restamp', implode("\n", $warnings));
         } finally {
             putenv('BOOTSTRAP_GEN0_ALLOW_UNVERIFIED_STAMP');
             file_put_contents($manifestPath, $origManifest);

@@ -12,6 +12,7 @@ use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\array_combine;
 use PHPCompiler\ext\standard\lcfirst;
 use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
+use PHPCompiler\JIT\Builtin\HashTableUnionRuntime;
 use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -28,6 +29,35 @@ final class ArrayBuiltinHelper
     public static function isNativeArray(int $type): bool
     {
         return 0 !== ($type & Variable::IS_NATIVE_ARRAY);
+    }
+
+    /**
+     * Array union (`$a + $b`) for hashtable / value-boxed / native-list operands.
+     *
+     * php-src: Zend/zend_operators.c — add_function; left-hand keys win (#3690, #10533).
+     * Bridge: {@see HashTableUnionRuntime} → {@see \PHPCompiler\VM\HashTable::unionCopy()}.
+     */
+    public static function arrayUnion(Context $context, Variable $left, Variable $right): Variable
+    {
+        $leftHt = self::loadHashTable($context, $left);
+        $rightHt = self::loadHashTable($context, $right);
+        $dest = HashTableUnionRuntime::union($context, $leftHt, $rightHt);
+        $context->refcount->addref($dest);
+
+        if (Variable::TYPE_HASHTABLE === $left->type && Variable::TYPE_HASHTABLE === $right->type) {
+            return new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $dest);
+        }
+
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $dest
+        );
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        $var->valueBoxHashtable = true;
+
+        return $var;
     }
 
     public static function loadHashTable(Context $context, Variable $array): Value
