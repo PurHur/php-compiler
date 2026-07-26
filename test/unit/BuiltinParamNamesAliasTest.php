@@ -902,6 +902,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'allowable_tags', 'strip_tags'));
     }
 
+    /** @covers issue #23226 */
+    public function testUcwordsZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('ucwords');
+        self::assertSame(['string', 'separators'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'ucwords'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'separators', 'ucwords'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $str / $delims)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'ucwords'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'delims', 'ucwords'));
+    }
+
     /** @covers issue #23351 */
     public function testMbStrimwidthZendStubNamedParams(): void
     {
