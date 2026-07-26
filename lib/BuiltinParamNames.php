@@ -43,6 +43,69 @@ final class BuiltinParamNames
             'resourcebundle::count' => [],
             // php-src timezone.stub.php — ICU≥74 (#21553)
             'intltimezone::getianaid' => ['zoneId'],
+            // php-src ext/dom/php_dom.stub.php — InternalArgInfo still has pre-stub names (#23391)
+            'domdocument::adoptnode' => ['node'],
+            'domdocument::appendchild' => ['node'],
+            'domdocument::createattribute' => ['localName'],
+            'domdocument::createattributens' => ['namespace', 'qualifiedName'],
+            'domdocument::createelement' => ['localName', 'value'],
+            'domdocument::createelementns' => ['namespace', 'qualifiedName', 'value'],
+            'domdocument::createtextnode' => ['data'],
+            'domdocument::getelementbyid' => ['elementId'],
+            'domdocument::getelementsbytagname' => ['qualifiedName'],
+            'domdocument::getelementsbytagnamens' => ['namespace', 'localName'],
+            'domdocument::importnode' => ['node', 'deep'],
+            'domdocument::loadhtml' => ['source', 'options'],
+            'domdocument::loadhtmlfile' => ['filename', 'options'],
+            'domdocument::registernodeclass' => ['baseClass', 'extendedClass'],
+            'domdocument::schemavalidate' => ['filename', 'flags'],
+            'domdocument::schemavalidatesource' => ['source', 'flags'],
+            'domdocument::xinclude' => ['options='],
+            'domelement::__construct' => ['qualifiedName', 'value', 'namespace'],
+            'domelement::appendchild' => ['node'],
+            'domelement::getattribute' => ['qualifiedName'],
+            'domelement::getattributenode' => ['qualifiedName'],
+            'domelement::getattributenodens' => ['namespace', 'localName'],
+            'domelement::getattributens' => ['namespace', 'localName'],
+            'domelement::getelementsbytagname' => ['qualifiedName'],
+            'domelement::getelementsbytagnamens' => ['namespace', 'localName'],
+            'domelement::hasattribute' => ['qualifiedName'],
+            'domelement::hasattributens' => ['namespace', 'localName'],
+            'domelement::removeattribute' => ['qualifiedName'],
+            'domelement::removeattributenode' => ['attr'],
+            'domelement::removeattributens' => ['namespace', 'localName'],
+            'domelement::setattribute' => ['qualifiedName', 'value'],
+            'domelement::setattributens' => ['namespace', 'qualifiedName', 'value'],
+            'domelement::setidattribute' => ['qualifiedName', 'isId'],
+            'domelement::setidattributenode' => ['attr', 'isId'],
+            'domelement::setidattributens' => ['namespace', 'qualifiedName', 'isId'],
+            'domimplementation::createdocument' => ['namespace', 'qualifiedName', 'doctype'],
+            'domimplementation::createdocumenttype' => ['qualifiedName', 'publicId', 'systemId'],
+            'domimplementation::getfeature' => ['feature', 'version'],
+            'domnamednodemap::getnameditem' => ['qualifiedName'],
+            'domnamednodemap::getnameditemns' => ['namespace', 'localName'],
+            'domdocumentfragment::appendchild' => ['node'],
+            'domnode::appendchild' => ['node'],
+            'domnode::c14n' => ['exclusive', 'withComments', 'xpath', 'nsPrefixes'],
+            'domnode::c14nfile' => ['uri', 'exclusive', 'withComments', 'xpath', 'nsPrefixes'],
+            'domnode::insertbefore' => ['node', 'child'],
+            'domnode::isdefaultnamespace' => ['namespace'],
+            'domnode::issamenode' => ['otherNode'],
+            'domnode::lookupprefix' => ['namespace'],
+            'domnode::removechild' => ['child'],
+            'domnode::replacechild' => ['node', 'child'],
+            'domtext::__construct' => ['data'],
+            'domxpath::__construct' => ['document', 'registerNodeNS'],
+            'domxpath::evaluate' => ['expression', 'contextNode', 'registerNodeNS'],
+            'domxpath::query' => ['expression', 'contextNode', 'registerNodeNS'],
+            'domxpath::registernamespace' => ['prefix', 'namespace'],
+            // php-src ext/xmlreader/php_xmlreader.stub.php (#23391)
+            'xmlreader::expand' => ['baseNode='],
+            'xmlreader::getattributens' => ['name', 'namespace'],
+            'xmlreader::movetoattributens' => ['name', 'namespace'],
+            'xmlreader::next' => ['name'],
+            'xmlreader::open' => ['uri', 'encoding', 'flags'],
+            'xmlreader::xml' => ['source', 'encoding', 'flags'],
             default => null,
         };
     }
@@ -801,6 +864,16 @@ final class BuiltinParamNames
     {
         $names = self::forClassMethod(strtolower($class).'::'.strtolower($method));
         if (null !== $names) {
+            // Bare name tables are for named-arg / Reflection labels; optionality lives in
+            // InternalArgInfo (`=` markers). Match forFunction() (#23391, DateTime req count).
+            if (self::namesEncodeOptionalParams(array_values($names))) {
+                return self::requiredParamCountFromNames($names);
+            }
+            $fromArgInfo = BuiltinInternalArgInfo::requiredParamCountForClassMethod($class, $method);
+            if (null !== $fromArgInfo) {
+                return $fromArgInfo;
+            }
+
             return self::requiredParamCountFromNames($names);
         }
 
@@ -1002,7 +1075,14 @@ final class BuiltinParamNames
         $lc = strtolower($namedParam);
         // InternalArgInfo may prefix by-ref params with '&' (e.g. '&count'); callers use bare names (#19697).
         $lowerNames = array_map(
-            static fn (string $name): string => strtolower(ltrim($name, '&')),
+            static function (string $name): string {
+                $n = ltrim($name, '&');
+                if (str_starts_with($n, '...')) {
+                    $n = substr($n, 3);
+                }
+
+                return strtolower(rtrim($n, '='));
+            },
             $paramNames
         );
         $idx = array_search($lc, $lowerNames, true);

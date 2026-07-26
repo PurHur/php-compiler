@@ -41246,7 +41246,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 936)
+- new ArgumentCountError (line 1009)
 - 16 class method(s)
 - 1 closure(s)
 
@@ -52865,21 +52865,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new AttributeEntry (line 1839)
 - new Variable (line 2366)
 - new ParameterMetadata (line 2372)
-- new Variable (line 3164)
-- new ObjectEntry (line 3339)
-- new SourceLocation (line 3367)
-- new ParameterMetadata (line 3847)
-- new ObjectEntry (line 3915)
-- new ObjectEntry (line 3932)
-- new ObjectEntry (line 4150)
-- new ObjectEntry (line 4163)
-- new Variable (line 4243)
-- new ObjectEntry (line 4365)
-- new ObjectEntry (line 4385)
-- new Variable (line 4572)
-- new Variable (line 4757)
+- new Variable (line 3183)
+- new ObjectEntry (line 3358)
+- new SourceLocation (line 3386)
+- new ParameterMetadata (line 3866)
+- new ObjectEntry (line 3934)
+- new ObjectEntry (line 3951)
+- new ObjectEntry (line 4169)
+- new ObjectEntry (line 4182)
+- new Variable (line 4262)
+- new ObjectEntry (line 4384)
+- new ObjectEntry (line 4404)
+- new Variable (line 4591)
+- new Variable (line 4776)
 - 248 class method(s)
-- 2 closure(s)
+- 3 closure(s)
 
 ### `lib/VM/ReflectionTypeSupport.php`
 
