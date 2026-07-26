@@ -427,7 +427,16 @@ final class JitIntdiv
         Value $doubleVal,
         Value $truncatedLong
     ): void {
+        // StringTriggerErrorJit::implement clears the builder insert position after linking
+        // bridges — without restore, sitofp/fcmp become orphan IR (module verify fails on
+        // every AOT unit that first touches float→int, including hello-world always-helpers).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         \PHPCompiler\JIT\Builtin\StringTriggerErrorJit::implement($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'float_int_prec_warn_setup');
+        }
         $roundtrip = $context->builder->sitofp($truncatedLong, $doubleVal->typeOf());
         $loses = $context->builder->fcmp(Builder::REAL_UNE, $doubleVal, $roundtrip);
         $warnBlock = BasicBlockHelper::append($context, 'intdiv_float_prec_warn');
@@ -477,6 +486,7 @@ final class JitIntdiv
      */
     public static function floatToLongWithPrecisionWarning(Context $context, Value $doubleVal): Value
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'float_to_long_prec');
         $truncated = $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
         self::maybeEmitFloatToIntPrecisionWarning($context, $doubleVal, $truncated);
 

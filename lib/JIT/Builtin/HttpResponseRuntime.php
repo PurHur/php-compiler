@@ -182,9 +182,14 @@ final class HttpResponseRuntime
         $context->builder->positionAtEnd($bbSetL);
         self::emitWriteFromSetSentinel(
             $context,
-            $context->builder->call(
-                self::helperFunction($context, self::APPLY_SET_HELPER),
-                $intval
+            JitNestedHelperCoerce::extractLongFromHelperResult(
+                $context,
+                JitNestedHelperCoerce::callHelper(
+                    $context,
+                    self::helperFunction($context, self::APPLY_SET_HELPER),
+                    [$intval]
+                ),
+                $i64
             ),
             $outPtr
         );
@@ -242,11 +247,17 @@ final class HttpResponseRuntime
             $context->lookupFunction('__value__readLong'),
             $boxedPtr
         );
+        $i64Box = $context->getTypeFromString('int64');
         self::emitWriteFromSetSentinel(
             $context,
-            $context->builder->call(
-                self::helperFunction($context, self::APPLY_SET_HELPER),
-                $boxedLong
+            JitNestedHelperCoerce::extractLongFromHelperResult(
+                $context,
+                JitNestedHelperCoerce::callHelper(
+                    $context,
+                    self::helperFunction($context, self::APPLY_SET_HELPER),
+                    [$boxedLong]
+                ),
+                $i64Box
             ),
             $outPtr
         );
@@ -263,7 +274,16 @@ final class HttpResponseRuntime
 
     private static function emitWriteFromGetSentinel(Context $context, Value $outPtr): void
     {
-        $sentinel = $context->builder->call(self::helperFunction($context, self::APPLY_GET_HELPER));
+        $i64 = $context->getTypeFromString('int64');
+        $sentinel = JitNestedHelperCoerce::extractLongFromHelperResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::APPLY_GET_HELPER),
+                []
+            ),
+            $i64
+        );
         self::emitWriteFromGetSentinelValue($context, $sentinel, $outPtr);
     }
 
@@ -376,11 +396,17 @@ final class HttpResponseRuntime
             $context->lookupFunction('__value__readLong'),
             $boxedPtr
         );
+        $i64 = $context->getTypeFromString('int64');
         self::emitWriteFromSetSentinel(
             $context,
-            $context->builder->call(
-                self::helperFunction($context, self::APPLY_SET_HELPER),
-                $boxedLong
+            JitNestedHelperCoerce::extractLongFromHelperResult(
+                $context,
+                JitNestedHelperCoerce::callHelper(
+                    $context,
+                    self::helperFunction($context, self::APPLY_SET_HELPER),
+                    [$boxedLong]
+                ),
+                $i64
             ),
             $outPtr
         );
@@ -418,8 +444,14 @@ final class HttpResponseRuntime
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('hr_status_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $raw = $context->builder->call(self::helperFunction($context, $helperLogical));
-        $context->builder->returnValue(JitNestedHelperCoerce::i64ToScalar($context, $raw, $i32));
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helperLogical),
+            []
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::extractLongFromHelperResult($context, $raw, $i32)
+        );
         $context->registerFunction($abiName, $fn);
     }
 
@@ -436,7 +468,11 @@ final class HttpResponseRuntime
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('hr_status_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(self::helperFunction($context, $helperLogical));
+        JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helperLogical),
+            []
+        );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -455,10 +491,14 @@ final class HttpResponseRuntime
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('hr_status_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $i64 = $context->getTypeFromString('int64');
-        $context->builder->call(
+        JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, $helperLogical),
-            JitNestedHelperCoerce::scalarToI64($context, $fn->getParam(0), $i32)
+            [JitNestedHelperCoerce::scalarToI64(
+                $context,
+                $fn->getParam(0),
+                $i32
+            )]
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);

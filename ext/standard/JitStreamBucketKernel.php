@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
@@ -182,9 +183,15 @@ final class JitStreamBucketKernel
     {
         $entry = $fn->appendBasicBlock('sb_reg_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::REGISTER),
-            $fn->getParam(0)
+        $i64 = $context->getTypeFromString('int64');
+        $result = JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::REGISTER),
+                [$fn->getParam(0)]
+            ),
+            $i64
         );
         $context->builder->returnValue($result);
     }
@@ -193,9 +200,15 @@ final class JitStreamBucketKernel
     {
         $entry = $fn->appendBasicBlock('sb_data_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::BUCKET_DATA),
-            $fn->getParam(0)
+        $strPtr = $context->getTypeFromString('__string__*');
+        $result = JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::BUCKET_DATA),
+                [$fn->getParam(0)]
+            ),
+            $strPtr
         );
         $context->builder->returnValue($result);
     }
@@ -205,10 +218,12 @@ final class JitStreamBucketKernel
         $entry = $fn->appendBasicBlock('sb_is_bucket_entry');
         $context->builder->positionAtEnd($entry);
         $i32 = $context->getTypeFromString('int32');
-        $result = $context->builder->trunc(
-            $context->builder->call(
+        $result = JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
                 self::helperFunction($context, self::IS_BUCKET),
-                $fn->getParam(0)
+                [$fn->getParam(0)]
             ),
             $i32
         );
@@ -220,10 +235,12 @@ final class JitStreamBucketKernel
         $entry = $fn->appendBasicBlock('sb_is_brig_entry');
         $context->builder->positionAtEnd($entry);
         $i32 = $context->getTypeFromString('int32');
-        $result = $context->builder->trunc(
-            $context->builder->call(
+        $result = JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
                 self::helperFunction($context, self::IS_BRIGADE),
-                $fn->getParam(0)
+                [$fn->getParam(0)]
             ),
             $i32
         );
@@ -234,7 +251,16 @@ final class JitStreamBucketKernel
     {
         $entry = $fn->appendBasicBlock('sb_brig_alloc_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(self::helperFunction($context, self::BRIGADE_ALLOC));
+        $i64 = $context->getTypeFromString('int64');
+        $result = JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::BRIGADE_ALLOC),
+                []
+            ),
+            $i64
+        );
         $context->builder->returnValue($result);
     }
 
@@ -243,11 +269,12 @@ final class JitStreamBucketKernel
         $entry = $fn->appendBasicBlock('sb_push_entry');
         $context->builder->positionAtEnd($entry);
         $i32 = $context->getTypeFromString('int32');
-        $result = $context->builder->trunc(
-            $context->builder->call(
+        $result = JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
                 self::helperFunction($context, self::BRIGADE_PUSH),
-                $fn->getParam(0),
-                $fn->getParam(1)
+                [$fn->getParam(0), $fn->getParam(1)]
             ),
             $i32
         );
@@ -258,9 +285,15 @@ final class JitStreamBucketKernel
     {
         $entry = $fn->appendBasicBlock('sb_pop_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::BRIGADE_POP),
-            $fn->getParam(0)
+        $i64 = $context->getTypeFromString('int64');
+        $result = JitNestedHelperCoerce::coerceBridgeResult(
+            $context,
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, self::BRIGADE_POP),
+                [$fn->getParam(0)]
+            ),
+            $i64
         );
         $context->builder->returnValue($result);
     }

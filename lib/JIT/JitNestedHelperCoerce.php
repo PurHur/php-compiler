@@ -221,6 +221,31 @@ final class JitNestedHelperCoerce
 
             return self::valueBoxArgAsWanted($context, $ptr, $wantStr);
         }
+        // NestedJIT *JitHelper int/bool params may be by-value `__value__` while ABI bridges pass
+        // bare i64/i32/i1 (getenv overlay htPtr, http_response_code, stream_bucket_*).
+        if (self::isValueBoxType($context, $wantTy) && Type::KIND_INTEGER === $haveTy->getKind()) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'nested_helper_box_int_arg');
+            if ('int1' === $haveStr || 'bool' === $haveStr) {
+                JitValueBox::writeBool($context, $slot, $arg);
+            } else {
+                $i64 = $context->getTypeFromString('int64');
+                $asI64 = $arg;
+                if ($haveTy !== $i64) {
+                    if ('int32' === $haveStr) {
+                        $asI64 = $context->builder->sext($arg, $i64);
+                    } elseif ('int8' === $haveStr || 'i8' === $haveStr) {
+                        $asI64 = $context->builder->zext($arg, $i64);
+                    } else {
+                        $asI64 = self::scalarToI64($context, $arg, $haveTy);
+                    }
+                }
+                JitValueBox::writeLong($context, $slot, $asI64);
+            }
+
+            return self::valueBoxArgAsWanted($context, $ptr, $wantStr);
+        }
         if (Type::KIND_INTEGER === $wantTy->getKind() && Type::KIND_INTEGER === $haveTy->getKind()) {
             if (('int8' === $haveStr || 'i8' === $haveStr) && ('int32' === $wantStr || 'int64' === $wantStr || 'long long' === $wantStr)) {
                 return $context->builder->zext($arg, $wantTy);
@@ -375,6 +400,7 @@ final class JitNestedHelperCoerce
             return $raw;
         }
         if (self::isValueBox($context, $raw)) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'nested_helper_extract_double');
             return $context->builder->call(
                 $context->lookupFunction('__value__readDouble'),
                 self::valueBoxPtrFromHelperResult($context, $raw)
