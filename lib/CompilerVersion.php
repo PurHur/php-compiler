@@ -20,8 +20,14 @@ final class CompilerVersion
 
     public const VERSION_ID = 80400;
 
-    /** Build timestamp for phpinfo() INFO_GENERAL Build Date row (php-src PHP_BUILD_DATE). */
+    /** Build timestamp for phpinfo() INFO_GENERAL Build Date row (kept empty on reference profile; #12141). */
     public const BUILD_DATE = '';
+
+    /**
+     * Deterministic {@see PHP_BUILD_DATE} stamp when profile ≥ 8.5 (php-src main/php_version.h; #23231).
+     * Format matches php-src {@code __DATE__}/{@code __TIME__}: {@code M j Y H:i:s}.
+     */
+    public const PHP_BUILD_DATE_STAMP = 'Jan 1 2026 00:00:00';
 
     /** SAPI name for CLI entrypoints (bin/vm.php, AOT binaries). */
     public const SAPI = 'cli';
@@ -746,6 +752,24 @@ final class CompilerVersion
     public static function supportsTentativeReturnConstant(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.5+ PHP_BUILD_DATE Core constant (php-src main/php_version.h / main/main.c; #23231).
+     *
+     * Withheld on ≤8.4 profiles (matches Zend — constant landed in 8.5). Enable via stable 8.5.0+
+     * or explicit {@code PHP_COMPILER_PROFILE=8.5} forward profile. Do not force-define
+     * PHP_BUILD_PROVIDER (optional configure stamp only).
+     */
+    public static function supportsPhpBuildDateConstant(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /** Parseable {@code M j Y H:i:s} stamp for {@see PHP_BUILD_DATE} (#23231). */
+    public static function phpBuildDateStamp(): string
+    {
+        return self::PHP_BUILD_DATE_STAMP;
     }
 
     /**
