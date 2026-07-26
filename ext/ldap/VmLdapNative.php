@@ -401,6 +401,43 @@ final class VmLdapNative
         return (int) self::requireFfi()->ldap_simple_bind_s($ld, $dn, $password);
     }
 
+    /**
+     * Async simple bind → LDAPMessage* (php-src ldap_bind_ext via ldap_sasl_bind LDAP_SASL_SIMPLE; #22164).
+     *
+     * @return array{result: ?\FFI\CData, errno: int}
+     */
+    public static function bindExtAsync(\FFI\CData $ld, ?string $dn, ?string $password): array
+    {
+        $ffi = self::requireFfi();
+        try {
+            $cred = $ffi->new('BerValue');
+            if (null === $password || '' === $password) {
+                $cred->bv_val = null;
+                $cred->bv_len = 0;
+            } else {
+                $cred->bv_len = \strlen($password);
+                $buf = $ffi->new('char['.\strlen($password).']', false);
+                \FFI::memcpy($buf, $password, \strlen($password));
+                $cred->bv_val = $buf;
+            }
+            $msgid = $ffi->new('int');
+            // LDAP_SASL_SIMPLE == NULL mechanism (OpenLDAP / php-src ldap_bind_ext).
+            $rc = (int) $ffi->ldap_sasl_bind(
+                $ld,
+                $dn,
+                null,
+                \FFI::addr($cred),
+                null,
+                null,
+                \FFI::addr($msgid)
+            );
+
+            return self::awaitMsgid($ld, $rc, $msgid);
+        } catch (\Throwable) {
+            return ['result' => null, 'errno' => -1];
+        }
+    }
+
     public static function unbind(\FFI\CData $ld): int
     {
         return (int) self::requireFfi()->ldap_unbind_ext_s($ld, null, null);
@@ -876,6 +913,7 @@ int ldap_delete_ext(LDAP *ld, const char *dn, void *serverctrls, void *clientctr
 int ldap_rename_s(LDAP *ld, const char *dn, const char *newrdn, const char *newparent, int deleteoldrdn, void *serverctrls, void *clientctrls);
 int ldap_rename(LDAP *ld, const char *dn, const char *newrdn, const char *newparent, int deleteoldrdn, void *serverctrls, void *clientctrls, int *msgidp);
 int ldap_simple_bind_s(LDAP *ld, const char *who, const char *passwd);
+int ldap_sasl_bind(LDAP *ld, const char *dn, const char *mechanism, BerValue *cred, void *serverctrls, void *clientctrls, int *msgidp);
 int ldap_search_ext_s(LDAP *ld, const char *base, int scope, const char *filter, char **attrs, int attrsonly, void *serverctrls, void *clientctrls, timeval *timeout, int sizelimit, LDAPMessage **res);
 int ldap_count_entries(LDAP *ld, LDAPMessage *res);
 LDAPMessage *ldap_first_entry(LDAP *ld, LDAPMessage *res);
