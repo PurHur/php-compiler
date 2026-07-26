@@ -1,5 +1,7 @@
 --TEST--
-ext/pgsql pg_set_error_context_visibility + PGSQL_SHOW_CONTEXT_* (#20674)
+ext/pgsql pg_set_error_context_visibility + PGSQL_SHOW_CONTEXT_* (#20674 / #22620)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (!function_exists('pg_connect')) die('skip no pg_connect (libpq FFI)');
