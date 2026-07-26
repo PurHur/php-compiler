@@ -65,23 +65,25 @@ final class FinalPropertyOverrideCheck
         $this->classes[$lc] = [
             'display' => $this->operandDisplayName($class->name, $lc),
             'extends' => $parentLc,
-            'properties' => $this->collectInstanceProperties($class, $lc),
+            'properties' => $this->collectProperties($class, $lc),
         ];
     }
 
     /**
+     * Instance + static properties (PHP 8.4 allows final static; pre-8.4 rejects all finals, #23403).
+     *
      * @return array<string, array{final: bool, fromFlags: bool, display: string}>
      */
-    private function collectInstanceProperties(Op\Stmt\Class_ $class, string $classLc): array
+    private function collectProperties(Op\Stmt\Class_ $class, string $classLc): array
     {
         $properties = [];
         foreach ($class->stmts->children as $member) {
-            if ($member instanceof Op\Stmt\Property && !$member->static) {
+            if ($member instanceof Op\Stmt\Property) {
                 $propDisplay = $this->propertyDisplayName($member->name);
                 $propLc = strtolower($propDisplay);
                 $fromFlags = $this->isFinalFromFlags($member);
-                $fromPrivateSet = $this->isImplicitlyFinalFromPrivateSet($member);
-                $fromRegistry = $this->isFinalFromHookRegistry($classLc, $propDisplay);
+                $fromPrivateSet = !$member->static && $this->isImplicitlyFinalFromPrivateSet($member);
+                $fromRegistry = !$member->static && $this->isFinalFromHookRegistry($classLc, $propDisplay);
                 $properties[$propLc] = [
                     'final' => $fromFlags || $fromPrivateSet || $fromRegistry,
                     'fromFlags' => $fromFlags,

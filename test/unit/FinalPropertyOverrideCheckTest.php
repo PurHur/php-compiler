@@ -58,6 +58,62 @@ PHP;
         $runtime->parseAndCompile($code, 'final_plain_reject_ref.php');
     }
 
+    /** @covers issue #23403 — static finals must also reject when supportsFinalProperties() is false */
+    public function testFinalStaticPropertyRejectedOnReferenceProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertFalse(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public final static $x = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Cannot declare property A::$x final, the final modifier is allowed only for methods, classes, and class constants'
+        );
+        $runtime->parseAndCompile($code, 'final_static_reject_ref.php');
+    }
+
+    /** @covers issue #23403 */
+    public function testFinalStaticPropertyCompilesOnForwardProfile(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public final static $x = 1;
+}
+echo A::$x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_static_ok.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n", ob_get_clean());
+    }
+
+    /** @covers issue #23403 */
+    public function testChildCannotOverrideFinalStaticProperty(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public final static $x = 1;
+}
+class B extends A {
+    public static $x = 2;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot override final property A::$x');
+        $runtime->parseAndCompile($code, 'final_static_override.php');
+    }
+
     public function testChildCannotOverrideFinalProperty(): void
     {
         $runtime = new Runtime();
