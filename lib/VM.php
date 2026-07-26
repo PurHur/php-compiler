@@ -2863,7 +2863,9 @@ class VM {
             ? null
             : $this->context->swapRunStack(null);
         $savedExternalCatch = $this->context->cloneMagicExternalCatchFrame;
+        $savedCallerFrame = $this->context->cloneMagicCallerFrame;
         $this->context->cloneMagicExternalCatchFrame = null;
+        $this->context->cloneMagicCallerFrame = $parentFrame;
         $this->context->invokingCloneMagic = true;
         VM\CloneWithSupport::beginCloneMagicReinit(
             $object,
@@ -2901,6 +2903,7 @@ class VM {
             VM\CloneWithSupport::endReinit($object);
             $this->context->invokingCloneMagic = false;
             $this->context->cloneMagicExternalCatchFrame = $savedExternalCatch;
+            $this->context->cloneMagicCallerFrame = $savedCallerFrame;
             if (null !== $savedStack) {
                 $this->context->swapRunStack($savedStack);
             }
@@ -8606,16 +8609,9 @@ restart:
                     if (null !== $op->arg2) {
                         VM\ExceptionSupport::stampThrowLine($thrown, (int) $op->arg2);
                     }
-                    if ($this->context->invokingCloneMagic) {
-                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
-                        if (null !== $catchFrame) {
-                            // Bubble to clone opcode caller — discard partial clone (#12068, zend_object_handlers.c).
-                            $this->context->cloneMagicExternalCatchFrame = $catchFrame;
-
-                            return self::FAILURE;
-                        }
-                        break;
-                    }
+                    // External catch during __clone throws CloneMagicCatchRedirect from
+                    // findCatchFrameForThrow (#23527 / #12068). Local try/catch inside __clone
+                    // falls through to the normal dispatchEngineThrow path below.
                     if ($this->frameIsPropertyGetHook($frame)) {
                         $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
                         if (null !== $catchFrame) {
@@ -8731,6 +8727,11 @@ restart:
                 }
                 $frame = $redirect->catchFrame;
                 goto restart;
+            } catch (VM\CloneMagicCatchRedirect $redirect) {
+                // Isolated __clone stack: abort nested runFrames; clone opcode resumes outer catch (#23527).
+                $this->context->cloneMagicExternalCatchFrame = $redirect->catchFrame;
+
+                return self::FAILURE;
             }
             if ($this->shouldAbortPropertyHookInvocation($frame)) {
                 return self::FAILURE;
@@ -11007,6 +11008,7 @@ restart:
                 if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
                     throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
                 }
+                $this->redirectCloneMagicExternalCatch($handler, $catchFrame);
 
                 return $catchFrame;
             }
@@ -11025,6 +11027,7 @@ restart:
                 if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
                     throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
                 }
+                $this->redirectCloneMagicExternalCatch($handler, $catchFrame);
 
                 return $catchFrame;
             }
@@ -11038,6 +11041,33 @@ restart:
      * handler runs (Zend CV undef on exception leave) so __destruct runs before catch / before
      * finally when leaving nested calls (#22541).
      */
+    /**
+     * When __clone() throws into a try/catch outside the isolated clone stack, defer the
+     * catch to the clone opcode caller — do not goto restart on the nested stack (#23527).
+     *
+     * TYPE_TRY stores the pre-getFrame handler, so identity with run-stack frames is unreliable;
+     * instead treat a handler as external when it is the clone caller or any of its ancestors.
+     *
+     * @throws VM\CloneMagicCatchRedirect
+     */
+    private function redirectCloneMagicExternalCatch(Frame $handler, Frame $catchFrame): void
+    {
+        if (!$this->context->invokingCloneMagic) {
+            return;
+        }
+        $caller = $this->context->cloneMagicCallerFrame;
+        if (null === $caller) {
+            return;
+        }
+        for ($f = $caller; null !== $f; $f = $f->parent) {
+            if ($f === $handler) {
+                $this->context->cloneMagicExternalCatchFrame = $catchFrame;
+
+                throw new VM\CloneMagicCatchRedirect($catchFrame);
+            }
+        }
+    }
+
     private function dispatchCatchForHandlerFrame(Frame $handler, Frame $throwFrame): ?Frame
     {
         $this->rewindHandlerToCatchChain($handler);

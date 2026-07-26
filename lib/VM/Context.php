@@ -144,6 +144,12 @@ class Context {
     /** Catch frame for throw during nested __clone(); bubble to clone opcode caller (#12068). */
     public ?Frame $cloneMagicExternalCatchFrame = null;
 
+    /**
+     * Frame that executed the `clone` opcode while {@see $invokingCloneMagic} is true (#23527).
+     * Used to tell outer try/catch handlers from try/catch inside __clone itself.
+     */
+    public ?Frame $cloneMagicCallerFrame = null;
+
     /** Active object-to-string coercion via __toString (issue #4284). */
     public bool $coercingObjectToString = false;
 
