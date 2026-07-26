@@ -1103,4 +1103,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', $fn), $fn);
         }
     }
+
+    /** @covers issue #23241 */
+    public function testStreamIoZendStubNamedParams(): void
+    {
+        foreach (['fclose', 'feof', 'fgetc', 'ftell', 'rewind', 'fflush'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['stream'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'stream', $fn), $fn);
+            // Legacy InternalArgInfo name must not resolve (Zend rejects $fp)
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'fp', $fn), $fn);
+        }
+
+        $fseek = BuiltinParamNames::forFunction('fseek');
+        self::assertSame(['stream', 'offset', 'whence'], $fseek);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fseek, 'stream', 'fseek'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fseek, 'offset', 'fseek'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fseek, 'whence', 'fseek'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fseek, 'fp', 'fseek'));
+    }
 }

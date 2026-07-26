@@ -323,6 +323,16 @@ final class BuiltinParamNames
             case 'fwrite':
             case 'fputs':
                 return ['stream', 'data', 'length'];
+            // php-src ext/standard/file.stub.php — InternalArgInfo still says fp (#23241)
+            case 'fclose':
+            case 'feof':
+            case 'fgetc':
+            case 'ftell':
+            case 'rewind':
+            case 'fflush':
+                return ['stream'];
+            case 'fseek':
+                return ['stream', 'offset', 'whence'];
             case 'socket_select':
                 return ['read', 'write', 'except', 'seconds', 'microseconds'];
             case 'fputcsv':
