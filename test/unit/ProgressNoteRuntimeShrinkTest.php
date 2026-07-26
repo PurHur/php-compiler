@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * ProgressNote NestedJIT ABI bridges quarantined in ext/standard (#9521, #19874).
+ * ProgressNote NestedJIT via JitVmHelperLink::ensureCompiled (#23311 / peer #23301).
  */
 final class ProgressNoteRuntimeShrinkTest extends TestCase
 {
@@ -29,18 +29,23 @@ final class ProgressNoteRuntimeShrinkTest extends TestCase
         $this->assertLessThan(50, \substr_count($orchestrator, "\n") + 1);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelUsesJitVmHelperLink(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitProgressNoteKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
         $this->assertStringContainsString('final class JitProgressNoteKernel', $source);
         $this->assertStringContainsString('__phpc_progress_note', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
-        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringContainsString('ProgressJitHelper', $source);
         $this->assertStringContainsString('phpc_segv_handler', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(650, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(600, \substr_count($source, "\n") + 1);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void

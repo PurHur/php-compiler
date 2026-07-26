@@ -4,21 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT NestedJIT bridges for __phpc_progress_note / SIGSEGV breadcrumbs (#9521, #19874).
+ * JIT/AOT ABI bridges for __phpc_progress_note / SIGSEGV breadcrumbs (#9521, #19874, #23311).
  *
  * Quarantined from lib/JIT/Builtin/ProgressNoteRuntime — {@see \PHPCompiler\JIT\Builtin\ProgressNoteRuntime}
  * stays the thin orchestrator.
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer UploadTemp #23301).
  *
  * SSOT: {@see ProgressJitHelper}
  * Refs #9521, #9795, #6748
@@ -291,48 +292,19 @@ final class JitProgressNoteKernel
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ProgressJitHelper compile (#9521)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23311');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
         self::ensureValueStringHelpers($context);
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        $realPath = \realpath($path) ?: $path;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $realPath): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ProgressJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ProgressJitHelper.php parseAndCompile failed (#9521)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-            $context->markJitIncludedFileCompiled($realPath);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9521)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23311'
+        );
     }
 
     private static function ensureProgressGlobals(Context $context): void
