@@ -839,4 +839,40 @@ final class BuiltinParamNamesAliasTest extends TestCase
         // Legacy InternalArgInfo name must not resolve (Zend rejects $ascii)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ascii', 'chr'));
     }
+
+    /** @covers issue #23263 */
+    public function testTypeIntrospectionZendStubNamedParams(): void
+    {
+        self::assertSame(['value'], BuiltinParamNames::forFunction('get_debug_type'));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('get_debug_type'),
+            'value',
+            'get_debug_type'
+        ));
+
+        foreach (['count', 'sizeof'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['value', 'mode'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'value', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'mode', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'var', $fn), $fn);
+        }
+
+        foreach ([
+            'is_string', 'is_array', 'is_bool', 'is_int', 'is_integer', 'is_long',
+            'is_float', 'is_double', 'is_null', 'is_object', 'is_resource',
+            'is_countable', 'is_iterable', 'is_numeric', 'is_scalar',
+        ] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['value'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'value', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'var', $fn), $fn);
+        }
+
+        foreach (['is_finite', 'is_infinite', 'is_nan'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['num'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', $fn), $fn);
+        }
+    }
 }
