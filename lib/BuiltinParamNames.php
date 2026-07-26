@@ -356,6 +356,9 @@ final class BuiltinParamNames
                 return ['algo', 'data', 'key', 'binary'];
             case 'hash_pbkdf2':
                 return ['algo', 'password', 'salt', 'iterations', 'length', 'binary'];
+            // php-src ext/hash/hash.stub.php — Reflection was empty without this map (#23205)
+            case 'hash_equals':
+                return ['known_string', 'user_string'];
             case 'base64_decode':
                 return ['string', 'strict'];
             case 'resetaslazyghost':
