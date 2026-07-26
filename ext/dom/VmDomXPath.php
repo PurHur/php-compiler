@@ -396,6 +396,11 @@ final class VmDomXPath
             return self::evaluateUnionNodeSet($ctx, $xpath, $expression, $context, $registerNodeNS);
         }
 
+        // XPath 1.0 id(object) — document ID table via getElementById (#23323).
+        if (preg_match('~^id\(~i', $expression)) {
+            return self::evaluateIdFunction($ctx, $xpath, $expression, $context, $registerNodeNS);
+        }
+
         // Relative location paths: `.` / `.//…` / `./…` (XPath 1.0; #20257).
         if ('.' === $expression) {
             return DomRegistry::has($context) ? [$context->id] : [];
@@ -511,6 +516,164 @@ final class VmDomXPath
         }
 
         return $ids;
+    }
+
+    /**
+     * XPath 1.0 id(object) → node-set from the document ID table (#23323).
+     *
+     * String arg: whitespace-separated tokens (libxml drops the first token when the
+     * string has leading whitespace — match Zend/php-src). Node-set arg: union of
+     * id(string-value) for each node.
+     *
+     * @return list<int>
+     */
+    private static function evaluateIdFunction(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $expression,
+        ObjectEntry $context,
+        bool $registerNodeNS
+    ): array {
+        $args = self::wrappedFunctionArgs($expression, 'id');
+        if (null === $args || 1 !== \count($args)) {
+            throw new \DOMException('Invalid expression');
+        }
+        $document = self::ownerDocumentOrSelf($context);
+        if (null === $document) {
+            $state = DomRegistry::state($xpath);
+            $document = DomRegistry::entry($state->xpathDocumentId ?? 0);
+        }
+        if (null === $document || !VmDom::isDocument($document)) {
+            return [];
+        }
+
+        $argValue = self::evaluateToMixed($ctx, $xpath, trim($args[0]), $context, $registerNodeNS);
+        if (is_array($argValue)) {
+            $seen = [];
+            $ids = [];
+            foreach ($argValue as $nodeId) {
+                $node = DomRegistry::entry((int) $nodeId);
+                if (null === $node) {
+                    continue;
+                }
+                foreach (self::elementIdsFromIdString($document, self::xpathStringValue($node)) as $id) {
+                    if (isset($seen[$id])) {
+                        continue;
+                    }
+                    $seen[$id] = true;
+                    $ids[] = $id;
+                }
+            }
+
+            return $ids;
+        }
+
+        return self::elementIdsFromIdString($document, self::stringify($argValue));
+    }
+
+    /**
+     * Split an id() string into tokens and resolve via getElementById (#23323).
+     *
+     * @return list<int>
+     */
+    private static function elementIdsFromIdString(ObjectEntry $document, string $str): array
+    {
+        // libxml xmlXPathIdFunction: leading whitespace skips the first token (Zend parity).
+        $skipFirst = 1 === preg_match('/^\s/u', $str);
+        $tokens = preg_split('/\s+/u', trim($str), -1, PREG_SPLIT_NO_EMPTY);
+        if (!is_array($tokens)) {
+            $tokens = [];
+        }
+        if ($skipFirst && [] !== $tokens) {
+            array_shift($tokens);
+        }
+        $seen = [];
+        $ids = [];
+        foreach ($tokens as $token) {
+            $element = VmDom::getElementById($document, $token);
+            if (null === $element || isset($seen[$element->id])) {
+                continue;
+            }
+            $seen[$element->id] = true;
+            $ids[] = $element->id;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * XPath 1.0 lang(string) — xml:lang on context or nearest ancestor (#23323).
+     */
+    private static function evaluateLangFunction(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $expression,
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS
+    ): bool {
+        $args = self::wrappedFunctionArgs($expression, 'lang');
+        if (null === $args || 1 !== \count($args)) {
+            throw new \DOMException('Invalid expression');
+        }
+        $want = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
+        $state = DomRegistry::state($xpath);
+        $document = DomRegistry::entry($state->xpathDocumentId ?? 0);
+        if (null === $document || !VmDom::isDocument($document)) {
+            return false;
+        }
+        $context = self::resolveXPathContext($document, $contextNode);
+        $xmlLang = self::nearestXmlLang($context);
+        if (null === $xmlLang) {
+            return false;
+        }
+
+        return self::xpathLangMatches($xmlLang, $want);
+    }
+
+    /** Walk context → ancestors for xml:lang (XML namespace or xml:lang qName). */
+    private static function nearestXmlLang(ObjectEntry $context): ?string
+    {
+        $current = $context;
+        while (DomRegistry::has($current)) {
+            if (VmDom::isElement($current)) {
+                if (VmDom::hasAttributeNS($current, DomConstants::XML_NS_URI, 'lang')) {
+                    return VmDom::getAttributeNS($current, DomConstants::XML_NS_URI, 'lang');
+                }
+                // Serialized xml:lang may live as a prefixed attribute without NS map yet.
+                $state = DomRegistry::state($current);
+                if (isset($state->attributes['xml:lang'])) {
+                    return $state->attributes['xml:lang'];
+                }
+            }
+            $state = DomRegistry::state($current);
+            if (null === $state->parentId) {
+                break;
+            }
+            $parent = DomRegistry::entry($state->parentId);
+            if (null === $parent || VmDom::isDocument($parent)) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return null;
+    }
+
+    /**
+     * XPath 1.0 lang() match: case-insensitive equality or prefix before '-'.
+     */
+    private static function xpathLangMatches(string $xmlLang, string $testLang): bool
+    {
+        $xmlLang = strtolower($xmlLang);
+        $testLang = strtolower($testLang);
+        if ($xmlLang === $testLang) {
+            return true;
+        }
+        $prefixLen = \strlen($testLang);
+
+        return \strlen($xmlLang) > $prefixLen
+            && str_starts_with($xmlLang, $testLang)
+            && '-' === $xmlLang[$prefixLen];
     }
 
     /**
@@ -1545,7 +1708,7 @@ final class VmDomXPath
 
     private static function isBooleanExpression(string $expression): bool
     {
-        if (preg_match('~^(true|false|boolean\(|not\(|starts-with\(|contains\()~i', $expression)) {
+        if (preg_match('~^(true|false|boolean\(|not\(|starts-with\(|contains\(|lang\()~i', $expression)) {
             return true;
         }
 
@@ -1629,6 +1792,10 @@ final class VmDomXPath
             $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode, $registerNodeNS));
 
             return str_contains($haystack, $needle);
+        }
+        // lang(string) — ancestor xml:lang match (XPath 1.0 / libxml; #23323).
+        if (preg_match('~^lang\(~i', $expression)) {
+            return self::evaluateLangFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
         }
         $comparison = self::findTopLevelComparison($expression);
         if (null !== $comparison) {
