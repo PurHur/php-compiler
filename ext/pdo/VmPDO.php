@@ -219,7 +219,7 @@ final class VmPDO
      */
     public static function registerSqliteSubclass(Context $ctx): void
     {
-        if (!PdoExtensionPolicy::advertisesSqliteDriver()) {
+        if (!PdoExtensionPolicy::advertisesSqliteSubclass()) {
             return;
         }
         if (!isset($ctx->classes[self::CLASS_LC])) {
