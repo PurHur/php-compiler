@@ -9078,9 +9078,11 @@ class JIT {
                             $this->context->coalesceMergeSlotOperands[$echoSlot]
                         );
                         if (Variable::TYPE_VALUE === $arg->type) {
+                            // valuePtrFromVariable — never pointer($arg->value): script globals are
+                            // __value__** and a bare bitcast reads the wrong type byte (#24009).
                             JIT\ValueEchoHelper::echo(
                                 $this->context,
-                                JIT\JitValueBox::pointer($this->context, $arg->value)
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
                             );
                             break;
                         }
@@ -9092,7 +9094,7 @@ class JIT {
                             if (Variable::TYPE_VALUE === $arg->type) {
                                 JIT\ValueEchoHelper::echo(
                                     $this->context,
-                                    JIT\JitValueBox::pointer($this->context, $arg->value)
+                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
                                 );
                                 break;
                             }
@@ -9250,6 +9252,20 @@ class JIT {
                                 && '__value__*' === $this->context->getStringFromType($arg->value->typeOf())
                             ) {
                                 JIT\ValueEchoHelper::echo($this->context, $arg->value);
+                                break;
+                            }
+                            if (
+                                Variable::TYPE_VALUE === $arg->type
+                                && (
+                                    $arg->functionStaticGlobal
+                                    || '__value__**' === $this->context->getStringFromType($arg->value->typeOf())
+                                )
+                            ) {
+                                // AOT script-global locals: load __value__** before echo (#24009).
+                                JIT\ValueEchoHelper::echo(
+                                    $this->context,
+                                    JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                );
                                 break;
                             }
                             throw new \LogicException("Echo for type $arg->type not implemented");
@@ -13670,10 +13686,7 @@ class JIT {
             $this->context->makeVariableFromOp($func, $llvmBlock, $block, $sendOperand);
         }
         $slotVar = $this->context->getVariableFromOp($sendOperand);
-        if (
-            Variable::TYPE_VALUE !== $slotVar->type
-            || Variable::KIND_VARIABLE !== $slotVar->kind
-        ) {
+        if (Variable::TYPE_VALUE !== $slotVar->type) {
             $slotVar->isNullConstant = false;
             $slotVar->compileTimeString = null;
             $slotVar->compileTimeFloat = null;
@@ -13682,6 +13695,8 @@ class JIT {
 
             return $slotVar;
         }
+        // Always copy into a stack __value__ — AOT {main} named locals are script globals
+        // (KIND_VALUE + __value__**). Returning them as-is let echo bitcast the global (#24009).
         $srcPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $slotVar);
         JIT\JitValueBox::publishAfterWrite($this->context, $srcPtr);
         $destSlot = JIT\JitValueBox::alloc($this->context);
