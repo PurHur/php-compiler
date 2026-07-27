@@ -1229,6 +1229,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'crc', 'crc32'));
     }
 
+    /** @covers issue #23895 */
+    public function testArrayFirstLastZendStubNamedParams(): void
+    {
+        foreach (['array_first', 'array_last'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['array'], $names);
+            self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
+        }
+    }
+
     /** @covers issue #23460 */
     public function testEscapeshellZendStubNamedParams(): void
     {
