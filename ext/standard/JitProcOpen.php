@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ProcessOpen;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -18,6 +19,8 @@ final class JitProcOpen
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
+        // STANDALONE/EMBED AOT skips eager ProcessOpen link (#12910); ensure before lookup (#23722).
+        ProcessOpen::ensureLinked($context);
         if (\count($args) < 3) {
             throw new \LogicException('proc_open() requires at least three arguments in this compiler build');
         }

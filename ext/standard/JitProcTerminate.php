@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\ProcessOpen;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitResourceArg;
@@ -16,6 +17,8 @@ final class JitProcTerminate
 {
     public static function invoke(Context $context, JITVariable $procArg, ?JITVariable $signalArg = null): Value
     {
+        // STANDALONE/EMBED AOT skips eager ProcessOpen link (#12910); ensure before lookup (#23722).
+        ProcessOpen::ensureLinked($context);
         JitResourceArg::rejectEnumCaseOperand($context, $procArg, 'proc_terminate', 0, 'process');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $procArg, 'proc_terminate() process'),
