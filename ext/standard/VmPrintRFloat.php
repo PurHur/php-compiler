@@ -24,6 +24,9 @@ final class VmPrintRFloat
         if (\is_infinite($f)) {
             return $f < 0 ? '-INF' : 'INF';
         }
+        if (0.0 === $f && Ieee754::isNegativeZero($f)) {
+            return '-0';
+        }
         $i = (int) $f;
         if ($f === (float) $i) {
             return (string) $i;
