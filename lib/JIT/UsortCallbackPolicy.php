@@ -8,18 +8,19 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VMVariable;
 
 /**
- * Supported vs deferred usort() / uksort() callback forms (issue #1210, #3597).
+ * Supported vs deferred usort() / uksort() callback forms (issue #1210, #3597, #23550).
  *
- * JIT/AOT lowers compile-time strcmp and closure/arrow comparators (int return).
- * strcasecmp/strnatcmp/strnatcasecmp/strcoll are VM-only until dedicated hashtable
- * sort lowering lands. Array callables and invokable objects stay deferred ([#142](https://github.com/PurHur/php-compiler/issues/142)).
+ * VM accepts Zend callables (closures, invokables, array callables, user function names)
+ * via VmArraySortCallback + VmCallable (#23550). strcmp-family strings stay a VM fast path.
+ * JIT/AOT still lowers compile-time strcmp and closure/arrow only; general callables fall
+ * back to the VM builtin path at runtime.
  */
 final class UsortCallbackPolicy
 {
     public const DEFERRED_SUMMARY =
-        'usort callbacks: compile-time strcmp + closure/arrow for JIT/AOT; strcmp-family string builtins VM-only';
+        'usort callbacks: compile-time strcmp + closure/arrow for JIT/AOT; general callables via VM';
 
-    public const DEFERRED_KINDS = 'array callables and invokable objects';
+    public const DEFERRED_KINDS = 'array callables and invokable objects (JIT/AOT only)';
 
     public const JIT_SUBSET = 'compile-time strcmp or closure/arrow comparator';
 
