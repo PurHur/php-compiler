@@ -1,20 +1,21 @@
 --TEST--
-stdlib array_find()/array_all()/array_any() optional $strict third parameter JIT (#6949, ext/standard/array.c)
+stdlib array_find()/array_all()/array_any() reject 3rd arg JIT — Zend exactly 2 (#23875, ext/standard/array.c)
 --JIT--
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-$haystack = [1, '1', 2];
-var_export(array_find($haystack, fn ($v) => $v == 1 ? 1 : 0, true));
-echo "\n";
-var_export(array_find_key($haystack, fn ($v) => $v == 1 ? 1 : 0, true));
-echo "\n";
-$h = ['a' => 1, 'b' => '1'];
-var_export(array_all($h, fn ($v, $k) => $v == 1 ? 1 : 0, true));
-echo "\n";
-var_export(array_any($h, fn ($v, $k) => $v == 1 ? 1 : 0, true));
-echo "\n";
+$haystack = [1, 2, 3];
+foreach (['array_find', 'array_find_key', 'array_any', 'array_all'] as $fn) {
+    try {
+        $fn($haystack, fn ($v) => $v === 2, true);
+        echo $fn, ":unexpected-ok\n";
+    } catch (Throwable $e) {
+        echo $fn, ':', get_class($e), ':', $e->getMessage(), "\n";
+    }
+}
 --EXPECT--
-NULL
-NULL
-false
-false
+array_find:ArgumentCountError:array_find() expects exactly 2 arguments, 3 given
+array_find_key:ArgumentCountError:array_find_key() expects exactly 2 arguments, 3 given
+array_any:ArgumentCountError:array_any() expects exactly 2 arguments, 3 given
+array_all:ArgumentCountError:array_all() expects exactly 2 arguments, 3 given

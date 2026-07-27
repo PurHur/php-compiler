@@ -16,17 +16,21 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayFindCallbackPolicy;
 use PHPCompiler\JIT\ArrayFindHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * array_any() — true when any element matches a predicate (PHP 8.4; ext/standard/array.c).
+ *
+ * php-src stub: array_any(array $array, callable $callback): bool — no $strict (#23875).
  */
 final class array_any extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $strict = VmArrayValueCallback::parseOptionalStrictArg($frame->calledArgs, 'array_any');
+        VmArrayValueCallback::requireExactTwoArgs($frame->calledArgs, 'array_any');
         if (null === $frame->returnVar) {
             return;
         }
@@ -35,7 +39,7 @@ final class array_any extends Internal
         VmArrayValueCallback::requireCallback($frame, $callback, 'array_any');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_any');
-            if (VmArrayValueCallback::predicateMatches($result, $strict)) {
+            if (VmArrayValueCallback::isTruthy($result)) {
                 $frame->returnVar->bool(true);
 
                 return;
@@ -49,8 +53,15 @@ final class array_any extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_any() requires two or three arguments in this compiler build');
+        if (2 !== $argc) {
+            $slot = JitValueBox::alloc($context);
+            $result = JitValueBox::pointer($context, $slot);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('array_any() expects exactly 2 arguments, %d given', $argc)
+            );
+
+            return $result;
         }
         $vacuous = ArrayFindHelper::vacuousAnyAllIfCompileTimeEmpty($context, $args[0], false);
         if (null !== $vacuous) {
@@ -64,11 +75,6 @@ final class array_any extends Internal
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_any() callback');
-        }
-        if (3 === $argc) {
-            $strictI1 = $this->jitBool($context, $args[2], 'array_any() strict');
-
-            return ArrayFindHelper::buildAnyArray($context, $args[0], $args[1], null, $strictI1);
         }
 
         return ArrayFindHelper::buildAnyArray($context, $args[0], $args[1]);

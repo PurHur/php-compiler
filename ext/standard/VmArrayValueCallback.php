@@ -168,6 +168,27 @@ final class VmArrayValueCallback
     }
 
     /**
+     * php-src array_find/array_find_key/array_any/array_all — exactly two args (#23875).
+     *
+     * @param list<Variable> $calledArgs
+     *
+     * @throws \ArgumentCountError
+     */
+    public static function requireExactTwoArgs(array $calledArgs, string $fn): void
+    {
+        $argc = \count($calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects exactly 2 arguments, %d given',
+                $fn,
+                $argc
+            ));
+        }
+    }
+
+    /**
+     * Forward-profile array_all_key/array_any_key optional $strict (#15704).
+     *
      * @param list<Variable> $calledArgs
      */
     public static function parseOptionalStrictArg(array $calledArgs, string $fn, int $minArgs = 2, int $maxArgs = 3): bool

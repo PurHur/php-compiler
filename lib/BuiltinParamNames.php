@@ -234,12 +234,16 @@ final class BuiltinParamNames
             case 'mktime':
             case 'gmmktime':
                 return ['hour', 'minute', 'second', 'month', 'day', 'year'];
+            // php-src ext/standard/basic_functions.stub.php — exactly array+callback (#23875).
+            // #6949 asked for optional $strict; php-src never shipped it.
             case 'array_all':
             case 'array_any':
-            case 'array_all_key':
-            case 'array_any_key':
             case 'array_find':
             case 'array_find_key':
+                return ['array', 'callback'];
+            // Forward-profile-only key variants retain optional $strict (#15704).
+            case 'array_all_key':
+            case 'array_any_key':
                 return ['array', 'callback', 'strict'];
             case 'str_pad':
                 return ['string', 'length', 'pad_string', 'pad_type'];
