@@ -139,7 +139,7 @@ PHP;
     }
 
     /**
-     * #22493 / php-src add_class_vars: virtual hooked props omitted; backed hooks keep defaults (#6603).
+     * #22493 / #23822 / php-src add_class_vars: virtual hooked props omitted (hook-only and same-name backed).
      */
     public function testVmGetClassVarsPropertyHooks(): void
     {
@@ -169,6 +169,6 @@ PHP;
         $block = $rt->parseAndCompile($code, 'get_class_vars_property_hooks.php');
         ob_start();
         $rt->run($block);
-        $this->assertSame("no\ng-no\n{\"b\":2,\"c\":null}\na-no\n", ob_get_clean());
+        $this->assertSame("no\ng-no\n{\"b\":2}\na-no\n", ob_get_clean());
     }
 }

@@ -33,7 +33,7 @@ $og = get_object_vars($g);
 $yVal = $og['y'];
 echo "gov:", $yVal, "\n";
 
-// #22493: virtual omitted; ordinary + backed hooked present.
+// #22493 / #23822: virtual omitted (hook-only and same-name backed hooks).
 class H {
     public string $a { get => 'x'; set {} }
     public $b = 2;
@@ -41,6 +41,7 @@ class H {
 }
 echo json_encode(get_class_vars(H::class)), "\n";
 echo array_key_exists('a', get_class_vars(H::class)) ? "a-yes\n" : "a-no\n";
+echo array_key_exists('c', get_class_vars(H::class)) ? "c-yes\n" : "c-no\n";
 --EXPECT--
 false
 Array
@@ -50,5 +51,6 @@ false
 'hook:x'
 gcv_key:no
 gov:g_only
-{"b":2,"c":null}
+{"b":2}
 a-no
+c-no

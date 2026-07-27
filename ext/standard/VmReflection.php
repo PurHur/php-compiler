@@ -1885,7 +1885,7 @@ final class VmReflection
         $entryLc = strtolower(ltrim($entry->name, '\\'));
         foreach ($entry->properties as $prop) {
             // php-src add_class_vars: skip ZEND_ACC_VIRTUAL — virtual hooked props have no
-            // default-properties slot (#22493). Backed hooked props still appear with defaults (#6603).
+            // default-properties slot (#22493, #23822).
             if ($prop->propertyHookVirtual) {
                 continue;
             }

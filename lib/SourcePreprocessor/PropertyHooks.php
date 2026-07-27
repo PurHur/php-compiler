@@ -1226,14 +1226,15 @@ final class PropertyHooks
                 || !empty($propMeta['requiresSet'])
                 || !empty($propMeta['requiresUnset']);
             $isSemicolonOnlyHook = [] === $methods && $hasSemicolonRequirements;
-            if (([] !== $methods && !$usesBacking) || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
+            if ([] !== $methods || $isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
                 if (!isset($this->registry[$lcClass][$prop])) {
                     $this->registry[$lcClass][$prop] = [];
                 }
                 if ($isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook) {
                     $this->registry[$lcClass][$prop]['abstract'] = true;
                 }
-                if ([] === $methods || !$usesBacking || $isInterfaceHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
+                // php-src ZEND_ACC_VIRTUAL — hook-only and same-name backed hooks omit from get_class_vars (#22493, #23822).
+                if ([] !== $methods || $isInterfaceHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
             }
