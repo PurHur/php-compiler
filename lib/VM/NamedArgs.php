@@ -72,7 +72,8 @@ final class NamedArgs
         /** @var array<string, Variable> $variadicNamed */
         $variadicNamed = [];
         // php-src internals reject unknown named args and naming the variadic slot (#23449).
-        $unknownNamed = false;
+        /** @var array<string, true> $deferredUnknownNamed */
+        $deferredUnknownNamed = [];
 
         foreach ($entries as $entry) {
             if ('p' === $entry[0]) {
@@ -131,7 +132,7 @@ final class NamedArgs
                         $variadicNamed[$key] = $value;
                         continue;
                     }
-                    $unknownNamed = true;
+                    self::deferInternalUnknownNamed($name, $deferredUnknownNamed);
                     continue;
                 }
                 if (null !== $variadicParamIndex) {
@@ -159,7 +160,7 @@ final class NamedArgs
                         continue;
                     }
                     // Internal variadics are positional-only; naming ...$values is unknown (#23449).
-                    $unknownNamed = true;
+                    self::deferInternalUnknownNamed($name, $deferredUnknownNamed);
                     continue;
                 }
                 $key = (string) $entry[1];
@@ -176,7 +177,7 @@ final class NamedArgs
             $result[$idx] = $value;
         }
 
-        if ($unknownNamed && null !== $functionName) {
+        if ([] !== $deferredUnknownNamed && null !== $functionName) {
             self::throwInternalUnknownNamedOrTooFew($functionName, $result, $variadicParamIndex, $variadicPositional);
         }
 
@@ -187,6 +188,17 @@ final class NamedArgs
         ksort($result);
 
         return $result;
+    }
+
+    /**
+     * @param array<string, true> $deferredUnknownNamed
+     */
+    private static function deferInternalUnknownNamed(string $name, array &$deferredUnknownNamed): void
+    {
+        if (isset($deferredUnknownNamed[$name])) {
+            throw new \Error("Named parameter \${$name} overwrites previous argument");
+        }
+        $deferredUnknownNamed[$name] = true;
     }
 
     /**
