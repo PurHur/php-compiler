@@ -599,7 +599,9 @@ final class VmSprintf
         return $sign.$mant.$expChar.$expSign.\abs($exp);
     }
 
-    /** php-src sprintf.c — %g / %G (default precision 6). */
+    /**
+     * php-src formatted_print.c — %g / %G via zend_gcvt (significant digits; #24016).
+     */
     private static function formatGeneral(float $value, bool $upper, int $precision = 6, ?string $showSign = null): string
     {
         if (\is_nan($value)) {
@@ -616,25 +618,17 @@ final class VmSprintf
 
             return self::positiveFloatSignPrefix($value, $showSign).'0';
         }
-        if ($abs < 1e-4 || $abs >= 1e6) {
-            return self::trimGeneralScientific(
-                self::formatScientific(
-                    $value,
-                    $upper,
-                    self::generalFormatScientificPrecision($precision),
-                    $showSign
-                )
-            );
-        }
-        $formatted = VmNumberFormat::format($value, $precision, '.', '');
-        if (str_contains($formatted, '.')) {
-            $formatted = \rtrim(\rtrim($formatted, '0'), '.');
-        }
 
-        return self::applyFloatSignPrefix($value, $formatted, $showSign);
+        return self::applyFloatSignPrefix(
+            $value,
+            VmFloatDtoa::formatSprintfG($value, $precision, $upper),
+            $showSign
+        );
     }
 
-    /** php-src sprintf.c — %h / %H (general format using non-locale %F; PHP 8.0+). */
+    /**
+     * php-src formatted_print.c — %h / %H (zend_gcvt with non-locale '.'; PHP 8.0+).
+     */
     private static function formatGeneralFixed(
         float $value,
         bool $upper,
@@ -655,30 +649,12 @@ final class VmSprintf
 
             return self::positiveFloatSignPrefix($value, $showSign).'0';
         }
-        if ($abs < 1e-4 || $abs >= 1e6) {
-            return self::trimGeneralScientific(
-                self::formatScientific(
-                    $value,
-                    $upper,
-                    self::generalFormatScientificPrecision($precision),
-                    $showSign
-                )
-            );
-        }
-        $formatted = self::formatFixed($value, $precision, $showSign);
-        if (str_contains($formatted, '.')) {
-            $formatted = \rtrim(\rtrim($formatted, '0'), '.');
-        }
 
-        return $formatted;
-    }
-
-    /** php-src sprintf.c — %g/%G/%h/%H scientific branch uses precision P−1. */
-    private static function generalFormatScientificPrecision(int $precision): int
-    {
-        $p = 0 === $precision ? 1 : $precision;
-
-        return max(0, $p - 1);
+        return self::applyFloatSignPrefix(
+            $value,
+            VmFloatDtoa::formatSprintfG($value, $precision, $upper),
+            $showSign
+        );
     }
 
     /**
@@ -717,22 +693,6 @@ final class VmSprintf
         $prefix = self::positiveFloatSignPrefix($value, $showSign);
 
         return '' === $prefix ? $formatted : $prefix.$formatted;
-    }
-
-    private static function trimGeneralScientific(string $scientific): string
-    {
-        if (!preg_match('/^(-?)(\d+\.\d*?)([eE])([+-]\d+)$/', $scientific, $m)) {
-            return $scientific;
-        }
-        $mantissa = \rtrim(\rtrim($m[2], '0'), '.');
-        if (!str_contains($mantissa, '.') && str_contains($m[2], '.')) {
-            $mantissa .= '.0';
-        }
-        if ('' === $mantissa || '.' === $mantissa) {
-            $mantissa = '0';
-        }
-
-        return $m[1].$mantissa.$m[3].$m[4];
     }
 
     /**
