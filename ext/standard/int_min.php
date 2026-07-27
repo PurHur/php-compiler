@@ -63,6 +63,13 @@ final class int_min extends Internal
     {
         $this->context = $context;
         if (2 === \count($args)) {
+            if (JitMinMax::canLowerPlainIntPair($args)) {
+                $l = JitLongArg::lower($context, $args[0], 'min() argument #1');
+                $r = JitLongArg::lower($context, $args[1], 'min() argument #2');
+                $cmp = $context->builder->icmp(Builder::INT_SLT, $l, $r);
+
+                return $context->builder->select($cmp, $l, $r);
+            }
             if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type && JITVariable::TYPE_NATIVE_LONG === $args[1]->type) {
                 $l = JitLongArg::lower($context, $args[0], 'min() argument #1');
                 $r = JitLongArg::lower($context, $args[1], 'min() argument #2');

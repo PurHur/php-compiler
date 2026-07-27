@@ -70,7 +70,127 @@ final class SprintfJitHelper
             return $positionalStar;
         }
 
+        $sequential = self::tryFormatSequentialDecimals($format, $fmtLen, $packedArgs, $packLen);
+        if (null !== $sequential) {
+            return $sequential;
+        }
+
         return $format;
+    }
+
+    /**
+     * Sequential %d (and literal text) for standalone AOT argv blobs (#23799).
+     *
+     * SprintfJitHelper fast paths cover single conversions; multi-arg calls like
+     * sprintf("%d-%d", $a, $b) must walk the format and consume packed argv in order.
+     */
+    private static function tryFormatSequentialDecimals(
+        string $format,
+        int $fmtLen,
+        string $packedArgs,
+        int $packLen
+    ): ?string {
+        $out = '';
+        $cursor = 0;
+        $argIdx = 0;
+        for ($pos = 0; $pos < $fmtLen; ++$pos) {
+            $ch = $format[$pos];
+            if ('%' !== $ch) {
+                $out .= $ch;
+                continue;
+            }
+            if ($pos + 1 >= $fmtLen) {
+                return null;
+            }
+            if ('%' === $format[$pos + 1]) {
+                $out .= '%';
+                ++$pos;
+                continue;
+            }
+            if ('d' === $format[$pos + 1]) {
+                ++$pos;
+                $n = self::readPackedLongAtOffset($packedArgs, $packLen, $cursor);
+                if (null === $n) {
+                    return null;
+                }
+                $cursor += 9;
+                ++$argIdx;
+                $out .= (string) $n;
+                continue;
+            }
+            if ('s' === $format[$pos + 1]) {
+                ++$pos;
+                $s = self::readPackedStringValueAtOffset($packedArgs, $packLen, $cursor);
+                if (null === $s) {
+                    return null;
+                }
+                $size = self::packedStringByteSizeAtOffset($packedArgs, $packLen, $cursor);
+                if (null === $size) {
+                    return null;
+                }
+                $cursor += $size;
+                ++$argIdx;
+                $out .= $s;
+                continue;
+            }
+            return null;
+        }
+        if (0 === $argIdx && '' === $out) {
+            return null;
+        }
+
+        return $out;
+    }
+
+    /** NestedJIT-safe packed long read — no by-ref cursor (#23799). */
+    private static function readPackedLongAtOffset(string $packed, int $packLen, int $offset): ?int
+    {
+        if ($offset + 9 > $packLen || !self::isByte($packed[$offset], 1)) {
+            return null;
+        }
+        $n = 0;
+        $i = 0;
+        while ($i < 8) {
+            $n |= self::byteOrd($packed[$offset + 1 + $i]) << (8 * $i);
+            ++$i;
+        }
+
+        return $n;
+    }
+
+    private static function packedStringByteSizeAtOffset(string $packed, int $packLen, int $offset): ?int
+    {
+        if ($offset + 9 > $packLen || !self::isByte($packed[$offset], 4)) {
+            return null;
+        }
+        $len = 0;
+        $i = 0;
+        while ($i < 8) {
+            $len |= self::byteOrd($packed[$offset + 1 + $i]) << (8 * $i);
+            ++$i;
+        }
+        if ($len < 0 || $offset + 9 + $len > $packLen) {
+            return null;
+        }
+
+        return 9 + $len;
+    }
+
+    private static function readPackedStringValueAtOffset(string $packed, int $packLen, int $offset): ?string
+    {
+        $size = self::packedStringByteSizeAtOffset($packed, $packLen, $offset);
+        if (null === $size) {
+            return null;
+        }
+        $len = $size - 9;
+        $out = '';
+        $i = 0;
+        while ($i < $len) {
+            $out .= $packed[$offset + 9 + $i];
+            ++$i;
+        }
+
+        return $out;
     }
 
     /**
