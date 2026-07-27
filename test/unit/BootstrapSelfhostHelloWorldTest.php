@@ -513,6 +513,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('HelperRuntimeCache::enabled()', $strReplace);
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O', $makefile);
+        $this->assertStringContainsString('still OOMs at 24GiB', $makefile);
+        $this->assertStringContainsString('cold AOT still OOMs past 24GiB', $script);
     }
 
     public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void

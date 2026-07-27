@@ -28,10 +28,12 @@ helloworld_m3_emit_next_lower() {
   if [[ "${M3_EMIT_HELPER_LINKED}" -eq 0 ]]; then
     if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" != "1" ]]; then
       echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 (+ real lowering + runtime compile) before emit-TU execute (#2572)" >&2
+    elif grep -qE 'Allowed memory size|memory exhausted' <<< "${M3_BLOCK_REASON}${m3_link_out:-}"; then
+      echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: inventory compile_driver cold AOT still OOMs past 24GiB after skip-bundle (#23970) — refresh prelinked/.m3_compile_driver_aot_blob or shrink emit-driver require graph; stale-sidecar refusal currently forces cold link" >&2
     else
       echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: M3 emit helper link — ${M3_BLOCK_REASON} (#1768)" >&2
     fi
-    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER_CMD: ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 BOOTSTRAP_M3_HELLOWORLD_STRICT=1 ./script/bootstrap-selfhost-helloworld-probe.sh'" >&2
+    echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER_CMD: PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g PHP_COMPILER_CI_RAM_GB=0 ./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 BOOTSTRAP_M3_HELLOWORLD_STRICT=1 ./script/bootstrap-selfhost-helloworld-probe.sh'" >&2
     return
   fi
   if grep -qE 'segfault|SIGKILL|exit 139' <<< "${M3_BLOCK_REASON}"; then
@@ -61,10 +63,12 @@ source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 # shellcheck source=bootstrap-resolve-compile-invoke.sh
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 ci_apply_llvm_memory_env
-# Inventory compile_driver: SourceBundler mega-concat OOMs through 24GiB in lib/JIT.php
-# (#23970). Fix is skip-bundle + PHP_COMPILER_HELPER_RUNTIME_O (phpc_str_replace ABI).
-# Keep a 16GiB floor for residual IncludeHelper peak; host docker-exec should use
-# PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g PHP_COMPILER_CI_RAM_GB=0.
+# Inventory compile_driver (#23970): SourceBundler mega-concat OOMs through 24GiB.
+# Skip-bundle + HELPER_RUNTIME_O fixes phpc_str_replace, but IncludeHelper of the
+# Runtime transitive closure still OOMs at 24GiB (measured). Floor 16GiB for residual
+# peak; host: PHP_COMPILER_DOCKER_MEM=16g … PHP_COMPILER_CI_RAM_GB=0.
+# NEXT_LOWER when still OOM: refresh prelinked .m3_compile_driver_aot_blob or shrink
+# compile_driver requires (stale-sidecar refusal currently forces cold inventory AOT).
 # shellcheck source=ci-resource-limits.sh
 source "$(dirname "$0")/ci-resource-limits.sh"
 export PHP_COMPILER_CI_RAM_GB=0
