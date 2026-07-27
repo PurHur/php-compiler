@@ -68,9 +68,6 @@ final class HashTableFindIndex implements Call
         if (Variable::TYPE_NATIVE_LONG === $index->type && null !== $index->compileTimeLong) {
             return $sizeT->constInt($index->compileTimeLong, false);
         }
-        if (Variable::TYPE_NATIVE_LONG === $index->type && Variable::KIND_LITERAL === $index->kind) {
-            return $sizeT->constInt((int) $index->literal, false);
-        }
         if (Variable::TYPE_VALUE === $index->type) {
             $ptr = JitValueBox::valuePtrFromVariable($context, $index);
             $long = $context->builder->call($context->lookupFunction('__value__readLong'), $ptr);
