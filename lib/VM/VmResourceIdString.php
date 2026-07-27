@@ -7,6 +7,8 @@ namespace PHPCompiler\VM;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringDir;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\IncDecResourceProvenance;
+use PHPCfg\Operand;
 use PHPCompiler\VM\ValueEchoSupport;
 use PHPLLVM\Value;
 
@@ -18,13 +20,20 @@ use PHPLLVM\Value;
  */
 final class VmResourceIdString
 {
-    public static function formatNativeLong(Context $context, Value $longVal): Value
+    public static function formatNativeLong(
+        Context $context,
+        Value $longVal,
+        ?Operand $sourceOperand = null
+    ): Value
     {
         StringDir::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
         $handle = $longVal->typeOf() === $i64
             ? $longVal
             : $context->builder->zExt($longVal, $i64);
+        if (IncDecResourceProvenance::cannotBeResourceForString($sourceOperand)) {
+            return self::snprintf($context, $handle, '%lld');
+        }
         $isRes = VmValueCompare::nativeLongIsResource($context, $handle);
 
         $tag = 'resid_'.(string) spl_object_id($context);
@@ -51,6 +60,17 @@ final class VmResourceIdString
         $phi->addIncoming($resStr, $resEnd);
 
         return $phi;
+    }
+
+    /** Boxed {@see __value__} TYPE_NATIVE_LONG — never a resource handle (#23811). */
+    public static function formatBoxedNativeLong(Context $context, Value $longVal): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $handle = $longVal->typeOf() === $i64
+            ? $longVal
+            : $context->builder->zExt($longVal, $i64);
+
+        return self::snprintf($context, $handle, '%lld');
     }
 
     private static function snprintf(Context $context, Value $handle, string $format): Value
