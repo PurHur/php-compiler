@@ -1043,6 +1043,18 @@ final class BuiltinParamNames
             // php-src ext/xml/xml.stub.php — InternalArgInfo still has shdl/ehdl (#23624)
             case 'xml_set_element_handler':
                 return ['parser', 'start_handler', 'end_handler'];
+            // php-src ext/xml/xml.stub.php — InternalArgInfo still says isfinal (#23605)
+            case 'xml_parse':
+                return ['parser', 'data', 'is_final='];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says additional_parameters (#23605)
+            case 'mail':
+                return ['to', 'subject', 'message', 'additional_headers=', 'additional_params='];
+            // php-src ext/sodium/sodium.stub.php — missing from InternalArgInfo (#23605)
+            case 'sodium_memzero':
+                return ['&string'];
+            // php-src ext/exif/exif.stub.php — InternalArgInfo still says filename/sections_needed/sub_arrays (#23605)
+            case 'exif_read_data':
+                return ['file', 'required_sections=', 'as_arrays=', 'read_thumbnail='];
             // php-src ext/simplexml/simplexml.stub.php — InternalArgInfo still has ns (#23455)
             case 'simplexml_load_string':
                 return ['data', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
