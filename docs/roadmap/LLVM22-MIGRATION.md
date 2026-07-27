@@ -30,6 +30,48 @@ compiles until pointee types are threaded. That single fact shapes the whole pla
 **The mitigating fact:** every one of those ~4,100 sites goes through `LLVMAbstract\Builder`. The
 work belongs in the binding, not in 4,100 edits.
 
+## Binding generation: SOLVED (2026-07-27)
+
+The blocker was recorded as "FFIMe cannot parse `llvm-c/Core.h`". That was three separate problems
+wearing one label. All are now cleared, and the bindings generate:
+
+```
+GENERATED OK
+61035 lines  ->  build/llvmup/llvm22.php   (2.9 MB, php -l clean)
+```
+
+Verified present in the output: `LLVMBuildLoad2`, `LLVMBuildCall2`, `LLVMBuildGEP2`,
+`LLVMRunPasses`, `LLVMCreatePassBuilderOptions`, `LLVMCreateExecutionEngineForModule`.
+
+### What actually blocked it
+
+1. **FFIMe cannot walk the include graph.** Feed it a `cpp -P` flattened header instead — all
+   eleven `llvm-c` headers collapse to 2,354 lines with 840 function declarations.
+2. **`ircmaxell/php-c-parser` requires PHP >= 8.4.** The pinned image is 8.2.32, so generation can
+   **never** run inside this project's own environment. It is a one-off on a separate PHP; the
+   output is committed source, so the compiler's runtime version is unaffected.
+3. **The generator host needs `ext-ffi`** (`libffi-dev` + `docker-php-ext-install ffi`).
+   `php:8.4-cli` does not ship it enabled.
+
+### Reproducing it
+
+`build/llvmup/gen84c.sh`, run against `php:8.4-cli`:
+
+```bash
+docker run --rm -v /root/php-compiler:/app -w /app php:8.4-cli bash /app/build/llvmup/gen84c.sh
+```
+
+One detail that is easy to get wrong: strip `__attribute__` with **balanced-paren matching**, not a
+regex. `__attribute__((visibility("default")))` defeats `\(\([^)]*\)\)` — the character class
+stops at the inner paren and leaves the outer one behind, so every declaration emerges as
+`) void LLVMFoo(...)` and the C parser rejects the file. That failure surfaces inside FFIMe and
+looks like an FFIMe limitation; it is not.
+
+### What this does and does not unblock
+
+It produces the **bindings**. It does not touch the ~4,100 call sites that must supply a pointee
+type, which remains the actual body of the migration and is unchanged by this.
+
 ## The de-risking move
 
 > **Do the pointee-type threading on LLVM 9 first.**
