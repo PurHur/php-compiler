@@ -293,9 +293,11 @@ final class VmDomXPath
             return null;
         }
         $message = $e->getMessage();
+        // libxml xmlXPathCompOpEval unbound QName prefix (#23534) — keep full message.
         if ('Invalid expression' !== $message
             && 'Undefined namespace prefix' !== $message
-            && 'Invalid number of arguments' !== $message) {
+            && 'Invalid number of arguments' !== $message
+            && !str_starts_with($message, 'xmlXPathCompOpEval:')) {
             return null;
         }
         $ctx->errors->triggerError(
@@ -2824,14 +2826,17 @@ final class VmDomXPath
             self::registerContextNodeNamespaces($xpath, $contextNode);
         }
         $prefix = $prefixMatch[1];
-        $callName = strtolower($prefixMatch[2]);
+        $callNameRaw = $prefixMatch[2];
+        $callName = strtolower($callNameRaw);
         $nsUri = $state->xpathNamespaces[$prefix] ?? null;
         if (null === $nsUri) {
-            // Zend emits a libxml warning and returns false for evaluate().
-            $var = new Variable(Variable::TYPE_BOOLEAN);
-            $var->bool(false);
-
-            return $var;
+            // php-src/libxml: xmlXPathCompOpEval unbound prefix → E_WARNING + false for the
+            // whole evaluate() (including string(php:function(...)) wrappers) (#23534).
+            throw new \DOMException(sprintf(
+                'xmlXPathCompOpEval: function %s bound to undefined prefix %s',
+                $callNameRaw,
+                $prefix
+            ));
         }
         if (DomConstants::PHP_XPATH_NS !== $nsUri) {
             throw new \DOMException('Invalid expression');
