@@ -1104,6 +1104,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'hash_init'));
     }
 
+    /** @covers issue #23595 */
+    public function testHashPbkdf2ZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash_pbkdf2');
+        self::assertSame(
+            ['algo', 'password', 'salt', 'iterations', 'length', 'binary', 'options'],
+            $names
+        );
+        self::assertSame(5, BuiltinParamNames::lookupNamedParamIndex($names, 'binary', 'hash_pbkdf2'));
+        self::assertSame(6, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'hash_pbkdf2'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_pbkdf2'));
+    }
+
     /** @covers issue #23642 */
     public function testInflateDeflateInitZendStubNamedParams(): void
     {

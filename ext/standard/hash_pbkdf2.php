@@ -12,13 +12,13 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * hash_pbkdf2() — sha256, sha1, md5 (VM + JIT/AOT via __compiler_hash_pbkdf2, issue #3773).
  *
- * php-src: ext/hash/hash.c / hash.stub.php — Z_PARAM_STR algo/password/salt.
+ * php-src: ext/hash/hash.c / hash.stub.php — Z_PARAM_STR algo/password/salt;
+ * optional array $options (passed to hash_init; unused for sha256/sha1/md5) — #23595.
  * Non-strict null is E_DEPRECATED + '' on 8.4 (re-#20659 / #21319); strict_types still TypeErrors.
  */
 final class hash_pbkdf2 extends Internal
@@ -26,8 +26,17 @@ final class hash_pbkdf2 extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 4 || $argc > 6) {
-            throw new \LogicException('hash_pbkdf2() requires four to six arguments in this compiler build');
+        if ($argc < 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'hash_pbkdf2() expects at least 4 arguments, %d given',
+                $argc
+            ));
+        }
+        if (self::maxCalledArgIndex($frame->calledArgs) > 6) {
+            throw new \ArgumentCountError(\sprintf(
+                'hash_pbkdf2() expects at most 7 arguments, %d given',
+                $argc
+            ));
         }
         // Z_PARAM_STR $algo / $password / $salt — soft-null DEP+coerce on 8.4 (#21319).
         $algo = self::vmZparamStrArg($frame, 0, 'algo');
@@ -35,16 +44,16 @@ final class hash_pbkdf2 extends Internal
         $salt = self::vmZparamStrArg($frame, 2, 'salt');
         $iterations = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'hash_pbkdf2', 4, 'iterations');
         $length = 0;
-        if ($argc >= 5) {
+        if (isset($frame->calledArgs[4])) {
             $length = VmMath::parseIntBuiltinArgForFrame($frame, 4, 'hash_pbkdf2', 5, 'length');
         }
         $raw = false;
-        if (6 === $argc) {
-            $rawArg = $frame->calledArgs[5]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $rawArg->type) {
-                throw new \LogicException('hash_pbkdf2() raw_output must be boolean in this compiler build');
-            }
-            $raw = $rawArg->toBool();
+        if (isset($frame->calledArgs[5])) {
+            $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[5], 'hash_pbkdf2', 6, 'binary');
+        }
+        if (isset($frame->calledArgs[6])) {
+            // Z_PARAM_ARRAY $options — stub parity; unused for sha256/sha1/md5 (#23595).
+            VmArray::requireArrayParam($frame->calledArgs[6], 'hash_pbkdf2', 7, 'options');
         }
         if ($iterations < 1) {
             throw new \ValueError('hash_pbkdf2(): Argument #4 ($iterations) must be greater than 0');
@@ -73,8 +82,18 @@ final class hash_pbkdf2 extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 4 || \count($args) > 6) {
-            throw new \LogicException('hash_pbkdf2() requires four to six arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'hash_pbkdf2() expects at least 4 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 7) {
+            throw new \ArgumentCountError(\sprintf(
+                'hash_pbkdf2() expects at most 7 arguments, %d given',
+                $argc
+            ));
         }
         $length = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[4])) {
@@ -82,7 +101,11 @@ final class hash_pbkdf2 extends Internal
         }
         $raw = $context->getTypeFromString('int1')->constInt(0, false);
         if (isset($args[5])) {
-            $raw = JitBoolArg::lower($context, $args[5], 'hash_pbkdf2() raw_output');
+            $raw = JitBoolArg::lower($context, $args[5], 'hash_pbkdf2(): Argument #6 ($binary)');
+        }
+        if (isset($args[6])) {
+            // Z_PARAM_ARRAY $options — type-checked; unused for sha256/sha1/md5 (#23595).
+            JitArrayElem::requireArrayParam($context, $args[6], 'hash_pbkdf2', 7, 'options');
         }
 
         return JitHash::hashPbkdf2(
@@ -94,6 +117,18 @@ final class hash_pbkdf2 extends Internal
             $length,
             $raw
         );
+    }
+
+    /**
+     * @param array<int, \PHPCompiler\VM\Variable> $calledArgs
+     */
+    private static function maxCalledArgIndex(array $calledArgs): int
+    {
+        if ([] === $calledArgs) {
+            return -1;
+        }
+
+        return max(array_keys($calledArgs));
     }
 
     /**

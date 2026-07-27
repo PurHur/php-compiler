@@ -596,8 +596,9 @@ final class BuiltinParamNames
             // php-src ext/hash/hash.stub.php — InternalArgInfo had options/key swapped (#23585)
             case 'hash_init':
                 return ['algo', 'flags', 'key', 'options'];
+            // php-src ext/hash/hash.stub.php — 7th array $options (#23595)
             case 'hash_pbkdf2':
-                return ['algo', 'password', 'salt', 'iterations', 'length', 'binary'];
+                return ['algo', 'password', 'salt', 'iterations', 'length', 'binary', 'options'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/raw_output (#23227)
             case 'md5':
             case 'sha1':
