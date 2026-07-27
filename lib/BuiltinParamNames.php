@@ -554,6 +554,13 @@ final class BuiltinParamNames
                 return ['string', 'offset', 'length', 'encoding'];
             case 'base64_decode':
                 return ['string', 'strict'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str (#23257)
+            case 'base64_encode':
+            case 'urlencode':
+            case 'urldecode':
+            case 'rawurlencode':
+            case 'rawurldecode':
+                return ['string'];
             case 'resetaslazyghost':
                 return ['object', 'initializer', 'options'];
             case 'exit':

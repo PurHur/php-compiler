@@ -1026,6 +1026,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23257 */
+    public function testBase64UrlZendStubNamedParams(): void
+    {
+        foreach (['base64_encode', 'urlencode', 'urldecode', 'rawurlencode', 'rawurldecode'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn), $fn);
+            // Legacy InternalArgInfo name must not resolve (Zend rejects $str)
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', $fn), $fn);
+        }
+    }
+
     /** @covers issue #23585 */
     public function testHashInitZendStubNamedParams(): void
     {
