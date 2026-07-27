@@ -132,9 +132,13 @@ final class VmZlibContext
         return $compressed;
     }
 
-    public static function inflateInit(Context $vmCtx, int $encoding): Variable
+    /**
+     * @param array<string, mixed> $options
+     */
+    public static function inflateInit(Context $vmCtx, int $encoding, array $options = []): Variable
     {
         self::assertValidEncoding($encoding, 'inflate_init', 1, 'encoding');
+        self::assertInflateWindowOption($options);
         self::registerClasses($vmCtx);
 
         $class = $vmCtx->classes[self::INFLATE_CLASS_LC] ?? null;
@@ -145,7 +149,7 @@ final class VmZlibContext
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
 
-        $native = self::tryNativeInflateInit($encoding);
+        $native = self::tryNativeInflateInit($encoding, $options);
         if (null !== $native) {
             self::$store[$entry->id] = [
                 'kind' => 'inflate',
@@ -305,13 +309,28 @@ final class VmZlibContext
             ));
         }
         $options = [];
-        foreach ($var->toArray()->iterateKeyed() as $key => $value) {
-            if (!\is_string($key)) {
+        foreach ($var->toArray()->iterateKeyed() as $pair) {
+            /** @var Variable $keyVar */
+            /** @var Variable $value */
+            [$keyVar, $value] = $pair;
+            $keyVar = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $keyVar->type) {
                 continue;
             }
+            $key = $keyVar->toString();
             $value = $value->resolveIndirect();
-            if ('level' === $key && Variable::TYPE_INTEGER === $value->type) {
-                $options['level'] = $value->toInt();
+            $intVal = null;
+            if (Variable::TYPE_INTEGER === $value->type) {
+                $intVal = $value->toInt();
+            } elseif (Variable::TYPE_FLOAT === $value->type) {
+                $intVal = (int) $value->toFloat();
+            }
+            if (null === $intVal) {
+                continue;
+            }
+            // php-src ext/zlib/zlib.c — level/window/memory option table (#23642)
+            if ('level' === $key || 'window' === $key || 'memory' === $key) {
+                $options[$key] = $intVal;
             }
         }
 
@@ -366,7 +385,34 @@ final class VmZlibContext
         }
     }
 
-    private static function tryNativeInflateInit(int $encoding): ?object
+    /**
+     * @param array<string, mixed> $options
+     */
+    private static function assertInflateWindowOption(array $options): void
+    {
+        if (!isset($options['window'])) {
+            return;
+        }
+        $window = $options['window'];
+        if (!\is_int($window)) {
+            throw new \TypeError(\sprintf(
+                'inflate_init(): "window" option must be of type int, %s given',
+                \get_debug_type($window)
+            ));
+        }
+        if ($window < 8 || $window > 15) {
+            // php-src ext/zlib/zlib.c — zlib_inflate_init window check
+            throw new \ValueError(\sprintf(
+                'zlib window size (logarithm) (%d) must be within 8..15',
+                $window
+            ));
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private static function tryNativeInflateInit(int $encoding, array $options = []): ?object
     {
         if (!\function_exists('inflate_init')) {
             return null;
@@ -377,7 +423,7 @@ final class VmZlibContext
             return null;
         }
         try {
-            $native = \inflate_init($encoding);
+            $native = \inflate_init($encoding, $options);
 
             return false === $native ? null : $native;
         } finally {

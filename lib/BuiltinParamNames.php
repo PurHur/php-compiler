@@ -752,6 +752,10 @@ final class BuiltinParamNames
                 return ['version1', 'version2', 'operator'];
             case 'in_array':
                 return ['needle', 'haystack', 'strict'];
+            // php-src ext/zlib/zlib.stub.php — InternalArgInfo omits options on inflate_init (#23642)
+            case 'inflate_init':
+            case 'deflate_init':
+                return ['encoding', 'options'];
             case 'array_search':
                 return ['needle', 'haystack', 'strict'];
             case 'array_rand':
