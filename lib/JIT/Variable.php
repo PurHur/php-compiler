@@ -126,6 +126,9 @@ final class Variable {
     /** Borrowed {@see __value__} entry from foreach by-ref; skip valueDelref (#4364). */
     public bool $borrowedValueEntry = false;
 
+    /** Dead php-cfg Concat temp in echo/call args; lifetime ends after echo (#23798, #23842). */
+    public bool $ephemeralConcatTemp = false;
+
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 
@@ -816,6 +819,9 @@ final class Variable {
         }
         if ($this->type & self::IS_REFCOUNTED) {
             if (null !== $this->objectPropertySlot) {
+                return;
+            }
+            if ($this->ephemeralConcatTemp) {
                 return;
             }
             $ptr = self::KIND_VALUE === $this->kind
