@@ -1740,6 +1740,20 @@ restart:
         );
     }
 
+    private static function warnFloatToIntBitwiseDeprecated(?\PHPCompiler\VM $vm, ?\PHPCompiler\Frame $frame, float $value): void
+    {
+        if (null === $vm) {
+            return;
+        }
+        $vm->context->errors->triggerError(
+            'Implicit conversion from float ' . $value . ' to int loses precision',
+            ErrorReporter::E_DEPRECATED,
+            '' !== ($frame->scriptPath ?? '') ? $frame->scriptPath : null,
+            $vm->context,
+            $frame
+        );
+    }
+
     private static function warnNonNumericValue(?\PHPCompiler\VM $vm, ?\PHPCompiler\Frame $frame): void
     {
         if (null === $vm) {
@@ -2527,6 +2541,12 @@ restart:
             if (!self::operandsValidForBitwiseOp($left, $right)) {
                 self::throwUnsupportedOperandTypes($opCode, $left, $right);
             }
+            if ($left->type === self::TYPE_FLOAT) {
+                self::warnFloatToIntBitwiseDeprecated($vm, $frame, $left->float);
+            }
+            if ($right->type === self::TYPE_FLOAT) {
+                self::warnFloatToIntBitwiseDeprecated($vm, $frame, $right->float);
+            }
             $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
 
             return;
@@ -2554,11 +2574,18 @@ restart:
                 $this->float($result);
             }
         } elseif ($pair === TYPE_PAIR_INTEGER_FLOAT) {
-            $this->float($this->_bitwiseOp($opCode, $left->integer, $right->float));
+            self::warnFloatToIntBitwiseDeprecated($vm, $frame, $right->float);
+            $result = $this->_bitwiseOp($opCode, $left->integer, (int) $right->float);
+            $this->int($result);
         } elseif ($pair === TYPE_PAIR_FLOAT_INTEGER) {
-            $this->float($this->_bitwiseOp($opCode, $left->float, $right->integer));
+            self::warnFloatToIntBitwiseDeprecated($vm, $frame, $left->float);
+            $result = $this->_bitwiseOp($opCode, (int) $left->float, $right->integer);
+            $this->int($result);
         } elseif ($pair === TYPE_PAIR_FLOAT_FLOAT) {
-            $this->float($this->_bitwiseOp($opCode, $left->float, $right->float));
+            self::warnFloatToIntBitwiseDeprecated($vm, $frame, $left->float);
+            self::warnFloatToIntBitwiseDeprecated($vm, $frame, $right->float);
+            $result = $this->_bitwiseOp($opCode, (int) $left->float, (int) $right->float);
+            $this->int($result);
         } elseif ($pair === TYPE_PAIR_STRING_STRING) {
             $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
         } else {
@@ -2581,11 +2608,17 @@ restart:
 
             return;
         }
-        $result = $this->_bitwiseOp(
-            $opCode,
-            $left->toNumericForArithmetic($vm, $frame),
-            $right->toNumericForArithmetic($vm, $frame)
-        );
+        $leftVal = $left->toNumericForArithmetic($vm, $frame);
+        $rightVal = $right->toNumericForArithmetic($vm, $frame);
+        if (is_float($leftVal)) {
+            self::warnFloatToIntBitwiseDeprecated($vm, $frame, $leftVal);
+            $leftVal = (int) $leftVal;
+        }
+        if (is_float($rightVal)) {
+            self::warnFloatToIntBitwiseDeprecated($vm, $frame, $rightVal);
+            $rightVal = (int) $rightVal;
+        }
+        $result = $this->_bitwiseOp($opCode, $leftVal, $rightVal);
         if (is_int($result)) {
             $this->int($result);
         } else {
