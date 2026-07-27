@@ -439,6 +439,9 @@ final class BuiltinParamNames
                 return ['stream', 'operation', 'wouldblock'];
             case 'get_resources':
                 return ['resource_type'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says res (#23342)
+            case 'get_resource_type':
+                return ['resource'];
             case 'get_browser':
                 return ['browser_name', 'return_array'];
             case 'get_defined_constants':

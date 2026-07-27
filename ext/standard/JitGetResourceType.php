@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamResource;
 use PHPCompiler\JIT\Builtin\StringDir;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -45,9 +46,11 @@ final class JitGetResourceType
         $context->builder->positionAtEnd($ctxBlock);
         $ctxSlot = JitValueBox::alloc($context);
         $ctxPtr = JitValueBox::pointer($context, $ctxSlot);
+        // Constant string globals — never call non-existent __string__literal (AOT #23342 / #3142)
+        $ctxLit = $context->builder->load($context->constantStringFromString('stream-context'));
         $ctxStr = $context->builder->call(
-            $context->lookupFunction('__string__literal'),
-            $context->constantStringFromString('stream-context')
+            $context->lookupFunction('__string__separate'),
+            $ctxLit
         );
         $context->builder->call($context->lookupFunction('__value__writeString'), $ctxPtr, $ctxStr);
         $ctxEnd = $context->builder->getInsertBlock();
@@ -69,7 +72,14 @@ final class JitGetResourceType
 
     private static function invokeHandle(Context $context, JITVariable $arg): Value
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         StringDir::ensureLinked($context);
+        StreamResource::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'get_resource_type_restore_cont');
+        }
 
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $arg, 'get_resource_type() argument #1 ($resource)'),
@@ -89,9 +99,10 @@ final class JitGetResourceType
         $context->builder->positionAtEnd($dirOkBlock);
         $dirSlot = JitValueBox::alloc($context);
         $dirPtr = JitValueBox::pointer($context, $dirSlot);
+        $streamLit = $context->builder->load($context->constantStringFromString('stream'));
         $streamStr = $context->builder->call(
-            $context->lookupFunction('__string__literal'),
-            $context->constantStringFromString('stream')
+            $context->lookupFunction('__string__separate'),
+            $streamLit
         );
         $context->builder->call($context->lookupFunction('__value__writeString'), $dirPtr, $streamStr);
         $dirEnd = $context->builder->getInsertBlock();
