@@ -635,6 +635,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         );
     }
 
+    /** @covers issue #23707 */
+    public function testDateIntervalConstructStubNamedParamsResolve(): void
+    {
+        $ctor = BuiltinParamNames::forClassMethod('DateInterval::__construct');
+        self::assertSame(['duration'], $ctor);
+        self::assertSame(
+            ['duration'],
+            BuiltinParamNames::paramNamesForInternalFunction('DateInterval::__construct')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ctor, 'duration', 'DateInterval::__construct'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ctor, 'spec', 'DateInterval::__construct'));
+    }
+
     /** @covers issue #10059 */
     public function testArrayMultisortArraySpliceNamedParameters(): void
     {
