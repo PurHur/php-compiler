@@ -267,6 +267,12 @@ final class VmDateInterval
             return null;
         }
 
+        // php-src timelib relative text — createFromDateString accepts phrases DateTime::modify does (#23936).
+        $relativeText = self::tryParseRelativeTextInterval($spec);
+        if (null !== $relativeText) {
+            return $relativeText;
+        }
+
         $y = $m = $d = $h = $i = $s = 0;
         $f = 0.0;
         $hasValue = false;
@@ -370,6 +376,83 @@ final class VmDateInterval
             'f' => $f,
             'invert' => 0,
         ];
+    }
+
+    /**
+     * Map timelib relative phrases to DateInterval bags (php-src createFromDateString; #23936).
+     *
+     * Observable Zend 8.2: "last day of next month" / "next month" → m=1; weekday/"this week"
+     * phrases → zero bag (special weekday stored internally; public props stay 0).
+     *
+     * @return array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int}|null
+     */
+    private static function tryParseRelativeTextInterval(string $spec): ?array
+    {
+        $zero = ['y' => 0, 'm' => 0, 'd' => 0, 'h' => 0, 'i' => 0, 's' => 0, 'f' => 0.0, 'invert' => 0];
+        if (1 === preg_match(
+            '/^(?:(?:first|last)\s+day\s+of\s+)?(next|last|this|previous)\s+month$/i',
+            $spec,
+            $matches
+        )) {
+            $when = strtolower($matches[1]);
+            if ('this' === $when) {
+                return $zero;
+            }
+            $bag = $zero;
+            $bag['m'] = 1;
+            if ('last' === $when || 'previous' === $when) {
+                $bag['invert'] = 1;
+            }
+
+            return $bag;
+        }
+        if (1 === preg_match('/^(next|last|this|previous)\s+year$/i', $spec, $matches)) {
+            $when = strtolower($matches[1]);
+            if ('this' === $when) {
+                return $zero;
+            }
+            $bag = $zero;
+            $bag['y'] = 1;
+            if ('last' === $when || 'previous' === $when) {
+                $bag['invert'] = 1;
+            }
+
+            return $bag;
+        }
+        if (1 === preg_match('/^(next|last|this|previous)\s+week$/i', $spec, $matches)) {
+            $when = strtolower($matches[1]);
+            if ('this' === $when) {
+                return $zero;
+            }
+            $bag = $zero;
+            $bag['d'] = 7;
+            if ('last' === $when || 'previous' === $when) {
+                $bag['invert'] = 1;
+            }
+
+            return $bag;
+        }
+        // Weekday / "monday this week" — Zend returns a zero bag (special weekday flag).
+        if (1 === preg_match(
+            '/^(?:next|last|previous|this)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $spec
+        )) {
+            return $zero;
+        }
+        if (1 === preg_match(
+            '/^(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $spec
+        )) {
+            return $zero;
+        }
+        if (1 === preg_match(
+            '/^(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:this|next|last|previous)\s+week$/i',
+            $spec
+        )) {
+            return $zero;
+        }
+
+        return null;
     }
 
     /** @return array{0: string, 1: int, 2: int}|null field, consumed chars, week multiplier */
