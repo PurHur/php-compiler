@@ -502,10 +502,11 @@ class JIT {
     }
 
     /**
-     * Literal ?: echo arms after object-producing calls need merge-block operand redirect (#18784).
+     * Literal ?: echo arms after side effects in the JUMPIF block need merge-block redirect (#18784, #23915).
      *
-     * Pure literal ternaries without preceding calls keep the default assign path; enabling echo
-     * merge there mis-lowers and can crash AOT init (#18052).
+     * Pure literal ternaries with nothing before the JUMPIF keep the default assign path; enabling
+     * echo merge there mis-lowers and can crash AOT init (#18052). A preceding ECHO (comma-echo
+     * `echo A, Cond ? X : Y`) or object-producing call pollutes the default phi path — redirect.
      */
     private function ternaryEchoMergeNeedsLiteralArmRedirect(
         ?Block $jumpIfBlock,
@@ -518,7 +519,7 @@ class JIT {
             return false;
         }
 
-        return $this->ternaryEchoMergeFollowsObjectProducerCall($jumpIfBlock, $jumpIfIndex);
+        return $this->ternaryEchoMergeFollowsSlotPollutingOp($jumpIfBlock, $jumpIfIndex);
     }
 
     /** @return bool true when every ?: arm assigns a literal into the merge ECHO slot */
@@ -549,8 +550,13 @@ class JIT {
         return $literalArmCount > 0;
     }
 
-    /** True when a call/method result may pollute the ?: echo slot before the JUMPIF (#18784, #19459). */
-    private function ternaryEchoMergeFollowsObjectProducerCall(Block $jumpIfBlock, int $jumpIfIndex): bool
+    /**
+     * True when a prior op in the JUMPIF block may pollute the ?: echo slot (#18784, #19459, #23915).
+     *
+     * Calls/methods leave object temps on the alias; a leading comma-echo ECHO leaves the merge
+     * ECHO reading an empty/uninitialized phi under AOT (#23915).
+     */
+    private function ternaryEchoMergeFollowsSlotPollutingOp(Block $jumpIfBlock, int $jumpIfIndex): bool
     {
         for ($i = 0; $i < $jumpIfIndex; ++$i) {
             $prior = $jumpIfBlock->opCodes[$i];
@@ -558,6 +564,7 @@ class JIT {
                 OpCode::TYPE_METHODCALL_INIT === $prior->type
                 || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $prior->type
                 || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $prior->type
+                || OpCode::TYPE_ECHO === $prior->type
             ) {
                 return true;
             }
