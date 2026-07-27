@@ -15398,7 +15398,7 @@ class JIT {
             Variable::TYPE_VALUE === $read->type
             && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
         ) {
-            $this->guardIncDecResourceOperand($read, $increment);
+            $this->guardIncDecResourceOperand($read, $increment, $readOp);
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->readIncDecValueBoxLong($read, $readPtr, $increment);
             $one = $cur->typeOf()->constInt(1, false);
@@ -15435,7 +15435,7 @@ class JIT {
         }
 
         if (Variable::TYPE_NATIVE_LONG === $read->type && Variable::KIND_VARIABLE === $read->kind) {
-            $this->guardIncDecResourceOperand($read, $increment);
+            $this->guardIncDecResourceOperand($read, $increment, $readOp);
             $cur = $this->context->helper->loadValue($read);
             $one = $cur->typeOf()->constInt(1, false);
             $newLong = $increment
@@ -15528,9 +15528,18 @@ class JIT {
     }
 
     /** Reject ++/-- on stream/dir handles (issue #6396, zend_operators.c). */
-    private function guardIncDecResourceOperand(JIT\Variable $read, bool $increment): void
+    private function guardIncDecResourceOperand(
+        JIT\Variable $read,
+        bool $increment,
+        ?Operand $readOp = null
+    ): void
     {
         if (JIT\NestedJitCompileScope::isActive()) {
+            return;
+        }
+        // A value that provably came from a literal or from arithmetic cannot be a resource handle,
+        // so the guard is dead code — and it is expensive enough to dominate hot loops (#23483).
+        if (JIT\IncDecResourceProvenance::cannotBeResource($readOp)) {
             return;
         }
         $longVal = null;
