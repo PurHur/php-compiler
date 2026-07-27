@@ -1196,6 +1196,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'crc', 'crc32'));
     }
 
+    /** @covers issue #23460 */
+    public function testEscapeshellZendStubNamedParams(): void
+    {
+        $arg = BuiltinParamNames::forFunction('escapeshellarg');
+        self::assertSame(['arg'], $arg);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($arg, 'arg', 'escapeshellarg'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($arg, 'string', 'escapeshellarg'));
+
+        $cmd = BuiltinParamNames::forFunction('escapeshellcmd');
+        self::assertSame(['command'], $cmd);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($cmd, 'command', 'escapeshellcmd'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($cmd, 'str', 'escapeshellcmd'));
+    }
+
     /** @covers issue #23206 */
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {

@@ -398,6 +398,11 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says new_error_level (#23436)
             case 'error_reporting':
                 return ['error_level'];
+            // php-src ext/standard/basic_functions.stub.php / exec.c (#23460)
+            case 'escapeshellarg':
+                return ['arg'];
+            case 'escapeshellcmd':
+                return ['command'];
             // php-src ext/session/session.stub.php — InternalArgInfo still says newname (#23436)
             case 'session_name':
                 return ['name'];
