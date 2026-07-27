@@ -50,14 +50,14 @@ final class VmSoapClient
         $entry->isInternal = true;
 
         $pub = CfgFunc::FLAG_PUBLIC;
-        // php-src stub marks private; UPGRADING documents userland `$client->httpurl` / `$sdl` reads (#23246/#23247).
+        // php-src stub marks private; UPGRADING documents userland `$client->httpurl` / `$sdl` / `$typemap` reads (#23246/#23247/#23903).
         if (SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
             $nullProto = new Variable(Variable::TYPE_NULL);
             $have = [];
             foreach ($entry->properties as $prop) {
                 $have[$prop->name] = true;
             }
-            foreach (['httpurl', 'sdl'] as $propName) {
+            foreach (['httpurl', 'sdl', 'typemap'] as $propName) {
                 if (!isset($have[$propName])) {
                     $entry->properties[] = new ClassProperty(
                         $propName,
@@ -202,6 +202,8 @@ final class VmSoapClient
             // php-src soap.c ctor — attach Soap\Sdl after successful WSDL parse (#23247).
             self::attachSdl($object, $ctx);
         }
+        // php-src soap.c — Z_CLIENT_TYPEMAP gets array after soap_create_typemap (#23903 / UPGRADING 8.4).
+        self::attachTypemap($object, $ctx, $state->typemap);
         if ('' === $state->location && isset($options['location'])) {
             $state->location = (string) $options['location'];
         }
@@ -533,6 +535,25 @@ final class VmSoapClient
             return;
         }
         $object->getProperty('sdl')->object(VmSoapOpaque::newSdlObject($ctx));
+    }
+
+    /**
+     * php-src soap.c SoapClient ctor — Z_CLIENT_TYPEMAP is array (was resource pre-8.4) (#23903).
+     *
+     * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     */
+    private static function attachTypemap(ObjectEntry $object, Context $ctx, array $typemap): void
+    {
+        if (!SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
+            return;
+        }
+        if (!$object->hasProperty('typemap')) {
+            return;
+        }
+        if ([] === $typemap) {
+            return;
+        }
+        $object->getProperty('typemap')->copyFrom(self::importDecodedTree($typemap, $ctx));
     }
 
     /**
