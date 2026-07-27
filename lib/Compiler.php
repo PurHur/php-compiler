@@ -2038,6 +2038,9 @@ class Compiler {
     }
 
     protected function compileBlock(Block $block) {
+        if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
+            $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
+        }
         $this->compileOps($block->orig->children, $block);
         // Do not auto-LEAVE at CFG block edges: file-level declare(ticks=N) and braced
         // bodies that span loops/jumps must keep the interval across successor blocks.
@@ -10405,9 +10408,6 @@ class Compiler {
 
     protected function compileStmt(Op\Stmt $stmt, Block $block) {
         if ($stmt instanceof Op\Stmt\Jump) {
-            if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
-                $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
-            }
             $target = $this->compileCfgBranch($stmt->target, $block);
             if (!$this->isRedundantTryEntryJump($block, $target)) {
                 $op = new OpCode(OpCode::TYPE_JUMP);
@@ -10419,9 +10419,6 @@ class Compiler {
                 $this->emitImplicitNullableParamCoalesceReturn($paramOp, $block);
 
                 return;
-            }
-            if (null !== $block->orig && $this->isErrorSuppressEndBlock($block->orig)) {
-                $block->addOpCode(new OpCode(OpCode::TYPE_END_SILENCE));
             }
             $rewriteNeNull = $this->rewrittenNeNullReturnJumpIf->contains($stmt);
             $op = new OpCode(OpCode::TYPE_JUMPIF, $this->compileOperand($stmt->cond, $block, true));
@@ -10655,6 +10652,7 @@ class Compiler {
                         !$arg instanceof Operand
                         || $this->isEmbeddedCallLiteralArg($arg)
                         || !$this->callArgIsDeadInlineTemporary($arg)
+                        || $this->callArgOpsContainInlineClosure($arg)
                     ) {
                         continue;
                     }
@@ -41346,6 +41344,12 @@ class Compiler {
         int $argIndex
     ): ?int {
         if (null === $cfgCallOp || !$this->isFirstNonEmbeddedDeadInlineCallArg($cfgCallOp, $argIndex)) {
+            return null;
+        }
+        $callArg = (property_exists($cfgCallOp, 'args') && \is_array($cfgCallOp->args))
+            ? ($cfgCallOp->args[$argIndex] ?? null)
+            : null;
+        if ($this->callArgOpsContainInlineClosure($callArg)) {
             return null;
         }
         if ($this->errorSuppressEndBlockDiscardsInnerResultForErrorGetLast($block)) {
