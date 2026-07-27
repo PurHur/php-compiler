@@ -88,11 +88,42 @@ final class VmClosureCall
         Variable $a,
         Variable $b
     ): int {
+        return self::invokeUserCompareWith(
+            static fn (Variable ...$args): Variable => self::invoke($context, $closure, ...$args),
+            $a,
+            $b
+        );
+    }
+
+    /**
+     * Same unstable user-compare rules for any VmCallable (invokable/array/user-string; #23551).
+     */
+    public static function invokeVariableForUserCompare(
+        Context $context,
+        Variable $callback,
+        Variable $a,
+        Variable $b
+    ): int {
+        return self::invokeUserCompareWith(
+            static fn (Variable ...$args): Variable => VmCallable::invoke($context, $callback, ...$args),
+            $a,
+            $b
+        );
+    }
+
+    /**
+     * @param callable(Variable...): Variable $invoke
+     */
+    private static function invokeUserCompareWith(
+        callable $invoke,
+        Variable $a,
+        Variable $b
+    ): int {
         $copyA = new Variable();
         $copyA->duplicateFrom($a);
         $copyB = new Variable();
         $copyB->duplicateFrom($b);
-        $result = self::invoke($context, $closure, $copyA, $copyB);
+        $result = $invoke($copyA, $copyB);
         $result = $result->resolveIndirect();
         if (Variable::TYPE_BOOLEAN === $result->type) {
             if (!$result->toBool()) {
@@ -100,7 +131,7 @@ final class VmClosureCall
                 $swapA->duplicateFrom($b);
                 $swapB = new Variable();
                 $swapB->duplicateFrom($a);
-                $retry = self::invoke($context, $closure, $swapA, $swapB);
+                $retry = $invoke($swapA, $swapB);
 
                 return -self::normalizeCompareSign(self::compareCallbackScalar($retry));
             }
