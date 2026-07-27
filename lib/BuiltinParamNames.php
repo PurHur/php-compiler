@@ -624,8 +624,9 @@ final class BuiltinParamNames
                 return ['filename', 'process_sections', 'scanner_mode'];
             case 'parse_url':
                 return ['url', 'component'];
+            // php-src ext/standard/proc_open.stub.php — InternalArgInfo still says env (#23404)
             case 'proc_open':
-                return ['command', 'descriptor_spec', 'pipes', 'cwd', 'env', 'options'];
+                return ['command', 'descriptor_spec', 'pipes', 'cwd', 'env_vars', 'options'];
             case 'proc_get_status':
             case 'proc_close':
                 return ['process'];

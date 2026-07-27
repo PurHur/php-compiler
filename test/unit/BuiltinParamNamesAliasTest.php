@@ -310,15 +310,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($set, 'value', 'ini_set'));
     }
 
-    /** @covers issue #10126 */
+    /** @covers issue #10126 / #23404 — Zend stub uses env_vars not env */
     public function testProcOpenNamedParameters(): void
     {
         $names = BuiltinParamNames::forFunction('proc_open');
-        self::assertSame(['command', 'descriptor_spec', 'pipes', 'cwd', 'env', 'options'], $names);
+        self::assertSame(['command', 'descriptor_spec', 'pipes', 'cwd', 'env_vars', 'options'], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'command', 'proc_open'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'descriptor_spec', 'proc_open'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'pipes', 'proc_open'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'cwd', 'proc_open'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'env_vars', 'proc_open'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'env', 'proc_open'));
     }
 
     /** @covers issue #16625 */
