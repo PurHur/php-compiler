@@ -181,6 +181,11 @@ final class BuiltinParamNames
                 return ['month', 'day', 'year'];
             case 'getdate':
                 return ['timestamp'];
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still says date (#23783)
+            case 'date_parse':
+                return ['datetime'];
+            case 'date_parse_from_format':
+                return ['format', 'datetime'];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says time/now (#23216)
             case 'strtotime':
                 return ['datetime', 'baseTimestamp'];
