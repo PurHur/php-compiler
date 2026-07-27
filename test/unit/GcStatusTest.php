@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\standard\VmIniIntrospection;
 use PHPCompiler\VM\MemoryAccounting;
 use PHPUnit\Framework\TestCase;
 
@@ -115,6 +116,37 @@ PHP;
 
         $this->assertStringContainsString('first='.$expected, $output);
         $this->assertStringContainsString('second=0', $output);
+    }
+
+    public function testGcMemCachesMatchesFreshZendAfterIniSeed(): void
+    {
+        VmIniIntrospection::seedHostIniEnvFromZend();
+        $binary = \defined('PHP_BINARY') ? PHP_BINARY : 'php';
+        $env = [];
+        foreach (\getenv() as $key => $value) {
+            if (\is_string($key) && \is_string($value) && !\str_starts_with($key, 'PHP_COMPILER_')) {
+                $env[$key] = $value;
+            }
+        }
+        $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = @\proc_open([$binary, '-n', '-r', 'echo gc_mem_caches();'], $desc, $pipes, null, [] === $env ? null : $env);
+        $this->assertTrue(\is_resource($proc), 'Zend gc_mem_caches probe subprocess failed (#23835)');
+        $zendFirst = (int) \trim((string) \stream_get_contents($pipes[1]));
+        \fclose($pipes[1]);
+        \fclose($pipes[2]);
+        \proc_close($proc);
+        $this->assertGreaterThan(0, $zendFirst);
+
+        $code = <<<'PHP'
+<?php
+echo gc_mem_caches(), "\n", gc_mem_caches(), "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'gc_mem_caches_zend_parity.php');
+        ob_start();
+        $rt->run($block);
+        $output = \trim((string) ob_get_clean());
+        $this->assertSame($zendFirst."\n0", $output);
     }
 
     public function testGcStatusRootsZeroAtColdStart(): void
