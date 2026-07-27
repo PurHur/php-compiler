@@ -160,6 +160,13 @@ final class GeneratorHelper
         $resumeName = $internalName.'__resume';
         $lc = strtolower($resumeName);
         self::registerCreator($context, $logicalName, $resumeName);
+        $decl = $block->func ?? null;
+        if (
+            null !== $decl
+            && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0
+        ) {
+            $context->functionReturnsRef[strtolower($logicalName)] = true;
+        }
         if (isset($context->functions[$lc])) {
             return $context->functions[$lc];
         }

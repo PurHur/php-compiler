@@ -228,10 +228,22 @@ final class GeneratorIteratorJitHelper
         Variable $gen,
         ?\PHPCompiler\JIT $jit = null
     ): Variable {
-        self::emitForeachGeneratorByRefError($context, $jit);
-        $slot = JitValueBox::alloc($context);
+        if (!GeneratorJitHelper::generatorYieldsByReference($context, $gen)) {
+            self::emitForeachGeneratorByRefError($context, $jit);
+            $slot = JitValueBox::alloc($context);
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+            return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        }
+        $statePtr = self::loadStateFromGeneratorObject($context, $gen);
+        $valField = $context->builder->structGep(
+            $statePtr,
+            $context->structFieldMap['__generator_state__']['current_value']
+        );
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $valField);
+        $var->valueBoxAliasPtr = JitValueBox::pointer($context, $valField);
+        $var->borrowedValueEntry = true;
+
+        return $var;
     }
 
     public static function compileIterReset(Context $context, Variable $gen): void

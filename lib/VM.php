@@ -8227,7 +8227,11 @@ restart:
                     }
                     if (null !== $op->arg2) {
                         if (isset($frame->scope[$op->arg2])) {
-                            $gen->publishCurrentValue($frame->scope[$op->arg2]->resolveIndirect());
+                            if ($gen->yieldsByReference()) {
+                                $gen->publishCurrentValueByRef($frame->scope[$op->arg2]);
+                            } else {
+                                $gen->publishCurrentValue($frame->scope[$op->arg2]->resolveIndirect());
+                            }
                         } elseif (isset($frame->block->constants[$op->arg2])) {
                             $gen->publishCurrentValue($frame->block->constants[$op->arg2]);
                         } else {
@@ -8556,14 +8560,22 @@ restart:
                     }
                     if ($this->variableIsGenerator($container)) {
                         if ((bool) $op->arg3) {
-                            $catchFrame = $this->dispatchVmEngineException(
-                                \PHPCompiler\JIT\GeneratorHelper::FOREACH_GENERATOR_BYREF_ERROR,
-                                $frame
-                            );
-                            if (null !== $catchFrame) {
-                                $frame = $catchFrame;
-                                goto restart;
+                            $genState = $container->toObject()->generatorState;
+                            if (!$genState->yieldsByReference()) {
+                                $catchFrame = $this->dispatchVmEngineException(
+                                    \PHPCompiler\JIT\GeneratorHelper::FOREACH_GENERATOR_BYREF_ERROR,
+                                    $frame
+                                );
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
                             }
+                            $frame->scope[$op->arg1]->indirect(
+                                $genState->currentValue->byRefTarget()
+                            );
+                            $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                             break;
                         }
                         $frame->scope[$op->arg1]->copyFrom(
