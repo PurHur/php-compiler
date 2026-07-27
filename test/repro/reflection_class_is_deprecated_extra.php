@@ -7,7 +7,6 @@ class DocblockDeprecatedClass
 {
 }
 
-#[\Deprecated]
 class AttributeDeprecatedClass
 {
 }

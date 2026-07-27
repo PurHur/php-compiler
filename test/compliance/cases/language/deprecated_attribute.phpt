@@ -1,5 +1,7 @@
 --TEST--
 Language: #[\Deprecated] attribute emits E_USER_DEPRECATED (VM, #3569)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 ini_set('error_reporting', '32767');

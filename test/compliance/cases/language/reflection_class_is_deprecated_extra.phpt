@@ -5,7 +5,6 @@ Regression: ReflectionClass has no isDeprecated() (#22111, ext/reflection/php_re
 /** @deprecated */
 class DocblockDeprecated {}
 
-#[\Deprecated]
 class AttributeDeprecated {}
 
 echo method_exists(ReflectionClass::class, 'isDeprecated') ? 'yes' : 'no', "\n";

@@ -135,28 +135,27 @@ PHP;
         $this->assertSame('pong', ob_get_clean());
     }
 
-    public function testBareDeprecatedPropertyAccessEmitsNotice(): void
+    public function testDeprecatedOnPropertyIsCompileFatalUnderProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
+            if (!\PHPCompiler\CompilerVersion::advertisesDeprecatedAttributeClass()) {
+                $this->markTestSkipped('Deprecated not advertised');
+            }
             $runtime = new Runtime();
             $code = <<<'PHP'
 <?php
-ini_set('error_reporting', '32767');
-ini_set('display_errors', '0');
 class C {
     #[\Deprecated]
     public int $p = 2;
 }
-$c = new C();
-$c->p;
-$last = error_get_last();
-echo $last['message'] ?? 'none';
 PHP;
-            ob_start();
-            $runtime->run($runtime->parseAndCompile($code, 'bare_deprecated_property.php'));
-            $this->assertSame('Property C::$p is deprecated', ob_get_clean());
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'Attribute "Deprecated" cannot target property (allowed targets: function, method, class constant)'
+            );
+            $runtime->parseAndCompile($code, 'bare_deprecated_property.php');
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

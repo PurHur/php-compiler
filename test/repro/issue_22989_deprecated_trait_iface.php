@@ -1,6 +1,7 @@
 <?php
 /**
- * Repro #22989 — #[\Deprecated] trait use (PHP 8.5+) / silent on 8.4.
+ * Repro #22989 — #[\Deprecated] trait use (PHP 8.5+).
+ * Under PROFILE=8.4 the attribute on a trait is a compile fatal (#23701).
  *
  * Usage:
  *   PHP_COMPILER_PROFILE=8.5 php bin/vm.php test/repro/issue_22989_deprecated_trait_iface.php
