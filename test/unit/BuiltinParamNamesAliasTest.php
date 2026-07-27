@@ -237,6 +237,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::forwardsNamedArgsIntoVariadic('max'));
     }
 
+    /** @covers issue #23803 */
+    public function testCompactVariadicNamedParamMetadata(): void
+    {
+        $names = BuiltinParamNames::forFunction('compact');
+        self::assertSame(['var_name', 'var_names'], $names);
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('compact'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('compact'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('compact'));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'var_name', 'compact'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'var_names', 'compact'));
+    }
+
     /** @covers issue #22825 */
     public function testInternalPrintfFamilyAndArrayVariadicReflectionArity(): void
     {
