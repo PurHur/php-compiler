@@ -1395,25 +1395,24 @@ final class HashTableWriteLlvm
         $context->builder->positionAtEnd($done);
     }
 
-    /** Persist in-place hashtable mutations on native/boxed array operands (#1086, #17865). */
+    /** Persist in-place hashtable mutations on native/boxed array operands (#1086, #17865, #24010). */
     public static function storeHashtableInArrayVariable(Context $context, Variable $array, Value $ht): void
     {
         if (0 !== ($array->type & Variable::IS_NATIVE_ARRAY)) {
             if (Variable::KIND_VARIABLE !== $array->kind) {
                 return;
             }
+            // Rebind the Variable onto a fresh __value__ box holding $ht — do not store a
+            // pointer into the native element alloca (that left `$a[0]` reading unsorted
+            // ints after sort()/array_push on literal arrays; peer promoteNativeArray…).
             $boxed = JitValueBox::alloc($context);
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
                 JitValueBox::pointer($context, $boxed),
                 $ht
             );
-            $voidPtr = $context->getTypeFromString('void*');
-            $context->builder->store(
-                $context->builder->pointerCast(JitValueBox::pointer($context, $boxed), $voidPtr),
-                $array->value
-            );
             $array->type = Variable::TYPE_VALUE;
+            $array->value = $boxed;
             $array->valueBoxHashtable = true;
 
             return;

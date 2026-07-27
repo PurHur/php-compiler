@@ -83,6 +83,16 @@ class AnalyzerTest extends TestCase
         $this->assertNull($analyzer->computeStaticArraySize($staticPropertyFetch->result));
     }
 
+    public function testComputeStaticArraySizeIteratorValueWriteOp(): void
+    {
+        $analyzer = new Analyzer();
+        $var = new Operand\Temporary();
+        $iter = new Op\Iterator\Value($var, false);
+        $result = $iter->result;
+
+        $this->assertNull($analyzer->computeStaticArraySize($result));
+    }
+
     public function testComputeStaticArraySizePhiMergeSameSize(): void
     {
         $analyzer = new Analyzer();

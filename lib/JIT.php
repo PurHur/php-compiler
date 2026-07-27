@@ -8903,6 +8903,23 @@ class JIT {
                             $resolvedUnset = $this->context->resolveRefAliasName($unsetName);
                             if (isset($this->context->namedVariableBindings[$resolvedUnset])) {
                                 $bound = $this->context->namedVariableBindings[$resolvedUnset];
+                                // foreach ($a as &$v); unset($v) breaks the reference — it must not
+                                // writeNull through the loop-body HT entry PHI (#24010 domination).
+                                if (
+                                    $bound->borrowedValueEntry
+                                    || null !== $bound->foreachByRefPackedArm
+                                    || isset($this->context->foreachByRefLocalNames[$resolvedUnset])
+                                ) {
+                                    $nullVar = $this->jitNullVariable();
+                                    $this->context->bindVariableByName($resolvedUnset, $nullVar);
+                                    $this->context->setVariableOp($targetOp, $nullVar);
+                                    unset(
+                                        $this->context->foreachByRefLocalNames[$resolvedUnset],
+                                        $this->context->namedVariableBindings[$resolvedUnset]
+                                    );
+                                    $this->context->bindVariableByName($resolvedUnset, $nullVar);
+                                    break;
+                                }
                                 if (
                                     Variable::KIND_VARIABLE === $bound->kind
                                     && Variable::TYPE_VALUE === $bound->type
@@ -8920,6 +8937,19 @@ class JIT {
                         }
                         if ($this->context->hasVariableOp($targetOp)) {
                             $target = $this->context->getVariableFromOp($targetOp);
+                            if (
+                                $target->borrowedValueEntry
+                                || null !== $target->foreachByRefPackedArm
+                            ) {
+                                $nullVar = $this->jitNullVariable();
+                                $this->context->setVariableOp($targetOp, $nullVar);
+                                if (null !== $unsetName && '' !== $unsetName) {
+                                    $resolvedUnset = $this->context->resolveRefAliasName($unsetName);
+                                    $this->context->bindVariableByName($resolvedUnset, $nullVar);
+                                    unset($this->context->foreachByRefLocalNames[$resolvedUnset]);
+                                }
+                                break;
+                            }
                             if (
                                 null !== $target->writableHt
                                 && null !== $target->writableStringKey

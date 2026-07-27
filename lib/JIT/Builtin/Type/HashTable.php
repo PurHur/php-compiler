@@ -118,6 +118,9 @@ class HashTable extends Type
         $this->registerFn('__hashtable__sortStringKeyValuesNatural', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesNaturalCase', 'void', ['__hashtable__*']);
         $this->registerFn('__hashtable__sortStringKeyValuesReverse', 'void', ['__hashtable__*']);
+        // Packed-list sort()/rsort() — NestedJIT SortJitHelper stubs were no-ops (#24010).
+        $this->registerFn('__hashtable__sortPacked', 'void', ['__hashtable__*']);
+        $this->registerFn('__hashtable__sortPackedReverse', 'void', ['__hashtable__*']);
         $this->pointer = $this->context->getTypeFromString('__hashtable__*');
     }
 
@@ -183,6 +186,8 @@ class HashTable extends Type
         $this->implementSortStringKeyValuesNatural();
         $this->implementSortStringKeyValuesNaturalCase();
         $this->implementSortStringKeyValuesReverse();
+        $this->implementSortPacked(false);
+        $this->implementSortPacked(true);
     }
 
     private function ensureLibcStrtol(): void
@@ -2830,6 +2835,127 @@ class HashTable extends Type
         $this->context->builder->returnVoid();
     }
 
+
+    /**
+     * Bubble-sort packed list values in place (sort / rsort SORT_REGULAR) (#24010).
+     *
+     * NestedJIT {@see \PHPCompiler\ext\standard\SortJitHelper} currently lowers to a no-op
+     * stub; this LLVM path matches the asort string-key bubble sort but walks `values[]`.
+     */
+    private function implementSortPacked(bool $reverse): void
+    {
+        $abi = $reverse ? '__hashtable__sortPackedReverse' : '__hashtable__sortPacked';
+        $tag = $reverse ? 'rsort' : 'sort';
+        $fn = $this->context->lookupFunction($abi);
+        $main = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($main);
+        $ht = $fn->getParam(0);
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $valueMap = $this->context->structFieldMap['__value__'];
+        $sizeT = $this->context->getTypeFromString('size_t');
+        $i1 = $this->context->getTypeFromString('int1');
+        $i32 = $this->context->getTypeFromString('int32');
+        $i8 = $this->context->getTypeFromString('int8');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $stringTag = $i8->constInt(Variable::TYPE_STRING, false);
+        $valueType = $this->context->getTypeFromString('__value__');
+
+        $n = $this->context->builder->load($this->context->builder->structGep($ht, $htMap['nextFreeElement']));
+        $done = $fn->appendBasicBlock($tag.'_done');
+        $work = $fn->appendBasicBlock($tag.'_work');
+        $tooSmall = $this->context->builder->icmp(
+            Builder::INT_ULT,
+            $n,
+            $sizeT->constInt(2, false)
+        );
+        $this->context->builder->branchIf($tooSmall, $done, $work);
+
+        $this->context->builder->positionAtEnd($work);
+        $swappedSlot = $this->context->builder->alloca($i1, 1, $tag.'_swapped');
+        $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
+        $passHead = $fn->appendBasicBlock($tag.'_pass_head');
+        $passBody = $fn->appendBasicBlock($tag.'_pass_body');
+        $this->context->builder->branch($passHead);
+
+        $this->context->builder->positionAtEnd($passHead);
+        $didSwap = $this->context->builder->load($swappedSlot);
+        $this->context->builder->branchIf($didSwap, $passBody, $done);
+
+        $this->context->builder->positionAtEnd($passBody);
+        $this->context->builder->store($i1->constInt(0, false), $swappedSlot);
+        $iSlot = $this->context->builder->alloca($sizeT, 1, $tag.'_i');
+        $this->context->builder->store($zero, $iSlot);
+        $limit = $this->context->builder->sub($n, $one);
+        $walkHead = $fn->appendBasicBlock($tag.'_walk_head');
+        $walkBody = $fn->appendBasicBlock($tag.'_walk_body');
+        $passExit = $fn->appendBasicBlock($tag.'_pass_exit');
+        $this->context->builder->branch($walkHead);
+
+        $this->context->builder->positionAtEnd($walkHead);
+        $i = $this->context->builder->load($iSlot);
+        $atEnd = $this->context->builder->icmp(Builder::INT_UGE, $i, $limit);
+        $this->context->builder->branchIf($atEnd, $passExit, $walkBody);
+
+        $this->context->builder->positionAtEnd($walkBody);
+        $j = $this->context->builder->addNoSignedWrap($i, $one);
+        $valCur = $this->listEntryAt($ht, $htMap, $i);
+        $valNext = $this->listEntryAt($ht, $htMap, $j);
+        $typeCur = $this->context->builder->load($this->context->builder->structGep($valCur, $valueMap['type']));
+        $isString = $this->context->builder->icmp(Builder::INT_EQ, $typeCur, $stringTag);
+        $cmpStr = $fn->appendBasicBlock($tag.'_cmp_str');
+        $cmpLong = $fn->appendBasicBlock($tag.'_cmp_long');
+        $cmpDone = $fn->appendBasicBlock($tag.'_cmp_done');
+        $needsSwapSlot = $this->context->builder->alloca($i1, 1, $tag.'_needs_swap');
+        $this->context->builder->branchIf($isString, $cmpStr, $cmpLong);
+
+        $this->context->builder->positionAtEnd($cmpStr);
+        $strCur = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valCur);
+        $strNext = $this->context->builder->call($this->context->lookupFunction('__value__readString'), $valNext);
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($strCur),
+            $this->stringDataPtr($strNext)
+        );
+        $strOutOfOrder = $reverse
+            ? $this->context->builder->icmp(Builder::INT_SLT, $cmp, $i32->constInt(0, false))
+            : $this->context->builder->icmp(Builder::INT_SGT, $cmp, $i32->constInt(0, false));
+        $this->context->builder->store($strOutOfOrder, $needsSwapSlot);
+        $this->context->builder->branch($cmpDone);
+
+        $this->context->builder->positionAtEnd($cmpLong);
+        $longCur = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valCur);
+        $longNext = $this->context->builder->call($this->context->lookupFunction('__value__readLong'), $valNext);
+        $longOutOfOrder = $reverse
+            ? $this->context->builder->icmp(Builder::INT_SLT, $longCur, $longNext)
+            : $this->context->builder->icmp(Builder::INT_SGT, $longCur, $longNext);
+        $this->context->builder->store($longOutOfOrder, $needsSwapSlot);
+        $this->context->builder->branch($cmpDone);
+
+        $this->context->builder->positionAtEnd($cmpDone);
+        $needsSwap = $this->context->builder->load($needsSwapSlot);
+        $swapBlock = $fn->appendBasicBlock($tag.'_swap');
+        $advance = $fn->appendBasicBlock($tag.'_advance');
+        $this->context->builder->branchIf($needsSwap, $swapBlock, $advance);
+
+        $this->context->builder->positionAtEnd($swapBlock);
+        $tmp = $this->context->builder->alloca($valueType, 1, $tag.'_tmp');
+        $this->context->builder->store($this->context->builder->load($valCur), $tmp);
+        $this->context->builder->store($this->context->builder->load($valNext), $valCur);
+        $this->context->builder->store($this->context->builder->load($tmp), $valNext);
+        $this->context->builder->store($i1->constInt(1, false), $swappedSlot);
+        $this->context->builder->branch($advance);
+
+        $this->context->builder->positionAtEnd($advance);
+        $this->context->builder->store($this->context->builder->addNoSignedWrap($i, $one), $iSlot);
+        $this->context->builder->branch($walkHead);
+
+        $this->context->builder->positionAtEnd($passExit);
+        $this->context->builder->branch($passHead);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
 
     /**
      * @param array<string, int> $map

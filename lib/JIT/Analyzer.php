@@ -243,8 +243,16 @@ class Analyzer
                 || $op instanceof Op\Expr\StaticPropertyFetch
                 || $op instanceof Op\Expr\Param
                 || $op instanceof Op\Expr\ConstFetch
+                || $op instanceof Op\Expr\AssignRef
                 || $op instanceof FirstClassCallable
-                || $op instanceof Op\Terminal\Const_) {
+                || $op instanceof Op\Terminal\Const_
+                || $op instanceof Op\Iterator\Reset
+                || $op instanceof Op\Iterator\Valid
+                || $op instanceof Op\Iterator\Key
+                || $op instanceof Op\Iterator\Value
+                || $op instanceof Op\Iterator\Next) {
+                // Dynamic / non-literal writes (foreach Iterator\\Value, AssignRef, calls) —
+                // cannot prove a fixed packed size (#24010 nested foreach).
                 return null;
             } else {
                 throw new \LogicException('Unknown array write op: '.get_class($op));

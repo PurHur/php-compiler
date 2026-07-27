@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
@@ -108,6 +109,10 @@ final class MemoryRuntime
             return;
         }
 
+        // Restore caller insert block after bridge emit (#24010 / peer StringFilterBoolean #20988) —
+        // clearInsertionPosition left the user-script builder detached
+        // ("Current basic block has no parent function") on unset($v) after foreach-by-ref.
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementBoolToI64Bridge($context, self::GET_USAGE, self::GET_USAGE_HELPER);
         self::implementBoolToI64Bridge($context, self::GET_PEAK_USAGE, self::GET_PEAK_USAGE_HELPER);
@@ -115,7 +120,11 @@ final class MemoryRuntime
         self::implementI64VoidBridge($context, self::NOTE_ALLOC, self::NOTE_ALLOC_HELPER);
         self::implementZeroArgI64Bridge($context, self::GC_MEM_CACHES, self::GC_MEM_CACHES_HELPER);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBoolToI64Bridge(
