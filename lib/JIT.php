@@ -15625,7 +15625,13 @@ class JIT {
         // StreamLifecycle + StringDir: is_resource must see JitOpenStreamHandles (#23777).
         JIT\Builtin\StreamLifecycleRuntime::ensureLinked($this->context);
         JIT\Builtin\StringDir::ensureLinked($this->context);
-        $isRes = JIT\JitValueCompare::nativeLongIsResource($this->context, $longVal);
+        // Provenance proves this operand cannot be a handle — fold the registry walk to false while
+        // keeping the ok-block split script-scope ++/-- requires (#23840, #23841).
+        $provenNonResource = $readOp instanceof Operand
+            && JIT\IncDecResourceProvenance::cannotBeResource($readOp);
+        $isRes = $provenNonResource
+            ? $this->context->getTypeFromString('int1')->constInt(0, false)
+            : JIT\JitValueCompare::nativeLongIsResource($this->context, $longVal);
         ++self::$blockNumber;
         $suffix = (string) self::$blockNumber;
         $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_ok_'.$suffix);

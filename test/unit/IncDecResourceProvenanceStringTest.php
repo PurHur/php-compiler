@@ -30,4 +30,11 @@ final class IncDecResourceProvenanceStringTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
         self::assertStringContainsString('isIncDecValueBoxLvalue', $source);
     }
+
+    public function testGuardFoldsProvenNonResourceCheck(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        self::assertStringContainsString('IncDecResourceProvenance::cannotBeResource', $source);
+        self::assertStringContainsString('provenNonResource', $source);
+    }
 }
