@@ -28,7 +28,9 @@ final class NestedVmHashTableMethodLlvmTest extends TestCase
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('find'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('findindex'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('unshiftprepend'));
-        $this->assertFalse(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('iteratekeyed'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('iteratekeyed'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('duplicate'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('unioncopy'));
     }
 
     /** Issue #20533 — thin AOT gate via isThinStandaloneAotMain, not StreamIo defer bag. */

@@ -16817,6 +16817,27 @@ class JIT {
 
                 return;
             }
+            // LogicException/Error subclasses inherit getCode; only Exception/Error proxies exist (#23974).
+            if ('getcode' === $methodLc && $this->context->functionIsRegistered('exception::getcode')) {
+                $codeProxy = 'exception::getcode';
+                if (
+                    '' !== $declaringClassLc
+                    && (
+                        \PHPCompiler\ext\standard\ThrowableManifest::isDescendantOf(
+                            $declaringClassLc,
+                            \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR
+                        )
+                        || \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR === $declaringClassLc
+                    )
+                    && $this->context->functionIsRegistered('error::getcode')
+                ) {
+                    $codeProxy = 'error::getcode';
+                }
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($codeProxy);
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
             if (
                 '__construct' === $methodLc
                 && $this->context->functionIsRegistered('exception::__construct')

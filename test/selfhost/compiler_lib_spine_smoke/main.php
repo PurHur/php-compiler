@@ -5268,6 +5268,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomNodeReplaceChildren.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomXPathEvaluate.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomXPathQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionConstruct.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ExceptionGetCode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExceptionGetMessage.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ExternalMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/FiberConstruct.php';

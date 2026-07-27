@@ -29,6 +29,8 @@ final class NestedVmHashTableMethodLlvm
         'ispackedlist' => Call\HashTableIsPackedList::class,
         'comparespaceship' => Call\HashTableCompareSpaceship::class,
         'iterate' => Call\HashTableIterate::class,
+        // NestedJIT-safe: same pair-list materialization as exportKeyValuePairs (#23974 / #12908).
+        'iteratekeyed' => Call\HashTableExportKeyValuePairs::class,
         'mergestringkeysfrom' => Call\HashTableMergeStringKeysFrom::class,
         'unshiftprepend' => Call\HashTableUnshiftPrepend::class,
         'find' => Call\HashTableFind::class,
