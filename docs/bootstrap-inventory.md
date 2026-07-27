@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6583 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21280 |
+| Source constructs flagged (warnings) | 21283 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3090,7 +3090,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmArrayFindInternalInvoke.php` | 0 | 1 |
 | `ext/standard/VmArrayPointer.php` | 0 | 2 |
 | `ext/standard/VmArraySort.php` | 0 | 2 |
-| `ext/standard/VmArraySortCallback.php` | 0 | 3 |
+| `ext/standard/VmArraySortCallback.php` | 0 | 6 |
 | `ext/standard/VmArrayUserSetOps.php` | 0 | 16 |
 | `ext/standard/VmArrayValueCallback.php` | 0 | 1 |
 | `ext/standard/VmArrayWalk.php` | 0 | 12 |
@@ -23823,24 +23823,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplArrayStorage.php`
 
 **Warnings** (review for bootstrap subset):
-- new OutOfBoundsException (line 107)
-- new Variable (line 266)
-- new Variable (line 280)
-- new ObjectEntry (line 296)
-- new Variable (line 310)
-- new Variable (line 320)
-- new Variable (line 326)
-- new Variable (line 414)
-- new Variable (line 416)
-- new HashTable (line 440)
-- new Variable (line 466)
-- new Variable (line 468)
-- new HashTable (line 492)
-- new Variable (line 505)
-- new Variable (line 524)
-- new Variable (line 530)
-- new Variable (line 536)
-- new Variable (line 542)
+- new OutOfBoundsException (line 105)
+- new Variable (line 264)
+- new Variable (line 278)
+- new ObjectEntry (line 294)
+- new Variable (line 308)
+- new Variable (line 318)
+- new Variable (line 324)
+- new Variable (line 413)
+- new Variable (line 415)
+- new HashTable (line 428)
+- new Variable (line 455)
+- new Variable (line 457)
+- new HashTable (line 470)
+- new Variable (line 483)
+- new Variable (line 502)
+- new Variable (line 508)
+- new Variable (line 514)
+- new Variable (line 520)
 - 38 class method(s)
 
 ### `ext/spl/SplArrayUserSortMethod.php`
@@ -30429,9 +30429,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmArraySortCallback.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 98)
-- new Variable (line 100)
-- 8 class method(s)
+- new Variable (line 82)
+- new Variable (line 84)
+- new Variable (line 210)
+- new Variable (line 212)
+- 15 class method(s)
+- 3 closure(s)
 
 ### `ext/standard/VmArrayUserSetOps.php`
 
@@ -37624,9 +37627,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/uasort_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 48)
-- new Variable (line 50)
-- new HashTable (line 79)
+- new Variable (line 49)
+- new Variable (line 51)
+- new HashTable (line 73)
 - 2 class method(s)
 
 ### `ext/standard/ucfirst.php`
@@ -37645,7 +37648,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 48)
 - new Variable (line 50)
-- new HashTable (line 79)
+- new HashTable (line 72)
 - 2 class method(s)
 
 ### `ext/standard/umask_.php`
