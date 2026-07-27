@@ -66,7 +66,7 @@ final class VmAssert
         }
         $frame->vmContext->errors->triggerError(
             $warningMessage,
-            ErrorReporter::E_USER_WARNING,
+            ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,
             $frame
@@ -89,15 +89,20 @@ final class VmAssert
         if (Variable::TYPE_STRING === $desc->type) {
             $text = $desc->toString();
 
-            return [$text, 'Assertion failed: '.$text];
+            return [$text, self::warningMessageForDescription($text)];
         }
         if (Variable::TYPE_OBJECT === $desc->type) {
             $object = $desc->toObject();
             $message = $object->getProperty(ExceptionSupport::PROP_MESSAGE)->resolveIndirect()->toString();
 
-            return [$message, 'Assertion failed: '.$message];
+            return [$message, self::warningMessageForDescription($message)];
         }
 
         return [$default, $default];
+    }
+
+    private static function warningMessageForDescription(string $description): string
+    {
+        return 'assert(): '.$description.' failed';
     }
 }
