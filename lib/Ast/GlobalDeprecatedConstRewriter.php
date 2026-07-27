@@ -8,9 +8,12 @@ use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Rewrite PHP 8.4+ #[\Deprecated] on file/namespace constants for nikic/php-parser 4.x (#16819).
+ * Rewrite attributes on file/namespace constants for nikic/php-parser 4.x (#16819, #23882).
  *
- * php-src: Zend/zend_compile.c — compile-unit const attributes (PHP 8.4+).
+ * - PHP 8.4+: #[\Deprecated] only (Zend/zend_compile.c).
+ * - PHP 8.5+: any attribute (RFC attributes_on_constants / TARGET_CONSTANT).
+ *
+ * php-parser 4.x rejects `#[Attr] const X` — strip to a comment marker and recover in PHPCfg.
  */
 final class GlobalDeprecatedConstRewriter
 {
@@ -18,6 +21,12 @@ final class GlobalDeprecatedConstRewriter
 
     /** @internal Marker embedded in source for PHPCfg recovery. */
     public const MARKER_PATTERN = '/\/\*\s*phpc-global-deprecated-const:([^*]+?)\s*\*\//';
+
+    /** PHP 8.5+ general const attributes — rawurlencoded attribute-group source (#23882). */
+    public const ATTRS_MARKER_PREFIX = 'phpc-global-const-attrs:';
+
+    /** @internal */
+    public const ATTRS_MARKER_PATTERN = '/\/\*\s*phpc-global-const-attrs:([^*]+?)\s*\*\//';
 
     /**
      * Zend 8.2 reference profile diagnostic for attributed file-scope constants (#16819).
@@ -64,7 +73,9 @@ final class GlobalDeprecatedConstRewriter
 
     public static function rewrite(string $source): string
     {
-        if (!CompilerVersion::supportsGlobalDeprecatedConstAttributes()) {
+        $allowDeprecated = CompilerVersion::supportsGlobalDeprecatedConstAttributes();
+        $allowAll = CompilerVersion::supportsAttributeTargetConstant();
+        if (!$allowDeprecated && !$allowAll) {
             return $source;
         }
         if (false === stripos($source, 'const')) {
@@ -85,6 +96,22 @@ final class GlobalDeprecatedConstRewriter
                 if (\in_array($tok[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
                     $pendingClassLike = true;
                 } elseif (T_ATTRIBUTE === $tok[0] && 0 === $classLikeDepth) {
+                    if ($allowAll) {
+                        $meta = self::consumeAllAttributeGroups($tokens, $i, $n);
+                        if (null === $meta) {
+                            $out .= $text;
+                            continue;
+                        }
+                        [$attrsSource, $end] = $meta;
+                        $constIdx = self::skipIgnorable($tokens, $end, $n);
+                        if ($constIdx >= $n || !\is_array($tokens[$constIdx]) || T_CONST !== $tokens[$constIdx][0]) {
+                            $out .= $text;
+                            continue;
+                        }
+                        $out .= '/*'.self::ATTRS_MARKER_PREFIX.rawurlencode($attrsSource).'*/ ';
+                        $i = $end - 1;
+                        continue;
+                    }
                     $meta = self::consumeDeprecatedAttributeGroups($tokens, $i, $n);
                     if (null === $meta) {
                         $out .= $text;
@@ -113,6 +140,41 @@ final class GlobalDeprecatedConstRewriter
         return $source === $out ? $source : $out;
     }
 
+    /**
+     * Rebuild PhpParser AttributeGroup[] from a rewritten marker payload (#23882).
+     *
+     * @return list<\PhpParser\Node\AttributeGroup>
+     */
+    public static function parseAttrGroupsFromMarkerSource(string $attrsSource): array
+    {
+        $attrsSource = trim($attrsSource);
+        if ('' === $attrsSource) {
+            return [];
+        }
+        $parser = (new \PhpParser\ParserFactory())->createForNewestSupportedVersion();
+        try {
+            $ast = $parser->parse("<?php\n".$attrsSource."\nclass __PhpcGlobalConstAttrProbe {}\n");
+        } catch (\Throwable) {
+            return [];
+        }
+        if (!\is_array($ast) || [] === $ast) {
+            return [];
+        }
+        $stmt = $ast[0];
+        if (!$stmt instanceof \PhpParser\Node\Stmt\Class_) {
+            return [];
+        }
+
+        return $stmt->attrGroups;
+    }
+
+    public static function parseAttrsMarkerPayload(string $payload): array
+    {
+        $decoded = rawurldecode(trim($payload));
+
+        return self::parseAttrGroupsFromMarkerSource($decoded);
+    }
+
     public static function parseMarkerPayload(string $payload): ?DeprecatedMetadata
     {
         $payload = trim($payload);
@@ -137,6 +199,40 @@ final class GlobalDeprecatedConstRewriter
         }
 
         return new DeprecatedMetadata($message, $since);
+    }
+
+    /**
+     * Consume every attribute group before a following token (PHP 8.5+ const attrs, #23882).
+     *
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     *
+     * @return array{0: string, 1: int}|null [raw attribute source, index after groups]
+     */
+    private static function consumeAllAttributeGroups(array $tokens, int $start, int $n): ?array
+    {
+        $i = $start;
+        $sawAny = false;
+        while ($i < $n) {
+            $i = self::skipIgnorable($tokens, $i, $n);
+            if ($i >= $n || !\is_array($tokens[$i]) || T_ATTRIBUTE !== $tokens[$i][0]) {
+                break;
+            }
+            $parsed = self::parseAttributeGroup($tokens, $i, $n);
+            if (null === $parsed) {
+                return null;
+            }
+            $sawAny = true;
+            $i = $parsed[1];
+        }
+        if (!$sawAny) {
+            return null;
+        }
+        $source = '';
+        for ($k = $start; $k < $i; ++$k) {
+            $source .= self::tokenText($tokens[$k]);
+        }
+
+        return [trim($source), $i];
     }
 
     /**

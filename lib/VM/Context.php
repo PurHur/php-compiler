@@ -42,6 +42,13 @@ class Context {
     public array $globalConstDeprecated = [];
 
     /**
+     * File/namespace constant attribute entries (PHP 8.5+ TARGET_CONSTANT, #23882).
+     *
+     * @var array<string, list<\PHPCompiler\Compiler\AttributeEntry>> lowercase const => entries
+     */
+    public array $globalConstAttributeEntries = [];
+
+    /**
      * Declaring filename for user constants (ReflectionConstant::getFileName, PHP 8.5+, #21551).
      *
      * @var array<string, string>

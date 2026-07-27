@@ -39854,6 +39854,16 @@ class Compiler {
         AttributeNames::assertCompileTimeConstTargetOnly($opcode->attributeNames, 'constant');
         AttributeNames::assertSensitiveParameterParamTargetOnly($opcode->attributeNames, 'constant');
         AttributeNames::assertDeprecatedTargetAllowed($opcode->attributeNames, 'constant');
+        // PHP 8.5+ user attributes on file/namespace constants (#23882).
+        if (CompilerVersion::supportsAttributeTargetConstant() && [] !== $opcode->attributeEntries) {
+            AttributeTargetValidator::assertEntriesForTarget(
+                $opcode->attributeEntries,
+                \PHPCompiler\VM\AttributeSupport::TARGET_CONSTANT,
+                'constant',
+                $this->attributeClassRegistry,
+                true
+            );
+        }
 
         return $opcode;
     }
