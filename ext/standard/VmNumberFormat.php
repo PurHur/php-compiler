@@ -130,10 +130,16 @@ final class VmNumberFormat
 
         $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
 
-        // php-src ext/standard/number_format.c — php_conv_floating_point / %F after _php_math_round.
+        // php-src ext/standard/math.c _php_math_number_format_ex (#23980):
+        // after round on the absolute value, clear the sign when magnitude is zero
+        // so number_format(-0.004, 2) is "0.00" not "-0.00".
+        if ($negative && 0.0 == $rounded) {
+            $negative = false;
+        }
+
+        // php-src formats %.*F on the absolute rounded value (not a re-signed float).
         // Integer frac extraction breaks past ~14 decimals (IEEE double); reuse dtoa fcvt path (#18525).
-        $signedRounded = $negative ? -$rounded : $rounded;
-        $formatted = VmFloatDtoa::formatSprintfF($signedRounded, $decimals);
+        $formatted = VmFloatDtoa::formatSprintfF($rounded, $decimals);
         if ('' !== $formatted && '-' === $formatted[0]) {
             $formatted = \substr($formatted, 1);
             $negative = true;
