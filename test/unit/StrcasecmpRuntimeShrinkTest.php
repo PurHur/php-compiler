@@ -8,9 +8,22 @@ use PHPCompiler\ext\standard\CaseCompareJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** strcasecmp()/strncasecmp() JIT routes through CaseCompareJitHelper PHP not libc LLVM (#15225). */
+/** strcasecmp()/strncasecmp() JIT routes through CaseCompareJitHelper PHP not libc LLVM (#15225, #23862). */
 final class StrcasecmpRuntimeShrinkTest extends TestCase
 {
+    public function testStringCaseCompareUsesJitVmHelperLinkNotHandRolledNestedJit(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringCaseCompare.php');
+        $this->assertStringContainsString('CaseCompareJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+    }
+
     public function testStrcasecmpUsesPhpBridgeNotLibcOnly(): void
     {
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/strcasecmp.php');
