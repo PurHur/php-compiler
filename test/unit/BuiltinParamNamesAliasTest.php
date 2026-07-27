@@ -659,6 +659,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23666 */
+    public function testDateTimeZoneGetTransitionsStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forClassMethod('DateTimeZone::getTransitions');
+        self::assertSame(['timestampBegin=', 'timestampEnd='], $names);
+        self::assertSame(
+            ['timestampBegin=', 'timestampEnd='],
+            BuiltinParamNames::paramNamesForInternalFunction('DateTimeZone::getTransitions')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'timestampBegin', 'DateTimeZone::getTransitions'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timestampEnd', 'DateTimeZone::getTransitions'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp_begin', 'DateTimeZone::getTransitions'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'object', 'DateTimeZone::getTransitions'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalMethod('DateTimeZone', 'getTransitions'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalMethod('DateTimeZone', 'getTransitions'));
+    }
+
     /** @covers issue #10059 */
     public function testArrayMultisortArraySpliceNamedParameters(): void
     {
