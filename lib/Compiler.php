@@ -18233,6 +18233,12 @@ class Compiler {
                 if (!$child->var instanceof CfgVariable && !$child->var instanceof Temporary) {
                     continue;
                 }
+                // Default-only match keeps seed+arm assigns in the same parent as
+                // preceding named locals (`$x = 1`). Those are not the match result
+                // temp — skipping them restores the shared phi slot for ARG_SEND (#23984).
+                if (null !== Block::resolveVariableName($child->var)) {
+                    continue;
+                }
                 if (null === $matchVar) {
                     $matchVar = $child->var;
                     continue;
