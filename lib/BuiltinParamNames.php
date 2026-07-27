@@ -415,6 +415,9 @@ final class BuiltinParamNames
             // php-src ext/session/session.stub.php — InternalArgInfo still says newname (#23436)
             case 'session_name':
                 return ['name'];
+            // php-src ext/session/session.stub.php — Reflection OK but forFunction empty (#23846)
+            case 'session_set_cookie_params':
+                return ['lifetime', 'path', 'domain', 'secure', 'httponly'];
             case 'define':
                 return ['constant_name', 'value', 'case_insensitive'];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says const_name/name (#23434)
