@@ -31,6 +31,7 @@ final class MatchJITTest extends BaseTest
                 'match_duplicate_default_jit.phpt',
                 'match_default_not_last_jit.phpt',
                 'match_default_arm_jit.phpt',
+                'match_default_only_call_arg_jit.phpt',
             ] as $file
         ) {
             yield $file => self::parsePHPT(
