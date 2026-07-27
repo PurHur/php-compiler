@@ -653,6 +653,10 @@ final class SprintfJitHelper
             } else {
                 $intPart = (int) ($number + 0.5);
             }
+            // php-src math.c _php_math_number_format_ex (#23980): drop sign after round-to-zero
+            if (1 === $negative && 0 === $intPart) {
+                $negative = 0;
+            }
             $result = self::insertThousands((string) $intPart, $thousandsSeparator);
 
             return 1 === $negative ? '-'.$result : $result;
@@ -674,6 +678,10 @@ final class SprintfJitHelper
         $fracPart = $scaledInt % $scaleInt;
         if ($fracPart < 0) {
             $fracPart = -$fracPart;
+        }
+        // php-src math.c _php_math_number_format_ex (#23980): drop sign after round-to-zero
+        if (1 === $negative && 0 === $intPart && 0 === $fracPart) {
+            $negative = 0;
         }
         $fracDigits = self::padLeftZeros((string) $fracPart, $decimals);
         $result = self::insertThousands((string) $intPart, $thousandsSeparator);
