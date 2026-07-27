@@ -14,6 +14,7 @@ use PHPCompiler\VM\Variable;
  *
  * Final internal classes; userland `new` rejected via {@see \PHPCompiler\VM\ReservedBuiltinClass}.
  * Soap\Sdl carries a {@see SoapSdlPayload} side-table like php-src `soap_sdl_object->sdl` (#23905).
+ * Soap\Url carries a {@see SoapUrlPayload} side-table like php-src `soap_url_object->url` (#23926).
  */
 final class VmSoapOpaque
 {
@@ -27,6 +28,9 @@ final class VmSoapOpaque
 
     /** @var array<int, SoapSdlPayload> */
     private static array $sdlPayloads = [];
+
+    /** @var array<int, SoapUrlPayload> */
+    private static array $urlPayloads = [];
 
     public static function register(Context $ctx): void
     {
@@ -53,8 +57,12 @@ final class VmSoapOpaque
         $ctx->classes[$lc] = $entry;
     }
 
-    /** Factory for SoapClient::$httpurl / related wiring (php-src soap_url_object_create). */
-    public static function newUrlObject(Context $ctx): ObjectEntry
+    /**
+     * Factory for SoapClient::$httpurl / related wiring (php-src soap_url_object_create).
+     *
+     * @param SoapUrlPayload|null $payload Parsed php_url snapshot (#23926).
+     */
+    public static function newUrlObject(Context $ctx, ?SoapUrlPayload $payload = null): ObjectEntry
     {
         self::register($ctx);
         $class = $ctx->classes[self::URL_CLASS_LC] ?? null;
@@ -63,6 +71,9 @@ final class VmSoapOpaque
         }
         $object = new ObjectEntry($class);
         $object->constructed = true;
+        if (null !== $payload) {
+            self::$urlPayloads[$object->id] = $payload;
+        }
 
         return $object;
     }
@@ -94,10 +105,16 @@ final class VmSoapOpaque
         return self::$sdlPayloads[$object->id] ?? null;
     }
 
-    public static function urlVariable(Context $ctx): Variable
+    /** php-src soap_url_object->url accessor for compiler-internal use (#23926). */
+    public static function urlPayload(ObjectEntry $object): ?SoapUrlPayload
+    {
+        return self::$urlPayloads[$object->id] ?? null;
+    }
+
+    public static function urlVariable(Context $ctx, ?SoapUrlPayload $payload = null): Variable
     {
         $var = new Variable(Variable::TYPE_OBJECT);
-        $var->object(self::newUrlObject($ctx));
+        $var->object(self::newUrlObject($ctx, $payload));
 
         return $var;
     }

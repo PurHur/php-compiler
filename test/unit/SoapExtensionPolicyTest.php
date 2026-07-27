@@ -105,10 +105,31 @@ final class SoapExtensionPolicyTest extends TestCase
             $ref = new \ReflectionClass(\PHPCompiler\ext\soap\VmSoapClient::class);
             $m = $ref->getMethod('attachHttpUrl');
             $m->setAccessible(true);
-            $m->invoke(null, $object, 'http://127.0.0.1/soap');
+            $m->invoke(null, $object, 'http://127.0.0.1:8080/soap?x=1');
             $urlVar = $object->getProperty('httpurl');
             self::assertSame(\PHPCompiler\VM\Variable::TYPE_OBJECT, $urlVar->type);
             self::assertSame('Soap\\Url', $urlVar->toObject()->class->name);
+            $payload = \PHPCompiler\ext\soap\VmSoapOpaque::urlPayload($urlVar->toObject());
+            self::assertNotNull($payload);
+            self::assertSame('http', $payload->scheme);
+            self::assertSame('127.0.0.1', $payload->host);
+            self::assertSame(8080, $payload->port);
+            self::assertSame('/soap', $payload->path);
+            self::assertSame('x=1', $payload->query);
+
+            $m->invoke(null, $object, 'https://example.com/api');
+            $payload2 = \PHPCompiler\ext\soap\VmSoapOpaque::urlPayload(
+                $object->getProperty('httpurl')->toObject()
+            );
+            self::assertNotNull($payload2);
+            self::assertSame('https', $payload2->scheme);
+            self::assertSame('example.com', $payload2->host);
+            self::assertSame(443, $payload2->port);
+            self::assertSame('/api', $payload2->path);
+            self::assertFalse($payload->matchesHost($payload2));
+            $same = \PHPCompiler\ext\soap\SoapUrlPayload::fromLocation('https://example.com/other');
+            self::assertNotNull($same);
+            self::assertTrue($payload2->matchesHost($same));
         } finally {
             if (false === $prev || null === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
