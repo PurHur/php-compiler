@@ -123,6 +123,46 @@ PHP;
         $this->assertStringContainsString('ok', $combined);
     }
 
+    /** Non-null ?-> undefined property still warns like plain -> (#23705). */
+    public function testBinJitNullsafeUndefPropertyWarns(): void
+    {
+        if (!$this->jitProbeOk()) {
+            $this->markTestSkipped('JIT MCJIT probe failed — bin/jit.php not runnable (#23705)');
+        }
+        $jit = realpath($this->repoRoot . '/bin/jit.php');
+        if (false === $jit) {
+            $this->markTestSkipped('bin/jit.php missing');
+        }
+        $repro = $this->repoRoot . '/test/repro/nullsafe_undef_23705.php';
+        $this->assertFileExists($repro);
+        $env = $this->llvmProcessEnv();
+        $cmd = array_merge(
+            LlvmToolchain::envPrefix($this->repoRoot),
+            [PHP_BINARY, $jit, $repro]
+        );
+        $descriptorSpec = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $proc = proc_open($cmd, $descriptorSpec, $pipes, $this->repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        $combined = ($stdout !== false ? $stdout : '') . ($stderr !== false ? $stderr : '');
+        $this->assertSame(0, $exit, $combined);
+        $this->assertSame(
+            2,
+            substr_count($combined, 'Undefined property: stdClass::$missing'),
+            $combined
+        );
+        $this->assertMatchesRegularExpression('/null-recv:\s*z=NULL/s', $combined);
+    }
+
     private function fixtureCode(string $file): string
     {
         $path = $this->repoRoot . '/test/compliance/cases/language/' . $file;

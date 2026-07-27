@@ -7504,10 +7504,7 @@ restart:
                                 || $this->isParentPrivatePropertyInvisibleFromCaller($invisibleParentPrivateMeta, $frame)
                             )
                         ) {
-                            if ($op->nullsafeFetchPropertyRead) {
-                                $result->null();
-                                break;
-                            }
+                            // Non-null receiver: nullsafe still warns like plain -> (#23705).
                             $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
                             $this->context->errors->undefinedPropertyRead(
                                 $propertyObject->class->name,
@@ -7671,20 +7668,19 @@ restart:
                                 break;
                             }
                             // Untyped declared property after unset: E_WARNING + NULL (#22021, zend_object_handlers.c).
+                            // Nullsafe on a live object still warns (#23705) — only null receivers short-circuit.
                             if (
                                 $propSlot->resolveIndirect()->isUndefined()
                                 && !VM\TypedPropertyCheck::isUninitialized($propSlot)
                             ) {
-                                if (!$op->nullsafeFetchPropertyRead) {
-                                    $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                                    $this->context->errors->undefinedPropertyRead(
-                                        $propertyObject->class->name,
-                                        $name,
-                                        $this->context,
-                                        $frame,
-                                        $scriptFile
-                                    );
-                                }
+                                $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                                $this->context->errors->undefinedPropertyRead(
+                                    $propertyObject->class->name,
+                                    $name,
+                                    $this->context,
+                                    $frame,
+                                    $scriptFile
+                                );
                                 $result->null();
                                 break;
                             }
@@ -7712,26 +7708,8 @@ restart:
                         $result->copyFrom(SplArrayStorage::offsetGet($propertyObject, $key));
                         break;
                     }
-                    if ($propertyObject->class->allowsDynamicProperties) {
-                        if ($op->nullsafeFetchPropertyRead) {
-                            $result->null();
-                            break;
-                        }
-                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                        $this->context->errors->undefinedPropertyRead(
-                            $propertyObject->class->name,
-                            $name,
-                            $this->context,
-                            $frame,
-                            $scriptFile
-                        );
-                        $result->null();
-                        break;
-                    }
-                    if ($op->nullsafeFetchPropertyRead) {
-                        $result->null();
-                        break;
-                    }
+                    // Undefined property on a non-null object: warn for both -> and ?-> (#23705).
+                    // Nullsafe only skips the warning when the receiver itself is null (TYPE_NULLSAFE).
                     $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
                     $this->context->errors->undefinedPropertyRead(
                         $propertyObject->class->name,

@@ -7,8 +7,8 @@ echo (1)?->foo ?? 'nullsafe', "\n";
 echo (false)?->x ?? 'ns', "\n";
 echo ('x')?->bar ?? 'ok', "\n";
 echo ([1])?->n ?? 'arr', "\n";
-$obj = new stdClass();
-echo $obj?->missing ?? 'ns', "\n";
+$n = null;
+echo $n?->missing ?? 'ns', "\n";
 --EXPECT--
 nullsafe
 ns
