@@ -6712,6 +6712,4 @@ unset($__spineMimeEnc, $__spineMimeDec);
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
 require_once __DIR__.'/../../../ext/standard/JitOpenStreamHandles.php';
-require_once __DIR__.'/../../../ext/dom/JitDomParentNodeProperty.php';
-require_once __DIR__.'/../../../ext/soap/SoapSdlPayload.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
