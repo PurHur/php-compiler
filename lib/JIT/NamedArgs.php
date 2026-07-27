@@ -225,7 +225,8 @@ final class NamedArgs
         $variadicNamed = [];
         /** @var array<string, Operand|null> $variadicNamedOperands */
         $variadicNamedOperands = [];
-        $unknownNamed = false;
+        /** @var array<string, true> $deferredUnknownNamed */
+        $deferredUnknownNamed = [];
 
         foreach ($entries as $entry) {
             if ('p' === $entry['kind']) {
@@ -287,7 +288,7 @@ final class NamedArgs
                         $variadicNamedOperands[$key] = $entry['operand'];
                         continue;
                     }
-                    $unknownNamed = true;
+                    self::deferInternalUnknownNamed($name, $deferredUnknownNamed);
                     continue;
                 }
                 if (null !== $variadicParamIndex) {
@@ -317,7 +318,7 @@ final class NamedArgs
                         continue;
                     }
                     // Internal variadics are positional-only; naming ...$values is unknown (#23449).
-                    $unknownNamed = true;
+                    self::deferInternalUnknownNamed($name, $deferredUnknownNamed);
                     continue;
                 }
                 $key = (string) $entry['name'];
@@ -336,7 +337,7 @@ final class NamedArgs
             $resultOperands[$idx] = $entry['operand'];
         }
 
-        if ($unknownNamed && null !== $functionName) {
+        if ([] !== $deferredUnknownNamed && null !== $functionName) {
             $required = BuiltinParamNames::requiredParamCountForInternalFunction($functionName) ?? 0;
             $given = 0;
             foreach ($result as $idx => $_) {
@@ -444,6 +445,17 @@ final class NamedArgs
             || isset($callee->paramIntersectionConstraintsByArg[$llvmArgIndex])
             || isset($callee->paramDnfConstraintsByArg[$llvmArgIndex])
             || isset($callee->paramClassConstraintsByArg[$llvmArgIndex]);
+    }
+
+    /**
+     * @param array<string, true> $deferredUnknownNamed
+     */
+    private static function deferInternalUnknownNamed(string $name, array &$deferredUnknownNamed): void
+    {
+        if (isset($deferredUnknownNamed[$name])) {
+            throw new \Error("Named parameter \${$name} overwrites previous argument");
+        }
+        $deferredUnknownNamed[$name] = true;
     }
 
     /**

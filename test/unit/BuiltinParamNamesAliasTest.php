@@ -527,11 +527,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'clearstatcache'));
     }
 
-    /** @covers issue #11349 */
+    /** @covers issue #11349, #23804 */
     public function testVariadicArrayBuiltinsRejectNamedParameters(): void
     {
-        foreach (['array_replace', 'array_merge', 'array_replace_recursive', 'array_merge_recursive', 'pack'] as $fn) {
-            self::assertTrue(BuiltinParamNames::rejectsNamedParameters($fn), $fn);
+        self::assertTrue(BuiltinParamNames::rejectsNamedParameters('pack'));
+        foreach (['array_replace', 'array_merge', 'array_replace_recursive', 'array_merge_recursive'] as $fn) {
+            self::assertFalse(BuiltinParamNames::rejectsNamedParameters($fn), $fn);
         }
         self::assertFalse(BuiltinParamNames::rejectsNamedParameters('array_combine'));
     }

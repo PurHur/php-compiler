@@ -1304,18 +1304,14 @@ final class BuiltinParamNames
     }
 
     /**
-     * php-src rejects all named parameters on these variadic array builtins (#11349).
+     * php-src rejects all named parameters on these variadic builtins (#11349, #23804).
+     *
+     * array_merge/array_replace accept only repeated variadic-slot names (overwrite Error);
+     * single named args still end in ArgumentCountError via deferred unknown-named resolution.
      */
     public static function rejectsNamedParameters(string $name): bool
     {
-        return match (strtolower($name)) {
-            'array_replace',
-            'array_merge',
-            'array_replace_recursive',
-            'array_merge_recursive',
-            'pack' => true,
-            default => false,
-        };
+        return 'pack' === strtolower($name);
     }
 
     /**
