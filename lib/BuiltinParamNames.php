@@ -24,6 +24,8 @@ final class BuiltinParamNames
             'datetime::format' => ['format'],
             'datetimeimmutable::format' => ['format'],
             'datetimezone::__construct' => ['timezone'],
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still says spec (#23707)
+            'dateinterval::__construct' => ['duration'],
             'errorexception::__construct' => ['message=', 'code=', 'severity=', 'filename=', 'line=', 'previous='],
             'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
             'splfileobject::seek' => ['line'],
