@@ -2492,6 +2492,26 @@ restart:
         return self::spaceshipNumeric($left, $right);
     }
 
+    /**
+     * Zend bitwise/shift numeric operands coerce through float->long before the host operator runs.
+     */
+    private static function coerceBitwiseNumericOperand(
+        $value,
+        ?\PHPCompiler\VM $vm = null,
+        ?\PHPCompiler\Frame $frame = null
+    ): int {
+        if (\is_float($value)) {
+            $opCtx = $frame?->vmContext ?? $vm?->context;
+            if (null !== $opCtx) {
+                \PHPCompiler\ext\standard\VmMath::warnFloatToIntPrecisionLoss($value, $opCtx, $frame);
+            }
+
+            return \PHPCompiler\ext\standard\VmMath::floatToZendLong($value);
+        }
+
+        return (int) $value;
+    }
+
     public function bitwiseOp(
         int $opCode,
         Variable $left,
@@ -2527,7 +2547,11 @@ restart:
             if (!self::operandsValidForBitwiseOp($left, $right)) {
                 self::throwUnsupportedOperandTypes($opCode, $left, $right);
             }
-            $this->int($this->_bitwiseOp($opCode, $left->toNumeric(), $right->toNumeric()));
+            $this->int($this->_bitwiseOp(
+                $opCode,
+                self::coerceBitwiseNumericOperand($left->toNumeric(), $vm, $frame),
+                self::coerceBitwiseNumericOperand($right->toNumeric(), $vm, $frame)
+            ));
 
             return;
         }
@@ -2554,11 +2578,23 @@ restart:
                 $this->float($result);
             }
         } elseif ($pair === TYPE_PAIR_INTEGER_FLOAT) {
-            $this->float($this->_bitwiseOp($opCode, $left->integer, $right->float));
+            $this->int($this->_bitwiseOp(
+                $opCode,
+                $left->integer,
+                self::coerceBitwiseNumericOperand($right->float, $vm, $frame)
+            ));
         } elseif ($pair === TYPE_PAIR_FLOAT_INTEGER) {
-            $this->float($this->_bitwiseOp($opCode, $left->float, $right->integer));
+            $this->int($this->_bitwiseOp(
+                $opCode,
+                self::coerceBitwiseNumericOperand($left->float, $vm, $frame),
+                $right->integer
+            ));
         } elseif ($pair === TYPE_PAIR_FLOAT_FLOAT) {
-            $this->float($this->_bitwiseOp($opCode, $left->float, $right->float));
+            $this->int($this->_bitwiseOp(
+                $opCode,
+                self::coerceBitwiseNumericOperand($left->float, $vm, $frame),
+                self::coerceBitwiseNumericOperand($right->float, $vm, $frame)
+            ));
         } elseif ($pair === TYPE_PAIR_STRING_STRING) {
             $this->string($this->_bitwiseOp($opCode, $left->toString(), $right->toString()));
         } else {
@@ -2583,14 +2619,10 @@ restart:
         }
         $result = $this->_bitwiseOp(
             $opCode,
-            $left->toNumericForArithmetic($vm, $frame),
-            $right->toNumericForArithmetic($vm, $frame)
+            self::coerceBitwiseNumericOperand($left->toNumericForArithmetic($vm, $frame), $vm, $frame),
+            self::coerceBitwiseNumericOperand($right->toNumericForArithmetic($vm, $frame), $vm, $frame)
         );
-        if (is_int($result)) {
-            $this->int($result);
-        } else {
-            $this->float($result);
-        }
+        $this->int($result);
     }
 
     private function _bitwiseOp(int $opCode, $left, $right) {
