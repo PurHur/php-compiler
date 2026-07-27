@@ -3534,13 +3534,17 @@ class VM {
             VmIteratorWalk::assertGeneratorIterableForRewind($gen);
             $gen->rewind();
             $index = 0;
-            while ($this->advanceGeneratorIteration($gen)) {
+            // After rewind the generator is on the opening yield — collect before advance (#23713).
+            while ($gen->hasCurrent && !$gen->done) {
                 if ($preserveKeys) {
                     self::appendHashTableEntry($out, $gen->currentKey, $gen->currentValue);
                 } else {
                     $packedKey = new Variable();
                     $packedKey->int($index++);
                     self::appendHashTableEntry($out, $packedKey, $gen->currentValue);
+                }
+                if (!$this->advanceGeneratorIteration($gen)) {
+                    break;
                 }
             }
 
@@ -14725,7 +14729,16 @@ restart:
     {
         $gen->foreachAdvance = true;
         try {
+            // Zend foreach: rewind may leave the generator on the opening yield; first valid
+            // must not advance past it (#23713). Later valids resume (next).
+            if ($gen->hasCurrent && !$gen->done && !$gen->foreachNeedsAdvance) {
+                $frame->scope[$validSlot]->bool(true);
+                $gen->foreachNeedsAdvance = true;
+
+                return null;
+            }
             $frame->scope[$validSlot]->bool($this->advanceGeneratorIteration($gen));
+            $gen->foreachNeedsAdvance = true;
 
             return null;
         } catch (VM\GeneratorUncaughtThrow $e) {
@@ -14751,6 +14764,8 @@ restart:
             // Instance-method / bound-closure generators need $this in scope (#22067).
             VM\GeneratorTrace::ensureFrameThisBound($gen->frame, $gen);
         }
+        // Zend zend_generator_resume clears ZEND_GENERATOR_AT_FIRST_YIELD (#23713).
+        $gen->atFirstYield = false;
         $gen->started = true;
         $savedStack = $this->context->swapRunStack(null);
         // Isolate try/catch from the caller so a suspended generator try cannot absorb

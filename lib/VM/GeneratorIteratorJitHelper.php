@@ -143,8 +143,12 @@ final class GeneratorIteratorJitHelper
         $i1 = $context->getTypeFromString('int1');
         $i64 = $context->getTypeFromString('int64');
         $doneField = $context->builder->structGep($state, $map['done']);
+        $hasCurrentField = $context->builder->structGep($state, $map['has_current']);
+        $needsAdvanceField = $context->builder->structGep($state, $map['foreach_needs_advance']);
         $fn = $context->builder->getInsertBlock()->getParent();
         $doneBb = $fn->appendBasicBlock('gen_iter_done');
+        $checkPosBb = $fn->appendBasicBlock('gen_iter_check_pos');
+        $useCurrentBb = $fn->appendBasicBlock('gen_iter_use_current');
         $resumeBb = $fn->appendBasicBlock('gen_iter_resume');
         $mergeBb = $fn->appendBasicBlock('gen_iter_merge');
         $resumeFn = $context->functions[strtolower($gen->generatorResumeName)] ?? null;
@@ -152,14 +156,31 @@ final class GeneratorIteratorJitHelper
             throw new \LogicException('Generator resume function missing from JIT context');
         }
 
-        $context->builder->branchIf($context->builder->load($doneField), $doneBb, $resumeBb);
+        $context->builder->branchIf($context->builder->load($doneField), $doneBb, $checkPosBb);
 
         $context->builder->positionAtEnd($doneBb);
         $context->builder->branch($mergeBb);
 
+        // Already on a yield and first VALID after RESET — report true without advancing (#23713).
+        $context->builder->positionAtEnd($checkPosBb);
+        $hasCurrent = $context->builder->load($hasCurrentField);
+        $needsAdvance = $context->builder->load($needsAdvanceField);
+        $useCurrent = $context->builder->and(
+            $context->builder->icmp(Builder::INT_NE, $hasCurrent, $i1->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_EQ, $needsAdvance, $i1->constInt(0, false))
+        );
+        $context->builder->branchIf($useCurrent, $useCurrentBb, $resumeBb);
+
+        $context->builder->positionAtEnd($useCurrentBb);
+        $context->builder->store($i1->constInt(1, false), $needsAdvanceField);
+        $context->builder->branch($mergeBb);
+
         $context->builder->positionAtEnd($resumeBb);
         $loopHead = $resumeBb;
+        // Clear AT_FIRST_YIELD like zend_generator_resume.
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['at_first_yield']));
         $yielded = $context->builder->call($resumeFn, $state);
+        $context->builder->store($i1->constInt(1, false), $needsAdvanceField);
         $hasYield = $context->builder->icmp(Builder::INT_NE, $yielded, $i64->constInt(0, false));
         $afterResume = $fn->appendBasicBlock('gen_iter_after_resume');
         $context->builder->branchIf($hasYield, $mergeBb, $afterResume);
@@ -170,6 +191,7 @@ final class GeneratorIteratorJitHelper
         $context->builder->positionAtEnd($mergeBb);
         $phi = $context->builder->phi($i1);
         $phi->addIncoming($i1->constInt(0, false), $doneBb);
+        $phi->addIncoming($i1->constInt(1, false), $useCurrentBb);
         $phi->addIncoming($i1->constInt(1, false), $resumeBb);
 
         return $phi;
@@ -217,21 +239,21 @@ final class GeneratorIteratorJitHelper
         if (null === $gen->generatorStatePtr) {
             return;
         }
-        $state = $gen->generatorStatePtr;
+        // Foreach ITER_RESET: reject closed/advanced; do not open unstarted gens (#23713).
+        self::compileAssertGeneratorIterableForRewind($context, $gen);
+        $statePtr = self::loadStateFromGeneratorObject($context, $gen);
         $map = $context->structFieldMap['__generator_state__'];
-        $sizeT = $context->getTypeFromString('size_t');
         $i1 = $context->getTypeFromString('int1');
-        $zero = $sizeT->constInt(0, false);
-        $context->builder->store($zero, $context->builder->structGep($state, $map['resume_ip']));
-        $context->builder->store($zero, $context->builder->structGep($state, $map['auto_key']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['has_current']));
-        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['done']));
-        VmGenerator::clearYieldFromFields($context, $state);
-        VmGenerator::clearPendingAndReturnFields($context, $state);
+        $context->builder->store(
+            $i1->constInt(0, false),
+            $context->builder->structGep($statePtr, $map['foreach_needs_advance'])
+        );
     }
 
     /**
      * Zend ext/spl/php_spl.c — iterator_to_array()/iterator_count() on started/closed Generator (#18582).
+     *
+     * Rewind is allowed while ZEND_GENERATOR_AT_FIRST_YIELD (#23713); only advanced/closed gens fail.
      */
     public static function compileAssertGeneratorIterableForRewind(Context $context, Variable $gen): void
     {
@@ -250,11 +272,16 @@ final class GeneratorIteratorJitHelper
         $context->builder->positionAtEnd($checkStarted);
         $resumeIp = $context->builder->load($context->builder->structGep($statePtr, $map['resume_ip']));
         $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
-        $started = $context->builder->or(
+        $atFirst = $context->builder->load($context->builder->structGep($statePtr, $map['at_first_yield']));
+        $opened = $context->builder->or(
             $context->builder->icmp(Builder::INT_NE, $resumeIp, $zero),
             $context->builder->icmp(Builder::INT_NE, $hasCurrent, $i1->constInt(0, false))
         );
-        $context->builder->branchIf($started, $failStarted, $ok);
+        $advancedPastFirst = $context->builder->and(
+            $opened,
+            $context->builder->icmp(Builder::INT_EQ, $atFirst, $i1->constInt(0, false))
+        );
+        $context->builder->branchIf($advancedPastFirst, $failStarted, $ok);
         $context->builder->positionAtEnd($failClosed);
         TryCatchHelper::emitCatchableClassError(
             $context,
@@ -415,6 +442,13 @@ final class GeneratorIteratorJitHelper
         if (!$resumeFn instanceof \PHPLLVM\Value\Function_) {
             throw new \LogicException('Generator resume function missing from JIT context');
         }
+        // Zend zend_generator_resume clears ZEND_GENERATOR_AT_FIRST_YIELD (#23713).
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $context->builder->store(
+            $i1->constInt(0, false),
+            $context->builder->structGep($statePtr, $map['at_first_yield'])
+        );
 
         return $context->builder->call($resumeFn, $statePtr);
     }
@@ -506,6 +540,11 @@ final class GeneratorIteratorJitHelper
         $context->builder->branchIf($needsStart, $startBb, $skipBb);
         $context->builder->positionAtEnd($startBb);
         self::runSingleResume($context, self::resolveResumeLc($context, $genVar), $statePtr);
+        // Zend zend_generator_ensure_initialized sets AT_FIRST_YIELD after open (#23713).
+        $context->builder->store(
+            $i1->constInt(1, false),
+            $context->builder->structGep($statePtr, $map['at_first_yield'])
+        );
         $context->builder->branch($skipBb);
         $context->builder->positionAtEnd($skipBb);
     }
