@@ -648,6 +648,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ctor, 'spec', 'DateInterval::__construct'));
     }
 
+    /** @covers issue #23685 */
+    public function testDateTimeModifyStubNamedParamsResolve(): void
+    {
+        foreach (['DateTime::modify', 'DateTimeImmutable::modify'] as $qual) {
+            $names = BuiltinParamNames::forClassMethod($qual);
+            self::assertSame(['modifier'], $names, $qual);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'modifier', $qual));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'modify', $qual));
+        }
+    }
+
     /** @covers issue #10059 */
     public function testArrayMultisortArraySpliceNamedParameters(): void
     {
