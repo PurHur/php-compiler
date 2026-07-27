@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT/AOT helper for str_replace() — routes through StrReplaceJitHelper PHP (#14779).
+ * JIT/AOT helper for str_replace() — routes through StrReplaceJitHelper PHP (#14779, #23912).
  */
 
 namespace PHPCompiler\ext\standard;

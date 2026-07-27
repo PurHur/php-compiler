@@ -63,6 +63,11 @@ final class HelperRuntimeCache
         // Same TU as sprintfArgv — linking the prelinked unit.o would reintroduce the
         // NestedJIT `$packed[$i+1]` miscompile (#23871) alongside the inlined fix.
         'phpcompiler\\ext\\standard\\sprintfjithelper::numberformat' => true,
+        // #23912 — force NestedJIT of NestedJIT-safe StrReplaceJitHelper into user AOT
+        // (stale/empty helper unit.o otherwise returns "" / wrong bytes for scalar replace).
+        'phpcompiler\\ext\\standard\\strreplacejithelper::replaceargv' => true,
+        'phpcompiler\\ext\\standard\\strreplacejithelper::ireplaceargv' => true,
+        'phpcompiler\\ext\\standard\\strreplacejithelper::takelastcount' => true,
     ];
 
     private static bool $loggedHit = false;
