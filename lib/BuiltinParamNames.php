@@ -406,6 +406,8 @@ final class BuiltinParamNames
             case 'array_merge':
             case 'array_merge_recursive':
                 return ['arrays'];
+            case 'var_dump':
+            case 'debug_zval_dump':
             case 'max':
             case 'min':
                 return ['value', 'values'];
