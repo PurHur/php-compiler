@@ -3474,9 +3474,12 @@ class Compiler {
             $var = $this->compileOperand($concat->result, $block, true);
         } else {
             $var = $this->compileOperand($echoOperand, $block, true);
+            $var = $this->resolveEchoEmitSlot($echoOperand, $block, $var);
         }
         $line = $op->getLine();
-        $block->addOpCode(new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null));
+        $echoOpcode = new OpCode(OpCode::TYPE_ECHO, $var, $line > 0 ? $line : null);
+        $this->attachEchoScriptGlobalName($echoOpcode, $echoOperand, $block);
+        $block->addOpCode($echoOpcode);
 
         return $block;
     }
@@ -37714,6 +37717,54 @@ class Compiler {
         return $slot;
     }
 
+    /**
+     * Echo must read the live CV slot after ++/-- or assign-op, not a stale literal (#23842).
+     */
+    private function resolveEchoEmitSlot(Operand $expr, Block $block, ?int $slot): ?int
+    {
+        if (null === $slot) {
+            return null;
+        }
+        $root = Block::cfgVarRoot($expr);
+        if (!$root instanceof Operand\Variable) {
+            return $slot;
+        }
+        $name = Block::resolveVariableName($root);
+        if (null === $name || '' === $name) {
+            return $slot;
+        }
+        if (!$block->isMainScript() && !$block->hasLocallyWrittenVariableName($name)) {
+            return $slot;
+        }
+        $live = $block->slotIndexForVariableName($name);
+        if (null === $live) {
+            return $slot;
+        }
+        $block->invalidateCompileTimeSlot($live);
+
+        return $live;
+    }
+
+    private function attachEchoScriptGlobalName(OpCode $opcode, Operand $expr, Block $block): void
+    {
+        if (!$block->isMainScript()) {
+            return;
+        }
+        $root = Block::cfgVarRoot($expr);
+        if (!$root instanceof Operand\Variable) {
+            return;
+        }
+        $name = Block::resolveVariableName($root);
+        if (
+            null === $name
+            || '' === $name
+            || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)
+        ) {
+            return;
+        }
+        $opcode->echoScriptGlobalName = $name;
+    }
+
     protected function compileOperand(?Operand $operand, Block $block, bool $isRead): ?int {
         if (null === $operand) {
             return null;
@@ -38721,15 +38772,19 @@ class Compiler {
                 } else {
                     $this->compileEmbeddedExprForOperand($terminal->expr, $block);
                     $var = $this->compileOperand($terminal->expr, $block, true);
+                    $var = $this->resolveEchoEmitSlot($terminal->expr, $block, $var);
                 }
 
                 $line = $terminal->getLine();
 
-                return [new OpCode(
+                $echoOpcode = new OpCode(
                     OpCode::TYPE_ECHO,
                     $var,
                     $line > 0 ? $line : null
-                )];
+                );
+                $this->attachEchoScriptGlobalName($echoOpcode, $terminal->expr, $block);
+
+                return [$echoOpcode];
             case 'Terminal_Return':
                 $returnLine = $terminal->getLine();
                 $returnLineArg = $returnLine > 0 ? $returnLine : null;

@@ -343,13 +343,30 @@ class Block {
     }
 
     public function getOperand(int $offset): ?Operand {
+        foreach ($this->namedAssignDestSlots as $root => $slot) {
+            if ($slot === $offset) {
+                return $root;
+            }
+        }
+        $fallback = null;
         foreach ($this->scope as $operand) {
-            if ($this->scope[$operand] === $offset) {
+            if ($this->scope[$operand] !== $offset) {
+                continue;
+            }
+            if ($operand instanceof VarOperand) {
                 return $operand;
+            }
+            if ($operand instanceof Operand\Literal) {
+                $fallback = $operand;
+
+                continue;
+            }
+            if (null === $fallback) {
+                $fallback = $operand;
             }
         }
 
-        return null;
+        return $fallback;
     }
 
     /**
@@ -460,6 +477,14 @@ class Block {
                     return $paramSlot;
                 }
             }
+            if ($this->scope->contains($operand)) {
+                $existing = $this->scope[$operand];
+                if ($this->shouldRegisterInheritedArg($operand)) {
+                    $this->args[$operand] = $existing;
+                }
+
+                return $existing;
+            }
             $namedDest = $this->slotForNamedAssignDest($operand);
             if (null === $namedDest) {
                 if (null !== $name && '' !== $name) {
@@ -563,7 +588,7 @@ class Block {
             if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
                 $this->args[$operand] = $next;
             }
-            if (!$isRead) {
+            if (!$isRead && !$operand instanceof Operand\Literal) {
                 $this->markLocallyWritten($operand);
             }
 
@@ -601,6 +626,30 @@ class Block {
         if (null !== $name && '' !== $name) {
             $this->localWrittenVarNames[$name] = true;
         }
+        $slots = [];
+        if ($this->scope->contains($operand)) {
+            $slots[(int) $this->scope[$operand]] = true;
+        }
+        if (null !== $root && $this->scope->contains($root)) {
+            $slots[(int) $this->scope[$root]] = true;
+        }
+        if (null !== $name && '' !== $name) {
+            $named = $this->slotIndexForVariableName($name);
+            if (null !== $named) {
+                $slots[$named] = true;
+            }
+        }
+        foreach ($slots as $slot => $_) {
+            unset($this->constants[$slot]);
+            foreach ($this->scope as $scopedOp) {
+                if ($this->scope[$scopedOp] !== $slot) {
+                    continue;
+                }
+                if ($scopedOp instanceof Operand\Literal && $scopedOp !== $operand) {
+                    $this->scope->detach($scopedOp);
+                }
+            }
+        }
     }
 
     private function isLocallyWritten(Operand $operand): bool
@@ -618,6 +667,48 @@ class Block {
         }
 
         return false;
+    }
+
+    public function hasLocallyWrittenVariableName(string $name): bool
+    {
+        return isset($this->localWrittenVarNames[$name]);
+    }
+
+    /** Drop stale literal operands/constants on a live CV slot before echo (#23842). */
+    public function invalidateCompileTimeSlot(int $slot): void
+    {
+        unset($this->constants[$slot]);
+        foreach ($this->scope as $scopedOp) {
+            if ($this->scope[$scopedOp] !== $slot) {
+                continue;
+            }
+            if ($scopedOp instanceof Operand\Literal) {
+                $this->scope->detach($scopedOp);
+            }
+        }
+    }
+
+    public function variableNameForSlot(int $slot): ?string
+    {
+        foreach ($this->namedAssignDestSlots as $root => $destSlot) {
+            if ($destSlot === $slot) {
+                $name = self::resolveVariableName($root);
+                if (null !== $name && '' !== $name) {
+                    return $name;
+                }
+            }
+        }
+        foreach ($this->scope as $operand) {
+            if ($this->scope[$operand] !== $slot) {
+                continue;
+            }
+            $name = self::resolveVariableName($operand);
+            if (null !== $name && '' !== $name) {
+                return $name;
+            }
+        }
+
+        return null;
     }
 
     /** Bind operand to a fresh slot (?: throw arm must not alias merge phi slot, #3802). */
@@ -1851,9 +1942,6 @@ class Block {
             return (string) $value;
         }
         if (!\is_string($value)) {
-            return null;
-        }
-        if (null !== $nameOp->type && Variable::mapFromType($nameOp->type) !== Variable::TYPE_STRING) {
             return null;
         }
 

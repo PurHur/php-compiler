@@ -8,7 +8,6 @@ use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Operand\Variable as VarOperand;
-use PHPCompiler\VM\Variable;
 
 /**
  * Resolve a hoisted operand back to a source variable name when possible.
@@ -30,10 +29,7 @@ final class OperandName
         if (!$nameOp instanceof Literal) {
             return null;
         }
-        if (null !== $nameOp->type && Variable::mapFromType($nameOp->type) !== Variable::TYPE_STRING) {
-            return null;
-        }
-        if (!is_string($nameOp->value)) {
+        if (!\is_string($nameOp->value)) {
             return null;
         }
 

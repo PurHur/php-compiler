@@ -291,6 +291,8 @@ class OpCode {
     public ?int $functionStaticTypeSlot = null;
     /** TYPE_DECLARE_FUNCTION_STATIC / TYPE_FUNCTION_STATIC_INIT_STORE: variable name for TypeError (#9998). */
     public ?string $functionStaticVarName = null;
+    /** TYPE_ECHO: {main} script-global CV when literal slot would stale-fold (#23842). */
+    public ?string $echoScriptGlobalName = null;
 
     /**
      * Closure `use ($var)` metadata for TYPE_CLOSURE (issue #72).
