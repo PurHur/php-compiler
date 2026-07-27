@@ -1,6 +1,5 @@
 <?php
-// #24009: `??=` leaves the variable empty under AOT — for null AND non-null subjects, so it is not
-// a wrong-branch bug. FAILS AOT today by design; becomes a live guard when #24009 lands.
+// #24009: `??=` / assign-from-?? must leave named locals usable under AOT (script-global load).
 $z = null;
 $z ??= 'set';
 echo $z, "\n";
