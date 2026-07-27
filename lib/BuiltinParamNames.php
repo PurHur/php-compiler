@@ -110,6 +110,14 @@ final class BuiltinParamNames
             'domxpath::evaluate' => ['expression', 'contextNode', 'registerNodeNS'],
             'domxpath::query' => ['expression', 'contextNode', 'registerNodeNS'],
             'domxpath::registernamespace' => ['prefix', 'namespace'],
+            // php-src ext/simplexml/simplexml.stub.php (#23686)
+            'simplexmlelement::xpath' => ['expression'],
+            'simplexmlelement::registerxpathnamespace' => ['prefix', 'namespace'],
+            'simplexmlelement::asxml' => ['filename'],
+            'simplexmlelement::addchild' => ['qualifiedName', 'value', 'namespace'],
+            'simplexmlelement::addattribute' => ['qualifiedName', 'value', 'namespace'],
+            'simplexmlelement::getnamespaces' => ['recursive'],
+            'simplexmlelement::getdocnamespaces' => ['recursive', 'fromRoot'],
             // php-src ext/xmlreader/php_xmlreader.stub.php (#23391)
             'xmlreader::expand' => ['baseNode='],
             'xmlreader::getattributens' => ['name', 'namespace'],
