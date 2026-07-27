@@ -163,6 +163,8 @@ final class BuiltinParamNames
             case 'quoted_printable_encode':
             case 'quoted_printable_decode':
             case 'bin2hex':
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/crc (#23491)
+            case 'crc32':
                 return ['string'];
             case 'substr':
                 return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
