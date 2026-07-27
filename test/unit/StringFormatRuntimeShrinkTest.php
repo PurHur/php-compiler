@@ -48,6 +48,27 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('VmSprintf::', $source);
         $this->assertStringNotContainsString('VmString::', $source);
         $this->assertStringContainsString('byteOrd', $source);
+        // NestedJIT mishandles `$packed[$i + 1]` on heap blobs (#23871) — readers must ++ only.
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$n\s*\|\=\s*self::byteOrd\(\$packed\[\$i\s*\+\s*1\]\)/',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$packed\[\$offset\s*\+\s*1\s*\+\s*\$i\]/',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$packed\[\$cursor\s*\+\s*\$i\]/',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$packed\[\$offset\s*\+\s*9\s*\+\s*\$i\]/',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$cursor\s*\+=\s*\$size/',
+            $source
+        );
     }
 
     public function testSprintfJitHelperMatchesVmSprintfForPercent03d(): void

@@ -60,6 +60,9 @@ final class HelperRuntimeCache
      */
     private const USER_SCRIPT_INLINE_ONLY_LOGICALS = [
         'phpcompiler\\ext\\standard\\sprintfjithelper::sprintfargv' => true,
+        // Same TU as sprintfArgv — linking the prelinked unit.o would reintroduce the
+        // NestedJIT `$packed[$i+1]` miscompile (#23871) alongside the inlined fix.
+        'phpcompiler\\ext\\standard\\sprintfjithelper::numberformat' => true,
     ];
 
     private static bool $loggedHit = false;
