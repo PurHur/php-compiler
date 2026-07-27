@@ -48,9 +48,9 @@ final class VmArrayValueCallback
     }
 
     /**
-     * Invoke array_find-family predicate — php-src php_array_find passes (value, key) for
-     * array_find/array_find_key/array_any/array_all; forward-profile array_any_key/array_all_key
-     * closures get (key, value); internal builtins get arity-trimmed operands (#17300, #17599).
+     * Invoke array_find-family predicate — php-src php_array_find passes (value, key)
+     * for array_find/array_find_key/array_any/array_all; internal builtins get
+     * arity-trimmed operands (#17300, #17599).
      */
     public static function invokePredicate(
         Frame $frame,
@@ -107,20 +107,19 @@ final class VmArrayValueCallback
     }
 
     /**
-     * Forward-profile array_any_key/array_all_key pass key before value; php-src array_find_key uses (value, key) (#17599).
+     * php-src array_find family always passes (value, key). Phantom array_*_key variants removed (#24000).
      */
     public static function callbackKeyFirst(string $function): bool
     {
-        return 'array_any_key' === $function
-            || 'array_all_key' === $function;
+        return false;
     }
 
     /**
-     * Forward-profile array_all_key/array_any_key unary internal predicates inspect keys (#17300).
+     * php-src unary internal predicates inspect values, not keys (#17300).
      */
     private static function unaryInternalUsesKey(string $function): bool
     {
-        return 'array_all_key' === $function || 'array_any_key' === $function;
+        return false;
     }
 
     private static function requireStringCallback(
@@ -184,28 +183,5 @@ final class VmArrayValueCallback
                 $argc
             ));
         }
-    }
-
-    /**
-     * Forward-profile array_all_key/array_any_key optional $strict (#15704).
-     *
-     * @param list<Variable> $calledArgs
-     */
-    public static function parseOptionalStrictArg(array $calledArgs, string $fn, int $minArgs = 2, int $maxArgs = 3): bool
-    {
-        $argc = \count($calledArgs);
-        if ($argc < $minArgs || $argc > $maxArgs) {
-            throw new \LogicException(\sprintf(
-                '%s() requires %d or %d arguments in this compiler build',
-                $fn,
-                $minArgs,
-                $maxArgs
-            ));
-        }
-        if ($argc === $maxArgs) {
-            return $calledArgs[$maxArgs - 1]->resolveIndirect()->toBool();
-        }
-
-        return false;
     }
 }

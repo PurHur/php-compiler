@@ -14,8 +14,8 @@ if (!function_exists('stream_context_set_options')) {
     echo "fail: stream_context_set_options missing\n";
     exit(1);
 }
-if (!function_exists('array_all_key')) {
-    echo "fail: array_all_key missing (control)\n";
+if (!function_exists('array_all')) {
+    echo "fail: array_all missing (control)\n";
     exit(1);
 }
 
