@@ -12389,7 +12389,7 @@ class JIT {
                             $name->value
                         );
                     }
-                    // PHP 8.4 final static (#23403) — same mark as instance finals for override/write guards.
+                    // PHP 8.4 final static (#23403, #23683) — inheritance + Reflection; writes allowed.
                     if ($op->propertyFinal ?? false) {
                         $this->context->type->object->markPropertyFinal($classId, $name->value);
                     }

@@ -3134,10 +3134,11 @@ final class VmReflection
         if (null !== $instance && $instance->readonly) {
             $modifiers |= self::REFLECTION_IS_READONLY;
         }
-        // php-src prop->flags & ZEND_ACC_FINAL → ReflectionProperty::IS_FINAL (#22341).
-        // private(set) is implicitly final (zend_API.c, #23068).
+        // php-src prop->flags & ZEND_ACC_FINAL → ReflectionProperty::IS_FINAL (#22341, #23683).
+        // private(set) is implicitly final (zend_API.c, #23068). Plain final does not block writes.
         if (
             (null !== $instance && $instance->propertyFinal)
+            || self::staticPropertyIsFinal($entry, $property, $ctx)
             || self::propertyIsFinalFromHookRegistry($entry, $property, $ctx)
             || \PHPCompiler\PropertyVisibility::isImplicitlyFinalFromPrivateSet($meta['setVisibility'])
         ) {
@@ -3145,6 +3146,27 @@ final class VmReflection
         }
 
         return $modifiers;
+    }
+
+    /**
+     * True when a static property carries ZEND_ACC_FINAL (#23683, #23403).
+     */
+    private static function staticPropertyIsFinal(
+        ClassEntry $entry,
+        string $property,
+        Context $ctx
+    ): bool {
+        $lc = strtolower($property);
+        $current = $entry;
+        while (true) {
+            if (!empty($current->staticPropertyFinal[$lc])) {
+                return true;
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return false;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
     }
 
     /**

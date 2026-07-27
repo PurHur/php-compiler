@@ -27,7 +27,8 @@ class ClassProperty {
     public ?string $unsetHookMethodLc = null;
     /** Virtual hooked property: hooks do not use backing storage (#4687, Zend zend_property_hooks.c). */
     public bool $propertyHookVirtual = false;
-    /** Final property (ZEND_ACC_FINAL / ReflectionProperty::isFinal, #20511, #22241). */
+    /** Final property (ZEND_ACC_FINAL / ReflectionProperty::isFinal, #20511, #22241).
+     * Inheritance-only in php-src — does not block writes (#23683). */
     public bool $propertyFinal = false;
     /** Individual readonly property (issue #3149, promoted readonly #3432). */
     public bool $readonly = false;

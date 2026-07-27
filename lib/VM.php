@@ -13463,33 +13463,17 @@ restart:
     }
 
     /**
-     * ReflectionProperty::setValue — PHP 8.4 final property write guard (#22450, #22451).
+     * ReflectionProperty::setValue — plain `final` does not block writes (php-src-strict, #23683).
      *
-     * Asymmetric set visibility (incl. implicit-final private(set), #23068/#23110) is governed by
-     * the set-visibility path, not the plain final write ban.
-     *
-     * @throws \Error
+     * Verified Zend PHP 8.4.23 / 8.5.8: `final` is inheritance-only (zend_inheritance.c).
+     * Asymmetric set visibility (private(set), #23068/#23110) still governs Reflection writes.
      */
     private function assertFinalPropertyWriteAllowedForReflection(
         ObjectEntry $object,
         string $propName
     ): void {
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || !$meta->propertyFinal) {
-            return;
-        }
-        if ($this->classPropertyHasDistinctAsymmetricSetVisibility($meta)) {
-            return;
-        }
-        if (!$object->constructed) {
-            return;
-        }
-        if (VM\CloneWithSupport::consumeReinit($object, $propName)) {
-            return;
-        }
-        $declaringClass = $this->context->classes[$meta->declaringClassLc]->name
-            ?? $meta->declaringClassLc;
-        throw new \Error(sprintf('Cannot modify final property %s::$%s', $declaringClass, $propName));
+        // No-op: php-src has no "Cannot modify final property" write path.
+        unset($object, $propName);
     }
 
     /** Reject readonly property writes; returns catch frame or throws when uncaught. */
@@ -13620,50 +13604,15 @@ restart:
     }
 
     /**
-     * Reject PHP 8.4 final property writes after initialization (#22450, #22451).
+     * Plain `final` properties are inheritance-only in php-src (#23683, re-#22450).
      *
-     * php-src: Zend/zend_object_handlers.c — "Cannot modify final property %s::$%s".
-     * Construction (including promoted ctor assignment) may still initialize the slot.
-     *
-     * Implicit-final from private(set) (#23068) must not use this path: in-class writes are
-     * allowed and external denies use the asymmetric message (#23110).
+     * Verified Zend PHP 8.4.23 / 8.5.8: post-construct writes succeed; child redeclaration
+     * fatals via {@see Compiler\FinalPropertyOverrideCheck}. External private(set) denies
+     * remain on the asymmetric write path (#23110).
      */
     private function enforceFinalPropertyWrite(Variable $lvalue, Frame $frame): ?Frame
     {
-        $owner = $this->resolvePropertyWriteOwner($lvalue);
-        if (null === $owner) {
-            return null;
-        }
-        $prop = $this->resolvePropertyWriteName($lvalue) ?? 'property';
-        $meta = $this->classPropertyMeta($owner, $prop);
-        if (null === $meta || !$meta->propertyFinal) {
-            return null;
-        }
-        // Asymmetric set visibility owns write checks (not "Cannot modify final property").
-        if ($this->classPropertyHasDistinctAsymmetricSetVisibility($meta)) {
-            return null;
-        }
-        if (!$owner->constructed) {
-            return null;
-        }
-        if (VM\CloneWithSupport::consumeReinit($owner, $prop)) {
-            return null;
-        }
-        $declaringClass = $this->context->classes[$meta->declaringClassLc]->name
-            ?? $meta->declaringClassLc;
-        $thrown = VM\BuiltinExceptionSupport::materializeError(
-            $this->context,
-            sprintf('Cannot modify final property %s::$%s', $declaringClass, $prop)
-        );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
-                return null;
-            }
-
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
+        unset($lvalue, $frame);
 
         return null;
     }
@@ -16415,6 +16364,9 @@ restart:
                 }
                 $entry->staticPropertyDeclaringClassLc[$name] = $trait->staticPropertyDeclaringClassLc[$name]
                     ?? $traitLc;
+                if (isset($trait->staticPropertyFinal[$name])) {
+                    $entry->staticPropertyFinal[$name] = true;
+                }
             }
             $this->inheritTraitStaticPropertyHooks($entry, $trait);
             $this->inheritTraitInstanceProperties($entry, $trait, $trait->name);
@@ -17268,6 +17220,9 @@ restart:
                 if (isset($parent->staticPropertyDeclaringClassLc[$name])) {
                     $entry->staticPropertyDeclaringClassLc[$name] = $parent->staticPropertyDeclaringClassLc[$name];
                 }
+                if (isset($parent->staticPropertyFinal[$name])) {
+                    $entry->staticPropertyFinal[$name] = true;
+                }
             }
         }
         foreach ($parent->staticPropertyHooks as $name => $hooks) {
@@ -17727,6 +17682,12 @@ restart:
                         $entry->staticPropertyAsymmetricExplicitRead[$name] = true;
                     }
                     $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
+                    // php-src ZEND_ACC_FINAL on static props — inheritance + Reflection only (#23683).
+                    if (!empty($op->propertyFinal)) {
+                        $entry->staticPropertyFinal[$name] = true;
+                    } else {
+                        unset($entry->staticPropertyFinal[$name]);
+                    }
                     if (null !== $op->deprecatedMetadata) {
                         $entry->propDeprecated[$name] = $op->deprecatedMetadata;
                     }
@@ -18243,6 +18204,11 @@ restart:
                 $entry->staticPropertyAsymmetricExplicitRead[$name] = true;
             }
             $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
+            if (!empty($declareOp->propertyFinal)) {
+                $entry->staticPropertyFinal[$name] = true;
+            } else {
+                unset($entry->staticPropertyFinal[$name]);
+            }
 
             return;
         }
