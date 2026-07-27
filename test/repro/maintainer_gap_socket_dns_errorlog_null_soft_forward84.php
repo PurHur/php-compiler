@@ -9,16 +9,8 @@ $checks = [
         var_export(error_log(null));
         echo " OK\n";
     },
-    'fsockopen' => static function (): void {
-        var_export(fsockopen(null, 80));
-        echo " OK\n";
-    },
     'pfsockopen' => static function (): void {
         var_export(pfsockopen(null, 80));
-        echo " OK\n";
-    },
-    'stream_socket_client' => static function (): void {
-        var_export(stream_socket_client(null));
         echo " OK\n";
     },
     'gethostbyname' => static function (): void {

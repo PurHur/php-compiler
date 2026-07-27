@@ -16,9 +16,9 @@ foreach (
     try {
         $call();
         echo $fn, " COERCED\n";
+        exit(1);
     } catch (TypeError $e) {
         echo $fn, ': ', $e->getMessage(), "\n";
-        exit(1);
     }
 }
 

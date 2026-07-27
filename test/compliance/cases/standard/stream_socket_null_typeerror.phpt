@@ -1,5 +1,5 @@
 --TEST--
-stdlib stream_socket_client()/fsockopen()(null) DEP+coerce on 8.4 (#21446, reverts #19199, ext/standard/streamsfuncs.c)
+stdlib stream_socket_client()/fsockopen()(null) TypeError (#23823, reverts #21446, ext/standard/streamsfuncs.c)
 --FILE--
 <?php
 putenv('PHP_COMPILER_PROFILE=8.4');
@@ -15,5 +15,6 @@ foreach (['stream_socket_client', 'fsockopen'] as $fn) {
 }
 ?>
 --EXPECT--
-stream_socket_client COERCED
-fsockopen COERCED
+stream_socket_client: stream_socket_client(): Argument #1 ($address) must be of type string, null given
+fsockopen: fsockopen(): Argument #1 ($hostname) must be of type string, null given
+
