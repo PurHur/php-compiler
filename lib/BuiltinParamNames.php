@@ -188,6 +188,12 @@ final class BuiltinParamNames
             case 'date_timestamp_get':
             case 'date_timezone_get':
                 return ['object'];
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still says timezone_identifier (#23446)
+            case 'date_default_timezone_set':
+                return ['timezoneId'];
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still says what/country (#23446)
+            case 'timezone_identifiers_list':
+                return ['timezoneGroup', 'countryCode'];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says min/sec/mon (#23275)
             case 'mktime':
             case 'gmmktime':
