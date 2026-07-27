@@ -6887,10 +6887,19 @@ class JIT {
             --$limit;
         }
 
+        // Trailing JUMP to merge is stripped; buildDispatch adds the edge. Without
+        // syntheticCfgBranch, compileBlockInternal would emit returnVoid() on the open
+        // catch tail and skip AFTER (#23641).
+        $savedSynthetic = $block->syntheticCfgBranch;
+        $block->syntheticCfgBranch = true;
         $this->context->inlineIncludeExitBlock = null;
-        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
-        if (null !== $this->context->inlineIncludeExitBlock) {
-            $exit = $this->context->inlineIncludeExitBlock;
+        try {
+            $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
+            if (null !== $this->context->inlineIncludeExitBlock) {
+                $exit = $this->context->inlineIncludeExitBlock;
+            }
+        } finally {
+            $block->syntheticCfgBranch = $savedSynthetic;
         }
 
         return $exit;
@@ -6912,10 +6921,16 @@ class JIT {
             --$limit;
         }
 
+        $savedSynthetic = $block->syntheticCfgBranch;
+        $block->syntheticCfgBranch = true;
         $this->context->inlineIncludeExitBlock = null;
-        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
-        if (null !== $this->context->inlineIncludeExitBlock) {
-            $exit = $this->context->inlineIncludeExitBlock;
+        try {
+            $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
+            if (null !== $this->context->inlineIncludeExitBlock) {
+                $exit = $this->context->inlineIncludeExitBlock;
+            }
+        } finally {
+            $block->syntheticCfgBranch = $savedSynthetic;
         }
         JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'finally_at_entry_cont');
 
@@ -12071,6 +12086,11 @@ class JIT {
             ) {
                 $prior = $this->context->getVariableFromOp($result);
                 if (Variable::TYPE_OBJECT === $prior->type) {
+                    // `new Foo()` result operand is reused for __construct's null/void return;
+                    // keep the allocated object (AOT LogicException/getMessage, #23641).
+                    if ($this->isJitCallConstructProxy($this->context->scope->toCall)) {
+                        return;
+                    }
                     // Inline f(); g() must not inherit object-typed operand slots (#18052).
                     $prior->free();
                     unset($this->context->scope->variables[$result]);
@@ -15181,6 +15201,37 @@ class JIT {
         return '__construct' === $name || str_ends_with($name, '::__construct');
     }
 
+    /** True when toCall is `__construct` (proxy / native / external stub). */
+    private function isJitCallConstructProxy(?JIT\Call $toCall): bool
+    {
+        if (null === $toCall) {
+            return false;
+        }
+        if ($toCall instanceof JIT\Call\Native) {
+            return str_ends_with(strtolower($toCall->name), '::__construct')
+                || '__construct' === strtolower($toCall->name);
+        }
+        if ($toCall instanceof JIT\Call\ExternalMethod) {
+            return str_ends_with(strtolower($toCall->proxyName), '::__construct');
+        }
+        if ($toCall instanceof JIT\Call\SimpleXMLElementConstruct
+            || $toCall instanceof JIT\Call\ExceptionConstruct
+            || $toCall instanceof JIT\Call\FiberConstruct
+            || $toCall instanceof JIT\Call\ReflectionClassConstruct
+            || $toCall instanceof JIT\Call\ReflectionObjectConstruct
+            || $toCall instanceof JIT\Call\ReflectionFunctionConstruct
+            || $toCall instanceof JIT\Call\ReflectionPropertyConstruct
+            || $toCall instanceof JIT\Call\ReflectionEnumConstruct
+            || $toCall instanceof JIT\Call\ReflectionConstantConstruct
+            || $toCall instanceof JIT\Call\RandomizerConstruct
+            || $toCall instanceof JIT\Call\RandomizerMt19937Construct
+        ) {
+            return true;
+        }
+
+        return str_ends_with(strtolower(get_class($toCall)), 'construct');
+    }
+
     /**
      * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
      */
@@ -15195,6 +15246,8 @@ class JIT {
             $name = strtolower($toCall->proxyName);
         } elseif ($toCall instanceof JIT\Call\SimpleXMLElementConstruct) {
             $name = 'simplexmlelement::__construct';
+        } elseif ($this->isJitCallConstructProxy($toCall)) {
+            $name = '::__construct';
         } else {
             return;
         }
@@ -16204,6 +16257,19 @@ class JIT {
 
                 return;
             }
+        }
+        // Catch-bound `$e->getMessage()` often has no PHPCfg userType and is lowered before
+        // `new LogicException` registers the class — RuntimeIndirect then only sees NestedJIT
+        // helpers with getMessage and aborts on real Throwable class_ids (#23641).
+        if (
+            'getmessage' === strtolower($methodName)
+            && $this->context->functionIsRegistered('exception::getmessage')
+        ) {
+            $receiverVar = $this->context->getVariableFromOp($receiverOp);
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy('exception::getmessage');
+            $this->context->scope->args = [$receiverVar];
+
+            return;
         }
         if ('propertyisinitialized' === strtolower($methodName)) {
             $receiverVar = $this->context->getVariableFromOp($receiverOp);

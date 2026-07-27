@@ -3139,6 +3139,7 @@ class Object_ extends Type {
         }
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
+        $this->seedThrowableExternalClass($id, $lcname);
         if ('reflectionattribute' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
             $this->defineProperty($id, 'args', Variable::TYPE_HASHTABLE);
@@ -3577,6 +3578,76 @@ class Object_ extends Type {
         }
         foreach (array_keys($arrayProps[$lcname]) as $propName) {
             $this->defineProperty($classId, $propName, Variable::TYPE_HASHTABLE);
+        }
+    }
+
+    /**
+     * Engine Throwable classes need Exception property slots + hasConstructor (#23641).
+     *
+     * Without this, `new LogicException("msg")` allocates a zero-prop object, skips
+     * __construct, and getMessage() reads slot 0 out of bounds (AOT rc=134 after catch).
+     * php-src: Zend/zend_exceptions.stub.php
+     */
+    private function seedThrowableExternalClass(int $classId, string $lcname): void
+    {
+        $name = \PHPCompiler\ext\standard\ThrowableManifest::nameForLc($lcname);
+        if (null === $name) {
+            return;
+        }
+        if (!\PHPCompiler\ext\standard\ThrowableManifest::isAdvertised($name)) {
+            return;
+        }
+
+        $this->ensureZendBuiltinInterfaces();
+        $this->markInterfaceClass('Throwable');
+
+        $parentName = \PHPCompiler\ext\standard\ThrowableManifest::parentName($name);
+        if (null !== $parentName) {
+            $this->setClassParentName($name, $parentName);
+        } else {
+            // Exception / Error roots implement Throwable (php-src zend_exceptions.stub.php).
+            $this->setClassInterfaces($name, ['Throwable']);
+        }
+
+        // Same order on every Throwable so ExceptionGetMessage's Exception::$message @ slot 0
+        // matches the allocated object's layout (LogicException / TypeError / …).
+        $prot = \PHPCfg\Func::FLAG_PROTECTED;
+        foreach (
+            [
+                \PHPCompiler\VM\ExceptionSupport::PROP_MESSAGE => Variable::TYPE_STRING,
+                \PHPCompiler\VM\ExceptionSupport::PROP_CODE => Variable::TYPE_NATIVE_LONG,
+                \PHPCompiler\VM\ExceptionSupport::PROP_FILE => Variable::TYPE_STRING,
+                \PHPCompiler\VM\ExceptionSupport::PROP_LINE => Variable::TYPE_NATIVE_LONG,
+            ] as $prop => $type
+        ) {
+            $this->defineProperty($classId, $prop, $type);
+            $this->definePropertyVisibility($classId, $prop, $prot);
+        }
+        if (\PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR_EXCEPTION === $lcname) {
+            $this->defineProperty(
+                $classId,
+                \PHPCompiler\VM\ExceptionSupport::PROP_SEVERITY,
+                Variable::TYPE_NATIVE_LONG
+            );
+        }
+
+        $this->markHasConstructor($classId);
+        $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        foreach (
+            [
+                '__construct',
+                'getmessage',
+                'getcode',
+                'getfile',
+                'getline',
+                'getprevious',
+                'gettrace',
+                'gettraceastring',
+                '__tostring',
+                '__wakeup',
+            ] as $method
+        ) {
+            $this->defineMethodVisibility($classId, $method, $pub);
         }
     }
 

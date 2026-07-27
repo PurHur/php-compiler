@@ -667,16 +667,32 @@ final class TryCatchHelper
                         continue;
                     }
                 }
-                $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
-                $catchTail = $context->builder->getInsertBlock();
+                $catchTail = $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
+                $insertAfter = null;
+                try {
+                    $insertAfter = $context->builder->getInsertBlock();
+                } catch (\Throwable) {
+                }
+                if (
+                    null !== $insertAfter
+                    && null === $insertAfter->getTerminator()
+                    && (null !== $catchTail->getTerminator() || $insertAfter !== $catchTail)
+                ) {
+                    $catchTail = $insertAfter;
+                }
                 $builder->positionAtEnd($catchTail);
                 if (null === $catchTail->getTerminator()) {
                     if (null !== $handler->finallyBb) {
                         $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
                         $builder->branch($handler->finallyBb);
-                    } elseif (null !== $mergeBody) {
-                        $builder->call($context->lookupFunction('phpc_jit_clear_active_catch'));
-                        $builder->branch($mergeBody);
+                    } else {
+                        $mergeTarget = $handler->mergeBodyLlvmBb
+                            ?? $handler->mergeEntryBb
+                            ?? $mergeBody;
+                        if (null !== $mergeTarget) {
+                            $builder->call($context->lookupFunction('phpc_jit_clear_active_catch'));
+                            $builder->branch($mergeTarget);
+                        }
                     }
                 }
             }
@@ -769,8 +785,7 @@ final class TryCatchHelper
         $builder->positionAtEnd($handledBb);
         ScriptExit::emitLibcExitWithStatus($context, $context->getTypeFromString('int64')->constInt(0, false));
         $builder->positionAtEnd($abortBb);
-        $builder->call($context->lookupFunction('abort'));
-        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        \PHPCompiler\JIT\Builtin\UncaughtThrowableRaise::emitCall($context, $exceptionObj);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'ex_handler_after_abort');
     }
 
