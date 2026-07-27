@@ -10661,6 +10661,10 @@ class JIT {
                     $this->context->popScope();
                     break;
                 case OpCode::TYPE_NEW:
+                    // new-expression startLine for Exception::__construct file/line (#195, #23641).
+                    if (null !== $op->arg3 && (int) $op->arg3 > 0) {
+                        $this->context->callSiteLine = (int) $op->arg3;
+                    }
                     $classOp = $block->getOperand($op->arg2);
                     if ($classOp instanceof Operand\Literal && 0 === strcasecmp($classOp->value, 'SplObjectStorage')) {
                         $classId = $this->context->type->object->lookup('SplObjectStorage');
