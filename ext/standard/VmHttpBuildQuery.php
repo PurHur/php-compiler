@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -144,6 +145,32 @@ final class VmHttpBuildQuery
         }
         if (Variable::TYPE_NULL === $value->type) {
             return '';
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            $exported = self::exportEnumCase($value, null);
+            if (\is_array($exported)) {
+                $childPrefix = self::buildChildKeyPrefix(
+                    $keyStr,
+                    $isIntKey,
+                    $numericPrefix,
+                    $keyPrefix,
+                    $useRaw
+                );
+
+                return self::buildWithKeyPrefix(
+                    $exported,
+                    '',
+                    $argSeparator,
+                    $encodingType,
+                    $childPrefix,
+                    $legacyIntEncodingArg
+                );
+            }
+
+            $fullKey = self::buildScalarKey($keyStr, $isIntKey, $numericPrefix, $keyPrefix, $useRaw);
+            $encodedKey = self::encodeKeyForOutput($fullKey, $isIntKey, $numericPrefix, $keyPrefix, $useRaw);
+
+            return $encodedKey.'='.self::encodeScalarValue($exported, $useRaw);
         }
 
         $scalar = self::variableToScalar($value);
@@ -357,18 +384,60 @@ final class VmHttpBuildQuery
     }
 
     /**
-     * php-src http.c — backed/unit enum cases expand to name[/value] sub-arrays.
+     * php-src http.c — enum case query encoding (#5654, #23703).
      *
-     * @return array<string, mixed>
+     * Pre-8.4: expand to name[/value] sub-arrays (get_object_vars shape).
+     * PHP 8.4+: BackedEnum → backing scalar; UnitEnum → ValueError (php_url_encode_scalar).
+     *
+     * @return array<string, mixed>|int|string
      */
-    private static function exportEnumCase(Variable $v, ?Frame $frame): array
+    private static function exportEnumCase(Variable $v, ?Frame $frame): array|int|string
     {
+        if (CompilerVersion::supportsHttpBuildQueryEnumBackingScalar()) {
+            $entry = EnumCaseSupport::enumCaseEntryForVariable($v);
+            if (null === $entry) {
+                return [];
+            }
+            if (null === $entry->enumClass->backedType) {
+                throw new \ValueError(
+                    'Unbacked enum '.$entry->enumClass->name.' cannot be converted to a string'
+                );
+            }
+            $backing = $entry->backingValue->resolveIndirect();
+
+            return match ($entry->enumClass->backedType) {
+                'int' => $backing->toInt(),
+                'string' => (string) $backing->toString(),
+                default => throw new \LogicException(
+                    'http_build_query() unsupported enum backing type in this compiler build'
+                ),
+            };
+        }
+
         $out = [];
         foreach (EnumCaseSupport::objectVarsForCaseVariable($v) as $name => $propVar) {
             $out[$name] = self::export($propVar, $frame);
         }
 
         return $out;
+    }
+
+    /**
+     * php-src http.c — root formdata must not be an enum under PHP 8.4+ (#23703).
+     */
+    public static function rejectRootEnumIfNeeded(Variable $data): void
+    {
+        if (!CompilerVersion::supportsHttpBuildQueryEnumBackingScalar()) {
+            return;
+        }
+        if (!EnumCaseSupport::isEnumCaseVariable($data)) {
+            return;
+        }
+        $className = EnumCaseSupport::enumClassForCaseVariable($data)?->name ?? 'enum';
+
+        throw new \TypeError(
+            'http_build_query(): Argument #1 ($data) must not be an enum, '.$className.' given'
+        );
     }
 
     private static function encodeScalarValue(mixed $value, bool $useRaw): string
