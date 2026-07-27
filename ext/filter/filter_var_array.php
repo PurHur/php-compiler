@@ -81,7 +81,7 @@ final class filter_var_array extends Internal
         }
 
         // Wrong type — TypeError with php-src-shaped array|int|null expectation (#21937).
-        VmArray::requireArrayParam($arg, 'filter_var_array', 2, 'definition', 'array|int|null');
+        VmArray::requireArrayParam($arg, 'filter_var_array', 2, 'options', 'array|int|null');
 
         return null;
     }

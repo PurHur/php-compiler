@@ -418,6 +418,9 @@ final class BuiltinParamNames
                 return ['stream', 'offset', 'whence'];
             case 'socket_select':
                 return ['read', 'write', 'except', 'seconds', 'microseconds'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says read_streams/tv_sec (#23598)
+            case 'stream_select':
+                return ['read', 'write', 'except', 'seconds', 'microseconds'];
             case 'fputcsv':
                 return ['stream', 'fields', 'separator', 'enclosure', 'escape', 'eol'];
             case 'stream_context_create':
@@ -426,6 +429,9 @@ final class BuiltinParamNames
                 return ['from', 'to', 'length', 'offset'];
             case 'stream_socket_client':
                 return ['address', 'error_code', 'error_message', 'timeout', 'flags', 'context'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says format; omits context (#23598)
+            case 'get_headers':
+                return ['url', 'associative', 'context'];
             case 'flock':
                 return ['stream', 'operation', 'wouldblock'];
             case 'get_resources':
@@ -552,6 +558,9 @@ final class BuiltinParamNames
                 return ['json', 'associative', 'depth', 'flags'];
             case 'filter_var':
                 return ['value', 'filter', 'options'];
+            // php-src ext/filter/filter.stub.php — InternalArgInfo still says data/definition (#23598)
+            case 'filter_var_array':
+                return ['array', 'options', 'add_empty'];
             // php-src ext/filter/filter.stub.php — Zend stub uses var_name (#23383)
             case 'filter_input':
                 return ['type', 'var_name', 'filter', 'options'];

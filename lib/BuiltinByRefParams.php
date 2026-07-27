@@ -65,6 +65,9 @@ final class BuiltinByRefParams
                 return [3];
             case 'socket_select':
                 return [0, 1, 2];
+            // php-src ext/standard/basic_functions.stub.php — &$read,&$write,&$except (#23598)
+            case 'stream_select':
+                return [0, 1, 2];
             case 'socket_getsockname':
             case 'socket_getpeername':
                 return [1, 2];
