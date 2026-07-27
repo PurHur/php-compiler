@@ -245,6 +245,7 @@ final class VmUnserializeFormat
             's' => $this->parseString(),
             'a' => $this->parseArray($depth),
             'O' => $this->parseObject($depth),
+            'E' => $this->parseEnum(),
             'r' => $this->parseObjectReference(),
             'R' => $this->parseReference(),
             default => $this->failCell(),
@@ -315,6 +316,27 @@ final class VmUnserializeFormat
         }
         $cell = new VmUnserializeCell();
         $cell->value = new VmUnserializeObjectPayload($className, $properties, $start, $this->pos);
+        $this->pushRef($cell);
+
+        return $cell;
+    }
+
+    /** php-src E:len:"ClassName:CaseName"; — enum wire format (var_unserializer.re). */
+    private function parseEnum(): VmUnserializeCell|false
+    {
+        if (!$this->expect('E:')) {
+            return $this->failCell();
+        }
+        $len = $this->readUnsignedInteger();
+        if (null === $len || !$this->expect(':"')) {
+            return $this->failCell();
+        }
+        $payload = $this->readStringContent($len);
+        if (null === $payload || !$this->expect('";')) {
+            return $this->failCell();
+        }
+        $cell = new VmUnserializeCell();
+        $cell->value = new VmUnserializeEnumPayload($payload);
         $this->pushRef($cell);
 
         return $cell;
@@ -573,6 +595,12 @@ final class VmUnserializeFormat
             return $cell->value->objectVar;
         }
 
+        if ($cell->value instanceof VmUnserializeEnumPayload) {
+            throw new \LogicException(
+                'unserialize() nested enum requires Context in this compiler build'
+            );
+        }
+
         if ($cell->value instanceof VmUnserializeObjectPayload) {
             throw new \LogicException(
                 'unserialize() nested object requires Context in this compiler build'
@@ -622,6 +650,23 @@ final class VmUnserializeFormat
             $slotForCell[$id] = $alias;
 
             return $alias;
+        }
+
+        if ($cell->value instanceof VmUnserializeEnumPayload) {
+            $colonPos = strrpos($cell->value->payload, ':');
+            if (false === $colonPos || 0 === $colonPos) {
+                throw new \LogicException('unserialize(): invalid enum case payload');
+            }
+            $className = \substr($cell->value->payload, 0, $colonPos);
+            $caseName = \substr($cell->value->payload, $colonPos + 1);
+            $resolved = VmSerialize::resolveEnumCaseVariable($ctx, $className, $caseName);
+            if (null === $resolved) {
+                throw new \LogicException('unserialize(): invalid enum case in this compiler build');
+            }
+            $canonical[$id] = $resolved;
+            $slotForCell[$id] = $resolved;
+
+            return $resolved;
         }
 
         if ($cell->value instanceof VmUnserializeObjectPayload) {
@@ -689,6 +734,19 @@ final class VmUnserializeFormat
             }
 
             return $objectVar;
+        }
+
+        if ($cell->value instanceof VmUnserializeEnumPayload) {
+            $resolved = VmSerialize::resolveEnumCaseFromWirePayload($ctx, $cell->value->payload);
+            if (null === $resolved) {
+                $var = new Variable();
+                $var->bool(false);
+
+                return $var;
+            }
+            $slotForCell[$id] = $resolved;
+
+            return $resolved;
         }
 
         if (\is_array($cell->value)) {
@@ -1011,6 +1069,15 @@ final class VmUnserializeObjectPayload
         public readonly array $properties,
         public readonly int $start,
         public readonly int $end,
+    ) {
+    }
+}
+
+/** E: payload captured during parse — enum wire format (#23692). */
+final class VmUnserializeEnumPayload
+{
+    public function __construct(
+        public readonly string $payload,
     ) {
     }
 }

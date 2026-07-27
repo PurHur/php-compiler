@@ -23,7 +23,7 @@ final class VmFloatDtoa
             return $value > 0.0 ? 'INF' : '-INF';
         }
         if (0.0 === $value) {
-            return '0';
+            return Ieee754::isNegativeZero($value) ? '-0' : '0';
         }
 
         $abs = \abs($value);

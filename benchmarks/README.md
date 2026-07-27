@@ -12,12 +12,12 @@ Environment: 8.2.32 · LLVM 9 available · 5 iterations averaged, wall time per 
 
 | Test Name          | Zend       8.2 (s)| bin/vm.php (s) | bin/jit.php (s) | phpc build (s) | native run (s) |
 |--------------------|-------------------|----------------|-----------------|----------------|----------------|
-|          Ack(3,10) |            1.6108 |            n/a |            n/a |            n/a |            n/a |
-|           Ack(3,8) |            0.0983 |            n/a |            n/a |            n/a |            n/a |
-|           Ack(3,9) |            0.3286 |            n/a |            n/a |            n/a |            n/a |
-|           fibo(30) |            0.1019 |            n/a |            n/a |         5.5706 |         0.0133 |
-|           fibo(32) |            0.2278 |            n/a |            n/a |         5.3847 |         0.0298 |
-|         mandelbrot |            0.1545 |            n/a |            n/a |            n/a |            n/a |
-|             simple |            0.0658 |            n/a |            n/a |         5.5292 |         1.0131 |
+|          Ack(3,10) |            1.8035 |            n/a |            n/a |         8.3113 |         4.0265 |
+|           Ack(3,8) |            0.0986 |            n/a |            n/a |         8.3422 |         0.2597 |
+|           Ack(3,9) |            0.3186 |            n/a |            n/a |         8.3537 |         1.0024 |
+|           fibo(30) |            0.1093 |            n/a |            n/a |         8.3028 |         0.0142 |
+|           fibo(32) |            0.2286 |            n/a |            n/a |         8.3128 |         0.0244 |
+|         mandelbrot |            0.1532 |            n/a |            n/a |         8.3582 |         0.1676 |
+|             simple |            0.0667 |            n/a |            n/a |         8.5173 |         1.0172 |
 
 <!-- benchmark table end -->
