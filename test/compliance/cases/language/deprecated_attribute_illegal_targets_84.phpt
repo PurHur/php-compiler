@@ -1,23 +1,23 @@
 --TEST--
-Language: #[\Deprecated] on trait is a compile fatal under PROFILE=8.4 (Zend 8.4 — no TARGET_CLASS, #23701 / #22989)
+Language: #[\Deprecated] rejects class/property/parameter under PROFILE=8.4 (#23701, Zend/zend_attributes.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
-if (PHPCompiler\CompilerVersion::supportsDeprecatedTraitAttribute()) {
-    die('skip trait deprecation enabled on this profile');
-}
 if (!PHPCompiler\CompilerVersion::advertisesDeprecatedAttributeClass()) {
     die('skip requires Deprecated builtin attribute (PROFILE=8.4)');
+}
+if (PHPCompiler\CompilerVersion::supportsDeprecatedTraitAttribute()) {
+    die('skip 8.5+ uses validate_deprecated class-like messages');
 }
 ?>
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-#[\Deprecated('old trait')]
-trait Tr {}
+#[\Deprecated('old')]
+class Old {}
 echo "unreachable\n";
 --EXPECT_EXIT--
 255

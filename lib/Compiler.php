@@ -837,6 +837,7 @@ class Compiler {
             AttributeNames::assertOverrideMethodTargetOnly($names, 'parameter');
             AttributeNames::assertCompileTimeConstTargetOnly($names, 'parameter');
             AttributeNames::assertSensitiveParameterParamTargetOnly($names, 'parameter');
+            AttributeNames::assertDeprecatedTargetAllowed($names, 'parameter');
             AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
         }
     }
@@ -6139,6 +6140,7 @@ class Compiler {
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertDeprecatedTargetAllowed($return->attributeNames, 'class');
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($iface);
         AttributeNames::assertDeprecatedAllowedOnClassLike(
             $return->attributeNames,
@@ -6174,6 +6176,7 @@ class Compiler {
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertDeprecatedTargetAllowed($return->attributeNames, 'class');
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($trait);
         AttributeNames::assertDeprecatedAllowedOnClassLike(
             $return->attributeNames,
@@ -6217,8 +6220,15 @@ class Compiler {
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertDeprecatedTargetAllowed($return->attributeNames, 'class');
         $enumName = $this->staticNameFromOperand($enum->name);
         if (null !== $enumName) {
+            AttributeNames::assertDeprecatedAllowedOnClassLike(
+                $return->attributeNames,
+                $return->deprecatedMetadata,
+                'enum',
+                $enumName
+            );
             AttributeNames::assertAllowDynamicPropertiesNotOnEnum($return->attributeNames, $enumName);
             $this->registerAttributeClassFromEntries($enumName, $return->attributeEntries);
         }
@@ -6359,6 +6369,7 @@ class Compiler {
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($declare->attributeNames, 'method');
         AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'method');
         AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'method');
+        AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'method');
         $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
@@ -6523,6 +6534,13 @@ class Compiler {
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertDeprecatedTargetAllowed($return->attributeNames, 'class');
+        AttributeNames::assertDeprecatedAllowedOnClassLike(
+            $return->attributeNames,
+            $return->deprecatedMetadata,
+            'class',
+            $className
+        );
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
@@ -7510,6 +7528,7 @@ class Compiler {
                     AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
                     AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
                     AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'property');
+                    AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'property');
                     $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
                     $this->assignSourceMetadata($declare, $child);
                     $result->addOpCode($declare);
@@ -7636,6 +7655,7 @@ class Compiler {
         $this->assignSourceMetadata($constOp, $child);
         AttributeNames::assertCompileTimeConstTargetOnly($constOp->attributeNames, 'class constant');
         AttributeNames::assertSensitiveParameterParamTargetOnly($constOp->attributeNames, 'class constant');
+        AttributeNames::assertDeprecatedTargetAllowed($constOp->attributeNames, 'class constant');
         $result->addOpCode($constOp);
         if (null !== $this->compilingClassLc && null !== $constName) {
             $this->compileTimeClassConstEmitted[$this->compilingClassLc][strtolower($constName)] = true;
@@ -8242,6 +8262,7 @@ class Compiler {
         AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
         // Promoted ctor params keep parameter attribute targets (zend_compile.c / #20351).
         AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'parameter');
+        AttributeNames::assertDeprecatedTargetAllowed($declare->attributeNames, 'parameter');
         $result->addOpCode($declare);
     }
 
@@ -10314,6 +10335,7 @@ class Compiler {
         $this->assignSourceMetadata($return, $function);
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'function');
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'function');
+        AttributeNames::assertDeprecatedTargetAllowed($return->attributeNames, 'function');
         return $return;
     }
 
@@ -12000,6 +12022,7 @@ class Compiler {
         $this->assignSourceMetadata($op, $expr);
         AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
         AttributeNames::assertSensitiveParameterParamTargetOnly($op->attributeNames, 'function');
+        AttributeNames::assertDeprecatedTargetAllowed($op->attributeNames, 'function');
         if ($expr instanceof Op\Expr\Closure) {
             foreach ($closureUseVars as $useVar) {
                 $name = $this->boundVariableName($useVar);
@@ -39721,6 +39744,7 @@ class Compiler {
         $this->assignAttributeMetadata($opcode, $const);
         AttributeNames::assertCompileTimeConstTargetOnly($opcode->attributeNames, 'constant');
         AttributeNames::assertSensitiveParameterParamTargetOnly($opcode->attributeNames, 'constant');
+        AttributeNames::assertDeprecatedTargetAllowed($opcode->attributeNames, 'constant');
 
         return $opcode;
     }

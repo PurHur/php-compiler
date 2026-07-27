@@ -1,25 +1,25 @@
 --TEST--
-Language: #[\Deprecated] on enum declarations — case fetch emits E_USER_DEPRECATED (#6921)
+Language: #[\Deprecated] on enum is a compile fatal under PROFILE=8.4 (#23701 / #6921, Zend/zend_attributes.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::advertisesDeprecatedAttributeClass()) {
+    die('skip requires Deprecated builtin attribute (PROFILE=8.4)');
+}
+if (PHPCompiler\CompilerVersion::supportsDeprecatedTraitAttribute()) {
+    die('skip 8.5+ uses validate_deprecated enum message');
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-ini_set('error_reporting', '32767');
-set_error_handler(function (): bool {
-    return true;
-});
-
 #[\Deprecated(message: 'Legacy enum', since: '8.4')]
 enum Legacy { case A; }
-
-enum Control { case A; }
-
-Legacy::A;
-$last = error_get_last();
-echo ($last['message'] ?? ''), "\n";
-echo ($last['type'] ?? 0) === 16384 ? "deprecated\n" : "no\n";
-
-Control::A;
-echo "after\n";
---EXPECT--
-Enum Legacy is deprecated since 8.4, Legacy enum
-deprecated
-after
+echo "unreachable\n";
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: Attribute "Deprecated" cannot target class (allowed targets: function, method, class constant)

@@ -112,9 +112,17 @@ final class BuiltinAttributes
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
 
+        // PHP 8.4: function|method|class constant (zend_attributes.c).
+        // PHP 8.5+: +TARGET_CLASS (traits via validate_deprecated) +TARGET_CONSTANT (#23701, #22989).
         $targets = AttributeSupport::TARGET_METHOD
             | AttributeSupport::TARGET_FUNCTION
             | AttributeSupport::TARGET_CLASS_CONSTANT;
+        if (CompilerVersion::supportsDeprecatedTraitAttribute()) {
+            $targets |= AttributeSupport::TARGET_CLASS;
+            if (AttributeSupport::hasTargetConstant()) {
+                $targets |= AttributeSupport::TARGET_CONSTANT;
+            }
+        }
         $entry->attributeNames = ['Attribute'];
         $entry->attributeEntries = [
             new AttributeEntry('Attribute', [['name' => null, 'value' => $targets]]),
