@@ -21,6 +21,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmResourceIdString;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -68,7 +69,8 @@ final class strval extends Internal
             case JITVariable::TYPE_NATIVE_LONG:
                 return JitResourceIdString::formatNativeLong(
                     $context,
-                    $context->helper->loadValue($args[0])
+                    $context->helper->loadValue($args[0]),
+                    null
                 );
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 return \PHPCompiler\JIT\Builtin\ZendDoubleStringRuntime::format(
@@ -123,7 +125,7 @@ final class strval extends Internal
         );
 
         $context->builder->positionAtEnd($longBlock);
-        $longStr = JitResourceIdString::formatNativeLong(
+        $longStr = VmResourceIdString::formatBoxedNativeLong(
             $context,
             $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr)
         );

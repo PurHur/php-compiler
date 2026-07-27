@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\VM\VmResourceIdString;
+use PHPCfg\Operand;
 use PHPLLVM\Value;
 
 /**
@@ -14,8 +15,12 @@ use PHPLLVM\Value;
  */
 final class JitResourceIdString
 {
-    public static function formatNativeLong(Context $context, Value $longVal): Value
+    public static function formatNativeLong(
+        Context $context,
+        Value $longVal,
+        ?Operand $sourceOperand = null
+    ): Value
     {
-        return VmResourceIdString::formatNativeLong($context, $longVal);
+        return VmResourceIdString::formatNativeLong($context, $longVal, $sourceOperand);
     }
 }
