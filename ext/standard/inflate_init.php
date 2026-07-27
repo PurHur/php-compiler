@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** inflate_init() — incremental inflate context (ext/zlib/zlib.c, issue #4656). */
+/** inflate_init() — incremental inflate context (ext/zlib/zlib.c, issue #4656 / #23642). */
 final class inflate_init extends ZlibIncrementalFunction
 {
     public function __construct()
@@ -18,11 +18,14 @@ final class inflate_init extends ZlibIncrementalFunction
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('inflate_init() expects exactly one argument in this compiler build');
-        }
+        $argc = \count($frame->calledArgs);
+        $this->requireArgCountBetween($argc, 1, 2);
         $encoding = VmZlibArg::resolveEncodingInt($frame, 0, 'inflate_init', 1, 'encoding');
-        $ctx = VmZlibContext::inflateInit(VmReflection::requireContext($frame), $encoding);
+        $options = [];
+        if (2 === $argc) {
+            $options = VmZlibContext::parseOptionsVariable($frame->calledArgs[1], 'inflate_init');
+        }
+        $ctx = VmZlibContext::inflateInit(VmReflection::requireContext($frame), $encoding, $options);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ctx): void {
             $ret->copyFrom($ctx);
         });
