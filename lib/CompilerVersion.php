@@ -1012,10 +1012,11 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ exit()/die() as proper functions — FCC, named args, two-arg (#6975, #12413, #12414, #12435, #13650, #13885, #13973).
+     * PHP 8.4+ exit()/die() as proper functions — FCC, named status (#6975, #12413, #12435, #13650, #13885, #13973, #23957).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects named/two-arg/FCC forms like Zend 8.2.
-     * Forward profile via {@see languageProfileVersion()} enables exit(status:)/die(message:) on 8.4.0-dev (#13487).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects named/multi-arg/FCC forms like Zend 8.2.
+     * Forward profile via {@see languageProfileVersion()} enables exit(status:)/die(status:) on 8.4.0-dev (#13487).
+     * php-src arity is a single optional $status (string|int); excess args → ArgumentCountError (#23957).
      * Reference-profile rejection tests skip when this returns true (exit_named_status_reference_profile.phpt).
      */
     public static function supportsExitFunctionForm(): bool

@@ -1,9 +1,14 @@
 --TEST--
-Language: exit()/die() two-argument form — status + message (#6718)
+Language: exit() rejects a second argument — ArgumentCountError (#23957, Zend/zend_builtin_functions.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-exit(1, "bye");
+try {
+    exit(1, "bye");
+    echo "unreachable\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-bye
---EXPECT_EXIT--
-1
+exit() expects at most 1 argument, 2 given

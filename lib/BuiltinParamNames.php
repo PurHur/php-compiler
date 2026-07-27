@@ -675,9 +675,10 @@ final class BuiltinParamNames
                 return ['string'];
             case 'resetaslazyghost':
                 return ['object', 'initializer', 'options'];
+            // php-src Zend/zend_builtin_functions.stub.php — string|int $status = 0 only (#23957; reverts #6718 two-arg)
             case 'exit':
             case 'die':
-                return ['status', 'message'];
+                return ['status='];
             case 'http_build_query':
                 return ['data', 'numeric_prefix', 'arg_separator', 'encoding_type'];
             case 'json_encode':

@@ -1,9 +1,14 @@
 --TEST--
-Language: die() two-argument form — status + message (#6718)
+Language: die() rejects a second argument — ArgumentCountError (#23957, Zend/zend_builtin_functions.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-die(2, "done");
+try {
+    die(2, "done");
+    echo "unreachable\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-done
---EXPECT_EXIT--
-2
+die() expects at most 1 argument, 2 given

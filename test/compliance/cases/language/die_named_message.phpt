@@ -1,9 +1,14 @@
 --TEST--
-Language: die(message:) named parameter prints message and exits 0 (#12414, basic_functions.c)
+Language: die(message:) unknown named parameter — Zend only has $status (#23957, Zend/zend_builtin_functions.stub.php)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-die(message: 'bye');
+try {
+    die(message: 'bye');
+    echo "unreachable\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-bye
---EXPECT_EXIT--
-0
+Unknown named parameter $message

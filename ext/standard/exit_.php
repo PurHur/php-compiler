@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ScriptExit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -18,7 +19,8 @@ use PHPLLVM\Value;
 /**
  * exit() — PHP 8.4 proper function form (paren calls only; bare exit; stays a construct).
  *
- * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.c PHP_FUNCTION(exit)
+ * php-src: Zend/zend_builtin_functions.stub.php — function exit(string|int $status = 0): never
+ * php-src: Zend/zend_builtin_functions.c — ZEND_FUNCTION(exit) ZEND_PARSE_PARAMETERS_START(0, 1)
  */
 final class exit_ extends Internal
 {
@@ -47,14 +49,27 @@ final class exit_ extends Internal
 
     public static function invokeFromFrame(Frame $frame, string $function): void
     {
+        // php-src ZEND_PARSE_PARAMETERS_START(0, 1) — no phantom $message (#23957).
+        self::assertAtMostOneArg($frame, $function);
         $args = $frame->calledArgs;
         $status = \array_key_exists(0, $args) ? $args[0] : null;
-        $message = \array_key_exists(1, $args) ? $args[1] : null;
         if (\array_key_exists(0, $args)) {
             self::validateStatusArg($args[0], $frame, $function);
         }
         $userFrame = $frame->parent ?? $frame;
-        VmExit::terminate($status, $userFrame, $message);
+        VmExit::terminate($status, $userFrame, null);
+    }
+
+    private static function assertAtMostOneArg(Frame $frame, string $function): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects at most 1 argument, %d given',
+                $function,
+                $argc
+            ));
+        }
     }
 
     private static function validateStatusArg(Variable $arg, Frame $frame, string $function): void
@@ -87,15 +102,23 @@ final class exit_ extends Internal
 
     private static function jitInvoke(Context $context, string $function, JITVariable ...$args): void
     {
+        // php-src ZEND_PARSE_PARAMETERS_START(0, 1) — no phantom $message (#23957).
+        if (\count($args) > 1) {
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            ExceptionBridge::emitArgumentCountError(
+                $context,
+                \sprintf('%s() expects at most 1 argument, %d given', $function, \count($args))
+            );
+
+            return;
+        }
         $status = $args[0] ?? null;
-        $message = $args[1] ?? null;
         if ($context->callerStrictTypes && null !== $status) {
             self::jitRequireStringOrIntStatus($context, $status, $function);
         }
 
-        if (null !== $message) {
-            ScriptExit::emitWithMessage($context, $status ?? self::jitNullStatus($context), $message);
-        } elseif (null !== $status) {
+        if (null !== $status) {
             ScriptExit::emit($context, $status);
         } else {
             ScriptExit::emit($context, self::jitNullStatus($context));
