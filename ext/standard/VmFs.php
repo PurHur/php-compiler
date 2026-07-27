@@ -921,7 +921,7 @@ final class VmFs
         $message = 'file_put_contents(): Exclusive locks may only be set for regular files';
         $vm = VM::running();
         if (null === $vm) {
-            @\trigger_error($message, \E_WARNING);
+            @\trigger_error($message, \E_USER_WARNING);
 
             return;
         }

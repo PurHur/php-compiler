@@ -18,6 +18,10 @@ final class StreamLifecycleJitHelper
         if ($handle <= 0) {
             return 0;
         }
+        // Shared NestedJIT table from StreamIoJitHelper::fopenArgv php://memory path (#23777).
+        if (JitOpenStreamHandles::isOpen($handle)) {
+            return 1;
+        }
         if (VmFs::isFailedStreamHandle($handle)) {
             return 1;
         }
@@ -40,6 +44,11 @@ final class StreamLifecycleJitHelper
     /** @return 0|1 ABI for __compiler_fclose */
     public static function fcloseArgv(int $handle): int
     {
+        if (JitOpenStreamHandles::isOpen($handle)) {
+            JitOpenStreamHandles::release($handle);
+
+            return 1;
+        }
         if (VmFs::isValidHandle($handle)) {
             return VmFs::fclose($handle) ? 1 : 0;
         }
