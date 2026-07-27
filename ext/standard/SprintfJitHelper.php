@@ -9,6 +9,8 @@ namespace PHPCompiler\ext\standard;
  *
  * NestedJIT-safe (Bin2hex #20452 / HashEquals #20469): no Variable / VmSprintf / VmString,
  * no native ord()/unpack()/strlen() (return 0 / empty under NestedJIT TUs).
+ * Never index packed argv with `$str[$a + $b]` — NestedJIT on `__string__init` heap blobs
+ * returns `(string)$index` instead of the byte (#23871). Walk with `++$cursor` only.
  * php-src: ext/standard/formatted_print.c, ext/standard/math.c
  */
 final class SprintfJitHelper
@@ -39,13 +41,19 @@ final class SprintfJitHelper
                 return $format;
             }
             if ($n < 0) {
-                return (string) $n;
+                $out = '';
+                $out .= (string) $n;
+
+                return $out;
             }
 
             return self::padLeftZeros((string) $n, 3);
         }
 
         // %d — including empty-array argv tag (0x05) → 0 (#18532).
+        // Build via concat (not bare `(string)$n` return): NestedJIT user-script AOT
+        // intermittently `free(): invalid pointer` when the helper returns a fresh
+        // int-to-string alone (#23871). Sequential path uses the same concat shape.
         if (2 === $fmtLen && '%' === $format[0] && 'd' === $format[1]) {
             if (1 === $packLen && self::isByte($packedArgs[0], 5)) {
                 return '0';
@@ -54,8 +62,10 @@ final class SprintfJitHelper
             if (null === $n) {
                 return $format;
             }
+            $out = '';
+            $out .= (string) $n;
 
-            return (string) $n;
+            return $out;
         }
 
         // %.*s / %.Ns / %*.*s — string precision (+ optional width) (#21956).
@@ -113,7 +123,12 @@ final class SprintfJitHelper
                 if (null === $n) {
                     return null;
                 }
-                $cursor += 9;
+                // NestedJIT: `$cursor += N` with a non-literal is unreliable (#23871).
+                $k = 0;
+                while ($k < 9) {
+                    ++$cursor;
+                    ++$k;
+                }
                 ++$argIdx;
                 $out .= (string) $n;
                 continue;
@@ -128,7 +143,11 @@ final class SprintfJitHelper
                 if (null === $size) {
                     return null;
                 }
-                $cursor += $size;
+                $k = 0;
+                while ($k < $size) {
+                    ++$cursor;
+                    ++$k;
+                }
                 ++$argIdx;
                 $out .= $s;
                 continue;
@@ -142,16 +161,25 @@ final class SprintfJitHelper
         return $out;
     }
 
-    /** NestedJIT-safe packed long read — no by-ref cursor (#23799). */
+    /** NestedJIT-safe packed long read — no by-ref cursor (#23799, #23871). */
     private static function readPackedLongAtOffset(string $packed, int $packLen, int $offset): ?int
     {
-        if ($offset + 9 > $packLen || !self::isByte($packed[$offset], 1)) {
+        if ($offset + 9 > $packLen) {
             return null;
         }
+        $p = 0;
+        while ($p < $offset) {
+            ++$p;
+        }
+        if (!self::isByte($packed[$p], 1)) {
+            return null;
+        }
+        ++$p;
         $n = 0;
         $i = 0;
         while ($i < 8) {
-            $n |= self::byteOrd($packed[$offset + 1 + $i]) << (8 * $i);
+            $n |= self::byteOrd($packed[$p]) << (8 * $i);
+            ++$p;
             ++$i;
         }
 
@@ -160,13 +188,22 @@ final class SprintfJitHelper
 
     private static function packedStringByteSizeAtOffset(string $packed, int $packLen, int $offset): ?int
     {
-        if ($offset + 9 > $packLen || !self::isByte($packed[$offset], 4)) {
+        if ($offset + 9 > $packLen) {
             return null;
         }
+        $p = 0;
+        while ($p < $offset) {
+            ++$p;
+        }
+        if (!self::isByte($packed[$p], 4)) {
+            return null;
+        }
+        ++$p;
         $len = 0;
         $i = 0;
         while ($i < 8) {
-            $len |= self::byteOrd($packed[$offset + 1 + $i]) << (8 * $i);
+            $len |= self::byteOrd($packed[$p]) << (8 * $i);
+            ++$p;
             ++$i;
         }
         if ($len < 0 || $offset + 9 + $len > $packLen) {
@@ -183,10 +220,21 @@ final class SprintfJitHelper
             return null;
         }
         $len = $size - 9;
+        $p = 0;
+        while ($p < $offset) {
+            ++$p;
+        }
+        // Skip TAG_STRING + 8-byte length.
+        $skip = 0;
+        while ($skip < 9) {
+            ++$p;
+            ++$skip;
+        }
         $out = '';
         $i = 0;
         while ($i < $len) {
-            $out .= $packed[$offset + 9 + $i];
+            $out .= $packed[$p];
+            ++$p;
             ++$i;
         }
 
@@ -397,14 +445,18 @@ final class SprintfJitHelper
             $len = 0;
             $i = 0;
             while ($i < 8) {
-                $len |= self::byteOrd($packed[$cursor + $i]) << (8 * $i);
+                $len |= self::byteOrd($packed[$cursor]) << (8 * $i);
+                ++$cursor;
                 ++$i;
             }
-            $cursor += 8;
             if ($len < 0 || $cursor + $len > $packLen) {
                 return false;
             }
-            $cursor += $len;
+            $i = 0;
+            while ($i < $len) {
+                ++$cursor;
+                ++$i;
+            }
 
             return true;
         }
@@ -514,10 +566,10 @@ final class SprintfJitHelper
         $n = 0;
         $i = 0;
         while ($i < 8) {
-            $n |= self::byteOrd($packed[$cursor + $i]) << (8 * $i);
+            $n |= self::byteOrd($packed[$cursor]) << (8 * $i);
+            ++$cursor;
             ++$i;
         }
-        $cursor += 8;
 
         return $n;
     }
@@ -533,20 +585,20 @@ final class SprintfJitHelper
         $len = 0;
         $i = 0;
         while ($i < 8) {
-            $len |= self::byteOrd($packed[$cursor + $i]) << (8 * $i);
+            $len |= self::byteOrd($packed[$cursor]) << (8 * $i);
+            ++$cursor;
             ++$i;
         }
-        $cursor += 8;
         if ($len < 0 || $cursor + $len > $packLen) {
             return null;
         }
         $out = '';
         $i = 0;
         while ($i < $len) {
-            $out .= $packed[$cursor + $i];
+            $out .= $packed[$cursor];
+            ++$cursor;
             ++$i;
         }
-        $cursor += $len;
 
         return $out;
     }
@@ -633,13 +685,17 @@ final class SprintfJitHelper
     private static function readPackedLong(string $packed, int $packLen): ?int
     {
         // TAG_LONG (1) + 8-byte little-endian int64.
+        // Index with ++ only — `$packed[$i + 1]` miscompiles under NestedJIT (#23871).
         if ($packLen < 9 || !self::isByte($packed[0], 1)) {
             return null;
         }
+        $p = 0;
+        ++$p;
         $n = 0;
         $i = 0;
         while ($i < 8) {
-            $n |= self::byteOrd($packed[$i + 1]) << (8 * $i);
+            $n |= self::byteOrd($packed[$p]) << (8 * $i);
+            ++$p;
             ++$i;
         }
 
