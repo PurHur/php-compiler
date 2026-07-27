@@ -10,12 +10,9 @@ namespace PHPCompiler\ext\standard;
  * SSOT: {@see VmString::strReplace()} / {@see VmString::strIreplace()}
  * php-src: ext/standard/string.c — php_str_replace, php_str_replace_in_subject
  *
- * NestedJIT user-script AOT (#23912 / peer #23871):
- * - Never index with `$s[$i+$j]`; walk with `++` only.
- * - After a match, search a fresh suffix from index 0 (advancing cursor on the same
- *   string value can sticky-read the matched byte → "hell0 w0000").
- * - Measure subject length once; shrink `$remLen` by arithmetic — do not re-`byteLen`
- *   the suffix (`isset` past the real end can sticky-read `'o'` → "hell0 w0rld0").
+ * NestedJIT user-script AOT (#23912 / peer #23871): per-char `$s[$i]` after a match can
+ * sticky-read the matched byte. Prefer `\substr` slices + whole-chunk `===` (same shape as
+ * ParseStrNativeJitHelper / PregJitHelper), and shrink length by arithmetic only.
  */
 final class StrReplaceJitHelper
 {
@@ -28,20 +25,24 @@ final class StrReplaceJitHelper
 
             return $subject;
         }
-        $searchLen = self::byteLen($search);
-        $remLen = self::byteLen($subject);
+        // Prefer strlen over isset-walk: NestedJIT AOT isset can be true one past the
+        // real end with a sticky matched byte (#23912 → "hell0 w0rld0").
+        $searchLen = \strlen($search);
+        $remLen = \strlen($subject);
         $count = 0;
         $out = '';
         $remaining = $subject;
         while ($remLen >= $searchLen) {
             $pos = self::findBounded($remaining, $remLen, $search, $searchLen);
             if ($pos < 0) {
-                $out = self::concat($out, self::slice($remaining, 0, $remLen));
+                $out = self::concat($out, $remaining);
                 self::$lastCount = $count;
 
                 return $out;
             }
-            $out = self::concat($out, self::slice($remaining, 0, $pos));
+            if ($pos > 0) {
+                $out = self::concat($out, \substr($remaining, 0, $pos));
+            }
             $out = self::concat($out, $replace);
             $skip = $pos;
             $u = 0;
@@ -55,12 +56,12 @@ final class StrReplaceJitHelper
                 ++$tailLen;
                 ++$t;
             }
-            $remaining = self::slice($remaining, $skip, $tailLen);
+            $remaining = \substr($remaining, $skip);
             $remLen = $tailLen;
             ++$count;
         }
         if ($remLen > 0) {
-            $out = self::concat($out, self::slice($remaining, 0, $remLen));
+            $out = self::concat($out, $remaining);
         }
         self::$lastCount = $count;
 
@@ -69,7 +70,6 @@ final class StrReplaceJitHelper
 
     public static function ireplaceArgv(string $search, string $replace, string $subject): string
     {
-        // Keep SSOT for case-insensitive via VmString (ASCII fold); count still NestedJIT-safe.
         $count = 0;
         $result = VmString::strIreplace($search, $replace, $subject, $count);
         self::$lastCount = $count;
@@ -77,36 +77,8 @@ final class StrReplaceJitHelper
         return $result;
     }
 
-    private static function byteLen(string $s): int
-    {
-        $n = 0;
-        while (true) {
-            if (!isset($s[$n])) {
-                return $n;
-            }
-            ++$n;
-        }
-    }
-
-    private static function slice(string $s, int $start, int $len): string
-    {
-        if ($len <= 0) {
-            return '';
-        }
-        $out = '';
-        $idx = $start;
-        $left = $len;
-        while ($left > 0) {
-            $out = self::concat($out, $s[$idx]);
-            ++$idx;
-            --$left;
-        }
-
-        return $out;
-    }
-
     /**
-     * Find needle in the first `$hayLen` bytes — bound by counter, not isset (#23912).
+     * Find via `\substr` chunk compare — avoids per-char sticky reads (#23912).
      */
     private static function findBounded(string $hay, int $hayLen, string $needle, int $needleLen): int
     {
@@ -116,18 +88,7 @@ final class StrReplaceJitHelper
         $i = 0;
         $remain = $hayLen;
         while ($remain >= $needleLen) {
-            $j = 0;
-            $hi = $i;
-            $matched = true;
-            while ($j < $needleLen) {
-                if ($hay[$hi] !== $needle[$j]) {
-                    $matched = false;
-                    break;
-                }
-                ++$j;
-                ++$hi;
-            }
-            if ($matched) {
+            if (\substr($hay, $i, $needleLen) === $needle) {
                 return $i;
             }
             ++$i;
@@ -137,7 +98,6 @@ final class StrReplaceJitHelper
         return -1;
     }
 
-    /** NestedJIT-safe concat — avoid `$a .= $b` alone as a return path (#23871). */
     private static function concat(string $left, string $right): string
     {
         $out = '';
