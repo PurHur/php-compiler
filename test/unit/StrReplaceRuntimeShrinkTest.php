@@ -8,17 +8,18 @@ use PHPCompiler\ext\standard\StrReplaceJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** str_replace() subject routing + inline LLVM JitStrReplace (#14779, #23912). */
+/** str_replace() subject routing + StrReplaceJitHelper NestedJIT path (#14779, #23912). */
 final class StrReplaceRuntimeShrinkTest extends TestCase
 {
-    public function testJitStrReplaceUsesInlineLlvmForAotScalarPath(): void
+    public function testStringStrReplaceUsesJitHelperNotInlineLlvm(): void
     {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrReplace.php');
+        $this->assertStringContainsString('StrReplaceJitHelper', $source);
+
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStrReplace.php');
-        // #23912: NestedJIT helper is wrong under user-script AOT — scalar path is LLVM again.
-        $this->assertStringContainsString('JitStringSearch::findOffsetI32', $jit);
-        $this->assertStringContainsString('string_trim::jitCopySlice', $jit);
-        $this->assertStringContainsString('BasicBlockHelper::entryAlloca', $jit);
-        $this->assertStringNotContainsString('StringStrReplace::invoke', $jit);
+        $this->assertStringContainsString('StringStrReplace::invoke', $jit);
+        $this->assertStringNotContainsString('JitStringSearch::findOffsetI32', $jit);
+        $this->assertStringNotContainsString('string_trim::jitCopySlice', $jit);
 
         $replace = (string) file_get_contents(__DIR__.'/../../ext/standard/str_replace.php');
         $this->assertStringContainsString('JitStrReplace::replace', $replace);
@@ -31,10 +32,17 @@ final class StrReplaceRuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitStrReplaceSubject.php');
     }
 
-    public function testStrReplaceJitHelperDelegatesToVmString(): void
+    public function testStrReplaceJitHelperWalkOriginalSubject(): void
     {
+        // NestedJIT-safe replaceArgv: correct string; count left 0 (int tally segfaults under AOT).
         $this->assertSame('heLLo', StrReplaceJitHelper::replaceArgv('l', 'L', 'hello'));
-        $this->assertSame(2, StrReplaceJitHelper::takeLastCount());
+        $this->assertSame(0, StrReplaceJitHelper::takeLastCount());
+        $this->assertSame('hell0 w0rld', StrReplaceJitHelper::replaceArgv('o', '0', 'hello world'));
+        $this->assertSame('hello', StrReplaceJitHelper::replaceArgv('', 'X', 'hello'));
+
+        $ssotCount = 0;
+        $this->assertSame('heLLo', VmString::strReplace('l', 'L', 'hello', $ssotCount));
+        $this->assertSame(2, $ssotCount);
 
         $expectedCount = 0;
         $expected = VmString::strIreplace('l', 'x', 'Hello', $expectedCount);
