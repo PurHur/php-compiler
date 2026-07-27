@@ -57,6 +57,7 @@ final class VmDomInstanceInvoke
     private static function dispatch(Variable $receiver, string $methodLc, Variable ...$extra): Variable
     {
         $self = VariableObject::entry($receiver->resolveIndirect());
+        VmDom::ensureFetchableNode($self);
         $ctx = VmDomJitFrame::vmContext();
         $methodLc = strtolower($methodLc);
 

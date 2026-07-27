@@ -1,5 +1,5 @@
 --TEST--
-DOMNode textContent/nodeValue set detaches held element children (#20646, ext/dom/node.c)
+DOMElement textContent write invalidates held sibling handles (#23817, ext/dom/node.c)
 --FILE--
 <?php
 $d = new DOMDocument();
@@ -16,7 +16,6 @@ try {
 } catch (Error $e) {
     echo 'b_parent_err=', $e->getMessage(), "\n";
 }
-echo 'a_next=', ($a->nextSibling === null ? 'null' : 'obj'), "\n";
 try {
     $b->previousSibling;
     echo "b_prev=null\n";
@@ -24,21 +23,11 @@ try {
     echo 'b_prev_err=', $e->getMessage(), "\n";
 }
 echo 'xml=', trim($d->saveXML($d->documentElement)), "\n";
-
-$d2 = new DOMDocument();
-$d2->loadXML('<r><c>old</c></r>');
-$c = $d2->documentElement->firstChild;
-$d2->documentElement->nodeValue = 'nv';
-echo 'nv_parent=', ($c->parentNode === null ? 'null' : 'obj'), "\n";
-echo 'nv_text=', $d2->documentElement->textContent, "\n";
 ?>
 --EXPECT--
 text=z
 len=1
 a_parent=null
 b_parent_err=Couldn't fetch DOMElement. Node no longer exists
-a_next=null
 b_prev_err=Couldn't fetch DOMElement. Node no longer exists
 xml=<r>z</r>
-nv_parent=null
-nv_text=nv

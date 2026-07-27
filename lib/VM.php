@@ -3945,6 +3945,7 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
+                    ext\dom\VmDom::retainUserHandleFromVariable($arg2);
                     if (
                         !$this->shouldDeferVmDeadTempRelease($frame)
                         && $op->arg2 !== $op->arg3
@@ -7661,6 +7662,16 @@ restart:
                                 goto restart;
                             }
                             $propMeta = $this->classPropertyMeta($propertyObject, $name, $frame);
+                            $domStaleMsg = ext\dom\VmDom::fetchableNodeErrorMessage($propertyObject);
+                            if (null !== $domStaleMsg) {
+                                $catchFrame = $this->dispatchVmError($domStaleMsg, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $result->null();
+                                break;
+                            }
                             $propSlot = null !== $propMeta && $propertyObject->hasPropertyForMeta($propMeta)
                                 ? $propertyObject->getPropertyForMeta($propMeta)
                                 : $propertyObject->getProperty($name);

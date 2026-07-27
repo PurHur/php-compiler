@@ -24,6 +24,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VariableObject;
 
 /**
  * DOM factory + serialization in PHP (php-src ext/dom/php_dom.c; issue #6140).
@@ -6358,7 +6359,11 @@ final class VmDom
         self::syncSubtree($ctx, $parent);
     }
 
-    private static function removeAllLiveStandardChildren(Context $ctx, ObjectEntry $parent): void
+    private static function removeAllLiveStandardChildren(
+        Context $ctx,
+        ObjectEntry $parent,
+        bool $freeRemovedChildList = false
+    ): void
     {
         $parentState = DomRegistry::state($parent);
         $existingIds = $parentState->childIds;
@@ -6380,6 +6385,106 @@ final class VmDom
                 self::linkChildToParent($child, null);
             }
         }
+        if ($freeRemovedChildList) {
+            self::freeRemovedChildrenLikeLibxml($existingIds);
+        }
+    }
+
+    /**
+     * php-src dom_remove_all_children + php_libxml_node_free_list (#23817).
+     *
+     * Walk removed children: free unheld nodes; when the first user-held child is kept,
+     * invalidate its following siblings (Zend fatals on their property access).
+     *
+     * @param list<int> $existingIds
+     */
+    private static function freeRemovedChildrenLikeLibxml(array $existingIds): void
+    {
+        if ([] === $existingIds) {
+            return;
+        }
+        $retainedIndex = null;
+        foreach ($existingIds as $index => $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child || !DomRegistry::has($child)) {
+                continue;
+            }
+            if (DomRegistry::state($child)->userHandleCount > 0) {
+                $retainedIndex = $index;
+                break;
+            }
+            self::markNodeFreedRecursive($child);
+        }
+        if (null === $retainedIndex) {
+            return;
+        }
+        $count = \count($existingIds);
+        for ($i = $retainedIndex + 1; $i < $count; ++$i) {
+            $sibling = DomRegistry::entry($existingIds[$i]);
+            if (null !== $sibling) {
+                self::markNodeFreedRecursive($sibling);
+            }
+        }
+    }
+
+    private static function markNodeFreedRecursive(ObjectEntry $node): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        $state = DomRegistry::state($node);
+        if ($state->nodeFreed) {
+            return;
+        }
+        $state->nodeFreed = true;
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::markNodeFreedRecursive($child);
+            }
+        }
+    }
+
+    /** php-src dom_objects_not_found — stale wrapper after textContent child free (#23817). */
+    public static function fetchableNodeErrorMessage(ObjectEntry $node): ?string
+    {
+        if (!DomRegistry::has($node)) {
+            return null;
+        }
+        if (DomRegistry::state($node)->nodeFreed) {
+            return 'Couldn\'t fetch '.$node->class->name.'. Node no longer exists';
+        }
+
+        return null;
+    }
+
+    public static function ensureFetchableNode(ObjectEntry $node): void
+    {
+        $message = self::fetchableNodeErrorMessage($node);
+        if (null !== $message) {
+            throw new \Error($message);
+        }
+    }
+
+    /** Track user CV/global assignment for php_libxml_node_free_list simulation (#23817). */
+    public static function retainUserHandleFromVariable(Variable $var): void
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return;
+        }
+        try {
+            self::retainUserHandle(VariableObject::entry($resolved));
+        } catch (\TypeError) {
+        }
+    }
+
+    public static function retainUserHandle(ObjectEntry $node): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        ++DomRegistry::state($node)->userHandleCount;
     }
 
     /**
@@ -10898,7 +11003,7 @@ final class VmDom
         // inserting replacement text (#20646). Clearing childIds alone left held element
         // wrappers still parented (live-tree desync vs Zend).
         // Empty string still inserts one empty DOMText (DOM Living / php-src; #22657).
-        self::removeAllLiveStandardChildren($ctx, $node);
+        self::removeAllLiveStandardChildren($ctx, $node, true);
         $ownerDoc = self::ownerDocumentEntry($node);
         $text = self::createTextNode($ctx, $value, $ownerDoc);
         $state->childIds[] = $text->id;
