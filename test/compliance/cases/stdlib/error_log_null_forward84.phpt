@@ -1,5 +1,5 @@
 --TEST--
-stdlib error_log(null) — DEP+coerce on 8.4 forward profile (#21446, reverts #20253, ext/standard/basic_functions.c)
+stdlib error_log(null) — TypeError on 8.4 forward profile (#23858, reverts #21446, ext/standard/basic_functions.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -12,4 +12,4 @@ try {
 }
 ?>
 --EXPECT--
-true COERCED
+error_log(): Argument #1 ($message) must be of type string, null given
