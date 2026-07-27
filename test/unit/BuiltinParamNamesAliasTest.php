@@ -1093,6 +1093,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23784 */
+    public function testConvertUuZendStubNamedParams(): void
+    {
+        foreach (['convert_uuencode', 'convert_uudecode'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn), $fn);
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'data', $fn), $fn);
+        }
+    }
+
     /** @covers issue #23585 */
     public function testHashInitZendStubNamedParams(): void
     {

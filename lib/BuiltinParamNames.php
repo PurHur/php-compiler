@@ -624,6 +624,9 @@ final class BuiltinParamNames
             case 'urldecode':
             case 'rawurlencode':
             case 'rawurldecode':
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says data (#23784)
+            case 'convert_uuencode':
+            case 'convert_uudecode':
                 return ['string'];
             case 'resetaslazyghost':
                 return ['object', 'initializer', 'options'];
