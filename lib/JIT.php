@@ -15610,11 +15610,6 @@ class JIT {
         if (JIT\NestedJitCompileScope::isActive()) {
             return;
         }
-        // A value that provably came from a literal or from arithmetic cannot be a resource handle,
-        // so the guard is dead code — and it is expensive enough to dominate hot loops (#23483).
-        if (JIT\IncDecResourceProvenance::cannotBeResource($readOp)) {
-            return;
-        }
         $longVal = null;
         if (JIT\Variable::TYPE_NATIVE_LONG === $read->type) {
             $longVal = $this->context->helper->loadValue($read);
@@ -15628,10 +15623,34 @@ class JIT {
         if (null === $longVal) {
             return;
         }
+        // A value that provably came from a literal or from arithmetic cannot be a resource handle,
+        // so the runtime check is dead — and it is expensive enough to dominate hot loops
+        // (#23483: 135ms -> 8ms on build/micro/m_loop.php). nativeLongIsResource() calls
+        // __compiler_is_resource, which walks four handle registries in StreamLifecycleJitHelper.
+        //
+        // Fold the condition to false rather than returning early, and keep the ensureLinked() calls
+        // below unconditional. #23781 originally bailed out before them, which silently stopped
+        // ++/-- from taking effect at script scope (#23840): `$n = 5; $n--;` kept 5, and
+        // `for ($i=0;$i<5;++$i){++$acc;}` yielded 0, in every AOT binary.
+        //
+        // The dependency is on the ensureLinked() calls, not on anything else in this function.
+        // Verified by elimination, because the shape is non-obvious: bailing out after the load
+        // above still broke it, so it is not the load's materialisation; keeping the basic block
+        // split with a constant-false branch but skipping ensureLinked() still broke it, so it is
+        // not the split; and restricting the elision by call site did not help, because
+        // script-scope operands take the TYPE_VALUE+functionStaticGlobal site rather than the
+        // fall-through. Linking these two units is what the script-scope store path needs.
+        //
+        // Folding rather than gating on scope also avoids #23841. Gating meant the real check ran
+        // on plain counters, so with a live fopen() handle `++$acc` raised a false
+        // "Cannot increment resource" as soon as a counter's value matched a handle id.
+        $provablyNotResource = JIT\IncDecResourceProvenance::cannotBeResource($readOp);
         // StreamLifecycle + StringDir: is_resource must see JitOpenStreamHandles (#23777).
         JIT\Builtin\StreamLifecycleRuntime::ensureLinked($this->context);
         JIT\Builtin\StringDir::ensureLinked($this->context);
-        $isRes = JIT\JitValueCompare::nativeLongIsResource($this->context, $longVal);
+        $isRes = $provablyNotResource
+            ? $this->context->getTypeFromString('int1')->constInt(0, false)
+            : JIT\JitValueCompare::nativeLongIsResource($this->context, $longVal);
         ++self::$blockNumber;
         $suffix = (string) self::$blockNumber;
         $okBlock = JIT\BasicBlockHelper::append($this->context, 'incdec_res_ok_'.$suffix);
