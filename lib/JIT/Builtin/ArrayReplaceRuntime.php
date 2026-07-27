@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for array_replace() via ArrayReplaceJitHelper PHP (#12516).
+ * JIT/AOT link for array_replace() via ArrayReplaceJitHelper PHP (#12516, #23807).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ArrayMerge #22954).
  * Standalone AOT compiles {@see ArrayReplaceJitHelper} via nested JIT bridges (#14341); embed uses same PHP path.
  * SSOT: {@see \PHPCompiler\VM\HashTable::replaceCopy()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace)
@@ -188,44 +188,18 @@ final class ArrayReplaceRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ArrayReplaceJitHelper compile (#12516)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23807');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ArrayReplaceJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ArrayReplaceJitHelper.php parseAndCompile failed (#12516)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#12516)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23807'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
