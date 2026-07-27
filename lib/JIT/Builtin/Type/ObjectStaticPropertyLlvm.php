@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM;
@@ -23,79 +24,89 @@ use PHPLLVM\Value;
  */
 final class ObjectStaticPropertyLlvm
 {
-    public static function unset(Object_ $object, int $classId, string $name): void
+    /**
+     * Zend zend_std_unset_static_property — Error for every declared static (#23691 / #6648).
+     * Undeclared names keep the undeclared-property Error.
+     * Catchable inside try; otherwise pending Error + early return (#4029 shape).
+     */
+    public static function unset(Object_ $object, int $classId, string $name, ?\PHPCompiler\JIT $jit = null): void
     {
-        $entry = $object->staticPropertyGlobalEntry($classId, $name);
-        if (null === $entry) {
-            $context = $object->jitContext();
-            $classLabel = $object->classNameForId($classId);
-            ErrorRaise::ensureLinked($context);
-            ErrorRaise::emitRaise(
-                $context,
-                'Access to undeclared static property '.$classLabel.'::$'.$name
-            );
-
-            return;
-        }
         $context = $object->jitContext();
-        $global = $entry['global'];
-        if (null !== ($entry['initGlobal'] ?? null)) {
-            $context->builder->store(
-                $context->getTypeFromString('int1')->constInt(0, false),
-                $entry['initGlobal']
-            );
+        $classLabel = $object->classNameForId($classId);
+        $entry = $object->staticPropertyGlobalEntry($classId, $name);
+        $message = null === $entry
+            ? 'Access to undeclared static property '.$classLabel.'::$'.$name
+            : 'Attempt to unset static property '.$classLabel.'::$'.$name;
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         }
-        if (Variable::TYPE_VALUE === $entry['type']) {
-            $valueType = $context->getTypeFromString('__value__');
-            $heapVal = $context->memory->malloc($valueType);
-            $heapPtr = $context->builder->pointerCast(
-                $heapVal,
-                $context->getTypeFromString('__value__*')
-            );
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                $heapPtr
-            );
-            $context->builder->store($heapPtr, $global);
+
+        $insert = $context->builder->getInsertBlock();
+        if (null === $insert || null !== $insert->getTerminator()) {
+            return;
+        }
+        $fn = $insert->getParent();
+        if (!$fn instanceof \PHPLLVM\Value\Function_) {
+            $fn = BasicBlockHelper::parentFunction($context);
+        }
+        $failBlock = $fn->appendBasicBlock('static_prop_unset_error');
+        $continueBlock = $fn->appendBasicBlock('static_prop_unset_continue');
+        $context->builder->positionAtEnd($insert);
+        $context->builder->branch($failBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+            $stillOpen = $context->builder->getInsertBlock();
+            if (null !== $stillOpen && null === $stillOpen->getTerminator()) {
+                ErrorRaise::emitRaise($context, $message);
+                self::returnAfterPendingError($context, $fn);
+            }
+        } else {
+            ErrorRaise::emitRaise($context, $message);
+            self::returnAfterPendingError($context, $fn);
+        }
+
+        $context->builder->positionAtEnd($continueBlock);
+    }
+
+    private static function returnAfterPendingError(Context $context, \PHPLLVM\Value\Function_ $fn): void
+    {
+        if (BasicBlockHelper::isVoidLlvmFunctionValue($fn)) {
+            $context->builder->returnVoid();
 
             return;
         }
-        if (Variable::TYPE_STRING === $entry['type']) {
-            $context->builder->store(
-                $context->getTypeFromString('__string__*')->constNull(),
-                $global
-            );
+        $fnType = BasicBlockHelper::llvmFunctionSignatureType($fn);
+        if (null !== $fnType) {
+            $returnType = $fnType->getReturnType();
+            if (\PHPLLVM\Type::KIND_POINTER === $returnType->getKind()) {
+                $context->builder->returnValue($returnType->constNull());
 
-            return;
-        }
-        if (Variable::TYPE_HASHTABLE === $entry['type']) {
-            $context->builder->store(
-                $context->getTypeFromString('__hashtable__*')->constNull(),
-                $global
-            );
+                return;
+            }
+            if (\PHPLLVM\Type::KIND_INTEGER === $returnType->getKind()) {
+                $context->builder->returnValue($returnType->constInt(0, false));
 
-            return;
-        }
-        if (Variable::TYPE_NATIVE_BOOL === $entry['type']) {
-            $context->builder->store(
-                $context->getTypeFromString('int1')->constInt(0, false),
-                $global
-            );
+                return;
+            }
+            $structName = $context->getStringFromType($returnType);
+            if ('__value__' === $structName) {
+                $slot = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
+                $context->builder->returnValue($context->builder->load($slot));
 
-            return;
+                return;
+            }
         }
-        if (Variable::TYPE_NATIVE_DOUBLE === $entry['type']) {
-            $context->builder->store(
-                $context->getTypeFromString('double')->constReal(0.0),
-                $global
-            );
-
-            return;
-        }
-        $context->builder->store(
-            $context->getTypeFromString('int64')->constInt(0, false),
-            $global
-        );
+        $context->builder->returnVoid();
     }
 
     public static function fetch(Object_ $object, int $classId, string $name): Variable
@@ -285,8 +296,12 @@ final class ObjectStaticPropertyLlvm
     }
 
     /** Runtime static property name for unset (`unset(Class::$$name)`, issue #4597). */
-    public static function unsetDynamic(Object_ $object, int $classId, Variable $nameVar): void
-    {
+    public static function unsetDynamic(
+        Object_ $object,
+        int $classId,
+        Variable $nameVar,
+        ?\PHPCompiler\JIT $jit = null
+    ): void {
         $context = $object->jitContext();
         $globals = $object->staticPropertyGlobalsForClass($classId);
         if ([] === $globals) {
@@ -310,14 +325,21 @@ final class ObjectStaticPropertyLlvm
                 : $fallback;
             $context->builder->branchIf($match, $caseBlock, $nextCheck);
             $context->builder->positionAtEnd($caseBlock);
-            self::unset($object, $classId, $propName);
-            $context->builder->branch($done);
+            self::unset($object, $classId, $propName, $jit);
+            $after = $context->builder->getInsertBlock();
+            if (null !== $after && null === $after->getTerminator()) {
+                $context->builder->branch($done);
+            }
             $checkBlock = $nextCheck;
             ++$i;
         }
         $context->builder->positionAtEnd($fallback);
         $classLabel = $object->classNameForId($classId);
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         ErrorRaise::ensureLinked($context);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        }
         self::emitUndeclaredStaticPropertyRaise($context, $classLabel, $runtimeName);
         $context->builder->returnVoid();
         $context->builder->positionAtEnd($done);

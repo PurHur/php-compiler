@@ -8784,10 +8784,10 @@ class JIT {
                     $nameOp = $block->getOperand($op->arg3);
                     $classId = $this->context->type->object->resolveClassId($classOp);
                     if ($nameOp instanceof Operand\Literal) {
-                        $this->context->type->object->staticPropertyUnset($classId, $nameOp->value);
+                        $this->context->type->object->staticPropertyUnset($classId, $nameOp->value, $this);
                     } else {
                         $nameVar = $this->context->getVariableFromOp($nameOp);
-                        $this->context->type->object->staticPropertyUnsetDynamic($classId, $nameVar);
+                        $this->context->type->object->staticPropertyUnsetDynamic($classId, $nameVar, $this);
                     }
                     break;
                 case OpCode::TYPE_UNSET:

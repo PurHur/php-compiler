@@ -1,12 +1,15 @@
 --TEST--
-AOT: unset() on static property then reassign (#2256)
+AOT: unset() on untyped static property must Error (#23691)
 --FILE--
 <?php
 class C {
     public static $x = 1;
 }
-unset(C::$x);
-C::$x = 2;
-echo C::$x, "\n";
+try {
+    unset(C::$x);
+    echo "NO_THROW\n";
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
 --EXPECT--
-2
+Error: Attempt to unset static property C::$x

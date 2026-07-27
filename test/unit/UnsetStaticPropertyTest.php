@@ -7,7 +7,7 @@ namespace PHPCompiler;
 require_once __DIR__.'/../BaseTest.php';
 
 /**
- * VM compliance for unset() on static properties (#2256).
+ * VM compliance for unset() on untyped static properties (#23691; supersedes #2256).
  */
 final class UnsetStaticPropertyTest extends BaseTest
 {
