@@ -187,7 +187,9 @@ final class VmVarExport
         bool $compactHeader = false
     ): string {
         $indent = str_repeat('  ', $level);
-        $inner = str_repeat('  ', $level + 1);
+        // php-src php_object_element_export: object __set_state properties use level+1 base
+        // (3 spaces at top level) vs array elements at level (2 spaces) (#23742).
+        $inner = str_repeat('  ', $level + 1).($compactHeader ? ' ' : '');
         $lines = [$compactHeader ? "array(\n" : "array (\n"];
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $k = Variable::TYPE_INTEGER === $key->type
