@@ -19,10 +19,13 @@ use PHPCompiler\Web\Superglobals;
  * True when bin/compile.php is building a user/test fixture binary (not bootstrap/self-host spine).
  */
 /**
- * Self-host spine / inventory emit drivers: do not mega-concat via SourceBundler
- * (OOM / invalid LLVM IR at thousands of units; #8391, #8559, #23970). Native argv
- * drivers compile the entry file and fold literal includes incrementally via JIT
- * IncludeHelper.
+ * Self-host spine bundles: do not mega-concat via SourceBundler (OOM / invalid LLVM IR at
+ * ~2465+ units; #8391, #8559). Native argv drivers compile the entry file and fold literal
+ * includes incrementally via JIT IncludeHelper.
+ *
+ * Note (#23970): inventory compile_driver still uses SourceBundler today; skip-bundle there
+ * hits missing helper ABIs (e.g. phpc_str_replace). Instead floor PHP/Docker RAM at 16GiB+
+ * for that path (see helloworld probe / Makefile).
  */
 function phpc_compile_skip_aot_bundle(string $normalized): bool
 {
@@ -30,14 +33,7 @@ function phpc_compile_skip_aot_bundle(string $normalized): bool
         return false;
     }
 
-    if (str_contains($normalized, 'test/selfhost/compiler_lib_spine_smoke/main.php')) {
-        return true;
-    }
-
-    // Inventory compile_driver entries pull Runtime + transitively thousands of
-    // units through LiteralIncludeDiscovery — bundling OOMs past 16GiB (#23970).
-    return str_contains($normalized, 'test/selfhost/')
-        && str_contains($normalized, 'compile_driver.php');
+    return str_contains($normalized, 'test/selfhost/compiler_lib_spine_smoke/main.php');
 }
 
 /** @deprecated alias for lint call sites */
@@ -286,11 +282,11 @@ function run(string $filename, string $code, array $options): void
             };
         };
         // Non-driver selfhost bundles: 6G floor. Inventory compile_driver emit:
-        // 16G floor (measured OOM at 10GiB in lib/JIT.php — #23970).
-        $floorMib = $isCompileDriver ? 16384 : 6144;
+        // 24G floor (measured OOM at 6G, 8G, and 16GiB in lib/JIT.php — #23970).
+        $floorMib = $isCompileDriver ? 24576 : 6144;
         $curMib = $limitMib($bundleLimit);
         if ($curMib < $floorMib) {
-            $floor = $isCompileDriver ? '16384M' : '6G';
+            $floor = $isCompileDriver ? '24576M' : '6G';
             ini_set('memory_limit', $floor);
             putenv('PHP_COMPILER_MEMORY_LIMIT='.$floor);
             $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = $floor;
