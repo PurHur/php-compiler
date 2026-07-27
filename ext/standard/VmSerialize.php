@@ -467,6 +467,12 @@ final class VmSerialize
             $target = $value->resolveIndirect();
             // php_add_var_hash: ISREF to object is keyed by the object, emit R: on revisit.
             if (Variable::TYPE_OBJECT === $target->type) {
+                $enumRef = self::enumCaseRefFromVariable($target);
+                if (null !== $enumRef) {
+                    $state->bumpIndex();
+
+                    return self::encodeEnumCaseLiteral($enumRef->className, $enumRef->caseName);
+                }
                 $object = $target->toObject();
                 $existingObject = $state->lookupObjectIndex($object);
                 if (null !== $existingObject) {
@@ -490,6 +496,13 @@ final class VmSerialize
 
         $value = $value->resolveIndirect();
         if (Variable::TYPE_OBJECT === $value->type) {
+            $enumRef = self::enumCaseRefFromVariable($value);
+            if (null !== $enumRef) {
+                $state->bumpIndex();
+
+                return self::encodeEnumCaseLiteral($enumRef->className, $enumRef->caseName);
+            }
+
             return self::encodeWireObject($ctx, $value->toObject(), $state, $frame);
         }
         // Non-object, non-ref: bump n only (not hashed).
@@ -558,6 +571,11 @@ final class VmSerialize
         VmSerializeRefState $state,
         ?Frame $frame = null
     ): string {
+        if (EnumCaseSupport::isEnumCase($entry)) {
+            $state->assignObjectIndex($entry);
+
+            return self::encodeEnumCaseLiteral($entry->class->name, $entry->enumCaseName ?? '');
+        }
         if (0 === strcasecmp($entry->class->name, 'Closure')) {
             throw new \Exception("Serialization of 'Closure' is not allowed");
         }
@@ -980,6 +998,24 @@ final class VmSerialize
         }
 
         return null;
+    }
+
+    /**
+     * Resolve enum case from the raw "ClassName:CaseName" payload extracted by VmUnserializeFormat (#23692).
+     */
+    public static function resolveEnumCaseFromWirePayload(Context $ctx, string $payload): ?Variable
+    {
+        $colonPos = strrpos($payload, ':');
+        if (false === $colonPos || 0 === $colonPos) {
+            return null;
+        }
+        $className = \substr($payload, 0, $colonPos);
+        $caseName = \substr($payload, $colonPos + 1);
+        if ('' === $className || '' === $caseName) {
+            return null;
+        }
+
+        return self::resolveEnumCaseVariable($ctx, $className, $caseName);
     }
 
     /**
