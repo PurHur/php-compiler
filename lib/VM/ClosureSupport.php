@@ -127,13 +127,13 @@ final class ClosureSupport
                 return self::wrapState($ctx, self::fromNewClassCallable($ctx, $frame, substr($name, 4)));
             }
             if (str_contains($name, '::')) {
-                return self::wrapState($ctx, self::fromStaticStringCallable($ctx, $frame, $name));
+                return self::wrapState($ctx, self::fromStaticStringCallable($ctx, $frame, $name, $fromCallableApi));
             }
 
             return self::wrapState($ctx, self::fromFunctionName($ctx, $name, $fromCallableApi));
         }
         if (Variable::TYPE_ARRAY === $callable->type) {
-            return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable, $parentScope));
+            return self::wrapState($ctx, self::fromArrayCallable($ctx, $frame, $callable, $parentScope, $fromCallableApi));
         }
 
         throw new \LogicException(
@@ -459,8 +459,12 @@ final class ClosureSupport
         return ClosureState::fromWrappedFunc(new NewCallableHandler($ctx->classes[$lcClass]));
     }
 
-    private static function fromStaticStringCallable(Context $ctx, Frame $frame, string $callable): ClosureState
-    {
+    private static function fromStaticStringCallable(
+        Context $ctx,
+        Frame $frame,
+        string $callable,
+        bool $fromCallableApi = false
+    ): ClosureState {
         [$className, $methodName] = explode('::', $callable, 2);
         $lcClass = self::resolveClassScopeName($className, $frame, $ctx);
         if (!isset($ctx->classes[$lcClass])) {
@@ -482,7 +486,7 @@ final class ClosureSupport
             return ClosureState::fromWrappedFunc(new EnumFromHandler($class, 'tryfrom' === $methodLc));
         }
         [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
-        self::assertStaticMethodForCallable($class, $methodLc);
+        self::assertStaticMethodForCallable($class, $methodLc, $fromCallableApi);
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
@@ -503,7 +507,8 @@ final class ClosureSupport
         Context $ctx,
         Frame $frame,
         Variable $callable,
-        bool $parentScope = false
+        bool $parentScope = false,
+        bool $fromCallableApi = false
     ): ClosureState {
         $table = $callable->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
@@ -532,7 +537,8 @@ final class ClosureSupport
             return self::fromStaticStringCallable(
                 $ctx,
                 $frame,
-                $receiver->toString().'::'.$methodName
+                $receiver->toString().'::'.$methodName,
+                $fromCallableApi
             );
         }
 
@@ -756,8 +762,11 @@ final class ClosureSupport
     /**
      * First-class `Class::instanceMethod(...)` must Error at creation (zend_compile.c, #7465).
      */
-    private static function assertStaticMethodForCallable(ClassEntry $declaringClass, string $methodLc): void
-    {
+    private static function assertStaticMethodForCallable(
+        ClassEntry $declaringClass,
+        string $methodLc,
+        bool $fromCallableApi = false
+    ): void {
         if ($declaringClass->isEnum && 'cases' === $methodLc) {
             return;
         }
@@ -783,9 +792,15 @@ final class ClosureSupport
                 $declaredName = $func->block->func->name;
             }
         }
-        throw new \Error(
-            'Non-static method '.$declaringName.'::'.$declaredName.'() cannot be called statically'
-        );
+        $message = 'Non-static method '.$declaringName.'::'.$declaredName.'() cannot be called statically';
+        if ($fromCallableApi) {
+            throw new \TypeError(
+                'Failed to create closure from callable: '
+                .'non-static method '.$declaringName.'::'.$declaredName.'() cannot be called statically'
+            );
+        }
+
+        throw new \Error($message);
     }
 
     private static function resolveStaticMethod(Context $ctx, string $lcClass, string $methodLc): array
