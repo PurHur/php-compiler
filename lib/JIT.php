@@ -15370,18 +15370,6 @@ class JIT {
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
         $write = $this->context->getVariableFromOpInScopes($writeOp);
-        // TEMP #23777 diagnose — remove after fix
-        if (\getenv('PHP_COMPILER_DEBUG_INCDEC_RES') === '1') {
-            fwrite(\STDERR, sprintf(
-                "incdec read type=%d kind=%d fsg=%d provenanceSafe=%s nested=%s name=%s\n",
-                $read->type,
-                $read->kind,
-                $read->functionStaticGlobal ? 1 : 0,
-                JIT\IncDecResourceProvenance::cannotBeResource($readOp) ? 'yes' : 'no',
-                JIT\NestedJitCompileScope::isActive() ? 'yes' : 'no',
-                (string) (JIT\OperandName::resolve($readOp) ?? '')
-            ));
-        }
         if (
             JIT\StringOffsetHelper::isWritableCharOffsetLvalue($write, $this->context)
             || JIT\StringOffsetHelper::isWritableCharOffsetLvalue($read, $this->context)
@@ -15465,10 +15453,7 @@ class JIT {
             return;
         }
 
-        if (
-            Variable::TYPE_VALUE === $read->type
-            && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
-        ) {
+        if ($this->isIncDecValueBoxLvalue($read, $readOp)) {
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->readIncDecValueBoxLong($read, $readPtr, $increment);
@@ -15600,6 +15585,20 @@ class JIT {
         return $phi;
     }
 
+    /** True when ++/-- should read/write a boxed local slot via __value__* helpers. */
+    private function isIncDecValueBoxLvalue(JIT\Variable $read, ?Operand $readOp): bool
+    {
+        if (Variable::TYPE_VALUE !== $read->type) {
+            return false;
+        }
+        if (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal) {
+            return true;
+        }
+
+        // Typed locals can be KIND_VALUE rvalues bound to a scope slot (#23840).
+        return $readOp instanceof Operand && $this->context->hasVariableOpInScopes($readOp);
+    }
+
     /** Reject ++/-- on stream/dir handles (issue #6396, zend_operators.c). */
     private function guardIncDecResourceOperand(
         JIT\Variable $read,
@@ -15608,11 +15607,6 @@ class JIT {
     ): void
     {
         if (JIT\NestedJitCompileScope::isActive()) {
-            return;
-        }
-        // A value that provably came from a literal or from arithmetic cannot be a resource handle,
-        // so the guard is dead code — and it is expensive enough to dominate hot loops (#23483).
-        if (JIT\IncDecResourceProvenance::cannotBeResource($readOp)) {
             return;
         }
         $longVal = null;

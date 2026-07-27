@@ -24,4 +24,10 @@ final class IncDecResourceProvenanceStringTest extends TestCase
         self::assertStringContainsString('formatBoxedNativeLong', $source);
         self::assertStringContainsString('cannotBeResourceForString', $source);
     }
+
+    public function testJitExposesIncDecValueBoxLvalueHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        self::assertStringContainsString('isIncDecValueBoxLvalue', $source);
+    }
 }
