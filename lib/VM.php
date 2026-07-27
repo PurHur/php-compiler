@@ -14527,14 +14527,13 @@ restart:
         }
 
         $active = $this->advanceGeneratorIteration($gen);
-        // Zend: first send() on unstarted generator runs through bare-yield receive (#18108).
-        if (
-            $sendStartsGenerator
-            && $active
-            && $gen->hasPendingSend
-            && null !== $gen->yieldResultSlot
-            && Variable::TYPE_NULL === $gen->currentValue->type
-        ) {
+        // Zend: first send() on an unstarted generator opens, then injects+resumes past the
+        // first yield (bare `yield`, `$v = yield expr`, and plain `yield expr`) — #18108 / #23712.
+        if ($sendStartsGenerator && $active) {
+            // Plain `yield expr` has no receive slot: discard the sent value before resuming.
+            if ($gen->hasPendingSend && null === $gen->yieldResultSlot) {
+                $gen->hasPendingSend = false;
+            }
             $active = $this->advanceGeneratorIteration($gen);
         }
 
