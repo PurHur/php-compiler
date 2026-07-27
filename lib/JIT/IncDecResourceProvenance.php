@@ -30,6 +30,8 @@ use PHPCfg\Operand;
  * The analysis is deliberately conservative: anything it does not recognise — a call, a parameter,
  * a property or array read — answers "unknown" and keeps the guard. Only the listed
  * value-producing ops, which cannot yield a resource under any input, allow it to be dropped.
+ *
+ * Also used to skip resource-handle checks in int→string lowering (#23811).
  */
 final class IncDecResourceProvenance
 {
@@ -91,6 +93,19 @@ final class IncDecResourceProvenance
         $budget = self::MAX_VISITS;
 
         return self::operandIsSafe($op, $seen, $budget);
+    }
+
+    /**
+     * Like {@see cannotBeResource()} but peels php-cfg {@see Operand\Temporary} wrappers first.
+     * Used for int→string lowering where concat operands are often temporaries (#23811).
+     */
+    public static function cannotBeResourceForString(?Operand $op): bool
+    {
+        while ($op instanceof Operand\Temporary && $op->original instanceof Operand) {
+            $op = $op->original;
+        }
+
+        return self::cannotBeResource($op);
     }
 
     /**

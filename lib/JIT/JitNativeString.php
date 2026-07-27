@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCfg\Operand;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -26,7 +27,7 @@ final class JitNativeString
         $context->builder->positionAtEnd($resume);
     }
 
-    public static function coerce(Context $context, Variable $var): Variable
+    public static function coerce(Context $context, Variable $var, ?Operand $sourceOperand = null): Variable
     {
         if (Variable::TYPE_STRING === $var->type) {
             return $var;
@@ -80,7 +81,7 @@ final class JitNativeString
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VALUE,
-                    JitResourceIdString::formatNativeLong($context, $value)
+                    JitResourceIdString::formatNativeLong($context, $value, $sourceOperand)
                 );
             case Variable::TYPE_NATIVE_DOUBLE:
                 // PG(precision) via VmZendDoubleString (#21963, Zend/zend_operators.c).

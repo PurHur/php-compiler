@@ -12,6 +12,8 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ValueEchoRuntime;
+use PHPCompiler\JIT\IncDecResourceProvenance;
+use PHPCfg\Operand;
 use PHPCompiler\VM\ValueEchoSupport;
 use PHPLLVM\Value;
 
@@ -34,12 +36,24 @@ final class ValueEchoHelper
     /**
      * Echo a native long, formatting stream/dir resources like Zend (ext/standard, #4740).
      */
-    public static function echoNativeLong(Context $context, Value $longVal): void
+    public static function echoNativeLong(
+        Context $context,
+        Value $longVal,
+        ?Operand $sourceOperand = null
+    ): void
     {
         Builtin\StringDir::ensureLinked($context);
         $tag = 'enl'.(string) ++self::$seq;
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->zExt($longVal, $i64);
+        if (IncDecResourceProvenance::cannotBeResourceForString($sourceOperand)) {
+            $context->builder->call(
+                $context->lookupFunction('__phpc_ob_echo_ll'),
+                $handle
+            );
+
+            return;
+        }
         $isRes = JitValueCompare::nativeLongIsResource($context, $handle);
 
         $plainBlock = BasicBlockHelper::append($context, 'echo_native_long_plain_'.$tag);

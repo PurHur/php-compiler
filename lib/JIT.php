@@ -8388,7 +8388,12 @@ class JIT {
                                 JIT\StringOffsetHelper::emitAssignOpError($this->context);
                                 break;
                             }
-                            $newVal = $this->compileConcatIntoNewString($left, $right);
+                            $newVal = $this->compileConcatIntoNewString(
+                                $left,
+                                $right,
+                                $block->getOperand($op->arg2),
+                                $block->getOperand($op->arg3)
+                            );
                             $this->assignOperand($destOp, $newVal, true);
                             $this->maybeRefreshIncludeBindingsBeforeUse();
                             break;
@@ -8455,7 +8460,12 @@ class JIT {
                     if (null !== $result->objectPropertySlot) {
                         $this->compileObjectPropertyConcatOp($result, $left, $right);
                     } elseif (Variable::TYPE_VALUE === $result->type || JIT\JitValueBox::isValueOperand($result)) {
-                        $newVal = $this->compileConcatIntoNewString($left, $right);
+                        $newVal = $this->compileConcatIntoNewString(
+                            $left,
+                            $right,
+                            $block->getOperand($op->arg2),
+                            $block->getOperand($op->arg3)
+                        );
                         JIT\JitValueBox::assignToPointer(
                             $this->context,
                             $this->valueBoxPointer($result),
@@ -8472,10 +8482,10 @@ class JIT {
                         // Fresh and in-place native concat: JitStringConcat + store. Avoid
                         // string->concat __string__realloc on entry allocas (AOT strlen→0, #15642).
                         $leftVar = $this->context->helper->loadValue(
-                            JIT\JitNativeString::coerce($this->context, $left)
+                            JIT\JitNativeString::coerce($this->context, $left, $block->getOperand($op->arg2))
                         );
                         $rightVar = $this->context->helper->loadValue(
-                            JIT\JitNativeString::coerce($this->context, $right)
+                            JIT\JitNativeString::coerce($this->context, $right, $block->getOperand($op->arg3))
                         );
                         $newStr = \PHPCompiler\ext\standard\JitStringConcat::concat(
                             $this->context,
@@ -9056,7 +9066,8 @@ class JIT {
                         case Variable::TYPE_NATIVE_LONG:
                             JIT\ValueEchoHelper::echoNativeLong(
                                 $this->context,
-                                $this->context->helper->loadValue($arg)
+                                $this->context->helper->loadValue($arg),
+                                $echoOp
                             );
                             break;
                         case Variable::TYPE_NATIVE_DOUBLE:
@@ -15661,11 +15672,16 @@ class JIT {
     }
 
     /** Allocate a fresh native string holding left . right (php-src string concat semantics). */
-    private function compileConcatIntoNewString(Variable $left, Variable $right): Variable
+    private function compileConcatIntoNewString(
+        Variable $left,
+        Variable $right,
+        ?\PHPCfg\Operand $leftOp = null,
+        ?\PHPCfg\Operand $rightOp = null
+    ): Variable
     {
         $this->context->intrinsic->builder = $this->context->builder;
-        $left = JIT\JitNativeString::coerce($this->context, $left);
-        $right = JIT\JitNativeString::coerce($this->context, $right);
+        $left = JIT\JitNativeString::coerce($this->context, $left, $leftOp);
+        $right = JIT\JitNativeString::coerce($this->context, $right, $rightOp);
         $leftVar = $this->context->helper->loadValue($left);
         $rightVar = $this->context->helper->loadValue($right);
         $map = $this->context->structFieldMap['__string__'];
