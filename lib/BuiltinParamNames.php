@@ -157,6 +157,37 @@ final class BuiltinParamNames
             case 'date_create':
             case 'date_create_immutable':
                 return ['datetime', 'timezone'];
+            // php-src ext/date/php_date.stub.php — Reflection empty / InternalArgInfo pre-stub (#23289)
+            case 'date_create_from_format':
+            case 'date_create_immutable_from_format':
+                return ['format', 'datetime', 'timezone'];
+            case 'date_modify':
+                return ['object', 'modifier'];
+            case 'date_add':
+            case 'date_sub':
+                return ['object', 'interval'];
+            case 'date_date_set':
+                return ['object', 'year', 'month', 'day'];
+            case 'date_time_set':
+                return ['object', 'hour', 'minute', 'second', 'microsecond'];
+            case 'date_timestamp_set':
+                return ['object', 'timestamp'];
+            case 'date_timezone_set':
+                return ['object', 'timezone'];
+            case 'date_isodate_set':
+                return ['object', 'year', 'week', 'dayOfWeek'];
+            case 'date_interval_create_from_date_string':
+                return ['datetime'];
+            case 'date_interval_format':
+                return ['object', 'format'];
+            case 'date_diff':
+                return ['baseObject', 'targetObject', 'absolute'];
+            case 'date_format':
+                return ['object', 'format'];
+            case 'date_offset_get':
+            case 'date_timestamp_get':
+            case 'date_timezone_get':
+                return ['object'];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says min/sec/mon (#23275)
             case 'mktime':
             case 'gmmktime':
