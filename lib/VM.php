@@ -7839,7 +7839,14 @@ restart:
                                 break;
                             }
                             VM\TypedPropertyCheck::assertReadable($propSlot);
-                            $result->indirect($propSlot);
+                            // `$obj->arr[] =` needs a live alias into property storage. Plain R-mode
+                            // fetches must copy: an indirect alias makes ternary/`&&` phi self-ASSIGN
+                            // look like a property write (readonly / DOM read-only / skipped `__get`) (#23986).
+                            if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                                $result->indirect($propSlot);
+                            } else {
+                                $result->copyFrom($propSlot);
+                            }
                         }
                         break;
                     }
@@ -9908,18 +9915,18 @@ restart:
     /** True when a following opcode assigns through this PROPERTY_FETCH destination slot (#5370). */
     private function propertyFetchDestUsedAsAssignLvalue(Frame $frame, OpCode $op): bool
     {
-        $destSlot = (int) $op->arg1;
-        for ($j = $frame->pos, $n = $frame->block->nOpCodes; $j < $n; $j++) {
-            $candidate = $frame->block->opCodes[$j] ?? null;
-            if (null === $candidate) {
-                continue;
-            }
-            if (OpCode::destSlotUsedAsAssignLvalue($candidate, $destSlot)) {
-                return true;
-            }
+        // Only the immediate next opcode (pos already advanced past this fetch). Scanning the
+        // whole block false-positives on dead-temp reuse after ARG_SEND / nested fetches (#23986).
+        $nextIndex = $frame->pos;
+        if ($nextIndex >= $frame->block->nOpCodes) {
+            return false;
+        }
+        $next = $frame->block->opCodes[$nextIndex] ?? null;
+        if (null === $next) {
+            return false;
         }
 
-        return false;
+        return OpCode::destSlotUsedAsAssignLvalue($next, (int) $op->arg1);
     }
 
     /** True when fetch dest is the RHS of a following ASSIGN_REF (#22475). */

@@ -19055,13 +19055,13 @@ class JIT {
 
     private function varFetchDestUsedAsAssignLvalue(Block $block, int $opIndex, int $destSlot): bool
     {
-        for ($j = $opIndex + 1, $n = count($block->opCodes); $j < $n; $j++) {
-            if (OpCode::destSlotUsedAsAssignLvalue($block->opCodes[$j], $destSlot)) {
-                return true;
-            }
+        // Immediate next only — later ASSIGN is often dead-temp reuse, not a write (#23986).
+        $next = $block->opCodes[$opIndex + 1] ?? null;
+        if (null === $next) {
+            return false;
         }
 
-        return false;
+        return OpCode::destSlotUsedAsAssignLvalue($next, $destSlot);
     }
 
     private function varFetchDestUsedAsIncDec(Block $block, int $opIndex, int $destSlot): bool
