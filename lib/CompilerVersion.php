@@ -1215,6 +1215,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ `new ClassName(...)` first-class callable (constructor Closure).
+     *
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference / PROFILE≤8.3 reject like
+     * Zend ≤8.3 ("Cannot create Closure for new expression"). Forward profile:
+     * `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
+     * php-src: Zend/zend_compile.c — ZEND_AST_NEW + ZEND_AST_CALLABLE_CONVERT (#23714, re-#9767 / #10130).
+     */
+    public static function supportsNewFirstClassCallable(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2 (#12508, #17197).

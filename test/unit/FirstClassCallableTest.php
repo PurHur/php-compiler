@@ -243,6 +243,34 @@ echo $maker(42)->v, "\n";
 PHP, 'test.php');
     }
 
+    /** Issue #23714: PROFILE=8.4 allows new Class(...) constructor FCC (Zend/zend_compile.c). */
+    public function testVmNewExpressionFirstClassCallableProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $rt = new Runtime();
+            $block = $rt->parseAndCompile(<<<'PHP'
+<?php
+declare(strict_types=1);
+class Box {
+    public function __construct(public int $v) {}
+}
+$maker = new Box(...);
+echo $maker(42)->v;
+PHP, 'test.php');
+            ob_start();
+            $rt->run($block);
+            $this->assertSame('42', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** Issue #19727: $obj?->m(...) first-class callable must compile-fatal (Zend/zend_compile.c). */
     public function testVmNullsafeMethodFirstClassCallableCompileErrors(): void
     {
