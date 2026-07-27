@@ -50,6 +50,11 @@ final class JitSerialize
             );
         }
 
-        throw new \LogicException('serialize() value type not supported in this compiler build');
+        // Object / string / native scalars — box then SerializeJitHelper::encodeValue (#23509 AOT).
+        // Same bridge as var_export(); previously only TYPE_VALUE/HASHTABLE were accepted.
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_serialize_value'),
+            JitValueBox::valuePtrFromVariable($context, $arg)
+        );
     }
 }
