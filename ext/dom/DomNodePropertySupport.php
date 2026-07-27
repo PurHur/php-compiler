@@ -131,6 +131,7 @@ final class DomNodePropertySupport
 
     public static function getProperty(ObjectEntry $object, string $name, ?Context $ctx = null): Variable
     {
+        VmDom::ensureFetchableNode($object);
         $lc = strtolower($name);
         $var = new Variable();
         $var->objectPropertyOwner = $object;

@@ -63,6 +63,18 @@ final class DomNodeState
     /** Live DOMDocumentType child object id (php-src ext/dom/document.c; #15292). */
     public ?int $doctypeId = null;
 
+    /**
+     * User-visible handles retained this wrapper (php-src dom_object refcount; #23817).
+     * Incremented when a CV/global receives the node via ASSIGN; never decremented.
+     */
+    public int $userHandleCount = 0;
+
+    /**
+     * Underlying node was freed by dom_remove_all_children / textContent write
+     * (php-src php_libxml_node_free_list + dom_objects_not_found; #23817).
+     */
+    public bool $nodeFreed = false;
+
     /** Child element object ids in document order (php-src dom_child_nodes). */
     /** @var list<int> */
     public array $childIds = [];

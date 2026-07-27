@@ -11,11 +11,15 @@ final class DomNodeChildPropertyJitHelper
 {
     public static function firstChildArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
+
         return self::childArgv($node, true);
     }
 
     public static function lastChildArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
+
         return self::childArgv($node, false);
     }
 
@@ -52,6 +56,7 @@ final class DomNodeChildPropertyJitHelper
     /** Live parentNode after removeChild/replaceChild (#19240). */
     public static function parentNodeArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
         $node = DomRegistry::entry($node->id) ?? $node;
         if (!DomRegistry::has($node)) {
             return null;
@@ -67,18 +72,23 @@ final class DomNodeChildPropertyJitHelper
     /** Live nextSibling for detached/attached nodes (#19240). */
     public static function nextSiblingArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
+
         return self::siblingArgv($node, true);
     }
 
     /** Live previousSibling for detached/attached nodes (#19240). */
     public static function previousSiblingArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
+
         return self::siblingArgv($node, false);
     }
 
     /** ParentNode::$firstElementChild (#19431). */
     public static function firstElementChildArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
         $node = DomRegistry::entry($node->id) ?? $node;
         if (!DomRegistry::has($node)) {
             return null;
@@ -90,6 +100,7 @@ final class DomNodeChildPropertyJitHelper
     /** ParentNode::$lastElementChild (#19431). */
     public static function lastElementChildArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
         $node = DomRegistry::entry($node->id) ?? $node;
         if (!DomRegistry::has($node)) {
             return null;
@@ -101,6 +112,7 @@ final class DomNodeChildPropertyJitHelper
     /** ParentNode::$childElementCount (#19431). */
     public static function childElementCountArgv(ObjectEntry $node): int
     {
+        VmDom::ensureFetchableNode($node);
         $node = DomRegistry::entry($node->id) ?? $node;
         if (!DomRegistry::has($node)) {
             return 0;
@@ -119,12 +131,16 @@ final class DomNodeChildPropertyJitHelper
     /** NonDocumentTypeChildNode::$nextElementSibling (#19431). */
     public static function nextElementSiblingArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
+
         return self::elementSiblingArgv($node, true);
     }
 
     /** NonDocumentTypeChildNode::$previousElementSibling (#19431). */
     public static function previousElementSiblingArgv(ObjectEntry $node): ?ObjectEntry
     {
+        VmDom::ensureFetchableNode($node);
+
         return self::elementSiblingArgv($node, false);
     }
 

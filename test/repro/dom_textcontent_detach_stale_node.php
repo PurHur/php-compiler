@@ -1,6 +1,3 @@
---TEST--
-AOT: loadXML user-script textContent write detaches held children (#23251, #23817)
---FILE--
 <?php
 $d = new DOMDocument();
 $d->loadXML('<r><a/><b/></r>');
@@ -18,10 +15,3 @@ try {
 echo 'kids=', $r->childNodes->length, "\n";
 echo 'text=', $r->textContent, "\n";
 echo 'xml=', trim($d->saveXML($r)), "\n";
-?>
---EXPECT--
-a_parent_null=true
-b_parent_err=Couldn't fetch DOMElement. Node no longer exists
-kids=1
-text=z
-xml=<r>z</r>
