@@ -10666,6 +10666,7 @@ class Compiler {
                         || $this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingComparisonProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingConcatProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasTrailingClosureProducer($endCompiled, $endChild, (int) $argIndex)
                     ) {
                         continue;
                     }
@@ -41373,6 +41374,9 @@ class Compiler {
         if ($this->errorSuppressEndBlockCallArgHasTrailingConcatProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
+        if ($this->errorSuppressEndBlockCallArgHasTrailingClosureProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
     }
@@ -41429,6 +41433,44 @@ class Compiler {
 
         // php-cfg allocates a distinct dead arg temp from ConcatList/Concat.result (#13466, #23045).
         return $this->isFirstNonEmbeddedDeadInlineCallArg($cfgCallOp, $argIndex);
+    }
+
+    /**
+     * `@strlen(null); set_error_handler(function...)` — Closure in the end block feeds
+     * the dead-temp arg, not the @ return (#23730).
+     */
+    private function errorSuppressEndBlockCallArgHasTrailingClosureProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $callIndex = array_search($cfgCallOp, $children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
+            $prev = $children[$i] ?? null;
+            if ($prev instanceof Op\Expr\Closure || $prev instanceof Op\Expr\ArrowFunction) {
+                return true;
+            }
+            if ($prev instanceof Op\Expr\ConstFetch || $prev instanceof Op\Expr\Assign) {
+                continue;
+            }
+            break;
+        }
+
+        return false;
     }
 
     /**
