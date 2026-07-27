@@ -8376,6 +8376,27 @@ class JIT {
                     if (null === $destOp) {
                         break;
                     }
+                    $destIsDeadOperand = false;
+                    foreach ($block->orig->deadOperands ?? [] as $deadOp) {
+                        if ($deadOp === $destOp) {
+                            $destIsDeadOperand = true;
+                            break;
+                        }
+                    }
+                    // php-cfg leaves Concat.result as a dead Temporary before FuncCall/Echo;
+                    // prologue may already have allocated the scope slot, but in-place CONCAT into
+                    // a slot that aliases the left operand corrupts the local (#23798).
+                    if ($destIsDeadOperand) {
+                        $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                        $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                        if (JIT\StringOffsetHelper::isWritableCharOffsetLvalue($left, $this->context)) {
+                            JIT\StringOffsetHelper::emitAssignOpError($this->context);
+                            break;
+                        }
+                        $this->assignEphemeralConcatOperand($block, $destOp, $left, $right, $func);
+                        $this->maybeRefreshIncludeBindingsBeforeUse();
+                        break;
+                    }
                     // php-cfg leaves Concat.result as a dead Temporary before FuncCall;
                     // Compiler wires ARG_SEND to that slot, but prologue never allocated it.
                     // Skipping here made ARG_SEND materialize null via getVariableFromOp
@@ -8388,8 +8409,7 @@ class JIT {
                                 JIT\StringOffsetHelper::emitAssignOpError($this->context);
                                 break;
                             }
-                            $newVal = $this->compileConcatIntoNewString($left, $right);
-                            $this->assignOperand($destOp, $newVal, true);
+                            $this->assignEphemeralConcatOperand($block, $destOp, $left, $right, $func);
                             $this->maybeRefreshIncludeBindingsBeforeUse();
                             break;
                         }
@@ -15658,6 +15678,45 @@ class JIT {
                 );
             }
         );
+    }
+
+    /**
+     * Store concat into a php-cfg dead Temporary (echo/call arg) with entry alloca lifetime (#23798).
+     *
+     * assignOperand → makeVariableFromValueOp left a bare {@see KIND_VALUE} __string__*; a second
+     * concat from the same local then double-freed or corrupted the heap under AOT.
+     */
+    private function assignEphemeralConcatOperand(
+        Block $block,
+        Operand $destOp,
+        Variable $left,
+        Variable $right,
+        \PHPLLVM\Value\Function_ $func
+    ): void {
+        $newVal = $this->compileConcatIntoNewString($left, $right);
+        $destSlot = JIT\BasicBlockHelper::entryAllocaForFunction(
+            $this->context,
+            $func,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $promoted = new Variable(
+            $this->context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VARIABLE,
+            $destSlot
+        );
+        JIT\BasicBlockHelper::storeAtFunctionEntry(
+            $this->context,
+            $func,
+            $this->context->type->string->pointer->constNull(),
+            $destSlot
+        );
+        $this->context->builder->store($newVal->value, $destSlot);
+        $this->context->setVariableOp($destOp, $promoted);
+        $this->bindPromotedStringConcatDest($block, $destOp, $promoted);
+        if (null !== ($newVal->compileTimeString ?? null)) {
+            $promoted->compileTimeString = $newVal->compileTimeString;
+        }
     }
 
     /** Allocate a fresh native string holding left . right (php-src string concat semantics). */
