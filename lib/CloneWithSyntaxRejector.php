@@ -8,10 +8,10 @@ use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject PHP 8.3+ clone-with syntax on the Zend 8.2 reference profile (#12987).
+ * Reject PHP 8.5+ clone-with syntax on the Zend 8.2 reference profile (#12987, #23877).
  *
  * Must run before {@see Ast\CloneWithDesugar} so clone-with is not lowered into valid PHP.
- * php-src: Zend/zend_language_parser.y clone_expr with clause; zend_clones.c.
+ * php-src: Zend/zend_language_parser.y clone_expr with clause; zend_vm_def.h ZEND_CLONE.
  */
 final class CloneWithSyntaxRejector
 {

@@ -1,19 +1,20 @@
 --TEST--
-Language: clone-with forward profile gate (#16676, PHP_COMPILER_PROFILE=8.4)
+Language: clone-with forward profile gate (#23877, #16676, PHP_COMPILER_PROFILE=8.5)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
-putenv('PHP_COMPILER_PROFILE=8.4');
+putenv('PHP_COMPILER_PROFILE=8.5');
 if (!PHPCompiler\CompilerVersion::supportsCloneWithSyntax()) {
-    die('skip requires PHP_COMPILER_PROFILE=8.4 clone-with gate');
+    die('skip requires PHP_COMPILER_PROFILE=8.5 clone-with gate');
 }
 ?>
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
+error_reporting(E_ALL);
 class Src {
     public int $x = 1;
 }

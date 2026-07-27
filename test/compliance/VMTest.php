@@ -1194,7 +1194,7 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'encapsed_coalesce_interpolation')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when clone-with syntax enabled (#12987).
+            // 8.5-target reject gate; skipped when clone-with syntax enabled (#12987, #23877).
             if (CompilerVersion::supportsCloneWithSyntax()
                 && str_contains($name, 'clone_with_reference_profile')) {
                 continue;

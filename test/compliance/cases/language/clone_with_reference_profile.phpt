@@ -6,7 +6,7 @@ if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
 if (PHPCompiler\CompilerVersion::supportsCloneWithSyntax()) {
-    die('skip clone-with syntax enabled on PHP 8.4.0+ target');
+    die('skip clone-with syntax enabled on PHP 8.5.0+ target');
 }
 ?>
 --FILE--
