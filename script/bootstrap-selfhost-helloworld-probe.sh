@@ -61,17 +61,19 @@ source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 # shellcheck source=bootstrap-resolve-compile-invoke.sh
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
 ci_apply_llvm_memory_env
-# Inventory compile_driver emit-helper AOT OOMs well past the 6G/6144M LLVM default
-# and past 8G/16G floors tried on harness (#23970). Measured: PHP Fatal at 6–16GiB in
-# lib/JIT.php during emit-helper link. Floor matches gen-0 exclusive refresh (24576M).
-# Default CI ulimit -v is 8 GiB (#436) and docker cgroup defaults to 10g — both must
-# rise or the PHP floor is unreachable. Host: PHP_COMPILER_DOCKER_MEM=32g
-# PHP_COMPILER_DOCKER_MEM_SWAP=32g PHP_COMPILER_CI_RAM_GB=0 ./script/docker-exec.sh …
+# Inventory compile_driver: SourceBundler mega-concat OOMs through 24GiB in lib/JIT.php
+# (#23970). Fix is skip-bundle + PHP_COMPILER_HELPER_RUNTIME_O (phpc_str_replace ABI).
+# Keep a 16GiB floor for residual IncludeHelper peak; host docker-exec should use
+# PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g PHP_COMPILER_CI_RAM_GB=0.
 # shellcheck source=ci-resource-limits.sh
 source "$(dirname "$0")/ci-resource-limits.sh"
 export PHP_COMPILER_CI_RAM_GB=0
 ci_apply_resource_limits 2>/dev/null || true
 ulimit -v unlimited 2>/dev/null || ulimit -v 0 2>/dev/null || true
+if [[ "${PHP_COMPILER_HELPER_RUNTIME_O:-}" != "1" && "${PHP_COMPILER_HELPER_RUNTIME_O:-}" != "true" ]]; then
+  export PHP_COMPILER_HELPER_RUNTIME_O=1
+  echo "bootstrap-selfhost-helloworld-probe: enabled PHP_COMPILER_HELPER_RUNTIME_O=1 for skip-bundle compile_driver ABIs (#23970)" >&2
+fi
 helloworld_mem_mib() {
   local v="${1:-}"
   local n u
@@ -88,23 +90,23 @@ helloworld_mem_mib() {
     *) echo 0 ;;
   esac
 }
-HELLOWORLD_EMIT_MEM_FLOOR_MIB=24576
+HELLOWORLD_EMIT_MEM_FLOOR_MIB=16384
 _cur_mib="$(helloworld_mem_mib "${PHP_COMPILER_MEMORY_LIMIT:-}")"
 if [[ "${_cur_mib}" -lt "${HELLOWORLD_EMIT_MEM_FLOOR_MIB}" ]]; then
-  export PHP_COMPILER_MEMORY_LIMIT=24576M
-  echo "bootstrap-selfhost-helloworld-probe: raised PHP_COMPILER_MEMORY_LIMIT to 24576M for inventory emit-helper (#23970; was ${_cur_mib}MiB)" >&2
+  export PHP_COMPILER_MEMORY_LIMIT=16384M
+  echo "bootstrap-selfhost-helloworld-probe: raised PHP_COMPILER_MEMORY_LIMIT to 16384M for inventory emit-helper (#23970; was ${_cur_mib}MiB)" >&2
 fi
 unset _cur_mib
 if [[ -r /sys/fs/cgroup/memory.max ]]; then
   _cgroup_max="$(cat /sys/fs/cgroup/memory.max 2>/dev/null || true)"
-  if [[ "${_cgroup_max}" =~ ^[0-9]+$ ]] && [[ "${_cgroup_max}" -lt $((24 * 1024 * 1024 * 1024)) ]]; then
-    echo "bootstrap-selfhost-helloworld-probe: WARNING cgroup memory.max=${_cgroup_max} < 24GiB — emit-helper may SIGKILL; re-run docker-exec with PHP_COMPILER_DOCKER_MEM=32g (#23970)" >&2
+  if [[ "${_cgroup_max}" =~ ^[0-9]+$ ]] && [[ "${_cgroup_max}" -lt $((16 * 1024 * 1024 * 1024)) ]]; then
+    echo "bootstrap-selfhost-helloworld-probe: WARNING cgroup memory.max=${_cgroup_max} < 16GiB — emit-helper may SIGKILL; re-run docker-exec with PHP_COMPILER_DOCKER_MEM=16g (#23970)" >&2
   fi
   unset _cgroup_max
 elif [[ -r /sys/fs/cgroup/memory/memory.limit_in_bytes ]]; then
   _cgroup_max="$(cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || true)"
-  if [[ "${_cgroup_max}" =~ ^[0-9]+$ ]] && [[ "${_cgroup_max}" -lt $((24 * 1024 * 1024 * 1024)) ]]; then
-    echo "bootstrap-selfhost-helloworld-probe: WARNING cgroup memory.limit_in_bytes=${_cgroup_max} < 24GiB — emit-helper may SIGKILL; re-run docker-exec with PHP_COMPILER_DOCKER_MEM=32g (#23970)" >&2
+  if [[ "${_cgroup_max}" =~ ^[0-9]+$ ]] && [[ "${_cgroup_max}" -lt $((16 * 1024 * 1024 * 1024)) ]]; then
+    echo "bootstrap-selfhost-helloworld-probe: WARNING cgroup memory.limit_in_bytes=${_cgroup_max} < 16GiB — emit-helper may SIGKILL; re-run docker-exec with PHP_COMPILER_DOCKER_MEM=16g (#23970)" >&2
   fi
   unset _cgroup_max
 fi

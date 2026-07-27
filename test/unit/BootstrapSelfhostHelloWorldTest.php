@@ -489,16 +489,17 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $jit);
     }
 
-    /** Issue #23970: inventory emit-helper link OOMs below 24G; probe + compile.php must floor there. */
+    /** Issue #23970: skip-bundle + helper-runtime O; 16G floor (bundling OOMs through 24G). */
     public function testHelloWorldProbeRaisesCompileDriverMemoryFloor(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
-        $this->assertStringContainsString('HELLOWORLD_EMIT_MEM_FLOOR_MIB=24576', $script);
-        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT=24576M', $script);
+        $this->assertStringContainsString('HELLOWORLD_EMIT_MEM_FLOOR_MIB=16384', $script);
+        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT=16384M', $script);
+        $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $script);
         $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB=0', $script);
-        $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM=32g', $script);
+        $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM=16g', $script);
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
-        $this->assertStringContainsString("'24576M'", $compile);
+        $this->assertStringContainsString("'16384M'", $compile);
         $this->assertStringContainsString('compile_driver.php', $compile);
         $this->assertStringContainsString('#23970', $compile);
         $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $compile);
@@ -510,6 +511,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('StringStrReplace::ensureStandaloneBodies', $ctx);
         $strReplace = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/StringStrReplace.php');
         $this->assertStringContainsString('HelperRuntimeCache::enabled()', $strReplace);
+        $makefile = (string) file_get_contents(self::$root.'/Makefile');
+        $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O', $makefile);
     }
 
     public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void

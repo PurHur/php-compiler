@@ -375,16 +375,17 @@ bootstrap-selfhost-lib-spine-vm-smoke:
 	./script/bootstrap-selfhost-lib-spine-vm-smoke.sh
 bootstrap-selfhost-vm-driver-execute-probe:
 	./script/bootstrap-selfhost-vm-driver-execute-probe.sh
-# Inventory emit-helper AOT needs ≥24GiB PHP + Docker cgroup (#23970). When invoking
-# via docker-exec from the host, set PHP_COMPILER_DOCKER_MEM=32g PHP_COMPILER_DOCKER_MEM_SWAP=32g
-# (and preferably PHP_COMPILER_MEMORY_LIMIT=24576M) — the default 10g cgroup is too small.
+# Inventory emit-helper: skip SourceBundler + HELPER_RUNTIME_O (#23970). Bundling alone
+# OOMs through 24GiB; with skip-bundle, 16GiB PHP/Docker is enough. Host docker-exec:
+# PHP_COMPILER_DOCKER_MEM=16g PHP_COMPILER_DOCKER_MEM_SWAP=16g
 bootstrap-selfhost-helloworld:
 	BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
 	BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 	BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 	BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
-	PHP_COMPILER_MEMORY_LIMIT=$${PHP_COMPILER_MEMORY_LIMIT:-24576M} \
-	PHP_COMPILER_LLVM_MEMORY_LIMIT=$${PHP_COMPILER_LLVM_MEMORY_LIMIT:-24576M} \
+	PHP_COMPILER_HELPER_RUNTIME_O=$${PHP_COMPILER_HELPER_RUNTIME_O:-1} \
+	PHP_COMPILER_MEMORY_LIMIT=$${PHP_COMPILER_MEMORY_LIMIT:-16384M} \
+	PHP_COMPILER_LLVM_MEMORY_LIMIT=$${PHP_COMPILER_LLVM_MEMORY_LIMIT:-16384M} \
 	./script/bootstrap-selfhost-helloworld-probe.sh
 bootstrap-selfhost-helloworld-compile-bin:
 	./script/bootstrap-selfhost-helloworld-compile-bin.sh
