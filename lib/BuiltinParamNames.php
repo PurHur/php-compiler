@@ -250,6 +250,9 @@ final class BuiltinParamNames
             case 'dns_get_mx':
             case 'getmxrr':
                 return ['hostname', 'mxhosts', 'weight'];
+            case 'gethostbyname':
+                // php-src ext/standard/basic_functions.stub.php / dns.c (#23492)
+                return ['hostname'];
             case 'sort':
             case 'rsort':
                 // php-src ext/standard/basic_functions.stub.php — array, flags only (#23225).
