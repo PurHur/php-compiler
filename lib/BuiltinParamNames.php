@@ -24,6 +24,7 @@ final class BuiltinParamNames
             'datetime::format' => ['format'],
             'datetimeimmutable::format' => ['format'],
             'datetimezone::__construct' => ['timezone'],
+            'errorexception::__construct' => ['message=', 'code=', 'severity=', 'filename=', 'line=', 'previous='],
             'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
             'splfileobject::seek' => ['line'],
             'splfileobject::fgetcsv' => ['separator', 'enclosure', 'escape'],
