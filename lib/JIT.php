@@ -8959,6 +8959,31 @@ class JIT {
                         : (int) ($op->arg3 ?? 0);
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
                     $echoOp = $block->getOperand($argOffset);
+                    $scriptGlobalEchoName = (
+                        OpCode::TYPE_ECHO === $op->type
+                        && null !== $op->echoScriptGlobalName
+                        && '' !== $op->echoScriptGlobalName
+                        && $block->isMainScript()
+                    ) ? $op->echoScriptGlobalName : null;
+                    $arg = null;
+                    if (null !== $scriptGlobalEchoName) {
+                        $arg = $this->context->ensureScriptGlobal($scriptGlobalEchoName);
+                    }
+                    if (null === $arg) {
+                        if ($echoOp instanceof Operand\Literal && null !== $argOffset) {
+                            foreach ($block->scopedOperands() as $scopeOp) {
+                                if ($block->slotForOperand($scopeOp) !== $argOffset) {
+                                    continue;
+                                }
+                                if ($scopeOp instanceof Operand\Variable) {
+                                    $echoOp = $scopeOp;
+                                    break;
+                                }
+                            }
+                        }
+                        $arg = $this->resolveScriptGlobalForRuntimeRead($echoOp, $block)
+                            ?? $this->context->getVariableFromOpInScopes($echoOp);
+                    }
                     // CFG string Literals must not load include-binding slots: refresh can
                     // alias inherited locals over slot-backed fromLiteral temps, so
                     // echo "<html>", "\n" emits $appName/$title (#19504 MiniWebApp AOT).
@@ -9001,7 +9026,7 @@ class JIT {
                         break;
                     }
                     $echoSlot = $block->slotForOperand($echoOp);
-                    if (null !== $echoSlot && isset($this->context->coalesceMergeSlotOperands[$echoSlot])) {
+                    if (null === $scriptGlobalEchoName && null !== $echoSlot && isset($this->context->coalesceMergeSlotOperands[$echoSlot])) {
                         $arg = $this->materializeCoalesceMergeSlotArgSend(
                             $block,
                             $this->context->coalesceMergeSlotOperands[$echoSlot]
@@ -9014,7 +9039,7 @@ class JIT {
                             break;
                         }
                     }
-                    if (null !== $echoSlot && isset($this->context->ternaryEchoPhiByAliasSlot[$echoSlot])) {
+                    if (null === $scriptGlobalEchoName && null !== $echoSlot && isset($this->context->ternaryEchoPhiByAliasSlot[$echoSlot])) {
                         $phiOp = $this->context->ternaryEchoPhiByAliasSlot[$echoSlot];
                         if ($this->context->hasVariableOp($phiOp)) {
                             $arg = $this->materializeCoalesceMergeSlotArgSend($block, $phiOp);
@@ -9032,7 +9057,6 @@ class JIT {
                         }
                         $echoOp = $phiOp;
                     }
-                    $arg = $this->context->getVariableFromOpInScopes($echoOp);
                     if (Variable::KIND_VARIABLE === $arg->kind) {
                         $slotType = $this->context->getStringFromType($arg->value->typeOf());
                         if ('__value__' === $slotType) {
@@ -9051,6 +9075,20 @@ class JIT {
                                 $arg->value
                             );
                         }
+                    }
+                    if (null !== $scriptGlobalEchoName) {
+                        $sg = $this->context->ensureScriptGlobal($scriptGlobalEchoName);
+                        $echoSlot = JIT\JitValueBox::alloc($this->context);
+                        JIT\JitValueBox::copyFromPointer(
+                            $this->context,
+                            $echoSlot,
+                            JIT\JitValueBox::valuePtrFromVariable($this->context, $sg)
+                        );
+                        JIT\ValueEchoHelper::echo(
+                            $this->context,
+                            JIT\JitValueBox::pointer($this->context, $echoSlot)
+                        );
+                        break;
                     }
                     switch ($arg->type) {
                         case Variable::TYPE_VALUE:
@@ -13224,14 +13262,67 @@ class JIT {
         }
         $globalVar = $this->context->ensureScriptGlobal($name);
         $this->context->setVariableOp($resultOp, $globalVar);
+        $globalPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $globalVar);
         JIT\JitValueBox::assignToPointer(
             $this->context,
-            JIT\JitValueBox::valuePtrFromVariable($this->context, $globalVar),
+            $globalPtr,
             $value
         );
+        JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
+        $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
         $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
 
         return true;
+    }
+
+    /**
+     * Script-global heap boxes keep stale {@see JIT\Variable::$compileTimeLong} after ++/-- or
+     * assign-op unless cleared; echo must not constant-fold those operands (#23842).
+     */
+    private function invalidateScriptGlobalCompileTimeMetadata(JIT\Variable $global): void
+    {
+        if (!$global->functionStaticGlobal) {
+            return;
+        }
+        $global->compileTimeLong = null;
+        $global->compileTimeFloat = null;
+        $global->compileTimeString = null;
+        $global->isNullConstant = false;
+        $global->compileTimeConstantName = null;
+        $global->compileTimeEnumCase = null;
+    }
+
+    /**
+     * Re-bind echo/print operands to the module-global heap box when the name is a script global.
+     *
+     * Scope slots can retain TYPE_NATIVE_LONG rvalues from an earlier literal assign even after
+     * inc/dec or assign-op updated the heap box (#23842).
+     */
+    private function resolveScriptGlobalForRuntimeRead(Operand $op, ?Block $block = null): ?JIT\Variable
+    {
+        $name = JIT\OperandName::resolve($op);
+        if (null === $name || '' === $name || \PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
+            return null;
+        }
+        $block ??= $this->context->jitFunctionRootBlock ?? $this->context->jitEnclosingBlock;
+        if (null === $block) {
+            return null;
+        }
+        if ($block->isMainScript() && !$this->context->isForeachByRefLocalName($name, $block)) {
+            return $this->context->ensureScriptGlobal($name);
+        }
+        if ($block->declaresGlobalName($name) || isset($this->context->jitImportedGlobalNames[$name])) {
+            return $this->context->ensureScriptGlobal($name);
+        }
+        $resolved = $this->context->resolveRefAliasName($name);
+        if (
+            isset($this->context->namedVariableBindings[$resolved])
+            && $this->context->namedVariableBindings[$resolved]->functionStaticGlobal
+        ) {
+            return $this->context->ensureScriptGlobal($name);
+        }
+
+        return null;
     }
 
     /**
@@ -13674,11 +13765,14 @@ class JIT {
         }
         $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result);
         if (null !== $globalTarget) {
+            $globalPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget);
             JIT\JitValueBox::assignToPointer(
                 $this->context,
-                JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget),
+                $globalPtr,
                 $value
             );
+            JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
+            $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
             $this->context->setVariableOp($resultOp, $globalTarget);
             $globalName = JIT\OperandName::resolve($resultOp);
             if (null !== $globalName && '' !== $globalName) {
@@ -13906,6 +14000,7 @@ class JIT {
                 JIT\JitValueBox::valuePtrFromVariable($this->context, $result),
                 $value
             );
+            $this->invalidateScriptGlobalCompileTimeMetadata($result);
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName(
@@ -14015,11 +14110,14 @@ class JIT {
             }
             $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result);
             if (null !== $globalTarget) {
+                $globalPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget);
                 JIT\JitValueBox::assignToPointer(
                     $this->context,
-                    JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget),
+                    $globalPtr,
                     $value
                 );
+                JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
+                $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
                 $this->context->setVariableOp($resultOp, $globalTarget);
                 $globalName = JIT\OperandName::resolve($resultOp);
                 if (null !== $globalName && '' !== $globalName) {
@@ -15477,6 +15575,8 @@ class JIT {
                 $writePtr,
                 $newLong
             );
+            JIT\JitValueBox::publishAfterWrite($this->context, $writePtr);
+            $this->invalidateScriptGlobalCompileTimeMetadata($write);
             if ($prefix) {
                 $newVar = new Variable(
                     $this->context,
