@@ -17,6 +17,9 @@ use PHPLLVM\Value;
  * VM connects via {@see VmStreamSocketNative} + {@see VmPersistentSocket} registry — no host
  * {@see \pfsockopen()} delegation (PHP-in-PHP; no runtime/*.c socket table).
  *
+ * Z_PARAM_STR $hostname — null TypeError under caller strict_types or 8.4 forward profile
+ * (#23858, reverts #21446 soft-null; php-src ext/standard/fsock.c).
+ *
  * @see https://github.com/php/php-src/blob/master/ext/standard/fsock.c PHP_FUNCTION(pfsockopen)
  */
 final class pfsockopen extends Internal
@@ -38,7 +41,7 @@ final class pfsockopen extends Internal
             return;
         }
 
-        $hostname = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'pfsockopen', 0, 'hostname');
+        $hostname = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'pfsockopen', 0, 'hostname');
 
         $port = -1;
         if ($argc >= 2) {

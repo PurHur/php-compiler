@@ -57,8 +57,23 @@ final class gethostbynamel extends Internal
             throw new \LogicException('gethostbynamel() requires exactly one argument in this compiler build');
         }
 
-        GethostbynamelRuntime::ensureLinked($context);
         $hostnameArg = $args[0];
+        $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
+            || ($hostnameArg->isNullConstant ?? false);
+        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
+            JitStringBuiltinArg::lowerZparamStr(
+                $context,
+                $hostnameArg,
+                'gethostbynamel',
+                0,
+                'hostname'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        GethostbynamelRuntime::ensureLinked($context);
         $hostname = JitStringBuiltinArg::lowerZparamStr(
             $context,
             $hostnameArg,
@@ -66,14 +81,6 @@ final class gethostbynamel extends Internal
             0,
             'hostname'
         );
-        $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
-            || ($hostnameArg->isNullConstant ?? false);
-        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
-            // TypeError already emitted; skip DNS IR after abort (#20555, dns_get_record pattern).
-            $slot = JitValueBox::alloc($context);
-
-            return JitValueBox::pointer($context, $slot);
-        }
 
         return JitGethostbynamel::invoke($context, $hostname);
     }

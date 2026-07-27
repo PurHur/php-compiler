@@ -2,16 +2,23 @@
 
 declare(strict_types=1);
 
-$empty = dns_get_record('');
-$nullCoerced = dns_get_record(null);
+// VM: php bin/vm.php test/repro/maintainer_gap_dns_get_record_null_root.php
+// null → TypeError (#23856); empty hostname DNS_ALL/DNS_A semantics stay.
 
-if (!is_array($empty) || !is_array($nullCoerced)) {
-    echo "fail: expected arrays\n";
+try {
+    dns_get_record(null);
+    echo "fail: null coerced\n";
     exit(1);
+} catch (TypeError $e) {
+    if (!str_contains($e->getMessage(), 'must be of type string, null given')) {
+        echo 'fail: unexpected message: ', $e->getMessage(), "\n";
+        exit(1);
+    }
 }
 
-if ($empty !== $nullCoerced) {
-    echo "fail: null must match empty string\n";
+$empty = dns_get_record('');
+if (!is_array($empty)) {
+    echo "fail: expected array for empty hostname\n";
     exit(1);
 }
 
