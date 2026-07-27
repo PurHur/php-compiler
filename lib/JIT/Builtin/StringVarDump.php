@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
@@ -123,6 +124,7 @@ final class StringVarDump
             : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('var_dump_thin_scalar_entry');
+        $boolBlock = $fn->appendBasicBlock('var_dump_thin_bool');
         $longBlock = $fn->appendBasicBlock('var_dump_thin_long');
         $doubleBlock = $fn->appendBasicBlock('var_dump_thin_double');
         $fallback = $fn->appendBasicBlock('var_dump_thin_fallback');
@@ -136,6 +138,35 @@ final class StringVarDump
         );
         $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
 
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $afterBool = $fn->appendBasicBlock('var_dump_thin_after_bool');
+        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
+
+        $context->builder->positionAtEnd($boolBlock);
+        $boolByte = JitValueBox::readBoolByte($context, $arg);
+        $isTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $boolByte,
+            $i8->constInt(0, false)
+        );
+        $trueBlock = $fn->appendBasicBlock('var_dump_thin_bool_true');
+        $falseBlock = $fn->appendBasicBlock('var_dump_thin_bool_false');
+        $boolDone = $fn->appendBasicBlock('var_dump_thin_bool_done');
+        $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
+        $context->builder->positionAtEnd($trueBlock);
+        ValueEchoHelper::echoLiteral($context, "bool(true)\n");
+        $context->builder->branch($boolDone);
+        $context->builder->positionAtEnd($falseBlock);
+        ValueEchoHelper::echoLiteral($context, "bool(false)\n");
+        $context->builder->branch($boolDone);
+        $context->builder->positionAtEnd($boolDone);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterBool);
         $isLong = $context->builder->icmp(
             Builder::INT_EQ,
             $kind,
