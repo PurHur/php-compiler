@@ -499,9 +499,7 @@ final class BuiltinParamNames
                     ? ['num', 'exponent', 'modulus', 'scale', 'rounding_mode']
                     : ['num', 'exponent', 'modulus', 'scale'];
             case 'fpow':
-                return \PHPCompiler\CompilerVersion::supportsRoundingModeEnum()
-                    ? ['num', 'exponent', 'rounding_mode']
-                    : ['num', 'exponent'];
+                return ['num', 'exponent'];
             case 'intdiv':
                 return ['num1', 'num2'];
             case 'atan2':
