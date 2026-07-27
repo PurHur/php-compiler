@@ -13,6 +13,7 @@ use PHPCompiler\VM\Variable;
  * Soap\Url / Soap\Sdl — PHP 8.4 resource→object opaque types (php-src ext/soap/soap.stub.php; #23230).
  *
  * Final internal classes; userland `new` rejected via {@see \PHPCompiler\VM\ReservedBuiltinClass}.
+ * Soap\Sdl carries a {@see SoapSdlPayload} side-table like php-src `soap_sdl_object->sdl` (#23905).
  */
 final class VmSoapOpaque
 {
@@ -23,6 +24,9 @@ final class VmSoapOpaque
     public const SDL_CLASS = 'Soap\\Sdl';
 
     public const SDL_CLASS_LC = 'soap\\sdl';
+
+    /** @var array<int, SoapSdlPayload> */
+    private static array $sdlPayloads = [];
 
     public static function register(Context $ctx): void
     {
@@ -63,8 +67,12 @@ final class VmSoapOpaque
         return $object;
     }
 
-    /** Factory for SoapClient::$sdl (php-src soap_sdl_object_create). */
-    public static function newSdlObject(Context $ctx): ObjectEntry
+    /**
+     * Factory for SoapClient::$sdl (php-src soap_sdl_object_create).
+     *
+     * @param SoapSdlPayload|null $payload Parsed SDL snapshot (php-src sdl_object->sdl; #23905).
+     */
+    public static function newSdlObject(Context $ctx, ?SoapSdlPayload $payload = null): ObjectEntry
     {
         self::register($ctx);
         $class = $ctx->classes[self::SDL_CLASS_LC] ?? null;
@@ -73,8 +81,17 @@ final class VmSoapOpaque
         }
         $object = new ObjectEntry($class);
         $object->constructed = true;
+        if (null !== $payload) {
+            self::$sdlPayloads[$object->id] = $payload;
+        }
 
         return $object;
+    }
+
+    /** php-src soap_sdl_object->sdl accessor for compiler-internal use (#23905). */
+    public static function sdlPayload(ObjectEntry $object): ?SoapSdlPayload
+    {
+        return self::$sdlPayloads[$object->id] ?? null;
     }
 
     public static function urlVariable(Context $ctx): Variable
@@ -85,10 +102,10 @@ final class VmSoapOpaque
         return $var;
     }
 
-    public static function sdlVariable(Context $ctx): Variable
+    public static function sdlVariable(Context $ctx, ?SoapSdlPayload $payload = null): Variable
     {
         $var = new Variable(Variable::TYPE_OBJECT);
-        $var->object(self::newSdlObject($ctx));
+        $var->object(self::newSdlObject($ctx, $payload));
 
         return $var;
     }

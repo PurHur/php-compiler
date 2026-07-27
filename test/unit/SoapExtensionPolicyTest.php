@@ -151,6 +151,12 @@ final class SoapExtensionPolicyTest extends TestCase
             self::assertSame(\PHPCompiler\VM\Variable::TYPE_OBJECT, $sdlVar->type);
             self::assertSame('Soap\\Sdl', $sdlVar->toObject()->class->name);
 
+            $payload = \PHPCompiler\ext\soap\VmSoapOpaque::sdlPayload($sdlVar->toObject());
+            self::assertNotNull($payload);
+            self::assertSame($wsdl, $payload->wsdl);
+            self::assertContains('ping', $payload->functions);
+            self::assertSame('http://127.0.0.1/', $payload->location);
+
             @\unlink($wsdl);
             @\rmdir($dir);
         } finally {
