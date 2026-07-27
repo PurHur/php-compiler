@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ProcessOpen;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -19,6 +20,8 @@ final class JitProcGetStatus
 {
     public static function invoke(Context $context, JITVariable $procArg): Value
     {
+        // STANDALONE/EMBED AOT skips eager ProcessOpen link (#12910); ensure before lookup (#23722).
+        ProcessOpen::ensureLinked($context);
         JitResourceArg::rejectEnumCaseOperand($context, $procArg, 'proc_get_status', 0, 'process');
         $handle = $context->builder->truncOrBitCast(
             JitLongArg::lower($context, $procArg, 'proc_get_status() process'),

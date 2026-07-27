@@ -101,24 +101,36 @@ final class ProcessSlotJitHelper
             return false;
         }
 
+        // php-src 8.2: already-reaped waitpid → ECHILD: exitcode=-1 on later calls (#23722).
+        if ($entry['statusKnown']) {
+            $pendingSignals = VmProcessProcOpenNative::resolvePendingSignals($entry, false, false, 0);
+            self::$slots[$slot] = $entry;
+
+            return VmProcessProcOpenNative::buildProcStatusArray(
+                $entry['command'],
+                $entry['pid'],
+                false,
+                false,
+                false,
+                -1,
+                0,
+                0,
+                $pendingSignals,
+            );
+        }
+
         $running = true;
         $statusVal = 0;
-
+        self::pollChildExitStatus($ffi, $entry);
+        self::$slots[$slot] = $entry;
         if ($entry['statusKnown']) {
             $statusVal = $entry['status'];
             $running = false;
         } else {
-            self::pollChildExitStatus($ffi, $entry);
-            self::$slots[$slot] = $entry;
-            if ($entry['statusKnown']) {
-                $statusVal = $entry['status'];
-                $running = false;
-            } else {
-                try {
-                    $running = 0 === (int) $ffi->kill($entry['pid'], 0);
-                } catch (\Throwable) {
-                    return false;
-                }
+            try {
+                $running = 0 === (int) $ffi->kill($entry['pid'], 0);
+            } catch (\Throwable) {
+                return false;
             }
         }
 

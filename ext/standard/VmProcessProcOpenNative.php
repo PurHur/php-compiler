@@ -380,25 +380,38 @@ final class VmProcessProcOpenNative
             return false;
         }
 
+        // php-src 8.2: waitpid already reaped → ECHILD path: running=false, exitcode=-1 (#23722).
+        // Only the first post-exit proc_get_status() returns the real exitcode.
+        if ($slot['statusKnown']) {
+            $pendingSignals = self::resolvePendingSignals($slot, false, false, 0);
+            self::$slots[$handle] = $slot;
+
+            return self::buildProcStatusArray(
+                $slot['command'],
+                $slot['pid'],
+                false,
+                false,
+                false,
+                -1,
+                0,
+                0,
+                $pendingSignals,
+            );
+        }
+
         $running = true;
         $statusVal = 0;
-
+        self::pollChildExitStatus($ffi, $slot);
+        self::$slots[$handle] = $slot;
         if ($slot['statusKnown']) {
             $statusVal = $slot['status'];
             $running = false;
         } else {
-            self::pollChildExitStatus($ffi, $slot);
-            self::$slots[$handle] = $slot;
-            if ($slot['statusKnown']) {
-                $statusVal = $slot['status'];
-                $running = false;
-            } else {
-                // php-src: waitpid(WNOHANG) in proc_get_status; reap only when child already exited (#13079, #15647).
-                try {
-                    $running = 0 === (int) $ffi->kill($slot['pid'], 0);
-                } catch (\Throwable) {
-                    return false;
-                }
+            // php-src: waitpid(WNOHANG) in proc_get_status; reap only when child already exited (#13079, #15647).
+            try {
+                $running = 0 === (int) $ffi->kill($slot['pid'], 0);
+            } catch (\Throwable) {
+                return false;
             }
         }
 
