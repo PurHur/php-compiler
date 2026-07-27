@@ -2559,6 +2559,7 @@ require_once __DIR__.'/../../../ext/standard/JitStrReplace.php';
 require_once __DIR__.'/../../../ext/standard/JitStrReplaceArray.php';
 require_once __DIR__.'/../../../ext/standard/JitStrReplaceMulti.php';
 require_once __DIR__.'/../../../ext/standard/JitStrReplaceSearchReplaceGuard.php';
+require_once __DIR__.'/../../../ext/standard/JitStrReplaceSubject.php';
 require_once __DIR__.'/../../../ext/standard/JitStrShuffle.php';
 require_once __DIR__.'/../../../ext/standard/JitStrSplit.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamBucket.php';
