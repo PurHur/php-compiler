@@ -39594,8 +39594,21 @@ class Compiler {
             );
         }
 
+        // PHP 8.4+: `new Class(...)` → constructor Closure; ≤8.3 compile-fatal (#23714, #10130).
         if (Op\Expr\FirstClassCallable::KIND_NEW === $expr->kind) {
-            $this->throwCompileError('Cannot create Closure for new expression');
+            if (!CompilerVersion::supportsNewFirstClassCallable()) {
+                $this->throwCompileError('Cannot create Closure for new expression');
+            }
+            $classOperand = $expr->class ?? $expr->name;
+            if (!$classOperand instanceof Operand\Literal) {
+                $this->throwCompileLogic('First-class new callable requires a literal class name');
+            }
+
+            return [new OpCode(
+                OpCode::TYPE_FROM_CALLABLE,
+                $result,
+                $this->compileStringLiteralSlot('new '.$classOperand->value, $block)
+            )];
         }
 
         if (1 === $expr->kind) {
