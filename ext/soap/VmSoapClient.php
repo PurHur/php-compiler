@@ -50,13 +50,41 @@ final class VmSoapClient
         $entry->isInternal = true;
 
         $pub = CfgFunc::FLAG_PUBLIC;
+        // php-src stub marks private; expose readable like httpurl/sdl (#23246/#23922).
+        $have = [];
+        foreach ($entry->properties as $prop) {
+            $have[$prop->name] = true;
+        }
+        $nullProto = new Variable(Variable::TYPE_NULL);
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $intProto = new Variable(Variable::TYPE_INTEGER);
+        $boolProto = new Variable(Variable::TYPE_BOOLEAN);
+        $falseDefault = new Variable(Variable::TYPE_BOOLEAN);
+        $falseDefault->bool(false);
+        // Core ctor option props (soap.stub.php; #23922).
+        $coreProps = [
+            'uri' => [$nullProto, $strProto],
+            'style' => [$nullProto, $intProto],
+            'use' => [$nullProto, $intProto],
+            'location' => [$nullProto, $strProto],
+            'trace' => [$falseDefault, $boolProto],
+            'compression' => [$nullProto, $intProto],
+        ];
+        foreach ($coreProps as $propName => [$default, $proto]) {
+            if (!isset($have[$propName])) {
+                $entry->properties[] = new ClassProperty(
+                    $propName,
+                    $default,
+                    $proto,
+                    false,
+                    $pub,
+                    self::CLASS_LC
+                );
+                $have[$propName] = true;
+            }
+        }
         // php-src stub marks private; UPGRADING / soap.stub.php userland reads (#23246/#23247/#23903/#23904).
         if (SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
-            $nullProto = new Variable(Variable::TYPE_NULL);
-            $have = [];
-            foreach ($entry->properties as $prop) {
-                $have[$prop->name] = true;
-            }
             foreach (['httpurl', 'sdl', 'typemap', 'httpsocket'] as $propName) {
                 if (!isset($have[$propName])) {
                     $entry->properties[] = new ClassProperty(
@@ -213,7 +241,59 @@ final class VmSoapClient
         }
 
         self::$store[$object->id] = $state;
+        // php-src soap.c ctor — Z_CLIENT_URI/STYLE/USE/LOCATION/TRACE/COMPRESSION (#23922).
+        self::syncCoreOptionProperties($object, $state);
         $object->constructed = true;
+    }
+
+    /**
+     * Mirror SoapClientState onto stub core option properties (#23922 / soap.stub.php).
+     */
+    private static function syncCoreOptionProperties(ObjectEntry $object, SoapClientState $state): void
+    {
+        if ($object->hasProperty('uri')) {
+            $slot = $object->getProperty('uri');
+            if ('' !== $state->uri) {
+                $slot->string($state->uri);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('location')) {
+            $slot = $object->getProperty('location');
+            if ('' !== $state->location) {
+                $slot->string($state->location);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('style')) {
+            $slot = $object->getProperty('style');
+            if ($state->styleFromOptions) {
+                $slot->int($state->style);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('use')) {
+            $slot = $object->getProperty('use');
+            if ($state->useFromOptions) {
+                $slot->int($state->use);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('trace')) {
+            $object->getProperty('trace')->bool($state->trace);
+        }
+        if ($object->hasProperty('compression')) {
+            $slot = $object->getProperty('compression');
+            if (null !== $state->compression) {
+                $slot->int($state->compression);
+            } else {
+                $slot->null();
+            }
+        }
     }
 
     public static function state(ObjectEntry $object): SoapClientState
@@ -272,6 +352,15 @@ final class VmSoapClient
         $state = self::state($object);
         $previous = $state->location;
         $state->location = $location;
+        // Keep stub $location in sync with __setLocation (#23922).
+        if ($object->hasProperty('location')) {
+            $slot = $object->getProperty('location');
+            if ('' !== $location) {
+                $slot->string($location);
+            } else {
+                $slot->null();
+            }
+        }
 
         return $previous;
     }

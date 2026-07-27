@@ -167,4 +167,50 @@ final class SoapExtensionPolicyTest extends TestCase
             }
         }
     }
+
+    public function testSoapClientCoreOptionProperties(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $entry = $ctx->classes['soapclient'] ?? null;
+            self::assertNotNull($entry);
+            $names = \array_map(static fn ($p) => $p->name, $entry->properties);
+            foreach (['uri', 'style', 'use', 'location', 'trace', 'compression'] as $prop) {
+                self::assertContains($prop, $names);
+            }
+
+            $object = new \PHPCompiler\VM\ObjectEntry($entry);
+            \PHPCompiler\ext\soap\VmSoapClient::initObject(
+                $object,
+                null,
+                [
+                    'location' => 'http://127.0.0.1/',
+                    'uri' => 'http://test/',
+                    'trace' => true,
+                    'style' => \PHPCompiler\ext\soap\SoapConstants::SOAP_RPC,
+                    'use' => \PHPCompiler\ext\soap\SoapConstants::SOAP_ENCODED,
+                    'compression' => \PHPCompiler\ext\soap\SoapConstants::SOAP_COMPRESSION_ACCEPT,
+                ],
+                $ctx
+            );
+            self::assertSame('http://test/', $object->getProperty('uri')->toString());
+            self::assertSame('http://127.0.0.1/', $object->getProperty('location')->toString());
+            self::assertSame(\PHPCompiler\ext\soap\SoapConstants::SOAP_RPC, $object->getProperty('style')->toInt());
+            self::assertSame(\PHPCompiler\ext\soap\SoapConstants::SOAP_ENCODED, $object->getProperty('use')->toInt());
+            self::assertTrue($object->getProperty('trace')->toBool());
+            self::assertSame(
+                \PHPCompiler\ext\soap\SoapConstants::SOAP_COMPRESSION_ACCEPT,
+                $object->getProperty('compression')->toInt()
+            );
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
