@@ -16799,6 +16799,9 @@ class Compiler {
         }
         // Multi-arg: ClassConstFetch mapped to this arg is an Array_ element ⇒ arg is the Array_
         // (json_encode([E::A]); f([E::A], E::B) arg0). Bare E::A arg keeps ClassConstFetch wiring.
+        // Trailing-enum ordinal fallback can also map that same array-element fetch onto a later
+        // dead ConstFetch temp (http_build_query([E::A], '', '&', PHP_QUERY_RFC3986) — #23702);
+        // only arg #0 is the enum-case array in that case.
         $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp(
             $block->orig->children,
             $cfgCallOp,
@@ -16810,7 +16813,7 @@ class Compiler {
         }
         foreach ($array->values as $value) {
             if (null !== $value && $this->operandsReferToSameVariable($value, $fetch->result)) {
-                return true;
+                return 0 === $argIndex;
             }
         }
 

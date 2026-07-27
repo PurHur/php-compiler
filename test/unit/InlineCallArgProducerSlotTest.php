@@ -6995,6 +6995,58 @@ PHP;
         self::assertSame("a%5B0%5D=x&a%5B1%5D=y\n", ob_get_clean());
     }
 
+    /**
+     * Issue #23702 — enum-case Array_ + bare PHP_QUERY_RFC3986 must not reuse INIT_ARRAY for encoding_type.
+     */
+    public function testHttpBuildQueryEnumArrayBareRfc3986ConstUsesDistinctEncodingSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'a'; }
+echo http_build_query(['e' => E::A], '', '&', PHP_QUERY_RFC3986), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'http_build_query_enum_rfc3986_const.php');
+
+        $initArraySlot = null;
+        $constFetchSlot = null;
+        $sendSlots = [];
+        $walk = function (Block $b) use (&$walk, &$initArraySlot, &$constFetchSlot, &$sendSlots): void {
+            static $seen = [];
+            $id = spl_object_id($b);
+            if (isset($seen[$id])) {
+                return;
+            }
+            $seen[$id] = true;
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $initArraySlot) {
+                    $initArraySlot = $op->arg1;
+                }
+                if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constFetchSlot) {
+                    $constFetchSlot = $op->arg1;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type) {
+                    $sendSlots[] = $op->arg1;
+                }
+                if (OpCode::TYPE_TRY === $op->type && $op->block1 instanceof Block) {
+                    $walk($op->block1);
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotNull($initArraySlot);
+        self::assertNotNull($constFetchSlot);
+        self::assertCount(4, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($initArraySlot, $sendSlots[0], 'data must be INIT_ARRAY slot');
+        self::assertSame($constFetchSlot, $sendSlots[3], 'encoding_type must be CONST_FETCH slot, not INIT_ARRAY');
+        self::assertNotSame($initArraySlot, $sendSlots[3]);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("e%5Bname%5D=A&e%5Bvalue%5D=a\n", ob_get_clean());
+    }
+
     /** Bootstrap M4 (#2880): production driver must VM-parse (composer closure assign slot #5644). */
     public function testBinCompilePhpVmParseAndCompile(): void
     {
