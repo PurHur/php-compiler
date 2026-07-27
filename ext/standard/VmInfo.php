@@ -410,15 +410,19 @@ final class VmInfo
             $p2 = null !== $n2 ? $n2 : '';
         }
 
+        // php-src versioning.c: isdigit(*p) on the first character of the
+        // remaining segment only — not ctype_digit on the whole remainder
+        // (e.g. "0.dev" after "8.4" vs "8.4.0-dev"). Full-string digit
+        // checks flip X.Y vs X.Y.Z-dev (#23508).
         if (0 === $compare) {
             if (null !== $n1) {
-                if (ctype_digit($p1)) {
+                if ('' !== $p1 && self::isVersionDigitChar($p1[0])) {
                     $compare = 1;
                 } else {
                     $compare = self::phpVersionCompare($p1, '#N#');
                 }
             } elseif (null !== $n2) {
-                if (ctype_digit($p2)) {
+                if ('' !== $p2 && self::isVersionDigitChar($p2[0])) {
                     $compare = -1;
                 } else {
                     $compare = self::phpVersionCompare('#N#', $p2);
