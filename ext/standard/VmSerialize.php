@@ -43,6 +43,7 @@ use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\LazyObjectSupport;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
@@ -1109,14 +1110,20 @@ final class VmSerialize
         if (null === $names) {
             return 'N;';
         }
+        /** @var array<string, Variable> $props */
         $props = [];
+        /** @var array<string, true> $seenKeys */
+        $seenKeys = [];
         foreach ($names as $name) {
-            if (!$entry->hasProperty($name)) {
+            $resolved = self::resolveSleepProperty($ctx, $entry, $name, $frame);
+            if (null === $resolved) {
+                continue;
+            }
+            [$key, $value] = $resolved;
+            if (isset($seenKeys[$key])) {
+                // php-src php_var_serialize_try_add_sleep_prop — duplicate __sleep name.
                 $ctx->errors->triggerError(
-                    \sprintf(
-                        'serialize(): "%s" returned as member variable from __sleep() but does not exist',
-                        $name
-                    ),
+                    \sprintf('serialize(): "%s" is returned from __sleep() multiple times', $name),
                     ErrorReporter::E_WARNING,
                     null,
                     $ctx,
@@ -1124,10 +1131,110 @@ final class VmSerialize
                 );
                 continue;
             }
-            $props[$name] = $entry->getProperty($name)->resolveIndirect();
+            $seenKeys[$key] = true;
+            // Uninitialized typed slots: found but omitted (var.c IS_UNDEF + typed info).
+            if (TypedPropertyCheck::omitFromSerialize($value)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $props[$key] = $copy;
         }
 
         return self::encodeObjectPropertyBag($ctx, $entry->class->name, $props);
+    }
+
+    /**
+     * php-src php_var_serialize_get_sleep_props — try public/dynamic, then private(ce), then protected.
+     *
+     * @return array{0: string, 1: Variable}|null wire key + value, or null after "does not exist" warning
+     */
+    private static function resolveSleepProperty(
+        Context $ctx,
+        ObjectEntry $entry,
+        string $name,
+        ?Frame $frame
+    ): ?array {
+        // 1) Public declared or dynamic — unmangled key in ZEND_PROP_PURPOSE_SERIALIZE bag.
+        if ($entry->hasProperty($name)) {
+            $meta = VmReflection::findClassPropertyExact($entry->class, $name, $ctx);
+            if (null === $meta || MethodVisibility::isPublic($meta->visibility)) {
+                return [$name, $entry->getProperty($name)->resolveIndirect()];
+            }
+        }
+
+        // 2) Private of the object's class (mangle with ce->name).
+        $privMeta = self::findSleepPrivatePropertyOnClass($entry->class, $name);
+        if (null !== $privMeta && $entry->hasPropertyForMeta($privMeta)) {
+            return [
+                VmReflection::manglePropertyKey($privMeta, $ctx),
+                $entry->getPropertyForMeta($privMeta)->resolveIndirect(),
+            ];
+        }
+
+        // 3) Protected in the hierarchy (mangle as "\0*\0name").
+        $protMeta = self::findSleepProtectedProperty($entry->class, $name, $ctx);
+        if (null !== $protMeta && $entry->hasPropertyForMeta($protMeta)) {
+            return [
+                VmReflection::manglePropertyKey($protMeta, $ctx),
+                $entry->getPropertyForMeta($protMeta)->resolveIndirect(),
+            ];
+        }
+
+        $ctx->errors->triggerError(
+            \sprintf(
+                'serialize(): "%s" returned as member variable from __sleep() but does not exist',
+                $name
+            ),
+            ErrorReporter::E_WARNING,
+            null,
+            $ctx,
+            $frame
+        );
+
+        return null;
+    }
+
+    private static function findSleepPrivatePropertyOnClass(ClassEntry $class, string $name): ?ClassProperty
+    {
+        // php-src mangles with ce->name only — parent private slots live on the child CE
+        // for storage (#22521) but must not match __sleep lookup (var.c).
+        $ceLc = strtolower(ltrim($class->name, '\\'));
+        foreach ($class->properties as $meta) {
+            if ($meta->name !== $name) {
+                continue;
+            }
+            if (($meta->visibility & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
+                continue;
+            }
+            $declLc = '' !== $meta->declaringClassLc
+                ? $meta->declaringClassLc
+                : $ceLc;
+            if ($declLc === $ceLc) {
+                return $meta;
+            }
+        }
+
+        return null;
+    }
+
+    private static function findSleepProtectedProperty(
+        ClassEntry $class,
+        string $name,
+        Context $ctx
+    ): ?ClassProperty {
+        foreach (VmReflection::classHierarchyChain($class, $ctx) as $scan) {
+            foreach ($scan->properties as $meta) {
+                if ($meta->name !== $name) {
+                    continue;
+                }
+                if (($meta->visibility & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
+                    return $meta;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
