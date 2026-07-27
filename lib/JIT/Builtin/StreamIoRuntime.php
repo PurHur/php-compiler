@@ -49,6 +49,17 @@ final class StreamIoRuntime
 
     private const HELPER_PATH = '/ext/standard/StreamIoJitHelper.php';
 
+    /**
+     * JitOpenStreamHandles must NestedJIT with StreamIoJitHelper so php://memory fopen
+     * registers a live handle (#23777). Without it VmFs::fopen is ExternalMethod → 0.
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        '/ext/standard/JitOpenStreamHandles.php',
+        self::HELPER_PATH,
+    ];
+
     private const FOPEN = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::fopenArgv';
 
     private const POPEN = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::popenArgv';
@@ -534,9 +545,9 @@ final class StreamIoRuntime
     private static function ensureJitHelperCompiled(Context $context): void
     {
         LibcExtern::register($context);
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
             '#10326'
         );

@@ -15328,6 +15328,18 @@ class JIT {
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
         $write = $this->context->getVariableFromOpInScopes($writeOp);
+        // TEMP #23777 diagnose — remove after fix
+        if (\getenv('PHP_COMPILER_DEBUG_INCDEC_RES') === '1') {
+            fwrite(\STDERR, sprintf(
+                "incdec read type=%d kind=%d fsg=%d provenanceSafe=%s nested=%s name=%s\n",
+                $read->type,
+                $read->kind,
+                $read->functionStaticGlobal ? 1 : 0,
+                JIT\IncDecResourceProvenance::cannotBeResource($readOp) ? 'yes' : 'no',
+                JIT\NestedJitCompileScope::isActive() ? 'yes' : 'no',
+                (string) (JIT\OperandName::resolve($readOp) ?? '')
+            ));
+        }
         if (
             JIT\StringOffsetHelper::isWritableCharOffsetLvalue($write, $this->context)
             || JIT\StringOffsetHelper::isWritableCharOffsetLvalue($read, $this->context)
@@ -15451,7 +15463,7 @@ class JIT {
             return;
         }
 
-        if (Variable::TYPE_NATIVE_LONG === $read->type && Variable::KIND_VARIABLE === $read->kind) {
+        if (Variable::TYPE_NATIVE_LONG === $read->type) {
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
             $cur = $this->context->helper->loadValue($read);
             $one = $cur->typeOf()->constInt(1, false);
@@ -15481,6 +15493,8 @@ class JIT {
             return;
         }
 
+        // Top-level fopen() handles and other shapes that miss the buckets above (#23777 / #6396).
+        $this->guardIncDecResourceOperand($read, $increment, $readOp);
         if (!$prefix) {
             $this->assignOperand($resultOp, $read, true);
         }
@@ -15562,10 +15576,7 @@ class JIT {
         $longVal = null;
         if (JIT\Variable::TYPE_NATIVE_LONG === $read->type) {
             $longVal = $this->context->helper->loadValue($read);
-        } elseif (
-            JIT\Variable::TYPE_VALUE === $read->type
-            && (JIT\Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
-        ) {
+        } elseif (JIT\Variable::TYPE_VALUE === $read->type) {
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $longVal = $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),
@@ -15575,6 +15586,8 @@ class JIT {
         if (null === $longVal) {
             return;
         }
+        // StreamLifecycle + StringDir: is_resource must see JitOpenStreamHandles (#23777).
+        JIT\Builtin\StreamLifecycleRuntime::ensureLinked($this->context);
         JIT\Builtin\StringDir::ensureLinked($this->context);
         $isRes = JIT\JitValueCompare::nativeLongIsResource($this->context, $longVal);
         ++self::$blockNumber;
@@ -15589,7 +15602,15 @@ class JIT {
             $this->context,
             $increment ? 'Cannot increment resource' : 'Cannot decrement resource'
         );
-        $this->context->builder->call($this->context->lookupFunction('abort'));
+        // Standalone AOT: print Uncaught TypeError and exit 255 (php-src-strict); JIT uses abort.
+        if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
+            JIT\Builtin\TypeErrorRaise::ensureStandaloneBodies($this->context);
+            $this->context->builder->call(
+                $this->context->lookupFunction('phpc_jit_abort_if_pending_type_error')
+            );
+        } else {
+            $this->context->builder->call($this->context->lookupFunction('abort'));
+        }
         $this->context->builder->positionAtEnd($okBlock);
     }
 

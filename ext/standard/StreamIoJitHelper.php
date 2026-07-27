@@ -15,6 +15,17 @@ final class StreamIoJitHelper
     /** @return int ABI for __compiler_fopen (-1 on failure) */
     public static function fopenArgv(string $path, string $mode): int
     {
+        // NestedJIT cannot compile full VmFs today (ExternalMethod null → handle 0). For
+        // php://memory|temp allocate a live handle in the shared JitOpenStreamHandles table so
+        // is_resource / ++/-- TypeError work under AOT (#23777). Other paths still use VmFs.
+        if (JitOpenStreamHandles::isMemoryUri($path)) {
+            if (!JitOpenStreamHandles::modeLooksValid($mode)) {
+                return -1;
+            }
+
+            return JitOpenStreamHandles::alloc();
+        }
+
         $handle = VmFs::fopen($path, $mode);
         if (false === $handle) {
             return -1;

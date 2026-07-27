@@ -28,6 +28,16 @@ final class JitStreamLifecycleKernel
 {
     private const HELPER_PATH = '/ext/standard/StreamLifecycleJitHelper.php';
 
+    /**
+     * Share NestedJIT registry with StreamIoJitHelper (#23777).
+     *
+     * @var list<string>
+     */
+    private const HELPER_BUNDLE = [
+        '/ext/standard/JitOpenStreamHandles.php',
+        self::HELPER_PATH,
+    ];
+
     private const LIBC_HELPER_PATH = '/ext/standard/StreamLibcHandleJitHelper.php';
 
     private const IS_RESOURCE = 'PHPCompiler\\ext\\standard\\StreamLifecycleJitHelper::isResourceArgv';
@@ -218,9 +228,9 @@ final class JitStreamLifecycleKernel
             self::LIBC_HELPERS,
             '#20966'
         );
-        JitVmHelperLink::ensureCompiled(
+        JitVmHelperLink::ensureCompiledBundle(
             $context,
-            self::HELPER_PATH,
+            self::HELPER_BUNDLE,
             self::COMPILED_HELPERS,
             '#20966'
         );
