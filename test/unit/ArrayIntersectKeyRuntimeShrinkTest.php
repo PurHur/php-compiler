@@ -9,50 +9,67 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_intersect_key() JIT routes through ArrayIntersectKeyJitHelper PHP not ArrayBuiltinHelper LLVM (#12551, #14400). */
+/**
+ * array_intersect_key() NestedJIT via JitVmHelperLink::ensureCompiled (#23728 / peer #23627).
+ */
 final class ArrayIntersectKeyRuntimeShrinkTest extends TestCase
 {
     public function testArrayIntersectKeyRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayIntersectKeyRuntime.php');
         $this->assertStringContainsString('ArrayIntersectKeyJitHelper', $runtime);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayIntersectKey', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('parseAndCompile', $runtime);
+        $this->assertStringNotContainsString('new JIT(', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_intersect_key.php');
         $this->assertStringContainsString('ArrayIntersectKeyRuntime::intersectKey', $builtin);
-        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayIntersectKey', $builtin);
     }
 
     public function testArrayIntersectKeyJitHelperSingleCopy(): void
     {
         $base = new HashTable();
-        $v = new Variable();
-        $v->string('a');
-        $base->add('x', $v);
+        $a = new Variable();
+        $a->string('1');
+        $base->add('a', $a);
+        $b = new Variable();
+        $b->string('2');
+        $base->add('b', $b);
 
         $copy = ArrayIntersectKeyJitHelper::intersectKeySingleCopy($base);
         $this->assertNotSame($base, $copy);
-        $this->assertSame('a', $copy->find('x')?->toString());
+        $this->assertSame(2, $copy->getNumElements());
     }
 
-    public function testArrayIntersectKeyJitHelperKeyOnly(): void
+    public function testArrayIntersectKeyJitHelperKeepsSharedKeys(): void
     {
         $first = new HashTable();
         $a = new Variable();
-        $a->string('keep');
-        $first->add('k', $a);
+        $a->string('1');
+        $first->add('a', $a);
         $b = new Variable();
-        $b->string('drop');
-        $first->add('z', $b);
+        $b->string('2');
+        $first->add('b', $b);
+        $c = new Variable();
+        $c->string('3');
+        $first->add('c', $c);
 
         $other = new HashTable();
-        $c = new Variable();
-        $c->string('other-value');
-        $other->add('k', $c);
+        $d = new Variable();
+        $d->string('9');
+        $other->add('b', $d);
+        $e = new Variable();
+        $e->string('4');
+        $other->add('d', $e);
 
         $result = ArrayIntersectKeyJitHelper::intersectKeyTwo($first, $other);
-        $this->assertSame('keep', $result->find('k')?->toString());
-        $this->assertNull($result->find('z'));
+        $this->assertSame('2', $result->find('b')?->toString());
+        $this->assertNull($result->find('a'));
+        $this->assertNull($result->find('c'));
     }
 }
