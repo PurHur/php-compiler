@@ -380,10 +380,29 @@ final class VmDateTimeNative
                 'microsecond' => 0,
             ];
         }
-        if (1 === preg_match('/^(first|last) day of (next|this|last) month$/i', $time, $matches)) {
+        if (1 === preg_match('/^(first|last) day of (next|this|last|previous) month$/i', $time, $matches)) {
+            $when = strtolower($matches[2]);
+            if ('previous' === $when) {
+                $when = 'last';
+            }
+
             return self::monthBoundaryParseResult(
                 strtolower($matches[1]),
-                strtolower($matches[2]),
+                $when,
+                $base,
+                $tzName
+            );
+        }
+        // php-src parse_date.re — first|last day of MonthName next|last|this|previous year (#23936).
+        if (1 === preg_match(
+            '/^(first|last) day of ([A-Za-z]+)\s+(next|last|this|previous)\s+year$/i',
+            $time,
+            $matches
+        )) {
+            return self::monthBoundaryOfRelativeYearParseResult(
+                strtolower($matches[1]),
+                $matches[2],
+                strtolower($matches[3]),
                 $base,
                 $tzName
             );
@@ -396,6 +415,23 @@ final class VmDateTimeNative
         }
         if (1 === preg_match('/^(next|last|this) week$/i', $time, $matches)) {
             return self::weekOffsetParseResult(strtolower($matches[1]), $base, $tzName);
+        }
+        // php-src — "monday this week" (weekday within ISO week; may be past) (#23936).
+        if (1 === preg_match(
+            '/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(this|next|last|previous)\s+week$/i',
+            $time,
+            $matches
+        )) {
+            $when = strtolower($matches[2]);
+            if ('previous' === $when) {
+                $when = 'last';
+            }
+
+            return self::weekdayOfWeekParseResult(strtolower($matches[1]), $when, $base, $tzName);
+        }
+        // php-src parse_date.re — back of / front of hour (#23936).
+        if (1 === preg_match('/^(back|front)\s+of\s+(.+)$/i', $time, $matches)) {
+            return self::backFrontOfHourParseResult(strtolower($matches[1]), trim($matches[2]), $base, $tzName);
         }
         if (1 === preg_match('/^(.+?) (last|next|this) year$/i', $time, $matches)) {
             $yearRelative = self::yearRelativeMonthDayParseResult(
@@ -2152,6 +2188,7 @@ final class VmDateTimeNative
 
     /**
      * php-src timelib — first/last day of next|this|last month (#14326).
+     * Preserves hour/minute/second from $base (php-src does not TIMELIB_UNHAVE_TIME here; #23936).
      *
      * @return array{timestamp: int, microsecond: int}|null
      */
@@ -2163,6 +2200,9 @@ final class VmDateTimeNative
         }
         $year = self::tmInt($tm, 'tm_year') + 1900;
         $month = self::tmInt($tm, 'tm_mon') + 1;
+        $hour = self::tmInt($tm, 'tm_hour');
+        $minute = self::tmInt($tm, 'tm_min');
+        $second = self::tmInt($tm, 'tm_sec');
         $monthDelta = match ($when) {
             'next' => 1,
             'last' => -1,
@@ -2176,9 +2216,162 @@ final class VmDateTimeNative
         $day = 'first' === $which ? 1 : self::daysInMonth($year, $month);
 
         return [
-            'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
             'microsecond' => 0,
         ];
+    }
+
+    /**
+     * php-src — first|last day of MonthName next|last|this|previous year (#23936).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function monthBoundaryOfRelativeYearParseResult(
+        string $which,
+        string $monthName,
+        string $when,
+        int $base,
+        string $tzName
+    ): ?array {
+        $month = self::englishMonthToNumber($monthName);
+        if (null === $month) {
+            return null;
+        }
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $yearDelta = match ($when) {
+            'next' => 1,
+            'last', 'previous' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $yearDelta) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900 + $yearDelta;
+        $day = 'first' === $which ? 1 : self::daysInMonth($year, $month);
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                $year,
+                $month,
+                $day,
+                self::tmInt($tm, 'tm_hour'),
+                self::tmInt($tm, 'tm_min'),
+                self::tmInt($tm, 'tm_sec'),
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src — "monday this week" within ISO week (Mon–Sun); snaps to midnight (#23936).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function weekdayOfWeekParseResult(
+        string $weekday,
+        string $when,
+        int $base,
+        string $tzName
+    ): ?array {
+        $weekStart = self::weekOffsetParseResult($when, $base, $tzName);
+        if (null === $weekStart) {
+            return null;
+        }
+        $target = self::weekdayNameToNumber($weekday);
+        if ($target < 0) {
+            return null;
+        }
+        // Monday of week → +0 … Sunday → +6
+        $daysFromMonday = ($target + 6) % 7;
+        $timestamp = $weekStart['timestamp'];
+        if ($daysFromMonday > 0) {
+            try {
+                $timestamp = self::modifyRelative($timestamp, '+'.$daysFromMonday.' day', $tzName);
+            } catch (NativeDateMalformedStringException) {
+                return null;
+            }
+        }
+        $tm = self::localtime($timestamp);
+        if (null === $tm) {
+            return null;
+        }
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                self::tmInt($tm, 'tm_year') + 1900,
+                self::tmInt($tm, 'tm_mon') + 1,
+                self::tmInt($tm, 'tm_mday'),
+                0,
+                0,
+                0,
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src parse_date.re — back of H → H:15; front of H → (H-1):45 (#23936).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function backFrontOfHourParseResult(
+        string $which,
+        string $hourPart,
+        int $base,
+        string $tzName
+    ): ?array {
+        $clock = self::tryParseHourToken($hourPart);
+        if (null === $clock) {
+            return null;
+        }
+        $hour = $clock;
+        $minute = 0;
+        if ('back' === $which) {
+            $minute = 15;
+        } else {
+            // front of N → (N-1):45
+            $hour = ($hour + 23) % 24;
+            $minute = 45;
+        }
+
+        return self::timeOfDayOnBase($base, $hour, $minute, 0, $tzName);
+    }
+
+    /** Parse hour token for back/front of: "9", "9am", "17", "5pm". */
+    private static function tryParseHourToken(string $token): ?int
+    {
+        $token = trim($token);
+        if (1 === preg_match('/^(\d{1,2})\s*(am|pm)$/i', $token, $matches)) {
+            $hour = (int) $matches[1];
+            $ampm = strtolower($matches[2]);
+            if ($hour < 1 || $hour > 12) {
+                return null;
+            }
+            if ('pm' === $ampm && $hour < 12) {
+                $hour += 12;
+            }
+            if ('am' === $ampm && 12 === $hour) {
+                $hour = 0;
+            }
+
+            return $hour;
+        }
+        if (1 === preg_match('/^(\d{1,2})$/', $token, $matches)) {
+            $hour = (int) $matches[1];
+            if ($hour > 23) {
+                return null;
+            }
+
+            return $hour;
+        }
+
+        return null;
     }
 
     /**
