@@ -11,7 +11,7 @@ use PHPLLVM\Value;
  * empty($obj->prop) — thin trampoline to {@see EmptyObjectPropertyLlvm} + {@see \PHPCompiler\VM\VmEmpty} (#10268).
  *
  * Uninitialized typed slots are empty without read (#6787, zend_object_handlers.c);
- * __isset semantics otherwise (#3298).
+ * declared slots use value truthiness; magic uses __isset then __get (#23983, #3298).
  */
 final class EmptyObjectPropertyHelper
 {

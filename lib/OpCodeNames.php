@@ -256,6 +256,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_TICK_SCOPE_LEAVE';
         case 133:
             return 'TYPE_TICKS';
+        case 134:
+            return 'TYPE_EMPTY_STATIC_PROPERTY';
         default:
             return 'unknown opcode';
     }

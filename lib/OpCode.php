@@ -209,7 +209,7 @@ class OpCode {
      * arg1 = destination slot; arg2 = callable value slot (string or array).
      */
     const TYPE_FROM_CALLABLE = 125;
-    /** empty($obj->prop): uninitialized typed slots empty without read; __isset semantics otherwise (#6787, zend_object_handlers.c). */
+    /** empty($obj->prop): uninitialized typed slots empty without read; else value truthiness (#6787, #23983). */
     const TYPE_EMPTY_OBJECT_PROPERTY = 126;
     /** `(void)` cast — evaluate operand, result is null (#7346). */
     const TYPE_CAST_VOID = 127;
@@ -230,6 +230,12 @@ class OpCode {
      * Runtime decrements EG-style counter and may invoke register_tick_function handlers.
      */
     const TYPE_TICKS = 133;
+
+    /**
+     * empty(Class::$prop): uninitialized typed statics empty without read; else value truthiness (#23983, #15112).
+     * arg1=dest bool, arg2=class operand, arg3=property name.
+     */
+    const TYPE_EMPTY_STATIC_PROPERTY = 134;
 
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];

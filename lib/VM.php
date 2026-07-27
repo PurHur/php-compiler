@@ -1377,7 +1377,8 @@ class VM {
 
     /**
      * empty($obj->prop) — uninitialized typed slots are empty without read (#6787, zend_object_handlers.c);
-     * dynamic / __isset-only properties keep isset semantics (#3298).
+     * declared/dynamic slots use value truthiness (zend_is_true), not isset alone (#23983);
+     * magic: __isset first, then __get + truthiness when set (#3298, zend_object_handlers.c).
      * Incomplete objects: E_WARNING + empty (true) (#19632).
      */
     public function emptyObjectProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): ?Frame
@@ -1442,17 +1443,12 @@ class VM {
 
             return null;
         }
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || !$meta->prototype->isUndefined()) {
-            $dst->bool(!$this->objectPropertyIsSet($object, $propName, $frame));
-
-            return null;
-        }
-        $catchFrame = $this->enforcePropertyVisibilityRead($object, $propName, $frame);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        if ($object->hasProperty($propName)) {
+        // Accessible declared/dynamic slot: value truthiness (zend_is_true). Inaccessible declared
+        // props are unset for empty unless __isset/__get overload applies (#23983).
+        if (
+            $object->hasProperty($propName)
+            && $this->isInstancePropertyReadableForEmpty($object, $propName, $frame)
+        ) {
             $props = $object->getRawProperties();
             if (isset($props[$propName]) && VM\TypedPropertyCheck::isUninitialized($props[$propName])) {
                 $dst->bool(true);
@@ -1464,14 +1460,60 @@ class VM {
 
             return null;
         }
-        if ($this->propertyReadUsesMagicGet($object, $propName, $frame)) {
-            $read = new Variable();
-            $this->deliverMagicGetRead($read, $object, $propName);
-            $dst->bool(!ext\standard\boolval::isTruthy($read));
+        // Overload: zend_std_has_property(check_empty) — __isset first; only then __get + zend_is_true (#23983).
+        if ($this->hasInstanceMethod($object->class, '__isset')) {
+            if (!$this->objectPropertyIsSet($object, $propName, $frame)) {
+                $dst->bool(true);
+
+                return null;
+            }
+            if ($this->propertyReadUsesMagicGet($object, $propName, $frame)) {
+                $read = new Variable();
+                $this->deliverMagicGetRead($read, $object, $propName);
+                $dst->bool(!ext\standard\boolval::isTruthy($read));
+
+                return null;
+            }
+            // __isset true but no readable value (no __get / no slot) — treat as empty (null-like).
+            $dst->bool(true);
 
             return null;
         }
+        // __get without __isset, or inaccessible without magic: empty does not invoke __get.
         $dst->bool(true);
+
+        return null;
+    }
+
+    /**
+     * empty(Class::$prop) — uninitialized typed statics empty without read; else value truthiness (#23983, #6787).
+     */
+    public function emptyStaticProperty(string $classLc, string $propNameRaw, Frame $frame, Variable $dst): ?Frame
+    {
+        $visFrame = $this->enforceStaticPropertyReadVisibility($classLc, $propNameRaw, $frame);
+        if (null !== $visFrame) {
+            return $visFrame;
+        }
+        $propLc = strtolower($propNameRaw);
+        $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
+        if (null !== $hooks && isset($hooks['get'])) {
+            if ($this->emptyHookedStaticProperty($classLc, $propNameRaw, $frame, $dst)) {
+                return null;
+            }
+        }
+        $storage = $this->resolveStaticPropertyStorage($classLc, $propLc);
+        if (null === $storage) {
+            $dst->bool(true);
+
+            return null;
+        }
+        $value = $storage->resolveIndirect();
+        if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
+            $dst->bool(true);
+
+            return null;
+        }
+        $dst->bool(!ext\standard\boolval::isTruthy($value));
 
         return null;
     }
@@ -1760,6 +1802,91 @@ class VM {
             ?? null;
 
         return is_array($propMeta) && isset($propMeta['get']);
+    }
+
+    /**
+     * empty(Class::$hooked) — uninitialized/unset distinct backing probes storage only;
+     * initialized get-hook paths invoke get (#23983, #9683, zend_property_hooks.c).
+     */
+    private function emptyHookedStaticProperty(string $classLc, string $propNameRaw, Frame $frame, Variable $dst): bool
+    {
+        $propLc = strtolower($propNameRaw);
+        $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
+        if (null === $hooks) {
+            return false;
+        }
+        if (!is_array($hooks) || !isset($hooks['get'])) {
+            $backing = $this->hookedStaticPropertyBackingValue($classLc, $propNameRaw);
+            if (false === $backing) {
+                return false;
+            }
+            $uninit = $backing->isUndefined() || VM\TypedPropertyCheck::isUninitialized($backing);
+            if ($uninit) {
+                $dst->bool(true);
+
+                return true;
+            }
+            $dst->bool(!ext\standard\boolval::isTruthy($backing));
+
+            return true;
+        }
+        $issetProbe = $this->issetHookedStaticPropertyWithoutGetHook($classLc, $propNameRaw);
+        if (false === $issetProbe) {
+            // Uninitialized / unset backing — empty without invoking get (#9683).
+            $dst->bool(true);
+
+            return true;
+        }
+        $hookValue = $this->fetchStaticPropertyWithHooks($classLc, $propNameRaw, $hooks['get'], $frame);
+        $value = $hookValue->resolveIndirect();
+        if ($value->isUndefined() || VM\TypedPropertyCheck::isUninitialized($value)) {
+            $dst->bool(true);
+
+            return true;
+        }
+        $dst->bool(!ext\standard\boolval::isTruthy($value));
+
+        return true;
+    }
+
+    /**
+     * True when empty($obj->prop) may read the declared slot (public/accessible), not overload (#23983).
+     */
+    private function isInstancePropertyReadableForEmpty(ObjectEntry $object, string $propName, Frame $frame): bool
+    {
+        if ($this->propertyReadUsesMagicGet($object, $propName, $frame)) {
+            return false;
+        }
+        $meta = $this->classPropertyMeta($object, $propName, $frame);
+        if (null === $meta) {
+            // Dynamic property on the object — readable.
+            return true;
+        }
+        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame)) {
+            return false;
+        }
+        $readVis = PropertyVisibility::effectiveGetVisibility($meta->visibility, $meta->getVisibility);
+        if (MethodVisibility::isPublic($readVis)) {
+            return true;
+        }
+        $declaringDisplay = $this->context->classes[$meta->declaringClassLc]->name
+            ?? $meta->declaringClassLc;
+        try {
+            PropertyVisibility::assertAccessible(
+                $meta->visibility,
+                $this->callerClassLc($frame),
+                $meta->declaringClassLc,
+                $declaringDisplay,
+                $propName,
+                strtolower($object->class->name),
+                fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+                $meta->getVisibility
+            );
+
+            return true;
+        } catch (\LogicException $e) {
+            return false;
+        }
     }
 
     /**
@@ -7925,6 +8052,29 @@ restart:
                         $frame,
                         $dst
                     );
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    break;
+                case OpCode::TYPE_EMPTY_STATIC_PROPERTY:
+                    $dst = $frame->scope[$op->arg1];
+                    $lcClass = $this->resolveStaticPropertyClassLc($frame->scope[$op->arg2], $frame);
+                    if (!isset($this->context->classes[$lcClass])) {
+                        $classOperand = $frame->scope[$op->arg2]->resolveIndirect();
+                        $rawClass = Variable::TYPE_OBJECT === $classOperand->type
+                            ? $classOperand->toObject()->class->name
+                            : $classOperand->toString();
+                        if ('self' !== strtolower($rawClass) && 'static' !== strtolower($rawClass)) {
+                            $this->context->autoloadClass($rawClass);
+                        }
+                    }
+                    if (!isset($this->context->classes[$lcClass])) {
+                        $dst->bool(true);
+                        break;
+                    }
+                    $propNameRaw = $frame->scope[$op->arg3]->toString();
+                    $catchFrame = $this->emptyStaticProperty($lcClass, $propNameRaw, $frame, $dst);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;

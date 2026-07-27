@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Shared empty() semantic guards for VM + JIT lowering (#10268, #10170).
+ * Shared empty() semantic guards for VM + JIT lowering (#10268, #10170, #23983).
  *
- * php-src: Zend/zend_object_handlers.c — empty on typed/uninitialized slots (#6787)
+ * php-src: Zend/zend_object_handlers.c — empty on typed/uninitialized slots (#6787);
+ * declared property empty uses zend_is_true after read, not isset alone (#23983).
  */
 final class VmEmpty
 {
