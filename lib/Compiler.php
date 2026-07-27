@@ -11743,7 +11743,6 @@ class Compiler {
                     $this->compileOperand($expr->name, $block, true)
                 );
                 $init->staticCallParentScope = $parentScope;
-                $return = [$init];
                 $className = $this->literalScopeClassName($expr->class)
                     ?? $this->staticNameFromOperand($expr->class);
                 $methodName = $this->staticNameFromOperand($expr->name);
@@ -11751,16 +11750,16 @@ class Compiler {
                 if (null !== $className && null !== $methodName) {
                     $calleeName = ltrim($className, '\\').'::'.$methodName;
                 }
-                foreach ($this->compileCallArgSends($expr->args, $block, $calleeName, $expr) as $send) {
-                    $return[] = $send;
-                }
-                $return[] = $this->compileFuncCallExecOpcode(
+
+                return $this->compileStaticCallOpcodes(
+                    $init,
+                    $expr->args,
                     $expr->result,
                     $block,
                     max(0, $expr->getLine()),
-                    $expr
+                    $expr,
+                    $calleeName
                 );
-                return $return;
             case Op\Expr\New_::class:
                 $className = $this->literalScopeClassName($expr->class);
 
@@ -19043,7 +19042,12 @@ class Compiler {
             }
         }
         foreach ($producers as $producer) {
-            if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            if (
+                !$producer instanceof Op\Expr\FuncCall
+                && !$producer instanceof Op\Expr\NsFuncCall
+                && !$producer instanceof Op\Expr\StaticCall
+                && !$producer instanceof Op\Expr\MethodCall
+            ) {
                 continue;
             }
             if ($this->inlineCallArgProducerFeedsCallArgOp($producer, $cfgCallOp, $callArg)) {
@@ -19052,7 +19056,12 @@ class Compiler {
         }
         $immediate = $producers[0] ?? null;
         if (
-            ($immediate instanceof Op\Expr\FuncCall || $immediate instanceof Op\Expr\NsFuncCall)
+            (
+                $immediate instanceof Op\Expr\FuncCall
+                || $immediate instanceof Op\Expr\NsFuncCall
+                || $immediate instanceof Op\Expr\StaticCall
+                || $immediate instanceof Op\Expr\MethodCall
+            )
             && (int) $argIndex > 0
             && $this->callArgIsDeadInlineTemporary($callArg)
             && $this->callArgOperandExpectsArrayProducer($callArg)
@@ -19095,6 +19104,21 @@ class Compiler {
                 return null;
             }
             $execIndex = $n - 3;
+        } elseif (
+            OpCode::TYPE_STATICCALL_INIT === $tail->type
+            || OpCode::TYPE_METHODCALL_INIT === $tail->type
+        ) {
+            if ($n < 3) {
+                return null;
+            }
+            $beforeInit = $ops[$n - 2];
+            if (
+                OpCode::TYPE_CONST_FETCH !== $beforeInit->type
+                && OpCode::TYPE_CLASS_CONST_FETCH !== $beforeInit->type
+            ) {
+                return null;
+            }
+            $execIndex = $n - 3;
         } else {
             return null;
         }
@@ -19118,7 +19142,12 @@ class Compiler {
             $callArg = $cfgCallOp->args[$argIndex] ?? null;
             if (null !== $callArg) {
                 foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp) as $producer) {
-                    if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+                    if (
+                        !$producer instanceof Op\Expr\FuncCall
+                        && !$producer instanceof Op\Expr\NsFuncCall
+                        && !$producer instanceof Op\Expr\StaticCall
+                        && !$producer instanceof Op\Expr\MethodCall
+                    ) {
                         continue;
                     }
                     if (
@@ -19146,7 +19175,12 @@ class Compiler {
             return null;
         }
         foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp) as $producer) {
-            if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            if (
+                !$producer instanceof Op\Expr\FuncCall
+                && !$producer instanceof Op\Expr\NsFuncCall
+                && !$producer instanceof Op\Expr\StaticCall
+                && !$producer instanceof Op\Expr\MethodCall
+            ) {
                 continue;
             }
             $producerIndex = null;
@@ -27039,7 +27073,12 @@ class Compiler {
             }
         }
         $useHoistedArgLiteralPreludeCount = $embeddedLiteralCount > 0
-            && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall);
+            && (
+                $producer instanceof Op\Expr\FuncCall
+                || $producer instanceof Op\Expr\NsFuncCall
+                || $producer instanceof Op\Expr\StaticCall
+                || $producer instanceof Op\Expr\MethodCall
+            );
         // Leading embedded literal + middle hoisted producer (in_array('x', g(), true)): trailing
         // ConstFetch preludes count from $targetArgIndex (#11373, #13507). json_decode(g(), true, …)
         // keeps hoisted-arg formula when the producer feeds arg 0 (#12009).
@@ -51053,6 +51092,136 @@ class Compiler {
         }
 
         return $return;
+    }
+
+    /**
+     * StaticCall lowering — mirror compileFuncCall arg partitioning (#23848, re-#17697).
+     *
+     * Nested StaticCall/FuncCall producers inside args must emit before outer STATICCALL_INIT,
+     * same as FUNCCALL_INIT in {@see compileFuncCall()}.
+     *
+     * @param list<Op\Expr\Argument|Op\Expr\VariadicPlaceholder> $args
+     *
+     * @return list<OpCode>
+     */
+    protected function compileStaticCallOpcodes(
+        OpCode $init,
+        array $args,
+        Operand $result,
+        Block $block,
+        int $startLine = 0,
+        ?Op $cfgCallOp = null,
+        ?string $calleeName = null
+    ): array {
+        $initPrependedBeforeArgConstFetch = false;
+        if (!$this->inlineNestedProducerOpsInArgSends) {
+            $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
+                $block,
+                $init
+            );
+        }
+        $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
+        if (
+            !$initPrependedBeforeArgConstFetch
+            && !$this->inlineNestedProducerOpsInArgSends
+        ) {
+            $initPrependedBeforeArgConstFetch = $this->prependFuncCallInitBeforeTrailingArgConstFetches(
+                $block,
+                $init
+            );
+        }
+        [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
+        $this->rewireArrayBuiltinAdjacentFuncCallArgSendSlots(
+            $outerArgSends,
+            $nestedProducerOps,
+            $block,
+            $cfgCallOp,
+            $calleeName
+        );
+        $this->rewireInlineArithmeticBranchCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
+        $this->rewireSiblingMultiArgInlineCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
+        $this->rewireNestedMethodCallHoistedClassConstOuterCallArgSendSlots(
+            $outerArgSends,
+            $block,
+            $cfgCallOp,
+            $nestedProducerOps
+        );
+        $this->rewireHoistedClassConstPreludeCallArgSendSlots($outerArgSends, $block, $cfgCallOp, $nestedProducerOps);
+        $this->rewireRegisterShutdownFunctionClosureEnumCallArgSendSlots(
+            $outerArgSends,
+            $block,
+            $cfgCallOp,
+            $nestedProducerOps
+        );
+        $this->rewireSubstrNestedSprintfArgSendSlots($outerArgSends, $block, $cfgCallOp, $calleeName);
+        $this->rewireArrayKeysInlineInitArrayArgSendSlots(
+            $outerArgSends,
+            $block,
+            $cfgCallOp,
+            $calleeName,
+            array_merge($nestedProducerOps, $outerArgSends)
+        );
+        $this->rewireArrayCombineInlineArgSendSlots($outerArgSends, $block, $argSends, $calleeName, $cfgCallOp);
+        $this->rewirePregReplaceCallbackArrayPatternMapArgSendSlots($outerArgSends, $block, $cfgCallOp, $argSends);
+        $this->rewireVarExportNestedInlineCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
+        $this->rewireVarExportComparisonReturnFlagCallArgSendSlots(
+            $outerArgSends,
+            $nestedProducerOps,
+            $block,
+            $cfgCallOp,
+            $calleeName
+        );
+        $this->rewireIsArrayNestedFileCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
+        $this->rewireInlineBitmaskTrailingCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
+        $this->rewireNamedLocalBeforeInlineBitmaskCallArgSendSlots($outerArgSends, $block, $cfgCallOp);
+        $return = [];
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ASSIGN === $send->type) {
+                $return[] = $send;
+            }
+        }
+        foreach ($nestedProducerOps as $op) {
+            $return[] = $op;
+        }
+        if (!$initPrependedBeforeArgConstFetch) {
+            $return[] = $init;
+        }
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ASSIGN !== $send->type) {
+                $return[] = $send;
+            }
+        }
+        $return[] = $this->compileStaticCallExecOpcode($result, $block, $startLine, $cfgCallOp);
+
+        return $return;
+    }
+
+    /**
+     * StaticCall exec opcode — nested StaticCall arg producers need EXEC_RETURN like FuncCall (#23848).
+     */
+    protected function compileStaticCallExecOpcode(
+        Operand $result,
+        Block $block,
+        int $startLine = 0,
+        ?Op $cfgCallOp = null
+    ): OpCode {
+        $exec = $this->compileFuncCallExecOpcode($result, $block, $startLine, $cfgCallOp);
+        if (
+            OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $exec->type
+            && (
+                $this->callResultFeedsInlineCallArg($result, $block)
+                || $this->nestedLiteralPreludeInlineCallProducerNeedsReturnSlot($cfgCallOp, $block)
+                || $this->siblingInlineCallArgProducerNeedsReturnSlot($cfgCallOp, $block)
+            )
+        ) {
+            return new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN,
+                $this->compileOperand($result, $block, false),
+                $startLine > 0 ? $startLine : null
+            );
+        }
+
+        return $exec;
     }
 
     protected function compileMethodCallOpcodes(

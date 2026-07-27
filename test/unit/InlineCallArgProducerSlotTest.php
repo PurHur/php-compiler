@@ -2051,6 +2051,58 @@ PHP;
         self::assertSame($notIdenticalSlots[1], $staticCallSends[5], 'arg sends='.json_encode($staticCallSends));
     }
 
+    /** Issue #23848 — nested StaticCall arg + trailing ConstFetch must EXEC_RETURN before outer call. */
+    public function testNestedStaticCallArgWithLockExPreludeExecReturns(): void
+    {
+        $code = <<<'PHP'
+<?php
+class A {
+    public static function path(string $x): string { return $x; }
+}
+function put(string $p, string $d, int $f): void {}
+function test(string $id, string $payload): void {
+    put(A::path($id), $payload, \LOCK_EX);
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nested_static_call_lock_ex_arg.php');
+
+        $pathExecSlot = null;
+        $firstArgSendSlot = null;
+        $awaitingPathExec = false;
+        $awaitingOuterSends = false;
+        $walk = static function (Block $b) use (&$walk, &$pathExecSlot, &$firstArgSendSlot, &$awaitingPathExec, &$awaitingOuterSends): void {
+            foreach ($b->opCodes as $op) {
+                if (
+                    OpCode::TYPE_STATICCALL_INIT === $op->type
+                    && null !== $op->arg2
+                    && isset($b->constants[$op->arg2])
+                    && 'path' === $b->constants[$op->arg2]->toString()
+                ) {
+                    $awaitingPathExec = true;
+                }
+                if ($awaitingPathExec && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null !== $op->arg1) {
+                    $pathExecSlot = $op->arg1;
+                    $awaitingPathExec = false;
+                    $awaitingOuterSends = true;
+                }
+                if ($awaitingOuterSends && OpCode::TYPE_ARG_SEND === $op->type) {
+                    $firstArgSendSlot = $op->arg1;
+                    $awaitingOuterSends = false;
+                }
+                foreach ([$op->block1 ?? null, $op->block2 ?? null, $op->block3 ?? null] as $sub) {
+                    if ($sub instanceof Block) {
+                        $walk($sub);
+                    }
+                }
+            }
+        };
+        $walk($block);
+        self::assertNotNull($pathExecSlot, 'A::path nested producer must FUNCCALL_EXEC_RETURN');
+        self::assertNotNull($firstArgSendSlot, 'outer put() must ARG_SEND path result');
+        self::assertSame($pathExecSlot, $firstArgSendSlot);
+    }
+
     /** Issue #12824 — var_export([NAN, INF], true) wires Array_ producer, not hoisted ConstFetch temps. */
     public function testVarExportInlineNanInfArrayUsesArrayProducerSlot(): void
     {
