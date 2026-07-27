@@ -4,47 +4,48 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
-/** Guard match scrutinee slot survives fcall release when JUMPIF targets re-read it (#13955). */
+/** Guard match scrutinee stays live as ARG_SEND into UnhandledMatchError message helper (#13955, #23664). */
 final class MatchUnhandledScrutineeSlotTest extends \PHPUnit\Framework\TestCase
 {
-    public function testScopeSlotReadInJumpTargetsDetectsUnhandledMatchGetClassArm(): void
+    public function testScopeSlotReadForUnhandledMatchMessageHelper(): void
     {
         $rt = new Runtime();
-        $block = $rt->parseAndCompileFile(
-            __DIR__ . '/../repro/maintainer_gap_match_unhandled_enum.php'
+        $block = $rt->parseAndCompile(
+            '<?php enum E { case A; } try { match (E::A) { 1 => 0 }; } catch (UnhandledMatchError $e) { echo $e->getMessage(); }',
+            'match_unhandled_scrutinee_slot.php'
         );
         self::assertNotNull($block);
 
-        $probeBlock = $this->findMatchUnhandledProbeBlock($block->opCodes[1]->block1);
-        self::assertNotNull($probeBlock, 'expected phpc_match_unhandled_operand_is_object block');
-
-        $scrutineeSlot = (int) $probeBlock->opCodes[1]->arg1;
-        self::assertTrue(
-            $probeBlock->scopeSlotReadInJumpTargets($scrutineeSlot),
-            'scrutinee slot must be treated live for JUMPIF unhandled arms'
-        );
-    }
-
-    /**
-     * @param list<OpCode> $opCodes
-     */
-    private function findMatchUnhandledProbeBlock(Block $root): ?Block
-    {
-        foreach ($root->opCodes as $op) {
-            if (OpCode::TYPE_JUMPIF !== $op->type) {
+        $found = false;
+        $stack = [$block];
+        $seen = [];
+        while ($stack !== []) {
+            $b = \array_pop($stack);
+            $id = \spl_object_id($b);
+            if (isset($seen[$id])) {
                 continue;
             }
-            foreach ([$op->block2, $op->block1] as $candidate) {
-                if (
-                    $candidate instanceof Block
-                    && 4 === \count($candidate->opCodes)
-                    && OpCode::TYPE_ARG_SEND === $candidate->opCodes[1]->type
-                ) {
-                    return $candidate;
+            $seen[$id] = true;
+            foreach ($b->opCodes as $i => $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $name = $b->constants[$op->arg1]->toString();
+                    if ('phpc_match_unhandled_operand_message' === $name) {
+                        self::assertSame(
+                            OpCode::TYPE_ARG_SEND,
+                            $b->opCodes[$i + 1]->type ?? null,
+                            'message helper must receive scrutinee via ARG_SEND'
+                        );
+                        $found = true;
+                    }
+                }
+                if ($op->block1 instanceof Block) {
+                    $stack[] = $op->block1;
+                }
+                if ($op->block2 instanceof Block) {
+                    $stack[] = $op->block2;
                 }
             }
         }
-
-        return null;
+        self::assertTrue($found, 'expected phpc_match_unhandled_operand_message FUNCCALL_INIT');
     }
 }

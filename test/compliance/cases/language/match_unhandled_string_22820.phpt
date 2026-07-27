@@ -1,5 +1,5 @@
 --TEST--
-match unhandled string subject throws UnhandledMatchError (issue #22820; re-#13955)
+match unhandled string subject throws UnhandledMatchError (issue #22820; re-#13955; message form #23664)
 --FILE--
 <?php
 try {
@@ -12,5 +12,5 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-UnhandledMatchError: Unhandled match case x
+UnhandledMatchError: Unhandled match case 'x'
 extends Error

@@ -843,9 +843,9 @@ PHP;
             'php-cfg-match overlay must register match lowering (#143)'
         );
         self::assertStringContainsString(
-            'phpc_match_unhandled_operand_is_object',
+            'phpc_match_unhandled_operand_message',
             $body,
-            'php-cfg-match overlay must probe object/enum operands for UnhandledMatchError (#5448, #7199)'
+            'php-cfg-match overlay must format UnhandledMatchError via message helper (#23664)'
         );
         self::assertStringContainsString(
             'lowerUnhandledMatchError',

@@ -342,7 +342,7 @@ patch_already_applied() {
     php-cfg-match.patch)
       grep -q 'function parseExpr_Match' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -q 'lowerUnhandledMatchError' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
-        && grep -q 'phpc_match_unhandled_operand_is_object' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+        && grep -q 'phpc_match_unhandled_operand_message' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-incdec-expr.patch)
       grep -q 'new Op\\Expr\\PostInc' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \

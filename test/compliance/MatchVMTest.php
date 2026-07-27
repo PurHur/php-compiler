@@ -25,6 +25,7 @@ final class MatchVMTest extends BaseTest
                 'match_arm_assign.phpt',
                 'match_unhandled.phpt',
                 'match_unhandled_string_22820.phpt',
+                'match_unhandled_message_23664.phpt',
                 'match_enum_unhandled.phpt',
                 'match_object_unhandled.phpt',
                 'is_object_enum_case.phpt',
