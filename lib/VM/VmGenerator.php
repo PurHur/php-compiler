@@ -52,6 +52,8 @@ final class VmGenerator
             $context->getTypeFromString('__value__'),
             $context->getTypeFromString('__value__'),
             $context->getTypeFromString('int1'),
+            $context->getTypeFromString('int1'),
+            $context->getTypeFromString('int1'),
         );
         $context->structFieldMap['__generator_state__'] = [
             'resume_ip' => 0,
@@ -73,6 +75,10 @@ final class VmGenerator
             'pending_throw' => 16,
             'return_value' => 17,
             'has_returned' => 18,
+            // Zend ZEND_GENERATOR_AT_FIRST_YIELD (#23713).
+            'at_first_yield' => 19,
+            // Foreach open-on-valid: skip advance when already positioned (#23713).
+            'foreach_needs_advance' => 20,
         ];
     }
 
@@ -118,6 +124,8 @@ final class VmGenerator
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['auto_key']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_current']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['done']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['at_first_yield']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['foreach_needs_advance']));
         self::clearYieldFromFields($context, $statePtr);
     }
 
@@ -151,6 +159,8 @@ final class VmGenerator
         $context->builder->store($zero, $context->builder->structGep($statePtr, $map['auto_key']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['has_current']));
         $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['done']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['at_first_yield']));
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($statePtr, $map['foreach_needs_advance']));
         self::clearYieldFromFields($context, $statePtr);
         self::clearPendingAndReturnFields($context, $statePtr);
         $context->builder->call(

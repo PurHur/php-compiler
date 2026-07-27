@@ -52,8 +52,7 @@ final class GeneratorGetReturn extends VmClassMethod
     }
 
     /**
-     * Zend parity: most Generator iteration methods implicitly start the generator
-     * on first access (without requiring an explicit ->rewind()).
+     * Zend zend_generator_ensure_initialized — open to first yield and mark AT_FIRST_YIELD (#23713).
      */
     public static function ensureStarted(GeneratorState $gen): void
     {
@@ -62,5 +61,6 @@ final class GeneratorGetReturn extends VmClassMethod
         }
 
         $gen->vm->resumeGenerator($gen);
+        $gen->atFirstYield = true;
     }
 }

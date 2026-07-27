@@ -73,13 +73,15 @@ final class VmIteratorWalk
 
     /**
      * Zend ext/spl/php_spl.c — iterator_to_array()/iterator_count() on started/closed Generator (#18582, #5132).
+     *
+     * Rewind is allowed while still on the opening yield (ZEND_GENERATOR_AT_FIRST_YIELD, #23713).
      */
     public static function assertGeneratorIterableForRewind(VM\GeneratorState $gen): void
     {
         if ($gen->done) {
             throw new \Exception(self::CLOSED_GENERATOR_ITERATOR_COUNT_ERROR);
         }
-        if ($gen->started) {
+        if ($gen->started && !$gen->atFirstYield) {
             throw new \Exception(VM\GeneratorState::REWIND_ALREADY_RUN_ERROR);
         }
     }
@@ -120,11 +122,14 @@ final class VmIteratorWalk
         if (null !== $iterable->toObject()->generatorState) {
             $gen = $iterable->toObject()->generatorState;
             $gen->rewind();
-            while ($vm->resumeGenerator($gen)) {
+            while ($gen->hasCurrent && !$gen->done) {
                 if (!self::invokeApplyCallback($frame, $callback, $params)) {
                     break;
                 }
                 ++$count;
+                if (!$vm->resumeGenerator($gen)) {
+                    break;
+                }
             }
 
             return $count;
@@ -232,8 +237,12 @@ final class VmIteratorWalk
         self::assertGeneratorIterableForRewind($gen);
         $gen->rewind();
         $count = 0;
-        while ($vm->resumeGenerator($gen)) {
+        // Collect the opening yield before advancing (#23713 / zend_generator_rewind).
+        while ($gen->hasCurrent && !$gen->done) {
             ++$count;
+            if (!$vm->resumeGenerator($gen)) {
+                break;
+            }
         }
 
         return $count;

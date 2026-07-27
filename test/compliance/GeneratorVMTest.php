@@ -39,6 +39,7 @@ final class GeneratorVMTest extends BaseTest
                 'generator_throw_resume_internal_frame.phpt',
                 'generator_send_after_current.phpt',
                 'generator_send_value_yield_unstarted.phpt',
+                'generator_rewind_after_current.phpt',
                 'generator_bare_yield_cross_instance_current.phpt',
                 'generator_current_bare_yield_double_echo.phpt',
                 'generator_current_bare_yield_var_export.phpt',

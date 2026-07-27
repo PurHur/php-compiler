@@ -18,11 +18,8 @@ final class GeneratorRewind extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $gen = self::requireGenerator($frame);
-        if ($gen->started) {
-            throw new \Exception(GeneratorState::REWIND_ALREADY_RUN_ERROR);
-        }
-        $gen->vm->resumeGenerator($gen);
+        // Zend zend_generator_rewind — no-op while AT_FIRST_YIELD (#23713).
+        self::requireGenerator($frame)->rewind();
     }
 
     private static function requireGenerator(Frame $frame): GeneratorState

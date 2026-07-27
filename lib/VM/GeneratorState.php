@@ -35,6 +35,14 @@ final class GeneratorState
     /** True after the generator body has been entered (Zend rewind guard, #5195). */
     public bool $started = false;
 
+    /**
+     * Zend ZEND_GENERATOR_AT_FIRST_YIELD — rewind allowed while still on the opening yield (#23713).
+     *
+     * Set after the initial open (current/key/valid/rewind); cleared by every subsequent resume
+     * (next/send/throw). Rewind throws only when this flag is false.
+     */
+    public bool $atFirstYield = false;
+
     public bool $hasCurrent = false;
 
     /**
@@ -79,6 +87,14 @@ final class GeneratorState
 
     /** Foreach iteration must observe yielded values before a trailing throw (#13366). */
     public bool $foreachAdvance = false;
+
+    /**
+     * Foreach ITER_VALID advance-on-valid protocol (#23713).
+     *
+     * False after RESET while already positioned on a yield (rewind/current); first VALID
+     * reports true without advancing. Subsequent VALIDs resume like the legacy open-on-valid path.
+     */
+    public bool $foreachNeedsAdvance = false;
 
     /**
      * True while running finally during early close (Zend ZEND_GENERATOR_FORCED_CLOSE, #19905).
@@ -263,34 +279,34 @@ final class GeneratorState
         return $entry;
     }
 
-    /** Foreach ITER_RESET — closed generators use traverse error, not rewind (#17368). */
+    /** Foreach ITER_RESET — closed/advanced gens error; leave unstarted for open-on-valid (#17368, #23713). */
     public function rewindForForeach(): void
     {
         if ($this->done) {
             throw new \Exception(self::CLOSED_TRAVERSE_ERROR);
         }
-        $this->rewind();
-    }
-
-    public function rewind(): void
-    {
-        if ($this->started) {
+        if ($this->started && !$this->atFirstYield) {
             throw new \Exception(self::REWIND_ALREADY_RUN_ERROR);
         }
-        $this->done = false;
-        $this->clearCurrentValue();
-        $this->frame = null;
-        $this->clearSuspendedTryState();
-        $this->autoKey = 0;
-        $this->yieldFromActive = false;
-        $this->yieldFromIteratorAdvance = false;
-        $this->hasReturned = false;
-        $this->returnValue->null();
-        $this->yieldResultSlot = null;
-        $this->hasPendingSend = false;
-        $this->pendingSend->null();
-        $this->hasPendingThrow = false;
-        $this->pendingThrow->null();
-        $this->forcedClose = false;
+        // Already on opening yield (current/key/valid/rewind): keep position.
+        // Unstarted: do not open here — ITER_VALID advances to the first yield.
+        $this->foreachNeedsAdvance = false;
+    }
+
+    /**
+     * Zend zend_generator_rewind — ensure opened at first yield; no-op while AT_FIRST_YIELD (#23713).
+     *
+     * Does not re-execute the generator body when already suspended on the opening yield.
+     */
+    public function rewind(): void
+    {
+        if (!$this->done && !$this->hasCurrent && !$this->started && !$this->hasReturned) {
+            $this->vm->resumeGenerator($this);
+            $this->atFirstYield = true;
+        }
+        if (!$this->atFirstYield) {
+            throw new \Exception(self::REWIND_ALREADY_RUN_ERROR);
+        }
+        $this->foreachNeedsAdvance = false;
     }
 }

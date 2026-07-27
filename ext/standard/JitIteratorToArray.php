@@ -12,7 +12,9 @@ use PHPCompiler\JIT\IteratorHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\GeneratorState;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -146,7 +148,32 @@ final class JitIteratorToArray
     ): Value {
         GeneratorHelper::loadStateFromGeneratorObject($context, $gen);
         GeneratorHelper::compileAssertGeneratorIterableForRewind($context, $gen);
-        GeneratorHelper::compileIterReset($context, $gen);
+        // Method-style rewind: open to first yield if needed, require AT_FIRST_YIELD (#23713).
+        GeneratorHelper::ensureStarted($context, $gen);
+        $state = $gen->generatorStatePtr;
+        $map = $context->structFieldMap['__generator_state__'];
+        $i1 = $context->getTypeFromString('int1');
+        $atFirst = $context->builder->load($context->builder->structGep($state, $map['at_first_yield']));
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $rewindOk = $fn->appendBasicBlock('ita_gen_rewind_ok');
+        $rewindFail = $fn->appendBasicBlock('ita_gen_rewind_fail');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_NE, $atFirst, $i1->constInt(0, false)),
+            $rewindOk,
+            $rewindFail
+        );
+        $context->builder->positionAtEnd($rewindFail);
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Exception',
+            GeneratorState::REWIND_ALREADY_RUN_ERROR
+        );
+        $context->builder->positionAtEnd($rewindOk);
+        $context->builder->store(
+            $i1->constInt(0, false),
+            $context->builder->structGep($state, $map['foreach_needs_advance'])
+        );
+
         $out = new Variable(
             $context,
             Variable::TYPE_HASHTABLE,
@@ -156,29 +183,24 @@ final class JitIteratorToArray
         if (!$preserveKeys) {
             $out->nextFreeElement = 0;
         }
-        $state = $gen->generatorStatePtr;
-        $map = $context->structFieldMap['__generator_state__'];
-        $i1 = $context->getTypeFromString('int1');
-        $i64 = $context->getTypeFromString('int64');
         $resumeFn = GeneratorHelper::resolveResumeFunction($context, $gen);
-        $fn = $context->builder->getInsertBlock()->getParent();
         $head = $fn->appendBasicBlock('ita_gen_head');
         $body = $fn->appendBasicBlock('ita_gen_body');
-        $append = $fn->appendBasicBlock('ita_gen_append');
         $advance = $fn->appendBasicBlock('ita_gen_advance');
         $done = $fn->appendBasicBlock('ita_gen_done');
         $context->builder->branch($head);
 
+        // Collect current yield before advancing (rewind left us on the opening yield).
         $context->builder->positionAtEnd($head);
+        $hasCurrent = $context->builder->load($context->builder->structGep($state, $map['has_current']));
         $doneFlag = $context->builder->load($context->builder->structGep($state, $map['done']));
-        $context->builder->branchIf($doneFlag, $done, $body);
+        $alive = $context->builder->and(
+            $context->builder->icmp(Builder::INT_NE, $hasCurrent, $i1->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_EQ, $doneFlag, $i1->constInt(0, false))
+        );
+        $context->builder->branchIf($alive, $body, $done);
 
         $context->builder->positionAtEnd($body);
-        $yielded = $context->builder->call($resumeFn, $state);
-        $hasYield = $context->builder->icmp(Builder::INT_NE, $yielded, $i64->constInt(0, false));
-        $context->builder->branchIf($hasYield, $append, $advance);
-
-        $context->builder->positionAtEnd($append);
         $value = GeneratorHelper::compileIterValue($context, $gen);
         if ($preserveKeys) {
             $key = GeneratorHelper::compileIterKey($context, $gen);
@@ -186,11 +208,12 @@ final class JitIteratorToArray
         } else {
             HashTableHelper::addElement($context, $out, $value, null);
         }
-        $context->builder->branch($head);
+        $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($advance);
-        $stillDone = $context->builder->load($context->builder->structGep($state, $map['done']));
-        $context->builder->branchIf($stillDone, $done, $head);
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($state, $map['at_first_yield']));
+        $context->builder->call($resumeFn, $state);
+        $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
 
