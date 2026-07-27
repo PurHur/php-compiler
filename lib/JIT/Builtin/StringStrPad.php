@@ -6,11 +6,13 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_str_pad via StrPadJitHelper PHP (#14863).
+ * JIT/AOT link for __compiler_str_pad via StrPadJitHelper PHP (#14863, #23911).
  *
- * Replaces ~190 LOC inline LLVM in JitStrPad.php.
+ * Nested helper compile: {@see JitVmHelperLink::ensureBridge} (HelperRuntimeCache + user-script
+ * env clear — no hand-rolled NestedJit compile loop). Peer: StringStrRepeat #21601 / #23204.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(str_pad)
  */
@@ -27,6 +29,8 @@ final class StringStrPad
         self::PAD_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'str_pad_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -39,18 +43,29 @@ final class StringStrPad
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_STR_PAD);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_STR_PAD, $probe);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_STR_PAD,
-            'str_pad_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$strPtr, $i64, $strPtr, $i64],
             $strPtr,
             self::PAD_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#14863'
+            '#23911'
         );
     }
 }
