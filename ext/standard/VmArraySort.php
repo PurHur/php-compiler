@@ -252,6 +252,29 @@ final class VmArraySort
         return \PHPCompiler\CompilerVersion::supportsSortingEnum() ? 3 : 2;
     }
 
+    /**
+     * sort/rsort/asort/arsort/ksort/krsort — php-src array.stub.php arity 1–2 (#23855).
+     *
+     * @throws \ArgumentCountError
+     */
+    public static function assertFlagSortArgCount(int $argc, string $function): void
+    {
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects at least 1 argument, %d given',
+                $function,
+                $argc
+            ));
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                '%s() expects at most 2 arguments, %d given',
+                $function,
+                $argc
+            ));
+        }
+    }
+
     public static function assertUserSortArgCount(Frame $frame, string $function): void
     {
         $argc = \count($frame->calledArgs);
