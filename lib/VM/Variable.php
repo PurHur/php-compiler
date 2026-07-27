@@ -2685,6 +2685,15 @@ restart:
                 || $pair === TYPE_PAIR_FLOAT_FLOAT)) {
             $leftNum = TYPE_PAIR_INTEGER_FLOAT === $pair ? $left->integer : $left->float;
             $rightNum = TYPE_PAIR_FLOAT_INTEGER === $pair ? $right->integer : $right->float;
+            $opCtx = $frame?->vmContext ?? $vm?->context;
+            if (null !== $opCtx) {
+                if (\is_float($leftNum)) {
+                    \PHPCompiler\ext\standard\VmMath::warnFloatToIntPrecisionLoss($leftNum, $opCtx, $frame);
+                }
+                if (\is_float($rightNum)) {
+                    \PHPCompiler\ext\standard\VmMath::warnFloatToIntPrecisionLoss($rightNum, $opCtx, $frame);
+                }
+            }
             $this->int($this->_numericOp($opCode, $leftNum, $rightNum));
         } elseif ($pair === TYPE_PAIR_INTEGER_FLOAT) {
             $this->float($this->_numericOp($opCode, $left->integer, $right->float));
