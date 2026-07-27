@@ -81,6 +81,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -5416,6 +5417,7 @@ require_once __DIR__.'/../../../lib/JIT/ImplementsHierarchyJitGuard.php';
 require_once __DIR__.'/../../../lib/JIT/InOperatorHelper.php';
 require_once __DIR__.'/../../../lib/JIT/IncludeBindingEmitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/IncludeHelper.php';
+require_once __DIR__.'/../../../lib/JIT/IncDecResourceProvenance.php';
 require_once __DIR__.'/../../../lib/JIT/InstanceOfHelper.php';
 require_once __DIR__.'/../../../lib/JIT/InstancePropertyVisibilityJitGuard.php';
 require_once __DIR__.'/../../../lib/JIT/InternalStrictArg.php';
