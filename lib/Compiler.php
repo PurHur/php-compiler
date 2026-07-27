@@ -10372,21 +10372,24 @@ class Compiler {
                     $part
                 ));
             } else {
-                $pointer = 2;
-                $block->addOpCode(new OpCode(
-                    OpCode::TYPE_CONCAT,
-                    $return,
-                    $this->compileConcatListPart($op->list[0], $block),
-                    $this->compileConcatListPart($op->list[1], $block)
-                ));
-                while ($pointer < $total) {
-                    $right = $this->compileConcatListPart($op->list[$pointer++], $block);
+                // Encapsed ConcatList used to emit in-place CONCAT($return, $return, $right).
+                // Reusing one dead-temp slot for every link intermittently heap-corrupts under
+                // AOT once three or more variables are interpolated (#23842). Match explicit
+                // `$a . " " . $b . …`: a fresh destination per link.
+                $acc = $this->compileConcatListPart($op->list[0], $block);
+                for ($i = 1; $i < $total; $i++) {
+                    $right = $this->compileConcatListPart($op->list[$i], $block);
+                    $isLast = ($i === $total - 1);
+                    $dest = $isLast
+                        ? $return
+                        : $block->forceFreshVarSlot(new Temporary());
                     $block->addOpCode(new OpCode(
                         OpCode::TYPE_CONCAT,
-                        $return,
-                        $return,
+                        $dest,
+                        $acc,
                         $right
                     ));
+                    $acc = $dest;
                 }
             }
         } elseif ($op instanceof Op\Expr) {

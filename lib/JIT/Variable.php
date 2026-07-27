@@ -126,7 +126,13 @@ final class Variable {
     /** Borrowed {@see __value__} entry from foreach by-ref; skip valueDelref (#4364). */
     public bool $borrowedValueEntry = false;
 
-    /** Dead php-cfg Concat temp in echo/call args; lifetime ends after echo (#23798, #23842). */
+    /**
+     * Dead php-cfg Concat temp in echo/call args (#23798, #23842).
+     *
+     * Skip delref in freeDeadVariables — ownership is either an entry alloca that outlives
+     * the block, or a KIND_VALUE link in an ephemeral concat chain that must not be
+     * free()+addref balanced via assignOperand (multi-var encapsed heap corruption).
+     */
     public bool $ephemeralConcatTemp = false;
 
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
