@@ -19,9 +19,10 @@ use PHPCompiler\Web\Superglobals;
  * True when bin/compile.php is building a user/test fixture binary (not bootstrap/self-host spine).
  */
 /**
- * Self-host spine bundles: do not mega-concat via SourceBundler (OOM / invalid LLVM IR at
- * ~2465+ units; #8391, #8559). Native argv drivers compile the entry file and fold literal
- * includes incrementally via JIT IncludeHelper.
+ * Self-host spine / inventory emit drivers: do not mega-concat via SourceBundler
+ * (OOM / invalid LLVM IR at thousands of units; #8391, #8559, #23970). Native argv
+ * drivers compile the entry file and fold literal includes incrementally via JIT
+ * IncludeHelper.
  */
 function phpc_compile_skip_aot_bundle(string $normalized): bool
 {
@@ -29,7 +30,14 @@ function phpc_compile_skip_aot_bundle(string $normalized): bool
         return false;
     }
 
-    return str_contains($normalized, 'test/selfhost/compiler_lib_spine_smoke/main.php');
+    if (str_contains($normalized, 'test/selfhost/compiler_lib_spine_smoke/main.php')) {
+        return true;
+    }
+
+    // Inventory compile_driver entries pull Runtime + transitively thousands of
+    // units through LiteralIncludeDiscovery — bundling OOMs past 16GiB (#23970).
+    return str_contains($normalized, 'test/selfhost/')
+        && str_contains($normalized, 'compile_driver.php');
 }
 
 /** @deprecated alias for lint call sites */
@@ -252,14 +260,41 @@ function run(string $filename, string $code, array $options): void
         }
     }
 
-    // Self-host bundles need ~2-4G whether we are LINTING or COMPILING them; the
+    // Self-host bundles need multi-GB whether we are LINTING or COMPILING them; the
     // 1536M default OOMs deep inside php-cfg Traverser with no hint that the cap is
     // the cause (#16508). The bump used to sit inside the `-l` branch above, so
     // `bin/compile.php -o OUT test/selfhost/.../main.php` still died at 1536M.
+    // Inventory compile_driver emit-helper links OOM through 6G–10G when
+    // PHP_COMPILER_MEMORY_LIMIT is already set by ci_apply_llvm_memory_env (#23970).
     if ('' !== $normalized && str_contains($normalized, 'test/selfhost/')) {
         $bundleLimit = getenv('PHP_COMPILER_MEMORY_LIMIT');
-        if (false === $bundleLimit || '' === $bundleLimit || '1536M' === $bundleLimit || '2G' === $bundleLimit) {
-            ini_set('memory_limit', '6G');
+        $isCompileDriver = str_contains($normalized, 'compile_driver.php');
+        $limitMib = static function ($limit): int {
+            if (false === $limit || '' === $limit || !is_string($limit)) {
+                return 0;
+            }
+            if (1 !== preg_match('/^(\d+)\s*([KMG])?$/i', trim($limit), $m)) {
+                return 0;
+            }
+            $n = (int) $m[1];
+            $u = strtoupper($m[2] ?? 'M');
+
+            return match ($u) {
+                'G' => $n * 1024,
+                'K' => intdiv($n, 1024),
+                default => $n,
+            };
+        };
+        // Non-driver selfhost bundles: 6G floor. Inventory compile_driver emit:
+        // 16G floor (measured OOM at 10GiB in lib/JIT.php — #23970).
+        $floorMib = $isCompileDriver ? 16384 : 6144;
+        $curMib = $limitMib($bundleLimit);
+        if ($curMib < $floorMib) {
+            $floor = $isCompileDriver ? '16384M' : '6G';
+            ini_set('memory_limit', $floor);
+            putenv('PHP_COMPILER_MEMORY_LIMIT='.$floor);
+            $_ENV['PHP_COMPILER_MEMORY_LIMIT'] = $floor;
+            $_SERVER['PHP_COMPILER_MEMORY_LIMIT'] = $floor;
         }
     }
     if ('' !== $normalized && str_contains($normalized, 'selfhost/') && str_contains($normalized, 'compile_driver.php') && !isset($options['-l'])) {

@@ -489,6 +489,25 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $jit);
     }
 
+    /** Issue #23970: inventory emit-helper link OOMs below 16G; probe + compile.php must floor there. */
+    public function testHelloWorldProbeRaisesCompileDriverMemoryFloor(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
+        $this->assertStringContainsString('HELLOWORLD_EMIT_MEM_FLOOR_MIB=16384', $script);
+        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT=16384M', $script);
+        $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB=0', $script);
+        $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM=16g', $script);
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString("'16384M'", $compile);
+        $this->assertStringContainsString('compile_driver.php', $compile);
+        $this->assertStringContainsString('#23970', $compile);
+        $this->assertStringContainsString('phpc_compile_skip_aot_bundle', $compile);
+        $this->assertMatchesRegularExpression(
+            '/function phpc_compile_skip_aot_bundle.*?compile_driver\.php/s',
+            $compile
+        );
+    }
+
     public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
