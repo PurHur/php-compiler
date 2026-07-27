@@ -1476,6 +1476,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gcm, 'class', 'get_class_methods'));
     }
 
+    /** @covers issue #23947 */
+    public function testGetClassVarsZendStubNamedParams(): void
+    {
+        $gcv = BuiltinParamNames::forFunction('get_class_vars');
+        self::assertSame(['class'], $gcv);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gcv, 'class', 'get_class_vars'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $class_name)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gcv, 'class_name', 'get_class_vars'));
+    }
+
     /** @covers issue #23399 */
     public function testMethodExistsAndPropertyExistsZendStubNamedParams(): void
     {
