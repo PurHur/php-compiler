@@ -8373,9 +8373,26 @@ class JIT {
                         break;
                     }
                     $destOp = $block->getOperand($op->arg1);
-                    if (null === $destOp || !$this->context->hasVariableOp($destOp)) {
-                        // don't bother with constant operations
+                    if (null === $destOp) {
                         break;
+                    }
+                    // php-cfg leaves Concat.result as a dead Temporary before FuncCall;
+                    // Compiler wires ARG_SEND to that slot, but prologue never allocated it.
+                    // Skipping here made ARG_SEND materialize null via getVariableFromOp
+                    // (c04_concat: f($s.'1',$s.'2') → " \n" under AOT, #23779).
+                    if (!$this->context->hasVariableOp($destOp)) {
+                        if (!$this->context->aliasVariableOpFromSlot($block, $destOp)) {
+                            $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                            $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                            if (JIT\StringOffsetHelper::isWritableCharOffsetLvalue($left, $this->context)) {
+                                JIT\StringOffsetHelper::emitAssignOpError($this->context);
+                                break;
+                            }
+                            $newVal = $this->compileConcatIntoNewString($left, $right);
+                            $this->assignOperand($destOp, $newVal, true);
+                            $this->maybeRefreshIncludeBindingsBeforeUse();
+                            break;
+                        }
                     }
                     $result = $this->context->getVariableFromOp($destOp);
                     $leftProbeOp = $block->getOperand($op->arg2);
