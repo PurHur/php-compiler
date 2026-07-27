@@ -982,6 +982,7 @@ class JITTest extends BaseTest {
                     || str_ends_with($name, 'class_const_new'))) {
                 continue;
             }
+            // Functional typed_class_const_*_forward* cases set PROFILE via --ENV--; always include (#23757).
             if (!CompilerVersion::supportsTypedClassConstants()
                 && (str_contains($name, 'typed_class_const')
                     || str_contains($name, 'typed_enum_class_const')
@@ -989,7 +990,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'match_typed_class_const')
                     || str_contains($name, 'reflection_class_constant_get_type'))
                 && !str_contains($name, 'typed_class_const_reject')
-                && !str_contains($name, 'typed_class_const_reference_profile')) {
+                && !str_contains($name, 'typed_class_const_reference_profile')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).

@@ -96,6 +96,61 @@ PHP;
         }
     }
 
+    /** Issue #23757 repro — bare `const string` (no visibility) under forward profile. */
+    public function testTypedClassConstantBareConstIssue23757(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            if (!CompilerVersion::supportsTypedClassConstants()) {
+                $this->markTestSkipped('typed class constants require forward profile 8.3+ (#23757)');
+            }
+            $code = <<<'PHP'
+<?php
+class C { const string X = "hello"; }
+echo C::X . "\n";
+PHP;
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'issue_23757_typed_class_const.php');
+            $this->assertNotNull($block);
+            ob_start();
+            $runtime->run($block);
+            $this->assertSame("hello\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #23757 — type mismatch at declaration is a compile error under forward profile. */
+    public function testTypedClassConstantTypeMismatchIssue23757(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            if (!CompilerVersion::supportsTypedClassConstants()) {
+                $this->markTestSkipped('typed class constants require forward profile 8.3+ (#23757)');
+            }
+            $code = <<<'PHP'
+<?php
+class C { const string X = 123; }
+PHP;
+            $runtime = new Runtime();
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Cannot assign int to class constant X of type string');
+            $runtime->parseAndCompile($code, 'issue_23757_typed_class_const_mismatch.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testUntypedClassConstantStillCompilesOnReferenceProfile(): void
     {
         $code = <<<'PHP'
