@@ -396,6 +396,9 @@ final class BuiltinParamNames
                 return ['key'];
             case 'spl_autoload_register':
                 return ['callback', 'throw', 'prepend'];
+            // php-src ext/spl/spl.stub.php — InternalArgInfo still says autoload_function (#23680)
+            case 'spl_autoload_unregister':
+                return ['callback'];
             case 'touch':
                 return ['filename', 'mtime', 'atime'];
             case 'token_get_all':
