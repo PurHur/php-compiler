@@ -428,18 +428,16 @@ final class GeneratorIteratorJitHelper
     }
 
     /**
-     * Generator::send() resume — auto-continue past bare-yield receive on first send (#18108).
+     * Generator::send() resume — first send on unstarted generator opens then resumes past
+     * the first yield (bare / value / plain yield) (#18108, #23712, Zend/zend_generators.c).
      */
     public static function resumeSendAndBoxYield(Context $context, Variable $genVar): Value
     {
         $statePtr = self::loadStateFromGeneratorObject($context, $genVar);
         $map = $context->structFieldMap['__generator_state__'];
-        $valueMap = $context->structFieldMap['__value__'];
         $i1 = $context->getTypeFromString('int1');
-        $i8 = $context->getTypeFromString('int8');
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
-        $typeNull = $i8->constInt(Variable::TYPE_NULL, false);
         $resumeIp = $context->builder->load($context->builder->structGep($statePtr, $map['resume_ip']));
         $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
         $done = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
@@ -458,26 +456,14 @@ final class GeneratorIteratorJitHelper
         $resumeLc = self::resolveResumeLc($context, $genVar);
         self::runSingleResume($context, $resumeLc, $statePtr);
 
-        $hasPendingSend = $context->builder->load($context->builder->structGep($statePtr, $map['has_pending_send']));
         $hasCurrentAfter = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
         $doneAfter = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
-        $currentType = $context->builder->load(
-            $context->builder->structGep(
-                $context->builder->structGep($statePtr, $map['current_value']),
-                $valueMap['type']
-            )
-        );
+        // Zend always injects+advances on first send when the open left a live yield.
         $needsAutoContinue = $context->builder->and(
             $wasUnstarted,
             $context->builder->and(
-                $context->builder->icmp(Builder::INT_NE, $hasPendingSend, $i1->constInt(0, false)),
-                $context->builder->and(
-                    $context->builder->icmp(Builder::INT_NE, $hasCurrentAfter, $i1->constInt(0, false)),
-                    $context->builder->and(
-                        $context->builder->icmp(Builder::INT_EQ, $doneAfter, $i1->constInt(0, false)),
-                        $context->builder->icmp(Builder::INT_EQ, $currentType, $typeNull)
-                    )
-                )
+                $context->builder->icmp(Builder::INT_NE, $hasCurrentAfter, $i1->constInt(0, false)),
+                $context->builder->icmp(Builder::INT_EQ, $doneAfter, $i1->constInt(0, false))
             )
         );
 

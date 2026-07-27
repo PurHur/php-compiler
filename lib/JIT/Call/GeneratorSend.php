@@ -53,12 +53,14 @@ final class GeneratorSend implements Call
         }
         $context->builder->store($i1->constInt(1, false), $context->builder->structGep($statePtr, $map['has_pending_send']));
         $activeSlot = GeneratorHelper::resumeSendAndBoxYield($context, $genVar);
+        // resumeSendAndBoxYield may leave the builder in gen_send_auto_skip, not $okBlock (#23712).
+        $afterSendBlock = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($mergeBlock);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $phi = $context->builder->phi($valuePtrTy);
         $phi->addIncoming(JitValueBox::pointer($context, $closedSlot), $closedBlock);
-        $phi->addIncoming($activeSlot, $okBlock);
+        $phi->addIncoming($activeSlot, $afterSendBlock);
 
         return $phi;
     }
