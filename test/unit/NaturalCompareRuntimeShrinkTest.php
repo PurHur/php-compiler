@@ -8,13 +8,20 @@ use PHPCompiler\ext\standard\NaturalCompareJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** strnatcmp/strnatcasecmp JIT routes through NaturalCompareJitHelper PHP (#13535). */
+/** strnatcmp/strnatcasecmp JIT routes through NaturalCompareJitHelper PHP (#13535, #23879). */
 final class NaturalCompareRuntimeShrinkTest extends TestCase
 {
-    public function testStringNaturalCompareUsesJitHelperNotLlvmMonolith(): void
+    public function testStringNaturalCompareUsesJitVmHelperLinkNotHandRolledNestedJit(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringNaturalCompare.php');
         $this->assertStringContainsString('NaturalCompareJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringNaturalCompareJit.php');
 
         $strnatcmp = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrnatcmp.php');
