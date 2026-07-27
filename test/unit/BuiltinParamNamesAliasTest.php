@@ -232,6 +232,9 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('call_user_func'));
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('call_user_func'));
         self::assertSame(['callback', 'args'], BuiltinParamNames::forFunction('call_user_func_array'));
+        self::assertTrue(BuiltinParamNames::forwardsNamedArgsIntoVariadic('call_user_func'));
+        self::assertFalse(BuiltinParamNames::forwardsNamedArgsIntoVariadic('forward_static_call'));
+        self::assertFalse(BuiltinParamNames::forwardsNamedArgsIntoVariadic('max'));
     }
 
     /** @covers issue #22825 */
