@@ -9,13 +9,23 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_intersect_assoc() JIT routes through ArrayIntersectAssocJitHelper PHP not ArrayBuiltinHelper LLVM (#12636, #14399). */
+/**
+ * array_intersect_assoc() NestedJIT via JitVmHelperLink::ensureCompiled (#23674 / peer #23627).
+ * Routes through ArrayIntersectAssocJitHelper PHP not ArrayBuiltinHelper LLVM (#12636, #14399).
+ */
 final class ArrayIntersectAssocRuntimeShrinkTest extends TestCase
 {
     public function testArrayIntersectAssocRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayIntersectAssocRuntime.php');
         $this->assertStringContainsString('ArrayIntersectAssocJitHelper', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('parseAndCompile', $runtime);
+        $this->assertStringNotContainsString('new JIT(', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayIntersectAssoc', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
