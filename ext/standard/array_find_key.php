@@ -16,17 +16,21 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayFindCallbackPolicy;
 use PHPCompiler\JIT\ArrayFindHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * array_find_key() — key of first element matching a predicate (PHP 8.4; ext/standard/array.c).
+ *
+ * php-src stub: array_find_key(array $array, callable $callback): mixed — no $strict (#23875).
  */
 final class array_find_key extends Internal
 {
     public function execute(Frame $frame): void
     {
-        $strict = VmArrayValueCallback::parseOptionalStrictArg($frame->calledArgs, 'array_find_key');
+        VmArrayValueCallback::requireExactTwoArgs($frame->calledArgs, 'array_find_key');
         if (null === $frame->returnVar) {
             return;
         }
@@ -35,7 +39,7 @@ final class array_find_key extends Internal
         VmArrayValueCallback::requireCallback($frame, $callback, 'array_find_key');
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key, 'array_find_key');
-            if (VmArrayValueCallback::predicateMatches($result, $strict)) {
+            if (VmArrayValueCallback::isTruthy($result)) {
                 $frame->returnVar->copyFrom($key);
 
                 return;
@@ -49,8 +53,15 @@ final class array_find_key extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_find_key() requires two or three arguments in this compiler build');
+        if (2 !== $argc) {
+            $slot = JitValueBox::alloc($context);
+            $result = JitValueBox::pointer($context, $slot);
+            ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                \sprintf('array_find_key() expects exactly 2 arguments, %d given', $argc)
+            );
+
+            return $result;
         }
         if ($args[1]->isNullConstant) {
             throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError('array_find_key'));
@@ -60,11 +71,6 @@ final class array_find_key extends Internal
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_find_key() callback');
-        }
-        if (3 === $argc) {
-            $strictI1 = $this->jitBool($context, $args[2], 'array_find_key() strict');
-
-            return ArrayFindHelper::buildFindKeyArray($context, $args[0], $args[1], null, $strictI1);
         }
 
         return ArrayFindHelper::buildFindKeyArray($context, $args[0], $args[1]);

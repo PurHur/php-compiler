@@ -92,6 +92,29 @@ final class ExceptionBridge
         }
     }
 
+    /**
+     * Builtin ArgumentCountError — catchable in active try/catch, fatal when uncaught (#23875).
+     */
+    public static function emitArgumentCountErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'ArgumentCountError', $message);
+
+            return;
+        }
+
+        TypeErrorRaise::emitArgumentCountError($context, $message);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+    }
+
     public static function emitArgumentCountError(Context $context, string $message): void
     {
         TypeErrorRaise::registerDeclarations($context);

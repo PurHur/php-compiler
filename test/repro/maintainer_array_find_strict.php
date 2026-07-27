@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Maintainer repro: array_find()/array_find_key()/array_all()/array_any() optional $strict (#6949).
+ * Maintainer repro: array_find family — Zend has no $strict third arg (#23875; was #6949).
  */
 
 $haystack = [1, '1', 2];
@@ -13,10 +13,15 @@ if (array_find($haystack, fn ($v) => $v == 1) !== 1) {
     exit(1);
 }
 
-$strictFind = array_find($haystack, fn ($v) => $v == 1 ? 1 : 0, true);
-if (null !== $strictFind) {
-    echo "fail: strict array_find truthy-int callback\n";
+try {
+    array_find($haystack, fn ($v) => $v == 1 ? 1 : 0, true);
+    echo "fail: array_find accepted 3rd arg\n";
     exit(1);
+} catch (ArgumentCountError $e) {
+    if (!str_contains($e->getMessage(), 'expects exactly 2 arguments, 3 given')) {
+        echo 'fail: array_find message: ', $e->getMessage(), "\n";
+        exit(1);
+    }
 }
 
 if (array_find_key($haystack, fn ($v) => $v == 1) !== 0) {
@@ -24,32 +29,43 @@ if (array_find_key($haystack, fn ($v) => $v == 1) !== 0) {
     exit(1);
 }
 
-$strictFindKey = array_find_key($haystack, fn ($v) => $v == 1 ? 1 : 0, true);
-if (null !== $strictFindKey) {
-    echo "fail: strict array_find_key truthy-int callback\n";
+try {
+    array_find_key($haystack, fn ($v) => $v == 1 ? 1 : 0, true);
+    echo "fail: array_find_key accepted 3rd arg\n";
     exit(1);
+} catch (ArgumentCountError $e) {
+    if (!str_contains($e->getMessage(), 'expects exactly 2 arguments, 3 given')) {
+        echo 'fail: array_find_key message: ', $e->getMessage(), "\n";
+        exit(1);
+    }
 }
 
 $h = ['a' => 1, 'b' => '1'];
-if (!array_all($h, fn ($v, $k) => $v == 1, false)) {
+if (!array_all($h, fn ($v, $k) => $v == 1)) {
     echo "fail: array_all loose\n";
     exit(1);
 }
-if (!array_all($h, fn ($v, $k) => $v == 1 ? 1 : 0, false)) {
-    echo "fail: array_all loose truthy-int\n";
+if (!array_all($h, fn ($v, $k) => $v == 1 ? 1 : 0)) {
+    echo "fail: array_all truthy-int\n";
     exit(1);
 }
-if (array_all($h, fn ($v, $k) => $v == 1 ? 1 : 0, true)) {
-    echo "fail: array_all strict truthy-int\n";
+if (!array_any($h, fn ($v, $k) => $v == 1 ? 1 : 0)) {
+    echo "fail: array_any truthy-int\n";
     exit(1);
 }
-if (!array_any($h, fn ($v, $k) => $v == 1 ? 1 : 0, false)) {
-    echo "fail: array_any loose truthy-int\n";
+
+try {
+    array_all($h, fn ($v, $k) => $v == 1, true);
+    echo "fail: array_all accepted 3rd arg\n";
     exit(1);
+} catch (ArgumentCountError $e) {
 }
-if (array_any($h, fn ($v, $k) => $v == 1 ? 1 : 0, true)) {
-    echo "fail: array_any strict truthy-int\n";
+
+try {
+    array_any($h, fn ($v, $k) => $v == 1, true);
+    echo "fail: array_any accepted 3rd arg\n";
     exit(1);
+} catch (ArgumentCountError $e) {
 }
 
 echo "ok\n";
