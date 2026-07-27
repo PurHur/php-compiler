@@ -37,9 +37,11 @@ final class http_build_query extends Internal
 
         // php-src Z_PARAM_ARRAY_OR_OBJECT — TypeError text still says "array" on 8.2 (#21950).
         $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $data->type && Variable::TYPE_OBJECT !== $data->type) {
+        if (Variable::TYPE_ARRAY !== $data->type && Variable::TYPE_OBJECT !== $data->type
+            && Variable::TYPE_ENUM_CASE !== $data->type) {
             VmArray::requireArrayParam($frame->calledArgs[0], 'http_build_query', 1, 'data');
         }
+        VmHttpBuildQuery::rejectRootEnumIfNeeded($data);
 
         $prefix = self::resolveOptionalStringArg($frame->calledArgs, 1, 'numeric_prefix', '');
         [$separator, $encoding, $legacyEncoding] = self::resolveSeparatorAndEncoding($frame->calledArgs);

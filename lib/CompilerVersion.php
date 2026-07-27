@@ -1984,6 +1984,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ http_build_query() encodes BackedEnum as the backing scalar (ext/standard/http.c, #23703).
+     *
+     * Pre-8.4 Zend walks enum cases as {name[,value]} object props. Gated on
+     * {@see languageProfileVersion()} so 8.4.0-dev reference / PROFILE=8.2 keep the name/value form.
+     */
+    public static function supportsHttpBuildQueryEnumBackingScalar(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
      * visible to function_exists() — stable runtime or forward 8.4+ profile (#16346, #16494).
      */
