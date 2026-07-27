@@ -159,6 +159,9 @@ final class BuiltinParamNames
             case 'strtoupper':
             case 'strtolower':
             case 'addslashes':
+            case 'stripslashes':
+            case 'quoted_printable_encode':
+            case 'quoted_printable_decode':
             case 'bin2hex':
                 return ['string'];
             case 'substr':
