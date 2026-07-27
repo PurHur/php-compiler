@@ -13769,7 +13769,9 @@ class JIT {
             JIT\ReadonlyClassGuard::emitBeforePropertyStore(
                 $this->context,
                 $result,
-                $this->context->jitEnclosingBlock
+                $this->context->jitEnclosingBlock,
+                'modify',
+                $this
             );
             if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
                 $this->context,
@@ -15586,7 +15588,9 @@ class JIT {
         JIT\ReadonlyClassGuard::emitBeforePropertyStore(
             $this->context,
             $dest,
-            $this->context->jitEnclosingBlock
+            $this->context->jitEnclosingBlock,
+            'modify',
+            $this
         );
         if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
             $this->context,
@@ -15807,7 +15811,9 @@ class JIT {
         JIT\ReadonlyClassGuard::emitBeforePropertyStore(
             $this->context,
             $read,
-            $this->context->jitEnclosingBlock
+            $this->context->jitEnclosingBlock,
+            'modify',
+            $this
         );
         if (JIT\AsymmetricVisibilityGuard::emitBeforePropertyStore(
             $this->context,

@@ -302,7 +302,8 @@ final class UnsetHelperLlvm
                     $context,
                     $prop,
                     $context->jitEnclosingBlock,
-                    'unset'
+                    'unset',
+                    $jit
                 );
                 ReadonlyClassGuard::emitStoreUnlessPending(
                     $context,
@@ -342,7 +343,8 @@ final class UnsetHelperLlvm
                 $context,
                 $prop,
                 $context->jitEnclosingBlock,
-                'unset'
+                'unset',
+                $jit
             );
             ReadonlyClassGuard::emitStoreUnlessPending(
                 $context,
