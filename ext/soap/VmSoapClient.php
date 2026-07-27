@@ -144,6 +144,28 @@ final class VmSoapClient
                 $have[$propName] = true;
             }
         }
+        // Trace / fault bag props (soap.stub.php; #23925).
+        $traceFaultProps = [
+            '__last_request' => [$nullProto, $strProto],
+            '__last_response' => [$nullProto, $strProto],
+            '__last_request_headers' => [$nullProto, $strProto],
+            '__last_response_headers' => [$nullProto, $strProto],
+            '__default_headers' => [$nullProto, $arrayProto],
+            '__soap_fault' => [$nullProto, $nullProto],
+        ];
+        foreach ($traceFaultProps as $propName => [$default, $proto]) {
+            if (!isset($have[$propName])) {
+                $entry->properties[] = new ClassProperty(
+                    $propName,
+                    $default,
+                    $proto,
+                    false,
+                    $pub,
+                    self::CLASS_LC
+                );
+                $have[$propName] = true;
+            }
+        }
         // php-src stub marks private; UPGRADING / soap.stub.php userland reads (#23246/#23247/#23903/#23904).
         if (SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
             foreach (['httpurl', 'sdl', 'typemap', 'httpsocket'] as $propName) {
@@ -519,6 +541,71 @@ final class VmSoapClient
         $object->getProperty('_cookies')->copyFrom(self::importDecodedTree($state->cookies, $ctx));
     }
 
+    /**
+     * Mirror SoapClientState trace bags onto stub __last_* properties (#23925 / soap.stub.php).
+     * Only when options['trace'] is on — matches php-src Z_CLIENT_TRACE writes.
+     */
+    private static function syncTraceProperties(ObjectEntry $object, SoapClientState $state): void
+    {
+        if (!$state->trace) {
+            return;
+        }
+        if ($object->hasProperty('__last_request')) {
+            $object->getProperty('__last_request')->string($state->lastRequest);
+        }
+        if ($object->hasProperty('__last_response')) {
+            $object->getProperty('__last_response')->string($state->lastResponse);
+        }
+        if ($object->hasProperty('__last_request_headers')) {
+            $slot = $object->getProperty('__last_request_headers');
+            $headers = $state->lastRequestHeaders;
+            if (null === $headers || '' === $headers) {
+                $slot->null();
+            } else {
+                $slot->string($headers);
+            }
+        }
+        if ($object->hasProperty('__last_response_headers')) {
+            $slot = $object->getProperty('__last_response_headers');
+            $headers = $state->lastResponseHeaders;
+            if (null === $headers || '' === $headers) {
+                $slot->null();
+            } else {
+                $slot->string($headers);
+            }
+        }
+    }
+
+    /** Keep `__default_headers` aligned with SoapClientState::$soapHeaders (#23925). */
+    private static function syncDefaultHeadersProperty(ObjectEntry $object, SoapClientState $state): void
+    {
+        if (!$object->hasProperty('__default_headers')) {
+            return;
+        }
+        $slot = $object->getProperty('__default_headers');
+        if ([] === $state->soapHeaders) {
+            $slot->null();
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($state->soapHeaders as $i => $hdr) {
+            $v = new Variable();
+            $v->object($hdr);
+            $ht->addIndex((int) $i, $v);
+        }
+        $slot->array($ht);
+    }
+
+    /** Keep `__soap_fault` aligned with the last SoapFault (#23925). */
+    private static function syncSoapFaultProperty(ObjectEntry $object, Variable $faultVar): void
+    {
+        if (!$object->hasProperty('__soap_fault')) {
+            return;
+        }
+        $object->getProperty('__soap_fault')->copyFrom($faultVar);
+    }
+
     public static function state(ObjectEntry $object): SoapClientState
     {
         if (!isset(self::$store[$object->id])) {
@@ -596,7 +683,10 @@ final class VmSoapClient
      */
     public static function setSoapHeaders(ObjectEntry $object, array $headers): void
     {
-        self::state($object)->soapHeaders = $headers;
+        $state = self::state($object);
+        $state->soapHeaders = $headers;
+        // Keep stub `__default_headers` in sync (#23925).
+        self::syncDefaultHeadersProperty($object, $state);
     }
 
     public static function soapCall(
@@ -626,14 +716,14 @@ final class VmSoapClient
                 $state->complexTypeFields
             );
 
+            // php-src soap.c — Z_CLIENT_LAST_* after traced __soapCall (#23925).
+            self::syncTraceProperties($object, $state);
+
             return self::importValue($decoded, $ctx);
         } catch (\SoapFault $e) {
-            // php-src: SoapFault return value thrown only when exceptions != false (#20293).
-            if ($state->exceptions) {
-                throw $e;
-            }
-
-            return BuiltinExceptionSupport::materializeSoapFault(
+            // Trace bags may hold last request even when the call faults (#23925).
+            self::syncTraceProperties($object, $state);
+            $faultVar = BuiltinExceptionSupport::materializeSoapFault(
                 $ctx,
                 $e->getMessage(),
                 '',
@@ -644,6 +734,14 @@ final class VmSoapClient
                 $e->detail ?? null,
                 (string) ($e->_name ?? '')
             );
+            // php-src soap.c — Z_CLIENT_SOAP_FAULT (#23925).
+            self::syncSoapFaultProperty($object, $faultVar);
+            // php-src: SoapFault return value thrown only when exceptions != false (#20293).
+            if ($state->exceptions) {
+                throw $e;
+            }
+
+            return $faultVar;
         }
     }
 
@@ -713,6 +811,8 @@ final class VmSoapClient
             if ($state->trace) {
                 $state->lastResponseHeaders = self::synthesizeFixtureResponseHeaders(\strlen($body));
             }
+            // php-src — sync stub __last_* after fixture transport (#23925).
+            self::syncTraceProperties($object, $state);
 
             return $body;
         }
@@ -813,6 +913,8 @@ final class VmSoapClient
         // php-src php_http.c: attach Soap\Url on successful HTTP connect (#23246).
         // httpsocket stays null while transport uses file_get_contents (no keep-alive php_stream) (#23904).
         self::attachHttpUrl($object, $location);
+        // php-src — sync stub __last_* after HTTP transport (#23925).
+        self::syncTraceProperties($object, $state);
 
         return $body;
     }

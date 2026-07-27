@@ -213,4 +213,72 @@ final class SoapExtensionPolicyTest extends TestCase
             }
         }
     }
+
+    public function testSoapClientTraceFaultProperties(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $entry = $ctx->classes['soapclient'] ?? null;
+            self::assertNotNull($entry);
+            $names = \array_map(static fn ($p) => $p->name, $entry->properties);
+            foreach ([
+                '__last_request',
+                '__last_response',
+                '__last_request_headers',
+                '__last_response_headers',
+                '__default_headers',
+                '__soap_fault',
+            ] as $prop) {
+                self::assertContains($prop, $names);
+            }
+
+            $object = new \PHPCompiler\VM\ObjectEntry($entry);
+            \PHPCompiler\ext\soap\VmSoapClient::initObject(
+                $object,
+                null,
+                [
+                    'location' => 'http://127.0.0.1/',
+                    'uri' => 'http://test/',
+                    'trace' => true,
+                ],
+                $ctx
+            );
+            self::assertSame(
+                \PHPCompiler\VM\Variable::TYPE_NULL,
+                $object->getProperty('__last_request')->type
+            );
+            self::assertSame(
+                \PHPCompiler\VM\Variable::TYPE_NULL,
+                $object->getProperty('__default_headers')->type
+            );
+            self::assertSame(
+                \PHPCompiler\VM\Variable::TYPE_NULL,
+                $object->getProperty('__soap_fault')->type
+            );
+
+            $hdrEntry = $ctx->classes['soapheader'] ?? null;
+            self::assertNotNull($hdrEntry);
+            $hdr = new \PHPCompiler\VM\ObjectEntry($hdrEntry);
+            $hdr->constructed = true;
+            \PHPCompiler\ext\soap\VmSoapClient::setSoapHeaders($object, [$hdr]);
+            $def = $object->getProperty('__default_headers');
+            self::assertSame(\PHPCompiler\VM\Variable::TYPE_ARRAY, $def->type);
+            self::assertCount(1, \iterator_to_array($def->toArray()->iterateKeyed(false)));
+
+            \PHPCompiler\ext\soap\VmSoapClient::setSoapHeaders($object, []);
+            self::assertSame(
+                \PHPCompiler\VM\Variable::TYPE_NULL,
+                $object->getProperty('__default_headers')->type
+            );
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }
