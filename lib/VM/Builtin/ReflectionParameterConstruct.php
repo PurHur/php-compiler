@@ -142,7 +142,12 @@ final class ReflectionParameterConstruct extends VmClassMethod
         $receiver->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int($index);
         $receiver->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($index);
-        $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$index]);
+        $displayName = ltrim((string) $paramNames[$index], '&');
+        if (str_starts_with($displayName, '...')) {
+            $displayName = substr($displayName, 3);
+        }
+        $displayName = rtrim($displayName, '=');
+        $receiver->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($displayName);
         $receiver->constructed = true;
     }
 
@@ -157,6 +162,19 @@ final class ReflectionParameterConstruct extends VmClassMethod
         if (Variable::TYPE_STRING === $parameterArg->type) {
             $name = $parameterArg->toString();
             $index = array_search($name, $paramNames, true);
+            if (false === $index) {
+                // BuiltinParamNames may keep trailing `=` optionality markers (#23608).
+                foreach ($paramNames as $i => $label) {
+                    $bare = rtrim(ltrim((string) $label, '&'), '=');
+                    if (str_starts_with($bare, '...')) {
+                        $bare = substr($bare, 3);
+                    }
+                    if ($bare === $name) {
+                        $index = $i;
+                        break;
+                    }
+                }
+            }
             if (false === $index) {
                 ReflectionSupport::throwReflectionException(
                     'Parameter '.$name.' does not exist on '.$context

@@ -1407,6 +1407,39 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($proc, 'indent', 'xmlwriter_set_indent'));
     }
 
+    /** @covers issue #23608 */
+    public function testXmlWriterProceduralStubNamedParamsResolve(): void
+    {
+        $start = BuiltinParamNames::forFunction('xmlwriter_start_element');
+        self::assertSame(['writer', 'name'], $start);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($start, 'writer', 'xmlwriter_start_element'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($start, 'xmlwriter', 'xmlwriter_start_element'));
+
+        $writeAttr = BuiltinParamNames::forFunction('xmlwriter_write_attribute');
+        self::assertSame(['writer', 'name', 'value'], $writeAttr);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($writeAttr, 'value', 'xmlwriter_write_attribute'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($writeAttr, 'content', 'xmlwriter_write_attribute'));
+
+        $writeEl = BuiltinParamNames::forFunction('xmlwriter_write_element');
+        self::assertSame(['writer', 'name', 'content='], $writeEl);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($writeEl, 'writer', 'xmlwriter_write_element'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('xmlwriter_write_element'));
+
+        self::assertSame(['uri'], BuiltinParamNames::forFunction('xmlwriter_open_uri'));
+        self::assertSame(
+            ['writer', 'qualifiedName', 'publicId=', 'systemId='],
+            BuiltinParamNames::forFunction('xmlwriter_start_dtd')
+        );
+        self::assertSame(
+            ['writer', 'name', 'content', 'isParam=', 'publicId=', 'systemId=', 'notationData='],
+            BuiltinParamNames::forFunction('xmlwriter_write_dtd_entity')
+        );
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('xmlwriter_start_document'));
+        self::assertSame(3, BuiltinParamNames::requiredParamCountForInternalFunction('xmlwriter_write_dtd_entity'));
+        self::assertSame(['writer', 'empty='], BuiltinParamNames::forFunction('xmlwriter_flush'));
+        self::assertSame(['writer', 'flush='], BuiltinParamNames::forFunction('xmlwriter_output_memory'));
+    }
+
     /** @covers issue #23409 */
     public function testNumberFormatterCurrencyStubNamedParamsResolve(): void
     {

@@ -892,23 +892,70 @@ final class BuiltinParamNames
                 return ['id', 'direction'];
             case 'transliterator_transliterate':
                 return ['transliterator', 'string', 'start', 'end'];
-            // php-src ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo still has xmlwriter/indent* (#23407)
+            // php-src ext/xmlwriter/php_xmlwriter.stub.php — InternalArgInfo still has xmlwriter/content/pubid (#23407, #23608)
+            case 'xmlwriter_open_uri':
+                return ['uri'];
             case 'xmlwriter_set_indent':
                 return ['writer', 'enable'];
             case 'xmlwriter_set_indent_string':
                 return ['writer', 'indentation'];
             case 'xmlwriter_flush':
-                return ['writer', 'empty'];
+                return ['writer', 'empty='];
             case 'xmlwriter_output_memory':
-                return ['writer', 'flush'];
+                return ['writer', 'flush='];
+            case 'xmlwriter_start_comment':
+            case 'xmlwriter_end_comment':
+            case 'xmlwriter_end_attribute':
+            case 'xmlwriter_end_element':
+            case 'xmlwriter_full_end_element':
+            case 'xmlwriter_end_pi':
+            case 'xmlwriter_start_cdata':
+            case 'xmlwriter_end_cdata':
+            case 'xmlwriter_end_document':
+            case 'xmlwriter_end_dtd':
+            case 'xmlwriter_end_dtd_element':
+            case 'xmlwriter_end_dtd_attlist':
+            case 'xmlwriter_end_dtd_entity':
+                return ['writer'];
+            case 'xmlwriter_start_attribute':
+            case 'xmlwriter_start_element':
+            case 'xmlwriter_start_dtd_attlist':
+                return ['writer', 'name'];
+            case 'xmlwriter_write_attribute':
+                return ['writer', 'name', 'value'];
             case 'xmlwriter_start_attribute_ns':
+            case 'xmlwriter_start_element_ns':
                 return ['writer', 'prefix', 'name', 'namespace'];
             case 'xmlwriter_write_attribute_ns':
                 return ['writer', 'prefix', 'name', 'namespace', 'value'];
-            case 'xmlwriter_start_element_ns':
-                return ['writer', 'prefix', 'name', 'namespace'];
+            case 'xmlwriter_write_element':
+                return ['writer', 'name', 'content='];
             case 'xmlwriter_write_element_ns':
-                return ['writer', 'prefix', 'name', 'namespace', 'content'];
+                return ['writer', 'prefix', 'name', 'namespace', 'content='];
+            case 'xmlwriter_start_pi':
+                return ['writer', 'target'];
+            case 'xmlwriter_write_pi':
+                return ['writer', 'target', 'content'];
+            case 'xmlwriter_write_cdata':
+            case 'xmlwriter_text':
+            case 'xmlwriter_write_raw':
+            case 'xmlwriter_write_comment':
+                return ['writer', 'content'];
+            case 'xmlwriter_start_document':
+                return ['writer', 'version=', 'encoding=', 'standalone='];
+            case 'xmlwriter_start_dtd':
+                return ['writer', 'qualifiedName', 'publicId=', 'systemId='];
+            case 'xmlwriter_write_dtd':
+                return ['writer', 'name', 'publicId=', 'systemId=', 'content='];
+            case 'xmlwriter_start_dtd_element':
+                return ['writer', 'qualifiedName'];
+            case 'xmlwriter_write_dtd_element':
+            case 'xmlwriter_write_dtd_attlist':
+                return ['writer', 'name', 'content'];
+            case 'xmlwriter_start_dtd_entity':
+                return ['writer', 'name', 'isParam'];
+            case 'xmlwriter_write_dtd_entity':
+                return ['writer', 'name', 'content', 'isParam=', 'publicId=', 'systemId=', 'notationData='];
             // php-src ext/xml/xml.stub.php — InternalArgInfo still has shdl/ehdl (#23624)
             case 'xml_set_element_handler':
                 return ['parser', 'start_handler', 'end_handler'];
