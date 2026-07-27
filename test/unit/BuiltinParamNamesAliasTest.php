@@ -1462,6 +1462,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['writer', 'flush='], BuiltinParamNames::forFunction('xmlwriter_output_memory'));
     }
 
+    /** @covers issue #23645 */
+    public function testFinfoOpenMimeContentTypeStubNamedParamsResolve(): void
+    {
+        $open = BuiltinParamNames::forFunction('finfo_open');
+        self::assertSame(['flags=', 'magic_database='], $open);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($open, 'flags', 'finfo_open'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($open, 'magic_database', 'finfo_open'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($open, 'options', 'finfo_open'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($open, 'arg', 'finfo_open'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('finfo_open'));
+
+        $mime = BuiltinParamNames::forFunction('mime_content_type');
+        self::assertSame(['filename'], $mime);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($mime, 'filename', 'mime_content_type'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($mime, 'filename_or_stream', 'mime_content_type'));
+    }
+
     /** @covers issue #23410 */
     public function testFinfoBufferFileStubNamedParamsResolve(): void
     {

@@ -830,6 +830,12 @@ final class BuiltinParamNames
                 return ['array', 'flags', 'prefix'];
             case 'file':
                 return ['filename', 'flags'];
+            // php-src ext/fileinfo/fileinfo.stub.php — InternalArgInfo still says options/arg (#23645)
+            case 'finfo_open':
+                return ['flags=', 'magic_database='];
+            // php-src ext/standard/file.stub.php — InternalArgInfo still says filename_or_stream (#23645)
+            case 'mime_content_type':
+                return ['filename'];
             case 'glob':
                 return ['pattern', 'flags'];
             case 'substr_compare':
