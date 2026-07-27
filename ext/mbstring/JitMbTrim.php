@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helpers for mb_trim() / mb_ltrim() / mb_rtrim() (php-src ext/mbstring/mbstring.c; #5957, #9208).
+ * LLVM JIT/AOT helpers for mb_trim() / mb_ltrim() / mb_rtrim() (php-src ext/mbstring/mbstring.c; #5957, #9208, #23883).
  */
 final class JitMbTrim
 {
@@ -25,8 +25,9 @@ final class JitMbTrim
             return $folded;
         }
 
+        // Same fallback shape as mb_strtoupper::call — cli/JIT recovers via VM execute (#23883).
         throw new \LogicException(
-            $function.'() JIT requires compile-time string and mask literals in this compiler build'
+            $function.'() is not lowered for JIT/AOT in this compiler build'
         );
     }
 
@@ -57,9 +58,15 @@ final class JitMbTrim
             return null;
         }
 
+        // Unknown encoding → do not throw ValueError during IR fold (breaks try/catch).
+        // Fall through to VM execute via invoke()'s "not lowered" LogicException (#23883).
+        if (!MbstringEncodingRegistry::isValid($encoding)) {
+            return null;
+        }
+
         return self::materializeString(
             $context,
-            VmMbstring::trimString($string, $what, $encoding, $mode)
+            VmMbstring::trimString($string, $what, $encoding, $mode, $function)
         );
     }
 
@@ -73,7 +80,7 @@ final class JitMbTrim
         if (!isset($args[$index])) {
             return null;
         }
-        if (JITVariable::TYPE_NULL === $args[$index]->type) {
+        if (JITVariable::TYPE_NULL === $args[$index]->type || ($args[$index]->isNullConstant ?? false)) {
             return null;
         }
         if (JITVariable::TYPE_STRING !== $args[$index]->type) {
@@ -91,7 +98,7 @@ final class JitMbTrim
         if (!isset($args[$index])) {
             return 'UTF-8';
         }
-        if (JITVariable::TYPE_NULL === $args[$index]->type) {
+        if (JITVariable::TYPE_NULL === $args[$index]->type || ($args[$index]->isNullConstant ?? false)) {
             return 'UTF-8';
         }
         if (JITVariable::TYPE_STRING !== $args[$index]->type) {

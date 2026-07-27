@@ -1876,12 +1876,17 @@ final class VmMbstring
         $encoding = isset($frame->calledArgs[2])
             ? self::coerceEncodingArg($frame->calledArgs[2], $function, 2)
             : 'UTF-8';
-        $frame->returnVar->string(self::trimString($source, $what, $encoding, $mode));
+        $frame->returnVar->string(self::trimString($source, $what, $encoding, $mode, $function));
     }
 
-    public static function trimString(string $source, ?string $what, string $encoding, int $mode): string
-    {
-        self::assertTrimEncoding($encoding);
+    public static function trimString(
+        string $source,
+        ?string $what,
+        string $encoding,
+        int $mode,
+        string $function = 'mb_trim'
+    ): string {
+        $encoding = self::assertTrimEncoding($encoding, $function);
         if (null === $what) {
             $trimSet = self::defaultTrimSet();
         } elseif ('' === $what) {
@@ -2079,13 +2084,20 @@ final class VmMbstring
         return self::decodeUtf8Char($char);
     }
 
-    private static function assertTrimEncoding(string $encoding): void
+    /**
+     * php-src php_mb_get_encoding / zend_argument_value_error for unknown names (#23883);
+     * LogicException only for valid encodings this build does not yet trim.
+     */
+    private static function assertTrimEncoding(string $encoding, string $function, int $argIndex = 2): string
     {
+        $encoding = MbstringEncodingRegistry::assertValid($encoding, $function, $argIndex);
         if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
             throw new \LogicException(
-                'mb_trim() requires mbstring for encoding '.$encoding.' in this compiler build'
+                $function.'() requires mbstring for encoding '.$encoding.' in this compiler build'
             );
         }
+
+        return $encoding;
     }
 
     /**
