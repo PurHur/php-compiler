@@ -1332,6 +1332,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'function_name', 'function_exists'));
     }
 
+    /** @covers issue #23258 */
+    public function testPutenvZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('putenv');
+        self::assertSame(['assignment'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'assignment', 'putenv'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $setting)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'setting', 'putenv'));
+    }
+
     /** @covers issue #23436 */
     public function testErrorReportingSessionNameZendStubNamedParams(): void
     {

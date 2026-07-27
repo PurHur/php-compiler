@@ -363,6 +363,9 @@ final class BuiltinParamNames
                 return ['code', 'flags'];
             case 'getenv':
                 return ['name', 'local_only'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says setting (#23258)
+            case 'putenv':
+                return ['assignment'];
             case 'ini_get':
                 return ['option'];
             case 'ini_set':
