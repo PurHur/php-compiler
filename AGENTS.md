@@ -63,6 +63,27 @@ Without this, such a case fails forever regardless of compiler state and the exi
 meaning "regressions". Use it **only** for genuinely unsupported features — never to silence a real
 defect. Silencing a failing case is the cheap green of §4 wearing a different hat.
 
+**One run is not a verification.** The program must be deterministic; the *compiler's output need
+not be*. Heap corruption in a generated binary is a recurring defect class here, and it does not
+fail every run — measured rates for the same binary on the same input have included 7/10, 6/10 and
+3/5. A single run therefore passes such a case most of the time, and that has twice caused a live
+defect to be closed as fixed (#23842).
+
+```bash
+script/differential-sweep.sh --aot --repeat 10   # re-run each built binary 10x
+```
+
+`--repeat` multiplies run time only, not compile time, so `--aot --repeat 10` costs barely more
+than `--aot`. **Use it before declaring any memory-safety or wrong-output fix good.** A case can
+also opt itself in, so it is re-run even in a plain sweep:
+
+```php
+// @differential-repeat: 10   heap corruption is intermittent here (#23842)
+```
+
+A mismatch on *any* run fails the case, and the report shows the ratio
+(`6/10 runs matched — first mismatch on run 3`) so intermittency is visible rather than inferred.
+
 ### 4. Never make a gate green without making the artifact work
 
 The recurring failure here is a **cheap green**. Documented instances: the committed gen-0 driver
