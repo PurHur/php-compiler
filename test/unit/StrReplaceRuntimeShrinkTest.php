@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\StrReplaceJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** str_replace()/str_ireplace() JIT routes through StrReplaceJitHelper PHP not inline LLVM (#14779). */
+/** str_replace() subject routing + StrReplaceJitHelper SSOT (#14779, #23912). */
 final class StrReplaceRuntimeShrinkTest extends TestCase
 {
     public function testStringStrReplaceUsesJitHelperNotInlineLlvm(): void
@@ -23,9 +23,13 @@ final class StrReplaceRuntimeShrinkTest extends TestCase
 
         $replace = (string) file_get_contents(__DIR__.'/../../ext/standard/str_replace.php');
         $this->assertStringContainsString('JitStrReplace::replace', $replace);
+        $this->assertStringContainsString('JitStrReplaceSubject', $replace);
 
         $ireplace = (string) file_get_contents(__DIR__.'/../../ext/standard/str_ireplace.php');
         $this->assertStringContainsString('JitStrIreplace::replace', $ireplace);
+        $this->assertStringContainsString('JitStrReplaceSubject', $ireplace);
+
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStrReplaceSubject.php');
     }
 
     public function testStrReplaceJitHelperDelegatesToVmString(): void

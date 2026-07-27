@@ -141,7 +141,14 @@ final class str_replace extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
         $countSlot = self::jitCountSlot($context, 4 === $argc);
-        if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
+        // #23912 — AOT TYPE_VALUE string locals must not take the array $subject path
+        // (ensureHashtablePointer overwrites the string box → echo "Array").
+        $subjectIsStringish = JitPregSubject::isStringOrCoercibleNullSubject($args[2])
+            || (
+                JITVariable::TYPE_VALUE === $args[2]->type
+                && !JitStrReplaceSubject::isKnownArray($args[2])
+            );
+        if ($subjectIsStringish) {
             if (self::isArrayReplaceArg($args[0]) || self::isArrayReplaceArg($args[1])) {
                 $result = JitStrReplaceMulti::replace(
                     $context,
