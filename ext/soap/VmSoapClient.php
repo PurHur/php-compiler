@@ -117,6 +117,33 @@ final class VmSoapClient
                 $have[$propName] = true;
             }
         }
+        // Proxy/digest/stream/cookies props (soap.stub.php; #23924).
+        $emptyArrayDefault = new Variable(Variable::TYPE_ARRAY);
+        $emptyArrayDefault->array(new HashTable());
+        $proxyProps = [
+            '_proxy_host' => [$nullProto, $strProto],
+            '_proxy_port' => [$nullProto, $intProto],
+            '_proxy_login' => [$nullProto, $strProto],
+            '_proxy_password' => [$nullProto, $strProto],
+            '_use_proxy' => [$nullProto, $intProto],
+            '_use_digest' => [$falseDefault, $boolProto],
+            '_digest' => [$nullProto, $strProto],
+            '_stream_context' => [$nullProto, $nullProto],
+            '_cookies' => [$emptyArrayDefault, $arrayProto],
+        ];
+        foreach ($proxyProps as $propName => [$default, $proto]) {
+            if (!isset($have[$propName])) {
+                $entry->properties[] = new ClassProperty(
+                    $propName,
+                    $default,
+                    $proto,
+                    false,
+                    $pub,
+                    self::CLASS_LC
+                );
+                $have[$propName] = true;
+            }
+        }
         // php-src stub marks private; UPGRADING / soap.stub.php userland reads (#23246/#23247/#23903/#23904).
         if (SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
             foreach (['httpurl', 'sdl', 'typemap', 'httpsocket'] as $propName) {
@@ -284,6 +311,8 @@ final class VmSoapClient
         self::syncCoreOptionProperties($object, $state);
         // php-src soap.c ctor — underscored option props (#23923).
         self::syncUnderscoredOptionProperties($object, $state, $ctx);
+        // php-src soap.c ctor — proxy/digest/stream/cookies (#23924).
+        self::syncProxyCookieProperties($object, $state, $ctx);
         $object->constructed = true;
     }
 
@@ -417,6 +446,79 @@ final class VmSoapClient
         }
     }
 
+    /**
+     * Mirror proxy/digest/stream/cookies stub properties (#23924 / soap.stub.php).
+     */
+    private static function syncProxyCookieProperties(
+        ObjectEntry $object,
+        SoapClientState $state,
+        Context $ctx
+    ): void {
+        if ($object->hasProperty('_proxy_host')) {
+            $slot = $object->getProperty('_proxy_host');
+            if (null !== $state->proxyHost) {
+                $slot->string($state->proxyHost);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('_proxy_port')) {
+            $slot = $object->getProperty('_proxy_port');
+            if (null !== $state->proxyPort) {
+                $slot->int($state->proxyPort);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('_proxy_login')) {
+            $slot = $object->getProperty('_proxy_login');
+            if (null !== $state->proxyLogin) {
+                $slot->string($state->proxyLogin);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('_proxy_password')) {
+            $slot = $object->getProperty('_proxy_password');
+            if (null !== $state->proxyPassword) {
+                $slot->string($state->proxyPassword);
+            } else {
+                $slot->null();
+            }
+        }
+        // php-src sets _use_proxy during http_connect; null until then (#23924).
+        if ($object->hasProperty('_use_proxy')) {
+            $object->getProperty('_use_proxy')->null();
+        }
+        if ($object->hasProperty('_use_digest')) {
+            $object->getProperty('_use_digest')->bool(
+                SoapConstants::SOAP_AUTHENTICATION_DIGEST === $state->authentication
+            );
+        }
+        // Challenge payload lives in state; stub types as ?string — leave null until stringified attach.
+        if ($object->hasProperty('_digest')) {
+            $object->getProperty('_digest')->null();
+        }
+        if ($object->hasProperty('_stream_context')) {
+            $object->getProperty('_stream_context')->null();
+        }
+        if ($object->hasProperty('_cookies')) {
+            self::syncCookiesProperty($object, $state, $ctx);
+        }
+    }
+
+    /** Keep `_cookies` array property aligned with SoapClientState::$cookies (#23924). */
+    private static function syncCookiesProperty(
+        ObjectEntry $object,
+        SoapClientState $state,
+        Context $ctx
+    ): void {
+        if (!$object->hasProperty('_cookies')) {
+            return;
+        }
+        $object->getProperty('_cookies')->copyFrom(self::importDecodedTree($state->cookies, $ctx));
+    }
+
     public static function state(ObjectEntry $object): SoapClientState
     {
         if (!isset(self::$store[$object->id])) {
@@ -462,10 +564,13 @@ final class VmSoapClient
         $state = self::state($object);
         if (null === $value) {
             unset($state->cookies[$name]);
-
-            return;
+        } else {
+            $state->cookies[$name] = $value;
         }
-        $state->cookies[$name] = $value;
+        // Keep stub `_cookies` in sync (#23924).
+        if (null !== $state->vmContext) {
+            self::syncCookiesProperty($object, $state, $state->vmContext);
+        }
     }
 
     public static function setLocation(ObjectEntry $object, string $location): string
