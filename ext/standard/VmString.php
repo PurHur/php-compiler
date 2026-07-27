@@ -55,8 +55,8 @@ final class VmString
      * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
      * substr_compare soft-null on 8.4 (#21515, reverts #20164 TypeError; peers strncmp #21317).
      * glob()/fnmatch() pattern soft-null on 8.4 (#21366, ext/standard/file.c, fnmatch.c).
-     * error_log($message), fsockopen/pfsockopen/stream_socket_client hostname/remote,
-     * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
+     * error_log($message), pfsockopen hostname, gethostbyname($hostname), dns_get_record($hostname)
+     * soft-null (#21446, ext/standard). fsockopen/stream_socket_client null → TypeError (#23823, reverts #21446).
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
@@ -117,8 +117,8 @@ final class VmString
      * openssl_encrypt/openssl_decrypt $data soft-null (#21445, reverts #20263; ext/openssl/openssl.c).
      * openssl_digest($data) soft-null (#21517, reverts #20207; ext/openssl/openssl.c).
      * sodium_bin2hex($string) soft-null (#21517, reverts #20196; ext/sodium).
-     * error_log($message), fsockopen/pfsockopen/stream_socket_client hostname/remote,
-     * gethostbyname($hostname), dns_get_record($hostname) soft-null (#21446, ext/standard).
+     * error_log($message), pfsockopen hostname, gethostbyname($hostname), dns_get_record($hostname)
+     * soft-null (#21446, ext/standard). fsockopen/stream_socket_client null → TypeError (#23823, reverts #21446).
      * implode/join $separator soft-null (#21210, reverts #19894).
      * header($header), preg_quote($str), printf/fprintf($format) soft-null (#21234, reverts #19224/#20197).
      * vprintf/vfprintf($format) soft-null (#21514, reverts over-strict requireStringBuiltinArg).

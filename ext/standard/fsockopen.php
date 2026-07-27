@@ -38,7 +38,7 @@ final class fsockopen extends Internal
             return;
         }
 
-        $hostname = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'fsockopen', 0, 'hostname');
+        $hostname = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'fsockopen', 0, 'hostname');
 
         $port = -1;
         if ($argc >= 2) {

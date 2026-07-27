@@ -36,11 +36,11 @@ final class stream_socket_client extends Internal
             return;
         }
 
-        $remote = VmString::coerceTrimFamilyStringArg(
+        $remote = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'stream_socket_client',
             0,
-            'remote_socket'
+            'address'
         );
 
         $errno = 0;
