@@ -53,6 +53,21 @@ export PHP_COMPILER_HELPER_RUNTIME_O="${PHP_COMPILER_HELPER_RUNTIME_O:-0}"
 export PHPCFG_SIMPLIFIER_USECHAIN="${PHPCFG_SIMPLIFIER_USECHAIN:-1}"
 unset PHPCFG_SIMPLIFIER_LEGACY
 
+# Full cli_driver + native $argv bridge — same knobs as
+# bootstrap-selfhost-driver-host-compile.sh with BOOTSTRAP_M5_DRIVER_HOST_FULL_CLI=1.
+# Without these, Zend emits a link-only stub that fails functional smoke (#23468).
+export PHP_COMPILER_SELFHOST_AOT=1
+export PHP_COMPILER_M3_COMPILE_DRIVER=1
+export PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1
+export PHP_COMPILER_M5_DRIVER_HOST=1
+export PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1
+export PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1
+export PHP_COMPILER_EMIT_HELPER_LINK=1
+export PHP_COMPILER_CLI_COMPILED=1
+export PHP_COMPILER_CLI_SKIP_VENDOR=1
+export PHP_COMPILER_M3_EMIT_LOG_PREFIX="${PHP_COMPILER_M3_EMIT_LOG_PREFIX:-helloworld_compile_smoke}"
+unset PHP_COMPILER_M3_EMIT_TU
+
 mkdir -p "${ROOT}/build" "${PRELINKED}"
 rm -f "${OUT}"
 export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-gen0-argv-driver"
@@ -60,7 +75,7 @@ export PHP_COMPILER_JIT_ENTRY_FILE="${ROOT}/build/.last-jit-gen0-argv-driver-ent
 export PHP_COMPILER_JIT_PHASE_FILE="${ROOT}/build/.last-jit-gen0-argv-driver-phase"
 
 echo "bootstrap-gen0-refresh-argv-driver: Zend compile ${ENTRY} -> ${OUT} (mem=${MEM})"
-echo "bootstrap-gen0-refresh-argv-driver: ulimit -v=$(ulimit -v)"
+echo "bootstrap-gen0-refresh-argv-driver: ulimit -v=$(ulimit -v) M5_DRIVER_HOST=1"
 
 set +e
 env PHP_COMPILER_MEMORY_LIMIT="${MEM}" \

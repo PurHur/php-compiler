@@ -16574,6 +16574,13 @@ class JIT {
             || 'object' === strtolower($normalizedReceiverUserType)
             || $staticProxy instanceof JIT\Call\ExternalMethod;
         if ($needsRuntimeDispatch) {
+            // NestedJIT may lose HashTable userType on temps; prefer HT/Variable bridges
+            // before RuntimeIndirect — otherwise static helpers named `add` (e.g.
+            // OutputRewriteVarsJitHelper::add) pollute candidates and fail string lowering
+            // when compiling bin/compile.php (#23468).
+            if ($this->tryInitNestedVmHelperMethodCall($declaringClassLc, $methodLc, $receiverVar)) {
+                return;
+            }
             $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
             if ([] !== $runtimeCandidates) {
                 $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
@@ -16809,6 +16816,14 @@ class JIT {
         $candidates = [];
         foreach ($this->context->type->object->allClassNamesById() as $classId => $className) {
             $classLc = strtolower(ltrim($className, '\\'));
+            // Instance dispatch must not invoke static methods that share a short name
+            // (HashTable::add vs OutputRewriteVarsJitHelper::add) (#23468).
+            if ($this->context->type->object->hasMethod($classId, $methodLc)) {
+                $vis = $this->context->type->object->methodVisibility($classId, $methodLc);
+                if (0 !== ($vis & \PHPCfg\Func::FLAG_STATIC)) {
+                    continue;
+                }
+            }
             $proxyName = $this->resolveJitInstanceMethodProxyName($classLc, $methodLc);
             if (!$this->context->functionIsRegistered($proxyName)) {
                 continue;
