@@ -50,14 +50,14 @@ final class VmSoapClient
         $entry->isInternal = true;
 
         $pub = CfgFunc::FLAG_PUBLIC;
-        // php-src stub marks private; UPGRADING documents userland `$client->httpurl` / `$sdl` / `$typemap` reads (#23246/#23247/#23903).
+        // php-src stub marks private; UPGRADING / soap.stub.php userland reads (#23246/#23247/#23903/#23904).
         if (SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
             $nullProto = new Variable(Variable::TYPE_NULL);
             $have = [];
             foreach ($entry->properties as $prop) {
                 $have[$prop->name] = true;
             }
-            foreach (['httpurl', 'sdl', 'typemap'] as $propName) {
+            foreach (['httpurl', 'sdl', 'typemap', 'httpsocket'] as $propName) {
                 if (!isset($have[$propName])) {
                     $entry->properties[] = new ClassProperty(
                         $propName,
@@ -496,6 +496,7 @@ final class VmSoapClient
             }
         }
         // php-src php_http.c: attach Soap\Url on successful HTTP connect (#23246).
+        // httpsocket stays null while transport uses file_get_contents (no keep-alive php_stream) (#23904).
         self::attachHttpUrl($object, $location);
 
         return $body;
@@ -503,6 +504,7 @@ final class VmSoapClient
 
     /**
      * php-src php_http.c — Z_CLIENT_HTTPURL gets Soap\Url after successful stream connect (#23246).
+     * Z_CLIENT_HTTPSOCKET is declared on the client; live stream attach needs stream-based HTTP (#23904).
      */
     private static function attachHttpUrl(ObjectEntry $object, string $location): void
     {
