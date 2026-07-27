@@ -1576,13 +1576,17 @@ final class ReflectionSupport
      * Resolve a named function for ReflectionFunction::__construct (user or internal).
      *
      * php-src: ext/reflection/php_reflection.c — zend_lookup_internal_function()
+     *
+     * Symbols kept in the VM table for paren-call lowering but hidden from
+     * function_exists() (exit/die on the Zend 8.2 reference profile) must also
+     * fail Reflection — same as Zend (#23687, re-#14738 / #20575).
      */
     public static function resolveFunctionForReflection(Context $ctx, string $functionName): Func
     {
         $functionName = VmReflection::normalizeGlobalIntrospectionName($functionName);
         $lc = strtolower($functionName);
         $func = $ctx->functions[$lc] ?? null;
-        if (null === $func) {
+        if (null === $func || !VmReflection::isVisibleToFunctionExists($functionName)) {
             self::throwReflectionException(self::functionNotFoundMessage($functionName));
         }
 

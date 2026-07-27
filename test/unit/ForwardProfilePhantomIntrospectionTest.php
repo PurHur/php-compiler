@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\BuiltinIntrospectionPolicy;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPUnit\Framework\TestCase;
 
 /** Forward-profile callability vs reference introspection gates (#16086). */
@@ -551,6 +552,41 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $this->assertFalse(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'die')
             );
+
+            // ReflectionFunction must match function_exists — Zend ReflectionException (#23687).
+            foreach (['exit', 'die'] as $name) {
+                try {
+                    ReflectionSupport::resolveFunctionForReflection($ctx, $name);
+                    $this->fail('expected ReflectionException for '.$name);
+                } catch (\ReflectionException $e) {
+                    $this->assertSame('Function '.$name.'() does not exist', $e->getMessage());
+                }
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** PHP 8.4 profile: ReflectionFunction('exit'|'die') resolves with Zend status param (#23687). */
+    public function testExitDieReflectionVisibleOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsExitFunctionForm());
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['exit', 'die'] as $name) {
+                $func = ReflectionSupport::resolveFunctionForReflection($ctx, $name);
+                $this->assertNotNull($func);
+                $this->assertTrue(
+                    \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, $name)
+                );
+            }
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
