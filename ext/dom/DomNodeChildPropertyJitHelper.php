@@ -13,14 +13,14 @@ final class DomNodeChildPropertyJitHelper
     {
         VmDom::ensureFetchableNode($node);
 
-        return self::childArgv($node, true);
+        return self::retainChild(self::childArgv($node, true));
     }
 
     public static function lastChildArgv(ObjectEntry $node): ?ObjectEntry
     {
         VmDom::ensureFetchableNode($node);
 
-        return self::childArgv($node, false);
+        return self::retainChild(self::childArgv($node, false));
     }
 
     public static function firstChildByIdArgv(int $nodeId): ?ObjectEntry
@@ -74,7 +74,7 @@ final class DomNodeChildPropertyJitHelper
     {
         VmDom::ensureFetchableNode($node);
 
-        return self::siblingArgv($node, true);
+        return self::retainChild(self::siblingArgv($node, true));
     }
 
     /** Live previousSibling for detached/attached nodes (#19240). */
@@ -82,7 +82,22 @@ final class DomNodeChildPropertyJitHelper
     {
         VmDom::ensureFetchableNode($node);
 
-        return self::siblingArgv($node, false);
+        return self::retainChild(self::siblingArgv($node, false));
+    }
+
+    /**
+     * AOT/JIT property helpers hand out ObjectEntry* without going through VM ASSIGN, so
+     * retainUserHandleFromVariable never runs — count the hand-out as a user handle so
+     * textContent's php_libxml_node_free_list simulation can keep the first held child
+     * and invalidate later siblings (#23892 / #23817).
+     */
+    private static function retainChild(?ObjectEntry $child): ?ObjectEntry
+    {
+        if (null !== $child) {
+            VmDom::retainUserHandle($child);
+        }
+
+        return $child;
     }
 
     /** ParentNode::$firstElementChild (#19431). */

@@ -153,7 +153,12 @@ final class JitDomElementTextContent
         return true;
     }
 
-    /** Null parentNode on current children, install a single text stand-in child (#23251). */
+    /**
+     * Detach children like php_libxml_node_free_list (#23251, #23892).
+     *
+     * First held child keeps a null parentNode; later siblings are marked freed so
+     * property access raises dom_objects_not_found(). Then install a text stand-in.
+     */
     private static function emitUserScriptDetachAndReplace(
         Context $context,
         Value $receiver,
@@ -171,55 +176,56 @@ final class JitDomElementTextContent
             $objectType->defineProperty($elementClassId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
         }
 
-        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
-            // firstChild/lastChild are TYPE_VALUE slots holding __value__ boxes (#23251).
-            $childSlot = $objectType->propertySlotFor($receiver, 'DOMNode', $prop);
-            $slotPtr = $context->builder->load($childSlot);
-            $voidPtr = $context->getTypeFromString('void*');
-            $isNullSlot = $context->builder->icmp(
-                Builder::INT_EQ,
-                $slotPtr,
-                $voidPtr->constNull()
-            );
-            $detachBlock = BasicBlockHelper::append($context, 'dom_tc_detach_'.$prop);
-            $contBlock = BasicBlockHelper::append($context, 'dom_tc_cont_'.$prop);
-            $context->builder->branchIf($isNullSlot, $contBlock, $detachBlock);
-            $context->builder->positionAtEnd($detachBlock);
-            $valuePtr = $context->builder->pointerCast(
-                $slotPtr,
-                $context->getTypeFromString('__value__*')
-            );
-            $childObj = $context->builder->call(
-                $context->lookupFunction('__value__readObject'),
-                $valuePtr
-            );
-            $isNullObj = $context->builder->icmp(
-                Builder::INT_EQ,
-                $childObj,
-                $context->getTypeFromString('__object__*')->constNull()
-            );
-            $doDetach = BasicBlockHelper::append($context, 'dom_tc_do_detach_'.$prop);
-            $context->builder->branchIf($isNullObj, $contBlock, $doDetach);
-            $context->builder->positionAtEnd($doDetach);
-            $nullSlot = JitValueBox::alloc($context);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                JitValueBox::pointer($context, $nullSlot)
-            );
-            $nullVar = new JITVariable(
-                $context,
-                JITVariable::TYPE_VALUE,
-                JITVariable::KIND_VARIABLE,
-                $nullSlot
-            );
-            $objectType->propertyStore(
-                $objectType->propertySlotFor($childObj, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
-                $nullVar,
-                JITVariable::TYPE_VALUE
-            );
-            $context->builder->branch($contBlock);
-            $context->builder->positionAtEnd($contBlock);
-        }
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $firstObj = self::loadChildObjectFromSlot(
+            $context,
+            $objectType,
+            $receiver,
+            VmDom::PROP_FIRST_CHILD
+        );
+        $lastObj = self::loadChildObjectFromSlot(
+            $context,
+            $objectType,
+            $receiver,
+            VmDom::PROP_LAST_CHILD
+        );
+
+        // Null parentNode on firstChild (retained user handle).
+        $firstNull = $context->builder->icmp(Builder::INT_EQ, $firstObj, $objPtrTy->constNull());
+        $detachFirst = BasicBlockHelper::append($context, 'dom_tc_detach_first');
+        $afterFirst = BasicBlockHelper::append($context, 'dom_tc_after_first');
+        $context->builder->branchIf($firstNull, $afterFirst, $detachFirst);
+        $context->builder->positionAtEnd($detachFirst);
+        $nullSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $nullSlot)
+        );
+        $nullVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_VALUE,
+            JITVariable::KIND_VARIABLE,
+            $nullSlot
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($firstObj, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $nullVar,
+            JITVariable::TYPE_VALUE
+        );
+        $context->builder->branch($afterFirst);
+        $context->builder->positionAtEnd($afterFirst);
+
+        // Mark lastChild freed when it is a distinct sibling (#23892).
+        $lastNull = $context->builder->icmp(Builder::INT_EQ, $lastObj, $objPtrTy->constNull());
+        $sameAsFirst = $context->builder->icmp(Builder::INT_EQ, $lastObj, $firstObj);
+        $skipLast = $context->builder->or($lastNull, $sameAsFirst);
+        $markLast = BasicBlockHelper::append($context, 'dom_tc_mark_last_freed');
+        $afterLast = BasicBlockHelper::append($context, 'dom_tc_after_last');
+        $context->builder->branchIf($skipLast, $afterLast, $markLast);
+        $context->builder->positionAtEnd($markLast);
+        JitDomParentNodeProperty::markFreed($context, $lastObj);
+        $context->builder->branch($afterLast);
+        $context->builder->positionAtEnd($afterLast);
 
         $textNode = JitDomCreateTextNode::materialize($context);
         if (!$objectType->hasProperty($elementClassId, self::PROP_TEXT_CONTENT)) {
@@ -264,6 +270,42 @@ final class JitDomElementTextContent
             JITVariable::TYPE_VALUE
         );
         JitDomDocumentElement::storeChildNodesLength($context, $receiver, 1);
+    }
+
+    /** Load __object__* from a DOMNode firstChild/lastChild TYPE_VALUE slot (or null). */
+    private static function loadChildObjectFromSlot(
+        Context $context,
+        Object_ $objectType,
+        Value $receiver,
+        string $prop
+    ): Value {
+        $childSlot = $objectType->propertySlotFor($receiver, 'DOMNode', $prop);
+        $slotPtr = $context->builder->load($childSlot);
+        $voidPtr = $context->getTypeFromString('void*');
+        $objPtrTy = $context->getTypeFromString('__object__*');
+        $isNullSlot = $context->builder->icmp(Builder::INT_EQ, $slotPtr, $voidPtr->constNull());
+        $nullBlock = BasicBlockHelper::append($context, 'dom_tc_load_'.$prop.'_null');
+        $readBlock = BasicBlockHelper::append($context, 'dom_tc_load_'.$prop.'_read');
+        $merge = BasicBlockHelper::append($context, 'dom_tc_load_'.$prop.'_merge');
+        $context->builder->branchIf($isNullSlot, $nullBlock, $readBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($readBlock);
+        $valuePtr = $context->builder->pointerCast(
+            $slotPtr,
+            $context->getTypeFromString('__value__*')
+        );
+        $childObj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $valuePtr
+        );
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($merge);
+        $phi = $context->builder->phi($objPtrTy);
+        $phi->addIncoming($objPtrTy->constNull(), $nullBlock);
+        $phi->addIncoming($childObj, $readBlock);
+
+        return $phi;
     }
 
     public static function loadObjectFromReceiver(Context $context, JITVariable $receiver): Value
