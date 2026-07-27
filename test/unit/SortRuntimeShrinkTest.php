@@ -9,13 +9,19 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** sort()/rsort() JIT routes through SortJitHelper PHP not __hashtable__sortPacked LLVM (#12769, #13049, #17775). */
+/**
+ * sort()/rsort() SORT_REGULAR use LLVM `__hashtable__sortPacked*` (#24010);
+ * locale/natural still bridge SortJitHelper (#12769, #13049, #17775).
+ */
 final class SortRuntimeShrinkTest extends TestCase
 {
-    public function testSortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testSortRuntimeUsesLlvmPackedForRegularAndHelperForLocale(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SortRuntime.php');
+        $this->assertStringContainsString('__hashtable__sortPacked', $runtime);
+        $this->assertStringContainsString('__hashtable__sortPackedReverse', $runtime);
         $this->assertStringContainsString('SortJitHelper', $runtime);
+        $this->assertStringContainsString('sortPackedLocale', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPacked', $runtime);
         $this->assertStringContainsString('loadHashTable', $runtime);
@@ -35,10 +41,11 @@ final class SortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('#17775', $source);
     }
 
-    public function testHashtableTypeLlvmNoLongerRegistersSortPackedSymbols(): void
+    public function testHashtableTypeLlvmRegistersSortPackedSymbols(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/HashTable.php');
-        $this->assertStringNotContainsString('__hashtable__sortPacked', $source);
+        $this->assertStringContainsString('__hashtable__sortPacked', $source);
+        $this->assertStringContainsString('__hashtable__sortPackedReverse', $source);
         $this->assertStringNotContainsString('__hashtable__shufflePacked', $source);
     }
 

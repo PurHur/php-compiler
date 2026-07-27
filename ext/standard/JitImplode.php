@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for implode() — glue plus packed __hashtable__ of strings.
+ * LLVM JIT helper for implode() — glue plus packed __hashtable__ of scalars (#24010).
+ *
+ * Elements are coerced with strval() (php-src php_implode); do not assume __string__*.
  */
 
 namespace PHPCompiler\ext\standard;
@@ -11,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -31,6 +34,7 @@ final class JitImplode
         $zeroSize = $sizeT->constInt(0, false);
         $zeroI64 = $i64->constInt(0, false);
         $oneSize = $sizeT->constInt(1, false);
+        $strval = new strval();
 
         $mergeBlock = BasicBlockHelper::append($context, 'implode_merge_'.$tag);
         $emptyBlock = BasicBlockHelper::append($context, 'implode_empty_'.$tag);
@@ -43,7 +47,8 @@ final class JitImplode
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($workBlock);
-        $first = HashTableHelper::readStringAt($context, $haystack, $zeroSize);
+        $firstBox = HashTableHelper::readIndexedToValueBox($context, $haystack, $zeroSize);
+        $first = $strval->valueToString($context, JitValueBox::pointer($context, $firstBox->value));
         $resultSlot = $context->builder->alloca($strPtr, 1, 'implode_acc_'.$tag);
         $acc = $context->builder->call($context->lookupFunction('__string__separate'), $first);
         $context->builder->store($acc, $resultSlot);
@@ -64,7 +69,8 @@ final class JitImplode
         $context->builder->positionAtEnd($loopBody);
         $acc = $context->builder->load($resultSlot);
         $withGlue = JitStringConcat::concat($context, $acc, $glue);
-        $part = HashTableHelper::readStringAt($context, $haystack, $i);
+        $partBox = HashTableHelper::readIndexedToValueBox($context, $haystack, $i);
+        $part = $strval->valueToString($context, JitValueBox::pointer($context, $partBox->value));
         $acc = JitStringConcat::concat($context, $withGlue, $part);
         $context->builder->store($acc, $resultSlot);
         $context->builder->store(

@@ -721,45 +721,10 @@ final class VmIteratorForeach
         array $valueMap,
         \PHPLLVM\LLVMAbstract\Value\Function_ $fn
     ): void {
-        $i8 = $context->getTypeFromString('int8');
-        $typeByte = $context->builder->load($context->builder->structGep($entry, $valueMap['type']));
-        $stringBlock = $fn->appendBasicBlock('foreach_copy_string');
-        $objectBlock = $fn->appendBasicBlock('foreach_copy_object');
-        $longBlock = $fn->appendBasicBlock('foreach_copy_long');
-        $merge = $fn->appendBasicBlock('foreach_copy_merge');
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(JitVariable::TYPE_STRING, false)
-        );
-        $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(JitVariable::TYPE_OBJECT, false)
-        );
-        $afterString = $fn->appendBasicBlock('foreach_copy_after_string');
-        $context->builder->branchIf($isString, $stringBlock, $afterString);
-        $context->builder->positionAtEnd($stringBlock);
-        $str = $context->builder->call($context->lookupFunction('__value__readString'), $entry);
-        $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
-        $context->builder->call($context->lookupFunction('__value__writeString'), $destPtr, $str);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($afterString);
-        $afterObject = $fn->appendBasicBlock('foreach_copy_after_object');
-        $context->builder->branchIf($isObject, $objectBlock, $afterObject);
-        $context->builder->positionAtEnd($objectBlock);
-        $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $entry);
-        $context->builder->call($context->lookupFunction('__value__writeObject'), $destPtr, $obj);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($afterObject);
-        $context->builder->branch($longBlock);
-        $context->builder->positionAtEnd($longBlock);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $destPtr,
-            $context->builder->call($context->lookupFunction('__value__readLong'), $entry)
-        );
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
+        // Full __value__ copy (hashtable / double / bool / null / …). The previous
+        // string|object|long switch coerced nested arrays to long 0 — nested foreach
+        // and `$row[0]` after `foreach ($g as $row)` were wrong (#24010).
+        unset($valueMap, $fn);
+        JitValueBox::copyIntoPointer($context, $destPtr, $entry);
     }
 }
