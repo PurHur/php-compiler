@@ -2458,6 +2458,8 @@ final class VmDom
         if (null === $document) {
             DomExceptionConstants::raiseNotFound();
         }
+        // php-src php_set_attribute_id only sets atype + marks ids modified; it does not
+        // xmlAddID. getElementById then tree-walks connected nodes only (#23999 / bug 77686).
         self::unregisterElementId($document, $element);
         if ($isId) {
             $state->idAttributeName = $qName;
@@ -2465,6 +2467,7 @@ final class VmDom
         } else {
             $state->idAttributeName = null;
         }
+        self::syncElementIdMapProperty($document);
     }
 
     private static function findAttributeQNameByNsAndLocal(
@@ -2509,6 +2512,11 @@ final class VmDom
 
     private static function registerElementId(ObjectEntry $document, ObjectEntry $element): void
     {
+        // Detached nodes must not enter the document ID map (php-src getElementById walks
+        // the live tree / checks php_dom_is_node_connected; #23999, bug 77686).
+        if (!self::isConnected($element)) {
+            return;
+        }
         $nodeState = DomRegistry::state($element);
         $docState = DomRegistry::state($document);
         $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
@@ -4101,8 +4109,14 @@ final class VmDom
         if (null === $objectId) {
             return null;
         }
+        $entry = DomRegistry::entry($objectId);
+        // php-src ext/dom/document.c — refuse IDs whose element is not in the document tree
+        // (bug 77686 / php_dom_is_node_connected); #23999.
+        if (null === $entry || !self::isConnected($entry)) {
+            return null;
+        }
 
-        return DomRegistry::entry($objectId);
+        return $entry;
     }
 
     private static function reindexDocumentIds(ObjectEntry $document, ObjectEntry $root): void
