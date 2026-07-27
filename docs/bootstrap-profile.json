@@ -2684,6 +2684,7 @@
         "ext/standard/JitObListHandlers.php",
         "ext/standard/JitObStart.php",
         "ext/standard/JitObWriteStdoutKernel.php",
+        "ext/standard/JitOpenStreamHandles.php",
         "ext/standard/JitOpendir.php",
         "ext/standard/JitOpensslRandomPseudoBytes.php",
         "ext/standard/JitOrd.php",
@@ -6821,9 +6822,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6587,
+        "inventory_files": 6588,
         "excluded": 0,
-        "eligible": 6587,
+        "eligible": 6588,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
