@@ -1448,4 +1448,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($file, 'filename', 'simplexml_load_file'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($file, 'ns', 'simplexml_load_file'));
     }
+
+    /** @covers issue #23624 */
+    public function testXmlSetElementHandlerStubNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('xml_set_element_handler');
+        self::assertSame(['parser', 'start_handler', 'end_handler'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'parser', 'xml_set_element_handler'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'start_handler', 'xml_set_element_handler'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'end_handler', 'xml_set_element_handler'));
+        // Legacy InternalArgInfo names must not resolve (Zend rejects $shdl/$ehdl)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'shdl', 'xml_set_element_handler'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ehdl', 'xml_set_element_handler'));
+    }
 }

@@ -905,6 +905,9 @@ final class BuiltinParamNames
                 return ['writer', 'prefix', 'name', 'namespace'];
             case 'xmlwriter_write_element_ns':
                 return ['writer', 'prefix', 'name', 'namespace', 'content'];
+            // php-src ext/xml/xml.stub.php — InternalArgInfo still has shdl/ehdl (#23624)
+            case 'xml_set_element_handler':
+                return ['parser', 'start_handler', 'end_handler'];
             // php-src ext/simplexml/simplexml.stub.php — InternalArgInfo still has ns (#23455)
             case 'simplexml_load_string':
                 return ['data', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
