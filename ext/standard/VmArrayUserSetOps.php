@@ -319,25 +319,26 @@ final class VmArrayUserSetOps
     ): callable {
         $callback = $callback->resolveIndirect();
         VmArraySortCallback::requireCallback($callback, $fn, $argNum, null);
-        if (VmClosureCall::isClosure($callback)) {
-            if (null === $frame->vmContext) {
-                throw new \LogicException($fn.'() requires VM context in this compiler build');
-            }
-            $closure = VmClosureCall::resolve($callback);
-            $ctx = $frame->vmContext;
+        if (Variable::TYPE_STRING === $callback->type
+            && UsortCallbackPolicy::isVmSupportedName($callback->toString())
+        ) {
+            $compare = VmInternalCompare::resolveStringCallback($callback->toString());
 
-            return static fn (Variable $a, Variable $b): int => VmClosureCall::invokeTwoForUserCompare($ctx, $closure, $a, $b);
+            return static fn (Variable $a, Variable $b): int => VmInternalCompare::invoke($compare, $a, $b);
         }
-        if (Variable::TYPE_STRING === $callback->type) {
-            $name = $callback->toString();
-            if (UsortCallbackPolicy::isVmSupportedName($name)) {
-                $compare = VmInternalCompare::resolveStringCallback($name);
+        if (null === $frame->vmContext) {
+            throw new \LogicException($fn.'() requires VM context in this compiler build');
+        }
+        if (!VmCallable::isCallable($frame->vmContext, $callback, false, null, $frame)) {
+            throw new \TypeError(VmArraySortCallback::invalidCallbackTypeError($fn, $argNum));
+        }
+        $ctx = $frame->vmContext;
 
-                return static fn (Variable $a, Variable $b): int => VmInternalCompare::invoke($compare, $a, $b);
-            }
-        }
-        throw new \LogicException(
-            $fn.'() callback must be a closure or strcmp/strcasecmp in this compiler build'
+        return static fn (Variable $a, Variable $b): int => VmClosureCall::invokeVariableForUserCompare(
+            $ctx,
+            $callback,
+            $a,
+            $b
         );
     }
 
