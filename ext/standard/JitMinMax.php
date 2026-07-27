@@ -52,12 +52,23 @@ final class JitMinMax
         return true;
     }
 
+    /**
+     * True only for compile-time int-shaped operands.
+     *
+     * Do not treat bare {@see JitValueBox::isValueOperand} boxes as ints: script locals
+     * and array-dim fetches are TYPE_VALUE and may hold strings. Routing those through
+     * {@see JitLongArg::lower} coerces non-numeric strings to 0 (#23951). Known int
+     * immediates keep the long fast path via {@see JITVariable::$compileTimeLong}.
+     */
     private static function isPlainIntScalar(JITVariable $arg): bool
     {
+        if (null !== $arg->compileTimeLong) {
+            return true;
+        }
+
         return JITVariable::TYPE_NATIVE_LONG === $arg->type
             || JITVariable::TYPE_NATIVE_BOOL === $arg->type
-            || JITVariable::TYPE_NULL === $arg->type
-            || JitValueBox::isValueOperand($arg);
+            || JITVariable::TYPE_NULL === $arg->type;
     }
 
     /**
