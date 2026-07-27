@@ -1185,6 +1185,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'flags', 'fnmatch'));
     }
 
+    /** @covers issue #23491 */
+    public function testCrc32ZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('crc32');
+        self::assertSame(['string'], $names);
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('crc32'));
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'crc32'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'crc32'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'crc', 'crc32'));
+    }
+
     /** @covers issue #23206 */
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {
