@@ -13,6 +13,7 @@ class H {
     public string $c { get => $this->c; set => $this->c = $value; }
 }
 
+// Zend 8.4: omit virtual $a only; keep plain $b and same-name backed $c (#22493 / #23881).
 echo json_encode(get_class_vars(H::class)), "\n";
 echo array_key_exists('a', get_class_vars(H::class)) ? "a-yes\n" : "a-no\n";
 echo array_key_exists('b', get_class_vars(H::class)) ? "b-yes\n" : "b-no\n";

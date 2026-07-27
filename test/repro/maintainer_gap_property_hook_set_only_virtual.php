@@ -1,7 +1,7 @@
 <?php
 /**
  * PROFILE=8.4: set-only property hook must be backed (RFC), not virtual.
- * Zend stores the transformed value; VM throws "Must not write to virtual property".
+ * Zend stores the transformed value; expect get=ADA / after=BOB (#23881).
  */
 error_reporting(E_ALL);
 
