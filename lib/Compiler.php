@@ -2575,7 +2575,7 @@ class Compiler {
                         && $i + 1 < $opCount
                         && $this->isStaticPropertyFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
                     ) {
-                        // Lowered by compileExpr Empty_ via TYPE_EMPTY_STATIC_PROPERTY (#15112).
+                        // Lowered by compileExpr Empty_ via TYPE_EMPTY_STATIC_PROPERTY (#15112, #23983).
                         break;
                     } elseif (
                         (
@@ -11576,14 +11576,13 @@ class Compiler {
                 if (null !== $staticPropFetch) {
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                     [$classSlot, $nameSlot] = $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $block);
-                    $issetSlot = $this->compileBoolTemporary($block);
-                    $issetOp = $this->makeIssetOpCode($issetSlot, $classSlot, $nameSlot, false);
-                    $issetOp->issetOnStaticProperty = true;
 
-                    return [
-                        $issetOp,
-                        new OpCode(OpCode::TYPE_BOOLEAN_NOT, $resultSlot, $issetSlot, null),
-                    ];
+                    return [new OpCode(
+                        OpCode::TYPE_EMPTY_STATIC_PROPERTY,
+                        $resultSlot,
+                        $classSlot,
+                        $nameSlot
+                    )];
                 }
                 $dimFetch = null !== $emptyOperand
                     ? $this->findCoalesceArrayDimFetch($emptyOperand, $block)
@@ -14981,6 +14980,7 @@ class Compiler {
                 $op = $block->opCodes[$i];
                 if (OpCode::TYPE_EMPTY === $op->type
                     || OpCode::TYPE_EMPTY_OBJECT_PROPERTY === $op->type
+                    || OpCode::TYPE_EMPTY_STATIC_PROPERTY === $op->type
                     || OpCode::TYPE_EMPTY_DIMENSION === $op->type) {
                     return $op->arg1;
                 }
@@ -15002,6 +15002,7 @@ class Compiler {
             }
             if (OpCode::TYPE_EMPTY === $op->type
                 || OpCode::TYPE_EMPTY_OBJECT_PROPERTY === $op->type
+                || OpCode::TYPE_EMPTY_STATIC_PROPERTY === $op->type
                 || OpCode::TYPE_EMPTY_DIMENSION === $op->type) {
                 return true;
             }

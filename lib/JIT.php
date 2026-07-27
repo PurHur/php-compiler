@@ -8187,6 +8187,16 @@ class JIT {
                     );
                     $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult);
                     break;
+                case OpCode::TYPE_EMPTY_STATIC_PROPERTY:
+                    $classOp = $block->getOperand($op->arg2);
+                    $nameOp = $block->getOperand($op->arg3);
+                    $emptyResult = JIT\EmptyStaticPropertyHelper::compile(
+                        $this->context,
+                        $classOp,
+                        $nameOp
+                    );
+                    $this->assignOperandValue($block->getOperand($op->arg1), $emptyResult);
+                    break;
                 case OpCode::TYPE_EMPTY_DIMENSION:
                     $containerOp = $block->getOperand($op->arg2);
                     $dimOp = $block->getOperand($op->arg3);

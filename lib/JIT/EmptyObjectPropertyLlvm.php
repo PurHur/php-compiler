@@ -62,13 +62,14 @@ final class EmptyObjectPropertyLlvm
                 return self::compileEmptyFromFetchedValue($context, $hookValue);
             }
             $resolved = $object->resolvePropertySlot($class, $propName);
-            if (null !== $resolved && $object->propertySlotIsTypedValue($resolved[0], $resolved[1])) {
+            if (null !== $resolved) {
                 $fetched = $object->propertyFetch($objPtr, $class, $propName);
 
                 return self::compileEmptyFromFetchedValue($context, $fetched);
             }
         }
 
+        // Dynamic / magic: isset probe only when the slot is missing (empty ≡ !isset for absent props).
         $isset = IssetHelper::compile($context, $container, $dim, $dimOp, $containerOp);
 
         return $context->builder->not($isset);
