@@ -5876,7 +5876,9 @@ restart:
                         $frame = $catchFrame;
                         goto restart;
                     }
-                    $catchFrame = $this->enforceTypedStaticPropertyUnset($lcClass, $propNameRaw, $storage, $frame);
+                    // Zend zend_std_unset_static_property: Error for all statics (#23691), not only typed (#6648).
+                    // Raw writes inside property-hook methods may still clear backing storage.
+                    $catchFrame = $this->enforceStaticPropertyUnset($lcClass, $propNameRaw, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
                         goto restart;
@@ -12925,14 +12927,16 @@ restart:
         return $this->raiseVirtualPropertyHookUnsetError($className, $propName, $frame);
     }
 
-    /** Reject unset() on typed static properties (Zend zend_object_handlers.c, #6648). */
-    private function enforceTypedStaticPropertyUnset(
+    /**
+     * Reject unset() on static properties (Zend zend_std_unset_static_property).
+     * Typed (#6648) and untyped (#23691) both Error; hook raw-writes may clear backing.
+     */
+    private function enforceStaticPropertyUnset(
         string $classLc,
         string $propNameRaw,
-        Variable $storage,
         Frame $frame
     ): ?Frame {
-        if (!$storage->hasDeclaredTypeConstraint()) {
+        if ($this->isPropertyHookRawWrite($frame, $propNameRaw)) {
             return null;
         }
         $className = $this->context->classes[$classLc]->name ?? $classLc;

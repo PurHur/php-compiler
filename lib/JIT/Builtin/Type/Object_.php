@@ -5338,9 +5338,9 @@ class Object_ extends Type {
         }
     }
 
-    public function staticPropertyUnset(int $classId, string $name): void
+    public function staticPropertyUnset(int $classId, string $name, ?\PHPCompiler\JIT $jit = null): void
     {
-        ObjectStaticPropertyLlvm::unset($this, $classId, $name);
+        ObjectStaticPropertyLlvm::unset($this, $classId, $name, $jit);
     }
 
     /**
@@ -5473,9 +5473,9 @@ class Object_ extends Type {
     /**
      * Runtime static property name for unset (`unset(Class::$$name)`, issue #4597).
      */
-    public function staticPropertyUnsetDynamic(int $classId, Variable $nameVar): void
+    public function staticPropertyUnsetDynamic(int $classId, Variable $nameVar, ?\PHPCompiler\JIT $jit = null): void
     {
-        ObjectStaticPropertyLlvm::unsetDynamic($this, $classId, $nameVar);
+        ObjectStaticPropertyLlvm::unsetDynamic($this, $classId, $nameVar, $jit);
     }
 
     public function staticPropertyStore(
