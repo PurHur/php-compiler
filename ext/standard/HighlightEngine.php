@@ -17,7 +17,7 @@ final class HighlightEngine
     private const COLOR_DEFAULT = '#000000';
 
     /** Zend highlight_file() on unreadable path with $return=true (ext/standard/url.c, #12032). */
-    public const EMPTY_HIGHLIGHT_HTML = '<code><span style="color: #000000">'."\n".'</span>'."\n".'</code>';
+    public const EMPTY_HIGHLIGHT_HTML = '<pre><code style="color: '.self::COLOR_DEFAULT.'"></code></pre>';
 
     private const COLOR_KEYWORD = '#007700';
 
@@ -38,10 +38,9 @@ final class HighlightEngine
         }
         $tokens = LanguageScanner::tokenize($code);
         $body = self::renderTokens($tokens);
-        $body = \str_replace("\n", '<br />'."\n", $body);
 
-        // php-src ext/standard/php_highlight.h — outer wrapper newlines match Zend byte-for-byte (#10308).
-        return '<code><span style="color: '.self::COLOR_DEFAULT.'">'."\n".$body."\n".'</span>'."\n".'</code>';
+        // php-src ext/standard/php_highlight.h — Zend 8.4 <pre><code> wrapper, literal spaces (#23733, #10308).
+        return '<pre><code style="color: '.self::COLOR_DEFAULT.'">'.$body.'</code></pre>';
     }
 
     /**
@@ -145,13 +144,7 @@ final class HighlightEngine
 
     private static function escapeAndFormat(string $text): string
     {
-        $escaped = \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
-        $escaped = \str_replace(' ', '&nbsp;', $escaped);
-        $escaped = \str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $escaped);
-        // php-src ext/standard/php_highlight.h — line breaks inside spans become <br /> (#17557).
-        $escaped = \str_replace("\n", '<br />', $escaped);
-
-        return $escaped;
+        return \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
     }
 
     /** @return array<string, int> */

@@ -21,7 +21,9 @@ final class AssertFail
 {
     private const DEFAULT_MSG = 'assert(): assert(false) failed';
 
-    private const PREFIX = 'Assertion failed: ';
+    private const WARNING_PREFIX = 'assert(): ';
+
+    private const WARNING_SUFFIX = ' failed';
 
     public static function ensureLinked(Context $context): void
     {
@@ -86,10 +88,10 @@ final class AssertFail
         $defaultLen = $sizeT->constInt(\strlen(self::DEFAULT_MSG), false);
 
         $context->builder->positionAtEnd($defaultBb);
-        self::emitFailWithMessage($context, $fn, $defaultMsgPtr, $defaultLen, $doneBb);
+        self::emitFailWithMessage($context, $fn, $defaultMsgPtr, $defaultLen, $doneBb, false);
 
         $context->builder->positionAtEnd($customBb);
-        self::emitFailWithMessage($context, $fn, $message, $len, $doneBb);
+        self::emitFailWithMessage($context, $fn, $message, $len, $doneBb, true);
 
         $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
@@ -101,7 +103,8 @@ final class AssertFail
         Value $fn,
         Value $msgPtr,
         Value $msgLen,
-        BasicBlock $doneBb
+        BasicBlock $doneBb,
+        bool $formatWarning
     ): void {
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
@@ -120,13 +123,76 @@ final class AssertFail
         $context->builder->branch($doneBb);
 
         $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $level = $i32->constInt(ErrorReporter::E_USER_WARNING, false);
+        $level = $i32->constInt(ErrorReporter::E_WARNING, false);
         $zeroLine = $i32->constInt(0, false);
         $trigger = $context->lookupFunction('__compiler_trigger_error');
 
         $context->builder->positionAtEnd($warningBb);
-        $context->builder->call($trigger, $msgPtr, $msgLen, $level, $emptyFile, $zeroLine);
+        if ($formatWarning) {
+            [$warningPtr, $warningLen] = self::buildWarningMessage($context, $fn, $msgPtr, $msgLen);
+            $context->builder->call($trigger, $warningPtr, $warningLen, $level, $emptyFile, $zeroLine);
+        } else {
+            $context->builder->call($trigger, $msgPtr, $msgLen, $level, $emptyFile, $zeroLine);
+        }
         $context->builder->branch($doneBb);
+    }
+
+    /**
+     * @return array{0: Value, 1: Value} warning cstr pointer and length
+     */
+    private static function buildWarningMessage(
+        Context $context,
+        Value $fn,
+        Value $descPtr,
+        Value $descLen
+    ): array {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        $buf = $context->builder->alloca($i8->arrayType(4096), 1, 'assert_warn_msg');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+
+        $prefixLen = \strlen(self::WARNING_PREFIX);
+        $prefixPtr = $context->builder->pointerCast(
+            $context->constantFromString(self::WARNING_PREFIX),
+            $i8p
+        );
+        $context->intrinsic->memcpy(
+            $bufPtr,
+            $prefixPtr,
+            $sizeT->constInt($prefixLen, false),
+            false
+        );
+
+        $descLenCast = $context->builder->trunc($descLen, $sizeT);
+        $destOff = $context->builder->inBoundsGEP($bufPtr, $sizeT->constInt($prefixLen, false));
+        $context->intrinsic->memcpy($destOff, $descPtr, $descLenCast, false);
+
+        $suffixLen = \strlen(self::WARNING_SUFFIX);
+        $suffixPtr = $context->builder->pointerCast(
+            $context->constantFromString(self::WARNING_SUFFIX),
+            $i8p
+        );
+        $afterDesc = $context->builder->add(
+            $sizeT->constInt($prefixLen, false),
+            $descLenCast
+        );
+        $suffixOff = $context->builder->inBoundsGEP($bufPtr, $afterDesc);
+        $context->intrinsic->memcpy(
+            $suffixOff,
+            $suffixPtr,
+            $sizeT->constInt($suffixLen, false),
+            false
+        );
+        $totalLen = $context->builder->add(
+            $afterDesc,
+            $sizeT->constInt($suffixLen, false)
+        );
+        $termPtr = $context->builder->inBoundsGEP($bufPtr, $totalLen);
+        $context->builder->store($i8->constInt(0, false), $termPtr);
+
+        return [$bufPtr, $totalLen];
     }
 
     private static function implementAssertFailString(Context $context, Value $fn): void
@@ -142,9 +208,9 @@ final class AssertFail
         $buf = $context->builder->alloca($i8->arrayType(4096), 1, 'assert_msg');
         $bufPtr = $context->builder->pointerCast($buf, $i8p);
 
-        $prefixLen = \strlen(self::PREFIX);
+        $prefixLen = \strlen(self::WARNING_PREFIX);
         $prefixPtr = $context->builder->pointerCast(
-            $context->constantFromString(self::PREFIX),
+            $context->constantFromString(self::WARNING_PREFIX),
             $i8p
         );
         $context->intrinsic->memcpy(
@@ -161,7 +227,7 @@ final class AssertFail
             $i8p
         );
 
-        $maxDesc = $context->constantFromInteger(4096 - $prefixLen - 2, 'size_t');
+        $maxDesc = $context->constantFromInteger(4096 - $prefixLen - \strlen(self::WARNING_SUFFIX) - 2, 'size_t');
         $descLenCast = $context->builder->trunc($descLen, $sizeT);
         $tooLong = $context->builder->icmp(Builder::INT_UGE, $descLenCast, $maxDesc);
 
@@ -179,9 +245,25 @@ final class AssertFail
         $copyLenPhi->addIncoming($maxDesc, $clampBb);
         $destOff = $context->builder->inBoundsGEP($bufPtr, $sizeT->constInt($prefixLen, false));
         $context->intrinsic->memcpy($destOff, $descPtr, $copyLenPhi, false);
-        $totalLen = $context->builder->add(
+        $afterDesc = $context->builder->add(
             $sizeT->constInt($prefixLen, false),
             $copyLenPhi
+        );
+        $suffixLen = \strlen(self::WARNING_SUFFIX);
+        $suffixPtr = $context->builder->pointerCast(
+            $context->constantFromString(self::WARNING_SUFFIX),
+            $i8p
+        );
+        $suffixOff = $context->builder->inBoundsGEP($bufPtr, $afterDesc);
+        $context->intrinsic->memcpy(
+            $suffixOff,
+            $suffixPtr,
+            $sizeT->constInt($suffixLen, false),
+            false
+        );
+        $totalLen = $context->builder->add(
+            $afterDesc,
+            $sizeT->constInt($suffixLen, false)
         );
         $termPtr = $context->builder->inBoundsGEP($bufPtr, $totalLen);
         $context->builder->store($i8->constInt(0, false), $termPtr);
@@ -195,21 +277,21 @@ final class AssertFail
         $context->builder->branchIf($exceptionOn, $exceptionBb, $warningBb);
 
         $context->builder->positionAtEnd($exceptionBb);
-        $descLen = $context->builder->sub($totalLen, $sizeT->constInt($prefixLen, false));
-        $descPtr = $context->builder->inBoundsGEP($bufPtr, $sizeT->constInt($prefixLen, false));
+        $descBodyPtr = $context->builder->inBoundsGEP($bufPtr, $sizeT->constInt($prefixLen, false));
         $context->builder->call(
             $context->lookupFunction('__compiler_jit_raise_assertion_error'),
-            $descPtr,
-            $descLen
+            $descBodyPtr,
+            $copyLenPhi
         );
         $context->builder->branch($afterFailBb);
 
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $level = $context->getTypeFromString('int32')->constInt(ErrorReporter::E_WARNING, false);
+        $zeroLine = $context->getTypeFromString('int32')->constInt(0, false);
+        $trigger = $context->lookupFunction('__compiler_trigger_error');
+
         $context->builder->positionAtEnd($warningBb);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_assert_fail'),
-            $bufPtr,
-            $totalLen
-        );
+        $context->builder->call($trigger, $bufPtr, $totalLen, $level, $emptyFile, $zeroLine);
         $context->builder->branch($afterFailBb);
 
         $context->builder->positionAtEnd($afterFailBb);
