@@ -28,9 +28,7 @@ final class rsort_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('rsort() requires one or two arguments');
-        }
+        VmArraySort::assertFlagSortArgCount($argc, 'rsort');
         $array = $frame->calledArgs[0]->resolveIndirect();
         $ht = VmArray::requireArray($frame->calledArgs[0], 'rsort');
         $flags = StdlibConstants::SORT_REGULAR;
@@ -110,7 +108,14 @@ final class rsort_ extends Internal
     {
         $argc = \count($args);
         if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('rsort() requires one or two arguments');
+            \PHPCompiler\JIT\ExceptionBridge::emitArgumentCountErrorAndAbort(
+                $context,
+                $argc < 1
+                    ? \sprintf('rsort() expects at least 1 argument, %d given', $argc)
+                    : \sprintf('rsort() expects at most 2 arguments, %d given', $argc)
+            );
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'rsort');
         if (1 === $argc) {
