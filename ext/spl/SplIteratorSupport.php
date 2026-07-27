@@ -121,6 +121,40 @@ final class SplIteratorSupport
     }
 
     /**
+     * ArrayIterator / RecursiveArrayIterator::__construct(array|object $array, int $flags = 0).
+     *
+     * php-src spl_array_set_array (#23886): arrays are copied; ArrayObject/ArrayIterator
+     * share the live backing table (SPL_ARRAY_USE_OTHER); plain objects materialize
+     * public/dynamic properties. Zend TypeError text still says "array" (param name).
+     *
+     * @return array{0: \PHPCompiler\VM\HashTable, 1: int} table + effective flags
+     */
+    public static function requireArrayOrObjectConstructArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        int $userFlags,
+        bool $inheritFlagsFromOther
+    ): array {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $resolved->type) {
+            return [$resolved->toArray()->duplicate(), $userFlags];
+        }
+        if (Variable::TYPE_OBJECT === $resolved->type) {
+            return SplArrayStorage::storageFromConstructObject(
+                $resolved->toObject(),
+                $userFlags,
+                $inheritFlagsFromOther
+            );
+        }
+
+        throw new \TypeError(
+            $function.'(): Argument #'.$argIndex.' ($array) must be of type array, '
+            .self::typeLabel($resolved).' given'
+        );
+    }
+
+    /**
      * Strong roots for ObjectEntry pointers held in SPL sidecars (#6138).
      *
      * Frame teardown uses {@see \PHPCompiler\VM\ObjectLifetime::releaseDirectObject}, which

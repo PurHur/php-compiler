@@ -128,31 +128,19 @@ final class RecursiveArrayIteratorBuiltin
                 return $var;
             }
 
-            return self::createFromTable($ctx, self::hashTableFromObject($childObj), $flags);
+            // Child object: copy storage snapshot for the new RecursiveArrayIterator (#22321).
+            if (SplArrayStorage::hasState($childObj)) {
+                return self::createFromTable($ctx, SplArrayStorage::getArrayCopy($childObj), $flags);
+            }
+
+            return self::createFromTable(
+                $ctx,
+                SplArrayStorage::hashTableFromObjectProperties($childObj),
+                $flags
+            );
         }
 
         return self::createFromTable($ctx, $current->toArray(), $flags);
-    }
-
-    /** @see php-src ArrayIterator::__construct(array|object) property/storage materialization */
-    private static function hashTableFromObject(ObjectEntry $object): HashTable
-    {
-        if (SplArrayStorage::hasState($object)) {
-            return SplArrayStorage::getArrayCopy($object);
-        }
-        $table = new HashTable();
-        foreach ($object->propertiesWithNames() as $name => $prop) {
-            $copy = new Variable();
-            $copy->copyFrom($prop->resolveIndirect());
-            $intKey = HashTable::tryIntFromNumericString((string) $name);
-            if (null !== $intKey) {
-                $table->addIndex($intKey, $copy);
-            } else {
-                $table->add((string) $name, $copy);
-            }
-        }
-
-        return $table;
     }
 
     private static function objectIsA(Context $ctx, ObjectEntry $object, string $rootClassLc): bool
@@ -204,16 +192,20 @@ final class RecursiveArrayIteratorConstruct extends VmClassMethod
             'RecursiveArrayIterator::__construct()'
         );
         $table = new HashTable();
+        $flags = 0;
+        $hasFlagsArg = isset($frame->calledArgs[2]);
+        if ($hasFlagsArg) {
+            $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
+        }
         if (isset($frame->calledArgs[1])) {
-            $table = SplIteratorSupport::requireArrayArg(
+            // php-src spl_array_set_array — array|object (#23886); just_array when flags omitted.
+            [$table, $flags] = SplIteratorSupport::requireArrayOrObjectConstructArg(
                 $frame->calledArgs[1],
                 'RecursiveArrayIterator::__construct',
-                1
-            )->duplicate();
-        }
-        $flags = 0;
-        if (isset($frame->calledArgs[2])) {
-            $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
+                1,
+                $flags,
+                !$hasFlagsArg
+            );
         }
         RecursiveArrayIteratorBuiltin::init($object, $table, $flags);
     }

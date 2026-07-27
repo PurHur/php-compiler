@@ -199,17 +199,21 @@ final class ArrayIteratorConstruct extends VmClassMethod
             'ArrayIterator::__construct()'
         );
         $table = new HashTable();
+        $flags = 0;
+        $hasFlagsArg = isset($frame->calledArgs[2]);
+        if ($hasFlagsArg) {
+            $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
+        }
         if (isset($frame->calledArgs[1])) {
-            // php-src spl_array_object_new_ex copies the input hashtable (#22020).
-            $table = SplIteratorSupport::requireArrayArg(
+            // php-src spl_array_set_array — array copy (#22020); object|ArrayObject share (#23886).
+            // just_array=(ZEND_NUM_ARGS()==1): inherit flags from ArrayObject when flags omitted.
+            [$table, $flags] = SplIteratorSupport::requireArrayOrObjectConstructArg(
                 $frame->calledArgs[1],
                 'ArrayIterator::__construct',
-                1
-            )->duplicate();
-        }
-        $flags = 0;
-        if (isset($frame->calledArgs[2])) {
-            $flags = $frame->calledArgs[2]->resolveIndirect()->toInt();
+                1,
+                $flags,
+                !$hasFlagsArg
+            );
         }
         SplArrayStorage::init($object, $table, $flags);
     }
