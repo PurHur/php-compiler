@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_map() JIT routes null/string-builtin/closure through ArrayMapJitHelper PHP not ArrayBuiltinHelper LLVM (#10183, #14977, #18328, #18364). */
+/** array_map(): closures via ArrayMapJitHelper NestedJIT; null/string builtins via ArrayMapLlvm (#10183, #14977, #18328, #23974). */
 final class ArrayMapRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 1920;
@@ -18,6 +18,7 @@ final class ArrayMapRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayMapRuntime.php');
         $this->assertStringContainsString('ArrayMapJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayMapLlvm', $runtime);
         $this->assertStringContainsString('mapWithClosure', $runtime);
         $this->assertStringContainsString('mapWithClosureMultiple', $runtime);
         $this->assertStringContainsString('mapNullZipMultiple', $runtime);
@@ -26,11 +27,17 @@ final class ArrayMapRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildMapArray(', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayMapLlvm.php');
+        $this->assertStringContainsString('mapNull', $llvm);
+        $this->assertStringContainsString('mapBuiltin', $llvm);
+        $this->assertStringContainsString('strtoupper', $llvm);
+
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayMapJitHelper.php');
         $this->assertStringContainsString('mapWithClosure', $helper);
         $this->assertStringContainsString('mapWithClosureMultiple', $helper);
         $this->assertStringContainsString('mapNullZipMultiple', $helper);
         $this->assertStringContainsString('VmClosureCall', $helper);
+        $this->assertStringContainsString('exportKeyValuePairs', $helper);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_map.php');
         $this->assertStringContainsString('ArrayMapRuntime::mapSingle', $builtin);

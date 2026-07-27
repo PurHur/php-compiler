@@ -13,11 +13,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -169,20 +169,11 @@ final class implode extends Internal
             'array',
             $glueAndArrayForm ? '?array' : 'array'
         );
-        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
-            return $context->helper->loadValue($arg);
-        }
-        if (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
-            return HashTableHelper::materializeNativeArrayForCall($context, $arg);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readHashtable'),
-                JitValueBox::pointer($context, $arg->value)
-            );
-        }
 
-        return $context->getTypeFromString('__hashtable__*')->constNull();
+        // Use the shared array-operand loader — KIND_VARIABLE locals are often value-boxed
+        // hashtables; helper->loadValue alone passes a garbage __hashtable__* into JitImplode
+        // and segfaults in __hashtable__getNumElements (#23974 e23).
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     /**

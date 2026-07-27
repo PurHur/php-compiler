@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\ArrayMapLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -18,7 +19,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_map() via ArrayMapJitHelper PHP (#10183, #14977).
  *
- * Standalone AOT compiles {@see ArrayMapJitHelper} via nested JIT bridges (#14277); closure callbacks route through PHP (#14977).
+ * Null / compile-time string builtins lower via {@see ArrayMapLlvm} (thin standalone AOT;
+ * NestedJIT of the helper body segfaults — #23974). Closures still use NestedJIT bridges (#14977).
  * SSOT: {@see \PHPCompiler\ext\standard\array_map}
  * php-src: ext/standard/array.c — php_array_map()
  */
@@ -72,21 +74,16 @@ final class ArrayMapRuntime
             return self::callMapClosure($context, $ht, $callback);
         }
 
-        self::ensureLinked($context);
         $ht = self::argToHashtable($context, $array);
         if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
-            return self::callMapNull($context, $ht);
+            return ArrayMapLlvm::mapNull($context, $ht);
         }
         $name = $callback->compileTimeString;
         if (null === $name) {
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
 
-        return self::callMapBuiltin(
-            $context,
-            $ht,
-            $context->builder->load($context->constantStringFromString($name))
-        );
+        return ArrayMapLlvm::mapBuiltin($context, $ht, $name);
     }
 
     /**
