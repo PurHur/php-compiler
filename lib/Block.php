@@ -1343,6 +1343,29 @@ class Block {
                 continue;
             }
             if (null !== $frame && 'this' === self::resolveVariableName($op)) {
+                // Entering a closure from another function must not treat the caller's
+                // method calledArgs[0] as $this (Zend zend_closures.c; #23704). Only
+                // auto-bind / bindTo (pendingClosureInvoke / closureCall) may supply it.
+                $enteringFromOtherFunc = null === $this->func
+                    || null === $frame->block
+                    || null === $frame->block->func
+                    || $frame->block->func !== $this->func;
+                $isClosureCallee = null !== $this->func
+                    && ((($this->func->flags ?? 0) & Func::FLAG_CLOSURE) !== 0);
+                if ($enteringFromOtherFunc && $isClosureCallee) {
+                    $isStaticClosure = ((($this->func->flags ?? 0) & Func::FLAG_STATIC) !== 0);
+                    $boundThis = $isStaticClosure ? null : self::resolveBoundClosureThis($frame);
+                    if (null !== $boundThis) {
+                        $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
+                        if (VM\EnumCaseSupport::isEnumCaseVariable($boundThis)) {
+                            $boundThis = VM\EnumCaseSupport::materializeConstantValue($context, $boundThis);
+                        }
+                        $scope[$pos]->copyFrom($boundThis);
+                        continue;
+                    }
+                    $scope[$pos] = new Variable(Variable::TYPE_UNDEFINED);
+                    continue;
+                }
                 if (!empty($frame->callArgs)) {
                     $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
                     $scope[$pos]->copyFrom($frame->callArgs[0]);

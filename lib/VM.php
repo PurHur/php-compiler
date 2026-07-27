@@ -9025,6 +9025,10 @@ restart:
         if (null === $func) {
             return false;
         }
+        // Static methods and static closures never have $this (zend_closures.c / #23704).
+        if ((($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return true;
+        }
         if (null === $func->class) {
             // Top-level / global arrow fn `fn() => $this` — no lexical $this (#10558, zend_closures.c).
             if (((int) ($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0) {
@@ -9032,9 +9036,6 @@ restart:
             }
 
             return false;
-        }
-        if ((($func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
-            return true;
         }
 
         return !isset($frame->scope[$thisIdx]);
