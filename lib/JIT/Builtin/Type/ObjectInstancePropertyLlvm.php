@@ -27,6 +27,9 @@ final class ObjectInstancePropertyLlvm
         if (\PHPCompiler\ext\dom\JitDomNodeChildProperty::isDomNodeChildProperty($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomNodeChildProperty::fetch($object, $obj, $name);
         }
+        if (\PHPCompiler\ext\dom\JitDomParentNodeProperty::isDomParentNodeProperty($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomParentNodeProperty::fetch($object, $obj);
+        }
         if (\PHPCompiler\ext\dom\JitDomNodeIsConnected::isDomNodeIsConnected($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomNodeIsConnected::fetch($object, $obj);
         }
