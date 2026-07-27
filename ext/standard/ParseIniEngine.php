@@ -93,7 +93,7 @@ final class ParseIniEngine
                 return false;
             }
             $rawValue = substr($line, $eq + 1);
-            $parsedValue = self::parseValueFromLines($lines, $lineNo, $rawValue);
+            $parsedValue = self::parseValueFromLines($lines, $lineNo, $rawValue, $scannerMode);
             if (false === $parsedValue) {
                 if (null === self::$lastSyntaxError) {
                     self::setSyntaxError($lineNo + 1, "unexpected '='");
@@ -209,7 +209,7 @@ final class ParseIniEngine
      *
      * @return string|false
      */
-    private static function parseValueFromLines(array $lines, int &$lineNo, string $raw): string|false
+    private static function parseValueFromLines(array $lines, int &$lineNo, string $raw, int $scannerMode): string|false
     {
         $raw = self::trimWs($raw);
         if ('' === $raw) {
@@ -226,10 +226,10 @@ final class ParseIniEngine
                 $combined .= "\n".$lines[$lineNo];
             }
 
-            return self::parseDoubleQuoted(self::trimWs($combined));
+            return self::parseDoubleQuoted(self::trimWs($combined), $scannerMode);
         }
 
-        return self::parseValue($raw);
+        return self::parseValue($raw, $scannerMode);
     }
 
     private static function doubleQuotedIsComplete(string $raw): bool
@@ -255,7 +255,7 @@ final class ParseIniEngine
     /**
      * @return string|false
      */
-    private static function parseValue(string $raw): string|false
+    private static function parseValue(string $raw, int $scannerMode): string|false
     {
         $raw = self::trimWs($raw);
         if ('' === $raw) {
@@ -263,7 +263,7 @@ final class ParseIniEngine
         }
         $first = $raw[0];
         if ('"' === $first) {
-            return self::parseDoubleQuoted($raw);
+            return self::parseDoubleQuoted($raw, $scannerMode);
         }
         if ("'" === $first) {
             return self::parseSingleQuoted($raw);
@@ -284,7 +284,7 @@ final class ParseIniEngine
     /**
      * @return string|false
      */
-    private static function parseDoubleQuoted(string $raw): string|false
+    private static function parseDoubleQuoted(string $raw, int $scannerMode): string|false
     {
         if (!str_ends_with($raw, '"') || 1 === strlen($raw)) {
             return false;
@@ -292,13 +292,15 @@ final class ParseIniEngine
         $inner = substr($raw, 1, -1);
         $out = '';
         $len = strlen($inner);
+        // ZEND_INI_SCANNER_RAW skips ${ENV} expansion (php-src zend_ini_scanner.l / #23563).
+        $expandEnv = self::SCANNER_RAW !== $scannerMode;
         for ($i = 0; $i < $len; ++$i) {
             $ch = $inner[$i];
             if ('\\' === $ch && $i + 1 < $len) {
                 $out .= $inner[++$i];
                 continue;
             }
-            if ('$' === $ch && $i + 1 < $len && '{' === $inner[$i + 1]) {
+            if ($expandEnv && '$' === $ch && $i + 1 < $len && '{' === $inner[$i + 1]) {
                 $expanded = self::expandEnvInterpolation($inner, $i);
                 if (null === $expanded) {
                     $out .= '$';
@@ -316,7 +318,8 @@ final class ParseIniEngine
     }
 
     /**
-     * php-src ext/standard/ini.c — ${ENV} substitution in double-quoted INI values.
+     * php-src ext/standard/ini.c — ${ENV} substitution in double-quoted INI values
+     * under NORMAL/TYPED (not RAW — #23563).
      *
      * @return array{0: string, 1: int}|null
      */
