@@ -1002,6 +1002,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', 'strtr'));
     }
 
+    /** @covers issue #23273 */
+    public function testStripslashesQuotedPrintableZendStubNamedParams(): void
+    {
+        foreach (['stripslashes', 'quoted_printable_encode', 'quoted_printable_decode'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str', $fn));
+        }
+    }
+
     /** @covers issue #23217 */
     public function testStripTagsZendStubNamedParams(): void
     {
