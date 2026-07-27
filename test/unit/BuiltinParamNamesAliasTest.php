@@ -1462,6 +1462,33 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['writer', 'flush='], BuiltinParamNames::forFunction('xmlwriter_output_memory'));
     }
 
+    /** @covers issue #23410 */
+    public function testFinfoBufferFileStubNamedParamsResolve(): void
+    {
+        $buffer = BuiltinParamNames::forClassMethod('finfo::buffer');
+        self::assertSame(['string', 'flags=', 'context='], $buffer);
+        self::assertSame(
+            ['string', 'flags=', 'context='],
+            BuiltinParamNames::paramNamesForInternalFunction('finfo::buffer')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($buffer, 'string', 'finfo::buffer'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($buffer, 'flags', 'finfo::buffer'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('finfo', 'buffer'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalMethod('finfo', 'buffer'));
+
+        $file = BuiltinParamNames::forClassMethod('finfo::file');
+        self::assertSame(['filename', 'flags=', 'context='], $file);
+        self::assertSame(
+            ['filename', 'flags=', 'context='],
+            BuiltinParamNames::paramNamesForInternalFunction('finfo::file')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($file, 'filename', 'finfo::file'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('finfo', 'file'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalMethod('finfo', 'file'));
+
+        self::assertSame(['flags'], BuiltinParamNames::forClassMethod('finfo::set_flags'));
+    }
+
     /** @covers issue #23409 */
     public function testNumberFormatterCurrencyStubNamedParamsResolve(): void
     {
