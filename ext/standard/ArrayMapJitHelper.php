@@ -13,13 +13,17 @@ use PHPCompiler\Web\Superglobals;
  *
  * SSOT: {@see array_map} VM execute path
  * php-src: ext/standard/array.c — php_array_map()
+ *
+ * NestedJIT: use exportKeyValuePairs, not iterateKeyed (#12908 / #23974) — iterateKeyed
+ * returns Traversable while NestedJIT materializes a pair-list hashtable; foreach on the
+ * Traversable shape segfaults under thin standalone AOT.
  */
 final class ArrayMapJitHelper
 {
     public static function mapNullIdentity(HashTable $src): HashTable
     {
         $out = new HashTable();
-        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+        foreach ($src->exportKeyValuePairs(true) as [$key, $value]) {
             $copy = new Variable();
             $copy->copyFrom($value);
             self::appendKeyed($out, $key, $copy);
@@ -32,7 +36,7 @@ final class ArrayMapJitHelper
     {
         $fn = VmInternalCall::resolveStringCallback($builtinName);
         $out = new HashTable();
-        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+        foreach ($src->exportKeyValuePairs(true) as [$key, $value]) {
             $mapped = VmInternalCall::invoke($fn, $value);
             self::appendKeyed($out, $key, $mapped);
         }
@@ -63,7 +67,7 @@ final class ArrayMapJitHelper
         }
         $closureState = VmClosureCall::resolve($closure);
         $out = new HashTable();
-        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+        foreach ($src->exportKeyValuePairs(true) as [$key, $value]) {
             $mapped = VmClosureCall::invokeOne($ctx, $closureState, $value);
             self::appendKeyed($out, $key, $mapped);
         }
@@ -101,7 +105,7 @@ final class ArrayMapJitHelper
         $out = new HashTable();
         $first = $sources[0];
         $destIdx = 0;
-        foreach ($first->iterateKeyed(true) as [$key, $_value]) {
+        foreach ($first->exportKeyValuePairs(true) as [$key, $_value]) {
             $rowArgs = [];
             foreach ($sources as $ht) {
                 $rowArgs[] = self::valueAtKey($ht, $key);
@@ -136,7 +140,7 @@ final class ArrayMapJitHelper
         $out = new HashTable();
         $first = $sources[0];
         $destIdx = 0;
-        foreach ($first->iterateKeyed(true) as [$key, $_value]) {
+        foreach ($first->exportKeyValuePairs(true) as [$key, $_value]) {
             $rowArgs = [];
             foreach ($sources as $ht) {
                 $rowArgs[] = self::valueAtKey($ht, $key);
@@ -174,7 +178,7 @@ final class ArrayMapJitHelper
         $out = new HashTable();
         $first = $sources[0];
         $destIdx = 0;
-        foreach ($first->iterateKeyed(true) as [$key, $_value]) {
+        foreach ($first->exportKeyValuePairs(true) as [$key, $_value]) {
             $rowArgs = [];
             foreach ($sources as $ht) {
                 $rowArgs[] = self::valueAtKey($ht, $key);
