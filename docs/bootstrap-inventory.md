@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6587 |
-| Phase A inventory files (M2 ratio SSOT) | 6587 |
+| PHP files on vm.php path | 6588 |
+| Phase A inventory files (M2 ratio SSOT) | 6588 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21300 |
+| Source constructs flagged (warnings) | 21301 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2641,6 +2641,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitObListHandlers.php` | 0 | 1 |
 | `ext/standard/JitObStart.php` | 0 | 1 |
 | `ext/standard/JitObWriteStdoutKernel.php` | 0 | 1 |
+| `ext/standard/JitOpenStreamHandles.php` | 0 | 1 |
 | `ext/standard/JitOpendir.php` | 0 | 1 |
 | `ext/standard/JitOpensslRandomPseudoBytes.php` | 0 | 1 |
 | `ext/standard/JitOrd.php` | 0 | 1 |
@@ -27094,6 +27095,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitOpenStreamHandles.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `ext/standard/JitOpendir.php`
 
 **Warnings** (review for bootstrap subset):
@@ -41321,8 +41327,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1329)
-- new ArgumentCountError (line 1340)
+- new ArgumentCountError (line 1332)
+- new ArgumentCountError (line 1343)
 - 18 class method(s)
 - 1 closure(s)
 
@@ -42464,39 +42470,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 14861)
 - new Variable (line 14909)
 - new Variable (line 14952)
-- new VM\Variable (line 15341)
-- new Variable (line 15375)
-- new Variable (line 15426)
-- new Variable (line 15442)
-- new Variable (line 15461)
-- new Variable (line 15468)
-- new OpCode (line 15488)
-- new Variable (line 15489)
-- new Variable (line 15672)
-- new Variable (line 15710)
-- new OpCode (line 15724)
-- new Variable (line 15725)
-- new Variable (line 15784)
-- new OpCode (line 15805)
-- new Variable (line 15806)
-- new Variable (line 15905)
-- new Variable (line 15927)
-- new Variable (line 15995)
-- new Operand\Literal (line 16004)
-- new Variable (line 16019)
-- new Variable (line 16208)
-- new VM\PropertyIsInitializedHandler (line 16300)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16340)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16586)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16698)
-- new JIT\Call\VmCoerceVariableToString (line 16822)
-- new JIT\Call\IncludePathResolverResolve (line 17116)
-- new Variable (line 18184)
-- new VM (line 18228)
-- new VM\Variable (line 18237)
-- new Variable (line 18258)
-- new Variable (line 18304)
-- new Variable (line 18828)
+- new VM\Variable (line 15353)
+- new Variable (line 15387)
+- new Variable (line 15438)
+- new Variable (line 15454)
+- new Variable (line 15473)
+- new Variable (line 15480)
+- new OpCode (line 15502)
+- new Variable (line 15503)
+- new Variable (line 15693)
+- new Variable (line 15731)
+- new OpCode (line 15745)
+- new Variable (line 15746)
+- new Variable (line 15805)
+- new OpCode (line 15826)
+- new Variable (line 15827)
+- new Variable (line 15926)
+- new Variable (line 15948)
+- new Variable (line 16016)
+- new Operand\Literal (line 16025)
+- new Variable (line 16040)
+- new Variable (line 16229)
+- new VM\PropertyIsInitializedHandler (line 16321)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16361)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16607)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16719)
+- new JIT\Call\VmCoerceVariableToString (line 16843)
+- new JIT\Call\IncludePathResolverResolve (line 17137)
+- new Variable (line 18205)
+- new VM (line 18249)
+- new VM\Variable (line 18258)
+- new Variable (line 18279)
+- new Variable (line 18325)
+- new Variable (line 18849)
 - 374 class method(s)
 - 7 closure(s)
 
