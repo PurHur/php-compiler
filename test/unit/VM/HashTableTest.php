@@ -312,6 +312,40 @@ class HashTableTest extends TestCase
         $this->assertTrue($left->compareIdentical($same));
     }
 
+    /**
+     * Issue #23985 / #23988 — == and <=> compare key bags; === stays order-sensitive
+     * (Zend zend_hash_compare ordered=false vs ordered=true).
+     */
+    public function testCompareLooseEqualAndSpaceshipIgnoreKeyOrder(): void
+    {
+        $left = new HashTable();
+        $left->addIndex(0, $this->int(1));
+        $left->addIndex(1, $this->int(2));
+
+        $right = new HashTable();
+        $right->addIndex(1, $this->int(2));
+        $right->addIndex(0, $this->int(1));
+
+        $this->assertTrue($left->compareLooseEqual($right));
+        $this->assertSame(0, $left->compareSpaceship($right));
+        $this->assertFalse($left->compareIdentical($right));
+
+        $assocLeft = new HashTable();
+        $assocLeft->add('a', $this->int(1));
+        $assocLeft->add('b', $this->int(2));
+        $assocRight = new HashTable();
+        $assocRight->add('b', $this->int(2));
+        $assocRight->add('a', $this->int(1));
+        $this->assertTrue($assocLeft->compareLooseEqual($assocRight));
+        $this->assertSame(0, $assocLeft->compareSpaceship($assocRight));
+        $this->assertFalse($assocLeft->compareIdentical($assocRight));
+
+        $smaller = new HashTable();
+        $smaller->addIndex(0, $this->int(1));
+        $this->assertSame(-1, $smaller->compareSpaceship($left));
+        $this->assertSame(1, $left->compareSpaceship($smaller));
+    }
+
     private function int(int $value): Variable
     {
         $var = new Variable();
