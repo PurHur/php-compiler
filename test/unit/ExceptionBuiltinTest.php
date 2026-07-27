@@ -223,6 +223,27 @@ echo $e2->getMessage(), ":", $e2->getSeverity(), "\n";
         );
     }
 
+    /** Issue #23706: ErrorException Reflection params + named args match Zend stub. */
+    public function testErrorExceptionReflectionParamsAndNamedConstruct(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$r = new ReflectionMethod(ErrorException::class, "__construct");
+$names = [];
+foreach ($r->getParameters() as $p) { $names[] = $p->getName(); }
+echo "params=", implode(",", $names), "\n";
+try {
+    throw new ErrorException(message: "m", code: 1, severity: E_WARNING, filename: "f.php", line: 9);
+} catch (ErrorException $e) {
+    echo "named_ok severity=", $e->getSeverity(), " file=", $e->getFile(), " line=", $e->getLine(), "\n";
+} catch (Throwable $e) {
+    echo "named_fail ", get_class($e), ":", $e->getMessage(), "\n";
+}
+',
+            "params=message,code,severity,filename,line,previous\nnamed_ok severity=2 file=f.php line=9\n"
+        );
+    }
+
     private function assertVmCliOutput(string $code, string $expected): void
     {
         [$stdout, $exit] = $this->runVmCli($code);
