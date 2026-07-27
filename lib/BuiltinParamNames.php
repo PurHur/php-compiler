@@ -548,6 +548,46 @@ final class BuiltinParamNames
                     'encoding',
                     'untrusted_certificates_filename',
                 ];
+            // php-src ext/curl/curl.stub.php — InternalArgInfo still says ch/mh/sh (#23594)
+            case 'curl_close':
+            case 'curl_copy_handle':
+            case 'curl_errno':
+            case 'curl_error':
+            case 'curl_exec':
+            case 'curl_reset':
+                return ['handle'];
+            case 'curl_setopt':
+                return ['handle', 'option', 'value'];
+            case 'curl_setopt_array':
+                return ['handle', 'options'];
+            case 'curl_escape':
+            case 'curl_unescape':
+                return ['handle', 'string'];
+            case 'curl_getinfo':
+                return ['handle', 'option'];
+            case 'curl_pause':
+                return ['handle', 'flags'];
+            case 'curl_multi_add_handle':
+            case 'curl_multi_remove_handle':
+                return ['multi_handle', 'handle'];
+            case 'curl_multi_close':
+                return ['multi_handle'];
+            case 'curl_multi_exec':
+                return ['multi_handle', 'still_running'];
+            case 'curl_multi_getcontent':
+                return ['handle'];
+            case 'curl_multi_info_read':
+                return ['multi_handle', 'queued_messages'];
+            case 'curl_multi_select':
+                return ['multi_handle', 'timeout'];
+            case 'curl_multi_setopt':
+                return ['multi_handle', 'option', 'value'];
+            case 'curl_share_close':
+                return ['share_handle'];
+            case 'curl_share_setopt':
+                return ['share_handle', 'option', 'value'];
+            case 'curl_strerror':
+                return ['error_code'];
             case 'hash':
                 return ['algo', 'data', 'binary', 'options'];
             case 'hash_hmac':
