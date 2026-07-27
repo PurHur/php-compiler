@@ -8,13 +8,23 @@ use PHPCompiler\ext\standard\LevenshteinJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** levenshtein() JIT routes through LevenshteinJitHelper PHP not inline LLVM (#14648). */
+/**
+ * levenshtein() NestedJIT via JitVmHelperLink::ensureCompiled (#23768 / peer #23671).
+ * Must route phpc_levenshtein through LevenshteinJitHelper PHP not inline LLVM (#14648).
+ */
 final class LevenshteinRuntimeShrinkTest extends TestCase
 {
     public function testStringLevenshteinUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringLevenshtein.php');
         $this->assertStringContainsString('LevenshteinJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitLevenshtein.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/levenshtein.php');
