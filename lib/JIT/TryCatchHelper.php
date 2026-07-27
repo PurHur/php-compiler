@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Builtin\TryCatchRuntime;
 use PHPCompiler\JIT\Builtin\JitReturnPending;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Builtin\ScriptExit;
+use PHPCompiler\JIT\Builtin\UncaughtThrowPrinter;
 use PHPCompiler\OpCode;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -667,16 +668,30 @@ final class TryCatchHelper
                         continue;
                     }
                 }
-                $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
-                $catchTail = $context->builder->getInsertBlock();
+                $catchTail = $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
+                // Prefer an open insert block — the return value may be a mid-block that already
+                // branches to the arm's real tail (#23641 AFTER).
+                $openTail = $builder->getInsertBlock();
+                if (null !== $openTail && null === $openTail->getTerminator()) {
+                    $catchTail = $openTail;
+                }
                 $builder->positionAtEnd($catchTail);
                 if (null === $catchTail->getTerminator()) {
                     if (null !== $handler->finallyBb) {
                         $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
                         $builder->branch($handler->finallyBb);
-                    } elseif (null !== $mergeBody) {
+                    } else {
+                        $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
                         $builder->call($context->lookupFunction('phpc_jit_clear_active_catch'));
-                        $builder->branch($mergeBody);
+                        // Prefer the dedicated merge-body BB — blockStorage[merge] may point at a
+                        // post-return dead insert from ensureOpenInsertBlock (#23641 AFTER).
+                        // mergeEntryBb is still null while buildDispatch runs (created after).
+                        $mergeTarget = $handler->mergeBodyLlvmBb
+                            ?? $handler->mergeEntryBb
+                            ?? $mergeBody;
+                        if (null !== $mergeTarget) {
+                            $builder->branch($mergeTarget);
+                        }
                     }
                 }
             }
@@ -761,6 +776,8 @@ final class TryCatchHelper
         }
         $handledBb = self::appendBlock($func, 'ex_handler_handled');
         $abortBb = self::appendBlock($func, 'ex_handler_abort');
+        // Non-zero = user set_exception_handler consumed the throw (#21325).
+        // Empty stack returns 0 → print Zend-shaped fatal + exit(255) (#23641).
         $builder->branchIf(
             $builder->icmp(Builder::INT_NE, $handled, $i32->constInt(0, false)),
             $handledBb,
@@ -769,9 +786,9 @@ final class TryCatchHelper
         $builder->positionAtEnd($handledBb);
         ScriptExit::emitLibcExitWithStatus($context, $context->getTypeFromString('int64')->constInt(0, false));
         $builder->positionAtEnd($abortBb);
-        $builder->call($context->lookupFunction('abort'));
-        $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'ex_handler_after_abort');
+        UncaughtThrowPrinter::emitPrintAndExit($context, $exceptionObj);
+        // Do not open a fall-through insert block after exit — that attached main
+        // epilogue and produced silent rc=0 (#23641).
     }
 
     /**

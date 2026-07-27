@@ -6888,7 +6888,15 @@ class JIT {
         }
 
         $this->context->inlineIncludeExitBlock = null;
-        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
+        // Catch arms fall through to try-merge; suppress the void-main trailing
+        // returnVoid() that would skip AFTER (#23641).
+        $savedSynthetic = $block->syntheticCfgBranch;
+        $block->syntheticCfgBranch = true;
+        try {
+            $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, true, ...$args);
+        } finally {
+            $block->syntheticCfgBranch = $savedSynthetic;
+        }
         if (null !== $this->context->inlineIncludeExitBlock) {
             $exit = $this->context->inlineIncludeExitBlock;
         }
@@ -12071,6 +12079,17 @@ class JIT {
             ) {
                 $prior = $this->context->getVariableFromOp($result);
                 if (Variable::TYPE_OBJECT === $prior->type) {
+                    // Void __construct EXEC_RETURN shares the `new` result operand — keep the
+                    // object (VM #4540). Wiping here made `throw new LogicException` see a
+                    // non-Throwable / wrong temp (#23641).
+                    if ($this->isVoidJitConstructCall($this->context->scope->toCall)) {
+                        $this->markNewObjectConstructedAfterCall(
+                            $this->context->scope->toCall,
+                            $this->context->scope->args
+                        );
+
+                        return;
+                    }
                     // Inline f(); g() must not inherit object-typed operand slots (#18052).
                     $prior->free();
                     unset($this->context->scope->variables[$result]);
@@ -15181,6 +15200,37 @@ class JIT {
         return '__construct' === $name || str_ends_with($name, '::__construct');
     }
 
+    /** Void JIT __construct Call proxies whose EXEC_RETURN must not wipe `new` (#23641). */
+    private function isVoidJitConstructCall(?JIT\Call $toCall): bool
+    {
+        if (null === $toCall) {
+            return false;
+        }
+        if ($toCall instanceof JIT\Call\ExceptionConstruct) {
+            return true;
+        }
+        if ($toCall instanceof JIT\Call\ReflectionClassConstruct
+            || $toCall instanceof JIT\Call\ReflectionObjectConstruct
+            || $toCall instanceof JIT\Call\ReflectionFunctionConstruct
+            || $toCall instanceof JIT\Call\ReflectionPropertyConstruct
+            || $toCall instanceof JIT\Call\ReflectionConstantConstruct
+            || $toCall instanceof JIT\Call\ReflectionEnumConstruct
+            || $toCall instanceof JIT\Call\RandomizerConstruct
+            || $toCall instanceof JIT\Call\SimpleXMLElementConstruct
+        ) {
+            return true;
+        }
+        if ($toCall instanceof JIT\Call\Native || $toCall instanceof JIT\Call\ExternalMethod) {
+            $name = strtolower(
+                $toCall instanceof JIT\Call\Native ? $toCall->name : $toCall->proxyName
+            );
+
+            return str_ends_with($name, '::__construct');
+        }
+
+        return false;
+    }
+
     /**
      * @param list<JIT\Variable|array{unpack: JIT\Variable}> $callArgs
      */
@@ -15195,6 +15245,10 @@ class JIT {
             $name = strtolower($toCall->proxyName);
         } elseif ($toCall instanceof JIT\Call\SimpleXMLElementConstruct) {
             $name = 'simplexmlelement::__construct';
+        } elseif ($toCall instanceof JIT\Call\ExceptionConstruct) {
+            $name = 'exception::__construct';
+        } elseif ($this->isVoidJitConstructCall($toCall)) {
+            $name = '::__construct';
         } else {
             return;
         }
@@ -16457,6 +16511,34 @@ class JIT {
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ('getmessage' === $methodLc && $this->context->functionIsRegistered('exception::getmessage')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('exception::getmessage');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+            if (
+                '__construct' === $methodLc
+                && $this->context->functionIsRegistered('exception::__construct')
+            ) {
+                $ctorProxy = 'exception::__construct';
+                if (
+                    '' !== $declaringClassLc
+                    && $this->context->functionIsRegistered($declaringClassLc.'::__construct')
+                ) {
+                    $ctorProxy = $declaringClassLc.'::__construct';
+                } elseif (
+                    '' !== $declaringClassLc
+                    && (
+                        \PHPCompiler\ext\standard\ThrowableManifest::isDescendantOf(
+                            $declaringClassLc,
+                            \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR
+                        )
+                        || \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR === $declaringClassLc
+                    )
+                    && $this->context->functionIsRegistered('error::__construct')
+                ) {
+                    $ctorProxy = 'error::__construct';
+                }
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($ctorProxy);
                 $this->context->scope->args = [$receiverVar];
 
                 return;
