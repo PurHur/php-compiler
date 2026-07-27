@@ -10931,6 +10931,12 @@ class JIT {
                                 $proxyName = strtolower($resolvedName).'::'.'__construct';
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                            } elseif (
+                                null !== ($inheritedCtor = $this->context->type->object->inheritedConstructorProxyLc($resolvedName))
+                            ) {
+                                // User subclass without own __construct inherits Exception/Error ctor (#23974 / #23641).
+                                $this->context->scope->toCall = $this->context->resolveFunctionProxy($inheritedCtor);
+                                $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } else {
                                 $this->context->scope->preserveNewResultOnNullCall = true;
                                 $this->context->type->object->markObjectConstructed(

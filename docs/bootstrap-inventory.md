@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6594 |
-| Phase A inventory files (M2 ratio SSOT) | 6594 |
+| PHP files on vm.php path | 6596 |
+| Phase A inventory files (M2 ratio SSOT) | 6596 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21331 |
+| Source constructs flagged (warnings) | 21328 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2208,7 +2208,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ArrayReverseJitHelper.php` | 0 | 1 |
 | `ext/standard/ArraySearchJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayShiftJitHelper.php` | 0 | 2 |
-| `ext/standard/ArraySliceJitHelper.php` | 0 | 7 |
+| `ext/standard/ArraySliceJitHelper.php` | 0 | 1 |
 | `ext/standard/ArraySpliceJitHelper.php` | 0 | 1 |
 | `ext/standard/ArraySumJitHelper.php` | 0 | 2 |
 | `ext/standard/ArrayUniqueJitHelper.php` | 0 | 5 |
@@ -5539,6 +5539,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/HashTableMergeStringKeysFrom.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableNestedReceiver.php` | 0 | 1 |
 | `lib/JIT/Call/HashTablePadCopy.php` | 0 | 2 |
+| `lib/JIT/Call/HashTableSliceCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableUnionCopy.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableUnshiftPrepend.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableUpdateIndex.php` | 0 | 1 |
@@ -5596,6 +5597,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/SplObjectStorageMethod.php` | 0 | 3 |
 | `lib/JIT/Call/Vararg.php` | 0 | 1 |
 | `lib/JIT/Call/VariableCopyFrom.php` | 0 | 1 |
+| `lib/JIT/Call/VariableIsUndefined.php` | 0 | 1 |
 | `lib/JIT/Call/VariableResolveIndirect.php` | 0 | 1 |
 | `lib/JIT/Call/VariableToArray.php` | 0 | 1 |
 | `lib/JIT/Call/VariableToBool.php` | 0 | 1 |
@@ -24763,13 +24765,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ArraySliceJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 43)
-- new Variable (line 47)
-- new HashTable (line 60)
-- new Variable (line 66)
-- new HashTable (line 84)
-- new Variable (line 88)
-- 5 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/ArraySpliceJitHelper.php`
 
@@ -46561,6 +46557,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 27)
 - 2 class method(s)
 
+### `lib/JIT/Call/HashTableSliceCopy.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 77)
+- 3 class method(s)
+
 ### `lib/JIT/Call/HashTableUnionCopy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -46586,7 +46588,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/HashTableWriteNested.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 73)
+- new Variable (line 74)
 - 4 class method(s)
 
 ### `lib/JIT/Call/IncludePathResolverResolve.php`
@@ -46865,6 +46867,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `lib/JIT/Call/VariableIsUndefined.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Call/VariableResolveIndirect.php`
 
@@ -47800,7 +47807,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmHashTableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\HashTableWriteNested (line 62)
+- new Call\HashTableWriteNested (line 64)
 - 2 class method(s)
 
 ### `lib/JIT/NestedVmObjectMethodLlvm.php`
@@ -47811,7 +47818,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmVariableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\VariableWriteNested (line 41)
+- new Call\VariableWriteNested (line 43)
 - 2 class method(s)
 
 ### `lib/JIT/NoDiscardCallGuard.php`

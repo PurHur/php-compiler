@@ -27,6 +27,7 @@ final class VariableWriteNested implements Call
 
         switch ($this->methodLc) {
             case 'null':
+            case 'reset':
                 $context->builder->call(
                     $context->lookupFunction('__value__writeNull'),
                     $destPtr

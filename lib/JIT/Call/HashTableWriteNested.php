@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * HashTable::{add,updateIndex,append}() for nested php-in-PHP JIT helpers (#16075 / #15642).
+ * HashTable::{add,addIndex,updateIndex,append}() for nested php-in-PHP JIT helpers (#16075 / #15642 / #23974).
  *
  * VmPregMatches and other ext/standard helpers build VM hashtables inside nested JIT;
  * write paths must lower to LLVM, not compile lib/VM/HashTable.php (#12910 pattern).
@@ -37,9 +37,10 @@ final class HashTableWriteNested implements Call
                 $keyPtr = JitStringArg::stringPtrFromVariable($context, $args[1]);
                 HashTableHelper::setAtKeyCoercingNumericString($context, $ht, $keyPtr, $args[2]);
                 break;
+            case 'addindex':
             case 'updateindex':
                 if (\count($args) < 3) {
-                    throw new \LogicException('updateIndex() requires HashTable receiver, index, and value');
+                    throw new \LogicException($this->methodLc.'() requires HashTable receiver, index, and value');
                 }
                 $ht = HashTableNestedReceiver::hashtableFromReceiver($context, $args[0]);
                 $index = self::indexAsSizeT($context, $args[1]);
