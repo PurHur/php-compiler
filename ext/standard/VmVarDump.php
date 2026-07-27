@@ -132,9 +132,10 @@ final class VmVarDump
         }
         self::write('array('.$count.") {\n");
         foreach ($table->iterateKeyed(false) as [$key, $value]) {
-            self::write(self::spaces($level));
+            // php-src php_array_element_dump: "%*c" with level+1; recurse level+2 (#23726).
+            self::write(self::spaces($level + 1));
             self::write(self::formatKey($key)."\n");
-            self::dumpVariable($vm, $value, $level + 1, true, $frame);
+            self::dumpVariable($vm, $value, $level + 2, true, $frame);
         }
         if ($level > 1) {
             self::write(self::spaces($level - 1));
@@ -154,9 +155,10 @@ final class VmVarDump
         $className = VmObjectDebugType::fromClassName($object->class->name);
         self::write('object('.$className.')#'.$object->id.' ('.$count.") {\n");
         foreach ($props as $name => $value) {
-            self::write(self::spaces($level));
+            // php-src php_object_property_dump: "%*c" with level+1; recurse level+2 (#23726).
+            self::write(self::spaces($level + 1));
             self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
-            self::dumpVariable($vm, $value, $level + 1, true, $frame);
+            self::dumpVariable($vm, $value, $level + 2, true, $frame);
         }
         if ($level > 1) {
             self::write(self::spaces($level - 1));

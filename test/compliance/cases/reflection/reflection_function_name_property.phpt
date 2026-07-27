@@ -27,8 +27,8 @@ pe_name=1
 pe_funcName=0
 eq=1
 object(ReflectionFunction)#%d (1) {
- ["name"]=>
- string(3) "foo"
+  ["name"]=>
+  string(3) "foo"
 }
 ReflectionFunction Object
 (

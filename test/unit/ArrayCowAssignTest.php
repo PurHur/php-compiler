@@ -23,12 +23,12 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'array_cow_simple.php'));
         self::assertSame(
             "array(1) {\n".
-            " [0]=>\n".
-            " int(1)\n".
+            "  [0]=>\n".
+            "  int(1)\n".
             "}\n".
             "array(1) {\n".
-            " [0]=>\n".
-            " int(99)\n".
+            "  [0]=>\n".
+            "  int(99)\n".
             "}\n",
             ob_get_clean()
         );
