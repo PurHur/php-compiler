@@ -291,7 +291,7 @@ docker run -d \
           set -e
           echo ARGV_DRIVER_REFRESH_RC=\$argv_rc \$(date -u +%H:%M:%S) | tee -a \"\$STATUS\"
           if [[ \$argv_rc -ne 0 ]]; then
-            echo ARGV_DRIVER_REFRESH_FAILED — spine sidecars OK but argv driver still broken (#23468) | tee -a \"\$STATUS\"
+            echo 'ARGV_DRIVER_REFRESH_FAILED — spine sidecars OK but argv driver still broken (#23468)' | tee -a \"\$STATUS\"
             rc=\$argv_rc
           fi
         fi
