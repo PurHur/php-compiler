@@ -27,6 +27,12 @@ final class HashTableExportKeyValuePairs implements Call
         return self::exportPairs($context, $ht);
     }
 
+    /** Ordered pair-list hashtable for NestedJIT slice / foreach (#23974 / #12908). */
+    public static function exportPairsForSlice(Context $context, Value $ht): Value
+    {
+        return self::exportPairs($context, $ht);
+    }
+
     private static function exportPairs(Context $context, Value $ht): Value
     {
         $result = HashTableHelper::alloc($context);

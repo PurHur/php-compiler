@@ -7,14 +7,19 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\HashTableReadLlvm;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** HashTable::findIndex() for nested php-in-PHP JIT helpers (ArrayPushJitHelper #12719). */
+/**
+ * HashTable::findIndex() for nested php-in-PHP JIT helpers (ArrayPushJitHelper #12719).
+ *
+ * PHI predecessors must be the block that actually branches to merge — HashTableReadLlvm
+ * advances the insert block (#23974 ArrayMap NestedJIT verify).
+ */
 final class HashTableFindIndex implements Call
 {
     public function call(Context $context, Variable ...$args): Value
@@ -40,21 +45,19 @@ final class HashTableFindIndex implements Call
             $context->lookupFunction('__value__writeNull'),
             JitValueBox::pointer($context, $nullSlot)
         );
+        $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($readBb);
         $valueVar = HashTableReadLlvm::readIndexedToValueBox($context, $ht, $index);
         $readSlot = JitValueBox::valuePtrFromVariable($context, $valueVar);
+        $readEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($mergeBb);
-        $phi = $context->builder->phi(
-            $context->getTypeFromString('__value__*'),
-            [
-                [$nullSlot, $nullBb],
-                [$readSlot, $readBb],
-            ]
-        );
+        $phi = $context->builder->phi($context->getTypeFromString('__value__*'));
+        $phi->addIncoming($nullSlot, $nullEnd);
+        $phi->addIncoming($readSlot, $readEnd);
 
         return $phi;
     }
@@ -62,12 +65,27 @@ final class HashTableFindIndex implements Call
     private static function indexAsSizeT(Context $context, Variable $index): Value
     {
         $sizeT = $context->getTypeFromString('size_t');
-        if (Variable::TYPE_NATIVE_LONG === $index->type && Variable::KIND_LITERAL === $index->kind) {
-            return $sizeT->constInt((int) $index->literal, false);
+        if (Variable::TYPE_NATIVE_LONG === $index->type && null !== $index->compileTimeLong) {
+            return $sizeT->constInt($index->compileTimeLong, false);
+        }
+        if (Variable::TYPE_VALUE === $index->type) {
+            $ptr = JitValueBox::valuePtrFromVariable($context, $index);
+            $long = $context->builder->call($context->lookupFunction('__value__readLong'), $ptr);
+
+            return JitNestedHelperCoerce::i64ToScalar(
+                $context,
+                JitNestedHelperCoerce::scalarToI64($context, $long, $context->getTypeFromString('int64')),
+                $sizeT
+            );
         }
 
-        return $context->builder->trunc(
-            $context->helper->loadValue($index),
+        return JitNestedHelperCoerce::i64ToScalar(
+            $context,
+            JitNestedHelperCoerce::scalarToI64(
+                $context,
+                $context->helper->loadValue($index),
+                $context->getTypeFromString('int32')
+            ),
             $sizeT
         );
     }

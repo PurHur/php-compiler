@@ -10,7 +10,12 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** Variable::toInt() for nested php-in-PHP JIT helpers (#12910). */
+/**
+ * Variable::toInt() for nested php-in-PHP JIT helpers (#12910).
+ *
+ * Returns i64 (PHP int width). Returning i32 caused NestedJIT to `store i32` into
+ * `%__value__*` temps when boxing the result for addIndex/findIndex (#23974).
+ */
 final class VariableToInt implements Call
 {
     public function call(Context $context, Variable ...$args): Value
@@ -19,8 +24,7 @@ final class VariableToInt implements Call
             throw new \LogicException('toInt() requires a Variable receiver');
         }
         $ptr = JitValueBox::valuePtrFromVariable($context, $args[0]);
-        $long = $context->builder->call($context->lookupFunction('__value__readLong'), $ptr);
 
-        return $context->builder->trunc($long, $context->getTypeFromString('int32'));
+        return $context->builder->call($context->lookupFunction('__value__readLong'), $ptr);
     }
 }

@@ -189,10 +189,10 @@ final class ArrayMapJitHelper
     private static function valueAtKey(HashTable $ht, Variable $key): Variable
     {
         $found = null;
-        if (Variable::TYPE_INTEGER === $key->type) {
-            $found = $ht->findIndex($key->toInt());
-        } elseif (Variable::TYPE_STRING === $key->type) {
+        if (Variable::TYPE_STRING === $key->type) {
             $found = $ht->find($key->toString());
+        } elseif (Variable::TYPE_INTEGER === $key->type) {
+            $found = $ht->findIndex($key->toInt());
         }
         $result = new Variable();
         if (null === $found) {
