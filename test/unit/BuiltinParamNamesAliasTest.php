@@ -1515,4 +1515,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'shdl', 'xml_set_element_handler'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'ehdl', 'xml_set_element_handler'));
     }
+
+    /** @covers issue #23342 */
+    public function testGetResourceTypeZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('get_resource_type');
+        self::assertSame(['resource'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'resource', 'get_resource_type'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $res)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'res', 'get_resource_type'));
+    }
 }

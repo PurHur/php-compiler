@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
+use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -33,18 +36,51 @@ final class JitStreamResourceKernel
 
     public static function implement(Context $context): void
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         $probe = $context->module->getNamedFunction('__compiler_get_resource_type');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
 
             return;
         }
 
-        self::ensureExternGlobals($context);
+        // Define stream table globals (with initializers) + is_resource ABI
+        // so standalone AOT does not leave extern decls unresolved (#23342 / #3142).
+        StreamGlobalsJit::ensureGlobals($context);
+        StreamLifecycle::ensureLinked($context);
+        self::ensureIsProcessResourceStub($context);
         self::ensureLibc($context);
 
         self::implementIfMissing($context, '__compiler_get_resource_type', self::emitGetResourceType(...));
         self::implementIfMissing($context, '__compiler_get_resources', self::emitGetResources(...));
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+    }
+
+    /**
+     * Lightweight ABI for process handles when ProcessOpenRuntime is not linked.
+     * Returns 0 (not a process) so get_resource_type() stream path remains usable under AOT.
+     */
+    private static function ensureIsProcessResourceStub(Context $context): void
+    {
+        $name = '__compiler_is_process_resource';
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($name, $context->context->functionType($i32, false, $i64));
+        $entry = $fn->appendBasicBlock('is_process_stub_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i32->constInt(0, false));
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     /**
@@ -299,17 +335,7 @@ final class JitStreamResourceKernel
 
     private static function ensureExternGlobals(Context $context): void
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $i8 = $context->getTypeFromString('int8');
-        $tableTy = $i8p->arrayType(self::MAX_HANDLES);
-        $wasUsedTy = $i8->arrayType(self::MAX_HANDLES);
-
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_HANDLES)) {
-            $context->module->addGlobal($tableTy, self::GLOBAL_HANDLES);
-        }
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_WAS_USED)) {
-            $context->module->addGlobal($wasUsedTy, self::GLOBAL_WAS_USED);
-        }
+        StreamGlobalsJit::ensureGlobals($context);
     }
 
     private static function loadTableSlot(Context $context, string $globalName, Value $handle): Value
