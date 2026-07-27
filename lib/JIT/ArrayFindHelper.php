@@ -171,7 +171,7 @@ final class ArrayFindHelper
             return $context->constantFromBool(false);
         }
 
-        return JitBoolArg::lower($context, $strictArg, 'array_all_key() strict');
+        return JitBoolArg::lower($context, $strictArg, 'array_find() strict');
     }
 
     private static function functionNameForMode(int $mode): string

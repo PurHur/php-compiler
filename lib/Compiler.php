@@ -38291,8 +38291,6 @@ class Compiler {
         if (in_array($funcName, [
             'array_all',
             'array_any',
-            'array_all_key',
-            'array_any_key',
             'array_find',
             'array_find_key',
             'array_reduce',

@@ -24,10 +24,6 @@ final class ArrayFindJitHelper
 
     public const MODE_ALL = 3;
 
-    public const MODE_ALL_KEY = 4;
-
-    public const MODE_ANY_KEY = 5;
-
     /**
      * Walk hashtable with a compile-time string callback (stdlib builtin or user function).
      */
@@ -41,7 +37,7 @@ final class ArrayFindJitHelper
         $ctx = Superglobals::getActiveContext();
         $function = self::functionNameForMode($mode);
         $keyFirst = VmArrayValueCallback::callbackKeyFirst($function) || $unaryInternalUsesKey;
-        $unaryUsesKey = $unaryInternalUsesKey || self::unaryInternalUsesKey($mode);
+        $unaryUsesKey = $unaryInternalUsesKey;
         try {
             $fn = VmInternalCall::resolveStringCallback($name);
             $invoke = static function (Variable $item, Variable $keyVar) use (
@@ -130,7 +126,7 @@ final class ArrayFindJitHelper
             $keyVar->copyFrom($key);
             $result = $invokePredicate($item, $keyVar);
             $matches = VmArrayValueCallback::predicateMatches($result, $strict);
-            if (self::MODE_ANY === $mode || self::MODE_ANY_KEY === $mode) {
+            if (self::MODE_ANY === $mode) {
                 if ($matches) {
                     $out->bool(true);
 
@@ -139,7 +135,7 @@ final class ArrayFindJitHelper
 
                 continue;
             }
-            if (self::MODE_ALL === $mode || self::MODE_ALL_KEY === $mode) {
+            if (self::MODE_ALL === $mode) {
                 if (!$matches) {
                     $out->bool(false);
 
@@ -158,9 +154,9 @@ final class ArrayFindJitHelper
                 return $out;
             }
         }
-        if (self::MODE_ANY === $mode || self::MODE_ANY_KEY === $mode) {
+        if (self::MODE_ANY === $mode) {
             $out->bool(false);
-        } elseif (self::MODE_ALL === $mode || self::MODE_ALL_KEY === $mode) {
+        } elseif (self::MODE_ALL === $mode) {
             $out->bool(true);
         } else {
             $out->null();
@@ -169,19 +165,12 @@ final class ArrayFindJitHelper
         return $out;
     }
 
-    private static function unaryInternalUsesKey(int $mode): bool
-    {
-        return self::MODE_ALL_KEY === $mode || self::MODE_ANY_KEY === $mode;
-    }
-
     private static function functionNameForMode(int $mode): string
     {
         return match ($mode) {
             self::MODE_FIND_KEY => 'array_find_key',
             self::MODE_ANY => 'array_any',
             self::MODE_ALL => 'array_all',
-            self::MODE_ALL_KEY => 'array_all_key',
-            self::MODE_ANY_KEY => 'array_any_key',
             default => 'array_find',
         };
     }

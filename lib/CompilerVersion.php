@@ -2384,8 +2384,9 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ array_all/any/find/find_key (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027, #15675).
+     * PHP 8.4+ array_all/any/find/find_key only (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027, #15675, #24000).
      *
+     * php-src never ships array_any_key()/array_all_key() — those phantoms were removed (#24000).
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
      * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
      * array_first()/array_last() are PHP 8.5+ — see {@see supportsPhp85ArrayFirstLast()} (#21173).

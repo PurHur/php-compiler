@@ -241,10 +241,6 @@ final class BuiltinParamNames
             case 'array_find':
             case 'array_find_key':
                 return ['array', 'callback'];
-            // Forward-profile-only key variants retain optional $strict (#15704).
-            case 'array_all_key':
-            case 'array_any_key':
-                return ['array', 'callback', 'strict'];
             case 'str_pad':
                 return ['string', 'length', 'pad_string', 'pad_type'];
             case 'str_replace':

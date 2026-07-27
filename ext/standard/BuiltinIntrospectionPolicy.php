@@ -38,8 +38,6 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, [
             'array_any',
             'array_all',
-            'array_any_key',
-            'array_all_key',
             'array_find',
             'array_find_key',
         ], true)) {

@@ -13,8 +13,7 @@ use PHPCompiler\VM\Variable;
 final class VmArrayFindInternalInvoke
 {
     /**
-     * @param bool $unaryUsesKey When true and the internal accepts one arg, pass the key operand
-     *                          (array_all_key / array_any_key forward profile).
+     * @param bool $unaryUsesKey When true and the internal accepts one arg, pass the key operand.
      */
     public static function invoke(
         Internal $fn,

@@ -10,11 +10,8 @@ var_export(array_find([1, 2, 3], 'is_int'));
 echo "\n";
 var_export(array_find_key([1, 2, 3], 'is_int'));
 echo "\n";
-var_export(array_all_key(['a' => 1], 'is_string'));
-echo "\n";
 --EXPECT--
 true
 true
 1
 0
-true
