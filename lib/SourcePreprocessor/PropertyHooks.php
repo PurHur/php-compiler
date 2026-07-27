@@ -1233,8 +1233,12 @@ final class PropertyHooks
                 if ($isAbstractHook || $isInterfaceHook || $isTraitAbstractHook || $isSemicolonOnlyHook) {
                     $this->registry[$lcClass][$prop]['abstract'] = true;
                 }
-                // php-src ZEND_ACC_VIRTUAL — hook-only and same-name backed hooks omit from get_class_vars (#22493, #23822).
-                if ([] !== $methods || $isInterfaceHook || $isSemicolonOnlyHook || $isExplicitVirtual) {
+                // php-src ZEND_ACC_VIRTUAL — no backing store only (zend_compile.c / isVirtual()).
+                // Short `set => expr` and same-name `$this->prop` imply backing (#23881); those must
+                // remain non-virtual so hook raw writes succeed and get_class_vars keeps them (#22493).
+                if ($isExplicitVirtual
+                    || (([] !== $methods || $isInterfaceHook || $isSemicolonOnlyHook) && !$usesBacking)
+                ) {
                     $this->registry[$lcClass][$prop]['virtual'] = true;
                 }
             }

@@ -579,17 +579,21 @@ PHP;
         self::assertStringContainsString('function __phpc_property_set_x', $out);
     }
 
-    /** @covers issue #23822 — same-name backed hooks are ZEND_ACC_VIRTUAL for get_class_vars */
-    public function testSameNameBackedHookRegistryMarksVirtual(): void
+    /** @covers issue #23881 — same-name / short-set backing is not ZEND_ACC_VIRTUAL (Zend isVirtual=false) */
+    public function testSameNameBackedHookRegistryNotVirtual(): void
     {
         $src = <<<'PHP'
 <?php
 class H {
     public string $c { get => $this->c; set => $this->c = $value; }
+    public string $d { set => strtoupper($value); }
+    public string $a { get => 'x'; set {} }
 }
 PHP;
         [, $registry] = (new PropertyHooks())->process($src);
-        self::assertTrue($registry['h']['c']['virtual'] ?? false);
+        self::assertFalse($registry['h']['c']['virtual'] ?? false);
+        self::assertFalse($registry['h']['d']['virtual'] ?? false);
+        self::assertTrue($registry['h']['a']['virtual'] ?? false);
     }
 
     public function testSkipsClassDeclarationsInsideStringLiterals(): void

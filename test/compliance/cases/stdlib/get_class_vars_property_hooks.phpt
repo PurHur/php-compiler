@@ -33,7 +33,7 @@ $og = get_object_vars($g);
 $yVal = $og['y'];
 echo "gov:", $yVal, "\n";
 
-// #22493 / #23822: virtual omitted (hook-only and same-name backed hooks).
+// #22493 / #23881: omit true virtual only; same-name backed $c stays (Zend get_class_vars).
 class H {
     public string $a { get => 'x'; set {} }
     public $b = 2;
@@ -51,6 +51,6 @@ false
 'hook:x'
 gcv_key:no
 gov:g_only
-{"b":2}
+{"b":2,"c":null}
 a-no
-c-no
+c-yes
