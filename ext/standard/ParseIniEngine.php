@@ -278,7 +278,38 @@ final class ParseIniEngine
             $raw = self::trimWs(substr($raw, 0, $hash));
         }
 
-        return $raw;
+        // Unquoted ${ENV} expands under NORMAL/TYPED only (php-src zend_ini_scanner.l / #23564).
+        if (self::SCANNER_RAW === $scannerMode) {
+            return $raw;
+        }
+
+        return self::expandEnvInString($raw);
+    }
+
+    /**
+     * Substitute ${ENV} / ${ENV:-fallback} spans in an unquoted INI value.
+     */
+    private static function expandEnvInString(string $raw): string
+    {
+        $out = '';
+        $len = strlen($raw);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $raw[$i];
+            if ('$' === $ch && $i + 1 < $len && '{' === $raw[$i + 1]) {
+                $expanded = self::expandEnvInterpolation($raw, $i);
+                if (null === $expanded) {
+                    $out .= '$';
+                    continue;
+                }
+                [$value, $nextIndex] = $expanded;
+                $out .= $value;
+                $i = $nextIndex;
+                continue;
+            }
+            $out .= $ch;
+        }
+
+        return $out;
     }
 
     /**
