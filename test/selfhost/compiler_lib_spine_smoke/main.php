@@ -2753,6 +2753,7 @@ require_once __DIR__.'/../../../ext/standard/ReadlinkJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ReadonlyRaiseJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RealpathJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ReflectionClassIsFinalJitHelper.php';
+
 require_once __DIR__.'/../../../ext/standard/ReflectionClassIsIterateableJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RenameJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RequestMethodEnumData.php';
@@ -4879,6 +4880,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/RangeIntRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReadonlyRaise.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Refcount.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassIsFinalRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionPropertyIsFinalRuntime.php';
+
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionClassIsIterateableRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionEnumJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ReflectionNamedArgumentsLookupRuntime.php';
@@ -5338,6 +5341,8 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionObjectConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionParameterIsSensitiveParameter.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyConstruct.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyGetAttributes.php';
+require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyIsFinal.php';
+
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeIndirectClosureCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeIndirectInstanceMethodCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeVariableFunction.php';

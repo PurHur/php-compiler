@@ -1243,6 +1243,18 @@ class Object_ extends Type {
     }
 
     /**
+     * @return list<string> lowercased property names marked final on $classId (#23845)
+     */
+    public function finalPropertyNamesForClassId(int $classId): array
+    {
+        if (!isset($this->finalPropertyNames[$classId])) {
+            return [];
+        }
+
+        return array_keys($this->finalPropertyNames[$classId]);
+    }
+
+    /**
      * True when set visibility differs from read visibility (#3165, #23110).
      * Implicit-final private(set) properties use this path for writes, not the plain final ban.
      */

@@ -116,6 +116,8 @@ final class BuiltinInternalTentativeReturnInfo
         'reflectionclass::isanonymous' => 'bool',
         'reflectionclass::iscloneable' => 'bool',
         'reflectionclass::isfinal' => 'bool',
+        'reflectionproperty::isfinal' => 'bool',
+
         'reflectionclass::isinstance' => 'bool',
         'reflectionclass::isinstantiable' => 'bool',
         'reflectionclass::isinterface' => 'bool',
