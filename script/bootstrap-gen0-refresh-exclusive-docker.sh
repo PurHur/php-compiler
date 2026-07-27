@@ -190,6 +190,7 @@ docker run -d \
   -e BOOTSTRAP_GEN0_HELPER_RUNTIME_O="${BOOTSTRAP_GEN0_HELPER_RUNTIME_O:-0}" \
   -e BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP="${BOOTSTRAP_GEN0_INCLUDE_SCOPE_REMAP:-0}" \
   -e BOOTSTRAP_GEN0_FORCE_ZEND_SPINE="${BOOTSTRAP_GEN0_FORCE_ZEND_SPINE:-1}" \
+  -e BOOTSTRAP_GEN0_REFRESH_ARGV_DRIVER="${BOOTSTRAP_GEN0_REFRESH_ARGV_DRIVER:-0}" \
   "${IMAGE}" \
   bash -lc "
     set -uo pipefail
@@ -280,6 +281,20 @@ docker run -d \
       echo LAST_ENTRY=\$(cat /compiler/build/.last-jit-spine-exclusive-entry 2>/dev/null)
       if [[ \$rc -eq 0 ]]; then
         echo REFRESH_OK \$(date -u +%H:%M:%S)
+        # Spine refresh alone leaves a stale argv driver (#23468). Opt in to Zend-rebuild
+        # bin/compile.php → prelinked bin-compile-aot after sidecars move.
+        if [[ \"\${BOOTSTRAP_GEN0_REFRESH_ARGV_DRIVER:-0}\" == \"1\" ]]; then
+          echo ARGV_DRIVER_REFRESH_BEGIN \$(date -u +%H:%M:%S)
+          set +e
+          ./script/bootstrap-gen0-refresh-argv-driver.sh
+          argv_rc=\$?
+          set -e
+          echo ARGV_DRIVER_REFRESH_RC=\$argv_rc \$(date -u +%H:%M:%S) | tee -a \"\$STATUS\"
+          if [[ \$argv_rc -ne 0 ]]; then
+            echo ARGV_DRIVER_REFRESH_FAILED — spine sidecars OK but argv driver still broken (#23468) | tee -a \"\$STATUS\"
+            rc=\$argv_rc
+          fi
+        fi
         if [[ \"\$LIVE_MOUNTS\" != \"1\" && -d /compiler/prelinked/bootstrap-gen0-publish ]]; then
           echo PUBLISH_PRELINKED \$(date -u +%H:%M:%S)
           # Atomic-ish publish: only after verified refresh wrote snap prelinked.

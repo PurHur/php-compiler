@@ -496,6 +496,24 @@ Harness hosts and contributors without host PHP/LLVM should use the **22.04 dev 
 
 `BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=1` (default) runs `script/check-bootstrap-gen0-manifest-sync.php` in `ci-fast`: verifies `prelinked/bootstrap-gen0/manifest.json` matches the committed gen-0 argv driver and compiler_lib sidecar byte sizes, so a sidecar refresh cannot land half-synced. `BOOTSTRAP_GEN0_MANIFEST_SYNC_GATE=0` opts out.
 
+## Gen-0 argv driver functional smoke (`BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE`, #23468)
+
+Stamp sync alone stayed green while `prelinked/bootstrap-gen0/bin-compile-aot` failed `parseAndCompile` on every input (including hello-world). The functional smoke exercises the committed driver on a **never-seen** script and requires a runnable binary whose stdout matches Zend:
+
+```bash
+make bootstrap-gen0-driver-functional-smoke
+# or: ./script/bootstrap-gen0-driver-functional-smoke.sh
+```
+
+`BOOTSTRAP_GEN0_DRIVER_FUNCTIONAL_GATE=1` adds the same check to `release-readiness` (default **off** until an honest argv-driver refresh lands — then flip default-on in `script/ci-defaults.env`). Rebuild the seed with:
+
+```bash
+# multi-hour exclusive spine + optional argv driver (#22642 protect name):
+BOOTSTRAP_GEN0_REFRESH_ARGV_DRIVER=1 ./script/bootstrap-gen0-refresh-exclusive-docker.sh
+# argv driver only (after spine sidecars are current):
+make bootstrap-gen0-refresh-argv-driver
+```
+
 ## Related issues
 
 - [#472](https://github.com/PurHur/php-compiler/issues/472) — MiniWebApp gate ladder umbrella
