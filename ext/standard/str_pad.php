@@ -28,7 +28,8 @@ use PHPLLVM\Value;
 /**
  * str_pad() for strings (STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH).
  *
- * VM: {@see VmString::strPad()}; JIT/AOT: {@see StringStrPad} + {@see StrPadJitHelper}.
+ * VM: {@see VmString::strPad()}; JIT/AOT: {@see StringStrPad} + {@see StrPadJitHelper}
+ * (helper inlines pad logic — do not call VmString from NestedJIT, #23911 / peer #23204).
  */
 final class str_pad extends Internal
 {

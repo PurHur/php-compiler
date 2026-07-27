@@ -26,15 +26,23 @@ final class StrPadRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_str_pad', $bridge);
     }
 
-    public function testStrPadJitHelperDelegatesToVmString(): void
+    public function testStrPadJitHelperInlinesWithoutVmStringCall(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/StrPadJitHelper.php');
-        $this->assertStringContainsString('VmString::strPad', $source);
+        // Must not call VmString — that path nulls/segfaults user-script AOT (#23911 / peer #23204).
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringNotContainsString('return VmString', $source);
 
         $this->assertSame('  hi', StrPadJitHelper::padArgv('hi', 4, ' ', 0));
         $this->assertSame('  hi', VmString::strPad('hi', 4, ' ', 0));
+        $this->assertSame('hi--', StrPadJitHelper::padArgv('hi', 4, '-', 1));
+        $this->assertSame('hi--', VmString::strPad('hi', 4, '-', 1));
+        $this->assertSame('-hi-', StrPadJitHelper::padArgv('hi', 4, '-', 2));
+        $this->assertSame('-hi-', VmString::strPad('hi', 4, '-', 2));
         $this->assertSame('hi', StrPadJitHelper::padArgv('hi', -5, 'x', 1));
         $this->assertSame('hi', VmString::strPad('hi', -5, 'x', 1));
+        $this->assertSame('p----', StrPadJitHelper::padArgv('p', 5, '-', 1));
+        $this->assertSame('p----', VmString::strPad('p', 5, '-', 1));
     }
 
     public function testSpineBundleIncludesStrPadJitHelper(): void
