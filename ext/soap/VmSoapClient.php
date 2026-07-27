@@ -199,8 +199,8 @@ final class VmSoapClient
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
-            // php-src soap.c ctor — attach Soap\Sdl after successful WSDL parse (#23247).
-            self::attachSdl($object, $ctx);
+            // php-src soap.c ctor — attach Soap\Sdl after successful WSDL parse (#23247 / #23905).
+            self::attachSdl($object, $ctx, $state);
         }
         // php-src soap.c — Z_CLIENT_TYPEMAP gets array after soap_create_typemap (#23903 / UPGRADING 8.4).
         self::attachTypemap($object, $ctx, $state->typemap);
@@ -527,8 +527,9 @@ final class VmSoapClient
 
     /**
      * php-src soap.c SoapClient ctor — Z_CLIENT_SDL gets Soap\Sdl after WSDL load (#23247).
+     * Attaches parsed SDL snapshot on the opaque object (php-src sdl_object->sdl; #23905).
      */
-    private static function attachSdl(ObjectEntry $object, Context $ctx): void
+    private static function attachSdl(ObjectEntry $object, Context $ctx, SoapClientState $state): void
     {
         if (!SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
             return;
@@ -536,7 +537,9 @@ final class VmSoapClient
         if (!$object->hasProperty('sdl')) {
             return;
         }
-        $object->getProperty('sdl')->object(VmSoapOpaque::newSdlObject($ctx));
+        $object->getProperty('sdl')->object(
+            VmSoapOpaque::newSdlObject($ctx, SoapSdlPayload::fromClientState($state))
+        );
     }
 
     /**
