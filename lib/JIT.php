@@ -8387,21 +8387,28 @@ class JIT {
                     // prologue may already have allocated the scope slot, but in-place CONCAT into
                     // a slot that aliases the left operand corrupts the local (#23798).
                     if ($destIsDeadOperand) {
-                        $left = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                        $right = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                        $leftOp = $block->getOperand($op->arg2);
+                        $rightOp = $block->getOperand($op->arg3);
+                        $left = $this->context->getVariableFromOp($leftOp);
+                        $right = $this->context->getVariableFromOp($rightOp);
                         if (JIT\StringOffsetHelper::isWritableCharOffsetLvalue($left, $this->context)) {
                             JIT\StringOffsetHelper::emitAssignOpError($this->context);
                             break;
                         }
-                        $this->assignEphemeralConcatOperand(
-                            $block,
-                            $destOp,
-                            $left,
-                            $right,
-                            $func,
-                            $block->getOperand($op->arg2),
-                            $block->getOperand($op->arg3)
-                        );
+                        if ($this->concatDeadOperandNeedsEntryAlloca($block, $destOp, $leftOp)) {
+                            $this->assignEphemeralConcatOperand(
+                                $block,
+                                $destOp,
+                                $left,
+                                $right,
+                                $func,
+                                $leftOp,
+                                $rightOp
+                            );
+                        } else {
+                            $newVal = $this->compileConcatIntoNewString($left, $right, $leftOp, $rightOp);
+                            $this->assignOperand($destOp, $newVal, true);
+                        }
                         $this->maybeRefreshIncludeBindingsBeforeUse();
                         break;
                     }
@@ -15803,6 +15810,31 @@ class JIT {
     }
 
     /**
+     * Entry-alloca ephemeral concat only when the left operand is a named local (#23798).
+     *
+     * Chained dead-temp concats (`$t = $a.' '; $t .= $b`) must keep KIND_VALUE temps — entry
+     * allocas on every link corrupt the heap under AOT (#23842).
+     */
+    private function concatDeadOperandNeedsEntryAlloca(Block $block, Operand $destOp, ?Operand $leftOp): bool
+    {
+        if (!$leftOp instanceof Operand\Variable) {
+            return false;
+        }
+        if ($leftOp === $destOp) {
+            return false;
+        }
+        $name = JIT\OperandName::resolve($leftOp);
+        if (null === $name || '' === $name) {
+            return false;
+        }
+        if (\PHPCompiler\Web\Superglobals::isSuperglobalName($name)) {
+            return false;
+        }
+
+        return $block->hasLocallyWrittenVariableName($name);
+    }
+
+    /**
      * Store concat into a php-cfg dead Temporary (echo/call arg) with entry alloca lifetime (#23798).
      *
      * assignOperand → makeVariableFromValueOp left a bare {@see KIND_VALUE} __string__*; a second
@@ -15829,6 +15861,7 @@ class JIT {
             Variable::KIND_VARIABLE,
             $destSlot
         );
+        $promoted->ephemeralConcatTemp = true;
         JIT\BasicBlockHelper::storeAtFunctionEntry(
             $this->context,
             $func,
