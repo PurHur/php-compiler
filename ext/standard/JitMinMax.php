@@ -92,9 +92,9 @@ final class JitMinMax
         foreach (\array_slice($args, 1) as $arg) {
             $candidate = pow::toJitDouble($context, $arg, $double);
             $cmp = $context->builder->fcmp(
-                $pickMin ? Builder::REAL_OGT : Builder::REAL_OGE,
-                $best,
-                $candidate
+                Builder::REAL_OGT,
+                $pickMin ? $best : $candidate,
+                $pickMin ? $candidate : $best
             );
             $best = $context->builder->select($cmp, $candidate, $best);
         }
@@ -103,44 +103,89 @@ final class JitMinMax
     }
 
     /**
+     * Boxed / mixed scalars — return winning __value__* (#23779).
+     *
      * @param list<JITVariable> $args
      */
     private static function reduceNumericBoxes(Context $context, bool $pickMin, array $args): Value
     {
-        $double = $context->getTypeFromString('double');
-        $useFloat = self::argsNeedFloatCompare($args);
-        $best = self::toCompareDouble($context, JitValueBox::valuePtrFromVariable($context, $args[0]));
+        $bestPtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
         foreach (\array_slice($args, 1) as $arg) {
-            $candidate = self::toCompareDouble($context, JitValueBox::valuePtrFromVariable($context, $arg));
-            $cmp = $context->builder->fcmp(
-                $pickMin ? Builder::REAL_OGT : Builder::REAL_OGE,
-                $best,
-                $candidate
-            );
-            $best = $context->builder->select($cmp, $candidate, $best);
-        }
-        if ($useFloat) {
-            return $best;
+            $candPtr = JitValueBox::valuePtrFromVariable($context, $arg);
+            $pickCand = self::shouldPickCandidate($context, $pickMin, $bestPtr, $candPtr);
+            $bestPtr = $context->builder->select($pickCand, $candPtr, $bestPtr);
         }
 
-        return $context->builder->fptosi($best, $context->getTypeFromString('int64'));
+        return $bestPtr;
     }
 
-    /**
-     * @param list<JITVariable> $args
-     */
-    private static function argsNeedFloatCompare(array $args): bool
-    {
-        foreach ($args as $arg) {
-            if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
-                return true;
-            }
-            if (JITVariable::TYPE_STRING === $arg->type || JitValueBox::isValueOperand($arg)) {
-                return true;
-            }
-        }
+    private static function shouldPickCandidate(
+        Context $context,
+        bool $pickMin,
+        Value $bestPtr,
+        Value $candPtr
+    ): Value {
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $bestType = $context->builder->load($context->builder->structGep($bestPtr, $map['type']));
+        $candType = $context->builder->load($context->builder->structGep($candPtr, $map['type']));
+        $stringTy = $i8->constInt(JITVariable::TYPE_STRING, false);
+        $bothString = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $bestType, $stringTy),
+            $context->builder->icmp(Builder::INT_EQ, $candType, $stringTy)
+        );
 
-        return false;
+        $tag = 'n'.(++self::$compareSeq);
+        $stringBlock = BasicBlockHelper::append($context, 'jit_min_max_'.$tag.'_str');
+        $numericBlock = BasicBlockHelper::append($context, 'jit_min_max_'.$tag.'_num');
+        $done = BasicBlockHelper::append($context, 'jit_min_max_'.$tag.'_done');
+        $i1 = $context->getTypeFromString('int1');
+
+        $context->builder->branchIf($bothString, $stringBlock, $numericBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strCmp = self::stringPtrSpaceship($context, $bestPtr, $candPtr);
+        $zero = $context->getTypeFromString('int32')->constInt(0, false);
+        $stringPick = $context->builder->icmp(
+            $pickMin ? Builder::INT_SGT : Builder::INT_SLT,
+            $strCmp,
+            $zero
+        );
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($numericBlock);
+        $bestD = self::toCompareDouble($context, $bestPtr);
+        $candD = self::toCompareDouble($context, $candPtr);
+        $numericPick = $context->builder->fcmp(
+            Builder::REAL_OGT,
+            $pickMin ? $bestD : $candD,
+            $pickMin ? $candD : $bestD
+        );
+        $numericEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $phi = $context->builder->phi($i1, 'jit_min_max_'.$tag.'_pick');
+        $phi->addIncoming($stringPick, $stringEnd);
+        $phi->addIncoming($numericPick, $numericEnd);
+
+        return $phi;
+    }
+
+    private static function stringPtrSpaceship(Context $context, Value $leftPtr, Value $rightPtr): Value
+    {
+        $leftStr = $context->builder->call($context->lookupFunction('__value__readString'), $leftPtr);
+        $rightStr = $context->builder->call($context->lookupFunction('__value__readString'), $rightPtr);
+        $strMap = $context->structFieldMap['__string__'];
+        $leftData = $context->builder->structGep($leftStr, $strMap['value']);
+        $rightData = $context->builder->structGep($rightStr, $strMap['value']);
+
+        return $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $leftData,
+            $rightData
+        );
     }
 
     private static function toCompareDouble(Context $context, Value $valuePtr): Value
