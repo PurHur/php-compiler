@@ -889,6 +889,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fileNames, 'scanner_mode', 'parse_ini_file'));
     }
 
+    /** @covers issue #23462 */
+    public function testCheckdateGetdateGmdateSubstrCountZendStubNamedParams(): void
+    {
+        $checkdate = BuiltinParamNames::forFunction('checkdate');
+        self::assertSame(['month', 'day', 'year'], $checkdate);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($checkdate, 'month', 'checkdate'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($checkdate, 'day', 'checkdate'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($checkdate, 'year', 'checkdate'));
+
+        $getdate = BuiltinParamNames::forFunction('getdate');
+        self::assertSame(['timestamp'], $getdate);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($getdate, 'timestamp', 'getdate'));
+
+        $gmdate = BuiltinParamNames::forFunction('gmdate');
+        self::assertSame(['format', 'timestamp'], $gmdate);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gmdate, 'format', 'gmdate'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($gmdate, 'timestamp', 'gmdate'));
+
+        $substrCount = BuiltinParamNames::forFunction('substr_count');
+        self::assertSame(['haystack', 'needle', 'offset', 'length'], $substrCount);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($substrCount, 'haystack', 'substr_count'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($substrCount, 'needle', 'substr_count'));
+    }
+
     /** @covers issue #23216 */
     public function testStrtotimeZendStubNamedParams(): void
     {
