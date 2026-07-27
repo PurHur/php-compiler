@@ -840,6 +840,31 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23598 */
+    public function testStreamSelectFilterVarArrayGetHeadersZendStubNamedParams(): void
+    {
+        $streamSelect = BuiltinParamNames::forFunction('stream_select');
+        self::assertSame(['read', 'write', 'except', 'seconds', 'microseconds'], $streamSelect);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($streamSelect, 'read', 'stream_select'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($streamSelect, 'seconds', 'stream_select'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($streamSelect, 'read_streams', 'stream_select'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($streamSelect, 'tv_sec', 'stream_select'));
+
+        $fva = BuiltinParamNames::forFunction('filter_var_array');
+        self::assertSame(['array', 'options', 'add_empty'], $fva);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fva, 'array', 'filter_var_array'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fva, 'options', 'filter_var_array'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fva, 'data', 'filter_var_array'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($fva, 'definition', 'filter_var_array'));
+
+        $headers = BuiltinParamNames::forFunction('get_headers');
+        self::assertSame(['url', 'associative', 'context'], $headers);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($headers, 'url', 'get_headers'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($headers, 'associative', 'get_headers'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($headers, 'context', 'get_headers'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($headers, 'format', 'get_headers'));
+    }
+
     /** @covers issue #23446 */
     public function testDateDefaultTimezoneSetZendStubNamedParams(): void
     {

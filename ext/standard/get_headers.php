@@ -27,9 +27,9 @@ final class get_headers extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
+        if ($argc < 1 || $argc > 3) {
             throw new \ArgumentCountError(
-                'get_headers() expects at least 1 argument, '.\max(0, $argc - 1).' given'
+                'get_headers() expects at least 1 argument, '.\max(0, $argc).' given'
             );
         }
         if (null === $frame->returnVar) {
@@ -45,6 +45,11 @@ final class get_headers extends Internal
                 2,
                 'associative'
             );
+        }
+        // Optional $context accepted for Zend stub arity (#23598); fetch path ignores it for now.
+        if ($argc >= 3) {
+            // Validate presence only — resource|null; unused until stream-context fetch lands.
+            $frame->calledArgs[2]->resolveIndirect();
         }
 
         if (!VmHttpLastResponseHeaders::isHttpUrl($url)) {
@@ -67,9 +72,9 @@ final class get_headers extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
+        if ($argc < 1 || $argc > 3) {
             throw new \LogicException(
-                'get_headers() expects at least 1 argument, '.\max(0, $argc - 1).' given'
+                'get_headers() expects at least 1 argument, '.\max(0, $argc).' given'
             );
         }
 
