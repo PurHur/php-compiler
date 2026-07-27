@@ -375,11 +375,18 @@ bootstrap-selfhost-lib-spine-vm-smoke:
 	./script/bootstrap-selfhost-lib-spine-vm-smoke.sh
 bootstrap-selfhost-vm-driver-execute-probe:
 	./script/bootstrap-selfhost-vm-driver-execute-probe.sh
+# Inventory emit-helper (#23970): skip SourceBundler + HELPER_RUNTIME_O for phpc_str_replace.
+# Bundling OOMs through 24GiB; skip-bundle still OOMs at 24GiB on inventory-scale IncludeHelper
+# (measured 2026-07-27) — floor 16GiB for residual peak; host needs PHP_COMPILER_DOCKER_MEM≥16g.
+# Deeper fix: refresh gen-0 compile_driver sidecar or shrink the emit-driver require graph.
 bootstrap-selfhost-helloworld:
 	BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
 	BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
 	BOOTSTRAP_M3_RUNTIME_COMPILE=1 \
 	BOOTSTRAP_M3_HELLOWORLD_STRICT=1 \
+	PHP_COMPILER_HELPER_RUNTIME_O=$${PHP_COMPILER_HELPER_RUNTIME_O:-1} \
+	PHP_COMPILER_MEMORY_LIMIT=$${PHP_COMPILER_MEMORY_LIMIT:-16384M} \
+	PHP_COMPILER_LLVM_MEMORY_LIMIT=$${PHP_COMPILER_LLVM_MEMORY_LIMIT:-16384M} \
 	./script/bootstrap-selfhost-helloworld-probe.sh
 bootstrap-selfhost-helloworld-compile-bin:
 	./script/bootstrap-selfhost-helloworld-compile-bin.sh

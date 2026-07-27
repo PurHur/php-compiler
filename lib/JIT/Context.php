@@ -1199,6 +1199,11 @@ class Context {
                 Builtin\StringParseStr::ensureStandaloneBodies($this);
             }
             Builtin\StringFormat::ensureStandaloneBodies($this);
+            // Skip-bundle inventory compile_driver (#23970): bind phpc_str_replace before
+            // NestedJIT includes; HelperRuntimeCache supplies the TU when enabled.
+            if (\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
+                Builtin\StringStrReplace::ensureStandaloneBodies($this);
+            }
             Builtin\StringJsonEncode::ensureStandaloneBodies($this);
             Builtin\StringJsonDecode::ensureStandaloneBodies($this);
             Builtin\StringTriggerError::ensureStandaloneBodies($this);

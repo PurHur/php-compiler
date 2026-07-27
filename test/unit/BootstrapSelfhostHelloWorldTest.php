@@ -489,6 +489,34 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $jit);
     }
 
+    /** Issue #23970: skip-bundle + helper-runtime O; 16G floor (bundling OOMs through 24G). */
+    public function testHelloWorldProbeRaisesCompileDriverMemoryFloor(): void
+    {
+        $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
+        $this->assertStringContainsString('HELLOWORLD_EMIT_MEM_FLOOR_MIB=16384', $script);
+        $this->assertStringContainsString('PHP_COMPILER_MEMORY_LIMIT=16384M', $script);
+        $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $script);
+        $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB=0', $script);
+        $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM=16g', $script);
+        $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
+        $this->assertStringContainsString("'16384M'", $compile);
+        $this->assertStringContainsString('compile_driver.php', $compile);
+        $this->assertStringContainsString('#23970', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $compile);
+        $this->assertMatchesRegularExpression(
+            '/function phpc_compile_skip_aot_bundle.*?compile_driver\.php/s',
+            $compile
+        );
+        $ctx = (string) file_get_contents(self::$root.'/lib/JIT/Context.php');
+        $this->assertStringContainsString('StringStrReplace::ensureStandaloneBodies', $ctx);
+        $strReplace = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/StringStrReplace.php');
+        $this->assertStringContainsString('HelperRuntimeCache::enabled()', $strReplace);
+        $makefile = (string) file_get_contents(self::$root.'/Makefile');
+        $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O', $makefile);
+        $this->assertStringContainsString('still OOMs at 24GiB', $makefile);
+        $this->assertStringContainsString('cold AOT still OOMs past 24GiB', $script);
+    }
+
     public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
