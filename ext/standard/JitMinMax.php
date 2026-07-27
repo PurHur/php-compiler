@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -24,6 +25,9 @@ final class JitMinMax
         if ($argc < 1) {
             throw new \LogicException('min()/max() requires at least one argument in this compiler build');
         }
+        if (self::allPlainIntScalars($args)) {
+            return self::reduceNativeLongValues($context, $pickMin, self::lowerPlainIntScalars($context, $args));
+        }
         if (self::allNativeLong($args)) {
             return self::reduceNativeLong($context, $pickMin, $args);
         }
@@ -32,6 +36,71 @@ final class JitMinMax
         }
 
         return self::reduceNumericBoxes($context, $pickMin, $args);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    private static function allPlainIntScalars(array $args): bool
+    {
+        foreach ($args as $arg) {
+            if (!self::isPlainIntScalar($arg)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function isPlainIntScalar(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NATIVE_LONG === $arg->type
+            || JITVariable::TYPE_NATIVE_BOOL === $arg->type
+            || JITVariable::TYPE_NULL === $arg->type
+            || JitValueBox::isValueOperand($arg);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     */
+    public static function canLowerPlainIntPair(array $args): bool
+    {
+        return 2 === \count($args)
+            && self::isPlainIntScalar($args[0])
+            && self::isPlainIntScalar($args[1]);
+    }
+
+    /**
+     * @param list<JITVariable> $args
+     *
+     * @return list<Value>
+     */
+    private static function lowerPlainIntScalars(Context $context, array $args): array
+    {
+        $out = [];
+        foreach ($args as $i => $arg) {
+            $out[] = JitLongArg::lower($context, $arg, 'min()/max() argument #'.($i + 1));
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<Value> $values
+     */
+    private static function reduceNativeLongValues(Context $context, bool $pickMin, array $values): Value
+    {
+        $best = $values[0];
+        foreach (\array_slice($values, 1) as $candidate) {
+            $cmp = $context->builder->icmp(
+                $pickMin ? Builder::INT_SLT : Builder::INT_SGT,
+                $candidate,
+                $best
+            );
+            $best = $context->builder->select($cmp, $candidate, $best);
+        }
+
+        return $best;
     }
 
     /**

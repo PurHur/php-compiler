@@ -71,6 +71,16 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         );
     }
 
+    public function testSprintfJitHelperSequentialMultiArgDecimals(): void
+    {
+        $blob = "\x01".\pack('q', 2)."\x01".\pack('q', 4);
+        $this->assertSame('2-4', SprintfJitHelper::sprintfArgv('%d-%d', $blob));
+        $this->assertSame('2 4', SprintfJitHelper::sprintfArgv('%d %d', $blob));
+        $blobMixed = "\x01".\pack('q', 9)."\x04".\pack('q', 3).'web';
+        $this->assertSame('id=9 name=web', SprintfJitHelper::sprintfArgv('id=%d name=%s', $blobMixed));
+        $this->assertSame('ok=%', SprintfJitHelper::sprintfArgv('ok=%%', ''));
+    }
+
     public function testVmSprintfCustomPadMatchesZendShapes(): void
     {
         $x = new Variable();

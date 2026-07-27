@@ -59,6 +59,7 @@ final class HelperRuntimeCache
      * @var array<string, true>
      */
     private const USER_SCRIPT_INLINE_ONLY_LOGICALS = [
+        'phpcompiler\\ext\\standard\\sprintfjithelper::sprintfargv' => true,
     ];
 
     private static bool $loggedHit = false;
