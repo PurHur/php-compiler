@@ -51,8 +51,9 @@ final class ClassConstDynamicFetchRejectorTest extends TestCase
         $runtime = new Runtime();
         $this->expectException(CompileFatal::class);
         $this->expectExceptionMessage('unexpected token ","');
+        // Inline Zend 8.2 reference-profile gap (comma after C::{$name}) — #17863 / #23760.
         $runtime->parseAndCompile(
-            file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_class_const_dynamic_fetch.php'),
+            "<?php\nclass C { public const FOO = 'bar'; }\n\$name = 'FOO';\necho C::{\$name}, \"\\n\";\n",
             'maintainer_gap_class_const_dynamic_fetch.php'
         );
     }
@@ -86,6 +87,38 @@ PHP;
             ob_start();
             $runtime->run($block);
             $this->assertSame("bar\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Issue #23760 Done-when: ClassName::{$expr}, $obj::{$expr}, undefined → Error. */
+    public function testForwardProfileIssue23760ObjectAndUndefined(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDynamicClassConstFetch());
+            $code = <<<'PHP'
+<?php
+class C { const RED = 'red'; }
+$n = 'RED';
+echo C::{$n}, "\n";
+$o = new C();
+echo $o::{$n}, "\n";
+$bad = 'MISSING';
+try { C::{$bad}; } catch (Error $e) { echo get_class($e), ':', $e->getMessage(), "\n"; }
+PHP;
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'issue_23760.php');
+            $this->assertNotNull($block);
+            ob_start();
+            $runtime->run($block);
+            $this->assertSame("red\nred\nError:Undefined constant C::MISSING\n", ob_get_clean());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

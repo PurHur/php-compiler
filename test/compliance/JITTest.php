@@ -1375,12 +1375,14 @@ class JITTest extends BaseTest {
                 continue;
             }
             // 8.3-target reject gate; skipped when dynamic class const fetch enabled (#17863).
+            // Functional *_forward_83 cases set PROFILE via --ENV--; always include (#23760).
             if (CompilerVersion::supportsDynamicClassConstFetch()
                 && str_contains($name, 'class_const_dynamic_fetch_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsDynamicClassConstFetch()
-                && str_contains($name, 'class_const_dynamic_fetch_forward')) {
+                && str_contains($name, 'class_const_dynamic_fetch_forward')
+                && !str_contains($name, 'forward_83')) {
                 continue;
             }
             if (!CompilerVersion::supportsDynamicClassConstFetch()
