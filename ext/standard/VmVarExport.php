@@ -67,7 +67,7 @@ final class VmVarExport
             return 'NULL';
         }
         if (Variable::TYPE_INTEGER === $v->type) {
-            return (string) $v->toInt();
+            return self::formatExportInteger($v->toInt());
         }
         if (Variable::TYPE_FLOAT === $v->type) {
             return VmVarExportFloat::format($v->toFloat());
@@ -99,6 +99,19 @@ final class VmVarExport
         }
 
         throw new \LogicException('var_export() does not support this value type in this compiler build');
+    }
+
+    /**
+     * php-src var.c php_var_export_ex — PHP_INT_MIN is not a valid integer literal
+     * (parser overflow), so Zend emits {@code (PHP_INT_MIN+1).'-1'} (#23690).
+     */
+    private static function formatExportInteger(int $value): string
+    {
+        if (\PHP_INT_MIN === $value) {
+            return (string) (\PHP_INT_MIN + 1).'-1';
+        }
+
+        return (string) $value;
     }
 
     /**
