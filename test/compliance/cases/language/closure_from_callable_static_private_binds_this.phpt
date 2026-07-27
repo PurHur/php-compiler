@@ -1,9 +1,9 @@
 --TEST--
-language: Closure::fromCallable([self::class, private]) TypeError (#23688, zend_closures.c)
+language: Closure::fromCallable([self::class, private]) binds $this (#23771, zend_closures.c)
 --FILE--
 <?php
 class A {
-    private function priv(): void {}
+    private function priv(): void { echo "called\n"; }
     public function run(): void {
         try {
             Closure::fromCallable([$this, 'priv']);
@@ -12,8 +12,9 @@ class A {
             echo get_class($e), ': ', $e->getMessage(), "\n";
         }
         try {
-            Closure::fromCallable([self::class, 'priv']);
-            echo "static array uncaught\n";
+            $c = Closure::fromCallable([self::class, 'priv']);
+            echo "static array ok\n";
+            $c();
         } catch (Throwable $e) {
             echo get_class($e), ': ', $e->getMessage(), "\n";
         }
@@ -22,4 +23,5 @@ class A {
 (new A())->run();
 --EXPECT--
 instance ok
-TypeError: Failed to create closure from callable: non-static method A::priv() cannot be called statically
+static array ok
+called

@@ -70,6 +70,64 @@ final class ClosureSupport
     }
 
     /**
+     * Active $this from the caller's instance frame (skip Internal handler frames).
+     * Used by Closure::fromCallable([Class, instanceMethod]) to bind a fake closure
+     * when Zend would accept the callback (zend_closures.c / zend_is_callable, #23771).
+     */
+    public static function callerThis(Frame $frame): ?Variable
+    {
+        for ($f = $frame; null !== $f; $f = $f->parent) {
+            if (null === $f->block || null === $f->block->func) {
+                continue;
+            }
+            if ((($f->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+                continue;
+            }
+            $isClosure = (($f->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0;
+            if (!$isClosure && null === $f->block->func->class) {
+                continue;
+            }
+            $idx = $f->block->slotIndexForVariableName('this');
+            if (null !== $idx && isset($f->scope[$idx])) {
+                $bound = $f->scope[$idx]->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $bound->type) {
+                    return $f->scope[$idx];
+                }
+            }
+            $fromScope = $f->block->findVariableByRuntimeName('this', $f);
+            if (null !== $fromScope) {
+                $bound = $fromScope->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $bound->type) {
+                    return $fromScope;
+                }
+            }
+            if ($isClosure) {
+                $state = $f->closureCall ?? $f->pendingClosureInvoke;
+                if (null !== $state && null !== $state->boundThis) {
+                    $bound = $state->boundThis->resolveIndirect();
+                    if (Variable::TYPE_OBJECT === $bound->type) {
+                        return $state->boundThis;
+                    }
+                }
+            }
+            if (!empty($f->calledArgs)) {
+                $receiver = $f->calledArgs[0]->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $receiver->type) {
+                    return $f->calledArgs[0];
+                }
+            }
+            if (!empty($f->callArgs)) {
+                $receiver = $f->callArgs[0]->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $receiver->type) {
+                    return $f->callArgs[0];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Closure::fromStatic() — static method callable string to closure (#9992, Zend/zend_closures.c).
      */
     public static function fromStatic(Context $ctx, Frame $frame, Variable $callable): ObjectEntry
@@ -485,18 +543,63 @@ final class ClosureSupport
         if ($class->isEnum && null !== $class->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
             return ClosureState::fromWrappedFunc(new EnumFromHandler($class, 'tryfrom' === $methodLc));
         }
+        $namedClassLc = $lcClass;
+        $namedClass = $ctx->classes[$namedClassLc];
         [$class, $methodLc] = self::resolveStaticMethod($ctx, $lcClass, $methodLc);
-        self::assertStaticMethodForCallable($class, $methodLc, $fromCallableApi);
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = self::callerClassLc($frame);
         $callerDisplay = self::classDisplayName($ctx, $callerClassLc);
+        $declaredName = $class->methodNames[$methodLc] ?? $methodName;
+        $isSameOrSubclass = fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc);
+
+        // Closure::fromCallable([Class, instanceMethod]) / "Class::instanceMethod": when
+        // $this is an instance of Class, Zend binds a fake closure (zend_closures.c, #23771).
+        // FCC Class::method(...) still Errors via assertStaticMethodForCallable.
+        if ($fromCallableApi && !self::isStaticMethod($class, $methodLc)) {
+            $thisVar = self::callerThis($frame);
+            if (null !== $thisVar) {
+                $resolvedThis = $thisVar->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $resolvedThis->type) {
+                    $thisClassLc = strtolower($resolvedThis->toObject()->class->name);
+                    if (self::isClassSameOrSubclassOf($ctx, $thisClassLc, $namedClassLc)) {
+                        self::assertMethodAccessibleForFromCallable(
+                            $vis,
+                            $callerClassLc,
+                            strtolower($class->name),
+                            $class->name,
+                            $declaredName,
+                            $isSameOrSubclass,
+                            $callerDisplay
+                        );
+                        $boundThis = new Variable();
+                        $boundThis->copyFrom($thisVar);
+                        // Non-virtual: invoke the resolved Func with bound $this (like parent::).
+                        $state = ClosureState::fromMethodCallable(
+                            $class->methods[$methodLc],
+                            $boundThis,
+                            $declaredName
+                        );
+                        $state->methodReceiver = null;
+                        $state->methodName = null;
+                        $state->boundThis = $boundThis;
+                        $state->boundScopeClass = $namedClass->name;
+
+                        return $state;
+                    }
+                }
+            }
+            self::assertStaticMethodForCallable($class, $methodLc, true);
+        } elseif (!$fromCallableApi) {
+            self::assertStaticMethodForCallable($class, $methodLc, false);
+        }
+
         self::assertMethodAccessibleForFromCallable(
             $vis,
             $callerClassLc,
             strtolower($class->name),
             $class->name,
-            $class->methodNames[$methodLc] ?? $methodName,
-            fn (string $classLc, string $ancestorLc): bool => self::isClassSameOrSubclassOf($ctx, $classLc, $ancestorLc),
+            $declaredName,
+            $isSameOrSubclass,
             $callerDisplay
         );
 
@@ -757,31 +860,39 @@ final class ClosureSupport
     }
 
     /**
-     * @return array{0: ClassEntry, 1: string}
+     * True when the resolved method is static (or enum cases / lazy-ghost factory).
      */
+    private static function isStaticMethod(ClassEntry $declaringClass, string $methodLc): bool
+    {
+        if ($declaringClass->isEnum && 'cases' === $methodLc) {
+            return true;
+        }
+        if ($declaringClass->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
+            return true;
+        }
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? 0;
+        if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+            return true;
+        }
+        $func = $declaringClass->methods[$methodLc] ?? null;
+
+        return $func instanceof Func\PHP && null !== $func->block->func
+            && (($func->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0;
+    }
+
     /**
      * First-class `Class::instanceMethod(...)` must Error at creation (zend_compile.c, #7465).
+     * Closure::fromCallable without a compatible $this uses the same message as TypeError (#23771).
      */
     private static function assertStaticMethodForCallable(
         ClassEntry $declaringClass,
         string $methodLc,
         bool $fromCallableApi = false
     ): void {
-        if ($declaringClass->isEnum && 'cases' === $methodLc) {
-            return;
-        }
-        if ($declaringClass->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
-            return;
-        }
-        $vis = $declaringClass->methodVisibility[$methodLc] ?? 0;
-        if (($vis & \PHPCfg\Func::FLAG_STATIC) !== 0) {
+        if (self::isStaticMethod($declaringClass, $methodLc)) {
             return;
         }
         $func = $declaringClass->methods[$methodLc] ?? null;
-        if ($func instanceof Func\PHP && null !== $func->block->func
-            && (($func->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) !== 0) {
-            return;
-        }
         $declaringName = $declaringClass->name;
         $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodLc;
         if ($func instanceof Func\PHP && null !== $func->block->func && null !== $func->block->func->class) {
@@ -803,6 +914,9 @@ final class ClosureSupport
         throw new \Error($message);
     }
 
+    /**
+     * @return array{0: ClassEntry, 1: string}
+     */
     private static function resolveStaticMethod(Context $ctx, string $lcClass, string $methodLc): array
     {
         $visited = [];
