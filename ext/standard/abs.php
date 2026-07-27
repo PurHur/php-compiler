@@ -45,7 +45,8 @@ final class abs extends Internal
 
             return;
         }
-        $frame->returnVar->float($num < 0.0 ? -$num : $num);
+        // php-src math.c fabs: abs(-0.0) → +0.0 (#23978). `$num < 0.0` is false for -0.0.
+        $frame->returnVar->float(AbsJitHelper::absDoubleArgv($num));
     }
 
     public Context $context;

@@ -32,6 +32,9 @@ final class AbsRuntimeShrinkTest extends TestCase
         $this->assertSame(3.5, AbsJitHelper::absDoubleArgv(-3.5));
         $this->assertSame(7, AbsJitHelper::absLongArgv(-7));
         $this->assertSame(0, AbsJitHelper::absLongArgv(0));
+        // php-src fabs: signed zero → +0.0 (#23978)
+        $this->assertSame('0.0', \var_export(AbsJitHelper::absDoubleArgv(-0.0), true));
+        $this->assertSame('0', \json_encode(AbsJitHelper::absDoubleArgv(-0.0)));
     }
 
     public function testSpineBundleIncludesAbsJitHelper(): void
