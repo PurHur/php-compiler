@@ -174,7 +174,13 @@ final class BuiltinParamNames
             case 'wordwrap':
                 return ['string', 'width', 'break', 'cut_long_words'];
             case 'date':
+            case 'gmdate':
                 return ['format', 'timestamp'];
+            // php-src ext/date/php_date.stub.php — Reflection OK but BuiltinParamNames missing (#23462)
+            case 'checkdate':
+                return ['month', 'day', 'year'];
+            case 'getdate':
+                return ['timestamp'];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says time/now (#23216)
             case 'strtotime':
                 return ['datetime', 'baseTimestamp'];
@@ -905,6 +911,9 @@ final class BuiltinParamNames
                 return ['filename'];
             case 'glob':
                 return ['pattern', 'flags'];
+            // php-src ext/standard/string.stub.php — Reflection OK but BuiltinParamNames missing (#23462)
+            case 'substr_count':
+                return ['haystack', 'needle', 'offset', 'length'];
             case 'substr_compare':
                 return ['haystack', 'needle', 'offset', 'length', 'case_insensitive'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/repl/start (#23183)
