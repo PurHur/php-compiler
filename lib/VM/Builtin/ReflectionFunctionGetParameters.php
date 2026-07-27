@@ -46,7 +46,13 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
             $param->getProperty(ReflectionSupport::PROP_METHOD_NAME)->null();
             $param->getProperty(ReflectionSupport::PROP_PARAM_INDEX)->int((int) $index);
             $param->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int((int) $index);
-            $param->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($paramNames[$index]);
+            // Strip InternalArgInfo / BuiltinParamNames optionality markers for Reflection::$name (#23608).
+            $displayName = ltrim((string) $paramNames[$index], '&');
+            if (str_starts_with($displayName, '...')) {
+                $displayName = substr($displayName, 3);
+            }
+            $displayName = rtrim($displayName, '=');
+            $param->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($displayName);
             if (null !== $closureState) {
                 $param->reflectionClosureState = $closureState;
             }

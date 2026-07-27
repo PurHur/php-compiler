@@ -2622,18 +2622,22 @@ final class ReflectionSupport
         $functionName = self::functionNameFromReflection($reflection);
         $override = BuiltinParamNames::forFunction($functionName);
         if (null !== $override && isset($override[$index])) {
+            $name = rtrim(ltrim($override[$index], '&'), '=');
+            if (str_starts_with($name, '...')) {
+                $name = substr($name, 3);
+            }
             $info = BuiltinInternalArgInfo::paramInfoForFunction($functionName, $index);
             if (null !== $info) {
                 return [
-                    'name' => $override[$index],
+                    'name' => $name,
                     'type' => $info['type'],
-                    'isOptional' => $info['isOptional'],
+                    'isOptional' => $info['isOptional'] || str_ends_with($override[$index], '='),
                 ];
             }
 
-            // Zend stub has trailing optionals not present in legacy InternalArgInfo (#23181).
+            // Zend stub has trailing optionals not present in legacy InternalArgInfo (#23181, #23608).
             return [
-                'name' => $override[$index],
+                'name' => $name,
                 'type' => '',
                 'isOptional' => true,
             ];
