@@ -119,6 +119,10 @@ final class BuiltinParamNames
             'xmlwriter::writeattributens' => ['prefix', 'name', 'namespace', 'value'],
             'xmlwriter::startelementns' => ['prefix', 'name', 'namespace'],
             'xmlwriter::writeelementns' => ['prefix', 'name', 'namespace', 'content'],
+            // php-src ext/fileinfo/fileinfo.stub.php — methods missing from InternalArgInfo (#23410)
+            'finfo::buffer' => ['string', 'flags=', 'context='],
+            'finfo::file' => ['filename', 'flags=', 'context='],
+            'finfo::set_flags' => ['flags'],
             default => null,
         };
     }
