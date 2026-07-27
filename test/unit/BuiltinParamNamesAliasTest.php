@@ -1564,6 +1564,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dpf, 'date', 'date_parse_from_format'));
     }
 
+    /** @covers issue #23680 */
+    public function testSplAutoloadUnregisterZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('spl_autoload_unregister');
+        self::assertSame(['callback'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', 'spl_autoload_unregister'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'autoload_function', 'spl_autoload_unregister'));
+    }
+
     /** @covers issue #23422 */
     public function testClassAliasZendStubNamedParams(): void
     {
