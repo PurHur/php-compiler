@@ -8996,6 +8996,19 @@ class JIT {
                         && '' !== $op->echoScriptGlobalName
                         && $block->isMainScript()
                     ) ? $op->echoScriptGlobalName : null;
+                    // CFG string Literals must echo by content (#19504) *before* same-slot
+                    // Variable rewrite. Try/catch merge blocks reuse SSA slots with catch
+                    // temps, so rewriting "AFTER" → a Variable prints "caught: "/"getMessage"
+                    // (#23930, #23641 AFTER regression).
+                    if (
+                        null === $scriptGlobalEchoName
+                        && $echoOp instanceof Operand\Literal
+                        && \is_string($echoOp->value)
+                    ) {
+                        JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
+                        JIT\ValueEchoHelper::echoLiteral($this->context, $echoOp->value);
+                        break;
+                    }
                     $arg = null;
                     if (null !== $scriptGlobalEchoName) {
                         $arg = $this->context->ensureScriptGlobal($scriptGlobalEchoName);
@@ -9014,14 +9027,6 @@ class JIT {
                         }
                         $arg = $this->resolveScriptGlobalForRuntimeRead($echoOp, $block)
                             ?? $this->context->getVariableFromOpInScopes($echoOp);
-                    }
-                    // CFG string Literals must not load include-binding slots: refresh can
-                    // alias inherited locals over slot-backed fromLiteral temps, so
-                    // echo "<html>", "\n" emits $appName/$title (#19504 MiniWebApp AOT).
-                    if ($echoOp instanceof Operand\Literal && \is_string($echoOp->value)) {
-                        JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
-                        JIT\ValueEchoHelper::echoLiteral($this->context, $echoOp->value);
-                        break;
                     }
                     if ($this->context->inlineIncludeDepth > 0) {
                         $echoName = JIT\OperandName::resolve($echoOp);
