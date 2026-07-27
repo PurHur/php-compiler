@@ -235,7 +235,7 @@ final class VmDebugZval
         self::write('object('.$className.')#'.$object->id.' ('.$count.') refcount('.$object->refCount."){\n");
         foreach ($props as $name => $value) {
             self::write(self::indent($level + 1));
-            self::write('["'.$name."\"]=>\n");
+            self::write(VmDebugPropertyName::formatForVarDump($name)."=>\n");
             self::dumpVariable($vm, $value, $level + 1, true, $frame);
         }
         if ($level > 0) {
