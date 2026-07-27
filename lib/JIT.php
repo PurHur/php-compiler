@@ -16813,6 +16813,22 @@ class JIT {
             if (!$this->context->functionIsRegistered($proxyName)) {
                 continue;
             }
+            // Static methods are not instance-dispatch targets (zend_execute). Including
+            // them mixes e.g. OutputRewriteVarsJitHelper::add into HashTable->$add (#23468).
+            if ($this->context->type->object->hasDeclaredClass($classLc)) {
+                $vis = $this->context->type->object->methodVisibility(
+                    $this->context->type->object->lookup($classLc),
+                    $methodLc
+                );
+                if (0 !== ($vis & \PHPCfg\Func::FLAG_STATIC)) {
+                    continue;
+                }
+            } elseif (
+                // Proxy without visibility metadata: still exclude known static rewrite-var helper.
+                'phpcompiler\\ext\\standard\\outputrewritevarsjithelper' === $classLc
+            ) {
+                continue;
+            }
             $candidates[$classId] = $this->context->resolveFunctionProxy($proxyName);
         }
 
