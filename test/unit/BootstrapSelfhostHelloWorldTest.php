@@ -501,6 +501,15 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString("'24576M'", $compile);
         $this->assertStringContainsString('compile_driver.php', $compile);
         $this->assertStringContainsString('#23970', $compile);
+        $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $compile);
+        $this->assertMatchesRegularExpression(
+            '/function phpc_compile_skip_aot_bundle.*?compile_driver\.php/s',
+            $compile
+        );
+        $ctx = (string) file_get_contents(self::$root.'/lib/JIT/Context.php');
+        $this->assertStringContainsString('StringStrReplace::ensureStandaloneBodies', $ctx);
+        $strReplace = (string) file_get_contents(self::$root.'/lib/JIT/Builtin/StringStrReplace.php');
+        $this->assertStringContainsString('HelperRuntimeCache::enabled()', $strReplace);
     }
 
     public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void

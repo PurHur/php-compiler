@@ -19,13 +19,11 @@ use PHPCompiler\Web\Superglobals;
  * True when bin/compile.php is building a user/test fixture binary (not bootstrap/self-host spine).
  */
 /**
- * Self-host spine bundles: do not mega-concat via SourceBundler (OOM / invalid LLVM IR at
- * ~2465+ units; #8391, #8559). Native argv drivers compile the entry file and fold literal
- * includes incrementally via JIT IncludeHelper.
- *
- * Note (#23970): inventory compile_driver still uses SourceBundler today; skip-bundle there
- * hits missing helper ABIs (e.g. phpc_str_replace). Instead floor PHP/Docker RAM at 16GiB+
- * for that path (see helloworld probe / Makefile).
+ * Self-host spine / inventory emit drivers: do not mega-concat via SourceBundler
+ * (OOM past 6–24GiB in lib/JIT.php; #8391, #8559, #23970). Native argv drivers
+ * compile the entry file and fold literal includes incrementally via JIT
+ * IncludeHelper. compile_driver also needs PHP_COMPILER_HELPER_RUNTIME_O so
+ * helper ABIs (phpc_str_replace, …) resolve from the prelinked cache.
  */
 function phpc_compile_skip_aot_bundle(string $normalized): bool
 {
@@ -33,7 +31,14 @@ function phpc_compile_skip_aot_bundle(string $normalized): bool
         return false;
     }
 
-    return str_contains($normalized, 'test/selfhost/compiler_lib_spine_smoke/main.php');
+    if (str_contains($normalized, 'test/selfhost/compiler_lib_spine_smoke/main.php')) {
+        return true;
+    }
+
+    // Inventory compile_driver pulls Runtime's transitive closure through
+    // LiteralIncludeDiscovery — bundling OOMs through 24GiB (#23970).
+    return str_contains($normalized, 'test/selfhost/')
+        && str_contains($normalized, 'compile_driver.php');
 }
 
 /** @deprecated alias for lint call sites */
@@ -297,6 +302,13 @@ function run(string $filename, string $code, array $options): void
         putenv('PHP_COMPILER_SELFHOST_AOT=1');
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
         putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+        // Skip-bundle compile_driver needs split helper objects or ABIs like
+        // phpc_str_replace fail lookup during IncludeHelper lowering (#23970).
+        if (false === getenv('PHP_COMPILER_HELPER_RUNTIME_O') || '' === (string) getenv('PHP_COMPILER_HELPER_RUNTIME_O')) {
+            putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');
+            $_ENV['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
+            $_SERVER['PHP_COMPILER_HELPER_RUNTIME_O'] = '1';
+        }
         if (str_contains($normalized, 'compiler_helloworld_smoke/compile_driver.php')
             || str_contains($normalized, 'bootstrap_loop_smoke/compile_driver.php')) {
             putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
@@ -381,11 +393,19 @@ function run(string $filename, string $code, array $options): void
     $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
     $prevHelperRuntimeO = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
     $setUserScriptAot = phpc_compile_is_user_script_aot($normalized);
+    // Skip-bundle inventory compile_driver needs helper-runtime .o for ABIs like
+    // phpc_str_replace — NestedJIT includes hit those calls while NestedJitCompileScope
+    // is active and StringStrReplace::ensureLinked no-ops (#23970 / peer #8559).
+    $needHelperRuntimeO = $setUserScriptAot
+        || ($skipBundle && str_contains($normalized, 'compile_driver.php'));
     if ($setUserScriptAot && \function_exists('putenv')) {
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
         $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
         $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
-        // Default-on helper-runtime split compilation for user scripts (#15889).
+    }
+    if ($needHelperRuntimeO && \function_exists('putenv')) {
+        // Default-on helper-runtime split compilation for user scripts (#15889)
+        // and skip-bundle selfhost compile_driver (#23970).
         $helperCache = getenv('PHP_COMPILER_HELPER_RUNTIME_O');
         if (false === $helperCache || '' === (string) $helperCache) {
             putenv('PHP_COMPILER_HELPER_RUNTIME_O=1');

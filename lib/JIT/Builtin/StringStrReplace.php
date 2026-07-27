@@ -84,7 +84,8 @@ final class StringStrReplace
 
     private static function implementReplace(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
+        // NestedJIT must not recurse into StrReplaceJitHelper; helper-runtime .o is OK (#23970).
+        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
             return;
         }
 
@@ -111,7 +112,7 @@ final class StringStrReplace
 
     private static function implementIreplace(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
+        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
             return;
         }
 
@@ -138,7 +139,7 @@ final class StringStrReplace
 
     private static function implementTakeCount(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
+        if (NestedJitCompileScope::isActive() && !\PHPCompiler\AOT\HelperRuntimeCache::enabled()) {
             return;
         }
 
