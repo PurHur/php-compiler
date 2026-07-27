@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_bc* via BcmathJitHelper PHP (#6100, #9235).
+ * JIT/AOT link for __compiler_bc* via BcmathJitHelper PHP (#6100, #9235, #23671).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer ArrayIntersect #23627).
  * Replaces ~480-line libc double-parse LLVM with thin bridges into {@see VmBcmath} SSOT.
  * php-src: ext/bcmath/libbcmath/src/*
  */
@@ -189,23 +189,6 @@ final class BcmathJit
         $context->builder->returnValue($old);
     }
 
-    private static function implementBinaryStringBridge(
-        Context $context,
-        LlvmFunction $fn,
-        string $helperLogical
-    ): void {
-        $entry = $fn->appendBasicBlock('bcmath_bin_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, $helperLogical),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            $fn->getParam(3)
-        );
-        $context->builder->returnValue($result);
-    }
-
     private static function implementBinaryStringWithRoundModeBridge(
         Context $context,
         LlvmFunction $fn,
@@ -273,44 +256,18 @@ final class BcmathJit
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after BcmathJitHelper compile (#9235)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23671');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'BcmathJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('BcmathJitHelper.php parseAndCompile failed (#9235)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9235)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23671'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
