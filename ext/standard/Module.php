@@ -806,6 +806,8 @@ class Module extends ModuleAbstract
             new __compiler_libcrypt(),
             new __compiler_password_random_bytes(),
             new phpc_match_unhandled_operand_is_object(),
+            new phpc_match_unhandled_operand_message(),
+            new phpc_match_unhandled_format_scalar(),
             new phpc_clone_with_begin(),
             new phpc_clone_with_end(),
             new phpc_clone_with_reinit(),

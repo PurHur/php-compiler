@@ -25,7 +25,7 @@ final class MatchUnhandledAbiResolveTest extends TestCase
         /** @var \PHPCompiler\VM\Context $ctx */
         $ctx = $ctxProp->getValue($runtime);
 
-        $name = 'phpc_match_unhandled_operand_is_object';
+        $name = 'phpc_match_unhandled_operand_message';
         $this->assertTrue(isset($ctx->functions[$name]), 'helper must be registered');
         $this->assertFalse(
             VmReflection::isVisibleToFunctionExists($name),
@@ -34,8 +34,12 @@ final class MatchUnhandledAbiResolveTest extends TestCase
         $this->assertSame(
             $name,
             $ctx->resolveFunctionCallLc($name),
-            'match lowering must still resolve the ABI helper (#22820)'
+            'match lowering must still resolve the ABI helper (#22820, #23664)'
         );
+        // Legacy probe remains registered for unit coverage / older CFG.
+        $legacy = 'phpc_match_unhandled_operand_is_object';
+        $this->assertTrue(isset($ctx->functions[$legacy]), 'legacy is_object probe still registered');
+        $this->assertSame($legacy, $ctx->resolveFunctionCallLc($legacy));
     }
 
     /**

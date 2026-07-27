@@ -30,25 +30,43 @@ def main() -> int:
     if not INSERT.strip():
         print(f"missing overlay {OVERLAY}", flush=True)
         return 1
+    insert = INSERT
+    # Overlay is a Parser.php method fragment — strip accidental file headers.
+    if insert.lstrip().startswith("<?php"):
+        lines = insert.splitlines(keepends=True)
+        while lines and (lines[0].strip() in ("", "<?php", "<?php\n") or lines[0].lstrip().startswith("<?php") or lines[0].startswith("declare(strict_types")):
+            lines.pop(0)
+            if lines and lines[0].strip() == "":
+                lines.pop(0)
+                break
+        insert = "".join(lines)
+        if not insert.startswith("    "):
+            print("overlay header strip left bad indent", flush=True)
+            return 1
     text = PARSER.read_text()
     if "lowerUnhandledMatchError" in text and "function parseExpr_Match" in text:
-        if "phpc_match_unhandled_operand_is_object" in text:
+        if "phpc_match_unhandled_operand_message" in text and "<?php\n\ndeclare(strict_types=1);" not in text[
+            text.find("function parseExpr_Match") : text.find("function parseExpr_UnaryMinus")
+        ]:
             print(f"skip {PARSER} (match overlay current)")
             return 0
-        print(f"refresh {PARSER} (match overlay stale — enum UnhandledMatchError probe)")
+        print(f"refresh {PARSER} (match overlay stale — UnhandledMatchError message helper #23664)")
 
     start = match_block_start(text)
+    # Also recover from a corrupted insert that dropped class-method indent.
+    if start is None and "\nfunction parseExpr_Match" in text:
+        start = text.index("\nfunction parseExpr_Match") + 1
     if start is not None:
         if NEEDLE not in text[start:]:
             print("parseExpr_UnaryMinus needle missing after parseExpr_Match", flush=True)
             return 1
         end = text.index(NEEDLE, start)
-        text = text[:start] + INSERT + text[end:]
+        text = text[:start] + insert + text[end:]
     elif NEEDLE not in text:
         print("needle not found in Parser.php", flush=True)
         return 1
     else:
-        text = text.replace(NEEDLE, INSERT + NEEDLE, 1)
+        text = text.replace(NEEDLE, insert + NEEDLE, 1)
 
     PARSER.write_text(text)
     print("patched", PARSER)

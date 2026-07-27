@@ -184,6 +184,17 @@ final class SensitiveParamSupport
     }
 
     /**
+     * php-src smart_str_append_scalar string arm / smart_str_append_escaped_truncated
+     * (Zend/zend_smart_str.c, EG(exception_string_param_max_len)).
+     *
+     * Shared by Throwable::getTraceAsString and UnhandledMatchError (#23664).
+     */
+    public static function formatExceptionStringParam(string $value): string
+    {
+        return self::formatTraceStringArg($value);
+    }
+
+    /**
      * php-src smart_str_append_scalar / smart_str_append_escaped_truncated
      * (Zend/zend_smart_str.c, EG(exception_string_param_max_len)).
      */
