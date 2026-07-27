@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -113,15 +115,29 @@ final class VmRange
         if (null !== $enumInt) {
             return $enumInt;
         }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            if (CompilerVersion::supportsRangeStrictEndpointTypes()) {
+                throw self::endpointTypeError($argIndex, $paramName, $var);
+            }
 
-        throw new \TypeError(
-            sprintf(
-                'range(): Argument #%d ($%s) must be of type int|float|string, %s given',
-                $argIndex,
-                $paramName,
-                VmStreamArg::debugTypeName($var)
-            )
-        );
+            return 0;
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            if (CompilerVersion::supportsRangeStrictEndpointTypes()) {
+                throw self::endpointTypeError($argIndex, $paramName, $var);
+            }
+            if (ResourceSupport::isResourceObject($var->toObject())) {
+                $handle = ResourceSupport::resolveHandle($var);
+
+                return null !== $handle ? $handle : 0;
+            }
+            $coerced = new Variable();
+            VmScalarType::legacyPlainObjectScalarCast($coerced, $var, $frame, 'int');
+
+            return $coerced->toInt();
+        }
+
+        throw self::endpointTypeError($argIndex, $paramName, $var);
     }
 
     private static function parseFloatEndpoint(Variable $var, Frame $frame, int $argIndex, string $paramName): float
@@ -151,8 +167,34 @@ final class VmRange
         if (null !== $enumFloat) {
             return $enumFloat;
         }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            if (CompilerVersion::supportsRangeStrictEndpointTypes()) {
+                throw self::endpointTypeError($argIndex, $paramName, $var);
+            }
 
-        throw new \TypeError(
+            return 0.0;
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            if (CompilerVersion::supportsRangeStrictEndpointTypes()) {
+                throw self::endpointTypeError($argIndex, $paramName, $var);
+            }
+            if (ResourceSupport::isResourceObject($var->toObject())) {
+                $handle = ResourceSupport::resolveHandle($var);
+
+                return (float) (null !== $handle ? $handle : 0);
+            }
+            $coerced = new Variable();
+            VmScalarType::legacyPlainObjectScalarCast($coerced, $var, $frame, 'float');
+
+            return $coerced->toFloat();
+        }
+
+        throw self::endpointTypeError($argIndex, $paramName, $var);
+    }
+
+    private static function endpointTypeError(int $argIndex, string $paramName, Variable $var): \TypeError
+    {
+        return new \TypeError(
             sprintf(
                 'range(): Argument #%d ($%s) must be of type int|float|string, %s given',
                 $argIndex,
