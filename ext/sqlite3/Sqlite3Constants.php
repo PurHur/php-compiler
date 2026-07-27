@@ -167,4 +167,26 @@ final class Sqlite3Constants
         'explain_mode_explain' => 'EXPLAIN_MODE_EXPLAIN',
         'explain_mode_explain_query_plan' => 'EXPLAIN_MODE_EXPLAIN_QUERY_PLAN',
     ];
+
+    /**
+     * Global SQLITE3_* constants (php-src ext/sqlite3/sqlite3.stub.php; #23732).
+     *
+     * @return array<string, int>
+     */
+    public static function globalConstants(): array
+    {
+        return [
+            'SQLITE3_ASSOC' => self::ASSOC,
+            'SQLITE3_NUM' => self::NUM,
+            'SQLITE3_BOTH' => self::BOTH,
+            'SQLITE3_INTEGER' => VmSqlite3Native::TYPE_INTEGER,
+            'SQLITE3_FLOAT' => VmSqlite3Native::TYPE_FLOAT,
+            'SQLITE3_TEXT' => VmSqlite3Native::TYPE_TEXT,
+            'SQLITE3_BLOB' => VmSqlite3Native::TYPE_BLOB,
+            'SQLITE3_NULL' => VmSqlite3Native::TYPE_NULL,
+            'SQLITE3_OPEN_READONLY' => self::OPEN_READONLY,
+            'SQLITE3_OPEN_READWRITE' => self::OPEN_READWRITE,
+            'SQLITE3_OPEN_CREATE' => self::OPEN_CREATE,
+        ];
+    }
 }
