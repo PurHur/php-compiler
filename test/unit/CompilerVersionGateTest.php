@@ -1443,10 +1443,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsCloneWithSyntax());
     }
 
-    public function testSupportsCloneWithSyntaxTrueWhenProfile84(): void
+    public function testSupportsCloneWithSyntaxFalseWhenProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            // Zend 8.4 parse-errors clone-with; only 8.5+ (#23877).
+            $this->assertFalse(CompilerVersion::supportsCloneWithSyntax());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsCloneWithSyntaxTrueWhenProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $this->assertTrue(CompilerVersion::supportsCloneWithSyntax());
         } finally {

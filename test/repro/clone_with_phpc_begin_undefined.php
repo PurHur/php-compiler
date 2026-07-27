@@ -1,9 +1,9 @@
 <?php
 /**
  * Issue #22856 — clone($obj, [...]) must resolve phpc_clone_with_* ABI helpers
- * (hidden from function_exists) under PHP_COMPILER_PROFILE=8.4.
+ * (hidden from function_exists) under PHP_COMPILER_PROFILE=8.5.
  *
- * Run: PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/clone_with_phpc_begin_undefined.php
+ * Run: PHP_COMPILER_PROFILE=8.5 php bin/vm.php test/repro/clone_with_phpc_begin_undefined.php
  */
 declare(strict_types=1);
 

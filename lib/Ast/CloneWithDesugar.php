@@ -7,12 +7,14 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Desugar PHP 8.3+ `clone $obj with { prop: $value, ... }` and PHP 8.4+
+ * Desugar PHP 8.5+ `clone $obj with { prop: $value, ... }` /
  * `clone($obj, ['prop' => $value, ...])` / `clone ($obj, with: [...])` /
- * `clone $obj with ['prop', ...]` before nikic/php-parser (#4513, #9743, #9995, #12939).
+ * `clone $obj with ['prop', ...]` before nikic/php-parser (#4513, #9743, #9995, #12939, #23877).
  *
- * Rewrites to an IIFE that clones then assigns properties — matches Zend/zend_compile.c lowering.
- * php-src: Zend/zend_language_parser.y clone_expr / with clause; zend_clones.c.
+ * Rewrites to a nested IIFE: outer binds the operand, inner receives `clone $o` as a
+ * parameter so `$__phpc_r` is an ARG_RECV (not a post-assign local). Assigned locals
+ * passed to call args currently mis-wire ARG_SEND (#23877); parameters do not.
+ * php-src: Zend/zend_language_parser.y clone_expr / with clause; zend_vm_def.h ZEND_CLONE.
  */
 final class CloneWithDesugar
 {
@@ -394,7 +396,7 @@ final class CloneWithDesugar
      */
     private static function buildCloneWithIife(string $exprText, array $assignments): string
     {
-        $body = '$__phpc_r = clone $__phpc_o;';
+        $body = '';
         $propArgs = [];
         foreach ($assignments as [$name, $_value]) {
             if ('__phpc_dynamic__' === $name) {
@@ -423,7 +425,9 @@ final class CloneWithDesugar
         }
         $body .= 'return $__phpc_r;';
 
-        return '(function ($__phpc_o) { '.$body.' })('.$exprText.')';
+        // Bind clone result as a parameter — avoids Undefined variable $__phpc_r when
+        // begin/end helpers receive a post-assign local via ARG_SEND (#23877).
+        return '(function ($__phpc_o) { return (function ($__phpc_r) { '.$body.' })(clone $__phpc_o); })('.$exprText.')';
     }
 
     /**

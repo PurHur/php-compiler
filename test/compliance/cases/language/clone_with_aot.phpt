@@ -1,9 +1,9 @@
 --TEST--
-Language: clone $obj with { prop: val } user-script AOT (#23046, re-#19130, PHP 8.4)
+Language: clone $obj with { prop: val } user-script AOT (#23046, re-#19130, PHP 8.5)
 --SKIPIF--
 <?php
-if (!getenv('PHP_COMPILER_PROFILE') || '8.4' !== getenv('PHP_COMPILER_PROFILE')) {
-    die('skip requires PHP_COMPILER_PROFILE=8.4 clone-with gate');
+if (!getenv('PHP_COMPILER_PROFILE') || '8.5' !== getenv('PHP_COMPILER_PROFILE')) {
+    die('skip requires PHP_COMPILER_PROFILE=8.5 clone-with gate');
 }
 --FILE--
 <?php

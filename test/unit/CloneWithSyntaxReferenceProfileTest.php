@@ -18,7 +18,7 @@ final class CloneWithSyntaxReferenceProfileTest extends TestCase
     public function testRejectorThrowsOnNamedWithArgForm(): void
     {
         if (CompilerVersion::supportsCloneWithSyntax()) {
-            $this->markTestSkipped('clone-with syntax enabled on PHP 8.4.0+ target');
+            $this->markTestSkipped('clone-with syntax enabled on PHP 8.5.0+ target');
         }
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(CloneWithDesugar::REFERENCE_PROFILE_UNEXPECTED_COMMA);
@@ -31,7 +31,7 @@ final class CloneWithSyntaxReferenceProfileTest extends TestCase
     public function testRejectorThrowsOnWithBlockForm(): void
     {
         if (CompilerVersion::supportsCloneWithSyntax()) {
-            $this->markTestSkipped('clone-with syntax enabled on PHP 8.4.0+ target');
+            $this->markTestSkipped('clone-with syntax enabled on PHP 8.5.0+ target');
         }
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(CloneWithDesugar::REFERENCE_PROFILE_UNEXPECTED_WITH);
@@ -44,7 +44,7 @@ final class CloneWithSyntaxReferenceProfileTest extends TestCase
     public function testDesugarNoOpWhenCloneWithDisabled(): void
     {
         if (CompilerVersion::supportsCloneWithSyntax()) {
-            $this->markTestSkipped('clone-with syntax enabled on PHP 8.4.0+ target');
+            $this->markTestSkipped('clone-with syntax enabled on PHP 8.5.0+ target');
         }
         $src = '<?php $q = clone ($p, with: [\'x\' => 9]);';
         $this->assertSame($src, CloneWithDesugar::desugar($src));
@@ -53,7 +53,7 @@ final class CloneWithSyntaxReferenceProfileTest extends TestCase
     public function testRuntimeRejectsMaintainerGapRepro(): void
     {
         if (CompilerVersion::supportsCloneWithSyntax()) {
-            $this->markTestSkipped('clone-with syntax enabled on PHP 8.4.0+ target');
+            $this->markTestSkipped('clone-with syntax enabled on PHP 8.5.0+ target');
         }
         $runtime = new Runtime();
         try {

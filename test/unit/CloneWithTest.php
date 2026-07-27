@@ -23,7 +23,7 @@ final class CloneWithTest extends TestCase
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with { x: 2, y: "b" };';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\', \'y\');$__phpc_r->x = 2;$__phpc_r->y = "b";phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\', \'y\');$__phpc_r->x = 2;$__phpc_r->y = "b";phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -32,7 +32,7 @@ final class CloneWithTest extends TestCase
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone($c, [\'a\']);';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -40,7 +40,7 @@ final class CloneWithTest extends TestCase
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone($c, [\'x\' => 2]);';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -49,7 +49,7 @@ final class CloneWithTest extends TestCase
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone ($c, with: [\'x\' => 2]);';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -57,7 +57,7 @@ final class CloneWithTest extends TestCase
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone ($c, with: [\'a\']);';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -81,12 +81,49 @@ PHP;
         $this->assertSame("9,2\n", ob_get_clean());
     }
 
+    /** Issue #23877 — clone-with must not emit Undefined variable $__phpc_r under E_ALL. */
+    public function testVmCloneCallNoUndefinedPhpcRWarning(): void
+    {
+        $this->skipUnlessCloneWithEnabled();
+        $code = <<<'PHP'
+<?php
+error_reporting(E_ALL);
+class T {
+    public function __construct(public int $x, public string $y = 'a') {}
+}
+$t = new T(1, 'b');
+$u = clone($t, ['x' => 9]);
+echo 'u.x=', $u->x, ' u.y=', $u->y, "\n";
+PHP;
+        $warnings = [];
+        set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
+            $warnings[] = $message;
+
+            return true;
+        });
+        try {
+            $rt = new Runtime();
+            $block = $rt->parseAndCompile($code, 'issue_23877.php');
+            ob_start();
+            $rt->run($block);
+            $out = ob_get_clean();
+        } finally {
+            restore_error_handler();
+        }
+        $this->assertSame("u.x=9 u.y=b\n", $out);
+        $phpcR = array_values(array_filter(
+            $warnings,
+            static fn (string $m): bool => str_contains($m, '__phpc_r')
+        ));
+        $this->assertSame([], $phpcR, 'clone-with must not warn on $__phpc_r (#23877)');
+    }
+
     /** Issue #9995 — PHP 8.4+ `clone $obj with ['prop']` keyword array syntax. */
     public function testDesugarRewritesCloneWithKeywordArray(): void
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with [\'a\'];';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -94,7 +131,7 @@ PHP;
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = clone $c with [\'x\' => 2];';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -103,7 +140,7 @@ PHP;
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with [\'a\'];';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'a\');phpc_clone_with_reinit($__phpc_r, \'a\');phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -111,7 +148,7 @@ PHP;
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with [\'x\' => 2];';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
@@ -119,7 +156,7 @@ PHP;
     {
         $this->skipUnlessCloneWithEnabled();
         $input = '<?php $d = (clone $c) with { x: 2 };';
-        $expected = '<?php $d = (function ($__phpc_o) { $__phpc_r = clone $__phpc_o;phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })($c);';
+        $expected = '<?php $d = (function ($__phpc_o) { return (function ($__phpc_r) { phpc_clone_with_begin($__phpc_r, \'x\');$__phpc_r->x = 2;phpc_clone_with_end($__phpc_r);return $__phpc_r; })(clone $__phpc_o); })($c);';
         $this->assertSame($expected, CloneWithDesugar::desugar($input));
     }
 
