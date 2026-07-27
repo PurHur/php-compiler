@@ -9,6 +9,13 @@ namespace PHPCompiler\ext\standard;
  *
  * SSOT: {@see VmString::strReplace()} / {@see VmString::strIreplace()}
  * php-src: ext/standard/string.c — php_str_replace, php_str_replace_in_subject
+ *
+ * NestedJIT user-script AOT (#23912 / peer #23871):
+ * - Never index with `$s[$i+$j]`; walk with `++` only.
+ * - After a match, search a fresh suffix from index 0 (advancing cursor on the same
+ *   string value can sticky-read the matched byte → "hell0 w0000").
+ * - Measure subject length once; shrink `$remLen` by arithmetic — do not re-`byteLen`
+ *   the suffix (`isset` past the real end can sticky-read `'o'` → "hell0 w0rld0").
  */
 final class StrReplaceJitHelper
 {
@@ -16,51 +23,44 @@ final class StrReplaceJitHelper
 
     public static function replaceArgv(string $search, string $replace, string $subject): string
     {
-        // NestedJIT user-script AOT: avoid VmString by-ref $count + .= rebuild (#23912).
-        // Build via concat of slices with index++ only (peer SprintfJitHelper / #23871).
         if ('' === $search) {
             self::$lastCount = 0;
 
             return $subject;
         }
         $searchLen = self::byteLen($search);
-        $subjectLen = self::byteLen($subject);
+        $remLen = self::byteLen($subject);
         $count = 0;
         $out = '';
-        $offset = 0;
-        $remaining = $subjectLen;
-        while ($remaining > 0) {
-            $pos = self::findAt($subject, $subjectLen, $search, $searchLen, $offset);
+        $remaining = $subject;
+        while ($remLen >= $searchLen) {
+            $pos = self::findBounded($remaining, $remLen, $search, $searchLen);
             if ($pos < 0) {
-                $out = self::concat($out, self::slice($subject, $offset, $remaining));
-                break;
+                $out = self::concat($out, self::slice($remaining, 0, $remLen));
+                self::$lastCount = $count;
+
+                return $out;
             }
-            $prefixLen = 0;
-            $t = $offset;
-            while ($t < $pos) {
-                ++$prefixLen;
-                ++$t;
-            }
-            $out = self::concat($out, self::slice($subject, $offset, $prefixLen));
+            $out = self::concat($out, self::slice($remaining, 0, $pos));
             $out = self::concat($out, $replace);
-            $consumed = $prefixLen;
+            $skip = $pos;
             $u = 0;
             while ($u < $searchLen) {
-                ++$consumed;
+                ++$skip;
                 ++$u;
             }
-            $offset = $pos;
-            $v = 0;
-            while ($v < $searchLen) {
-                ++$offset;
-                ++$v;
+            $tailLen = 0;
+            $t = $skip;
+            while ($t < $remLen) {
+                ++$tailLen;
+                ++$t;
             }
-            $w = 0;
-            while ($w < $consumed) {
-                --$remaining;
-                ++$w;
-            }
+            $remaining = self::slice($remaining, $skip, $tailLen);
+            $remLen = $tailLen;
             ++$count;
+        }
+        if ($remLen > 0) {
+            $out = self::concat($out, self::slice($remaining, 0, $remLen));
         }
         self::$lastCount = $count;
 
@@ -81,7 +81,6 @@ final class StrReplaceJitHelper
     {
         $n = 0;
         while (true) {
-            // NestedJIT: prefer isset+$n++ over strlen() (#23871).
             if (!isset($s[$n])) {
                 return $n;
             }
@@ -98,9 +97,6 @@ final class StrReplaceJitHelper
         $idx = $start;
         $left = $len;
         while ($left > 0) {
-            if (!isset($s[$idx])) {
-                break;
-            }
             $out = self::concat($out, $s[$idx]);
             ++$idx;
             --$left;
@@ -110,23 +106,15 @@ final class StrReplaceJitHelper
     }
 
     /**
-     * NestedJIT-safe find — never index with `$s[$i + $j]` (#23871 / #23912).
+     * Find needle in the first `$hayLen` bytes — bound by counter, not isset (#23912).
      */
-    private static function findAt(string $hay, int $hayLen, string $needle, int $needleLen, int $offset): int
+    private static function findBounded(string $hay, int $hayLen, string $needle, int $needleLen): int
     {
-        if ($needleLen <= 0) {
+        if ($needleLen <= 0 || $hayLen < $needleLen) {
             return -1;
         }
+        $i = 0;
         $remain = $hayLen;
-        $t = 0;
-        while ($t < $offset) {
-            --$remain;
-            ++$t;
-        }
-        if ($remain < $needleLen) {
-            return -1;
-        }
-        $i = $offset;
         while ($remain >= $needleLen) {
             $j = 0;
             $hi = $i;
