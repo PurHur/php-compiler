@@ -156,11 +156,30 @@ final class GeneratorState
         $this->pendingThrow->null();
     }
 
+    /** True when declared `function &gen()` — yields bind by reference (Zend/zend_generators.c, #4599). */
+    public function yieldsByReference(): bool
+    {
+        $decl = $this->func->block->func ?? null;
+
+        return null !== $decl
+            && (($decl->flags ?? 0) & \PHPCfg\Func::FLAG_RETURNS_REF) !== 0;
+    }
+
     /** Publish yielded value; keep snapshot for idempotent current() (#18183). */
     public function publishCurrentValue(Variable $value): void
     {
         $this->currentValue->duplicateFrom($value);
         $this->currentSnapshot->duplicateFrom($this->currentValue);
+        $this->hasCurrent = true;
+    }
+
+    /**
+     * Publish a by-reference yield — foreach {@code as &$v} aliases the yielded slot (#23814).
+     */
+    public function publishCurrentValueByRef(Variable $slot): void
+    {
+        $this->currentValue->indirect($slot);
+        $this->currentSnapshot->duplicateFrom($slot->resolveIndirect());
         $this->hasCurrent = true;
     }
 

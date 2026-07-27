@@ -68,6 +68,31 @@ final class GeneratorJitHelper
     }
 
     /**
+     * True when the JIT generator was compiled from `function &name()` (FLAG_RETURNS_REF).
+     */
+    public static function generatorYieldsByReference(Context $context, Variable $gen): bool
+    {
+        $resumeName = $gen->generatorResumeName;
+        if (null === $resumeName) {
+            $creators = array_values(array_unique($context->generatorCreators));
+            if (1 === \count($creators)) {
+                $resumeName = $creators[0];
+            }
+        }
+        if (null === $resumeName) {
+            return false;
+        }
+        $resumeLc = strtolower($resumeName);
+        foreach ($context->generatorCreators as $funcLc => $creatorResume) {
+            if (strtolower((string) $creatorResume) === $resumeLc) {
+                return $context->functionReturnsRef[$funcLc] ?? false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @return list<array{kind: string, op: OpCode, block: Block}>
      */
     public static function collectResumePoints(Block $entry): array
