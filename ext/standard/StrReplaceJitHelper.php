@@ -28,15 +28,38 @@ final class StrReplaceJitHelper
         $count = 0;
         $out = '';
         $offset = 0;
-        while ($offset < $subjectLen) {
+        $remaining = $subjectLen;
+        while ($remaining > 0) {
             $pos = self::findAt($subject, $subjectLen, $search, $searchLen, $offset);
             if ($pos < 0) {
-                $out = self::concat($out, self::slice($subject, $offset, $subjectLen - $offset));
+                $out = self::concat($out, self::slice($subject, $offset, $remaining));
                 break;
             }
-            $out = self::concat($out, self::slice($subject, $offset, $pos - $offset));
+            $prefixLen = 0;
+            $t = $offset;
+            while ($t < $pos) {
+                ++$prefixLen;
+                ++$t;
+            }
+            $out = self::concat($out, self::slice($subject, $offset, $prefixLen));
             $out = self::concat($out, $replace);
-            $offset = $pos + $searchLen;
+            $consumed = $prefixLen;
+            $u = 0;
+            while ($u < $searchLen) {
+                ++$consumed;
+                ++$u;
+            }
+            $offset = $pos;
+            $v = 0;
+            while ($v < $searchLen) {
+                ++$offset;
+                ++$v;
+            }
+            $w = 0;
+            while ($w < $consumed) {
+                --$remaining;
+                ++$w;
+            }
             ++$count;
         }
         self::$lastCount = $count;
@@ -72,37 +95,55 @@ final class StrReplaceJitHelper
             return '';
         }
         $out = '';
-        $i = 0;
-        while ($i < $len) {
-            $idx = $start + $i;
+        $idx = $start;
+        $left = $len;
+        while ($left > 0) {
             if (!isset($s[$idx])) {
                 break;
             }
             $out = self::concat($out, $s[$idx]);
-            ++$i;
+            ++$idx;
+            --$left;
         }
 
         return $out;
     }
 
+    /**
+     * NestedJIT-safe find — never index with `$s[$i + $j]` (#23871 / #23912).
+     */
     private static function findAt(string $hay, int $hayLen, string $needle, int $needleLen, int $offset): int
     {
-        if ($needleLen <= 0 || $offset > $hayLen - $needleLen) {
+        if ($needleLen <= 0) {
+            return -1;
+        }
+        $remain = $hayLen;
+        $t = 0;
+        while ($t < $offset) {
+            --$remain;
+            ++$t;
+        }
+        if ($remain < $needleLen) {
             return -1;
         }
         $i = $offset;
-        while ($i <= $hayLen - $needleLen) {
+        while ($remain >= $needleLen) {
             $j = 0;
+            $hi = $i;
+            $matched = true;
             while ($j < $needleLen) {
-                if ($hay[$i + $j] !== $needle[$j]) {
+                if ($hay[$hi] !== $needle[$j]) {
+                    $matched = false;
                     break;
                 }
                 ++$j;
+                ++$hi;
             }
-            if ($j === $needleLen) {
+            if ($matched) {
                 return $i;
             }
             ++$i;
+            --$remain;
         }
 
         return -1;
