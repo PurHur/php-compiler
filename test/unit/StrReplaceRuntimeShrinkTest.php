@@ -49,6 +49,7 @@ final class StrReplaceRuntimeShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('StrReplaceJitHelper.php', $spine);
+        $this->assertStringContainsString('JitStrReplaceSubject.php', $spine);
         $this->assertStringContainsString('StringStrReplace.php', $spine);
     }
 }
