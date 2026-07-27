@@ -251,8 +251,8 @@ final class HashTable {
     /**
      * Materialize key/value pairs for JIT/AOT nested helper foreach (#12908).
      *
-     * Prefer over iterateKeyed() in compiled php-in-PHP helpers — nested JIT lowers array
-     * foreach but not HashTable::iterateKeyed() yet.
+     * Nested JIT lowers both exportKeyValuePairs and iterateKeyed to the same pair-list
+     * materialization (#23974). Prefer exportKeyValuePairs in new helpers for clarity.
      *
      * @return list<array{Variable, Variable}>
      */

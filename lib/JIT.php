@@ -10931,6 +10931,12 @@ class JIT {
                                 $proxyName = strtolower($resolvedName).'::'.'__construct';
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                            } elseif (
+                                null !== ($inheritedCtor = $this->context->type->object->inheritedConstructorProxyLc($resolvedName))
+                            ) {
+                                // User subclass without own __construct inherits Exception/Error ctor (#23974 / #23641).
+                                $this->context->scope->toCall = $this->context->resolveFunctionProxy($inheritedCtor);
+                                $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } else {
                                 $this->context->scope->preserveNewResultOnNullCall = true;
                                 $this->context->type->object->markObjectConstructed(
@@ -16813,6 +16819,27 @@ class JIT {
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ('getmessage' === $methodLc && $this->context->functionIsRegistered('exception::getmessage')) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('exception::getmessage');
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+            // LogicException/Error subclasses inherit getCode; only Exception/Error proxies exist (#23974).
+            if ('getcode' === $methodLc && $this->context->functionIsRegistered('exception::getcode')) {
+                $codeProxy = 'exception::getcode';
+                if (
+                    '' !== $declaringClassLc
+                    && (
+                        \PHPCompiler\ext\standard\ThrowableManifest::isDescendantOf(
+                            $declaringClassLc,
+                            \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR
+                        )
+                        || \PHPCompiler\ext\standard\ThrowableManifest::LC_ERROR === $declaringClassLc
+                    )
+                    && $this->context->functionIsRegistered('error::getcode')
+                ) {
+                    $codeProxy = 'error::getcode';
+                }
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($codeProxy);
                 $this->context->scope->args = [$receiverVar];
 
                 return;

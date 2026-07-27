@@ -11,6 +11,8 @@ use PHPCompiler\VM\HashTable;
  *
  * SSOT: {@see HashTable::sliceCopy()}
  * php-src: ext/standard/array.c — php_array_slice()
+ *
+ * NestedJIT lowers `$ht->sliceCopy()` via {@see \PHPCompiler\JIT\Call\HashTableSliceCopy} (#23974).
  */
 final class ArraySliceJitHelper
 {

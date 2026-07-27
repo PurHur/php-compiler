@@ -3964,6 +3964,26 @@ class Object_ extends Type {
         return isset($this->hasConstructor[$classId]);
     }
 
+    /**
+     * Resolve inherited __construct proxy for subclasses that omit their own ctor (#23974 / #23641).
+     *
+     * Walks {@see parentClassLc} until a registered `parent::__construct` JIT proxy is found
+     * (Exception/Error hierarchy is pre-registered on Context).
+     */
+    public function inheritedConstructorProxyLc(string $className): ?string
+    {
+        $parentLc = $this->parentClassLc($className);
+        while (null !== $parentLc) {
+            $proxy = $parentLc.'::__construct';
+            if ($this->context->functionIsRegistered($proxy)) {
+                return $proxy;
+            }
+            $parentLc = $this->parentClassLc($parentLc);
+        }
+
+        return null;
+    }
+
     public function defineProperty(int $classId, string $name, int $type): void
     {
         $nameLc = strtolower($name);
