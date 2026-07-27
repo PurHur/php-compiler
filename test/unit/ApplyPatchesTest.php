@@ -1019,4 +1019,76 @@ PHP;
         $trycatchBody = (string) file_get_contents($trycatch);
         self::assertStringContainsString('public $else;', $trycatchBody, 'TryCatch op must expose else property (#15832)');
     }
+
+    public function testPhpCfgGlobalDeprecatedConstOverlayHasNoDuplicateExtract(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $body = (string) file_get_contents($parser);
+        self::assertStringContainsString(
+            'function applyGlobalDeprecatedConstMarkerAttributes',
+            $body,
+            'global-deprecated-const overlay must apply ATTRS + deprecated markers (#16819, #23882)'
+        );
+        self::assertStringContainsString(
+            'ATTRS_MARKER_PATTERN',
+            $body,
+            '8.5 const-attrs recovery must remain in Parser (#23882)'
+        );
+        self::assertStringContainsString(
+            'function globalConstMarkerCommentChunks',
+            $body,
+            'comment-chunk helper must be present for marker recovery'
+        );
+        self::assertSame(
+            0,
+            preg_match_all('/function extractGlobalDeprecatedConstMarkerPayloadFromAttributes/', $body),
+            'leftover extract* from partial #23882 refresh must not redeclare (Fatal on Zend gen-0)'
+        );
+    }
+
+    public function testPhpCfgGlobalDeprecatedConstOverlayHealsLeftoverExtractDuplicate(): void
+    {
+        $parser = self::$root.'/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php';
+        if (!is_readable($parser)) {
+            self::markTestSkipped('vendor/ircmaxell/php-cfg not installed');
+        }
+
+        $original = (string) file_get_contents($parser);
+        $yield = '    protected function parseExpr_Yield(Expr\\Yield_ $expr)';
+        self::assertStringContainsString($yield, $original);
+
+        $staleExtract = <<<'PHP'
+    private function extractGlobalDeprecatedConstMarkerPayloadFromAttributes(array $attributes): ?string
+    {
+        return null;
+    }
+
+PHP;
+        $poisoned = str_replace($yield, $staleExtract.$yield, $original);
+        self::assertNotSame($original, $poisoned);
+        file_put_contents($parser, $poisoned);
+
+        try {
+            $output = [];
+            $exitCode = 0;
+            exec('bash '.escapeshellarg(self::$root.'/script/apply-patches.sh').' 2>&1', $output, $exitCode);
+            $joined = implode("\n", $output);
+            self::assertSame(0, $exitCode, "apply-patches must heal leftover extract*:\n".$joined);
+
+            $healed = (string) file_get_contents($parser);
+            self::assertSame(
+                0,
+                preg_match_all('/function extractGlobalDeprecatedConstMarkerPayloadFromAttributes/', $healed),
+                'heal must remove extract* duplicates before parseExpr_Yield'
+            );
+            self::assertStringContainsString('ATTRS_MARKER_PATTERN', $healed);
+            self::assertStringContainsString('function applyGlobalDeprecatedConstMarkerAttributes', $healed);
+        } finally {
+            file_put_contents($parser, $original);
+        }
+    }
 }

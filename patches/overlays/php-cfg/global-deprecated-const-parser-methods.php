@@ -46,23 +46,3 @@
 
         return $chunks;
     }
-
-    /**
-     * Recover phpc-global-deprecated-const:* marker from comment attributes (#16819).
-     *
-     * @return string|null Raw marker payload (message=…|since=…).
-     */
-    private function extractGlobalDeprecatedConstMarkerPayloadFromAttributes(array $attributes): ?string
-    {
-        foreach ($this->globalConstMarkerCommentChunks($attributes) as $chunk) {
-            if (!preg_match(\PHPCompiler\Ast\GlobalDeprecatedConstRewriter::MARKER_PATTERN, $chunk, $m)) {
-                continue;
-            }
-            $payload = trim($m[1]);
-            if ('' !== $payload) {
-                return $payload;
-            }
-        }
-
-        return null;
-    }

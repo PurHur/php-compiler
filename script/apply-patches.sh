@@ -4260,13 +4260,18 @@ apply_php_cfg_global_deprecated_const_overlay() {
   if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
     return 0
   fi
-  # Refresh method body when 8.5 const-attrs recovery is missing (#23882).
+  # Healthy: ATTRS recovery present, helper present, and no leftover extract*
+  # duplicate from the #23882 refresh that only replaced the first method
+  # (Fatal: Cannot redeclare extractGlobalDeprecatedConstMarkerPayloadFromAttributes).
+  local extract_count
+  extract_count="$(grep -c 'function extractGlobalDeprecatedConstMarkerPayloadFromAttributes' "$parser" 2>/dev/null || true)"
   if grep -q 'function applyGlobalDeprecatedConstMarkerAttributes' "$parser" 2>/dev/null \
-    && grep -q 'ATTRS_MARKER_PATTERN' "$parser" 2>/dev/null; then
+    && grep -q 'ATTRS_MARKER_PATTERN' "$parser" 2>/dev/null \
+    && grep -q 'function globalConstMarkerCommentChunks' "$parser" 2>/dev/null \
+    && [[ "${extract_count}" -eq 0 ]]; then
     return 0
   fi
   python3 - "$parser" "$overlay" <<'PY'
-import re
 import sys
 from pathlib import Path
 
@@ -4275,20 +4280,41 @@ method_path = Path(sys.argv[2])
 text = parser_path.read_text()
 insert = method_path.read_text().rstrip("\n") + "\n\n"
 
-if 'function applyGlobalDeprecatedConstMarkerAttributes' in text:
-    start = text.find('    private function applyGlobalDeprecatedConstMarkerAttributes')
-    if start < 0:
-        sys.stderr.write("php-cfg-global-deprecated-const: method start missing for refresh\n")
+yield_anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
+    {"""
+if yield_anchor not in text:
+    sys.stderr.write("php-cfg-global-deprecated-const: parseExpr_Yield anchor not found in Parser.php\n")
+    raise SystemExit(1)
+
+# Replace the whole marker-helper block through parseExpr_Yield so a prior
+# refresh cannot leave a second extract* method behind (#23882 leftover).
+block_starts = []
+for needle in (
+    "    private function applyGlobalDeprecatedConstMarkerAttributes",
+    "    private function globalConstMarkerCommentChunks",
+    "    private function extractGlobalDeprecatedConstMarkerPayloadFromAttributes",
+):
+    pos = text.find(needle)
+    if pos >= 0:
+        block_starts.append(pos)
+
+if block_starts:
+    start = min(block_starts)
+    end = text.find(yield_anchor)
+    if end < start:
+        sys.stderr.write("php-cfg-global-deprecated-const: yield anchor before overlay block\n")
         raise SystemExit(1)
-    rest = text[start + 1 :]
-    m = re.search(r'\n    (?:private|protected|public) function ', rest)
-    if not m:
-        sys.stderr.write("php-cfg-global-deprecated-const: method end missing for refresh\n")
-        raise SystemExit(1)
-    end_pos = start + 1 + m.start()
-    text = text[:start] + insert + text[end_pos:]
+    text = text[:start] + insert + text[end:]
+    # Ensure parseStmt_Const wires apply* (idempotent).
+    old_anchor = """            $this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());
+            $this->block->children[] = $constOp;"""
+    new_anchor = """            $this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());
+            $this->applyGlobalDeprecatedConstMarkerAttributes($constOp, $node->getAttributes());
+            $this->block->children[] = $constOp;"""
+    if old_anchor in text:
+        text = text.replace(old_anchor, new_anchor, 1)
     parser_path.write_text(text)
-    print("Refreshed php-cfg-global-deprecated-const overlay (#23882)")
+    print("Healed php-cfg-global-deprecated-const overlay (#16819, #23882)")
     raise SystemExit(0)
 
 anchor = """            $this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());
@@ -4297,11 +4323,6 @@ if anchor not in text:
     sys.stderr.write("php-cfg-global-deprecated-const: parseStmt_Const anchor missing\n")
     raise SystemExit(1)
 
-yield_anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
-    {"""
-if yield_anchor not in text:
-    sys.stderr.write("php-cfg-global-deprecated-const: parseExpr_Yield anchor not found in Parser.php\n")
-    raise SystemExit(1)
 text = text.replace(yield_anchor, insert + yield_anchor, 1)
 text = text.replace(
     anchor,
@@ -4311,8 +4332,8 @@ text = text.replace(
     1,
 )
 parser_path.write_text(text)
+print("Applied php-cfg-global-deprecated-const overlay (#16819, #23882)")
 PY
-  echo "Applied php-cfg-global-deprecated-const overlay (#16819, #23882)"
 }
 
 apply_php_cfg_typed_function_static_overlay() {
