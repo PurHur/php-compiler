@@ -52,6 +52,9 @@ final class getimagesize extends Internal
             } elseif (VmImage::shouldEmitImageReadNoticeForPath($filename)) {
                 VmImage::emitImageReadNotice($frame, 'getimagesize', $filename);
             }
+            if (2 === $argc) {
+                VmImage::writeImageInfoVariable($frame->calledArgs[1], []);
+            }
             $frame->returnVar->bool(false);
 
             return;
