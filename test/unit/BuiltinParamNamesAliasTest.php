@@ -1531,6 +1531,24 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'httponly', 'session_set_cookie_params'));
     }
 
+    /** @covers issue #23402 */
+    public function testTriggerErrorSessionIdZendStubNamedParams(): void
+    {
+        $te = BuiltinParamNames::forFunction('trigger_error');
+        self::assertSame(['message', 'error_level'], $te);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($te, 'message', 'trigger_error'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($te, 'error_level', 'trigger_error'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($te, 'error_type', 'trigger_error'));
+
+        $ue = BuiltinParamNames::forFunction('user_error');
+        self::assertSame(['message', 'error_level'], $ue);
+
+        $sid = BuiltinParamNames::forFunction('session_id');
+        self::assertSame(['id'], $sid);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($sid, 'id', 'session_id'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sid, 'newid', 'session_id'));
+    }
+
     /** @covers issue #23422 */
     public function testClassAliasZendStubNamedParams(): void
     {
