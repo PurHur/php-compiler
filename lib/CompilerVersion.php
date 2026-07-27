@@ -2674,7 +2674,8 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ substr()/mb_substr() optional $truncate (ext/standard/string.c, ext/mbstring/mbstring.c, #17239).
+     * PHP 8.4+ substr() optional $truncate silences Z_STR_TRUNCATED warnings (#17239).
+     * mb_substr has no $truncate in php-src — use this only for byte substr() clip warnings (#23603).
      *
      * Withheld on 8.4.0-dev reference profile — enable via PHP_COMPILER_PROFILE=8.4 forward profile (#17252).
      */

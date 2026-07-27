@@ -810,9 +810,7 @@ final class BuiltinParamNames
             case 'mb_strlen':
                 return ['string', 'encoding'];
             case 'mb_substr':
-                return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
-                    ? ['string', 'start', 'length', 'encoding', 'truncate']
-                    : ['string', 'start', 'length', 'encoding'];
+                return ['string', 'start', 'length', 'encoding'];
             case 'mb_strcut':
                 return ['string', 'start', 'length', 'encoding'];
             case 'mb_stripos':
