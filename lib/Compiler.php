@@ -993,7 +993,11 @@ class Compiler {
             $child = $this->seen[$block];
             // Merge blocks already mapped on first branch; sibling inheritScopeFrom
             // adds duplicate slot indices and breaks ?: echo (#3790).
-            if (\count($block->parents) < 2) {
+            // Try/catch end often has only one CFG parent (the catch), so the parents>=2
+            // guard does not apply — re-inheriting from the catch aliases method-name /
+            // "caught:" temps onto the merge echo slot and AFTER prints the wrong string
+            // (#23930, #23641 AFTER regression). Skip once the merge already has opcodes.
+            if (\count($block->parents) < 2 && 0 === $child->nOpCodes) {
                 $child->inheritScopeFrom($parent);
                 if ($this->isErrorSuppressEndBlock($block)) {
                     $this->inheritErrorSuppressExpressionSlots($parent, $child);
@@ -15352,6 +15356,10 @@ class Compiler {
      * Try/catch merge blocks from php-cfg may include later sibling try/catch in the same end
      * block. JIT pre-lowers merge at beginTry via compileIncludedAtEntry; nested TYPE_TRY in
      * that merge corrupts LLVM EH basic blocks (#4041). Split so merge is prefix-only + JUMP.
+     *
+     * When the nested TYPE_TRY is at index 0 (two sequential try/catch, nothing between), still
+     * split into an empty merge prefix that JUMP's to the nested try — otherwise the first
+     * catch falls into the second try's EH and the second catch sees the first exception (#23930).
      */
     private function splitMergeBeforeNestedTry(Block $merge): Block
     {
@@ -15367,7 +15375,7 @@ class Compiler {
                 break;
             }
         }
-        if (null === $splitAt || 0 === $splitAt) {
+        if (null === $splitAt) {
             return $merge;
         }
         $tailOps = \array_slice($merge->opCodes, $splitAt);

@@ -185,7 +185,18 @@ final class TryCatchHelper
             $mergeBodyBb = self::appendBlock($func, 'try_merge_body_'.self::blockSuffix($handler));
             $handler->mergeBodyLlvmBb = $mergeBodyBb;
             if (null === $mergeBodyBb->getTerminator()) {
-                $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBodyBb);
+                // Detach this try while lowering the merge: php-cfg puts a following
+                // sibling try/catch in the same end block (#4041 / #23930). If this
+                // handler stays on the throw stack, the nested try is compiled as an
+                // inner EH region and the outer catch body is skipped / sees the wrong
+                // exception at runtime.
+                $savedThrowHandlerStack = $context->tryCatch->handlerStack;
+                self::detachHandlerFromThrowStack($context, $handler);
+                try {
+                    $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBodyBb);
+                } finally {
+                    $context->tryCatch->handlerStack = $savedThrowHandlerStack;
+                }
             }
             $builder->positionAtEnd($mergeHeaderBb);
             if (null === $mergeHeaderBb->getTerminator()) {
@@ -609,11 +620,11 @@ final class TryCatchHelper
         foreach ($handler->catchArms as $arm) {
             $catchOp = $arm['op'];
             $types = $arm['catchTypes'];
-            $catchCfg = $catchOp->block1;
-            $cachedCatchBb = null !== $catchCfg
-                ? ($context->scope->blockStorage[$catchCfg] ?? null)
-                : null;
-            $catchBodyBb = $cachedCatchBb ?? self::appendBlock($func, 'try_catch_match_'.$suffix);
+            // Always lower the catch arm at this dispatch entry (#4041 / #23930).
+            // Reusing blockStorage[catch] from an earlier partial compile (e.g. nested
+            // try inside the merge of a prior try) skips the body — first catch goes
+            // silent and the next catch can observe the earlier exception object.
+            $catchBodyBb = self::appendBlock($func, 'try_catch_match_'.$suffix);
             $noMatchBb = self::appendBlock($func, 'try_catch_nomatch_'.$suffix);
             $catchSetupBb = self::appendBlock($func, 'try_catch_setup_'.$suffix);
 
@@ -645,53 +656,51 @@ final class TryCatchHelper
             }
             $builder->branch($catchBodyBb);
 
-            if (null === $cachedCatchBb) {
-                if ($context->compilingGeneratorResume && null !== $catchOp->block1) {
-                    $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
-                    if (null !== $catchResume) {
-                        $builder->branch($catchResume);
-                        $context->tryCatch->handlerStack = $savedThrowHandlerStack;
-                        $nextCatch = $noMatchBb;
-                        $builder->positionAtEnd($nextCatch);
+            if ($context->compilingGeneratorResume && null !== $catchOp->block1) {
+                $catchResume = $context->generatorCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
+                if (null !== $catchResume) {
+                    $builder->branch($catchResume);
+                    $context->tryCatch->handlerStack = $savedThrowHandlerStack;
+                    $nextCatch = $noMatchBb;
+                    $builder->positionAtEnd($nextCatch);
 
-                        continue;
-                    }
+                    continue;
                 }
-                if ($context->compilingFiberResume && null !== $catchOp->block1) {
-                    $catchResume = $context->fiberCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
-                    if (null !== $catchResume) {
-                        $builder->branch($catchResume);
-                        $context->tryCatch->handlerStack = $savedThrowHandlerStack;
-                        $nextCatch = $noMatchBb;
-                        $builder->positionAtEnd($nextCatch);
+            }
+            if ($context->compilingFiberResume && null !== $catchOp->block1) {
+                $catchResume = $context->fiberCatchDispatchEntry[spl_object_id($catchOp->block1)] ?? null;
+                if (null !== $catchResume) {
+                    $builder->branch($catchResume);
+                    $context->tryCatch->handlerStack = $savedThrowHandlerStack;
+                    $nextCatch = $noMatchBb;
+                    $builder->positionAtEnd($nextCatch);
 
-                        continue;
-                    }
+                    continue;
                 }
-                $catchTail = $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
-                // Prefer an open insert block — the return value may be a mid-block that already
-                // branches to the arm's real tail (#23641 AFTER).
-                $openTail = $builder->getInsertBlock();
-                if (null !== $openTail && null === $openTail->getTerminator()) {
-                    $catchTail = $openTail;
-                }
-                $builder->positionAtEnd($catchTail);
-                if (null === $catchTail->getTerminator()) {
-                    if (null !== $handler->finallyBb) {
-                        $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
-                        $builder->branch($handler->finallyBb);
-                    } else {
-                        $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
-                        $builder->call($context->lookupFunction('phpc_jit_clear_active_catch'));
-                        // Prefer the dedicated merge-body BB — blockStorage[merge] may point at a
-                        // post-return dead insert from ensureOpenInsertBlock (#23641 AFTER).
-                        // mergeEntryBb is still null while buildDispatch runs (created after).
-                        $mergeTarget = $handler->mergeBodyLlvmBb
-                            ?? $handler->mergeEntryBb
-                            ?? $mergeBody;
-                        if (null !== $mergeTarget) {
-                            $builder->branch($mergeTarget);
-                        }
+            }
+            $catchTail = $jit->compileCatchArmAtEntry($func, $catchOp->block1, $catchBodyBb, ...$args);
+            // Prefer an open insert block — the return value may be a mid-block that already
+            // branches to the arm's real tail (#23641 AFTER).
+            $openTail = $builder->getInsertBlock();
+            if (null !== $openTail && null === $openTail->getTerminator()) {
+                $catchTail = $openTail;
+            }
+            $builder->positionAtEnd($catchTail);
+            if (null === $catchTail->getTerminator()) {
+                if (null !== $handler->finallyBb) {
+                    $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
+                    $builder->branch($handler->finallyBb);
+                } else {
+                    $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
+                    $builder->call($context->lookupFunction('phpc_jit_clear_active_catch'));
+                    // Prefer the dedicated merge-body BB — blockStorage[merge] may point at a
+                    // post-return dead insert from ensureOpenInsertBlock (#23641 AFTER).
+                    // mergeEntryBb is still null while buildDispatch runs (created after).
+                    $mergeTarget = $handler->mergeBodyLlvmBb
+                        ?? $handler->mergeEntryBb
+                        ?? $mergeBody;
+                    if (null !== $mergeTarget) {
+                        $builder->branch($mergeTarget);
                     }
                 }
             }
