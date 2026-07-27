@@ -187,7 +187,13 @@ final class VmArray
             return;
         }
         if (Variable::TYPE_BOOLEAN === $key->type) {
-            $ht->updateIndex($key->toBool() ? 1 : 0, $stored);
+            // Zend convert_to_string then hash update: true → "1" → int 1; false → "" (#24033/#24034).
+            // Literal `$a[false]` still uses int 0 via normalizeIndexKey — only combine/fill_keys stringify.
+            if ($key->toBool()) {
+                $ht->updateIndex(1, $stored);
+            } else {
+                $ht->update('', $stored);
+            }
 
             return;
         }
