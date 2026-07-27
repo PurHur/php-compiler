@@ -84,6 +84,12 @@ class ClassEntry {
     public array $staticPropertyAsymmetricExplicitRead = [];
     /** @var array<string, string> static property name (lowercase) => declaring class lc (#6785) */
     public array $staticPropertyDeclaringClassLc = [];
+    /**
+     * @var array<string, true> static property name (lowercase) => ZEND_ACC_FINAL (#23683, #23403)
+     *
+     * Inheritance-only in php-src (writes still allowed); drives ReflectionProperty::isFinal().
+     */
+    public array $staticPropertyFinal = [];
     /** @var array<string, array{get?: string, set?: string}> static prop (lowercase) => hook method lc (#4751) */
     public array $staticPropertyHooks = [];
     /** @var array<string, true> static props imported from a trait (per-class storage, #4670) */

@@ -58,8 +58,9 @@ final class ReflectionPropertyHookSupport
     }
 
     /**
-     * php-src ReflectionProperty::isFinal — prop->flags & ZEND_ACC_FINAL (#20511).
+     * php-src ReflectionProperty::isFinal — prop->flags & ZEND_ACC_FINAL (#20511, #23683).
      * private(set) is implicitly final (zend_API.c / manual, #23068).
+     * Static finals are tracked on ClassEntry::$staticPropertyFinal (inheritance-only; writes OK).
      */
     public static function isFinal(ClassEntry $entry, ?ClassProperty $meta, string $property, Context $ctx): bool
     {
@@ -75,6 +76,17 @@ final class ReflectionPropertyHookSupport
             && \PHPCompiler\PropertyVisibility::isImplicitlyFinalFromPrivateSet($vis['setVisibility'])
         ) {
             return true;
+        }
+        $lc = strtolower($property);
+        $current = $entry;
+        while (true) {
+            if (!empty($current->staticPropertyFinal[$lc])) {
+                return true;
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                break;
+            }
+            $current = $ctx->classes[$current->parentLc];
         }
         $lcClass = strtolower($entry->name);
         $propLc = strtolower($property);

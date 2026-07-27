@@ -16,7 +16,7 @@ use PHPLLVM\Builder;
 final class ReadonlyClassGuard
 {
     /**
-     * @param \PHPCompiler\JIT|null $jit Required for try/catch delivery of final/readonly Errors (#23665).
+     * @param \PHPCompiler\JIT|null $jit Required for try/catch delivery of readonly Errors (#23665).
      */
     public static function emitBeforePropertyStore(
         Context $context,
@@ -45,18 +45,11 @@ final class ReadonlyClassGuard
             return;
         }
 
-        // Asymmetric set visibility (incl. implicit-final private(set)) must not use the plain
-        // final write ban — set-visibility guard runs next (#23110, Zend/zend_object_handlers.c).
-        $finalIds = [];
-        foreach ($objectType->finalPropertyClassIdsForProperty($propName) as $finalId) {
-            if (!$objectType->propertyHasDistinctAsymmetricSetVisibility($finalId, $propName)) {
-                $finalIds[] = $finalId;
-            }
-        }
+        // Asymmetric set visibility (incl. implicit-final private(set)) is enforced by the
+        // set-visibility guard — not here. Plain `final` is inheritance-only in php-src (#23683).
         $guardClassIds = array_values(array_unique(array_merge(
             $objectType->readonlyClassIds(),
-            $objectType->readonlyPropertyClassIdsForProperty($propName),
-            $finalIds
+            $objectType->readonlyPropertyClassIdsForProperty($propName)
         )));
         if ([] === $guardClassIds) {
             return;
@@ -126,18 +119,13 @@ final class ReadonlyClassGuard
             $context->builder->branchIf($reinitOk, $storeBlock, $violateBlock);
             $context->builder->positionAtEnd($violateBlock);
             $declaringClass = $objectType->classNameForId($id);
-            $isFinal = $objectType->isPropertyFinal($id, $propName);
-            if ($isFinal && 'unset' !== $violation) {
-                $message = sprintf('Cannot modify final property %s::$%s', $declaringClass, $propName);
-            } else {
-                $message = sprintf(
-                    'unset' === $violation
-                        ? 'Cannot unset readonly property %s::$%s'
-                        : 'Cannot modify readonly property %s::$%s',
-                    $declaringClass,
-                    $propName
-                );
-            }
+            $message = sprintf(
+                'unset' === $violation
+                    ? 'Cannot unset readonly property %s::$%s'
+                    : 'Cannot modify readonly property %s::$%s',
+                $declaringClass,
+                $propName
+            );
             self::emitViolation($context, $jit, $message);
             $checkBlock = $nextCheck;
         }

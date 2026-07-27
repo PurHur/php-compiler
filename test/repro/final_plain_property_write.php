@@ -1,17 +1,15 @@
 <?php
-// Issue #22450 — PHP 8.4 final plain property post-construct write (Zend/zend_object_handlers.c).
+// Issue #23683 — PHP 8.4 final plain property: inheritance-only (Zend 8.4.23/8.5.8).
+// Writes succeed; ReflectionProperty::isFinal() is true; child override fatals separately.
 class F
 {
     public final string $x = 'a';
 }
 $o = new F();
 echo 'read=', $o->x, "\n";
-try {
-    $o->x = 'b';
-    echo "WROTE\n";
-} catch (Error $e) {
-    echo 'BLOCKED ', $e->getMessage(), "\n";
-}
+$o->x = 'b';
+echo 'wrote=', $o->x, "\n";
+echo 'isFinal=', (new ReflectionProperty('F', 'x'))->isFinal() ? '1' : '0', "\n";
 
 class G
 {
@@ -23,9 +21,5 @@ class G
     }
 }
 $g = new G();
-try {
-    $g->y = 'd';
-    echo "WROTE2\n";
-} catch (Error $e) {
-    echo 'BLOCKED2 ', $e->getMessage(), "\n";
-}
+$g->y = 'd';
+echo 'wrote2=', $g->y, "\n";
