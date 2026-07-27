@@ -55,6 +55,47 @@ final class SplArrayStorage
     }
 
     /**
+     * Materialize / share backing storage for ArrayIterator::__construct(object) (#23886).
+     *
+     * php-src spl_array_set_array: SPL ArrayObject/ArrayIterator → share live table
+     * (SPL_ARRAY_USE_OTHER); when flags arg omitted, inherit other→ar_flags.
+     * Plain objects → public/dynamic property hashtable (php-src object properties).
+     *
+     * @return array{0: HashTable, 1: int}
+     */
+    public static function storageFromConstructObject(
+        ObjectEntry $object,
+        int $userFlags,
+        bool $inheritFlagsFromOther
+    ): array {
+        if (self::hasState($object)) {
+            $flags = $inheritFlagsFromOther ? self::getFlags($object) : $userFlags;
+
+            return [self::state($object)['table'], $flags];
+        }
+
+        return [self::hashTableFromObjectProperties($object), $userFlags];
+    }
+
+    /** @see php-src ArrayIterator::__construct(array|object) property materialization */
+    public static function hashTableFromObjectProperties(ObjectEntry $object): HashTable
+    {
+        $table = new HashTable();
+        foreach ($object->propertiesWithNames() as $name => $prop) {
+            $copy = new Variable();
+            $copy->copyFrom($prop->resolveIndirect());
+            $intKey = HashTable::tryIntFromNumericString((string) $name);
+            if (null !== $intKey) {
+                $table->addIndex($intKey, $copy);
+            } else {
+                $table->add((string) $name, $copy);
+            }
+        }
+
+        return $table;
+    }
+
+    /**
      * php-src spl_array_object_clone — deep-copy HashTable + flags onto the shallow-cloned object (#19803).
      */
     public static function cloneInto(ObjectEntry $src, ObjectEntry $dest): void
