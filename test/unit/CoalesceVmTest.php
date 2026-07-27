@@ -328,7 +328,7 @@ declare(strict_types=1);
 $a = ["k" => ["x" => 1]];
 var_dump(array_keys($a["k"] ?? []));
 ',
-            "array(1) {\n [0]=>\n string(1) \"x\"\n}\n"
+            "array(1) {\n  [0]=>\n  string(1) \"x\"\n}\n"
         );
     }
 
@@ -337,8 +337,8 @@ var_dump(array_keys($a["k"] ?? []));
     {
         $this->assertVmOutput(
             file_get_contents(__DIR__ . '/../repro/maintainer_gap_ini_get_all_array_keys_inline.php'),
-            "array(3) {\n [0]=>\n string(12) \"global_value\"\n [1]=>\n string(11) \"local_value\"\n [2]=>\n string(6) \"access\"\n}\n"
-            . "array(1) {\n [0]=>\n string(1) \"x\"\n}\n"
+            "array(3) {\n  [0]=>\n  string(12) \"global_value\"\n  [1]=>\n  string(11) \"local_value\"\n  [2]=>\n  string(6) \"access\"\n}\n"
+            . "array(1) {\n  [0]=>\n  string(1) \"x\"\n}\n"
         );
     }
 
@@ -368,7 +368,7 @@ var_dump(array_keys($all[\'display_errors\'] ?? []));
 $flat = ini_get_all(null, false);
 echo is_string($flat[\'display_errors\'] ?? null) ? "flat string\n" : "flat not string\n";
 ',
-            "array(3) {\n [0]=>\n string(12) \"global_value\"\n [1]=>\n string(11) \"local_value\"\n [2]=>\n string(6) \"access\"\n}\nflat string\n"
+            "array(3) {\n  [0]=>\n  string(12) \"global_value\"\n  [1]=>\n  string(11) \"local_value\"\n  [2]=>\n  string(6) \"access\"\n}\nflat string\n"
         );
     }
 

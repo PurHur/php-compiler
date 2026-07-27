@@ -44,8 +44,8 @@ ReflectionParameter Object
     [name] => a
 )
 object(ReflectionParameter)#%d (1) {
- ["name"]=>
- string(1) "a"
+  ["name"]=>
+  string(1) "a"
 }
 b
 'b'

@@ -14,15 +14,15 @@ echo Color::Red->name, "\n";
 echo ob_get_clean();
 --EXPECT--
 array(2) {
- [0]=>
- enum(Color::Red)
- [1]=>
- enum(Color::Green)
+  [0]=>
+  enum(Color::Red)
+  [1]=>
+  enum(Color::Green)
 }
 array(2) {
- [0]=>
- enum(Size::S)
- [1]=>
- enum(Size::M)
+  [0]=>
+  enum(Size::S)
+  [1]=>
+  enum(Size::M)
 }
 Red
