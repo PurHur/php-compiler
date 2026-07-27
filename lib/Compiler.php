@@ -36360,6 +36360,11 @@ class Compiler {
         if (!$arg instanceof Operand\Temporary) {
             return false;
         }
+        // Bare named locals are SSA temps cloned for call-site flags (#8560); their ops[] still
+        // list the CV Assign writer — that is not assign-in-call ($v = expr) (#23893).
+        if (null !== Block::resolveVariableName($arg)) {
+            return false;
+        }
         foreach ($arg->ops ?? [] as $embedded) {
             if ($embedded instanceof Op\Expr\Assign) {
                 return true;
@@ -49268,6 +49273,27 @@ class Compiler {
             $exactSlot = $this->exactHoistedCallArgProducerSlot($block, $cfgCallOp, (int) $argIndex, $sends);
             if (null !== $exactSlot) {
                 $valueSlot = $exactSlot;
+            }
+            // Bare named locals ($x as call arg): CV assign-dest must win over later heuristics
+            // that re-bind the call-site clone Temporary to a fresh empty slot (#23893, re-#23354).
+            $bareLocalProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if (
+                $bareLocalProbe instanceof Operand
+                && null !== Block::resolveVariableName($bareLocalProbe)
+                && !$this->callArgIsDeadInlineTemporary($bareLocalProbe)
+            ) {
+                $bareNamedDest = $block->slotForNamedAssignDest($bareLocalProbe);
+                if (null !== $bareNamedDest) {
+                    $valueSlot = $this->resolveNamedAssignCallArgSlot(
+                        $block,
+                        (int) $bareNamedDest,
+                        $calleeName,
+                        (int) $argIndex,
+                        $bareLocalProbe
+                    );
+                } elseif (null === $valueSlot) {
+                    $valueSlot = $this->compileOperand($bareLocalProbe, $block, true);
+                }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }

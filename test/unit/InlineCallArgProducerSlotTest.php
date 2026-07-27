@@ -9603,4 +9603,30 @@ PHP;
             trim($out)
         );
     }
+
+    /** Issue #23893 — bare local as call arg inside function matches Zend. */
+    public function testBareLocalCallArgUsesNamedAssignDestSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+function show_local() {
+  $x = 42;
+  var_dump($x);
 }
+show_local();
+function pass_to_user() {
+  $x = 7;
+  sink($x);
+}
+function sink($v) { var_dump($v); }
+pass_to_user();
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'bare_local_call_arg.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("int(42)\nint(7)\n", ob_get_clean());
+    }
+
+}
+
