@@ -9052,13 +9052,26 @@ class JIT {
                             );
                         }
                     }
+                    $echoName = JIT\OperandName::resolve($echoOp);
+                    if (null !== $echoName && '' !== $echoName) {
+                        $resolvedEcho = $this->context->resolveRefAliasName($echoName);
+                        if (isset($this->context->namedVariableBindings[$resolvedEcho])
+                            && $this->context->namedVariableBindings[$resolvedEcho]->functionStaticGlobal
+                        ) {
+                            $arg = $this->context->namedVariableBindings[$resolvedEcho];
+                        }
+                    }
                     switch ($arg->type) {
                         case Variable::TYPE_VALUE:
+                            $srcPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $arg);
+                            if ($arg->functionStaticGlobal) {
+                                JIT\JitValueBox::publishAfterWrite($this->context, $srcPtr);
+                            }
                             $echoSlot = JIT\JitValueBox::alloc($this->context);
                             JIT\JitValueBox::copyFromPointer(
                                 $this->context,
                                 $echoSlot,
-                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                $srcPtr
                             );
                             JIT\ValueEchoHelper::echo(
                                 $this->context,
@@ -15470,12 +15483,28 @@ class JIT {
             && (Variable::KIND_VARIABLE === $read->kind || $read->functionStaticGlobal)
         ) {
             $this->guardIncDecResourceOperand($read, $increment, $readOp);
+            $readName = JIT\OperandName::resolve($readOp);
+            if (null !== $readName && '' !== $readName) {
+                $resolvedRead = $this->context->resolveRefAliasName($readName);
+                if (isset($this->context->namedVariableBindings[$resolvedRead])
+                    && $this->context->namedVariableBindings[$resolvedRead]->functionStaticGlobal
+                ) {
+                    $read = $this->context->namedVariableBindings[$resolvedRead];
+                    $this->context->scope->variables[$readOp] = $read;
+                }
+            }
             $readPtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $read);
             $cur = $this->readIncDecValueBoxLong($read, $readPtr, $increment);
             $one = $cur->typeOf()->constInt(1, false);
             $newLong = $increment
                 ? $this->context->builder->add($cur, $one)
                 : $this->context->builder->sub($cur, $one);
+            $newVar = new Variable(
+                $this->context,
+                Variable::TYPE_NATIVE_LONG,
+                Variable::KIND_VALUE,
+                $newLong
+            );
             if (!$prefix) {
                 $oldVar = new Variable(
                     $this->context,
@@ -15485,20 +15514,8 @@ class JIT {
                 );
                 $this->assignOperand($resultOp, $oldVar, true);
             }
-            $write = $this->context->getVariableFromOpInScopes($writeOp);
-            $writePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $write);
-            $this->context->builder->call(
-                $this->context->lookupFunction('__value__writeLong'),
-                $writePtr,
-                $newLong
-            );
+            $this->assignOperand($writeOp, $newVar, true);
             if ($prefix) {
-                $newVar = new Variable(
-                    $this->context,
-                    Variable::TYPE_NATIVE_LONG,
-                    Variable::KIND_VALUE,
-                    $newLong
-                );
                 $this->assignOperand($resultOp, $newVar, true);
             }
 
