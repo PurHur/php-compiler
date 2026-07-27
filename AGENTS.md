@@ -48,6 +48,21 @@ script/differential-sweep.sh --aot    # AOT — the least-covered path
 It found 24 such defects that the compliance suite missed (#23354). Mandatory for any change to
 argument handling, call lowering, operand/slot resolution or CFG shape.
 
+**VM is 53/53; `--aot` is not green** — 27 of 53 failed on master when it was first run end-to-end
+(#23779). So for AOT, compare failing case **names** against master exactly as you would for the
+compliance suites; the raw count is not a pass/fail signal.
+
+A case that exercises a feature a backend genuinely does not implement can declare that, with a
+reason:
+
+```php
+// @differential-skip-aot: print_r() JIT helper requires Runtime->vm from thin standalone init (#9190 / #23540)
+```
+
+Without this, such a case fails forever regardless of compiler state and the exit status stops
+meaning "regressions". Use it **only** for genuinely unsupported features — never to silence a real
+defect. Silencing a failing case is the cheap green of §4 wearing a different hat.
+
 ### 4. Never make a gate green without making the artifact work
 
 The recurring failure here is a **cheap green**. Documented instances: the committed gen-0 driver

@@ -1,4 +1,11 @@
 <?php
+// @differential-skip-aot: AOT renders int 2 as "Resource id #2" and mis-decrements (#23811)
+//
+// This case is a VM guard for now. It FAILS under --aot, and that failure is real, not a
+// mis-specified expectation: see #23811. It is skipped rather than deleted because the moment
+// #23811 is fixed, removing the marker turns this back into an AOT guard for free. Do NOT read the
+// skip as "this shape works under AOT".
+//
 // #23483: ++/-- guards every native long with __compiler_is_resource, because resource handles
 // ARE native longs here and php-types has no resource type. IncDecResourceProvenance elides that
 // guard when the value provably comes from a literal or from arithmetic.

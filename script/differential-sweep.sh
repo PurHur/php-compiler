@@ -42,13 +42,27 @@ cd "$ROOT" || exit 2
 
 fail=0
 total=0
+skipped=0
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 for f in "$DIR"/*.php; do
     [ -e "$f" ] || continue
-    total=$((total + 1))
     name="$(basename "$f")"
+
+    # A case may declare a backend it cannot pass, e.g. it exercises a feature that mode does not
+    # implement. Without this, such a case fails forever regardless of compiler state and the exit
+    # status stops meaning "regressions" — see #23779. The marker must carry a reason:
+    #     // @differential-skip-aot: var_dump() of non-scalars needs Runtime->vm (#23540)
+    # Use it ONLY for genuinely unsupported features, never to silence a real defect.
+    if grep -q "@differential-skip-$BACKEND\b" "$f" 2>/dev/null; then
+        reason="$(sed -n "s|.*@differential-skip-$BACKEND: *||p" "$f" | head -1)"
+        [ "$QUIET" -eq 1 ] || printf 'skip    %-34s %s\n' "$name" "$reason"
+        skipped=$((skipped + 1))
+        continue
+    fi
+
+    total=$((total + 1))
 
     zend="$(timeout 120 php "$f" 2>&1)"
 
@@ -74,5 +88,10 @@ for f in "$DIR"/*.php; do
     fi
 done
 
-printf '\n%d/%d match Zend (%s backend)\n' "$((total - fail))" "$total" "$BACKEND"
+if [ "$skipped" -gt 0 ]; then
+    printf '\n%d/%d match Zend (%s backend, %d skipped)\n' \
+        "$((total - fail))" "$total" "$BACKEND" "$skipped"
+else
+    printf '\n%d/%d match Zend (%s backend)\n' "$((total - fail))" "$total" "$BACKEND"
+fi
 exit "$fail"
