@@ -67,8 +67,13 @@ final class VmZlibCore
         return true;
     }
 
-    public static function gzcompress(string $data, int $level = -1, int $encoding = \ZLIB_ENCODING_DEFLATE): string|false
-    {
+    // Encoding defaults are numeric literals — global ZLIB_ENCODING_* consts are not
+    // foldable yet during spine AOT of this unit (#3803 / #23468 / #22642).
+    public static function gzcompress(
+        string $data,
+        int $level = -1,
+        int $encoding = 15 // ZLIB_ENCODING_DEFLATE
+    ): string|false {
         $level = self::normalizeLevel($level);
 
         if (self::isDeflateEncoding($encoding) || (!self::isRawEncoding($encoding) && !self::isGzipEncoding($encoding))) {
@@ -86,8 +91,11 @@ final class VmZlibCore
         return self::decodeZlib($data, $maxLength);
     }
 
-    public static function gzdeflate(string $data, int $level = -1, int $encoding = \ZLIB_ENCODING_RAW): string|false
-    {
+    public static function gzdeflate(
+        string $data,
+        int $level = -1,
+        int $encoding = -15 // ZLIB_ENCODING_RAW
+    ): string|false {
         $level = self::normalizeLevel($level);
         if (self::isGzipEncoding($encoding)) {
             return self::encodeGzip($data, $level);
@@ -108,8 +116,11 @@ final class VmZlibCore
         return self::rawInflate($data, $maxLength);
     }
 
-    public static function gzencode(string $data, int $level = -1, int $encoding = \ZLIB_ENCODING_GZIP): string|false
-    {
+    public static function gzencode(
+        string $data,
+        int $level = -1,
+        int $encoding = 31 // ZLIB_ENCODING_GZIP
+    ): string|false {
         $level = self::normalizeLevel($level);
         if (self::isRawEncoding($encoding)) {
             return self::rawDeflate($data, $level);

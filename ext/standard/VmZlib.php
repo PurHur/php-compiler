@@ -33,8 +33,13 @@ final class VmZlib
         );
     }
 
-    public static function gzcompress(string $data, int $level = -1, int $encoding = \ZLIB_ENCODING_DEFLATE): string|false
-    {
+    // Encoding defaults are numeric literals — global ZLIB_ENCODING_* consts are not
+    // foldable yet during spine AOT of this unit (#3803 / #23468 / #22642).
+    public static function gzcompress(
+        string $data,
+        int $level = -1,
+        int $encoding = 15 // ZLIB_ENCODING_DEFLATE
+    ): string|false {
         return VmZlibCore::gzcompress($data, $level, $encoding);
     }
 
@@ -48,13 +53,19 @@ final class VmZlib
         return VmZlibCore::gzinflate($data, $maxLength);
     }
 
-    public static function gzdeflate(string $data, int $level = -1, int $encoding = \ZLIB_ENCODING_RAW): string|false
-    {
+    public static function gzdeflate(
+        string $data,
+        int $level = -1,
+        int $encoding = -15 // ZLIB_ENCODING_RAW
+    ): string|false {
         return VmZlibCore::gzdeflate($data, $level, $encoding);
     }
 
-    public static function gzencode(string $data, int $level = -1, int $encoding = \ZLIB_ENCODING_GZIP): string|false
-    {
+    public static function gzencode(
+        string $data,
+        int $level = -1,
+        int $encoding = 31 // ZLIB_ENCODING_GZIP
+    ): string|false {
         return VmZlibCore::gzencode($data, $level, $encoding);
     }
 
