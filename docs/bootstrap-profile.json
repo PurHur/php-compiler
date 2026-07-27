@@ -393,6 +393,7 @@
         "ext/dom/JitDomNodeListItemUserScript.php",
         "ext/dom/JitDomNodeListLength.php",
         "ext/dom/JitDomNormalize.php",
+        "ext/dom/JitDomParentNodeProperty.php",
         "ext/dom/JitDomRemoveChild.php",
         "ext/dom/JitDomReplaceChild.php",
         "ext/dom/JitDomSaveHTML.php",
@@ -1900,6 +1901,7 @@
         "ext/soap/SoapConstants.php",
         "ext/soap/SoapExtensionPolicy.php",
         "ext/soap/SoapFaultConstruct.php",
+        "ext/soap/SoapSdlPayload.php",
         "ext/soap/VmSoapClient.php",
         "ext/soap/VmSoapEncoding.php",
         "ext/soap/VmSoapOpaque.php",
@@ -5190,6 +5192,7 @@
         "lib/JIT/Builtin/ReflectionNamedArgumentsLookupRuntime.php",
         "lib/JIT/Builtin/ReflectionNamedArgumentsLowering.php",
         "lib/JIT/Builtin/ReflectionNative.php",
+        "lib/JIT/Builtin/ReflectionPropertyIsFinalRuntime.php",
         "lib/JIT/Builtin/ReflectionRuntime.php",
         "lib/JIT/Builtin/ReflectionSetup.php",
         "lib/JIT/Builtin/RequestParseBodyRuntime.php",
@@ -5646,6 +5649,7 @@
         "lib/JIT/Call/ReflectionParameterIsSensitiveParameter.php",
         "lib/JIT/Call/ReflectionPropertyConstruct.php",
         "lib/JIT/Call/ReflectionPropertyGetAttributes.php",
+        "lib/JIT/Call/ReflectionPropertyIsFinal.php",
         "lib/JIT/Call/RuntimeIndirectClosureCall.php",
         "lib/JIT/Call/RuntimeIndirectInstanceMethodCall.php",
         "lib/JIT/Call/RuntimeVariableFunction.php",
@@ -6822,9 +6826,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6588,
+        "inventory_files": 6592,
         "excluded": 0,
-        "eligible": 6588,
+        "eligible": 6592,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
