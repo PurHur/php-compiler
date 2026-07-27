@@ -38795,12 +38795,15 @@ class Compiler {
         }
 
         $valueOperand = $arrayExpr->values[$elementIndex] ?? $valueOperand;
-        $isRead = !$forRefBinding;
         $producer = $this->findCfgProducerExprForOperand($valueOperand);
         if ($producer instanceof Op\Expr) {
             $ops = $this->rematerializeCfgProducerExprOps($producer, $block);
             if ([] !== $ops) {
-                $valueSlot = $this->compileOperand($valueOperand, $block, $isRead);
+                $valueSlot = $this->compileArrayLiteralElementExpressionSlot(
+                    $valueOperand,
+                    $block,
+                    $forRefBinding
+                );
                 $snapshotOperand = new Operand\Temporary();
                 $snapshotSlot = $block->getVarSlot($snapshotOperand, false);
                 $ops[] = new OpCode(OpCode::TYPE_ASSIGN, $snapshotSlot, $valueSlot);
@@ -38809,7 +38812,39 @@ class Compiler {
             }
         }
 
-        return [[], $this->compileOperand($valueOperand, $block, $isRead)];
+        return [[], $this->compileArrayLiteralElementExpressionSlot(
+            $valueOperand,
+            $block,
+            $forRefBinding
+        )];
+    }
+
+    /**
+     * Resolve a non-ref array-literal element to its expression-result slot.
+     *
+     * Zend evaluates elements left-to-right and packs the expression value. Do not rewrite
+     * assign.result → lvalue via {@see finalizeOperandSlotForAccess()}: dim/property write
+     * slots stay live aliases, so later elements (e.g. array_shift) would mutate the packed
+     * value (#23979). By-ref elements still need the live lvalue.
+     */
+    private function compileArrayLiteralElementExpressionSlot(
+        Operand $valueOperand,
+        Block $block,
+        bool $forRefBinding = false,
+    ): int {
+        if ($forRefBinding) {
+            return (int) $this->compileOperand($valueOperand, $block, false);
+        }
+        if ($valueOperand instanceof Operand\Temporary || $valueOperand instanceof Operand\Variable) {
+            $catchSlot = $this->slotForActiveCatchVariable($valueOperand);
+            if (null !== $catchSlot) {
+                return $catchSlot;
+            }
+
+            return $block->getVarSlot($valueOperand, true);
+        }
+
+        return (int) $this->compileOperand($valueOperand, $block, true);
     }
 
     /**
