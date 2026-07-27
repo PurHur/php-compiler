@@ -228,12 +228,8 @@ final class ScopeBuiltinJitHelper
 
     public static function callerVarIsSet(Variable $var): bool
     {
-        $resolved = $var->resolveIndirect();
-        if ($resolved->isUndefined()) {
-            return false;
-        }
-
-        return Variable::TYPE_NULL !== $resolved->type;
+        // php-src zend_hash / symbol table: null CVs are still defined (#23567).
+        return !$var->resolveIndirect()->isUndefined();
     }
 
     /**
@@ -348,7 +344,7 @@ final class ScopeBuiltinJitHelper
     public static function storeVarSnapshotAtStringKey(HashTable $dest, string $key, Variable $value): void
     {
         $resolved = $value->resolveIndirect();
-        if ($resolved->isUndefined() || Variable::TYPE_NULL === $resolved->type) {
+        if ($resolved->isUndefined()) {
             return;
         }
         $copy = new Variable();
