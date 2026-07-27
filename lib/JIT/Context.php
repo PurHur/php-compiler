@@ -1289,6 +1289,8 @@ class Context {
             $emitInStandaloneMain(fn () => $this->builder->call($this->initFunc));
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_init'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                // Thin user-script AOT still needs pending Error clear/abort for final/readonly
+                // property writes (#23665, #3149). Session/header resets stay full-init only.
                 if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
                     $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
@@ -1302,7 +1304,13 @@ class Context {
                     $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending')));
                     $emitInStandaloneMain(fn () => Builtin\JitReturnPending::registerDeclarations($this));
                     $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending')));
-                    $emitInStandaloneMain(fn () => ErrorBridge::emitClearForStandaloneMain($this));
+                } else {
+                    // Thin path: still clear Error/Readonly pending buffers (#23665).
+                    $emitInStandaloneMain(fn () => ErrorBridge::registerDeclarations($this));
+                    $emitInStandaloneMain(fn () => ErrorBridge::ensureLinked($this));
+                }
+                $emitInStandaloneMain(fn () => ErrorBridge::emitClearForStandaloneMain($this));
+                if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => ExceptionBridge::emitClearForStandaloneMain($this));
                 }
             }
@@ -1314,11 +1322,17 @@ class Context {
                 $emitInStandaloneMain(fn () => $this->builder->call($this->main));
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_php'));
-            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && !$this->isThinStandaloneAotMain()) {
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                // Always abort pending Errors after user script — thin AOT previously skipped this
+                // and silently no-op'd final/readonly writes (#23665, readonly_property_write AOT).
+                $emitInStandaloneMain(fn () => ErrorBridge::registerDeclarations($this));
+                $emitInStandaloneMain(fn () => ErrorBridge::ensureLinked($this));
                 $emitInStandaloneMain(fn () => ErrorBridge::emitAbortIfPendingForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
-                $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
+                if (!$this->isThinStandaloneAotMain()) {
+                    $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
+                    $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
+                }
             }
             if (!$this->isThinStandaloneAotMain()) {
                 // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).

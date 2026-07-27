@@ -15,11 +15,15 @@ use PHPLLVM\Builder;
  */
 final class ReadonlyClassGuard
 {
+    /**
+     * @param \PHPCompiler\JIT|null $jit Required for try/catch delivery of final/readonly Errors (#23665).
+     */
     public static function emitBeforePropertyStore(
         Context $context,
         Variable $lvalue,
         ?Block $enclosingBlock,
-        string $violation = 'modify'
+        string $violation = 'modify',
+        ?\PHPCompiler\JIT $jit = null
     ): void {
         if (null === $lvalue->objectPropertySlot) {
             return;
@@ -134,10 +138,7 @@ final class ReadonlyClassGuard
                     $propName
                 );
             }
-            ReadonlyBridge::emitReadonlyViolation($context, $message);
-            // Merge with allow path: pending flag + skip store (#3149, #4875). Avoid returnVoid here —
-            // it breaks AOT LLVM verify and MCJIT uncaught readonly inc/dec (#4082).
-            $context->builder->branch($exitBlock);
+            self::emitViolation($context, $jit, $message);
             $checkBlock = $nextCheck;
         }
 
@@ -258,7 +259,10 @@ final class ReadonlyClassGuard
             $propName,
             $callerClass
         );
-        ReadonlyBridge::emitReadonlyViolation($context, $message);
+        // Pending + skip-store; thin AOT main aborts via ErrorRaise (#23665 / #3149).
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, $message);
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof \PHPLLVM\Value\Function_);
         $exitBlock = $fn->appendBasicBlock('readonly_init_scope_exit');
@@ -266,6 +270,76 @@ final class ReadonlyClassGuard
         $context->builder->positionAtEnd($exitBlock);
 
         return true;
+    }
+
+    /**
+     * Deliver final/readonly write Error: catchable inside try, else pending + return (#23665).
+     *
+     * Uncaught pending uses {@see ErrorRaise} (LLVM globals + abort) — same as asymmetric
+     * visibility (#4029). Early return stops further script ops before standalone abort.
+     */
+    private static function emitViolation(
+        Context $context,
+        ?\PHPCompiler\JIT $jit,
+        string $message
+    ): void {
+        if (null !== $jit && [] !== $context->tryCatch->handlerStack) {
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+            $insert = $context->builder->getInsertBlock();
+            if (null !== $insert && null === $insert->getTerminator()) {
+                ErrorRaise::registerDeclarations($context);
+                ErrorRaise::ensureLinked($context);
+                ErrorRaise::emitRaise($context, $message);
+                self::returnAfterPendingError($context);
+            }
+
+            return;
+        }
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        ErrorRaise::emitRaise($context, $message);
+        self::returnAfterPendingError($context);
+    }
+
+    /**
+     * Stop the current LLVM function after recording a pending Error (#4029 shape).
+     * Prefer typed returns over bare returnVoid for AOT verify (#4082).
+     */
+    private static function returnAfterPendingError(Context $context): void
+    {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof \PHPLLVM\Value\Function_);
+        if (BasicBlockHelper::isVoidLlvmFunctionValue($fn)) {
+            $context->builder->returnVoid();
+
+            return;
+        }
+        $fnType = BasicBlockHelper::llvmFunctionSignatureType($fn);
+        if (null !== $fnType) {
+            $returnType = $fnType->getReturnType();
+            if (\PHPLLVM\Type::KIND_POINTER === $returnType->getKind()) {
+                $context->builder->returnValue($returnType->constNull());
+
+                return;
+            }
+            if (\PHPLLVM\Type::KIND_INTEGER === $returnType->getKind()) {
+                $context->builder->returnValue($returnType->constInt(0, false));
+
+                return;
+            }
+            $structName = $context->getStringFromType($returnType);
+            if ('__value__' === $structName) {
+                $slot = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
+                $context->builder->returnValue($context->builder->load($slot));
+
+                return;
+            }
+        }
+        $context->builder->returnVoid();
     }
 
     /**
