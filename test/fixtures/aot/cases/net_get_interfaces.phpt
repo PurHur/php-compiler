@@ -1,5 +1,5 @@
 --TEST--
-AOT net_get_interfaces() — loopback interface present (#6106)
+AOT net_get_interfaces() — returns array (#6106, #23715)
 --FILE--
 <?php
 $ifaces = net_get_interfaces();

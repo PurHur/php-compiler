@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * net_get_interfaces() VM array builder (#6106).
+ * net_get_interfaces() VM array builder (#6106, #23715).
  *
  * php-src: ext/standard/net.c — PHP_FUNCTION(net_get_interfaces)
  */
@@ -39,16 +39,7 @@ final class VmNetInterfaces
 
             $unicastHt = new HashTable();
             foreach ($iface['unicast'] as $entry) {
-                $uHt = new HashTable();
-                foreach ($entry as $key => $value) {
-                    $slot = new Variable();
-                    if (\is_int($value)) {
-                        $slot->int($value);
-                    } else {
-                        $slot->string((string) $value);
-                    }
-                    $uHt->add((string) $key, $slot);
-                }
+                $uHt = self::unicastEntryToHashTable($entry);
                 $uVar = new Variable();
                 $uVar->array($uHt);
                 $unicastHt->append($uVar);
@@ -63,5 +54,35 @@ final class VmNetInterfaces
         }
 
         return $root;
+    }
+
+    /**
+     * Build one unicast row (php-src iface_append_unicast key order).
+     *
+     * @param array<string, int|string> $entry
+     */
+    private static function unicastEntryToHashTable(array $entry): HashTable
+    {
+        $uHt = new HashTable();
+        if (\array_key_exists('flags', $entry)) {
+            $slot = new Variable();
+            $slot->int((int) $entry['flags']);
+            $uHt->add('flags', $slot);
+        }
+        if (\array_key_exists('family', $entry)) {
+            $slot = new Variable();
+            $slot->int((int) $entry['family']);
+            $uHt->add('family', $slot);
+        }
+        foreach (['address', 'netmask', 'broadcast', 'ptp'] as $key) {
+            if (!\array_key_exists($key, $entry)) {
+                continue;
+            }
+            $slot = new Variable();
+            $slot->string((string) $entry[$key]);
+            $uHt->add($key, $slot);
+        }
+
+        return $uHt;
     }
 }

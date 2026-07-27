@@ -26,6 +26,7 @@ final class VmNetInterfacesRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringNetInterfacesJit.php');
         $this->assertStringContainsString('NetInterfacesJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
         $this->assertStringNotContainsString('ifa_next', $source);
         $this->assertStringNotContainsString('IFA_NAME', $source);
     }
@@ -43,13 +44,18 @@ final class VmNetInterfacesRuntimeShrinkTest extends TestCase
             $this->assertIsArray($raw);
             $this->assertArrayHasKey('lo', $raw);
             $this->assertTrue($raw['lo']['up']);
+            $this->assertNotEmpty($raw['lo']['unicast']);
             $found = false;
+            $hasFamily = false;
             foreach ($raw['lo']['unicast'] as $entry) {
+                if (isset($entry['family'])) {
+                    $hasFamily = true;
+                }
                 if (($entry['address'] ?? '') === '127.0.0.1') {
                     $found = true;
-                    break;
                 }
             }
+            $this->assertTrue($hasFamily, 'unicast entries must include family (#23715)');
             $this->assertTrue($found);
 
             $this->assertTrue(VmNetInterfacesNative::available());

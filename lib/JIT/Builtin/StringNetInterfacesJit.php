@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_net_get_interfaces via NetInterfacesJitHelper PHP (#8988).
+ * JIT/AOT link for __compiler_net_get_interfaces via NetInterfacesJitHelper PHP (#8988, #23715).
  *
- * Replaces the former getifaddrs LLVM walk monolith.
  * SSOT: VmNetInterfaces::get. php-src: ext/standard/net.c
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer StringFilterBoolean #23612).
  */
 final class StringNetInterfacesJit
 {
@@ -43,11 +43,17 @@ final class StringNetInterfacesJit
             return;
         }
 
+        // Restore caller insert block after bridge emit (#20988 / peer StrRepeat #19998).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureExternals($context);
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void
@@ -108,66 +114,23 @@ final class StringNetInterfacesJit
         );
         $context->builder->returnVoid();
         $context->registerFunction(self::ABI_NAME, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after NetInterfacesJitHelper compile (#8988)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#23715');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $realPath = \realpath($path) ?: $path;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $realPath): void {
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'NetInterfacesJitHelper.php');
-                if (null === $block) {
-                    throw new \LogicException('NetInterfacesJitHelper.php parseAndCompile failed (#8988)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($realPath);
-            });
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#8988)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#23715'
+        );
     }
 
     private static function ensureExternals(Context $context): void
