@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\calendar\CalendarConstants;
 use PHPCompiler\ext\curl\CurlConstants;
+use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\fileinfo\FileinfoConstants;
 use PHPCompiler\ext\filter\FilterConstants;
@@ -14,6 +15,7 @@ use PHPCompiler\ext\gd\GdConstants;
 use PHPCompiler\ext\gd\GdExtensionPolicy;
 use PHPCompiler\ext\gmp\GmpConstants;
 use PHPCompiler\ext\hash\MhashRegistry;
+use PHPCompiler\ext\hash\VmHashContext;
 use PHPCompiler\ext\iconv\IconvConstants;
 use PHPCompiler\ext\inotify\InotifyConstants;
 use PHPCompiler\ext\intl\IntlConstants;
@@ -32,6 +34,7 @@ use PHPCompiler\ext\random\RandomConstants;
 use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\ext\snmp\SnmpConstants;
 use PHPCompiler\ext\snmp\SnmpExtensionPolicy;
+use PHPCompiler\ext\sqlite3\Sqlite3Constants;
 use PHPCompiler\ext\soap\SoapConstants;
 use PHPCompiler\ext\sockets\SocketConstants;
 use PHPCompiler\ext\sodium\SodiumConstants;
@@ -67,7 +70,10 @@ final class ExtensionConstantGroups
         $groups['calendar'] = CalendarConstants::registeredConstants();
         $groups['filter'] = FilterConstants::REGISTERED;
         $groups['tokenizer'] = TokenConstants::registeredConstants();
-        $groups['dom'] = DomExceptionConstants::globalConstants();
+        $groups['dom'] = array_merge(
+            DomExceptionConstants::globalConstants(),
+            DomConstants::globalConstants()
+        );
         $groups['libxml'] = LibxmlConstants::registeredConstants();
         $groups['openssl'] = OpensslConstants::registeredConstants();
         $groups['pcntl'] = PcntlConstants::registeredConstants();
@@ -75,7 +81,10 @@ final class ExtensionConstantGroups
         $groups['session'] = SessionConstants::registeredConstants();
         $groups['mbstring'] = MbstringConstants::registeredConstants();
         $groups['iconv'] = IconvConstants::registeredConstants();
-        $groups['hash'] = MhashRegistry::constants();
+        $groups['hash'] = array_merge(
+            MhashRegistry::constants(),
+            ['HASH_HMAC' => VmHashContext::HASH_HMAC]
+        );
         if (\PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension()) {
             $groups['inotify'] = InotifyConstants::registeredConstants();
         }
@@ -102,6 +111,7 @@ final class ExtensionConstantGroups
         // Module buckets for extensions that register into Context::$constants (#22337 / re-#19113 / #22858).
         $groups['ftp'] = FtpConstants::registeredConstants();
         $groups['mysqli'] = MysqliConstants::registeredConstants();
+        $groups['sqlite3'] = Sqlite3Constants::globalConstants();
         if (SnmpExtensionPolicy::advertisesExtension()) {
             $groups['snmp'] = SnmpConstants::registeredConstants();
         }
