@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\Builtin\ArraySliceRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableSliceLlvm;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
@@ -15,7 +15,8 @@ use PHPLLVM\Value;
 /**
  * HashTable::sliceCopy() for nested php-in-PHP JIT helpers (#23974 / #12410).
  *
- * Same bridge shape as {@see HashTablePadCopy} / {@see HashTableValuesCopy}.
+ * Pure LLVM via {@see HashTableSliceLlvm} — must not call ArraySliceRuntime
+ * (NestedJIT of ArraySliceJitHelper would recurse; peer #23548 COW).
  */
 final class HashTableSliceCopy implements Call
 {
@@ -26,6 +27,7 @@ final class HashTableSliceCopy implements Call
         }
 
         $htVar = self::receiverVariable($context, $args[0]);
+        $ht = HashTableNestedReceiver::hashtableFromReceiver($context, $htVar);
         $offset = self::longAsI64($context, $args[1]);
         $lengthArg = $args[2] ?? null;
         $preserveArg = $args[3] ?? null;
@@ -64,7 +66,7 @@ final class HashTableSliceCopy implements Call
             }
         }
 
-        return ArraySliceRuntime::slice($context, $htVar, $offset, $hasLength, $length, $preserve);
+        return HashTableSliceLlvm::slice($context, $ht, $offset, $hasLength, $length, $preserve);
     }
 
     private static function receiverVariable(Context $context, Variable $receiver): Variable

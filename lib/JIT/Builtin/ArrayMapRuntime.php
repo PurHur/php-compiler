@@ -82,7 +82,11 @@ final class ArrayMapRuntime
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
 
-        return self::callMapBuiltin($context, $ht, $context->constantFromString($name));
+        return self::callMapBuiltin(
+            $context,
+            $ht,
+            $context->builder->load($context->constantStringFromString($name))
+        );
     }
 
     /**
@@ -112,7 +116,11 @@ final class ArrayMapRuntime
         }
         $packed = self::packHashtablePtrArray($context, $sources);
 
-        return self::callMapBuiltinMultiple($context, $packed, $context->constantFromString($builtinName));
+        return self::callMapBuiltinMultiple(
+            $context,
+            $packed,
+            $context->builder->load($context->constantStringFromString($builtinName))
+        );
     }
 
     /**
