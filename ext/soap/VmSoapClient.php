@@ -921,6 +921,7 @@ final class VmSoapClient
 
     /**
      * php-src php_http.c — Z_CLIENT_HTTPURL gets Soap\Url after successful stream connect (#23246).
+     * Attaches parsed php_url payload for keep-alive host/port/scheme compare (#23926).
      * Z_CLIENT_HTTPSOCKET is declared on the client; live stream attach needs stream-based HTTP (#23904).
      */
     private static function attachHttpUrl(ObjectEntry $object, string $location): void
@@ -939,7 +940,8 @@ final class VmSoapClient
         if (null === $ctx) {
             return;
         }
-        $object->getProperty('httpurl')->object(VmSoapOpaque::newUrlObject($ctx));
+        $payload = SoapUrlPayload::fromLocation($location);
+        $object->getProperty('httpurl')->object(VmSoapOpaque::newUrlObject($ctx, $payload));
     }
 
     /**
