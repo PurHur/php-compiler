@@ -146,28 +146,69 @@ final class MemoryAccounting
     private static function probeHostZendMmCache(): ?int
     {
         $binary = \defined('PHP_BINARY') ? PHP_BINARY : 'php';
+        $env = self::subprocessEnvStrippingCompilerMirror();
         $descriptorSpec = [
             1 => ['pipe', 'w'],
             2 => ['pipe', 'w'],
         ];
-        $proc = @proc_open(
+        $proc = @\proc_open(
             [$binary, '-n', '-r', 'echo gc_mem_caches();'],
             $descriptorSpec,
-            $pipes
+            $pipes,
+            null,
+            $env
         );
         if (!\is_resource($proc)) {
             return null;
         }
-        $stdout = (string) stream_get_contents($pipes[1]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-        proc_close($proc);
-        $stdout = trim($stdout);
-        if ('' === $stdout || !ctype_digit($stdout)) {
+        $stdout = (string) \stream_get_contents($pipes[1]);
+        \fclose($pipes[1]);
+        \fclose($pipes[2]);
+        \proc_close($proc);
+        $stdout = \trim($stdout);
+        if ('' === $stdout || !\ctype_digit($stdout)) {
             return null;
         }
 
         return (int) $stdout;
+    }
+
+    /**
+     * Inherited PHP_COMPILER_* (VmIniIntrospection::seedHostIniEnvFromZend) skews Zend gc_mem_caches()
+     * probe subprocesses (#23835, re-#12921). Strip only those keys — not env -i (MM sizing differs).
+     *
+     * @return array<string, string>|null
+     */
+    private static function subprocessEnvStrippingCompilerMirror(): ?array
+    {
+        if (!\function_exists('getenv')) {
+            return null;
+        }
+        $raw = @\getenv();
+        if (!\is_array($raw) || [] === $raw) {
+            return null;
+        }
+        $env = [];
+        foreach ($raw as $key => $value) {
+            if (!\is_string($key) || !\is_string($value)) {
+                continue;
+            }
+            if (\str_starts_with($key, 'PHP_COMPILER_')) {
+                continue;
+            }
+            $env[$key] = $value;
+        }
+        if ([] === $env) {
+            return null;
+        }
+        if (!isset($env['PATH'])) {
+            $path = \getenv('PATH');
+            if (\is_string($path) && '' !== $path) {
+                $env['PATH'] = $path;
+            }
+        }
+
+        return $env;
     }
 
     /** Release VM allocator caches (php_gc.c gc_mem_caches / zend_mm_gc parity, #9160). */
@@ -175,11 +216,8 @@ final class MemoryAccounting
     {
         $fromMmCache = self::$mmCacheRemaining;
         self::$mmCacheRemaining = 0;
-        $peak = self::peakBytes();
-        $current = self::currentBytes();
         self::resetPeakToCurrent();
-        $fromPeak = max(0, $peak - $current);
 
-        return $fromMmCache + $fromPeak;
+        return $fromMmCache;
     }
 }
