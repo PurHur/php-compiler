@@ -8242,7 +8242,7 @@ final class VmDom
             // libxml htmlNodeDump: escape &<> in normal text; leave script/style raw (#21149).
             $text = DomRegistry::state($entry)->textContent ?? '';
 
-            return self::htmlTextNeedsEntityEscape($entry) ? self::escapeText($text) : $text;
+            return self::htmlTextNeedsEntityEscape($entry) ? self::escapeHtmlText($text) : $text;
         }
         if (self::isCommentNode($entry)) {
             return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
@@ -11543,6 +11543,18 @@ final class VmDom
     private static function escapeText(string $value): string
     {
         return str_replace(['&', '<', '>'], ['&amp;', '&lt;', '&gt;'], $value);
+    }
+
+    /**
+     * HTML text escape matching libxml htmlNodeDump: &/</> plus named HTML 4.01 entity references
+     * for non-ASCII codepoints (e.g. \xC2\xA0 → &nbsp;, \xC3\xA9 → &eacute;).
+     *
+     * php-src ext/dom/document.c uses libxml htmlNodeDumpOutput which calls htmlSerializeHtmlEncoder;
+     * PHP's htmlentities(…, ENT_HTML401) uses the same codepoint→name table (#23684).
+     */
+    private static function escapeHtmlText(string $value): string
+    {
+        return htmlentities($value, ENT_NOQUOTES | ENT_HTML401 | ENT_SUBSTITUTE, 'UTF-8', true);
     }
 
     private static function escapeName(string $name): string
