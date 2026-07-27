@@ -45,4 +45,18 @@ final class VmFloatDtoaTest extends TestCase
         // #10415 — %.17F must not cap at 15 fractional digits (DBL_DECIMAL_DIG parity).
         $this->assertSame('83.33333333333332860', VmFloatDtoa::formatSprintfF(5 * 200.0 / 12, 17));
     }
+
+    /** php-src zend_gcvt / formatted_print.c %g significant digits (#24016). */
+    public function testSprintfGeneralSignificantDigitsMatchZend(): void
+    {
+        $this->assertSame('1.2e+3', VmFloatDtoa::formatSprintfG(1234.0, 2));
+        $this->assertSame('1.23e+3', VmFloatDtoa::formatSprintfG(1234.0, 3));
+        $this->assertSame('1.0e+3', VmFloatDtoa::formatSprintfG(1234.0, 1));
+        $this->assertSame('12', VmFloatDtoa::formatSprintfG(12.34, 2));
+        $this->assertSame('0.012', VmFloatDtoa::formatSprintfG(0.01234, 2));
+        $this->assertSame('1.0e+3', VmFloatDtoa::formatSprintfG(1234.0, 0));
+        $this->assertSame('1.2E+3', VmFloatDtoa::formatSprintfG(1234.0, 2, true));
+        $this->assertSame('10', VmFloatDtoa::formatSprintfG(9.99, 2));
+        $this->assertSame('0.0001', VmFloatDtoa::formatSprintfG(9.99e-5, 2));
+    }
 }

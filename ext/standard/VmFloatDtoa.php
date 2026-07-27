@@ -70,6 +70,93 @@ final class VmFloatDtoa
         return $negative ? '-'.$formatted : $formatted;
     }
 
+    /**
+     * php-src Zend/zend_strtod.c zend_gcvt + ext/standard/formatted_print.c %g/%G/%h/%H (#24016).
+     *
+     * Precision is significant digits (0 means 1). Scientific when decpt > ndigit or decpt < -3.
+     */
+    public static function formatSprintfG(float $value, int $ndigit, bool $upper = false): string
+    {
+        if (\is_nan($value)) {
+            return 'NaN';
+        }
+        if (\is_infinite($value)) {
+            return $value > 0.0 ? 'INF' : '-INF';
+        }
+
+        $negative = $value < 0.0 || (0.0 === $value && Ieee754::isNegativeZero($value));
+        $abs = \abs($value);
+        if (0.0 === $abs) {
+            return $negative ? '-0' : '0';
+        }
+
+        if ($ndigit < 0) {
+            $ndigit = self::NDIGIT;
+        } elseif (0 === $ndigit) {
+            $ndigit = 1;
+        }
+
+        [$digits, $decpt] = self::dtoaMode2Significant($abs, $ndigit);
+        $digits = \rtrim($digits, '0');
+        if ('' === $digits || '0' === $digits) {
+            return $negative ? '-0' : '0';
+        }
+
+        $expChar = $upper ? 'E' : 'e';
+        $body = self::gcvtSprintf($digits, $decpt, $ndigit, $expChar);
+
+        return $negative ? '-'.$body : $body;
+    }
+
+    /**
+     * zend_dtoa mode 2 — up to $ndigit significant digits + decimal-point index.
+     *
+     * @return array{0: string, 1: int}
+     */
+    private static function dtoaMode2Significant(float $abs, int $ndigit): array
+    {
+        [$digits, $decpt] = self::dtoaDigitsFromFloat($abs, $ndigit + 8);
+        if ('0' === $digits) {
+            return ['0', 1];
+        }
+
+        return self::roundDigitsHalfEven($digits, $ndigit, $decpt);
+    }
+
+    /** php-src zend_gcvt() body after dtoa (locale-free decimal point). */
+    private static function gcvtSprintf(string $digits, int $decpt, int $ndigit, string $expChar): string
+    {
+        if (($decpt >= 0 && $decpt > $ndigit) || $decpt < -3) {
+            $exp = $decpt - 1;
+            $expNegative = $exp < 0;
+            $expAbs = \abs($exp);
+            $body = $digits[0].'.';
+            $rest = \substr($digits, 1);
+            $body .= '' === $rest ? '0' : $rest;
+            $body .= $expChar.($expNegative ? '-' : '+').$expAbs;
+
+            return $body;
+        }
+
+        if ($decpt < 0) {
+            return '0.'.\str_repeat('0', -$decpt).$digits;
+        }
+
+        $len = \strlen($digits);
+        $out = '';
+        for ($i = 0; $i < $decpt; ++$i) {
+            $out .= $i < $len ? $digits[$i] : '0';
+        }
+        if ($decpt < $len) {
+            if (0 === $decpt) {
+                $out .= '0';
+            }
+            $out .= '.'.\substr($digits, $decpt);
+        }
+
+        return $out;
+    }
+
     private static function formatLargeScientific(float $value): string
     {
         $negative = $value < 0.0;
