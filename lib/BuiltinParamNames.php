@@ -1312,6 +1312,17 @@ final class BuiltinParamNames
     }
 
     /**
+     * Internals that use Z_PARAM_VARIADIC_WITH_NAMED and forward unknown names to the callee (#23772).
+     *
+     * Most internal variadics reject unknown named args (#23449); call_user_func is the exception
+     * (php-src ext/standard/basic_functions.c — zif_call_user_func). forward_static_call does not.
+     */
+    public static function forwardsNamedArgsIntoVariadic(string $name): bool
+    {
+        return 'call_user_func' === strtolower($name);
+    }
+
+    /**
      * @throws \ArgumentCountError
      */
     public static function throwUnknownNamedParameterError(string $name): never

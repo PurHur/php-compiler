@@ -109,6 +109,12 @@ final class NamedArgs
             // Defer Zend call-binding errors to runtime so try/catch in user code works (#23449).
             return null;
         }
+        $vmResolved = self::expandCallUserFuncNamedForward(
+            $vmResolved,
+            $functionName,
+            $variadicParamIndex,
+            $jit
+        );
         if (
             null !== $variadicParamIndex
             && null !== $callee
@@ -264,9 +270,22 @@ final class NamedArgs
             if (false === $idx) {
                 if ($internalFunction) {
                     // Non-variadic internals: Zend Error "Unknown named parameter $x" (#23490).
-                    // Variadics defer to too-few vs "does not accept unknown named" (#23449).
+                    // Variadics defer to too-few vs "does not accept unknown named" (#23449),
+                    // except call_user_func which forwards into the variadic pack (#23772 / #10637).
                     if (null === $variadicParamIndex) {
                         throw new \Error("Unknown named parameter \${$name}");
+                    }
+                    if (
+                        null !== $functionName
+                        && BuiltinParamNames::forwardsNamedArgsIntoVariadic($functionName)
+                    ) {
+                        $key = (string) $entry['name'];
+                        if (isset($variadicNamed[$key])) {
+                            throw new \Error("Named parameter \${$key} overwrites previous argument");
+                        }
+                        $variadicNamed[$key] = $value;
+                        $variadicNamedOperands[$key] = $entry['operand'];
+                        continue;
                     }
                     $unknownNamed = true;
                     continue;
@@ -284,6 +303,20 @@ final class NamedArgs
             }
             if (null !== $variadicParamIndex && $idx === $variadicParamIndex) {
                 if ($internalFunction) {
+                    // call_user_func: naming the variadic slot still forwards to the callee (#23772).
+                    if (
+                        null !== $functionName
+                        && BuiltinParamNames::forwardsNamedArgsIntoVariadic($functionName)
+                    ) {
+                        $key = (string) $entry['name'];
+                        if (isset($variadicNamed[$key])) {
+                            throw new \Error("Named parameter \${$key} overwrites previous argument");
+                        }
+                        $variadicNamed[$key] = $value;
+                        $variadicNamedOperands[$key] = $entry['operand'];
+                        continue;
+                    }
+                    // Internal variadics are positional-only; naming ...$values is unknown (#23449).
                     $unknownNamed = true;
                     continue;
                 }
@@ -411,5 +444,116 @@ final class NamedArgs
             || isset($callee->paramIntersectionConstraintsByArg[$llvmArgIndex])
             || isset($callee->paramDnfConstraintsByArg[$llvmArgIndex])
             || isset($callee->paramClassConstraintsByArg[$llvmArgIndex]);
+    }
+
+    /**
+     * call_user_func() packs forwarded names into the variadic slot; AOT must expand them against
+     * the compile-time target before Internal::call splat (php-src zif_call_user_func, #23772).
+     *
+     * @param array<int, VmVariable> $vmResolved
+     *
+     * @return array<int, VmVariable>
+     */
+    private static function expandCallUserFuncNamedForward(
+        array $vmResolved,
+        ?string $functionName,
+        ?int $variadicParamIndex,
+        JIT $jit
+    ): array {
+        if (
+            null === $functionName
+            || null === $variadicParamIndex
+            || !BuiltinParamNames::forwardsNamedArgsIntoVariadic($functionName)
+            || !isset($vmResolved[0], $vmResolved[$variadicParamIndex])
+        ) {
+            return $vmResolved;
+        }
+        $callback = $vmResolved[0];
+        $pack = $vmResolved[$variadicParamIndex];
+        if (VmVariable::TYPE_STRING !== $callback->type || VmVariable::TYPE_ARRAY !== $pack->type) {
+            return $vmResolved;
+        }
+        if (!$pack->namedVariadicPack && !self::vmArrayHasNamedStringKeys($pack)) {
+            return $vmResolved;
+        }
+        $targetLc = strtolower($callback->toString());
+        if ('' === $targetLc || str_contains($targetLc, '::') || !$jit->context->functionIsRegistered($targetLc)) {
+            return $vmResolved;
+        }
+        $proxy = $jit->context->resolveFunctionProxy($targetLc);
+        if (!$proxy instanceof Native || [] === $proxy->paramNames) {
+            return $vmResolved;
+        }
+        $entries = self::vmArrayToNamedArgEntries($pack);
+        if ([] === $entries) {
+            return $vmResolved;
+        }
+        try {
+            $forwarded = VmNamedArgs::resolve(
+                $entries,
+                $proxy->paramNames,
+                $proxy->namedArgsVariadicIndex ?? $proxy->variadicArgIndex,
+                $targetLc,
+                false
+            );
+        } catch (\ArgumentCountError|\Error|\TypeError|\ValueError $e) {
+            return $vmResolved;
+        }
+        $expanded = [0 => $callback];
+        ksort($forwarded);
+        foreach ($forwarded as $idx => $value) {
+            $expanded[1 + (int) $idx] = $value;
+        }
+
+        return $expanded;
+    }
+
+    private static function vmArrayHasNamedStringKeys(VmVariable $arrayVar): bool
+    {
+        foreach ($arrayVar->toArray()->iterateKeyed(false) as $pair) {
+            [$keyVar] = $pair;
+            $key = $keyVar->resolveIndirect();
+            if (VmVariable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            $keyStr = $key->toString();
+            if ('' !== $keyStr && !ctype_digit($keyStr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<array{0: string, 1?: mixed, 2?: VmVariable}>
+     */
+    private static function vmArrayToNamedArgEntries(VmVariable $arrayVar): array
+    {
+        $entries = [];
+        foreach ($arrayVar->toArray()->iterateKeyed(false) as $pair) {
+            [$keyVar, $value] = $pair;
+            if (VmVariable::TYPE_INDIRECT === $value->type) {
+                $copy = $value;
+            } else {
+                $copy = new VmVariable();
+                $copy->copyFrom($value);
+            }
+            $keyResolved = $keyVar->resolveIndirect();
+            if (VmVariable::TYPE_INTEGER === $keyResolved->type) {
+                $entries[] = ['p', $copy];
+                continue;
+            }
+            if (VmVariable::TYPE_STRING === $keyResolved->type) {
+                $key = $keyResolved->toString();
+                if ('' !== $key && ctype_digit($key)) {
+                    $entries[] = ['p', $copy];
+                    continue;
+                }
+                $entries[] = ['n', $key, $copy];
+            }
+        }
+
+        return $entries;
     }
 }

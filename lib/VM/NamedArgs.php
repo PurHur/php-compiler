@@ -115,9 +115,21 @@ final class NamedArgs
             if (false === $idx) {
                 if ($internalFunction) {
                     // Non-variadic internals: Zend Error "Unknown named parameter $x" (#23490).
-                    // Variadics defer to too-few vs "does not accept unknown named" (#23449).
+                    // Variadics defer to too-few vs "does not accept unknown named" (#23449),
+                    // except call_user_func which forwards into the variadic pack (#23772 / #10637).
                     if (null === $variadicParamIndex) {
                         throw new \Error("Unknown named parameter \${$name}");
+                    }
+                    if (
+                        null !== $functionName
+                        && BuiltinParamNames::forwardsNamedArgsIntoVariadic($functionName)
+                    ) {
+                        $key = (string) $entry[1];
+                        if (isset($variadicNamed[$key])) {
+                            throw new \Error("Named parameter \${$key} overwrites previous argument");
+                        }
+                        $variadicNamed[$key] = $value;
+                        continue;
                     }
                     $unknownNamed = true;
                     continue;
@@ -134,6 +146,18 @@ final class NamedArgs
             }
             if (null !== $variadicParamIndex && $idx === $variadicParamIndex) {
                 if ($internalFunction) {
+                    // call_user_func: naming the variadic slot still forwards to the callee (#23772).
+                    if (
+                        null !== $functionName
+                        && BuiltinParamNames::forwardsNamedArgsIntoVariadic($functionName)
+                    ) {
+                        $key = (string) $entry[1];
+                        if (isset($variadicNamed[$key])) {
+                            throw new \Error("Named parameter \${$key} overwrites previous argument");
+                        }
+                        $variadicNamed[$key] = $value;
+                        continue;
+                    }
                     // Internal variadics are positional-only; naming ...$values is unknown (#23449).
                     $unknownNamed = true;
                     continue;
