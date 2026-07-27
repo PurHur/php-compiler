@@ -167,6 +167,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23626 */
+    public function testOpensslRandomPseudoBytesZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('openssl_random_pseudo_bytes');
+        self::assertSame(['length', 'strong_result'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'openssl_random_pseudo_bytes'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'strong_result', 'openssl_random_pseudo_bytes'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $returned_strong_result)
+        self::assertFalse(
+            BuiltinParamNames::lookupNamedParamIndex($names, 'returned_strong_result', 'openssl_random_pseudo_bytes')
+        );
+    }
+
     /** @covers issue #16886 */
     public function testMbConvertEncodingNamedParamsResolve(): void
     {

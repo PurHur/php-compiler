@@ -482,6 +482,9 @@ final class BuiltinParamNames
             case 'openssl_cipher_iv_length':
             case 'openssl_cipher_key_length':
                 return ['cipher_algo'];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says returned_strong_result (#23626)
+            case 'openssl_random_pseudo_bytes':
+                return ['length', 'strong_result'];
             case 'openssl_encrypt':
                 // php-src ext/openssl/openssl.stub.php (#21135)
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad', 'tag_length'];
