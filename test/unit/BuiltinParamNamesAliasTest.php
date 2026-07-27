@@ -1549,6 +1549,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sid, 'newid', 'session_id'));
     }
 
+    /** @covers issue #23783 */
+    public function testDateParseZendStubNamedParams(): void
+    {
+        $dp = BuiltinParamNames::forFunction('date_parse');
+        self::assertSame(['datetime'], $dp);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($dp, 'datetime', 'date_parse'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dp, 'date', 'date_parse'));
+
+        $dpf = BuiltinParamNames::forFunction('date_parse_from_format');
+        self::assertSame(['format', 'datetime'], $dpf);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($dpf, 'format', 'date_parse_from_format'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($dpf, 'datetime', 'date_parse_from_format'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($dpf, 'date', 'date_parse_from_format'));
+    }
+
     /** @covers issue #23422 */
     public function testClassAliasZendStubNamedParams(): void
     {
