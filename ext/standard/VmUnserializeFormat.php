@@ -933,10 +933,22 @@ final class VmUnserializeFormat
             $negative = true;
             ++$this->pos;
         }
-        $unsigned = $this->readUnsignedInteger();
-        if (null === $unsigned) {
+        if ($this->pos >= $this->length || !\ctype_digit($this->payload[$this->pos])) {
             return null;
         }
+        $start = $this->pos;
+        while ($this->pos < $this->length && \ctype_digit($this->payload[$this->pos])) {
+            ++$this->pos;
+        }
+        $digits = \substr($this->payload, $start, $this->pos - $start);
+        if ('' === $digits) {
+            return null;
+        }
+        // php-src var_unserializer.re / zend_long.h — |digits| may be 2^63; host (int) clamps (#23689).
+        if ($negative && '9223372036854775808' === $digits) {
+            return PHP_INT_MIN;
+        }
+        $unsigned = (int) $digits;
 
         return $negative ? -$unsigned : $unsigned;
     }
