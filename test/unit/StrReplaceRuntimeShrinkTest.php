@@ -8,18 +8,17 @@ use PHPCompiler\ext\standard\StrReplaceJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** str_replace() subject routing + StrReplaceJitHelper SSOT (#14779, #23912). */
+/** str_replace() subject routing + inline LLVM JitStrReplace (#14779, #23912). */
 final class StrReplaceRuntimeShrinkTest extends TestCase
 {
-    public function testStringStrReplaceUsesJitHelperNotInlineLlvm(): void
+    public function testJitStrReplaceUsesInlineLlvmForAotScalarPath(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrReplace.php');
-        $this->assertStringContainsString('StrReplaceJitHelper', $source);
-
         $jit = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStrReplace.php');
-        $this->assertStringContainsString('StringStrReplace::invoke', $jit);
-        $this->assertStringNotContainsString('JitStringSearch::findOffsetI32', $jit);
-        $this->assertStringNotContainsString('string_trim::jitCopySlice', $jit);
+        // #23912: NestedJIT helper is wrong under user-script AOT — scalar path is LLVM again.
+        $this->assertStringContainsString('JitStringSearch::findOffsetI32', $jit);
+        $this->assertStringContainsString('string_trim::jitCopySlice', $jit);
+        $this->assertStringContainsString('BasicBlockHelper::entryAlloca', $jit);
+        $this->assertStringNotContainsString('StringStrReplace::invoke', $jit);
 
         $replace = (string) file_get_contents(__DIR__.'/../../ext/standard/str_replace.php');
         $this->assertStringContainsString('JitStrReplace::replace', $replace);
