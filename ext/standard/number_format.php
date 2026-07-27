@@ -22,14 +22,14 @@ use PHPLLVM\Value;
 /**
  * number_format() for integers and floats (C-style locale subset; LLVM JIT/AOT).
  *
- * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR / RoundingMode
+ * php-src: ext/standard/number_format.c — arity 1–4 (no RoundingMode; #23575)
  */
 final class number_format extends Internal
 {
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        VmNumberFormat::assertArgCount($argc, $frame->calledArgs[4] ?? null);
+        VmNumberFormat::assertArgCount($argc);
         if (null === $frame->returnVar) {
             return;
         }
@@ -61,17 +61,12 @@ final class number_format extends Internal
                 'thousands_separator'
             ) ?? ','
             : ',';
-        $roundingMode = StdlibConstants::PHP_ROUND_HALF_UP;
-        if (5 === $argc && CompilerVersion::supportsRoundingModeEnum() && isset($frame->calledArgs[4])) {
-            $roundingMode = VmRoundMode::tryRoundModeInt($frame->calledArgs[4]->resolveIndirect())
-                ?? StdlibConstants::PHP_ROUND_HALF_UP;
-        }
         $frame->returnVar->string(VmNumberFormat::format(
             $num,
             $decimals,
             $decimalSeparator,
             $thousandsSeparator,
-            $roundingMode
+            StdlibConstants::PHP_ROUND_HALF_UP
         ));
     }
 

@@ -19,11 +19,11 @@ final class VmNumberFormat
     private const MAX_ARGS = 4;
 
     /**
-     * php-src ext/standard/math.c — ZEND_PARSE_PARAMETERS_START(1, 4).
+     * php-src ext/standard/basic_functions.stub.php — number_format(…): string (arity 1–4).
      *
-     * PHP 8.4 forward profile allows a fifth positional only when it is a RoundingMode enum (#9438).
+     * RoundingMode is not a number_format parameter (php-src math.c / #23575; re-#16330, #9438).
      */
-    public static function assertArgCount(int $argc, ?Variable $fifthArg = null): void
+    public static function assertArgCount(int $argc): void
     {
         if ($argc < 1) {
             throw new \ArgumentCountError(\sprintf(
@@ -32,12 +32,6 @@ final class VmNumberFormat
             ));
         }
         if ($argc <= self::MAX_ARGS) {
-            return;
-        }
-        if (5 === $argc
-            && CompilerVersion::supportsRoundingModeEnum()
-            && null !== $fifthArg
-            && null !== VmRoundMode::tryRoundModeInt($fifthArg->resolveIndirect())) {
             return;
         }
 

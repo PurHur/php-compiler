@@ -7,10 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
-use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitRoundModeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
@@ -20,9 +18,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helper for number_format() (int/float/numeric string, 0–5 args; subset of PHP).
+ * LLVM JIT/AOT helper for number_format() (int/float/numeric string, arity 1–4).
  *
- * php-src: ext/standard/number_format.c — Z_PARAM_LONG / Z_PARAM_STR / RoundingMode
+ * php-src: ext/standard/number_format.c — Z_PARAM_DOUBLE / Z_PARAM_LONG / Z_PARAM_STR
  */
 final class JitNumberFormat
 {
@@ -41,13 +39,6 @@ final class JitNumberFormat
             ));
         }
         if ($argc <= self::MAX_ARGS) {
-            return;
-        }
-        if (5 === $argc
-            && CompilerVersion::supportsRoundingModeEnum()
-            && isset($args[4])
-            && !NamedOptionalCallArgs::isOmittedOptional($args[4])
-            && null !== RoundingModeJit::compileTimeRoundMode($context, $args[4])) {
             return;
         }
 
@@ -109,9 +100,6 @@ final class JitNumberFormat
             ? JitStringBuiltinArg::lower($context, $args[3], 'number_format', 3, 'thousands_separator', '?string')
             : $context->builder->load($context->constantStringFromString(','));
         $mode = $i64->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
-        if (CompilerVersion::supportsRoundingModeEnum() && 5 === $argc && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
-            $mode = JitRoundModeArg::lower($context, $args[4], 'number_format', 'rounding_mode', 5);
-        }
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_number_format'),
