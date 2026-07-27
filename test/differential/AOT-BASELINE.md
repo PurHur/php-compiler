@@ -22,7 +22,6 @@ silently bakes in whichever flaky cases happened to pass that day.
 | case | cause |
 |---|---|
 | `e07_named` | compiler crash: `TypeError` in `BackedEnumFromJit::emitCallSiteStrictCheck()` — #23972 |
-| `e20_closure` | compiler crash: malformed IR, module verification fails — #23973 |
 | `e16_array_slice` | compiles; runtime still hits `print_r` thin-standalone gap (#23540) — slice itself fixed in #23991 |
 | `e04_usort` | **documented limitation** — array-callable / invokable comparators deferred |
 | `e08_spread` | variadic spread not lowered: `Unsupported cast for arg type int64 from __hashtable__*` |
@@ -44,7 +43,7 @@ standalone AOT does not have. These are **not** silent failures — they say so 
 ## Fixed on this path today, for reference
 
 `c04_concat`, `c10_builtin`, `c11_strcmp`, `d04_concat_dim`, `e05_sprintf`, `e09_nested_calls`,
-`e15_str_fns`, `e23_implode`, `e24_compare`, `g03_exception_caught`, `g04_exception_state`,
+`e15_str_fns`, `e20_closure`, `e23_implode`, `e24_compare`, `g03_exception_caught`, `g04_exception_state`,
 `g05_float_render`.
 
 The silent-wrong-output class — code that runs to completion and prints the wrong answer, which

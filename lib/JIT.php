@@ -13787,6 +13787,18 @@ class JIT {
                 $var->compileTimeEnumCase = $value->compileTimeEnumCase;
                 $var->compileTimeFloat = $value->compileTimeFloat;
                 $this->syncCompileTimeString($var, $value, false);
+                // First-bind must keep Closure invoke metadata; dropping it forces
+                // RuntimeIndirectClosureCall over every {closure}_* in the module and
+                // mis-stores __value__ returns into __value__** (#23973, e20_closure).
+                if (null !== $value->closureCall) {
+                    $var->closureCall = $value->closureCall;
+                }
+                if ($value->closureIsStatic) {
+                    $var->closureIsStatic = true;
+                }
+                if ($value->closureIsMethodFake) {
+                    $var->closureIsMethodFake = true;
+                }
 
                 return;
             }

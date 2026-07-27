@@ -131,7 +131,11 @@ final class RuntimeIndirectClosureCall implements Call
 
             $context->builder->positionAtEnd($onMatch);
             $raw = ClosureBindHelper::wrapCallWithBindingFromObject($context, $obj, $proxy, ...$args);
-            $context->builder->store($raw, $resultSlot);
+            // Untyped closures return __value__ by value; resultSlot is __value__** (#23973).
+            $context->builder->store(
+                JitValueBox::coerceToValuePtrForStore($context, $raw),
+                $resultSlot
+            );
             $context->builder->branch($merge);
             ++$i;
         }
