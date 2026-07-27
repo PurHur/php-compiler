@@ -7112,6 +7112,16 @@ restart:
                     if (null !== $op->deprecatedMetadata) {
                         $this->context->globalConstDeprecated[strtolower($name)] = $op->deprecatedMetadata;
                     }
+                    // PHP 8.5+ attributes on file/namespace constants (#23882).
+                    if ([] !== $op->attributeEntries) {
+                        $this->context->globalConstAttributeEntries[strtolower($name)] = $op->attributeEntries;
+                    } elseif ([] !== $op->attributeNames) {
+                        $entries = [];
+                        foreach ($op->attributeNames as $attrName) {
+                            $entries[] = new \PHPCompiler\Compiler\AttributeEntry((string) $attrName);
+                        }
+                        $this->context->globalConstAttributeEntries[strtolower($name)] = $entries;
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_ENUM:
                     $name = $frame->scope[$op->arg1]->toString();

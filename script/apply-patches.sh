@@ -4260,17 +4260,35 @@ apply_php_cfg_global_deprecated_const_overlay() {
   if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
     return 0
   fi
-  if grep -q 'function applyGlobalDeprecatedConstMarkerAttributes' "$parser" 2>/dev/null; then
+  # Refresh method body when 8.5 const-attrs recovery is missing (#23882).
+  if grep -q 'function applyGlobalDeprecatedConstMarkerAttributes' "$parser" 2>/dev/null \
+    && grep -q 'ATTRS_MARKER_PATTERN' "$parser" 2>/dev/null; then
     return 0
   fi
   python3 - "$parser" "$overlay" <<'PY'
+import re
 import sys
 from pathlib import Path
 
 parser_path = Path(sys.argv[1])
 method_path = Path(sys.argv[2])
 text = parser_path.read_text()
+insert = method_path.read_text().rstrip("\n") + "\n\n"
+
 if 'function applyGlobalDeprecatedConstMarkerAttributes' in text:
+    start = text.find('    private function applyGlobalDeprecatedConstMarkerAttributes')
+    if start < 0:
+        sys.stderr.write("php-cfg-global-deprecated-const: method start missing for refresh\n")
+        raise SystemExit(1)
+    rest = text[start + 1 :]
+    m = re.search(r'\n    (?:private|protected|public) function ', rest)
+    if not m:
+        sys.stderr.write("php-cfg-global-deprecated-const: method end missing for refresh\n")
+        raise SystemExit(1)
+    end_pos = start + 1 + m.start()
+    text = text[:start] + insert + text[end_pos:]
+    parser_path.write_text(text)
+    print("Refreshed php-cfg-global-deprecated-const overlay (#23882)")
     raise SystemExit(0)
 
 anchor = """            $this->applyGlobalTypedConstMarkerAttributes($constOp, $node->getAttributes());
@@ -4279,7 +4297,6 @@ if anchor not in text:
     sys.stderr.write("php-cfg-global-deprecated-const: parseStmt_Const anchor missing\n")
     raise SystemExit(1)
 
-insert = method_path.read_text().rstrip("\n") + "\n\n"
 yield_anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
     {"""
 if yield_anchor not in text:
@@ -4295,7 +4312,7 @@ text = text.replace(
 )
 parser_path.write_text(text)
 PY
-  echo "Applied php-cfg-global-deprecated-const overlay (#16819)"
+  echo "Applied php-cfg-global-deprecated-const overlay (#16819, #23882)"
 }
 
 apply_php_cfg_typed_function_static_overlay() {

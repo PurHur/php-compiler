@@ -16,6 +16,37 @@ final class GlobalDeprecatedConstRewriterTest extends TestCase
         parent::tearDown();
     }
 
+    public function testRewritesGeneralGlobalConstAttrsOn85Profile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        $src = <<<'PHP'
+<?php
+#[Marker]
+const FOO = 42;
+PHP;
+        $out = GlobalDeprecatedConstRewriter::rewrite($src);
+        self::assertStringContainsString('phpc-global-const-attrs:', $out);
+        self::assertStringNotContainsString('#[Marker]', $out);
+        self::assertStringContainsString('const FOO = 42', $out);
+        if (!preg_match(GlobalDeprecatedConstRewriter::ATTRS_MARKER_PATTERN, $out, $m)) {
+            self::fail('attrs marker missing');
+        }
+        $groups = GlobalDeprecatedConstRewriter::parseAttrsMarkerPayload($m[1]);
+        self::assertCount(1, $groups);
+        self::assertSame('Marker', $groups[0]->attrs[0]->name->toString());
+    }
+
+    public function testLeavesGeneralAttrsOn84ProfileForParserReject(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $src = <<<'PHP'
+<?php
+#[Marker]
+const FOO = 42;
+PHP;
+        self::assertSame($src, GlobalDeprecatedConstRewriter::rewrite($src));
+    }
+
     public function testRewritesDeprecatedGlobalConstOnForwardProfile(): void
     {
         putenv('PHP_COMPILER_PROFILE=8.4');

@@ -1,23 +1,33 @@
     /**
-     * Recover phpc-global-deprecated-const:* marker from comment attributes (#16819).
+     * Recover phpc-global-deprecated-const:* / phpc-global-const-attrs:* markers (#16819, #23882).
      */
     private function applyGlobalDeprecatedConstMarkerAttributes(Op\Terminal\Const_ $constOp, array $attributes): void
     {
-        $payload = $this->extractGlobalDeprecatedConstMarkerPayloadFromAttributes($attributes);
-        if (null === $payload) {
-            return;
+        $chunks = $this->globalConstMarkerCommentChunks($attributes);
+        foreach ($chunks as $chunk) {
+            if (preg_match(\PHPCompiler\Ast\GlobalDeprecatedConstRewriter::ATTRS_MARKER_PATTERN, $chunk, $m)) {
+                $groups = \PHPCompiler\Ast\GlobalDeprecatedConstRewriter::parseAttrsMarkerPayload($m[1]);
+                if ([] !== $groups) {
+                    $constOp->setAttribute('attrGroups', $groups);
+                }
+            }
+            if (preg_match(\PHPCompiler\Ast\GlobalDeprecatedConstRewriter::MARKER_PATTERN, $chunk, $m)) {
+                $payload = trim($m[1]);
+                if ('' === $payload) {
+                    continue;
+                }
+                $meta = \PHPCompiler\Ast\GlobalDeprecatedConstRewriter::parseMarkerPayload($payload);
+                if (null !== $meta) {
+                    $constOp->setAttribute('phpcGlobalDeprecatedMetadata', $meta);
+                }
+            }
         }
-        $meta = \PHPCompiler\Ast\GlobalDeprecatedConstRewriter::parseMarkerPayload($payload);
-        if (null === $meta) {
-            return;
-        }
-        $constOp->setAttribute('phpcGlobalDeprecatedMetadata', $meta);
     }
 
     /**
-     * @return string|null Raw marker payload (message=…|since=…).
+     * @return list<string>
      */
-    private function extractGlobalDeprecatedConstMarkerPayloadFromAttributes(array $attributes): ?string
+    private function globalConstMarkerCommentChunks(array $attributes): array
     {
         $chunks = [];
         if (isset($attributes['comments']) && is_array($attributes['comments'])) {
@@ -33,7 +43,18 @@
             && method_exists($attributes['docComment'], 'getText')) {
             $chunks[] = $attributes['docComment']->getText();
         }
-        foreach ($chunks as $chunk) {
+
+        return $chunks;
+    }
+
+    /**
+     * Recover phpc-global-deprecated-const:* marker from comment attributes (#16819).
+     *
+     * @return string|null Raw marker payload (message=…|since=…).
+     */
+    private function extractGlobalDeprecatedConstMarkerPayloadFromAttributes(array $attributes): ?string
+    {
+        foreach ($this->globalConstMarkerCommentChunks($attributes) as $chunk) {
             if (!preg_match(\PHPCompiler\Ast\GlobalDeprecatedConstRewriter::MARKER_PATTERN, $chunk, $m)) {
                 continue;
             }
