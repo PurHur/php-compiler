@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -94,7 +95,12 @@ final class GeneratorYieldFromJitHelper
             $context->builder->store($i1->constInt(1, false), $isGenField);
             $context->builder->store($i1->constInt(0, false), $isIterField);
             $context->builder->store($i1->constInt(1, false), $activeField);
-            VmGenerator::resetStateInPlace($context, $innerState);
+            // Zend zend_generator_rewind / ensure_initialized — open at first yield, not reset (#23813, #23713).
+            GeneratorHelper::ensureStarted($context, $containerVar);
+            $context->builder->store(
+                $i1->constInt(0, false),
+                $context->builder->structGep($innerState, $map['foreach_needs_advance'])
+            );
             $context->builder->branch($genIterBb);
         } elseif (Variable::TYPE_STRING === $containerVar->type) {
             $context->builder->branch($invalidContainerBb);
@@ -260,18 +266,35 @@ final class GeneratorYieldFromJitHelper
         $i1 = $context->getTypeFromString('int1');
         $i64 = $context->getTypeFromString('int64');
         $innerState = self::loadYieldFromGeneratorState($context, $htField);
+        $hasCurrentField = $context->builder->structGep($innerState, $map['has_current']);
+        $needsAdvanceField = $context->builder->structGep($innerState, $map['foreach_needs_advance']);
         $resumeFn = $context->functions[strtolower($innerResumeName)] ?? null;
         if (!$resumeFn instanceof \PHPLLVM\Value\Function_) {
             throw new \LogicException('Generator resume function missing for yield from: '.$innerResumeName);
         }
+        $useCurrentBb = $fn->appendBasicBlock('gen_yf_gen_use_current');
+        $resumeBb = $fn->appendBasicBlock('gen_yf_gen_resume');
+        $yieldBb = $fn->appendBasicBlock('gen_yf_gen_yield');
+        $exhausted = $fn->appendBasicBlock('gen_yf_gen_exhausted');
+        $useCurrent = $context->builder->and(
+            $context->builder->icmp(Builder::INT_NE, $context->builder->load($hasCurrentField), $i1->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_EQ, $context->builder->load($needsAdvanceField), $i1->constInt(0, false))
+        );
+        $context->builder->branchIf($useCurrent, $useCurrentBb, $resumeBb);
+
+        $context->builder->positionAtEnd($useCurrentBb);
+        $context->builder->store($i1->constInt(1, false), $needsAdvanceField);
+        $context->builder->branch($yieldBb);
+
+        $context->builder->positionAtEnd($resumeBb);
+        $context->builder->store($i1->constInt(0, false), $context->builder->structGep($innerState, $map['at_first_yield']));
         $yielded = $context->builder->call($resumeFn, $innerState);
+        $context->builder->store($i1->constInt(1, false), $needsAdvanceField);
         $hasYield = $context->builder->icmp(
             Builder::INT_NE,
             $yielded,
             $i64->constInt(0, false)
         );
-        $yieldBb = $fn->appendBasicBlock('gen_yf_gen_yield');
-        $exhausted = $fn->appendBasicBlock('gen_yf_gen_exhausted');
         $context->builder->branchIf($hasYield, $yieldBb, $exhausted);
 
         $context->builder->positionAtEnd($yieldBb);

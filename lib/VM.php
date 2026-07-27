@@ -8312,9 +8312,20 @@ restart:
                     }
                     if ($this->variableIsGenerator($container)) {
                         $inner = $container->toObject()->generatorState;
+                        // Zend yield-from: rewind leaves inner on opening yield; do not advance past it (#23813, #23713).
+                        if ($inner->hasCurrent && !$inner->done && !$inner->foreachNeedsAdvance) {
+                            $gen->currentKey->copyFrom($inner->currentKey);
+                            $gen->publishCurrentValue($inner->currentSnapshot);
+                            $inner->foreachNeedsAdvance = true;
+                            $gen->frame = $frame;
+                            $frame->pos--;
+                            $frame->generatorYield = true;
+                            break;
+                        }
                         if ($this->advanceGeneratorIteration($inner)) {
                             $gen->currentKey->copyFrom($inner->currentKey);
                             $gen->publishCurrentValue($inner->currentSnapshot);
+                            $inner->foreachNeedsAdvance = true;
                             $gen->frame = $frame;
                             $frame->pos--;
                             $frame->generatorYield = true;
