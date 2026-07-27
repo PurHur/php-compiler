@@ -36,16 +36,17 @@ final class exif_read_data extends Internal
                 $argc
             ));
         }
-        if ($argc > 3) {
+        // php-src stub arity 4: file, required_sections=, as_arrays=, read_thumbnail= (#23605).
+        if ($argc > 4) {
             throw new \ArgumentCountError(\sprintf(
-                'exif_read_data() expects at most 3 arguments, %d given',
+                'exif_read_data() expects at most 4 arguments, %d given',
                 $argc
             ));
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'exif_read_data', 'filename');
+        $filename = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'exif_read_data', 'file');
         $data = VmExifRead::readData($filename);
         if (false === $data) {
             if (!VmImage::pathPayloadReadable($filename)) {
