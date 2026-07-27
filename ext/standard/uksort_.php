@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -17,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * uksort() — sort by keys preserving values (ext/standard/array.c php_array_uksort; issue #3143).
  *
- * VM: strcmp and strcasecmp string callbacks; closure comparators (#3086).
+ * VM: strcmp-family, closures, invokables, array callables, user function names (#23550).
  * JIT/AOT: compile-time strcmp or closure comparator on string-key hashtables (#3597).
  */
 final class uksort_ extends Internal
@@ -36,6 +35,7 @@ final class uksort_ extends Internal
         $callback = $frame->calledArgs[1]->resolveIndirect();
         VmArraySortCallback::requireCallback($callback, 'uksort');
         VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, 'uksort');
+        VmArraySortCallback::requireVmCallable($frame, $callback, 'uksort');
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
@@ -51,30 +51,23 @@ final class uksort_ extends Internal
             $valCopy->duplicateFrom($value);
             $pairs[] = [$keyCopy, $valCopy];
         }
-        if (VmClosureCall::isClosure($callback)) {
-            if (null === $frame->vmContext) {
-                throw new \LogicException('uksort() requires VM context in this compiler build');
-            }
-            VmClosureCall::sortKeyedPairsByKey(
-                $frame->vmContext,
-                $pairs,
-                VmClosureCall::resolve($callback),
-                $descending
-            );
-        } else {
-            if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
-                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
-            }
-            $name = $callback->toString();
-            if (!UsortCallbackPolicy::isVmSupportedName($name)) {
-                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
-            }
-            $compare = VmInternalCompare::resolveStringCallback($name);
+        if (VmArraySortCallback::isStrcmpFamilyCallback($callback)) {
+            $compare = VmInternalCompare::resolveStringCallback($callback->toString());
             if ($descending) {
                 VmInternalCompare::sortKeyedPairsByKeyWithCompareDesc($pairs, $compare);
             } else {
                 VmInternalCompare::sortKeyedPairsByKeyWithCompare($pairs, $compare);
             }
+        } else {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('uksort() requires VM context in this compiler build');
+            }
+            VmArraySortCallback::sortKeyedPairsByKey(
+                $frame->vmContext,
+                $pairs,
+                $callback,
+                $descending
+            );
         }
         $sorted = new HashTable();
         foreach ($pairs as [$key, $value]) {

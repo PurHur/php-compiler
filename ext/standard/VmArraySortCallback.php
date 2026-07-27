@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\UsortCallbackPolicy;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /** usort/uasort/uksort and array_u* null callback → TypeError (ext/standard/array.c; #10624, #10799, #10785). */
@@ -34,6 +35,117 @@ final class VmArraySortCallback
         if (!VmCallable::isCallable($frame->vmContext, $callback)) {
             throw new \TypeError(self::invalidStringCallbackTypeError($function, $argNum, $name));
         }
+    }
+
+    /**
+     * Whether callback is a strcmp-family string builtin (fast path; #10968).
+     */
+    public static function isStrcmpFamilyCallback(Variable $callback): bool
+    {
+        $callback = $callback->resolveIndirect();
+
+        return Variable::TYPE_STRING === $callback->type
+            && UsortCallbackPolicy::isVmSupportedName($callback->toString());
+    }
+
+    /**
+     * Require a Zend-callable comparator for usort/uasort/uksort (#23550).
+     * Closures, invokables, array callables, and user-defined function names are accepted.
+     */
+    public static function requireVmCallable(
+        Frame $frame,
+        Variable $callback,
+        string $function,
+        int $argNum = 2
+    ): void {
+        $callback = $callback->resolveIndirect();
+        if (self::isStrcmpFamilyCallback($callback) || VmClosureCall::isClosure($callback)) {
+            return;
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException($function.'() requires VM context in this compiler build');
+        }
+        if (!VmCallable::isCallable($frame->vmContext, $callback, false, null, $frame)) {
+            throw new \TypeError(self::invalidCallbackTypeError($function, $argNum));
+        }
+    }
+
+    /**
+     * Deep-copy operands then invoke any VM callable (php-src php_usort_compare; #23550).
+     */
+    public static function invokeCompare(
+        Context $context,
+        Variable $callback,
+        Variable $a,
+        Variable $b
+    ): int {
+        $copyA = new Variable();
+        $copyA->duplicateFrom($a);
+        $copyB = new Variable();
+        $copyB->duplicateFrom($b);
+        $result = VmCallable::invoke($context, $callback, $copyA, $copyB);
+
+        return VmClosureCall::coerceUserSortCallbackResult($result);
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    public static function sortVariableValues(
+        Context $context,
+        array &$values,
+        Variable $callback,
+        bool $descending = false
+    ): void {
+        $cmp = static function (Variable $a, Variable $b) use ($context, $callback, $descending): int {
+            $result = self::invokeCompare($context, $callback, $a, $b);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($values, $cmp);
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKey(
+        Context $context,
+        array &$pairs,
+        Variable $callback,
+        bool $descending = false
+    ): void {
+        $cmp = static function (array $a, array $b) use ($context, $callback, $descending): int {
+            $result = self::invokeCompare($context, $callback, $a[0], $b[0]);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($pairs, $cmp);
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValue(
+        Context $context,
+        array &$pairs,
+        Variable $callback,
+        bool $descending = false
+    ): void {
+        $cmp = static function (array $a, array $b) use ($context, $callback, $descending): int {
+            $result = self::invokeCompare($context, $callback, $a[1], $b[1]);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($pairs, $cmp);
+    }
+
+    public static function invalidCallbackTypeError(string $function, int $argNum = 2): string
+    {
+        return \sprintf(
+            '%s(): Argument #%d ($callback) must be a valid callback, no array or string given',
+            $function,
+            $argNum
+        );
     }
 
     public static function invalidStringCallbackTypeError(string $function, int $argNum, string $name): string
