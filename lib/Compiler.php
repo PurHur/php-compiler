@@ -7812,6 +7812,23 @@ class Compiler {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
+            // Multi-op const-expr (e.g. SCALE * 2, LABEL . "y", -A, A ?? 5): php-cfg
+            // emits ConstFetch then the operator. Class bodies are hoisted before
+            // DECLARE_GLOBAL_CONST, so runtime CONST_FETCH would miss the global (#23997).
+            foreach ($children as $child) {
+                if (!$child instanceof Op\Expr) {
+                    continue;
+                }
+                if (!property_exists($child, 'result')
+                    || !$this->operandsReferToSameVariable($child->result, $terminal->value)
+                ) {
+                    continue;
+                }
+                $vm = $this->tryFoldCompileTimeExprDefault($child, $block, $children, true);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
             foreach ($children as $child) {
                 if (!$child instanceof Op\Stmt\JumpIf) {
                     continue;
@@ -8825,7 +8842,17 @@ class Compiler {
             return $this->tryBuildCompileTimeArrayFromExpr($expr, $block, $defaultBlockChildren);
         }
         if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
-            return $this->tryFoldUnaryLiteralDefault($expr);
+            $literal = $this->tryFoldUnaryLiteralDefault($expr);
+            if (null !== $literal) {
+                return $literal;
+            }
+
+            return $this->tryFoldCompileTimeUnaryMinusPlusDefault(
+                $expr,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
         }
         if ($expr instanceof Op\Expr\BitwiseNot || $expr instanceof Op\Expr\BooleanNot) {
             return $this->tryFoldCompileTimeUnaryExprDefault(
@@ -8836,7 +8863,12 @@ class Compiler {
             );
         }
         if ($expr instanceof Op\Expr\BinaryOp\Coalesce) {
-            return null;
+            return $this->tryFoldCompileTimeCoalesceDefault(
+                $expr,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
         }
         if ($expr instanceof Op\Expr\BinaryOp) {
             return $this->tryFoldCompileTimeBinaryExprDefault(
@@ -9055,6 +9087,80 @@ class Compiler {
     }
 
     /**
+     * Fold {@code -CONST}/{@code +CONST} when the operand is a ConstFetch prelude (#23997).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeUnaryMinusPlusDefault(
+        Op\Expr\UnaryMinus|Op\Expr\UnaryPlus $expr,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
+        $operand = $this->tryFoldCompileTimeOperandDefault(
+            $expr->expr,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $operand) {
+            return null;
+        }
+        $opCode = $expr instanceof Op\Expr\UnaryMinus
+            ? OpCode::TYPE_UNARY_MINUS
+            : OpCode::TYPE_UNARY_PLUS;
+        $result = new Variable();
+        try {
+            $result->unaryOp($opCode, $operand);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Fold {@code left ?? right} in const-expr defaults (#23997, zend_const_expr_to_zval).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeCoalesceDefault(
+        Op\Expr\BinaryOp\Coalesce $expr,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
+        $left = $this->tryFoldCompileTimeOperandDefault(
+            $expr->left,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $left) {
+            return null;
+        }
+        if (!$left->is(Variable::TYPE_NULL)) {
+            $kept = new Variable();
+            $kept->copyFrom($left);
+
+            return $kept;
+        }
+        $right = $this->tryFoldCompileTimeOperandDefault(
+            $expr->right,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $right) {
+            return null;
+        }
+        $result = new Variable();
+        $result->copyFrom($right);
+
+        return $result;
+    }
+
+    /**
      * Fold binary const-expr operators in parameter/property defaults (#5166, zend_const_expr_to_zval).
      *
      * @param list<Op> $defaultBlockChildren
@@ -9066,7 +9172,12 @@ class Compiler {
         bool $materializeEnumCase = false
     ): ?Variable {
         if ($expr instanceof Op\Expr\BinaryOp\Coalesce) {
-            return null;
+            return $this->tryFoldCompileTimeCoalesceDefault(
+                $expr,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
         }
         $opCode = $this->getOpCodeTypeFromBinaryOp($expr);
         if (!ClassConstExpr::isSupportedOpcode($opCode)) {

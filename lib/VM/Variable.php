@@ -3070,6 +3070,11 @@ restart:
                 }
 
                 return;
+            case OpCode::TYPE_BOOLEAN_NOT:
+                // Class-const / default fold path shares unaryOp with runtime (#23997).
+                $this->bool(!($expr->resolveIndirect()->toBool()));
+
+                return;
             case OpCode::TYPE_BITWISE_NOT:
                 $resolved = $expr->resolveIndirect();
                 if (self::isEnumCaseOperand($resolved)) {
