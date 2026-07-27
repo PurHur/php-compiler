@@ -1210,6 +1210,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fnmatch, 'flags', 'fnmatch'));
     }
 
+    /** @covers issue #23492 */
+    public function testGethostbynameZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('gethostbyname');
+        self::assertSame(['hostname'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'hostname', 'gethostbyname'));
+    }
+
     /** @covers issue #23491 */
     public function testCrc32ZendStubNamedParams(): void
     {
