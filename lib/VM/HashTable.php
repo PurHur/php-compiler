@@ -651,10 +651,14 @@ final class HashTable {
     }
 
     /**
-     * Zend zend_compare_arrays() parity for spaceship (<=>).
+     * Zend zend_compare_arrays() / zend_hash_compare(..., ordered=false) for spaceship (<=>).
+     * Same key bag + value compare; iteration order is ignored (#23985, #23988).
      */
     public function compareSpaceship(self $other): int
     {
+        if ($this === $other) {
+            return 0;
+        }
         $leftCount = $this->getNumElements();
         $rightCount = $other->getNumElements();
         if ($leftCount > $rightCount) {
@@ -664,14 +668,15 @@ final class HashTable {
             return -1;
         }
 
-        $leftItems = iterator_to_array($this->iterateKeyed(true));
-        $rightItems = iterator_to_array($other->iterateKeyed(true));
-        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
-            [$leftKey, $leftVal] = $leftItems[$i];
-            [$rightKey, $rightVal] = $rightItems[$i];
-            $keyCmp = Variable::spaceshipCompare($leftKey, $rightKey);
-            if (0 !== $keyCmp) {
-                return $keyCmp;
+        foreach ($this->iterateKeyed(true) as [$leftKey, $leftVal]) {
+            $rightStored = $other->findVariable($leftKey, false);
+            if (null === $rightStored) {
+                // Missing key on the right: Zend returns 1 (not a key-order walk).
+                return 1;
+            }
+            $rightVal = $rightStored->resolveIndirect();
+            if ($rightVal->isUndefined()) {
+                return 1;
             }
             $valCmp = Variable::spaceshipCompare($leftVal, $rightVal);
             if (0 !== $valCmp) {
@@ -683,7 +688,8 @@ final class HashTable {
     }
 
     /**
-     * Zend zend_compare_arrays() parity for loose == (compare_function returns 0).
+     * Zend zend_compare_arrays() / zend_hash_compare(..., ordered=false) for loose ==.
+     * Compares key/value multisets; iteration order is ignored (#23985).
      */
     public function compareLooseEqual(self $other): bool
     {
@@ -694,12 +700,13 @@ final class HashTable {
             return false;
         }
 
-        $leftItems = iterator_to_array($this->iterateKeyed(true));
-        $rightItems = iterator_to_array($other->iterateKeyed(true));
-        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
-            [$leftKey, $leftVal] = $leftItems[$i];
-            [$rightKey, $rightVal] = $rightItems[$i];
-            if (!$leftKey->equals($rightKey)) {
+        foreach ($this->iterateKeyed(true) as [$leftKey, $leftVal]) {
+            $rightStored = $other->findVariable($leftKey, false);
+            if (null === $rightStored) {
+                return false;
+            }
+            $rightVal = $rightStored->resolveIndirect();
+            if ($rightVal->isUndefined()) {
                 return false;
             }
             if (!$leftVal->identicalTo($rightVal) && !$leftVal->equals($rightVal)) {
