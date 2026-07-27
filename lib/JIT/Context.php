@@ -1006,6 +1006,16 @@ class Context {
         $this->functionProxies['reflectionenumunitcase::getname'] = new Call\ReflectionEnumUnitCaseGetName();
         $this->functionProxies['reflectionenumbackedcase::getname'] = new Call\ReflectionEnumUnitCaseGetName();
         $this->functionProxies['exception::getmessage'] = new Call\ExceptionGetMessage();
+        $exceptionCtor = new Call\ExceptionConstruct();
+        foreach (\PHPCompiler\ext\standard\ThrowableManifest::registrationOrder() as $throwableName) {
+            if (!\PHPCompiler\ext\standard\ThrowableManifest::isAdvertised($throwableName)) {
+                continue;
+            }
+            $lc = \PHPCompiler\ext\standard\ThrowableManifest::lcKey($throwableName);
+            $this->functionProxies[$lc.'::__construct'] = $exceptionCtor;
+        }
+        // Alias getMessage for Error family (same prop layout).
+        $this->functionProxies['error::getmessage'] = $this->functionProxies['exception::getmessage'];
 
         FiberHelper::registerJitMethods($this);
         GeneratorHelper::registerJitMethods($this);

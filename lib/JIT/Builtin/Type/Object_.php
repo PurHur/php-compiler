@@ -16,7 +16,9 @@ use PHPCompiler\ClassConstVisibility;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\DomConstants;
 use PHPCompiler\ext\dom\VmDomLiving;
+use PHPCompiler\ext\standard\ThrowableManifest;
 use PHPCompiler\ext\zip\ZipArchiveConstants;
+use PHPCompiler\VM\ExceptionSupport;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -3139,6 +3141,7 @@ class Object_ extends Type {
         }
         $this->ensureExternalClassConstants($id, $lcname);
         $this->seedExternalClassProperties($id, $lcname);
+        $this->seedThrowableExternalClass($id, $lcname, $displayName);
         if ('reflectionattribute' === $lcname) {
             $this->defineProperty($id, 'name', Variable::TYPE_VALUE);
             $this->defineProperty($id, 'args', Variable::TYPE_HASHTABLE);
@@ -3578,6 +3581,88 @@ class Object_ extends Type {
         foreach (array_keys($arrayProps[$lcname]) as $propName) {
             $this->defineProperty($classId, $propName, Variable::TYPE_HASHTABLE);
         }
+    }
+
+    /**
+     * Seed Exception/Error hierarchy layout + ctor for user-script AOT (#23641).
+     *
+     * External Throwable classes previously allocated with zero property slots, so
+     * getMessage()/uncaught printers read past the object (rc=134) and __construct
+     * was never called (hasConstructor false → empty message).
+     *
+     * php-src: Zend/zend_exceptions.stub.php — VM SSOT {@see \PHPCompiler\VM\BuiltinClasses::registerThrowableClass}
+     */
+    private function seedThrowableExternalClass(int $classId, string $lcname, string $displayName): void
+    {
+        $canonical = ThrowableManifest::nameForLc($lcname);
+        if (null === $canonical || !ThrowableManifest::isAdvertised($canonical)) {
+            return;
+        }
+
+        $parentName = ThrowableManifest::parentName($canonical);
+        if (null !== $parentName) {
+            $this->setClassParentName($canonical, $parentName);
+        } else {
+            // Exception / Error implement Throwable directly (#23641).
+            if (!isset($this->classes[ThrowableManifest::LC_THROWABLE])) {
+                $this->lookup('Throwable');
+            }
+            $this->markInterfaceClass('Throwable');
+            $this->setClassInterfaces($canonical, [ThrowableManifest::LC_THROWABLE]);
+        }
+
+        // Same slot order as VM BuiltinClasses::registerThrowableClass.
+        foreach (
+            [
+                ExceptionSupport::PROP_MESSAGE => Variable::TYPE_STRING,
+                ExceptionSupport::PROP_CODE => Variable::TYPE_NATIVE_LONG,
+                ExceptionSupport::PROP_FILE => Variable::TYPE_STRING,
+                ExceptionSupport::PROP_LINE => Variable::TYPE_NATIVE_LONG,
+                ExceptionSupport::PROP_PREVIOUS => Variable::TYPE_VALUE,
+                ExceptionSupport::PROP_TRACE => Variable::TYPE_HASHTABLE,
+            ] as $prop => $type
+        ) {
+            if (!$this->hasProperty($classId, $prop)) {
+                $this->defineProperty($classId, $prop, $type);
+            }
+        }
+
+        $isErrorFamily = ThrowableManifest::LC_ERROR === $lcname
+            || ThrowableManifest::isDescendantOf($lcname, ThrowableManifest::LC_ERROR);
+        if (!$isErrorFamily && !$this->hasProperty($classId, ExceptionSupport::PROP_STRING)) {
+            $this->defineProperty($classId, ExceptionSupport::PROP_STRING, Variable::TYPE_STRING);
+        }
+        if (
+            ThrowableManifest::LC_ERROR_EXCEPTION === $lcname
+            && !$this->hasProperty($classId, ExceptionSupport::PROP_SEVERITY)
+        ) {
+            $this->defineProperty($classId, ExceptionSupport::PROP_SEVERITY, Variable::TYPE_NATIVE_LONG);
+        }
+
+        $this->markHasConstructor($classId);
+        $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        foreach (
+            [
+                '__construct',
+                'getmessage',
+                'getcode',
+                'getfile',
+                'getline',
+                'getprevious',
+                'gettrace',
+                'gettraceasstring',
+                '__tostring',
+                '__wakeup',
+            ] as $method
+        ) {
+            $this->defineMethodVisibility($classId, $method, $pub);
+        }
+        if (ThrowableManifest::LC_ERROR_EXCEPTION === $lcname) {
+            $this->defineMethodVisibility($classId, 'getseverity', $pub);
+        }
+
+        // Keep display name (LogicException) not lowercase for get_class / fatals (#23641).
+        $this->classIdToName[$classId] = $canonical !== '' ? $canonical : $displayName;
     }
 
     /**
