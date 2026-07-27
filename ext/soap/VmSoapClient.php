@@ -83,6 +83,40 @@ final class VmSoapClient
                 $have[$propName] = true;
             }
         }
+        // Underscored option props (soap.stub.php; #23923).
+        $trueDefault = new Variable(Variable::TYPE_BOOLEAN);
+        $trueDefault->bool(true);
+        $zeroDefault = new Variable(Variable::TYPE_INTEGER);
+        $zeroDefault->int(0);
+        $soap11Default = new Variable(Variable::TYPE_INTEGER);
+        $soap11Default->int(SoapConstants::SOAP_1_1);
+        $arrayProto = new Variable(Variable::TYPE_ARRAY);
+        $uscoreProps = [
+            '_login' => [$nullProto, $strProto],
+            '_password' => [$nullProto, $strProto],
+            '_encoding' => [$nullProto, $strProto],
+            '_classmap' => [$nullProto, $arrayProto],
+            '_features' => [$nullProto, $intProto],
+            '_connection_timeout' => [$zeroDefault, $intProto],
+            '_keep_alive' => [$trueDefault, $boolProto],
+            '_ssl_method' => [$nullProto, $intProto],
+            '_soap_version' => [$soap11Default, $intProto],
+            '_exceptions' => [$trueDefault, $boolProto],
+            '_user_agent' => [$nullProto, $strProto],
+        ];
+        foreach ($uscoreProps as $propName => [$default, $proto]) {
+            if (!isset($have[$propName])) {
+                $entry->properties[] = new ClassProperty(
+                    $propName,
+                    $default,
+                    $proto,
+                    false,
+                    $pub,
+                    self::CLASS_LC
+                );
+                $have[$propName] = true;
+            }
+        }
         // php-src stub marks private; UPGRADING / soap.stub.php userland reads (#23246/#23247/#23903/#23904).
         if (SoapExtensionPolicy::advertisesOpaqueUrlSdlTypes()) {
             foreach (['httpurl', 'sdl', 'typemap', 'httpsocket'] as $propName) {
@@ -215,6 +249,11 @@ final class VmSoapClient
         // php-src SoapClient ctor: features bitmask (#20367).
         if (isset($options['features']) && (\is_int($options['features']) || \is_float($options['features']))) {
             $state->features = (int) $options['features'];
+            $state->featuresFromOptions = true;
+        }
+        // php-src SoapClient ctor: encoding (#23923 / Z_CLIENT_ENCODING).
+        if (isset($options['encoding']) && \is_string($options['encoding']) && '' !== $options['encoding']) {
+            $state->encoding = $options['encoding'];
         }
         // php-src SoapClient ctor: classmap type_name → PHP class (#21044; php_encoding.c to_zval_object_ex).
         if (isset($options['classmap']) && \is_array($options['classmap'])) {
@@ -243,6 +282,8 @@ final class VmSoapClient
         self::$store[$object->id] = $state;
         // php-src soap.c ctor — Z_CLIENT_URI/STYLE/USE/LOCATION/TRACE/COMPRESSION (#23922).
         self::syncCoreOptionProperties($object, $state);
+        // php-src soap.c ctor — underscored option props (#23923).
+        self::syncUnderscoredOptionProperties($object, $state, $ctx);
         $object->constructed = true;
     }
 
@@ -290,6 +331,86 @@ final class VmSoapClient
             $slot = $object->getProperty('compression');
             if (null !== $state->compression) {
                 $slot->int($state->compression);
+            } else {
+                $slot->null();
+            }
+        }
+    }
+
+    /**
+     * Mirror SoapClientState onto underscored stub option properties (#23923 / soap.stub.php).
+     */
+    private static function syncUnderscoredOptionProperties(
+        ObjectEntry $object,
+        SoapClientState $state,
+        Context $ctx
+    ): void {
+        if ($object->hasProperty('_login')) {
+            $slot = $object->getProperty('_login');
+            if (null !== $state->login) {
+                $slot->string($state->login);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('_password')) {
+            $slot = $object->getProperty('_password');
+            if (null !== $state->password) {
+                $slot->string($state->password);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('_encoding')) {
+            $slot = $object->getProperty('_encoding');
+            if (null !== $state->encoding) {
+                $slot->string($state->encoding);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('_classmap')) {
+            $slot = $object->getProperty('_classmap');
+            if ([] === $state->classmap) {
+                $slot->null();
+            } else {
+                $slot->copyFrom(self::importDecodedTree($state->classmap, $ctx));
+            }
+        }
+        if ($object->hasProperty('_features')) {
+            $slot = $object->getProperty('_features');
+            if ($state->featuresFromOptions) {
+                $slot->int($state->features);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('_connection_timeout')) {
+            $object->getProperty('_connection_timeout')->int(
+                null !== $state->connectionTimeout ? $state->connectionTimeout : 0
+            );
+        }
+        if ($object->hasProperty('_keep_alive')) {
+            $object->getProperty('_keep_alive')->bool($state->keepAlive);
+        }
+        if ($object->hasProperty('_ssl_method')) {
+            $slot = $object->getProperty('_ssl_method');
+            if (null !== $state->sslMethod) {
+                $slot->int($state->sslMethod);
+            } else {
+                $slot->null();
+            }
+        }
+        if ($object->hasProperty('_soap_version')) {
+            $object->getProperty('_soap_version')->int($state->soapVersion);
+        }
+        if ($object->hasProperty('_exceptions')) {
+            $object->getProperty('_exceptions')->bool($state->exceptions);
+        }
+        if ($object->hasProperty('_user_agent')) {
+            $slot = $object->getProperty('_user_agent');
+            if (null !== $state->userAgent) {
+                $slot->string($state->userAgent);
             } else {
                 $slot->null();
             }
@@ -2509,6 +2630,12 @@ final class SoapClientState
 
     /** php-src features bitmask (SOAP_SINGLE_ELEMENT_ARRAYS, …) (#20367). */
     public int $features = 0;
+
+    /** True when ctor options supplied features (#23923). */
+    public bool $featuresFromOptions = false;
+
+    /** php-src _encoding — null when unset (#23923). */
+    public ?string $encoding = null;
 
     /**
      * php-src _classmap — SOAP type local-name → PHP class name (no leading \) (#21044).
