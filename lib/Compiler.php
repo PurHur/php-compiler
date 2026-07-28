@@ -10803,6 +10803,8 @@ class Compiler {
                         || $this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingArrayDimFetchProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasAdjacentNestedFuncCallProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasAdjacentNestedNewProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->callArgInlineProducerIsNew($endChild, (int) $argIndex, $endCompiled)
                         || $this->errorSuppressEndBlockCallArgHasTrailingComparisonProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingConcatProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingClosureProducer($endCompiled, $endChild, (int) $argIndex)
@@ -41763,6 +41765,13 @@ class Compiler {
         if ($this->errorSuppressEndBlockDiscardsInnerResultForErrorGetLast($block)) {
             return null;
         }
+        // `@mkdir(...); new Outer(new Inner(...))` — dead arg temp is the inner New_, not @mkdir (#24368).
+        if ($this->callArgInlineProducerIsNew($cfgCallOp, $argIndex, $block)) {
+            return null;
+        }
+        if ($this->errorSuppressEndBlockCallArgHasAdjacentNestedNewProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
         // `@mkdir(...); var_export(require $f)` — include in the end block feeds the call, not @mkdir (#21938).
         if ($this->errorSuppressEndBlockCallArgHasTrailingIncludeProducer($block, $cfgCallOp, $argIndex)) {
             return null;
@@ -42043,6 +42052,63 @@ class Compiler {
         }
 
         return $argIndex === $targetArgIndex;
+    }
+
+    /**
+     * `@mkdir($dir); new Outer(new Inner($dir))` — adjacent New_ feeds the dead-temp arg (#24368).
+     *
+     * php-cfg may rewrite New_->result into a distinct Temporary on the outer arg; link via
+     * `$arg->ops` / {@see inlineNewProducerFeedsCallArg} (same family as #19439 / #12916).
+     */
+    private function errorSuppressEndBlockCallArgHasAdjacentNestedNewProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg) && !$this->callArgIsNewExpression($callArg)) {
+            return false;
+        }
+        if (
+            $callArg instanceof Operand
+            && isset($callArg->ops)
+            && \is_array($callArg->ops)
+        ) {
+            foreach ($callArg->ops as $writeOp) {
+                if ($writeOp instanceof Op\Expr\New_) {
+                    return true;
+                }
+            }
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
+            $prev = $block->orig->children[$i] ?? null;
+            if ($prev instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$prev instanceof Op\Expr\New_) {
+                break;
+            }
+            if ($this->inlineNewProducerFeedsCallArg($prev, $callArg)) {
+                return true;
+            }
+            // Nested ctor chain: inner New_ immediately precedes outer New_/call (#24368, #12916).
+            if ((int) $argIndex === 0 && $i === $callIndex - 1) {
+                return true;
+            }
+            break;
+        }
+
+        return false;
     }
 
     /**
