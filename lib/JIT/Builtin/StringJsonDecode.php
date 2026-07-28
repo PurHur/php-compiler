@@ -260,12 +260,8 @@ final class StringJsonDecode
             $payload
         );
         $context->refcount->disableRefcount($payloadOwned);
-        // Coerce against decodeInto's string param (#24137).
-        $payloadArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
-            $payloadOwned,
-            self::helperFunction($context, self::DECODE_HELPER)->getParam(1)->typeOf()
-        );
+        // Payload coerce is per-callee below: decodeInto may be `__string__*` while
+        // decodeBool/Int/Float/String take by-value `__value__` (#24465).
 
         // Peek first byte in LLVM (__string__.value is trailing int8 payload, not int8*).
         $strMap = $context->structFieldMap['__string__'];
@@ -315,10 +311,13 @@ final class StringJsonDecode
         $context->builder->positionAtEnd($bbBool);
         $slotBool = JitValueBox::alloc($context);
         $ptrBool = JitValueBox::pointer($context, $slotBool);
-        $boolRaw = $context->builder->call(
-            self::helperFunction($context, self::BOOL_HELPER),
-            $payloadArg
+        $boolHelper = self::helperFunction($context, self::BOOL_HELPER);
+        $boolArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $payloadOwned,
+            $boolHelper->getParam(0)->typeOf()
         );
+        $boolRaw = $context->builder->call($boolHelper, $boolArg);
         $context->builder->call(
             $context->lookupFunction('__value__writeBool'),
             $ptrBool,
@@ -333,10 +332,13 @@ final class StringJsonDecode
         $context->builder->positionAtEnd($bbInt);
         $slotInt = JitValueBox::alloc($context);
         $ptrInt = JitValueBox::pointer($context, $slotInt);
-        $long = $context->builder->call(
-            self::helperFunction($context, self::INT_HELPER),
-            $payloadArg
+        $intHelper = self::helperFunction($context, self::INT_HELPER);
+        $intArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $payloadOwned,
+            $intHelper->getParam(0)->typeOf()
         );
+        $long = $context->builder->call($intHelper, $intArg);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $ptrInt,
@@ -348,10 +350,13 @@ final class StringJsonDecode
         $context->builder->positionAtEnd($bbFloat);
         $slotFloat = JitValueBox::alloc($context);
         $ptrFloat = JitValueBox::pointer($context, $slotFloat);
-        $dbl = $context->builder->call(
-            self::helperFunction($context, self::FLOAT_HELPER),
-            $payloadArg
+        $floatHelper = self::helperFunction($context, self::FLOAT_HELPER);
+        $floatArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $payloadOwned,
+            $floatHelper->getParam(0)->typeOf()
         );
+        $dbl = $context->builder->call($floatHelper, $floatArg);
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),
             $ptrFloat,
@@ -363,10 +368,13 @@ final class StringJsonDecode
         $context->builder->positionAtEnd($bbString);
         $slotStr = JitValueBox::alloc($context);
         $ptrStr = JitValueBox::pointer($context, $slotStr);
-        $strRaw = $context->builder->call(
-            self::helperFunction($context, self::STRING_HELPER),
-            $payloadArg
+        $stringHelper = self::helperFunction($context, self::STRING_HELPER);
+        $stringArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $payloadOwned,
+            $stringHelper->getParam(0)->typeOf()
         );
+        $strRaw = $context->builder->call($stringHelper, $stringArg);
         $strVal = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strRaw);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
@@ -388,6 +396,11 @@ final class StringJsonDecode
             $context,
             $destArg,
             $decodeHelper->getParam(0)->typeOf()
+        );
+        $payloadArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $payloadOwned,
+            $decodeHelper->getParam(1)->typeOf()
         );
         $okRaw = $context->builder->call(
             $decodeHelper,

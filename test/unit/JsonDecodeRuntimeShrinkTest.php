@@ -44,6 +44,10 @@ final class JsonDecodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__hashtable__alloc', $bridge);
         $this->assertStringContainsString('ensureNativeHtInternalProxies', $bridge);
         $this->assertStringContainsString('phpc_native_ht_set_long_at', $bridge);
+        // Per-callee coerce: decodeInto may be __string__* while scalar helpers take __value__ (#24465).
+        $this->assertGreaterThanOrEqual(5, \substr_count($bridge, 'coerceArgForHelper'));
+        $this->assertStringContainsString('getParam(0)->typeOf()', $bridge);
+        $this->assertStringContainsString('getParam(1)->typeOf()', $bridge);
         $validate = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonValidateJitHelper.php');
         $this->assertStringContainsString('VmJsonScanner::validate', $validate);
         $this->assertStringContainsString('VmJson::lastError', $validate);
