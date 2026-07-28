@@ -2,11 +2,17 @@
 Language: final static property rejected on 8.2 reference profile (#23403, re-#22308, Zend/zend_compile.c)
 --SKIPIF--
 <?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../vendor/autoload.php';
-}
-if (PHPCompiler\CompilerVersion::supportsFinalProperties()) {
-    die('skip final properties enabled on PHP 8.4+ forward profile');
+// Key off PROFILE env — not supportsFinalProperties() — so a broken gate cannot
+// skip this case and hide a reference-profile regression (#24316 family).
+$raw = getenv('PHP_COMPILER_PROFILE');
+if (is_string($raw) && '' !== trim($raw)) {
+    $v = trim($raw);
+    if (preg_match('/^\d+\.\d+$/', $v)) {
+        $v .= '.0';
+    }
+    if (version_compare($v, '8.4.0', '>=')) {
+        die('skip final properties enabled on PHP 8.4+ forward profile');
+    }
 }
 ?>
 --FILE--
