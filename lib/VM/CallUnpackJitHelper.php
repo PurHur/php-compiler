@@ -13,13 +13,17 @@ namespace PHPCompiler\VM;
 final class CallUnpackJitHelper
 {
     /**
-     * @param list<array{0: Variable, 1: Variable}> $elements
+     * @param list<array{0: ?Variable, 1: Variable}> $elements null key = list append (#24144)
      */
     public static function vmArrayFromElements(array $elements): Variable
     {
         $array = new Variable(Variable::TYPE_ARRAY);
         $ht = $array->newArray();
         foreach ($elements as [$key, $value]) {
+            if (null === $key) {
+                $ht->append($value);
+                continue;
+            }
             if (Variable::TYPE_INTEGER === $key->type) {
                 $ht->addIndex($key->toInt(), $value);
                 continue;

@@ -10,7 +10,6 @@ use PHPCompiler\OpCode;
 use PHPCompiler\VM\CallUnpackJitHelper;
 use PHPCompiler\VM\CallUnpackSupport;
 use PHPCompiler\VM\Variable as VmVariable;
-use PHPCompiler\ext\standard\VmArray;
 use PHPCfg\Operand;
 
 /**
@@ -49,9 +48,7 @@ final class CallUnpackCompileTime
                 if (null === $vmArray) {
                     return null;
                 }
-                if (VmArray::isList($vmArray->toArray())) {
-                    return null;
-                }
+                // Lists and string-keyed spreads both expand here (#24144 / #5031).
                 foreach (
                     CallUnpackSupport::expandArrayEntries(
                         $vmArray,
@@ -131,9 +128,13 @@ final class CallUnpackCompileTime
             if (OpCode::TYPE_INIT_ARRAY === $op->type && $op->arg1 === $slot) {
                 $foundInit = true;
                 if (null !== $op->arg2) {
-                    $key = self::compileTimeKey($block, $op->arg3);
+                    // null arg3 = list append (nextFreeElement); do not treat as missing key (#24144).
+                    $key = null === $op->arg3 ? null : self::compileTimeKey($block, $op->arg3);
+                    if (null !== $op->arg3 && null === $key) {
+                        return null;
+                    }
                     $value = self::compileTimeValueFromSlot($block, (int) $op->arg2, $visited);
-                    if (null === $key || null === $value) {
+                    if (null === $value) {
                         return null;
                     }
                     $elements[] = [$key, $value];
@@ -141,9 +142,12 @@ final class CallUnpackCompileTime
                 continue;
             }
             if (OpCode::TYPE_ADD_ARRAY_ELEMENT === $op->type && $op->arg1 === $slot) {
-                $key = self::compileTimeKey($block, $op->arg3);
+                $key = null === $op->arg3 ? null : self::compileTimeKey($block, $op->arg3);
+                if (null !== $op->arg3 && null === $key) {
+                    return null;
+                }
                 $value = self::compileTimeValueFromSlot($block, (int) $op->arg2, $visited);
-                if (null === $key || null === $value) {
+                if (null === $value) {
                     return null;
                 }
                 $elements[] = [$key, $value];
@@ -208,12 +212,16 @@ final class CallUnpackCompileTime
         $out = [];
         foreach ($vmEntries as $entry) {
             if ('p' === $entry[0]) {
-                $out[] = $jit->jitVariableFromVmConstantForCallUnpack($entry[1]);
+                $out[] = $jit->jitVariableFromVmConstantForCallUnpack(
+                    $entry[1]->resolveIndirect()
+                );
                 continue;
             }
             $out[] = [
                 'named' => (string) $entry[1],
-                'value' => $jit->jitVariableFromVmConstantForCallUnpack($entry[2]),
+                'value' => $jit->jitVariableFromVmConstantForCallUnpack(
+                    $entry[2]->resolveIndirect()
+                ),
             ];
         }
 

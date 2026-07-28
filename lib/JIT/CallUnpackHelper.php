@@ -10,8 +10,8 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPCfg\Operand;
 
 /**
- * JIT lowering for call-time ...$spread — thin trampoline to {@see CallUnpackCompileTime}
- * + {@see \PHPCompiler\VM\CallUnpackSupport} (#10202).
+ * JIT lowering for call-time ...$spread — thin trampoline to {@see CallUnpackCompileTime},
+ * {@see CallUnpackExpand}, and {@see \PHPCompiler\VM\CallUnpackSupport} (#10202, #24144).
  */
 final class CallUnpackHelper
 {
@@ -45,5 +45,16 @@ final class CallUnpackHelper
     public static function tryCompileTimeArrayFromOperand(Block $block, Operand $operand): ?VmVariable
     {
         return CallUnpackCompileTime::tryCompileTimeArrayFromOperand($block, $operand);
+    }
+
+    /**
+     * @return list<Variable>|null
+     */
+    public static function expandPackedForNative(
+        Context $context,
+        Variable $packed,
+        Call\Native $toCall
+    ): ?array {
+        return CallUnpackExpand::expandPackedForNative($context, $packed, $toCall);
     }
 }
