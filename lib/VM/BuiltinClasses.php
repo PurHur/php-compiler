@@ -1777,13 +1777,18 @@ final class BuiltinClasses
         }
         $di->properties[] = new ClassProperty('f', null, $floatProto);
         $di->properties[] = new ClassProperty('days', null, $boolProto);
-        $di->properties[] = new ClassProperty('from_string', null, $boolProto);
+        // php-src: from_string / date_string live on php_interval_obj only — not direct $i->prop (#24334).
+        $fromStringStorage = new ClassProperty(DateIntervalSupport::FROM_STRING_STORAGE, null, $boolProto);
+        $fromStringStorage->phpInvisible = true;
+        $di->properties[] = $fromStringStorage;
         // Typed string slot stays uninitialized until createFromDateString / from_string wire (#22893).
         // TYPE_STRING prototype without payload made cloneShallow read Variable::$string uninit.
         $dateStringProto = new Variable(Variable::TYPE_UNDEFINED);
         $dateStringProto->typeConstraint = Variable::TYPE_STRING;
         $dateStringProto->declaredTypeLabel = 'string';
-        $di->properties[] = new ClassProperty('date_string', null, $dateStringProto);
+        $dateStringStorage = new ClassProperty(DateIntervalSupport::DATE_STRING_STORAGE, null, $dateStringProto);
+        $dateStringStorage->phpInvisible = true;
+        $di->properties[] = $dateStringStorage;
         foreach ($di->properties as $prop) {
             $prop->visibility = $pub;
         }
