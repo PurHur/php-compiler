@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\BackedEnumFromRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -90,27 +91,17 @@ final class BackedEnumFromJit
         $fn = BasicBlockHelper::parentFunction($context);
         $noMatchBlock = $fn->appendBasicBlock('enum_from_string_no_match');
         $normalized = BackedEnumFromRuntime::normalizeStringBacking($context, $arg);
-        $packed = self::packStringBackings($object, $classId, $caseKeys);
-        $matchIndex = BackedEnumFromRuntime::matchStringBacking(
-            $context,
-            $normalized,
-            $packed,
-            \count($caseKeys)
-        );
-        $i64 = $context->getTypeFromString('int64');
         $lastIdx = \count($caseKeys) - 1;
         for ($idx = 0; $idx <= $lastIdx; ++$idx) {
             $matchBlock = $fn->appendBasicBlock('enum_from_string_match_'.$idx);
             $nextBlock = $idx === $lastIdx ? $noMatchBlock : $fn->appendBasicBlock('enum_from_string_next_'.$idx);
-            $context->builder->branchIf(
-                $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $matchIndex,
-                    $i64->constInt($idx, false)
-                ),
-                $matchBlock,
-                $nextBlock
+            $caseBacking = $context->builder->load(
+                $context->constantStringFromString(
+                    (string) $object->enumCaseBackingScalarForCase($classId, $caseKeys[$idx])
+                )
             );
+            $isMatch = JitStringCompare::identical($context, $normalized, $caseBacking);
+            $context->builder->branchIf($isMatch, $matchBlock, $nextBlock);
             $context->builder->positionAtEnd($matchBlock);
             $context->builder->returnValue(
                 self::returnEnumCaseValue($context, $object, $classId, $caseKeys[$idx])
@@ -123,7 +114,6 @@ final class BackedEnumFromJit
             $context->builder->returnValue(self::returnNullValue($context));
         } else {
             BackedEnumFromRuntime::emitStringValueError($context, $className, $normalized);
-            $context->builder->returnValue(self::returnNullValue($context));
         }
     }
 
@@ -142,22 +132,17 @@ final class BackedEnumFromJit
         $fn = BasicBlockHelper::parentFunction($context);
         $noMatchBlock = $fn->appendBasicBlock('enum_from_int_no_match');
         $normalized = BackedEnumFromRuntime::normalizeIntBacking($context, $className, $arg);
-        $csv = self::packIntBackings($object, $classId, $caseKeys);
-        $matchIndex = BackedEnumFromRuntime::matchIntBacking($context, $normalized, $csv);
         $i64 = $context->getTypeFromString('int64');
         $lastIdx = \count($caseKeys) - 1;
         for ($idx = 0; $idx <= $lastIdx; ++$idx) {
             $matchBlock = $fn->appendBasicBlock('enum_from_int_match_'.$idx);
             $nextBlock = $idx === $lastIdx ? $noMatchBlock : $fn->appendBasicBlock('enum_from_int_next_'.$idx);
-            $context->builder->branchIf(
-                $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $matchIndex,
-                    $i64->constInt($idx, false)
-                ),
-                $matchBlock,
-                $nextBlock
+            $caseBacking = $i64->constInt(
+                (int) $object->enumCaseBackingScalarForCase($classId, $caseKeys[$idx]),
+                false
             );
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $normalized, $caseBacking);
+            $context->builder->branchIf($isMatch, $matchBlock, $nextBlock);
             $context->builder->positionAtEnd($matchBlock);
             $context->builder->returnValue(
                 self::returnEnumCaseValue($context, $object, $classId, $caseKeys[$idx])
@@ -170,34 +155,7 @@ final class BackedEnumFromJit
             $context->builder->returnValue(self::returnNullValue($context));
         } else {
             BackedEnumFromRuntime::emitIntValueError($context, $className, $normalized);
-            $context->builder->returnValue(self::returnNullValue($context));
         }
-    }
-
-    /**
-     * @param list<string> $caseKeys
-     */
-    private static function packStringBackings(ObjectBuiltin $object, int $classId, array $caseKeys): string
-    {
-        $parts = [];
-        foreach ($caseKeys as $caseKey) {
-            $parts[] = (string) $object->enumCaseBackingScalarForCase($classId, $caseKey);
-        }
-
-        return implode("\0", $parts);
-    }
-
-    /**
-     * @param list<string> $caseKeys
-     */
-    private static function packIntBackings(ObjectBuiltin $object, int $classId, array $caseKeys): string
-    {
-        $parts = [];
-        foreach ($caseKeys as $caseKey) {
-            $parts[] = (string) (int) $object->enumCaseBackingScalarForCase($classId, $caseKey);
-        }
-
-        return implode(',', $parts);
     }
 
     private static function returnEnumCaseValue(Context $context, ObjectBuiltin $object, int $classId, string $caseKey): Value
