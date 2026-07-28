@@ -57,6 +57,30 @@ final class VmPhpCoreConstantsTest extends TestCase
         $this->assertNotNull(VmPhpCoreConstants::fetchExact('PHP_VERSION'));
     }
 
+    public function testMainCoreExtrasDefinedAndMatchBucket(): void
+    {
+        $names = [
+            'UPLOAD_ERR_OK',
+            'UPLOAD_ERR_NO_FILE',
+            'DEFAULT_INCLUDE_PATH',
+            'PEAR_INSTALL_DIR',
+            'PEAR_EXTENSION_DIR',
+            'ZEND_THREAD_SAFE',
+            'ZEND_DEBUG_BUILD',
+        ];
+        $bucket = VmPhpCoreConstants::categorizedCoreEntries();
+        foreach ($names as $name) {
+            $exact = VmPhpCoreConstants::fetchExact($name);
+            $this->assertNotNull($exact, $name.' fetchExact');
+            $this->assertArrayHasKey($name, $bucket, $name.' bucket');
+            $this->assertNull(VmPhpCoreConstants::fetchExact(strtolower($name)), $name.' lowercase');
+        }
+        $this->assertSame(0, VmPhpCoreConstants::fetchExact('UPLOAD_ERR_OK')->toInt());
+        $this->assertSame(4, VmPhpCoreConstants::fetchExact('UPLOAD_ERR_NO_FILE')->toInt());
+        $this->assertTrue(is_string(VmPhpCoreConstants::fetchExact('DEFAULT_INCLUDE_PATH')->toString()));
+        $this->assertIsBool(VmPhpCoreConstants::fetchExact('ZEND_THREAD_SAFE')->toBool());
+    }
+
     public function testTentativeReturnConstantWithForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
