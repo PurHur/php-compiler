@@ -24,14 +24,9 @@ final class VmRange
         $endVar = $endVar->resolveIndirect();
         $stepVar = null !== $stepVar ? $stepVar->resolveIndirect() : null;
 
-        $startChar = self::charRangeLetter($startVar);
-        $endChar = self::charRangeLetter($endVar);
-        if (null !== $startChar && null !== $endChar) {
-            $step = self::resolveCharStep($stepVar, $startChar, $endChar);
-
-            return self::buildCharRange($startChar, $endChar, $step);
-        }
-
+        // php-src PHP_FUNCTION(range) / php_range (ext/standard/array.c): if step (or either
+        // bound) is IS_DOUBLE, take the double path even when both bounds are single letters —
+        // char path only when step is not double (#24399).
         $useFloat = self::endpointPrefersFloat($startVar)
             || self::endpointPrefersFloat($endVar)
             || (null !== $stepVar && self::endpointPrefersFloat($stepVar));
@@ -42,6 +37,14 @@ final class VmRange
             $step = self::resolveFloatStep($stepVar, $start, $end);
 
             return self::buildFloatRange($start, $end, $step);
+        }
+
+        $startChar = self::charRangeLetter($startVar);
+        $endChar = self::charRangeLetter($endVar);
+        if (null !== $startChar && null !== $endChar) {
+            $step = self::resolveCharStep($stepVar, $startChar, $endChar);
+
+            return self::buildCharRange($startChar, $endChar, $step);
         }
 
         $start = self::parseIntEndpoint($startVar, $frame, 1, 'start');
