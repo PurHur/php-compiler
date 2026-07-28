@@ -84,7 +84,7 @@ final class ClosureBindHelper
         }
 
         $boundThis = self::materializeBoundThis($context, $newThis);
-        $boundScope = self::materializeBoundScope($context, $newThis, $newScope);
+        $boundScope = self::materializeBoundScope($context, $closure, $newScope);
         $boundObj = self::cloneClosureObject($context, $closure, $boundThis, $boundScope);
         $result = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $boundObj);
         $result->closureCall = new ClosureWithBinding(
@@ -345,13 +345,17 @@ final class ClosureBindHelper
         return ClosureHelper::snapshotCapture($context, $newThis);
     }
 
+    /**
+     * Omitted $newScope / "static" keep the prior bound scope (#24244, zend_closures.c).
+     * Explicit null unbinds (#10097). Never adopt get_class($newThis) for those cases.
+     */
     private static function materializeBoundScope(
         Context $context,
-        Variable $newThis,
+        Variable $closure,
         ?Variable $newScope
     ): Variable {
         if (null === $newScope) {
-            return self::defaultScopeString($context, $newThis);
+            return self::priorBoundScopeString($context, $closure);
         }
         if (Variable::TYPE_NULL === $newScope->type) {
             // bindTo($obj, null) — unbound scope; do not inherit $newThis class (#10097).
@@ -363,7 +367,7 @@ final class ClosureBindHelper
                 $scope = self::loadStringFromVariable($context, $newScope);
             }
             if (ClosureBindJitHelper::resolveStaticScopeAlias($scope)) {
-                return self::defaultScopeString($context, $newThis);
+                return self::priorBoundScopeString($context, $closure);
             }
 
             return self::stringVariable($context, $scope);
@@ -378,16 +382,30 @@ final class ClosureBindHelper
         throw new \LogicException('Closure bind scope resolution failed in JIT');
     }
 
-    private static function defaultScopeString(Context $context, Variable $newThis): Variable
+    /** Read __closure_bound_scope from the source closure (omitted / "static" scope). */
+    private static function priorBoundScopeString(Context $context, Variable $closure): Variable
     {
-        if (Variable::TYPE_NULL === $newThis->type || ($newThis->isNullConstant ?? false)) {
+        if (
+            null !== $closure->closureCall
+            && $closure->closureCall instanceof ClosureWithBinding
+        ) {
+            $prior = $closure->closureCall->boundScope();
+            if (Variable::TYPE_STRING === $prior->type) {
+                return $prior;
+            }
+        }
+        if (Variable::TYPE_OBJECT !== $closure->type && Variable::TYPE_VALUE !== $closure->type) {
             return self::emptyScopeString($context);
         }
-        if (Variable::TYPE_OBJECT === $newThis->type) {
-            return self::classNameStringFromObject($context, $newThis);
-        }
-        if (Variable::TYPE_VALUE === $newThis->type) {
-            return self::classNameStringFromValueBox($context, $newThis);
+        self::ensureClosureBindingProperties($context);
+        $srcObj = self::loadClosureObject($context, $closure);
+        $prior = $context->type->object->propertyFetch(
+            $srcObj,
+            'Closure',
+            self::BOUND_SCOPE_PROPERTY
+        );
+        if (Variable::TYPE_STRING === $prior->type) {
+            return $prior;
         }
 
         return self::emptyScopeString($context);

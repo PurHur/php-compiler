@@ -33,6 +33,12 @@ final class ClosureWithBinding implements Call
         return $this->boundThis;
     }
 
+    /** Prior class scope string (empty when unbound). */
+    public function boundScope(): Variable
+    {
+        return $this->boundScope;
+    }
+
     public function call(Context $context, Variable ...$args): Value
     {
         $savedCalled = $context->scope->calledClassName;

@@ -215,7 +215,11 @@ final class ClosureSupport
                 .self::valueTypeName($newThis).' given'
             );
         }
-        $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
+        $scopeClass = self::resolveScopeClass(
+            $newScope,
+            $context,
+            $state->boundScopeClass
+        );
         if (self::rejectBindForExplicitScopeFailure($ctx, $newScope, $scopeClass, $frame)) {
             return null;
         }
@@ -727,18 +731,22 @@ final class ClosureSupport
         return $state;
     }
 
+    /**
+     * Resolve bind/bindTo scope class (php-src Zend/zend_closures.c).
+     *
+     * Omitted $newScope and the string alias "static" keep the closure's prior
+     * bound scope — they must not adopt get_class($newThis) (#24244).
+     * Explicit null unbinds scope (#10097).
+     */
     private static function resolveScopeClass(
         ?Variable $newScope,
-        Variable $newThis,
-        string $context = 'Closure::bindTo()'
+        string $context = 'Closure::bindTo()',
+        ?string $priorScopeClass = null
     ): ?string {
         $scopeArg = 'Closure::bind()' === $context ? '#3 ($newScope)' : '#2 ($newScope)';
         if (null === $newScope) {
-            if (Variable::TYPE_OBJECT === $newThis->type) {
-                return $newThis->toObject()->class->name;
-            }
-
-            return null;
+            // Scope argument omitted — do not change the scope by default.
+            return $priorScopeClass;
         }
         $newScope = $newScope->resolveIndirect();
         if (Variable::TYPE_NULL === $newScope->type) {
@@ -750,12 +758,8 @@ final class ClosureSupport
         }
         if (Variable::TYPE_STRING === $newScope->type) {
             $scope = $newScope->toString();
-            if ('static' === strtolower($scope)) {
-                if (Variable::TYPE_OBJECT === $newThis->type) {
-                    return $newThis->toObject()->class->name;
-                }
-
-                return null;
+            if (ClosureBindJitHelper::resolveStaticScopeAlias($scope)) {
+                return $priorScopeClass;
             }
 
             return $scope;
