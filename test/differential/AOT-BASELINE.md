@@ -83,11 +83,12 @@ surfaced. `g07a` carries `@differential-repeat: 10` so a plain sweep re-runs it.
 
 ## Batch 3 — modern PHP (`k01`–`k09`)
 
-Measured on `412a8cf79`, uncontended: **VM 9/9**, **AOT 3/9** (`--repeat 2` / `--repeat 3`).
+Measured originally on `412a8cf79` (AOT 3/9). Re-check individual rows below — several have since
+been fixed (`k03`, `k04`, `k06`); do not trust the batch headline alone.
 
 Batches 1 and 2 covered everyday PHP. This batch covers constructs that postdate the corpus:
 readonly properties, named arguments, enums, first-class callables, argument spread, late static
-binding. Six of nine fail.
+binding.
 
 | case | state | issue |
 |---|---|---|
@@ -96,7 +97,7 @@ binding. Six of nine fail.
 | `k03` `static::m()` through an overriding subclass | ~~`11` vs `21`~~ **fixed** #24182 | #24169 |
 | `k04` by-reference parameter | ~~no output at all~~ **fixed** #24185 | #24162 |
 | `k05` `str_starts_with()` | **`false` on matching input** | #24161 |
-| `k06` backed enum with `match($this)` | compile failure | #24163 |
+| `k06` backed enum with `match($this)` | ~~compile failure~~ **fixed** #24183/#24212 | #24163 |
 | `k07` first-class callable `f(...)` | compile failure (builtins core-dump) | #24166 |
 | `k08` spread into fixed untyped params | ok — see the warning below | — |
 | `k09` variadic pack used as an array | **`Object` vs `6`** | #24167 |
@@ -115,38 +116,35 @@ override, and two-hop `static::` forwarding — all 8/8. Reproducers in `build/m
 
 ## Batch 4 — backed enums (`m01`–`m04`)
 
-Measured on `e9df7b25c`, uncontended: **VM 4/4**, **AOT 2/4** (`--repeat 2` / `--repeat 3`).
+Measured originally on `e9df7b25c` (AOT 2/4). `m03`/`m04` have since gone green (#24218 / #24163).
 
-The corpus had **no enum case at all**. Four short programs, two of them crash.
+The corpus previously had **no enum case at all**. Four short programs.
 
 | case | state | issue |
 |---|---|---|
 | `m01` case constant, `->value`, concat | ok | — |
 | `m02` `cases()` and a plain static method | ok | — |
-| `m03` `Suit::from('S')` | **segfault, no output** | #24208 |
-| `m04` `match($this)` in an enum method | compile failure | #24163 residual |
+| `m03` `Suit::from('S')` | ~~segfault~~ **fixed** #24218 | #24208 |
+| `m04` `match($this)` in an enum method | ~~compile failure~~ **fixed** #24183/#24212 | #24163 |
 
 `m01`/`m02` exist to make `m03` attributable: they prove the enum declaration, case table, backing
-values and static dispatch all work, so the crash is `from()`/`tryFrom()` specifically rather than
-"enums are unsupported". `m03` crashes even when the result is discarded, on both string- and
-int-backed enums.
+values and static dispatch all work, so a prior `from()`/`tryFrom()` crash was not "enums are
+unsupported".
 
-`m04` fails with `Cannot coerce JIT type __object__* to string for concat` in a method declared
-`: string` whose arms are all string literals — the match lowering appears to yield its operand
-instead of the selected arm. `match($this->value)` compiles.
+`m04` previously failed with `Cannot coerce JIT type __object__* to string for concat` (match
+lowering appeared to yield its operand). Re-measured 2026-07-28 on master after #24183/#24212/#24218:
+compile + run print `H black` (5/5), including `Suit::from('S')->color()`.
 
 ## Corrections to the k-batch entries above
 
-Two k-batch rows were fixed and then measured as still failing, so do not trust the fix commit alone:
-
-- `k06` — #24163's fix removed the original `phpc_match_unhandled_operand_is_object()` error but the
-  case still fails to compile, now with the `__object__*` concat error above. Reopened.
+- `k06` — ~~still failing after #24183~~ **fixed** on master after #24212 (builder/CFG) + related
+  enum AOT work; re-measured `H black` 3/3 with `PHP_COMPILER_HELPER_RUNTIME_O=0`.
 - `k09` — #24202 landed for #24167 but the variadic-pack shape is unchanged: `array_sum($v)` on a
   spread pack still prints `Object` instead of `6`, measured directly on master with the fix in.
   Reopened.
 
-Both are the recurring pattern in this file: **a correct fix moved the failure rather than removing
-it.** Re-measure the case, never infer from the issue being closed.
+**Re-measure the case, never infer from the issue being closed** — a correct fix can move the
+failure rather than remove it (see historical notes on `k06`/`k09` reopenings).
 
 ## Smoke-check the toolchain before believing any sweep
 
