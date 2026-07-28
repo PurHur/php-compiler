@@ -1237,6 +1237,31 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'crc', 'crc32'));
     }
 
+    /** @covers issue #23335 */
+    public function testStrcmpFamilyZendStubNamedParams(): void
+    {
+        foreach (['strcmp', 'strcasecmp'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string1', 'string2'], $names);
+            self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string1', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'string2', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str1', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str2', $fn));
+        }
+        foreach (['strncmp', 'strncasecmp'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string1', 'string2', 'length'], $names);
+            self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction($fn));
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string1', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'string2', $fn));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'length', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str1', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'str2', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'len', $fn));
+        }
+    }
+
     /** @covers issue #23895 */
     public function testArrayFirstLastZendStubNamedParams(): void
     {
