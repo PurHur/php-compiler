@@ -131,6 +131,10 @@ final class RecursiveIteratorIteratorBuiltin
             'beginchildren' => RecursiveIteratorIteratorBeginChildren::class,
             'endchildren' => RecursiveIteratorIteratorEndChildren::class,
             'nextelement' => RecursiveIteratorIteratorNextElement::class,
+            // php-src spl_recursive_it_get_method forwards unknown methods to the current
+            // sub-iterator; register the RDI path APIs explicitly (#24314).
+            'getsubpath' => RecursiveIteratorIteratorGetSubPath::class,
+            'getsubpathname' => RecursiveIteratorIteratorGetSubPathname::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -147,6 +151,8 @@ final class RecursiveIteratorIteratorBuiltin
         $entry->methodNames['beginchildren'] = 'beginChildren';
         $entry->methodNames['endchildren'] = 'endChildren';
         $entry->methodNames['nextelement'] = 'nextElement';
+        $entry->methodNames['getsubpath'] = 'getSubPath';
+        $entry->methodNames['getsubpathname'] = 'getSubPathname';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -328,6 +334,20 @@ final class SplDualIteratorStorage
         }
 
         return $stack[$level]['iterator'];
+    }
+
+    /**
+     * php-src spl_recursive_it_get_method — forward getSubPath / getSubPathname to the
+     * current sub-iterator (RecursiveDirectoryIterator) (#24314).
+     */
+    public static function callCurrentSubMethod(Frame $frame, ObjectEntry $object, string $method): Variable
+    {
+        $sub = self::getSubIterator($object, null);
+        if (null === $sub) {
+            throw new \Error('Call to undefined method RecursiveIteratorIterator::'.$method.'()');
+        }
+
+        return self::invokeInner($frame, $sub, $method);
     }
 
     public static function callHasChildren(Frame $frame, ObjectEntry $object): bool
@@ -1162,6 +1182,50 @@ final class RecursiveIteratorIteratorGetInnerIterator extends VmClassMethod
         }
         SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
+    }
+}
+
+final class RecursiveIteratorIteratorGetSubPath extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSubPath');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::getSubPath()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = SplDualIteratorStorage::callCurrentSubMethod($frame, $object, 'getSubPath')->resolveIndirect();
+        $frame->returnVar->string($result->toString());
+    }
+}
+
+final class RecursiveIteratorIteratorGetSubPathname extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSubPathname');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::getSubPathname()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = SplDualIteratorStorage::callCurrentSubMethod($frame, $object, 'getSubPathname')->resolveIndirect();
+        $frame->returnVar->string($result->toString());
     }
 }
 
