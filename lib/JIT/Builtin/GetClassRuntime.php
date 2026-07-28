@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -38,6 +39,14 @@ final class GetClassRuntime
 
     public static function implement(Context $context): void
     {
+        // Mid-function ensureLinked (get_class / UnhandledMatchError "of type …") must not
+        // leave the builder cleared — that orphans __phpc_class_name_from_id calls (#24163).
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureJitHelperCompiled($context);
 
         $i64 = $context->getTypeFromString('int64');
@@ -68,7 +77,12 @@ final class GetClassRuntime
                 '#17443'
             );
         }
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function helperSourceForMap(array $namesById): string

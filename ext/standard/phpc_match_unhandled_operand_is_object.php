@@ -46,10 +46,13 @@ final class phpc_match_unhandled_operand_is_object extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('phpc_match_unhandled_operand_is_object() requires exactly one argument');
         }
+        $i1 = $context->getTypeFromString('int1');
+        // Native object / enum $this (match($this) in a method) — always an object (#24163).
+        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
+            return $i1->constInt(1, false);
+        }
         if (JITVariable::TYPE_VALUE !== $args[0]->type) {
-            throw new \LogicException(
-                'phpc_match_unhandled_operand_is_object() requires a boxed value in this compiler build'
-            );
+            return $i1->constInt(0, false);
         }
         $loaded = \PHPCompiler\JIT\JitValueBox::valuePtrFromVariable($context, $args[0]);
         $typeField = $context->structFieldMap['__value__']['type'];

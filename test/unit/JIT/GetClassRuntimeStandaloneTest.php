@@ -20,6 +20,9 @@ final class GetClassRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('GetClassJitHelper', $runtime);
         $this->assertStringContainsString('helperSourceForMap', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        // Mid-emit ensureLinked must restore the outer insert block (#24163).
+        $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $runtime);
+        $this->assertStringContainsString('getInsertBlock', $runtime);
         $helper = (string) file_get_contents(__DIR__.'/../../../ext/standard/GetClassJitHelper.php');
         $this->assertStringContainsString('classNameFromClassId', $helper);
     }
