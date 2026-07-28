@@ -18643,8 +18643,18 @@ restart:
     private function executePropertyDefaultInitBlock(Block $initBlock, int $resultSlot): Variable
     {
         $initFrame = $initBlock->getFrame($this->context);
-        $this->context->push($initFrame);
-        $status = $this->runFrames();
+        // Nested runFrames must not jump into an outer user try/catch — that resumes the
+        // caller after catch and re-runs trailing opcodes (#24138; same shape as #14104).
+        $prevDefer = $this->context->deferBuiltinCallbackCatchToOuterRunFrames;
+        $this->context->deferBuiltinCallbackCatchToOuterRunFrames = true;
+        try {
+            $this->context->push($initFrame);
+            $status = $this->runFrames();
+        } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+            throw $redirect;
+        } finally {
+            $this->context->deferBuiltinCallbackCatchToOuterRunFrames = $prevDefer;
+        }
         if (self::SUCCESS !== $status) {
             throw new \LogicException('Property default `new` initializer failed');
         }
