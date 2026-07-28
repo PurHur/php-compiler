@@ -59,9 +59,6 @@ final class ArrayReduceRuntime
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $initialPtr = self::initialPtr($context, $initial);
         if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)) {
-            if ($context->isThinStandaloneAotMain()) {
-                throw new \LogicException(ArrayReduceCallbackPolicy::thinAotClosureRejectionMessage());
-            }
             return $context->builder->call(
                 $context->lookupFunction(self::ABI_REDUCE_CLOSURE),
                 $ht,

@@ -11585,6 +11585,16 @@ class JIT {
             return $retval;
         }
         if ('__value__*' === $expected) {
+            if (null !== $return->nestedHelperValueSlot) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer(
+                    $this->context,
+                    $slot,
+                    JIT\JitValueBox::pointer($this->context, $return->nestedHelperValueSlot)
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
+            }
             if (Variable::TYPE_VALUE === $return->type) {
                 // Nullable returns use __value__*; copy merge/ternary slots into a fresh
                 // return slot instead of returning an interior pointer (#8555).

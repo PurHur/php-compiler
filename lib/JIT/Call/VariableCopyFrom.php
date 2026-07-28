@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
@@ -19,9 +20,13 @@ final class VariableCopyFrom implements Call
             throw new \LogicException('copyFrom() requires Variable receiver and source Variable');
         }
 
-        $destSlot = JitValueBox::pointer($context, self::destBox($context, $args[0]));
+        $slot = self::destBox($context, $args[0]);
+        $destPtr = JitValueBox::pointer($context, $slot);
         $srcPtr = JitValueBox::valuePtrFromVariable($context, $args[1]);
-        JitValueBox::copyFromPointer($context, $destSlot, $srcPtr);
+        JitValueBox::copyFromPointer($context, $destPtr, $srcPtr);
+        if (NestedJitCompileScope::isActive() && Variable::TYPE_OBJECT === $args[0]->type) {
+            $args[0]->nestedHelperValueSlot = $slot;
+        }
 
         return HashTableNestedReceiver::nullVariableResult($context);
     }
@@ -33,11 +38,13 @@ final class VariableCopyFrom implements Call
         }
 
         $slot = JitValueBox::alloc($context);
-        JitValueBox::copyFromPointer(
-            $context,
-            $slot,
-            JitValueBox::valuePtrFromVariable($context, $receiver)
-        );
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            JitValueBox::copyFromPointer(
+                $context,
+                $slot,
+                JitValueBox::valuePtrFromVariable($context, $receiver)
+            );
+        }
 
         return $slot;
     }

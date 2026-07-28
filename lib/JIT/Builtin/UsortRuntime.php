@@ -58,9 +58,6 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            if ($context->isThinStandaloneAotMain()) {
-                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('usort'));
-            }
             self::sortPackedWithClosure($context, $array, $callback);
         } else {
             SortRuntime::sortPacked($context, $array);
@@ -75,9 +72,6 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            if ($context->isThinStandaloneAotMain()) {
-                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('uksort'));
-            }
             self::sortKeysWithClosure($context, $array, $callback);
         } else {
             KeySortRuntime::ksortByKey($context, $array);
@@ -92,9 +86,6 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            if ($context->isThinStandaloneAotMain()) {
-                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('uasort'));
-            }
             self::sortValuesWithClosure($context, $array, $callback);
         } else {
             self::sortValuesByStrcmp($context, $array);
