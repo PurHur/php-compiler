@@ -389,6 +389,20 @@ final class VmDateTimeNative
                 $tzName
             );
         }
+        // php-src — first|last day of ±N month(s)|year(s) (#23987).
+        if (1 === preg_match(
+            '/^(first|last) day of\s+([+-]?\s*\d+)\s+(month|months|year|years)$/i',
+            $time,
+            $matches
+        )) {
+            return self::monthBoundaryOfSignedRelativeParseResult(
+                strtolower($matches[1]),
+                $matches[2],
+                strtolower($matches[3]),
+                $base,
+                $tzName
+            );
+        }
         if (1 === preg_match('/^(first|last) day of (next|this|last|previous) month$/i', $time, $matches)) {
             $when = strtolower($matches[2]);
             if ('previous' === $when) {
@@ -539,6 +553,8 @@ final class VmDateTimeNative
             '/^(.+?)\s+((?:this|next|last|previous)\s+week\s+(?:'.$weekday.'))$/i',
             '/^(.+?)\s+((?:'.$weekday.'))$/i',
             '/^(.+?)\s+((?:first|last)\s+day\s+of\s+(?:next|this|last)\s+month)$/i',
+            // first|last day of ±N month|year after absolute date (#23987).
+            '/^(.+?)\s+((?:first|last)\s+day\s+of\s+[+-]?\s*\d+\s+(?:month|months|year|years))$/i',
             // Nth weekday of month — named year or this|next|last (#19550).
             '/^(.+?)\s+((?:'.$ordinal.')\s+(?:'.$weekday.')\s+of\s+(?:this|next|last)\s+month)$/i',
             '/^(.+?)\s+((?:'.$ordinal.')\s+(?:'.$weekday.')\s+of\s+[A-Za-z]+\s+\d{4})$/i',
@@ -2209,6 +2225,52 @@ final class VmDateTimeNative
         }
 
         return $matched ? $timestamp : null;
+    }
+
+    /**
+     * php-src parse_date.re — first|last day of ±N month(s)|year(s); preserve clock (#23987).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function monthBoundaryOfSignedRelativeParseResult(
+        string $which,
+        string $amountRaw,
+        string $unit,
+        int $base,
+        string $tzName
+    ): ?array {
+        $amountRaw = preg_replace('/\s+/', '', $amountRaw) ?? $amountRaw;
+        if ('' === $amountRaw || !preg_match('/^[+-]?\d+$/', $amountRaw)) {
+            return null;
+        }
+        $amount = (int) $amountRaw;
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        if (str_starts_with($unit, 'month')) {
+            [$year, $month] = self::shiftYearMonth($year, $month, $amount);
+        } elseif (str_starts_with($unit, 'year')) {
+            $year += $amount;
+        } else {
+            return null;
+        }
+        $day = 'first' === $which ? 1 : self::daysInMonth($year, $month);
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                $year,
+                $month,
+                $day,
+                self::tmInt($tm, 'tm_hour'),
+                self::tmInt($tm, 'tm_min'),
+                self::tmInt($tm, 'tm_sec'),
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
     }
 
     /**
