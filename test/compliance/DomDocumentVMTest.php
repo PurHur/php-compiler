@@ -88,6 +88,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/element_remove_attribute_ns_return.phpt',
             'element_remove_attribute_ns_return.phpt'
         );
+        yield 'dom_element_setattr_empty_name.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_element_setattr_empty_name.phpt',
+            'dom_element_setattr_empty_name.phpt'
+        );
         yield 'dom_node_get_line_no.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_node_get_line_no.phpt',
             'dom_node_get_line_no.phpt'

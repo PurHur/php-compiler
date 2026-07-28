@@ -334,6 +334,42 @@ PHP;
         self::assertSame("item\nx\n\n1\n", ob_get_clean());
     }
 
+    public function test_dom_element_set_attribute_empty_name_value_error(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<r/>');
+$el = $doc->documentElement;
+foreach ([null, ''] as $i => $name) {
+    try {
+        $el->setAttribute($name, 'x');
+        echo "set$i=ok\n";
+    } catch (Throwable $e) {
+        echo 'set'.$i.'='.get_class($e).':'.$e->getMessage()."\n";
+    }
+}
+try {
+    $el->setAttributeNS(null, '', 'x');
+    echo "setNS=ok\n";
+} catch (Throwable $e) {
+    echo 'setNS='.get_class($e).':'.$e->getMessage()."\n";
+}
+echo 'attrs='.$el->attributes->length."\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_setattr_empty.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "set0=ValueError:DOMElement::setAttribute(): Argument #1 (\$qualifiedName) cannot be empty\n"
+            ."set1=ValueError:DOMElement::setAttribute(): Argument #1 (\$qualifiedName) cannot be empty\n"
+            ."setNS=ValueError:DOMElement::setAttributeNS(): Argument #2 (\$qualifiedName) cannot be empty\n"
+            ."attrs=0\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_dom_node_has_attributes(): void
     {
         $runtime = new Runtime();
