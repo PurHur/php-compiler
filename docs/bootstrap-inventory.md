@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6607 |
-| Phase A inventory files (M2 ratio SSOT) | 6607 |
+| PHP files on vm.php path | 6608 |
+| Phase A inventory files (M2 ratio SSOT) | 6608 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21350 |
+| Source constructs flagged (warnings) | 21353 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5621,6 +5621,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/XmlWriterMethod.php` | 0 | 1 |
 | `lib/JIT/Call/XsltMethod.php` | 0 | 1 |
 | `lib/JIT/CallUnpackCompileTime.php` | 0 | 7 |
+| `lib/JIT/CallUnpackExpand.php` | 0 | 3 |
 | `lib/JIT/CallUnpackHelper.php` | 0 | 1 |
 | `lib/JIT/CastArrayNativeJit.php` | 0 | 2 |
 | `lib/JIT/CastArrayShared.php` | 0 | 2 |
@@ -25977,7 +25978,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitCsvArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/JitDate.php`
 
@@ -30774,7 +30775,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmCsvArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 10 class method(s)
 
 ### `ext/standard/VmDataStream.php`
 
@@ -42584,12 +42585,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 17173)
 - new JIT\Call\VmCoerceVariableToString (line 17297)
 - new JIT\Call\IncludePathResolverResolve (line 17594)
-- new Variable (line 18676)
-- new VM (line 18720)
-- new VM\Variable (line 18729)
-- new Variable (line 18750)
-- new Variable (line 18796)
-- new Variable (line 19320)
+- new Variable (line 18692)
+- new VM (line 18736)
+- new VM\Variable (line 18745)
+- new Variable (line 18766)
+- new Variable (line 18812)
+- new Variable (line 19336)
 - 383 class method(s)
 - 7 closure(s)
 
@@ -47004,18 +47005,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CallUnpackCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmVariable (line 119)
-- new VmVariable (line 182)
-- new VmVariable (line 231)
-- new VmVariable (line 237)
-- new VmVariable (line 246)
-- new VmVariable (line 257)
+- new VmVariable (line 116)
+- new VmVariable (line 186)
+- new VmVariable (line 239)
+- new VmVariable (line 245)
+- new VmVariable (line 254)
+- new VmVariable (line 265)
 - 10 class method(s)
+
+### `lib/JIT/CallUnpackExpand.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 103)
+- new Variable (line 127)
+- 3 class method(s)
 
 ### `lib/JIT/CallUnpackHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/CastArrayNativeJit.php`
 
