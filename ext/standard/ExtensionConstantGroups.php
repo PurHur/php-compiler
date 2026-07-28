@@ -68,7 +68,7 @@ final class ExtensionConstantGroups
     {
         $groups = StdlibModuleConstants::categorizedBootstrapConstants();
         $groups['calendar'] = CalendarConstants::registeredConstants();
-        $groups['filter'] = FilterConstants::REGISTERED;
+        $groups['filter'] = FilterConstants::registeredConstants();
         $groups['tokenizer'] = TokenConstants::registeredConstants();
         $groups['dom'] = array_merge(
             DomExceptionConstants::globalConstants(),

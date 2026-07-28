@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmEngineBuiltinDeprecation;
@@ -29,6 +30,7 @@ final class VmFilter
     public const FILTER_REQUIRE_SCALAR = 0x2000000;
     public const FILTER_FORCE_ARRAY = 0x4000000;
     public const FILTER_NULL_ON_FAILURE = 0x8000000;
+    /** PHP 8.5+ only — shares the pre-8.5 FILTER_FLAG_GLOBAL_RANGE bit (#24065). */
     public const FILTER_THROW_ON_FAILURE = 0x10000000;
     public const FILTER_FLAG_ALLOW_OCTAL = 0x0001;
     public const FILTER_FLAG_ALLOW_HEX = 0x0002;
@@ -49,7 +51,13 @@ final class VmFilter
     public const FILTER_FLAG_IPV6 = 0x00200000;
     public const FILTER_FLAG_NO_RES_RANGE = 0x00400000;
     public const FILTER_FLAG_NO_PRIV_RANGE = 0x00800000;
-    public const FILTER_FLAG_GLOBAL_RANGE = 0x20000000;
+    /**
+     * PHP ≤8.4 / php-src PHP-8.2 filter_private.h — 0x10000000.
+     * PHP 8.5+ relocates this to {@see FILTER_FLAG_GLOBAL_RANGE_PHP85} when THROW takes the bit (#24065).
+     */
+    public const FILTER_FLAG_GLOBAL_RANGE = 0x10000000;
+    /** PHP 8.5+ FILTER_FLAG_GLOBAL_RANGE after FILTER_THROW_ON_FAILURE claimed 0x10000000. */
+    public const FILTER_FLAG_GLOBAL_RANGE_PHP85 = 0x20000000;
     public const FILTER_FLAG_HOSTNAME = 0x100000;
     public const FILTER_FLAG_EMAIL_UNICODE = 0x100000;
     public const FILTER_VALIDATE_INT = 0x0101;
@@ -90,6 +98,16 @@ final class VmFilter
     public const INPUT_SERVER = 5;
 
     public const INPUT_SESSION = 6;
+
+    /**
+     * Profile-correct FILTER_FLAG_GLOBAL_RANGE bit (php-src filter_private.h; #24065).
+     */
+    public static function filterFlagGlobalRange(): int
+    {
+        return CompilerVersion::supportsFilterThrowOnFailure()
+            ? self::FILTER_FLAG_GLOBAL_RANGE_PHP85
+            : self::FILTER_FLAG_GLOBAL_RANGE;
+    }
 
     public static function isSupportedFilter(int $filter): bool
     {
@@ -1391,7 +1409,7 @@ final class VmFilter
 
         $noPriv = 0 !== ($flags & self::FILTER_FLAG_NO_PRIV_RANGE);
         $noRes = 0 !== ($flags & self::FILTER_FLAG_NO_RES_RANGE);
-        $globalOnly = 0 !== ($flags & self::FILTER_FLAG_GLOBAL_RANGE);
+        $globalOnly = 0 !== ($flags & self::filterFlagGlobalRange());
         if ($noPriv || $noRes || $globalOnly) {
             $status = self::ipSpecialStatus($packed);
             if (null !== $status) {

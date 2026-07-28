@@ -2465,6 +2465,19 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ FILTER_THROW_ON_FAILURE + relocated FILTER_FLAG_GLOBAL_RANGE bit
+     * (ext/filter/filter_private.h; #24065).
+     *
+     * On PROFILE≤8.4 / 8.4.0-dev reference: FILTER_FLAG_GLOBAL_RANGE === 0x10000000 and
+     * FILTER_THROW_ON_FAILURE is undefined (Zend 8.2–8.4). PROFILE=8.5+ registers THROW at
+     * 0x10000000 and moves GLOBAL_RANGE to 0x20000000.
+     */
+    public static function supportsFilterThrowOnFailure(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ max_memory_limit INI (main/main.c; #23232).
      *
      * Ceiling for memory_limit — INI_SYSTEM, default "-1". Absent on PROFILE&lt;8.5 so
