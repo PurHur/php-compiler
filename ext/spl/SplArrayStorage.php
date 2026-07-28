@@ -169,11 +169,17 @@ final class SplArrayStorage
         return $state['pos'] >= 0 && $state['pos'] < \count($keys);
     }
 
+    /**
+     * php-src SPL_METHOD(Array, current) — NULL when position invalid (bug77903.phpt; #24325).
+     */
     public static function iteratorCurrent(ObjectEntry $object): Variable
     {
         $state = self::state($object);
         if (!self::iteratorValid($object)) {
-            throw new \RuntimeException('Cannot fetch current() on invalid ArrayIterator position');
+            $null = new Variable();
+            $null->null();
+
+            return $null;
         }
         $key = self::iteratorKeys($object)[$state['pos']];
         $var = \is_int($key)
@@ -186,11 +192,14 @@ final class SplArrayStorage
         return $var;
     }
 
-    public static function iteratorKey(ObjectEntry $object): int|string
+    /**
+     * php-src SPL_METHOD(Array, key) — NULL when position invalid (#24325).
+     */
+    public static function iteratorKey(ObjectEntry $object): int|string|null
     {
         $state = self::state($object);
         if (!self::iteratorValid($object)) {
-            throw new \RuntimeException('Cannot fetch key() on invalid ArrayIterator position');
+            return null;
         }
 
         return self::iteratorKeys($object)[$state['pos']];
