@@ -1946,6 +1946,18 @@ final class CompilerVersion
     }
 
     /**
+     * get_declared_attributes() — never registered in php-src (#24222, re-#6450).
+     *
+     * php-src: ext/reflection/php_reflection.c has no PHP_FUNCTION(get_declared_attributes);
+     * attribute discovery is ReflectionClass::getAttributes() / peers only. Forever off under
+     * php-src-strict (including PROFILE=8.4) until php-src adds the builtin.
+     */
+    public static function advertisesGetDeclaredAttributes(): bool
+    {
+        return false;
+    }
+
+    /**
      * PHP 8.4+ header_list() (ext/standard/head.c, #12546, #17791).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
