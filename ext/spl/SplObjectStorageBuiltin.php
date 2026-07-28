@@ -400,10 +400,13 @@ final class SplObjectStorageBuiltin
         return WeakRefSupport::resolveMapKeyVariable($key);
     }
 
+    /**
+     * php-src SplObjectStorage::key — current iterator index (including past-end; #24327).
+     */
     public static function key(ObjectEntry $storage): Variable
     {
         $out = new Variable();
-        $out->bool(false);
+        $out->int(self::state($storage)['pos']);
 
         return $out;
     }
