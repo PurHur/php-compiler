@@ -12362,7 +12362,10 @@ class JIT {
         if ($toCall instanceof JIT\Call\Native || $toCall instanceof JIT\Call\Vararg) {
             return isset($this->context->functionReturnsRef[strtolower($toCall->name)]);
         }
-        if ($toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall) {
+        if (
+            $toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
+            || $toCall instanceof JIT\Call\RuntimeIndirectStaticMethodCall
+        ) {
             foreach ($toCall->candidatesByClassId as $candidate) {
                 if (
                     $candidate instanceof JIT\Call\Native
@@ -17797,6 +17800,7 @@ class JIT {
             throw new \LogicException('Static call class must be a literal');
         }
         $selfScope = 'self' === strtolower((string) $classOp->value);
+        $staticScope = 'static' === strtolower((string) $classOp->value);
         $className = $this->resolveJitStaticScopeClass($block, $classOp);
         $declaringClassLc = strtolower($className);
         $methodLc = strtolower($nameOp->value);
@@ -17907,13 +17911,73 @@ class JIT {
             }
             throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
         }
+        // AOT/standalone: `static::method()` must dispatch from get_called_scope(), not the
+        // declaring class baked in at compile time (#24169). Compile-time resolve of `static`
+        // to the enclosing class is exactly `self::` — wrong for subclass overrides.
+        if (
+            $staticScope
+            && !$parentScope
+            && JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context)
+        ) {
+            $candidates = $this->buildRuntimeStaticMethodCandidatesByClassId($methodLc);
+            if ([] === $candidates) {
+                throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
+            }
+            $this->context->scope->toCall = new JIT\Call\RuntimeIndirectStaticMethodCall(
+                $methodLc,
+                $candidates,
+                $block
+            );
+            $this->context->scope->args = [];
+
+            return;
+        }
         // parent:: / self:: dispatch to resolved code but must not clobber late-static scope
-        // (#12245 parent, #21983 self).
+        // (#12245 parent, #21983 self). Named Class:: and static:: (non-standalone) rebind LSB.
         if (!$parentScope && !$selfScope) {
             $this->context->scope->lateStaticCallClassId = $declaringClassId;
         }
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
         $this->context->scope->args = [];
+    }
+
+    /**
+     * Map every known class id to the static method proxy resolved from that class (#24169).
+     *
+     * @return array<int, JIT\Call>
+     */
+    private function buildRuntimeStaticMethodCandidatesByClassId(string $methodLc): array
+    {
+        $methodLc = strtolower($methodLc);
+        $candidates = [];
+        foreach ($this->context->type->object->allClassNamesById() as $classId => $className) {
+            $classLc = strtolower(ltrim($className, '\\'));
+            $proxyName = $this->resolveJitStaticMethodProxyName($classLc, $methodLc);
+            if (!$this->context->functionIsRegistered($proxyName)) {
+                continue;
+            }
+            // Prefer static methods; skip instance-only names that share a short name.
+            if ($this->context->type->object->hasDeclaredClass($classLc)) {
+                $ownerId = $this->context->type->object->lookup($classLc);
+                if ($this->context->type->object->hasMethod($ownerId, $methodLc)) {
+                    $vis = $this->context->type->object->methodVisibility($ownerId, $methodLc);
+                    if (0 === ($vis & \PHPCfg\Func::FLAG_STATIC)) {
+                        // May still be inherited as static from a parent — check resolved owner.
+                        $resolvedLc = explode('::', $proxyName, 2)[0];
+                        if ($this->context->type->object->hasDeclaredClass($resolvedLc)) {
+                            $resolvedId = $this->context->type->object->lookup($resolvedLc);
+                            $resolvedVis = $this->context->type->object->methodVisibility($resolvedId, $methodLc);
+                            if (0 === ($resolvedVis & \PHPCfg\Func::FLAG_STATIC)) {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+            $candidates[$classId] = $this->context->resolveFunctionProxy($proxyName);
+        }
+
+        return $candidates;
     }
 
     /**
@@ -17938,6 +18002,7 @@ class JIT {
             || $toCall instanceof JIT\Call\Native
             || $toCall instanceof JIT\Call\ExternalMethod
             || $toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
+            || $toCall instanceof JIT\Call\RuntimeIndirectStaticMethodCall
         ) {
             return;
         }
