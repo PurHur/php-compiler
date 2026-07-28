@@ -14,6 +14,14 @@ final class DateIntervalSupport
 {
     public const CLASS_DATEINTERVAL = 'dateinterval';
 
+    /**
+     * php-src stores from_string / date_string on php_interval_obj, not the std property table
+     * (date_interval_read_property / has_property → Undefined for `$i->from_string`; get_properties
+     * synthesizes the public names for (array)/serialize/var_dump — #24334).
+     */
+    public const FROM_STRING_STORAGE = '__di_from_string';
+    public const DATE_STRING_STORAGE = '__di_date_string';
+
     public static function requireDateInterval(
         Variable $var,
         string $label,
@@ -44,7 +52,7 @@ final class DateIntervalSupport
         self::requireFloatProperty($interval, 'f')->float($parsed['f']);
         self::requireIntProperty($interval, 'invert')->int($parsed['invert']);
         self::requireBoolProperty($interval, 'days')->bool(false);
-        self::requireBoolProperty($interval, 'from_string')->bool(false);
+        self::requireBoolProperty($interval, self::FROM_STRING_STORAGE)->bool(false);
         $interval->constructed = true;
     }
 
@@ -155,8 +163,8 @@ final class DateIntervalSupport
         } else {
             $daysVar->bool(false);
         }
-        if ($interval->hasProperty('from_string')) {
-            $fromString = $interval->getProperty('from_string')->resolveIndirect();
+        if ($interval->hasProperty(self::FROM_STRING_STORAGE)) {
+            $fromString = $interval->getProperty(self::FROM_STRING_STORAGE)->resolveIndirect();
             if (Variable::TYPE_BOOLEAN === $fromString->type) {
                 $fromString->bool(false);
             }
@@ -192,32 +200,34 @@ final class DateIntervalSupport
 
     public static function markFromDateString(ObjectEntry $interval, string $dateString): void
     {
-        if ($interval->hasProperty('from_string')) {
-            $interval->getProperty('from_string')->resolveIndirect()->bool(true);
-        }
-        if ($interval->hasProperty('date_string')) {
-            $interval->getProperty('date_string')->resolveIndirect()->string($dateString);
+        if ($interval->hasProperty(self::FROM_STRING_STORAGE)) {
+            $interval->getProperty(self::FROM_STRING_STORAGE)->resolveIndirect()->bool(true);
         } else {
-            $interval->allocateProperty('date_string')->string($dateString);
+            $interval->allocateProperty(self::FROM_STRING_STORAGE)->bool(true);
+        }
+        if ($interval->hasProperty(self::DATE_STRING_STORAGE)) {
+            $interval->getProperty(self::DATE_STRING_STORAGE)->resolveIndirect()->string($dateString);
+        } else {
+            $interval->allocateProperty(self::DATE_STRING_STORAGE)->string($dateString);
         }
     }
 
     public static function isFromDateString(ObjectEntry $interval): bool
     {
-        if (!$interval->hasProperty('from_string')) {
+        if (!$interval->hasProperty(self::FROM_STRING_STORAGE)) {
             return false;
         }
-        $fromString = $interval->getProperty('from_string')->resolveIndirect();
+        $fromString = $interval->getProperty(self::FROM_STRING_STORAGE)->resolveIndirect();
 
         return Variable::TYPE_BOOLEAN === $fromString->type && $fromString->toBool();
     }
 
     public static function readDateString(ObjectEntry $interval): ?string
     {
-        if (!$interval->hasProperty('date_string')) {
+        if (!$interval->hasProperty(self::DATE_STRING_STORAGE)) {
             return null;
         }
-        $dateString = $interval->getProperty('date_string')->resolveIndirect();
+        $dateString = $interval->getProperty(self::DATE_STRING_STORAGE)->resolveIndirect();
         if (Variable::TYPE_STRING !== $dateString->type) {
             return null;
         }
@@ -233,13 +243,6 @@ final class DateIntervalSupport
     public static function exportZendJsonWireDateInterval(ObjectEntry $interval): array
     {
         $state = self::readState($interval);
-        $fromString = false;
-        if ($interval->hasProperty('from_string')) {
-            $fs = $interval->getProperty('from_string')->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN === $fs->type) {
-                $fromString = $fs->toBool();
-            }
-        }
 
         return [
             'y' => $state['y'],
@@ -251,7 +254,7 @@ final class DateIntervalSupport
             'f' => $state['f'],
             'invert' => $state['invert'],
             'days' => $state['days'],
-            'from_string' => $fromString,
+            'from_string' => self::isFromDateString($interval),
         ];
     }
 
@@ -315,13 +318,6 @@ final class DateIntervalSupport
         }
 
         $state = self::readState($interval);
-        $fromString = false;
-        if ($interval->hasProperty('from_string')) {
-            $fs = $interval->getProperty('from_string')->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN === $fs->type) {
-                $fromString = $fs->toBool();
-            }
-        }
 
         return VmSerialize::encodeExportedPropertyBag('DateInterval', [
             'y' => $state['y'],
@@ -333,7 +329,7 @@ final class DateIntervalSupport
             'f' => $state['f'],
             'invert' => $state['invert'],
             'days' => $state['days'],
-            'from_string' => $fromString,
+            'from_string' => self::isFromDateString($interval),
         ]);
     }
 
@@ -375,8 +371,8 @@ final class DateIntervalSupport
         ];
         if (null !== $target) {
             self::writeState($target, $state);
-            if ($target->hasProperty('from_string')) {
-                $fs = $target->getProperty('from_string')->resolveIndirect();
+            if ($target->hasProperty(self::FROM_STRING_STORAGE)) {
+                $fs = $target->getProperty(self::FROM_STRING_STORAGE)->resolveIndirect();
                 if (Variable::TYPE_BOOLEAN === $fs->type) {
                     $fs->bool(isset($data['from_string']) && true === $data['from_string']);
                 }
@@ -385,8 +381,8 @@ final class DateIntervalSupport
             return $target;
         }
         $interval = self::createFromState($ctx, $state);
-        if ($interval->hasProperty('from_string')) {
-            $fs = $interval->getProperty('from_string')->resolveIndirect();
+        if ($interval->hasProperty(self::FROM_STRING_STORAGE)) {
+            $fs = $interval->getProperty(self::FROM_STRING_STORAGE)->resolveIndirect();
             if (Variable::TYPE_BOOLEAN === $fs->type) {
                 $fs->bool(isset($data['from_string']) && true === $data['from_string']);
             }

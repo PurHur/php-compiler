@@ -8,6 +8,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
@@ -133,7 +134,7 @@ final class JitDateIntervalCreateFromDateString
             JITVariable::TYPE_NATIVE_BOOL
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_NAME, 'from_string'),
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, DateIntervalSupport::FROM_STRING_STORAGE),
             new JITVariable(
                 $context,
                 JITVariable::TYPE_NATIVE_BOOL,
@@ -149,7 +150,7 @@ final class JitDateIntervalCreateFromDateString
             $context->constantFromString($dateString)
         );
         $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, self::CLASS_NAME, 'date_string'),
+            $objectType->propertySlotFor($obj, self::CLASS_NAME, DateIntervalSupport::DATE_STRING_STORAGE),
             $dateStringVar,
             JITVariable::TYPE_STRING
         );
