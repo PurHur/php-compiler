@@ -26,6 +26,30 @@ final class VmScopeExtractFlagsTest extends TestCase
         );
     }
 
+    /** EXTR_SKIP imports when varExists=false; skips when true (#24309). */
+    public function testResolveExtractFinalNameExtrSkip(): void
+    {
+        $this->assertSame(
+            'b',
+            ScopeBuiltinJitHelper::resolveExtractFinalName('b', false, VmScope::EXTR_SKIP, null)
+        );
+        $this->assertNull(
+            ScopeBuiltinJitHelper::resolveExtractFinalName('a', true, VmScope::EXTR_SKIP, null)
+        );
+    }
+
+    /** EXTR_IF_EXISTS only imports when varExists=true (#24310). */
+    public function testResolveExtractFinalNameExtrIfExists(): void
+    {
+        $this->assertNull(
+            ScopeBuiltinJitHelper::resolveExtractFinalName('b', false, VmScope::EXTR_IF_EXISTS, null)
+        );
+        $this->assertSame(
+            'a',
+            ScopeBuiltinJitHelper::resolveExtractFinalName('a', true, VmScope::EXTR_IF_EXISTS, null)
+        );
+    }
+
     public function testExtrConstantsMatchStdlib(): void
     {
         $this->assertSame(0, VmScope::EXTR_OVERWRITE);
