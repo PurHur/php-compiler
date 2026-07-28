@@ -36,4 +36,20 @@ PHP;
         $runtime->run($block);
         self::assertSame('1151HELLO', ob_get_clean());
     }
+
+    /** @group mbstring_module_skeleton */
+    public function test_mb_oniguruma_version_constant_registered(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo defined('MB_ONIGURUMA_VERSION') ? 'yes' : 'no';
+echo '|';
+echo is_string(MB_ONIGURUMA_VERSION) && preg_match('/^\d+\.\d+(\.\d+)?/', MB_ONIGURUMA_VERSION) ? 'ok' : 'bad';
+PHP;
+        $block = $runtime->parseAndCompile($code, 'mb_oniguruma_version.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('yes|ok', ob_get_clean());
+    }
 }
