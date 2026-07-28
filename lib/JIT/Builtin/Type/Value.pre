@@ -57,6 +57,8 @@ class Value extends Type {
     }
 
     protected function implementValueDelref(): void {
+        // Hand-fixed in Value.php (#24226): load heap ptr for string/object/HT only,
+        // then clear type. compile{} &$value->value cast treated payload storage as __ref__.
         compile {
             function __value__valueDelref($value) {
                 $oldType = $value->type;
@@ -67,9 +69,10 @@ class Value extends Type {
                 $isCounted = $oldType & $mask;
                 if ($isCounted) {
                     $ptr = &$value->value;
-                    $virtual = (__ref__virtual*) $ptr;
-                    __ref__delref($virtual);
+                    $held = *(__ref__virtual**) $ptr;
+                    __ref__delref($held);
                 }
+                $value->type = (int8) 0;
                 return;
             }
         }
