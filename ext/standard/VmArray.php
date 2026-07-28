@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -147,7 +148,10 @@ final class VmArray
     }
 
     /**
-     * array_combine() key slot — Zend convert_to_key rules (ext/standard/array.c, #4161).
+     * array_combine()/array_fill_keys() key slot — Zend convert_to_key (ext/standard/array.c, #4161).
+     *
+     * Objects with __toString() stringify like zend_operators cast_object (#24035, #24036);
+     * enum cases stay Error via {@see rejectEnumCaseKeyVariable()}.
      */
     public static function storeCombineKey(HashTable $ht, Variable $key, Variable $stored, ?Frame $frame = null): void
     {
@@ -203,9 +207,18 @@ final class VmArray
             return;
         }
         if (Variable::TYPE_OBJECT === $key->type) {
-            throw new \Error(
-                'Object of class '.$key->toObject()->class->name.' could not be converted to string'
-            );
+            $vm = null !== $frame && null !== $frame->vmContext
+                ? $frame->vmContext->runtime->vm
+                : VM::running();
+            if (null === $vm) {
+                throw new \Error(
+                    'Object of class '.$key->toObject()->class->name.' could not be converted to string'
+                );
+            }
+            // HashTable::update() applies numeric-string → int key (zend_hash; __toString "5" → 5).
+            $ht->update($vm->castObjectToString($key->toObject()), $stored);
+
+            return;
         }
 
         throw new \Error(
