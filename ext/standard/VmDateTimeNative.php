@@ -380,6 +380,15 @@ final class VmDateTimeNative
                 'microsecond' => 0,
             ];
         }
+        // php-src parse_date.re — bare "first|last day of" ≡ this month; preserve clock (#23967).
+        if (1 === preg_match('/^(first|last) day of$/i', $time, $matches)) {
+            return self::monthBoundaryParseResult(
+                strtolower($matches[1]),
+                'this',
+                $base,
+                $tzName
+            );
+        }
         if (1 === preg_match('/^(first|last) day of (next|this|last|previous) month$/i', $time, $matches)) {
             $when = strtolower($matches[2]);
             if ('previous' === $when) {
