@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -66,7 +68,7 @@ final class VmAssertState
     }
 
     /** @return string|false */
-    public static function iniSet(string $option, string $value)
+    public static function iniSet(Context $ctx, string $option, string $value)
     {
         $key = strtolower($option);
         if (!in_array($key, self::SUPPORTED_INI_KEYS, true)) {
@@ -80,8 +82,20 @@ final class VmAssertState
 
         switch ($key) {
             case self::INI_ZEND_ASSERTIONS:
-                AssertOptionsJitHelper::iniSetZendAssertionsFromString($value);
-                break;
+                // OnUpdateAssertions may reject crossing -1 at runtime (#24396).
+                $set = AssertOptionsJitHelper::iniSetZendAssertionsFromString($value);
+                if (null === $set) {
+                    $ctx->errors->triggerError(
+                        AssertOptionsJitHelper::MSG_ZEND_ASSERTIONS_PHP_INI_ONLY,
+                        ErrorReporter::E_WARNING,
+                        null,
+                        $ctx
+                    );
+
+                    return false;
+                }
+
+                return $set;
             case self::INI_ASSERT_ACTIVE:
                 AssertOptionsJitHelper::iniSetActiveFromString($value);
                 break;

@@ -1,5 +1,7 @@
 --TEST--
 stdlib assert() failure warning — E_WARNING assert(): … failed (#23731, ext/standard/assert.c)
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 ini_set('zend.assertions', '1');

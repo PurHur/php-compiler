@@ -190,7 +190,7 @@ final class VmIni
     public static function set(Context $ctx, string $option, string $newValue) {
         $key = strtolower($option);
         if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
-            return VmAssertState::iniSet($option, $newValue);
+            return VmAssertState::iniSet($ctx, $option, $newValue);
         }
         // php-src: max_memory_limit is PHP_INI_SYSTEM — runtime ini_set() fails (#23232).
         if ('max_memory_limit' === $key) {
@@ -503,6 +503,12 @@ final class VmIni
         if ('register_argc_argv' === $key) {
             self::$registerArgcArgv = self::parseBoolIni($value);
             IniJitHelper::syncRegisterArgcArgv(self::$registerArgcArgv);
+
+            return true;
+        }
+        // php-src OnUpdateAssertions: -1 crossings allowed at startup only (#24396).
+        if ('zend.assertions' === $key) {
+            AssertOptionsJitHelper::applyStartupZendAssertions($value);
 
             return true;
         }

@@ -104,17 +104,44 @@ final class AssertOptionsJitHelper
         return $old;
     }
 
+    /** php-src Zend/zend.c OnUpdateAssertions — E_WARNING text. */
+    public const MSG_ZEND_ASSERTIONS_PHP_INI_ONLY =
+        'zend.assertions may be completely enabled or disabled only in php.ini';
+
     public static function iniGetZendAssertions(): string
     {
         return (string) self::$zendAssertions;
     }
 
-    public static function iniSetZendAssertionsFromString(string $value): string
+    /**
+     * CLI {@code -d zend.assertions=} / PHPT {@code --INI--} startup stage (#24396).
+     *
+     * php-src allows crossing -1 only at ZEND_INI_STAGE_STARTUP / SHUTDOWN.
+     */
+    public static function applyStartupZendAssertions(string $value): void
     {
-        $old = self::iniGetZendAssertions();
         self::$zendAssertions = (int) $value;
+    }
 
-        return $old;
+    /**
+     * Runtime ini_set('zend.assertions') — php-src OnUpdateAssertions (#24396).
+     *
+     * Crossing to/from a negative value at runtime is rejected (null → ini_set false).
+     * Callers emit the Zend E_WARNING via VM ErrorReporter or TriggerErrorJitHelper.
+     * Toggling between 0 and 1 (or no-op same value) remains allowed.
+     *
+     * @return string|null Previous value, or null when rejected
+     */
+    public static function iniSetZendAssertionsFromString(string $value): ?string
+    {
+        $oldInt = self::$zendAssertions;
+        $newInt = (int) $value;
+        if ($oldInt !== $newInt && ($oldInt < 0 || $newInt < 0)) {
+            return null;
+        }
+        self::$zendAssertions = $newInt;
+
+        return (string) $oldInt;
     }
 
     public static function iniGetActive(): string
