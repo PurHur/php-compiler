@@ -294,6 +294,15 @@ run_gate helper-runtime-prelink "check-helper-runtime-prelink.php --strict (#243
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-helper-runtime-prelink.php --strict \
   || FAILED=1
 
+# Outcome, not precondition. helper-runtime-prelink above checks the committed cache is CURRENT;
+# this checks that a clean checkout can actually compile hello world quickly. They are not the same
+# gate: before #24351 the committed cache was current (fingerprints matched) AND the build still took
+# ~9 minutes, because the corpus warmup never consulted it. Verified: this gate fails at a279902fc
+# and passes at HEAD (#24302).
+run_gate cold-build "cold-build-check (clean-checkout hello world, #24302)" \
+  script/cold-build-check.sh \
+  || FAILED=1
+
 run_gate spine-coverage "check-selfhost-spine-coverage-sync" \
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-coverage-sync.php \
   || FAILED=1
