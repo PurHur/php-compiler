@@ -360,12 +360,16 @@ final class SplFileObjectStorage
             $readLen = $length;
         }
         do {
+            // php-src 8.2 spl_filesystem_file_read_ex: fail only when already at EOF
+            // before the read attempt. A NULL get_line while !eof is SUCCESS with
+            // empty current_line — that is the trailing empty line after a final
+            // newline (#24331; master php-src later returns FAILURE on NULL).
             if (VmFs::feof($state['handle'])) {
                 return false;
             }
             $line = VmFs::fgets($state['handle'], $readLen);
             if (false === $line) {
-                return false;
+                $line = '';
             }
             $line = self::applyDropNewLine($line, $state['flags']);
             if (self::shouldSkipEmptyLine($state['flags'], $line)) {
