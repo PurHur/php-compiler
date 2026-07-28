@@ -17954,8 +17954,24 @@ class JIT {
                 return $namedUnpack;
             }
 
+            $callArgs = $this->finalizeJitCallArgs($argEntries);
+            if (
+                $toCall instanceof JIT\Call\Native
+                && 1 === \count($callArgs)
+                && Variable::TYPE_HASHTABLE === $callArgs[0]->type
+            ) {
+                $expanded = JIT\CallUnpackExpand::expandPackedForNative(
+                    $this->context,
+                    $callArgs[0],
+                    $toCall
+                );
+                if (null !== $expanded) {
+                    return [$expanded, array_fill(0, \count($expanded), null)];
+                }
+            }
+
             return [
-                $this->finalizeJitCallArgs($argEntries),
+                $callArgs,
                 $argOperands,
             ];
         }
