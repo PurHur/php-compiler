@@ -1173,6 +1173,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_pbkdf2'));
     }
 
+    /** @covers issue #24377 */
+    public function testHashHmacFileZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash_hmac_file');
+        self::assertSame(['algo', 'filename', 'key', 'binary'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'algo', 'hash_hmac_file'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'hash_hmac_file'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'key', 'hash_hmac_file'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'binary', 'hash_hmac_file'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $raw_output)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_hmac_file'));
+    }
+
     /** @covers issue #23642 */
     public function testInflateDeflateInitZendStubNamedParams(): void
     {
