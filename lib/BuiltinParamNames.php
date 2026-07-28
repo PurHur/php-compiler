@@ -886,7 +886,8 @@ final class BuiltinParamNames
             case 'trim':
             case 'ltrim':
             case 'rtrim':
-                // php-src basic_functions.stub.php — no $mode; StringTrimMode is not in php-src (#23224)
+            case 'chop':
+                // php-src basic_functions.stub.php — chop is rtrim alias; no $mode (#23224, #24039)
                 return ['string', 'characters'];
             case 'mb_strlen':
                 return ['string', 'encoding'];

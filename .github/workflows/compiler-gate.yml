@@ -53,7 +53,7 @@ jobs:
   compiler-gate:
     name: Lint + AOT smoke + VM differential
     runs-on: ubuntu-22.04
-    timeout-minutes: 40
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
 
@@ -63,12 +63,25 @@ jobs:
             docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
           fi
 
+      # The first AOT compile on a cold checkout emits the helper corpus and costs ~9 minutes on a
+      # dev box (measured: first 533s, second 5s — #24302). Caching build/helper-runtime-cache turns
+      # every run after the first into seconds. Keyed on the lowering sources that feed
+      # HelperRuntimeCache::coreFingerprint(), so a lowering change correctly misses the cache.
+      - name: Cache helper-runtime units
+        uses: actions/cache@v4
+        with:
+          path: build/helper-runtime-cache
+          key: helper-runtime-${{ runner.os }}-${{ hashFiles('lib/**/*.php', 'ext/standard/**/*.php', 'patches/**', 'composer.lock') }}
+          restore-keys: |
+            helper-runtime-${{ runner.os }}-
+
       - name: Compiler gates (Docker)
         run: |
           docker run --rm -m 10g \
             -e PHP_COMPILER_LLVM_PATH=/opt/llvm9 \
             -e PHP_COMPILER_MEMORY_LIMIT=1536M \
             -e PHP_COMPILER_LLVM_MEMORY_LIMIT=8192M \
+            -e AOT_SMOKE_TIMEOUT=900 \
             -v "$PWD:/compiler" -w /compiler \
             php-compiler:22.04-dev bash -lc '
               set -euo pipefail

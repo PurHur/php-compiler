@@ -99,11 +99,21 @@ Sizing that split:
 
 | group | files |
 |---|---|
-| `lib/` (compiler, VM, JIT, AOT) | 1,853 |
-| `ext/standard` (mandatory, as in php-src) | 2,122 |
-| rest of default set (`spl` 51, `hash` 36, `random` 19, `ctype` 16, `types` 4) | 126 |
-| **core total** | **4,101** |
-| optional extensions (69 modules) | 2,467 |
+| `lib/` (compiler, VM, JIT, AOT) | 1,882 |
+| `ext/standard` (mandatory, as in php-src) | 2,127 |
+| rest of default set (`spl`, `hash`, `random`, `ctype`, `types`) | 126 |
+| **core total** | **4,135** |
+| optional extensions (70 modules) | 2,473 |
+
+Regenerate with `php script/extension-inventory.php` (`--json` for machine output) — these are
+measured, not estimated, and the numbers above will drift as `ext/` grows. Audited 2026-07-28:
+**76 directories under `ext/`, all 76 loaded unconditionally** by `Runtime::loadCoreModules()`, with
+no phantom entries and no directory carrying a `Module.php` that is never loaded. So the load list
+is currently complete and consistent — the problem is not drift, it is that the set is hardcoded and
+non-optional.
+
+The optional 2,473 files are **37% of the 6,608 total**. Every compiled binary pays for all of them
+today.
 
 **CORRECTION to an earlier estimate:** I previously said this takes gen-0 from ~6,500 files to
 ~1,850. That was wrong — it assumed `ext/standard` leaves the core, which it does not under the

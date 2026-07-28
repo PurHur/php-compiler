@@ -379,7 +379,9 @@ final class SplDualIteratorStorage
 
     public static function currentSimple(Frame $frame, ObjectEntry $object): Variable
     {
-        if (!self::isPositionValid($object)) {
+        // php-src dual_it proxies current only while inner valid (#24272 FilterIterator;
+        // same for IteratorIterator / ParentIterator when no accepted element).
+        if (!self::validSimple($frame, $object)) {
             return self::nullVariable();
         }
 
@@ -388,7 +390,7 @@ final class SplDualIteratorStorage
 
     public static function keySimple(Frame $frame, ObjectEntry $object): Variable
     {
-        if (!self::isPositionValid($object)) {
+        if (!self::validSimple($frame, $object)) {
             return self::nullVariable();
         }
 

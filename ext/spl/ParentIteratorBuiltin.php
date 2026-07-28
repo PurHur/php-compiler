@@ -114,10 +114,13 @@ final class ParentIteratorConstruct extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('ParentIterator::__construct() requires VM context');
         }
-        $inner = SplDualIteratorStorage::resolveRecursiveIterator(
-            $frame->vmContext,
-            $frame,
-            $frame->calledArgs[1]
+        // php-src ParentIterator::__construct(RecursiveIterator $iterator) — typed arg → TypeError
+        // (zend_type_error), not the InvalidArgumentException used by RecursiveIteratorIterator.
+        $inner = RecursiveCachingIteratorBuiltin::requireRecursiveIteratorArg(
+            $frame->calledArgs[1],
+            'ParentIterator::__construct',
+            1,
+            $frame->vmContext
         );
         SplDualIteratorStorage::initSimple($object, $inner);
     }
