@@ -18243,10 +18243,14 @@ class JIT {
     private function invokeJitCall(JIT\Call $toCall, array $callArgs): \PHPLLVM\Value
     {
         if ($toCall instanceof JIT\Call\Native) {
-            return $toCall->callWithArgMap($this->context, $callArgs);
+            $result = $toCall->callWithArgMap($this->context, $callArgs);
+        } else {
+            $result = $toCall->call($this->context, ...array_values($callArgs));
         }
+        // Enum::from() (and other callees) set throw-pending then return; catch here (#24219).
+        JIT\TryCatchHelper::emitCheckPendingThrowAfterCall($this->context);
 
-        return $toCall->call($this->context, ...array_values($callArgs));
+        return $result;
     }
 
     /**

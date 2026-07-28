@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPCompiler\JIT\Builtin\ExceptionHandlerJitRuntime;
@@ -12,6 +13,7 @@ use PHPCompiler\JIT\Builtin\TryCatchRuntime;
 use PHPCompiler\JIT\Builtin\JitReturnPending;
 use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Builtin\ScriptExit;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin\UncaughtThrowPrinter;
 use PHPCompiler\OpCode;
 use PHPLLVM\BasicBlock;
@@ -372,6 +374,61 @@ final class TryCatchHelper
         $builder->branchIf($hasBool, $dispatchBb, $mergeBb);
         if (null !== $saved) {
             BasicBlockHelper::restoreInsertBlock($context, $saved);
+        }
+    }
+
+    /**
+     * After a callee that may have set throw-pending (e.g. Enum::from ValueError),
+     * branch into the active try handler or abort via the type-error pending buffer (#24219).
+     */
+    public static function emitCheckPendingThrowAfterCall(Context $context): void
+    {
+        // NestedJIT helper compiles also invoke calls; do not splice try/catch edges there (#24219).
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $builder = $context->builder;
+        $insert = self::probeInsertBlock($builder);
+        if (null === $insert || null !== $insert->getTerminator()) {
+            return;
+        }
+        $func = $insert->getParent();
+        if (!$func instanceof Function_) {
+            return;
+        }
+
+        $handler = self::resolveThrowHandler($context);
+        if (null !== $handler && null !== $handler->dispatchBb) {
+            $i32 = $context->getTypeFromString('int32');
+            $hasPending = $builder->call($context->lookupFunction('phpc_jit_has_throw_pending'));
+            $hasBool = $builder->icmp(
+                Builder::INT_NE,
+                $hasPending,
+                $i32->constInt(0, false)
+            );
+            $cont = self::appendBlock($func, 'after_call_no_throw');
+            $pending = self::appendBlock($func, 'after_call_throw_pending');
+            $builder->branchIf($hasBool, $pending, $cont);
+            $builder->positionAtEnd($pending);
+            // Drop type-error abort buffer so standalone main does not re-fatal (#24219).
+            if (null !== $context->module->getNamedFunction('phpc_jit_type_error_clear_pending')) {
+                $builder->call($context->lookupFunction('phpc_jit_type_error_clear_pending'));
+            }
+            $builder->branch($handler->dispatchBb);
+            $builder->positionAtEnd($cont);
+
+            return;
+        }
+
+        // Uncaught: Enum::from also fills the type-error pending message for abort text.
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            && null !== $context->module->getNamedFunction('phpc_jit_abort_if_pending_type_error')
+        ) {
+            $builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
         }
     }
 

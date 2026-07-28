@@ -44,6 +44,50 @@ PHP);
         }
     }
 
+    /** Invalid from() ValueError is catchable under thin AOT (#24219). */
+    public function testAotBackedEnumFromValueErrorIsCatchable(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $this->writeScript($root, <<<'PHP'
+<?php
+enum S: string { case A = 'a'; case B = 'b'; }
+try {
+    S::from('zz');
+    echo "no throw\n";
+} catch (\ValueError $e) {
+    echo "caught: ", $e->getMessage(), "\n";
+}
+try {
+    S::from('zz');
+} catch (\Throwable $e) {
+    echo "throwable\n";
+}
+PHP);
+        $bin = sys_get_temp_dir().'/phpc_enum_from_ve_24219_'.getmypid().'.bin';
+        $compile = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        $this->assertFileExists($bin);
+        try {
+            for ($i = 0; $i < 3; ++$i) {
+                $runOut = [];
+                exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+                $this->assertSame(0, $runRc, implode("\n", $runOut));
+                $this->assertSame(
+                    "caught: \"zz\" is not a valid backing value for enum S\nthrowable\n",
+                    implode("\n", $runOut)."\n"
+                );
+            }
+        } finally {
+            @unlink($src);
+            @unlink($bin);
+        }
+    }
+
     private function writeScript(string $root, string $code): string
     {
         $dir = $root.'/var';
