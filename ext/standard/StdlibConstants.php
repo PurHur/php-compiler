@@ -56,7 +56,9 @@ final class StdlibConstants
     public const ENT_DISALLOWED = 128;
     public const ENT_HTML401 = 0;
     public const ENT_XML1 = 16;
-    public const ENT_XHTML = 17;
+    /** php-src ENT_HTML_DOC_XHTML — bit 5; not ENT_XML1|1 (#24067, ext/standard/html.c). */
+    public const ENT_XHTML = 32;
+    /** php-src ENT_HTML_DOC_HTML5 = ENT_XML1 | ENT_XHTML; also the doctype mask. */
     public const ENT_HTML5 = 48;
 
     /** round() mode flags (ext/standard/php_math_round_mode.h). */
