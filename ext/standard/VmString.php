@@ -2437,10 +2437,11 @@ final class VmString
             if (null !== $path && ('' !== $path || '' === $url)) {
                 $filtered['path'] = $path;
             }
-            if (null !== $query && '' !== $query) {
+            // Empty query/fragment retained when '?' / '#' was present (php-src url.c, #24400).
+            if (null !== $query) {
                 $filtered['query'] = $query;
             }
-            if (null !== $fragment && '' !== $fragment) {
+            if (null !== $fragment) {
                 $filtered['fragment'] = $fragment;
             }
 
@@ -2461,9 +2462,9 @@ final class VmString
             case VmParseUrl::PHP_URL_PATH:
                 return null !== $path && ('' !== $path || '' === $url) ? $path : null;
             case VmParseUrl::PHP_URL_QUERY:
-                return null !== $query && '' !== $query ? $query : null;
+                return null !== $query ? $query : null;
             case VmParseUrl::PHP_URL_FRAGMENT:
-                return null !== $fragment && '' !== $fragment ? $fragment : null;
+                return null !== $fragment ? $fragment : null;
             default:
                 throw new \ValueError(sprintf(
                     'parse_url(): Argument #2 ($component) must be a valid URL component identifier, %d given',
