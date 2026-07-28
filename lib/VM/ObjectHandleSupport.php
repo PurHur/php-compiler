@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Shared object handle + spl_object_hash formatting (issues #3172, #3537).
+ * Shared object handle + spl_object_hash formatting (issues #3172, #3537, #24292).
  *
  * @see https://github.com/php/php-src/blob/master/ext/spl/php_spl.c PHP_FUNCTION(spl_object_id), php_spl_object_hash()
+ * @see https://github.com/php/php-src/blob/master/ext/spl/spl_observer.c spl_object_storage_get_hash()
  */
 final class ObjectHandleSupport
 {
@@ -15,7 +16,9 @@ final class ObjectHandleSupport
     {
         $var = $var->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            return EnumCaseSupport::objectIdForVariable($var, $context);
+            return CycleCollector::userVisibleObjectHandle(
+                EnumCaseSupport::objectIdForVariable($var, $context)
+            );
         }
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw new \TypeError(\sprintf(
@@ -25,13 +28,18 @@ final class ObjectHandleSupport
             ));
         }
 
-        return $var->toObject()->id;
+        return CycleCollector::userVisibleObjectHandle($var->toObject()->id);
     }
 
-    /** php-src php_spl_object_hash(): "%016zx0000000000000000" over object handle. */
+    /** php-src php_spl_object_hash() / SplObjectStorage::getHash(): "%016zx0000000000000000". */
     public static function hashForObjectId(int $objectId): string
     {
         return \sprintf('%016x', $objectId).'0000000000000000';
+    }
+
+    public static function hashForObject(Variable $object, string $function, ?Context $context = null): string
+    {
+        return self::hashForObjectId(self::requireObjectId($object, $function, $context));
     }
 
     public static function vmTypeName(int $type): string
