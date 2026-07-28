@@ -13,7 +13,13 @@ declare(strict_types=1);
  */
 function bootstrap_spine_native_link_deferred(): array
 {
-    return [];
+    return [
+        // Alternate PregJitHelper for thin standalone AOT (#24115) — same FQCN as
+        // PregJitHelper.php. NestedJIT loads this file instead of the full helper; a
+        // literal spine require alongside the full unit fatals under Zend (redeclare)
+        // and would emit duplicate symbols on a full spine AOT link.
+        'ext/standard/PregJitHelperThinAot.php',
+    ];
 }
 
 /** Inventory paths covered by spine shims without a 1:1 literal require_once (issue #2543, #2868). */
@@ -21,6 +27,7 @@ function bootstrap_spine_shim_substitute_extra_inventory(): int
 {
     // Inventory paths covered by spine shims (not a 1:1 require_once in the spine bundle).
     // Keep in sync with script/check-selfhost-spine-coverage-sync.php `$spineSubstitutes`.
-    // 0 when every Phase A file has a literal require_once (2643/2643, Jun 2026).
+    // 0 when every Phase A file has a literal require_once or is listed in
+    // bootstrap_spine_native_link_deferred() (6604/6605 + 1 deferred, Jul 2026).
     return 0;
 }

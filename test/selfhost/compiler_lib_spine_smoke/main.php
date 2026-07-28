@@ -2733,6 +2733,7 @@ require_once __DIR__.'/../../../ext/standard/PregCallbackInvokeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregEmptyPatternReplace.php';
 require_once __DIR__.'/../../../ext/standard/PregEmptyPatternReplaceJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregExpandJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/PregAotFastPath.php';
 require_once __DIR__.'/../../../ext/standard/PregJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregQuoteJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregReplacementExpand.php';
