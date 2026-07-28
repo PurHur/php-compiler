@@ -39,7 +39,12 @@ final class WeakRefSupport
     public static function trackWeakMapKey(ObjectEntry $weakMap, Variable $key): void
     {
         $slot = $weakMap->getProperty(self::MAP_KEYS_PROPERTY);
-        if (Variable::TYPE_ARRAY !== $slot->resolveIndirect()->type) {
+        $resolved = $slot->resolveIndirect();
+        if (
+            Variable::TYPE_ARRAY !== $resolved->type
+            || !isset($resolved->array)
+            || $resolved->array->isDestroyed()
+        ) {
             $slot->newArray();
         }
         $key = $key->resolveIndirect();
@@ -198,12 +203,52 @@ final class WeakRefSupport
 
     public static function mapTable(ObjectEntry $weakMap): ?HashTable
     {
-        $slot = $weakMap->getProperty(self::MAP_PROPERTY)->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $slot->type) {
+        $slot = $weakMap->getProperty(self::MAP_PROPERTY);
+        $resolved = $slot->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
             return null;
         }
+        $ht = $resolved->toArray();
+        if ($ht->isDestroyed()) {
+            self::reinitMapBackingTable($weakMap);
 
-        return $slot->toArray();
+            return $weakMap->getProperty(self::MAP_PROPERTY)->resolveIndirect()->toArray();
+        }
+
+        return $ht;
+    }
+
+    /**
+     * True when a HashTable is still owned by a live WeakMap instance (#24270, zend_weakrefs.c).
+     *
+     * GC must not destroy internal backing arrays while the WeakMap object survives — empty maps
+     * after weak-key collection still accept offsetSet().
+     */
+    public static function isInternalTableForLiveWeakMap(HashTable $table): bool
+    {
+        $tableId = \spl_object_id($table);
+        foreach (ObjectRegistry::snapshot() as $object) {
+            if (!self::isWeakMap($object)) {
+                continue;
+            }
+            foreach ([self::MAP_PROPERTY, self::MAP_KEYS_PROPERTY] as $propName) {
+                $slot = $object->getProperty($propName)->resolveIndirect();
+                if (
+                    Variable::TYPE_ARRAY === $slot->type
+                    && isset($slot->array)
+                    && \spl_object_id($slot->array) === $tableId
+                ) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function reinitMapBackingTable(ObjectEntry $weakMap): void
+    {
+        $weakMap->getProperty(self::MAP_PROPERTY)->newArray();
     }
 
     public static function initMapBacking(ObjectEntry $weakMap): void
