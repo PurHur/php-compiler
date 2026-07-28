@@ -417,6 +417,24 @@ final class SplArrayStorage
         return self::state($object)['table']->hasKey($keyVar);
     }
 
+    /**
+     * php-src spl_array_has_dimension(check_empty=0) — language isset/?? on dimensions.
+     * Key present with a null value is unset; offsetExists (check_empty=2) stays true (#24251).
+     */
+    public static function dimensionIsSet(ObjectEntry $object, Variable $offset): bool
+    {
+        if (!self::offsetExists($object, $offset)) {
+            return false;
+        }
+        $found = self::findOffset(self::state($object)['table'], $offset);
+        if (null === $found) {
+            return false;
+        }
+        $resolved = $found->resolveIndirect();
+
+        return !$resolved->isUndefined() && Variable::TYPE_NULL !== $resolved->type;
+    }
+
     public static function offsetUnset(ObjectEntry $object, Variable $offset): void
     {
         [$keyVar] = self::offsetKeyVar($offset);

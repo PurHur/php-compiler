@@ -90,6 +90,11 @@ final class VmArrayAccess
             return null;
         }
 
+        // ArrayObject/ArrayIterator native has_dimension(isset): null values are unset (#24251).
+        if (self::containerUsesNativeSplArrayDimensionIsset($context, $containerOp)) {
+            return self::compileNativeSplArrayDimensionIsSet($context, $container, $dim);
+        }
+
         $raw = self::invokeOffsetMethod($context, 'offsetexists', $container, $dim);
         $slot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer(
@@ -101,6 +106,80 @@ final class VmArrayAccess
         $boxed->addref();
 
         return (new \PHPCompiler\ext\standard\boolval())->call($context, $boxed);
+    }
+
+    /**
+     * Exact ArrayObject / ArrayIterator / RecursiveArrayIterator — php-src fptr_offset_has NULL (#24251).
+     * Subclasses with/without overrides are handled on the VM path; opaque JIT keeps offsetExists.
+     */
+    private static function containerUsesNativeSplArrayDimensionIsset(
+        Context $context,
+        ?Operand $containerOp
+    ): bool {
+        $classLc = null;
+        if (null !== $containerOp && null !== $containerOp->type && Type::TYPE_OBJECT === $containerOp->type->type) {
+            $userType = $containerOp->type->userType ?? '';
+            if ('' !== $userType && 'object' !== strtolower(ltrim($userType, '\\'))) {
+                $classLc = strtolower(ltrim($userType, '\\'));
+            }
+        }
+        if (null === $classLc) {
+            return false;
+        }
+
+        return in_array($classLc, ['arrayobject', 'arrayiterator', 'recursivearrayiterator'], true);
+    }
+
+    private static function compileNativeSplArrayDimensionIsSet(
+        Context $context,
+        JitVariable $container,
+        JitVariable $dim
+    ): Value {
+        $existsRaw = self::invokeOffsetMethod($context, 'offsetexists', $container, $dim);
+        $existsSlot = JitValueBox::alloc($context);
+        JitValueBox::copyFromPointer(
+            $context,
+            $existsSlot,
+            JitValueBox::normalizeValuePtr($context, $existsRaw)
+        );
+        $existsBoxed = new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $existsSlot);
+        $existsBoxed->addref();
+        $exists = (new \PHPCompiler\ext\standard\boolval())->call($context, $existsBoxed);
+
+        $tag = 'spl_ao_isset_'.(string) spl_object_id($context).'_'.(string) spl_object_id($container);
+        $missingBlock = BasicBlockHelper::append($context, $tag.'_missing');
+        $presentBlock = BasicBlockHelper::append($context, $tag.'_present');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $i1 = $context->getTypeFromString('int1');
+
+        $context->builder->branchIf($exists, $presentBlock, $missingBlock);
+
+        $context->builder->positionAtEnd($missingBlock);
+        $missing = $i1->constInt(0, false);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($presentBlock);
+        $fetched = self::offsetGet($context, $container, $dim);
+        // isset: non-null / non-undefined — matches spl_array_has_dimension(check_empty=0).
+        $valueMap = $context->structFieldMap['__value__'];
+        $valPtr = JitValueBox::valuePtrFromVariable($context, $fetched);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valPtr, $valueMap['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $nullType = $i8->constInt(Variable::TYPE_NULL, false);
+        $undefType = $i8->constInt(Variable::TYPE_UNDEFINED, false);
+        $notNull = $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $typeByte, $nullType);
+        $notUndef = $context->builder->icmp(\PHPLLVM\Builder::INT_NE, $typeByte, $undefType);
+        $isSet = $context->builder->and($notNull, $notUndef);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming([$missing, $missingBlock]);
+        $phi->addIncoming([$isSet, $presentBlock]);
+
+        return $phi;
     }
 
     public static function tryCompileOffsetIsEmpty(
