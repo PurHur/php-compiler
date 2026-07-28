@@ -195,6 +195,16 @@ final class JitDomLoadHTMLUserScript
      */
     private static function materializeParsedHtml(Context $context, JITVariable $receiver, array $parsed): Value
     {
+        // Pure-LLVM nodes: textContent must use property slots, not DomRegistry (#24121 / re-#17954).
+        JitDomLoadXMLUserScript::markLastLoadPureUserScript();
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup(self::CLASS_ELEMENT);
+        foreach ([self::PROP_TEXT_CONTENT, 'nodeValue'] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty($elementClassId, $prop, JITVariable::TYPE_STRING);
+            }
+        }
+
         $document = self::loadObjectArg($context, $receiver);
         $element = JitDomCreateElement::invoke(
             $context,

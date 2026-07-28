@@ -37,6 +37,17 @@ final class JitDomLoadXMLUserScript
         return self::$lastLoadWasPureUserScript;
     }
 
+    /**
+     * Mark the last load as pure user-script LLVM nodes (no DomRegistry tree).
+     *
+     * Shared by loadXML and loadHTML so {@see JitDomElementTextContent} reads
+     * textContent from property slots instead of DomElementTextContentRuntime (#24121).
+     */
+    public static function markLastLoadPureUserScript(): void
+    {
+        self::$lastLoadWasPureUserScript = true;
+    }
+
     public static function rememberCompileTimeXml(string $xml): void
     {
         self::$lastCompileTimeXml = $xml;
@@ -74,7 +85,7 @@ final class JitDomLoadXMLUserScript
         }
 
         self::$lastCompileTimeXml = $lit;
-        self::$lastLoadWasPureUserScript = true;
+        self::markLastLoadPureUserScript();
         // Declare textContent/nodeValue on DOMElement so forWrite hasProperty skips
         // dynamic-property deprecation (hasProperty does not walk DOMNode; #23251).
         $objectType = $context->type->object;
