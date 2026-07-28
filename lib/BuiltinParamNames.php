@@ -708,6 +708,11 @@ final class BuiltinParamNames
             // php-src ext/hash/hash.stub.php — InternalArgInfo still says raw_output (#24377)
             case 'hash_hmac_file':
                 return ['algo', 'filename', 'key', 'binary'];
+            // php-src ext/standard/image.stub.php — InternalArgInfo still says imagetype (#24459)
+            case 'image_type_to_extension':
+                return ['image_type', 'include_dot='];
+            case 'image_type_to_mime_type':
+                return ['image_type'];
             // php-src ext/hash/hash.stub.php — InternalArgInfo had options/key swapped (#23585)
             case 'hash_init':
                 return ['algo', 'flags', 'key', 'options'];
