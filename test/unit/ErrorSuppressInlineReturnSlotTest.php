@@ -534,6 +534,99 @@ PHP;
         @rmdir($dir);
     }
 
+    public function testNestedNewDirectoryIteratorAfterAtMkdirUsesInnerObjectNotBool(): void
+    {
+        $dir = sys_get_temp_dir() . '/phpc_atndi_ut_' . getmypid();
+        @mkdir($dir);
+        file_put_contents($dir . '/x.txt', '1');
+
+        $code = <<<PHP
+<?php
+\$dir = {$this->exportPhpString($dir)};
+@mkdir(\$dir);
+\$it = new IteratorIterator(new DirectoryIterator(\$dir));
+\$n = 0;
+foreach (\$it as \$f) { \$n++; }
+echo "count=\$n\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'at_nested_new_di.php');
+
+        $mkdirReturnSlot = null;
+        $innerCtorReturnSlot = null;
+        $outerArgSendSlot = null;
+        $seenNews = 0;
+        $capture = static function (Block $b) use (
+            &$capture,
+            &$mkdirReturnSlot,
+            &$innerCtorReturnSlot,
+            &$outerArgSendSlot,
+            &$seenNews
+        ): void {
+            $inSuppress = null !== $b->orig && $b->orig instanceof \PHPCfg\ErrorSuppressBlock;
+            $pendingInit = false;
+            $inCtorAfterNew = false;
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $pendingInit = true;
+                    continue;
+                }
+                if (OpCode::TYPE_NEW === $op->type) {
+                    ++$seenNews;
+                    $inCtorAfterNew = true;
+                    $pendingInit = false;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    if ($inSuppress && null === $mkdirReturnSlot) {
+                        $mkdirReturnSlot = $op->arg1;
+                    }
+                    $pendingInit = false;
+                    continue;
+                }
+                if ($inCtorAfterNew && OpCode::TYPE_ARG_SEND === $op->type) {
+                    if (2 === $seenNews && null === $outerArgSendSlot) {
+                        $outerArgSendSlot = $op->arg1;
+                    }
+                    continue;
+                }
+                if ($inCtorAfterNew && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    if (1 === $seenNews) {
+                        $innerCtorReturnSlot = $op->arg1;
+                    }
+                    $inCtorAfterNew = false;
+                    continue;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $capture($sub);
+                    }
+                }
+            }
+        };
+        $capture($block);
+
+        self::assertNotNull($mkdirReturnSlot, '@mkdir return slot');
+        self::assertNotNull($innerCtorReturnSlot, 'inner DirectoryIterator result slot');
+        self::assertNotNull($outerArgSendSlot, 'IteratorIterator ARG_SEND');
+        self::assertSame(
+            $innerCtorReturnSlot,
+            $outerArgSendSlot,
+            'outer new arg must be inner DirectoryIterator, not @mkdir bool (#24368)'
+        );
+        self::assertNotSame($mkdirReturnSlot, $outerArgSendSlot, 'outer arg must not alias @mkdir return');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("count=3\n", $out);
+
+        foreach (glob($dir . '/*') ?: [] as $f) {
+            @unlink($f);
+        }
+        @rmdir($dir);
+    }
+
     private function exportPhpString(string $value): string
     {
         return var_export($value, true);
