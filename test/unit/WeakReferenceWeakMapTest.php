@@ -85,6 +85,27 @@ PHP;
         $this->assertSame('1', ob_get_clean());
     }
 
+    /** @covers issue #24432 — Zend/zend_weakrefs.c Error, not LogicException */
+    public function testWeakReferenceDirectConstructThrowsError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+try {
+    new WeakReference(new stdClass());
+    echo 'FAIL';
+} catch (Throwable $e) {
+    echo get_class($e), '|', $e->getMessage();
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_direct_construct.php'));
+        $this->assertSame(
+            'Error|Direct instantiation of WeakReference is not allowed, use WeakReference::create instead',
+            ob_get_clean()
+        );
+    }
+
     public function testWeakMapOffsetSetAndGet(): void
     {
         $runtime = new Runtime();
