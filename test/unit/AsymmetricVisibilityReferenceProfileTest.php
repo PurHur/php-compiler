@@ -247,4 +247,50 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
             $this->assertSame(6, $e->sourceLine);
         }
     }
+
+    /** @covers issue #24460 — nowdoc body with asymmetric text is opaque (Zend ST_NOWDOC) */
+    public function testNowdocBodyWithAsymmetricTextIsNotRejected(): void
+    {
+        $source = file_get_contents(__DIR__.'/../repro/maintainer_gap_nowdoc_asymmetric.php');
+        self::assertNotFalse($source);
+        self::assertFalse(AsymmetricVisibilityRewriter::containsAsymmetricVisibilitySyntax($source));
+        self::assertSame(0, AsymmetricVisibilityRewriter::findMultipleAccessModifierLine($source));
+        self::assertSame($source, AsymmetricVisibilityRejector::reject($source, 'nowdoc.php'));
+        $runtime = new Runtime();
+        $runtime->parseAndCompile($source, 'maintainer_gap_nowdoc_asymmetric.php');
+    }
+
+    /** @covers issue #24460 — heredoc body with asymmetric text is opaque (Zend ST_HEREDOC) */
+    public function testHeredocBodyWithAsymmetricTextIsNotRejected(): void
+    {
+        $source = file_get_contents(__DIR__.'/../repro/maintainer_gap_heredoc_asymmetric.php');
+        self::assertNotFalse($source);
+        self::assertFalse(AsymmetricVisibilityRewriter::containsAsymmetricVisibilitySyntax($source));
+        self::assertSame(0, AsymmetricVisibilityRewriter::findMultipleAccessModifierLine($source));
+        self::assertSame($source, AsymmetricVisibilityRejector::reject($source, 'heredoc.php'));
+        $runtime = new Runtime();
+        $runtime->parseAndCompile($source, 'maintainer_gap_heredoc_asymmetric.php');
+    }
+
+    /** @covers issue #24460 — real declarations after a nowdoc still fail on the reference profile */
+    public function testRealAsymmetricAfterNowdocStillRejectedOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
+        }
+        $source = <<<'PHP'
+<?php
+$s = <<<'EOT'
+public private(set) string $x;
+EOT;
+class C {
+    public private(set) int $y = 1;
+}
+PHP;
+        self::assertTrue(AsymmetricVisibilityRewriter::containsAsymmetricVisibilitySyntax($source));
+        self::assertSame(6, AsymmetricVisibilityRewriter::findMultipleAccessModifierLine($source));
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRejector::reject($source, 'mixed.php');
+    }
 }
