@@ -522,7 +522,7 @@ final class SplPriorityQueueBuiltin
         return self::state($object)['flags'];
     }
 
-    public static function insert(ObjectEntry $object, Variable $data, Variable $priority): void
+    public static function insert(ObjectEntry $object, Variable $data, Variable $priority, Frame $frame): void
     {
         $state = &self::$store[$object->id];
         $dataCopy = new Variable();
@@ -530,10 +530,10 @@ final class SplPriorityQueueBuiltin
         $prioCopy = new Variable();
         $prioCopy->copyFrom($priority->resolveIndirect());
         $state['elements'][] = ['data' => $dataCopy, 'priority' => $prioCopy];
-        self::siftUp($object, \count($state['elements']) - 1);
+        self::siftUp($object, \count($state['elements']) - 1, $frame);
     }
 
-    public static function extract(ObjectEntry $object): Variable
+    public static function extract(ObjectEntry $object, Frame $frame): Variable
     {
         $state = &self::$store[$object->id];
         $n = \count($state['elements']);
@@ -544,7 +544,7 @@ final class SplPriorityQueueBuiltin
         $last = array_pop($state['elements']);
         if ($n > 1 && null !== $last) {
             $state['elements'][0] = $last;
-            self::siftDown($object, 0);
+            self::siftDown($object, 0, $frame);
         }
         $state['iterPos'] = -1;
 
@@ -684,17 +684,36 @@ final class SplPriorityQueueBuiltin
         return $out;
     }
 
-    private static function comparePriority(Variable $a, Variable $b): int
+    /**
+     * php-src SplPriorityQueue::compare / spl_ptr_pqueue_elem_cmp (#24328).
+     * Exact SplPriorityQueue uses spaceship; subclasses dispatch to overridden compare().
+     */
+    private static function comparePriority(ObjectEntry $object, Variable $a, Variable $b, Frame $frame): int
     {
-        return Variable::spaceshipCompare($a, $b);
+        if (SplHeapBuiltin::isExactHeapClass($object, self::CLASS_LC)) {
+            return Variable::spaceshipCompare($a, $b);
+        }
+        if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
+            throw new \LogicException('SplPriorityQueue::compare() requires VM runtime');
+        }
+        $result = $frame->vmContext->runtime->vm
+            ->invokeInstanceMethod($object, 'compare', $a, $b)
+            ->resolveIndirect();
+
+        return $result->toInt();
     }
 
-    private static function siftUp(ObjectEntry $object, int $index): void
+    private static function siftUp(ObjectEntry $object, int $index, Frame $frame): void
     {
         $state = &self::$store[$object->id];
         while ($index > 0) {
             $parent = intdiv($index - 1, 2);
-            if (self::comparePriority($state['elements'][$index]['priority'], $state['elements'][$parent]['priority']) <= 0) {
+            if (self::comparePriority(
+                $object,
+                $state['elements'][$index]['priority'],
+                $state['elements'][$parent]['priority'],
+                $frame
+            ) <= 0) {
                 break;
             }
             $tmp = $state['elements'][$index];
@@ -704,7 +723,7 @@ final class SplPriorityQueueBuiltin
         }
     }
 
-    private static function siftDown(ObjectEntry $object, int $index): void
+    private static function siftDown(ObjectEntry $object, int $index, Frame $frame): void
     {
         $state = &self::$store[$object->id];
         $n = \count($state['elements']);
@@ -714,15 +733,19 @@ final class SplPriorityQueueBuiltin
             $right = 2 * $index + 2;
             if ($left < $n
                 && self::comparePriority(
+                    $object,
                     $state['elements'][$left]['priority'],
-                    $state['elements'][$largest]['priority']
+                    $state['elements'][$largest]['priority'],
+                    $frame
                 ) > 0) {
                 $largest = $left;
             }
             if ($right < $n
                 && self::comparePriority(
+                    $object,
                     $state['elements'][$right]['priority'],
-                    $state['elements'][$largest]['priority']
+                    $state['elements'][$largest]['priority'],
+                    $frame
                 ) > 0) {
                 $largest = $right;
             }
@@ -784,7 +807,7 @@ final class SplPriorityQueueDebugInfo extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::__debugInfo()'
@@ -1076,7 +1099,7 @@ final class SplPriorityQueueConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::__construct()'
@@ -1094,7 +1117,7 @@ final class SplPriorityQueueInsert extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::insert()'
@@ -1105,7 +1128,7 @@ final class SplPriorityQueueInsert extends VmClassMethod
                 .(\count($frame->calledArgs) - 1).' given'
             );
         }
-        SplPriorityQueueBuiltin::insert($object, $frame->calledArgs[1], $frame->calledArgs[2]);
+        SplPriorityQueueBuiltin::insert($object, $frame->calledArgs[1], $frame->calledArgs[2], $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -1121,12 +1144,12 @@ final class SplPriorityQueueExtract extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::extract()'
         );
-        SplIteratorSupport::copyReturnFrom($frame, SplPriorityQueueBuiltin::extract($object));
+        SplIteratorSupport::copyReturnFrom($frame, SplPriorityQueueBuiltin::extract($object, $frame));
     }
 }
 
@@ -1139,7 +1162,7 @@ final class SplPriorityQueueTop extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::top()'
@@ -1157,7 +1180,7 @@ final class SplPriorityQueueCount extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::count()'
@@ -1178,7 +1201,7 @@ final class SplPriorityQueueIsEmpty extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::isEmpty()'
@@ -1197,7 +1220,7 @@ final class SplPriorityQueueIsCorrupted extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::isCorrupted()'
@@ -1215,7 +1238,7 @@ final class SplPriorityQueueSetExtractFlags extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::setExtractFlags()'
@@ -1243,7 +1266,7 @@ final class SplPriorityQueueGetExtractFlags extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::getExtractFlags()'
@@ -1264,7 +1287,7 @@ final class SplPriorityQueueRewind extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::rewind()'
@@ -1282,7 +1305,7 @@ final class SplPriorityQueueValid extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::valid()'
@@ -1300,7 +1323,7 @@ final class SplPriorityQueueCurrent extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::current()'
@@ -1318,7 +1341,7 @@ final class SplPriorityQueueKey extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::key()'
@@ -1339,7 +1362,7 @@ final class SplPriorityQueueNext extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::next()'
@@ -1357,7 +1380,7 @@ final class SplPriorityQueueRecoverFromCorruption extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::recoverFromCorruption()'
@@ -1375,7 +1398,7 @@ final class SplPriorityQueueCompare extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        SplIteratorSupport::receiver(
+        SplIteratorSupport::receiverIsA(
             $frame,
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::compare()'
