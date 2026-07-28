@@ -4,14 +4,26 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
-/** JIT/AOT link hook for token_get_all() — compiles TokenGetAllJitHelper into the module (#3171). */
+/**
+ * JIT/AOT link hook for token_get_all() — TokenGetAllJitHelper PHP (#3171, #24427).
+ *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiled} (peer Highlight #24417).
+ * php-src: ext/tokenizer/tokenizer.c — PHP_FUNCTION(token_get_all)
+ */
 final class TokenGetAll
 {
+    private const HELPER_PATH = '/ext/tokenizer/TokenGetAllJitHelper.php';
+
     private const HELPER_LOGICAL = 'PHPCompiler\\ext\\tokenizer\\TokenGetAllJitHelper::tokenizeToHashTable';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::HELPER_LOGICAL,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -23,37 +35,20 @@ final class TokenGetAll
         // Helper LLVM is compiled on first token_get_all() lowering (#3171).
     }
 
-    public static function helperFunction(Context $context): \PHPLLVM\Value\Function_
+    public static function helperFunction(Context $context): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = strtolower(self::HELPER_LOGICAL);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException('TokenGetAllJitHelper::tokenizeToHashTable missing after compile (#3171)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, self::HELPER_LOGICAL, '#24427');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = strtolower(self::HELPER_LOGICAL);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = dirname(__DIR__, 3).'/ext/tokenizer/TokenGetAllJitHelper.php';
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $lc): void {
-            $block = $runtime->parseAndCompile((string) file_get_contents($path), 'TokenGetAllJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('TokenGetAllJitHelper.php parseAndCompile failed (#3171)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException('TokenGetAllJitHelper::tokenizeToHashTable was not compiled for JIT (#3171)');
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#24427'
+        );
     }
 }
