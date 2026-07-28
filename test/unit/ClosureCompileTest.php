@@ -167,4 +167,41 @@ PHP;
         $rt->run($block);
         $this->assertSame("42\n", ob_get_clean());
     }
+
+    /**
+     * Regression: Closure::bind scope must survive CFG edges for private static ?? / if (#24335).
+     * Block::getFrame previously dropped calledClass on branch frames.
+     */
+    public function testVmBoundClosurePrivateStaticCoalesceAndIf(): void
+    {
+        $code = <<<'PHP'
+<?php
+class A { private static $v = 7; }
+class WrongScope {}
+$coalesce = Closure::bind(static function () { return A::$v ?? 'no'; }, null, A::class);
+echo 'c=', $coalesce(), "\n";
+$direct = Closure::bind(static function () { return A::$v; }, null, A::class);
+echo 'd=', $direct(), "\n";
+$branched = Closure::bind(static function () {
+    if (1) { return A::$v; }
+    return 0;
+}, null, A::class);
+echo 'i=', $branched(), "\n";
+try {
+    $wrong = Closure::bind(static function () { return A::$v; }, null, WrongScope::class);
+    echo 'w=', $wrong(), "\n";
+} catch (Throwable $t) {
+    echo 'e=', $t->getMessage(), "\n";
+}
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $out = ob_get_clean();
+        $this->assertStringContainsString('c=7', $out);
+        $this->assertStringContainsString('d=7', $out);
+        $this->assertStringContainsString('i=7', $out);
+        $this->assertStringContainsString('e=Cannot access private property A::$v', $out);
+    }
 }
