@@ -19,14 +19,13 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
-        foreach ([
-            'LIBXML_ERR_NONE' => LibxmlConstants::LIBXML_ERR_NONE,
-            'LIBXML_ERR_WARNING' => LibxmlConstants::LIBXML_ERR_WARNING,
-            'LIBXML_ERR_ERROR' => LibxmlConstants::LIBXML_ERR_ERROR,
-            'LIBXML_ERR_FATAL' => LibxmlConstants::LIBXML_ERR_FATAL,
-        ] + LibxmlConstants::parseFlagConstants() as $name => $value) {
+        foreach (LibxmlConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
-            $var->int($value);
+            if (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int($value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
     }

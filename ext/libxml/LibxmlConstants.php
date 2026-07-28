@@ -5,12 +5,27 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\libxml;
 
 /**
- * libxml2 parse/error constants (php-src ext/libxml/libxml.c; issues #6058, #11885).
+ * libxml2 parse/error/version constants (php-src ext/libxml/libxml.c / libxml.stub.php;
+ * issues #6058, #11885, #24051).
  *
  * @see libxml2 parser.h — XML_PARSE_*
+ * @see libxml2 xmlversion.h — LIBXML_VERSION / LIBXML_DOTTED_VERSION
+ * @see libxml2 xmlParserVersion — LIBXML_LOADED_VERSION
  */
 final class LibxmlConstants
 {
+    /**
+     * Pinned libxml2 identity for php-compiler:22.04-dev / Ubuntu 22.04 (libxml2 2.9.14).
+     * Used when host Zend does not expose the trio (AOT/self-host); DOM schema/RelaxNG FFI
+     * loads the same libxml2.so.2 family ({@see \PHPCompiler\ext\dom\VmDomValidationNative}).
+     */
+    public const LIBXML_VERSION = 20914;
+
+    public const LIBXML_DOTTED_VERSION = '2.9.14';
+
+    /** php-src: `(char *)xmlParserVersion` — numeric string, not dotted. */
+    public const LIBXML_LOADED_VERSION = '20914';
+
     public const LIBXML_ERR_NONE = 0;
 
     public const LIBXML_ERR_WARNING = 1;
@@ -63,14 +78,13 @@ final class LibxmlConstants
     public const LIBXML_SCHEMA_CREATE = 1;
 
     /**
-     * All userland parse-flag constants registered at module init.
+     * All userland libxml constants registered at module init / get_defined_constants.
      *
-     * @return array<string, int>
+     * @return array<string, int|string>
      */
-    /** @return array<string, int> */
     public static function registeredConstants(): array
     {
-        return [
+        return self::versionConstants() + [
             'LIBXML_ERR_NONE' => self::LIBXML_ERR_NONE,
             'LIBXML_ERR_WARNING' => self::LIBXML_ERR_WARNING,
             'LIBXML_ERR_ERROR' => self::LIBXML_ERR_ERROR,
@@ -78,6 +92,36 @@ final class LibxmlConstants
         ] + self::parseFlagConstants();
     }
 
+    /**
+     * LIBXML_VERSION / LIBXML_DOTTED_VERSION / LIBXML_LOADED_VERSION (php-src libxml.c; #24051).
+     *
+     * Prefer host Zend values when present so VM matches the linked libxml2 on the same box
+     * (php-src-strict). Fall back to the pinned Ubuntu 22.04 identity for AOT/self-host.
+     *
+     * @return array<string, int|string>
+     */
+    public static function versionConstants(): array
+    {
+        if (
+            \defined('LIBXML_VERSION')
+            && \defined('LIBXML_DOTTED_VERSION')
+            && \defined('LIBXML_LOADED_VERSION')
+        ) {
+            return [
+                'LIBXML_VERSION' => (int) \constant('LIBXML_VERSION'),
+                'LIBXML_DOTTED_VERSION' => (string) \constant('LIBXML_DOTTED_VERSION'),
+                'LIBXML_LOADED_VERSION' => (string) \constant('LIBXML_LOADED_VERSION'),
+            ];
+        }
+
+        return [
+            'LIBXML_VERSION' => self::LIBXML_VERSION,
+            'LIBXML_DOTTED_VERSION' => self::LIBXML_DOTTED_VERSION,
+            'LIBXML_LOADED_VERSION' => self::LIBXML_LOADED_VERSION,
+        ];
+    }
+
+    /** @return array<string, int> */
     public static function parseFlagConstants(): array
     {
         return [
