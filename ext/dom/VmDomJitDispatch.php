@@ -360,6 +360,8 @@ final class VmDomJitDispatch
     {
         $name = self::stringArg($extra[0] ?? self::missingArg('setAttribute', 0), 'setAttribute', 0);
         $value = self::stringArg($extra[1] ?? self::missingArg('setAttribute', 1), 'setAttribute', 1);
+        // php-src element.c — name_len == 0 → ValueError (#24480).
+        VmDom::rejectEmptyQualifiedName($name, 'DOMElement::setAttribute', 1);
         VmDom::setAttributeNS($ctx, $element, null, $name, $value);
         $null = new Variable();
         $null->null();

@@ -23,6 +23,8 @@ final class ElementSetAttributeNS extends DomClassMethod
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::setAttributeNS()', 0);
         $qualifiedName = $this->stringArg($frame->calledArgs[2], 'DOMElement::setAttributeNS()', 1);
         $value = $this->stringArg($frame->calledArgs[3], 'DOMElement::setAttributeNS()', 2);
+        // php-src element.c — name_len == 0 → ValueError on arg #2 (#24480).
+        VmDom::rejectEmptyQualifiedName($qualifiedName, 'DOMElement::setAttributeNS', 2);
         VmDom::setAttributeNS($frame->vmContext, $element, $namespace, $qualifiedName, $value);
     }
 }

@@ -4085,6 +4085,22 @@ final class VmDom
     }
 
     /**
+     * php-src ext/dom/element.c — empty attribute QName → ValueError (#24480).
+     *
+     * @param string $method Class::method without trailing "()"
+     */
+    public static function rejectEmptyQualifiedName(string $name, string $method, int $argumentNumber): void
+    {
+        if ('' === $name) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #%d ($qualifiedName) cannot be empty',
+                $method,
+                $argumentNumber
+            ));
+        }
+    }
+
+    /**
      * Zend dom_document_documenturi_read default for in-memory documents (ext/dom/document.c; #14468).
      *
      * Prefer {@see PHP_COMPILER_CLI_INVOCATION_CWD} so relative XInclude/href resolution matches the
