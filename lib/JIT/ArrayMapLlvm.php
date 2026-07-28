@@ -6,16 +6,16 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Call;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Pure LLVM for array_map(null|compile-time-string-builtin) under thin standalone AOT (#23974).
+ * Pure LLVM for array_map(null|compile-time-string-builtin|Closure) under thin standalone AOT
+ * (#23974 / #24156).
  *
- * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayMapJitHelper} still segfaults on
- * foreach + Variable property access / VmInternalCall (no active VM context). Peer of
- * {@see HashTableSliceLlvm}: keep the helper for VM/closures; lower these two shapes
- * without NestedJIT of the helper body.
+ * NestedJIT of {@see \PHPCompiler\ext\standard\ArrayMapJitHelper} still segfaults / returns
+ * null on foreach + PHP-array collect for Closures (#24156). Peer of {@see HashTableSliceLlvm}.
  *
  * php-src: ext/standard/array.c — php_array_map()
  */
@@ -52,6 +52,27 @@ final class ArrayMapLlvm
         return self::mapPacked($context, $src, $handler, $resultType, 'array_map');
     }
 
+    /**
+     * Map each packed element through a thin-AOT Closure via {@see Call\NestedClosureInvoke} (#24156).
+     */
+    public static function mapClosure(Context $context, Value $src, Variable $closure): Value
+    {
+        return self::mapPacked(
+            $context,
+            $src,
+            static function (Context $ctx, Variable $elem) use ($closure): Variable {
+                $raw = (new Call\NestedClosureInvoke())->call($ctx, $closure, $elem);
+                $ptr = JitNestedHelperCoerce::valueBoxPtrFromHelperResult($ctx, $raw);
+                $slot = JitValueBox::alloc($ctx);
+                JitValueBox::copyFromPointer($ctx, $slot, $ptr);
+
+                return new Variable($ctx, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+            },
+            Variable::TYPE_VALUE,
+            'array_map_closure'
+        );
+    }
+
     private static function mapCallbackResultType(Internal $handler): int
     {
         $type = self::MAP_CALLBACK_RESULT_TYPE[$handler::class] ?? null;
@@ -65,12 +86,15 @@ final class ArrayMapLlvm
     }
 
     /**
-     * @param Internal|null $handler null => identity copy into value boxes
+     * @param Internal|(callable(Context, Variable): Variable)|null $handler
+     *        null => identity copy into value boxes;
+     *        Internal => typed builtin call;
+     *        callable => Closure/value-box mapper (#24156)
      */
     private static function mapPacked(
         Context $context,
         Value $src,
-        ?Internal $handler,
+        $handler,
         int $resultType,
         string $prefix
     ): Value {
@@ -119,7 +143,7 @@ final class ArrayMapLlvm
         $elem = HashTableHelper::readIndexedToValueBox($context, $src, $srcIdx);
         if (null === $handler) {
             HashTableHelper::setAtIndex($context, $dest, $srcIdx, $elem);
-        } else {
+        } elseif ($handler instanceof Internal) {
             $mapped = $handler->call($context, $elem);
             self::storeMappedAtIndex(
                 $context,
@@ -128,6 +152,10 @@ final class ArrayMapLlvm
                 new Variable($context, $resultType, Variable::KIND_VALUE, $mapped),
                 $resultType
             );
+        } else {
+            /** @var callable(Context, Variable): Variable $handler */
+            $mappedVar = $handler($context, $elem);
+            HashTableHelper::setAtIndex($context, $dest, $srcIdx, $mappedVar);
         }
         $context->builder->branch($advance);
 

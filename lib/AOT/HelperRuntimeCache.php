@@ -68,6 +68,16 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\strreplacejithelper::replaceargv' => true,
         'phpcompiler\\ext\\standard\\strreplacejithelper::ireplaceargv' => true,
         'phpcompiler\\ext\\standard\\strreplacejithelper::takelastcount' => true,
+        // #24156 — prelinked helper TUs lack main-module {closure}_* proxies; NestedJIT
+        // closure helpers into the user AOT module so NestedClosureInvoke can dispatch.
+        'phpcompiler\\ext\\standard\\arrayreducejithelper::reducewithclosure' => true,
+        'phpcompiler\\ext\\standard\\usortjithelper::sortpackedwithclosure' => true,
+        'phpcompiler\\ext\\standard\\usortjithelper::sortkeyswithclosure' => true,
+        'phpcompiler\\ext\\standard\\usortjithelper::sortvalueswithclosure' => true,
+        'phpcompiler\\ext\\standard\\arraymapjithelper::mapwithclosure' => true,
+        'phpcompiler\\ext\\standard\\arraymapjithelper::mapwithclosuremultiple' => true,
+        'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariable' => true,
+        'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariabletwo' => true,
     ];
 
     private static bool $loggedHit = false;

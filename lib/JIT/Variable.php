@@ -138,6 +138,9 @@ final class Variable {
     /** void** property slot on {@see __object__} when this variable is a property lvalue (#58). */
     public ?\PHPLLVM\Value $objectPropertySlot = null;
 
+    /** Value-box alloca for `new Variable()` temps after copyFrom in NestedJIT (#24156). */
+    public ?\PHPLLVM\Value $nestedHelperValueSlot = null;
+
     /** Module global backing a static property (issue #1225). */
     public ?\PHPLLVM\Value $staticPropertyGlobal = null;
 

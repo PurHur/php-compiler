@@ -208,8 +208,24 @@ final class VmClosureCall
     }
 
     /**
-     * Sort [key, value] pairs in place by key using a closure comparator (uksort subset).
+     * Thin-AOT NestedJIT sort — Closure Variable, no ClosureState (#24156).
      *
+     * @param list<Variable> $values
+     */
+    public static function sortVariableValuesViaTarget(
+        array &$values,
+        Variable $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (Variable $a, Variable $b) use ($closure, $descending): int {
+            $result = VmClosureInvoke::invokeVariableTwo($closure, $a, $b);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($values, $cmp);
+    }
+
+    /**
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
     public static function sortKeyedPairsByKey(
@@ -227,8 +243,22 @@ final class VmClosureCall
     }
 
     /**
-     * Sort [key, value] pairs in place by value using a closure comparator (uasort subset).
-     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKeyViaTarget(
+        array &$pairs,
+        Variable $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (array $a, array $b) use ($closure, $descending): int {
+            $result = VmClosureInvoke::invokeVariableTwo($closure, $a[0], $b[0]);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($pairs, $cmp);
+    }
+
+    /**
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
     public static function sortKeyedPairsByValue(
@@ -239,6 +269,22 @@ final class VmClosureCall
     ): void {
         $cmp = static function (array $a, array $b) use ($context, $closure, $descending): int {
             $result = self::invokeTwo($context, $closure, $a[1], $b[1]);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($pairs, $cmp);
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueViaTarget(
+        array &$pairs,
+        Variable $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (array $a, array $b) use ($closure, $descending): int {
+            $result = VmClosureInvoke::invokeVariableTwo($closure, $a[1], $b[1]);
 
             return $descending ? -$result : $result;
         };

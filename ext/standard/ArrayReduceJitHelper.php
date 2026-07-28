@@ -15,6 +15,10 @@ use PHPCompiler\Web\Superglobals;
  * SSOT shared with {@see array_reduce} VM execute()
  * php-src: ext/standard/array.c — php_array_reduce()
  * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} → sg_vm_context (#17391 / #24117).
+ *
+ * NestedJIT (#24156): use {@see HashTable::iterate()} values (not iterateKeyed list-assign),
+ * and avoid `new Variable()` + copyFrom wrappers around invoke args/results — those TYPE_OBJECT
+ * temps do not round-trip through NestedClosureInvoke arg ABI.
  */
 final class ArrayReduceJitHelper
 {
@@ -24,14 +28,11 @@ final class ArrayReduceJitHelper
         $hasInitial = Variable::TYPE_NULL !== $initialOrNull->type;
         $carry = null;
         if ($hasInitial) {
-            $carry = new Variable();
-            $carry->copyFrom($initialOrNull);
+            $carry = $initialOrNull;
         }
         $empty = true;
-        foreach ($ht->iterateKeyed(true) as [, $value]) {
+        foreach ($ht->iterate() as $value) {
             $empty = false;
-            $item = new Variable();
-            $item->copyFrom($value);
             if ($hasInitial) {
                 $carryArg = $carry;
             } elseif (null === $carry) {
@@ -40,7 +41,7 @@ final class ArrayReduceJitHelper
             } else {
                 $carryArg = $carry;
             }
-            $carry = VmInternalCall::invoke($fn, $carryArg, $item);
+            $carry = VmInternalCall::invoke($fn, $carryArg, $value);
         }
         $out = new Variable();
         if ($empty) {
@@ -64,18 +65,14 @@ final class ArrayReduceJitHelper
         if (null === $ctx) {
             $ctx = VmActiveContextJitHelper::resolve();
         }
-        $closureState = VmClosureCall::resolve($closure);
         $hasInitial = Variable::TYPE_NULL !== $initialOrNull->type;
         $carry = null;
         if ($hasInitial) {
-            $carry = new Variable();
-            $carry->copyFrom($initialOrNull);
+            $carry = $initialOrNull;
         }
         $empty = true;
-        foreach ($ht->iterateKeyed(true) as [, $value]) {
+        foreach ($ht->iterate() as $value) {
             $empty = false;
-            $item = new Variable();
-            $item->copyFrom($value);
             if ($hasInitial) {
                 $carryArg = $carry;
             } elseif (null === $carry) {
@@ -84,7 +81,7 @@ final class ArrayReduceJitHelper
             } else {
                 $carryArg = $carry;
             }
-            $carry = VmClosureCall::invoke($ctx, $closureState, $carryArg, $item);
+            $carry = VmClosureInvoke::invokeVariable($closure, $carryArg, $value);
         }
         $out = new Variable();
         if ($empty) {

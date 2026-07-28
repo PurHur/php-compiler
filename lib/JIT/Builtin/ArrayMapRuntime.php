@@ -12,6 +12,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -39,6 +40,8 @@ final class ArrayMapRuntime
     private const ABI_MAP_CLOSURE_MULTI = '__array_map__closure_multi';
 
     private const HELPER_PATH = '/ext/standard/ArrayMapJitHelper.php';
+
+    private const CLOSURE_INVOKE_PATH = '/ext/standard/VmClosureInvoke.php';
 
     private const MAP_NULL = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapNullIdentity';
 
@@ -68,10 +71,12 @@ final class ArrayMapRuntime
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
-            self::ensureLinked($context);
+            // Pure LLVM + caller closureCall — NestedJIT helper new HashTable() aborts under
+            // thin AOT and snaps wrong multi-Closure candidates (#24156).
+            NestedClosureInvokeLlvm::ensureLinked($context);
             $ht = self::argToHashtable($context, $array);
 
-            return self::callMapClosure($context, $ht, $callback);
+            return ArrayMapLlvm::mapClosure($context, $ht, $callback);
         }
 
         $ht = self::argToHashtable($context, $array);
@@ -179,6 +184,7 @@ final class ArrayMapRuntime
 
     private static function implementClosureBridges(Context $context): void
     {
+        NestedClosureInvokeLlvm::ensureLinked($context);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         JitVmHelperLink::ensureBridge(

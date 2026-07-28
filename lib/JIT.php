@@ -11688,6 +11688,16 @@ class JIT {
             return $retval;
         }
         if ('__value__*' === $expected) {
+            if (null !== $return->nestedHelperValueSlot) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer(
+                    $this->context,
+                    $slot,
+                    JIT\JitValueBox::pointer($this->context, $return->nestedHelperValueSlot)
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
+            }
             if (Variable::TYPE_VALUE === $return->type) {
                 // Nullable returns use __value__*; copy merge/ternary slots into a fresh
                 // return slot instead of returning an interior pointer (#8555).
@@ -12580,6 +12590,31 @@ class JIT {
                         $i1Slot
                     )
                 );
+
+                return;
+            }
+            if ($this->context->scope->toCall instanceof JIT\Call\NestedClosureInvoke) {
+                $llvmTy = $this->context->getStringFromType($llvmResult->typeOf());
+                if ('__value__*' === $llvmTy || '__value__' === $llvmTy || JIT\JitNestedHelperCoerce::isValueBox($this->context, $llvmResult)) {
+                    $ptr = JIT\JitNestedHelperCoerce::valueBoxPtrFromHelperResult($this->context, $llvmResult);
+                    if ($this->context->hasVariableOp($result)) {
+                        $this->context->getVariableFromOp($result)->free();
+                    }
+                    $slot = JIT\JitValueBox::alloc($this->context);
+                    JIT\JitValueBox::copyFromPointer($this->context, $slot, $ptr);
+                    $this->context->setVariableOp(
+                        $result,
+                        new Variable(
+                            $this->context,
+                            Variable::TYPE_VALUE,
+                            Variable::KIND_VARIABLE,
+                            $slot
+                        )
+                    );
+
+                    return;
+                }
+                $this->assignOperandValue($result, $llvmResult, true);
 
                 return;
             }
@@ -17982,6 +18017,18 @@ class JIT {
             $parentScopeAllows
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
+        // Per-user-module VmClosureInvoke::invokeVariable needs NestedClosureInvoke (#24156).
+        if (
+            'invokevariable' === $methodLc
+            && str_ends_with($declaringClassLc, 'vmclosureinvoke')
+            && isset($this->context->functionProxies[JIT\NestedClosureInvokeLlvm::PROXY])
+            && $this->context->functionProxies[JIT\NestedClosureInvokeLlvm::PROXY] instanceof JIT\Call\NestedClosureInvoke
+        ) {
+            $this->context->scope->toCall = $this->context->functionProxies[JIT\NestedClosureInvokeLlvm::PROXY];
+            $this->context->scope->args = [];
+
+            return;
+        }
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ($this->context->type->object->isEnumClassLc($declaringClassLc)
                 && \in_array($methodLc, ['cases', 'from', 'tryfrom'], true)) {

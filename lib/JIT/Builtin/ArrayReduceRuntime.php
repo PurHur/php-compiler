@@ -9,6 +9,7 @@ use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
@@ -29,6 +30,8 @@ final class ArrayReduceRuntime
     private const ABI_REDUCE_CLOSURE = '__array_reduce__closure';
 
     private const HELPER_PATH = '/ext/standard/ArrayReduceJitHelper.php';
+
+    private const CLOSURE_INVOKE_PATH = '/ext/standard/VmClosureInvoke.php';
 
     private const REDUCE_BUILTIN_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReduceJitHelper::reduceWithBuiltin';
 
@@ -51,11 +54,6 @@ final class ArrayReduceRuntime
         }
         if (!ArrayReduceCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
-        }
-        if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)
-            && $context->isThinStandaloneAotMain()
-        ) {
-            throw new \LogicException(ArrayReduceCallbackPolicy::thinAotClosureRejectionMessage());
         }
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
@@ -98,6 +96,7 @@ final class ArrayReduceRuntime
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
+        NestedClosureInvokeLlvm::ensureLinked($context);
 
         if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);
@@ -114,6 +113,15 @@ final class ArrayReduceRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
+        // Do not NestedJIT-compile VmClosureInvoke.php here — that bakes NestedClosureInvoke
+        // candidates at first-helper time (before later Closures exist). Call sites use the
+        // NestedClosureInvoke proxy via initJitStaticCall instead (#24156).
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            [self::HELPER_PATH],
+            self::COMPILED_HELPERS,
+            '#24156'
+        );
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_REDUCE_BUILTIN,

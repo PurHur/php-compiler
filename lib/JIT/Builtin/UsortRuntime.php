@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -36,6 +37,8 @@ final class UsortRuntime
 
     private const HELPER_PATH = '/ext/standard/UsortJitHelper.php';
 
+    private const CLOSURE_INVOKE_PATH = '/ext/standard/VmClosureInvoke.php';
+
     private const USORT_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\UsortJitHelper::sortPackedWithClosure';
 
     private const UKSORT_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\UsortJitHelper::sortKeysWithClosure';
@@ -55,10 +58,6 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            // Thin AOT has Context but not Runtime->vm — VmClosureCall cannot invoke (#24142 / #23540).
-            if ($context->isThinStandaloneAotMain()) {
-                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('usort'));
-            }
             self::sortPackedWithClosure($context, $array, $callback);
         } else {
             SortRuntime::sortPacked($context, $array);
@@ -73,9 +72,6 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            if ($context->isThinStandaloneAotMain()) {
-                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('uksort'));
-            }
             self::sortKeysWithClosure($context, $array, $callback);
         } else {
             KeySortRuntime::ksortByKey($context, $array);
@@ -90,9 +86,6 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            if ($context->isThinStandaloneAotMain()) {
-                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('uasort'));
-            }
             self::sortValuesWithClosure($context, $array, $callback);
         } else {
             self::sortValuesByStrcmp($context, $array);
@@ -118,6 +111,7 @@ final class UsortRuntime
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
+        NestedClosureInvokeLlvm::ensureLinked($context);
 
         if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);

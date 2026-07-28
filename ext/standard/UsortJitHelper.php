@@ -12,8 +12,11 @@ use PHPCompiler\Web\Superglobals;
 /**
  * usort()/uksort()/uasort() closure comparators for compiled JIT/AOT modules (#15518, php-in-PHP).
  *
- * Returns a new HashTable built with NestedJIT-safe append/add/addIndex — avoids
- * replacePackedValues/reorderKeyedPairs which lack NestedJIT lowering (#24142).
+ * Packed usort: in-place {@see HashTable::replacePackedValues} — NestedJIT `new HashTable()`
+ * segfaults under thin standalone AOT (#24156). Compare via {@see Variable::toInt()} on the
+ * invoke result — {@see VmClosureCall::coerceUserSortCallbackResult} reads VM type tags that
+ * NestedClosureInvoke value-boxes do not populate.
+ *
  * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} → sg_vm_context (#17391).
  *
  * SSOT shared with {@see usort_} / {@see uksort_} / {@see uasort_} VM execute() closure paths
@@ -26,20 +29,28 @@ final class UsortJitHelper
         if ($ht->getNumElements() < 2) {
             return $ht;
         }
-        // Inline context resolve — NestedJIT mis-types `: Context` returns as int (#20816 / #24142).
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
             $ctx = VmActiveContextJitHelper::resolve();
         }
         $values = [];
-        foreach ($ht->iterate(true) as $value) {
-            $copy = new Variable();
-            $copy->duplicateFrom($value);
-            $values[] = $copy;
+        foreach ($ht->iterate() as $value) {
+            $values[] = $value;
         }
-        VmClosureCall::sortVariableValues($ctx, $values, VmClosureCall::resolve($closure));
+        $n = \count($values);
+        for ($i = 0; $i < $n - 1; ++$i) {
+            for ($j = 0; $j < $n - $i - 1; ++$j) {
+                $cmpVar = VmClosureInvoke::invokeVariable($closure, $values[$j], $values[$j + 1]);
+                if ($cmpVar->toInt() > 0) {
+                    $tmp = $values[$j];
+                    $values[$j] = $values[$j + 1];
+                    $values[$j + 1] = $tmp;
+                }
+            }
+        }
+        $ht->replacePackedValues($values);
 
-        return self::packedFromValues($values);
+        return $ht;
     }
 
     public static function sortKeysWithClosure(HashTable $ht, Variable $closure): HashTable
@@ -52,7 +63,7 @@ final class UsortJitHelper
             $ctx = VmActiveContextJitHelper::resolve();
         }
         $pairs = self::collectKeyedPairs($ht);
-        VmClosureCall::sortKeyedPairsByKey($ctx, $pairs, VmClosureCall::resolve($closure));
+        VmClosureCall::sortKeyedPairsByKeyViaTarget($pairs, $closure);
 
         return self::fromKeyedPairs($pairs);
     }
@@ -67,22 +78,9 @@ final class UsortJitHelper
             $ctx = VmActiveContextJitHelper::resolve();
         }
         $pairs = self::collectKeyedPairs($ht);
-        VmClosureCall::sortKeyedPairsByValue($ctx, $pairs, VmClosureCall::resolve($closure));
+        VmClosureCall::sortKeyedPairsByValueViaTarget($pairs, $closure);
 
         return self::fromKeyedPairs($pairs);
-    }
-
-    /**
-     * @param list<Variable> $values
-     */
-    private static function packedFromValues(array $values): HashTable
-    {
-        $out = new HashTable();
-        foreach ($values as $value) {
-            $out->append($value);
-        }
-
-        return $out;
     }
 
     /**
