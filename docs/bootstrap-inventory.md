@@ -47508,12 +47508,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/HashTableReadLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 138)
-- new Variable (line 267)
-- new Variable (line 313)
-- new Variable (line 507)
-- new Variable (line 549)
-- new Variable (line 663)
+- new Variable (line 69)
+- new Variable (line 119)
+- new Variable (line 165)
+- new Variable (line 359)
+- new Variable (line 401)
+- new Variable (line 515)
 - 17 class method(s)
 
 ### `lib/JIT/HashTableShiftLlvm.php`
