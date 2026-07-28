@@ -6895,11 +6895,15 @@ restart:
                         $frame->closureCall = null;
                     }
                     $frame->pendingClosureInvoke = null;
-                    // Only bind captures/$this when entering the closure body, not nested $this->method() (#4927).
+                    // Only bind captures/$this/called-scope when entering the closure body, not nested
+                    // $this->method() (#4927). wrappedFunc is the fromCallable/FCC static-method target
+                    // (stub $closureState->func differs) — still apply boundScopeClass for LSB (#24431).
                     if (
                         null !== $closureState
-                        && $frame->call instanceof Func\PHP
-                        && $frame->call === $closureState->func
+                        && (
+                            ($frame->call instanceof Func\PHP && $frame->call === $closureState->func)
+                            || (null !== $closureState->wrappedFunc && $frame->call === $closureState->wrappedFunc)
+                        )
                     ) {
                         $this->applyClosureBinding($new, $closureState);
                     }
@@ -15743,6 +15747,9 @@ restart:
             return;
         }
         if (null !== $state->wrappedFunc) {
+            if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+                $frame->calledClass = $state->boundScopeClass;
+            }
             $frame->call = $state->wrappedFunc;
             $frame->closureCall = null;
             $frame->callArgs = [];

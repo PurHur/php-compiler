@@ -607,7 +607,12 @@ final class ClosureSupport
             $callerDisplay
         );
 
-        return ClosureState::fromWrappedFunc($class->methods[$methodLc]);
+        // Named class is called-scope for LSB (zend_closures.c): Closure::fromCallable([B::class, 'foo'])
+        // / 'B::foo' / FCC B::foo(...) must resolve static:: to B, not declaring class A (#24431).
+        $state = ClosureState::fromWrappedFunc($class->methods[$methodLc]);
+        $state->boundScopeClass = $namedClass->name;
+
+        return $state;
     }
 
     private static function fromArrayCallable(
