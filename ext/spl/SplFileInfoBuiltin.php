@@ -138,13 +138,13 @@ final class SplFileInfoBuiltin
     public static function debugInfoTable(ObjectEntry $object): HashTable
     {
         $ht = new HashTable();
-        $pathname = SplFileInfoStorage::pathname($object);
         $pathName = new Variable();
-        $pathName->string($pathname);
+        $pathName->string(SplFileInfoStorage::pathname($object));
         $ht->addNew("\0SplFileInfo\0pathName", $pathName);
 
         $fileName = new Variable();
-        $fileName->string(VmString::basename($pathname));
+        // php-src debug fileName matches getFilename(), not php basename() (#24338).
+        $fileName->string(SplFileInfoStorage::filename($object));
         $ht->addNew("\0SplFileInfo\0fileName", $fileName);
 
         if (SplFileObjectStorage::hasHandle($object)) {
@@ -358,7 +358,8 @@ final class SplFileInfoGetPath extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(VmString::dirname(SplFileInfoStorage::pathname($object)));
+        // php-src intern->path — empty when the only slash is leading (#24338).
+        $frame->returnVar->string(SplFileInfoStorage::path($object));
     }
 }
 
@@ -379,7 +380,7 @@ final class SplFileInfoGetFilename extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(VmString::basename(SplFileInfoStorage::pathname($object)));
+        $frame->returnVar->string(SplFileInfoStorage::filename($object));
     }
 }
 
