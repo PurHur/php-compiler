@@ -68,7 +68,7 @@ final class EmptyIteratorCurrent extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiver($frame, EmptyIteratorBuiltin::CLASS_LC, 'EmptyIterator::current()');
-        throw new \RuntimeException('Cannot fetch current() on Empty Iterator');
+        throw new \BadMethodCallException('Accessing the value of an EmptyIterator');
     }
 }
 
@@ -82,7 +82,7 @@ final class EmptyIteratorKey extends VmClassMethod
     public function execute(Frame $frame): void
     {
         SplIteratorSupport::receiver($frame, EmptyIteratorBuiltin::CLASS_LC, 'EmptyIterator::key()');
-        throw new \RuntimeException('Cannot fetch key() on Empty Iterator');
+        throw new \BadMethodCallException('Accessing the key of an EmptyIterator');
     }
 }
 
