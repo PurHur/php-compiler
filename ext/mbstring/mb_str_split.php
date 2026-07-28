@@ -15,6 +15,9 @@ use PHPLLVM\Value;
 
 /**
  * mb_str_split() — multibyte string to array (php-src ext/mbstring/mbstring.c; #3299).
+ *
+ * Zend Z_PARAM_STR soft-null + DEP on $string under PROFILE=8.4 (not TypeError) — #24207,
+ * peer #24176 / #24209 (mb_trim / mb_convert_kana family).
  */
 final class mb_str_split extends Internal
 {
@@ -32,12 +35,8 @@ final class mb_str_split extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_str_split',
-            0,
-            'string'
-        );
+        // Zend 8.4 ZPP soft-null + DEP (not TypeError) — #24207, peer #24176.
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_str_split', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
