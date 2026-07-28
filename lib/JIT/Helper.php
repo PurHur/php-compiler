@@ -1892,8 +1892,10 @@ return_bool:
                         $this->context->lookupFunction('__value__readHashtable'),
                         $ptr
                     );
-                case Variable::TYPE_NATIVE_LONG:
                 case Variable::TYPE_VALUE:
+                    // Alias is already __value__*; do not readLong (#24162).
+                    return $ptr;
+                case Variable::TYPE_NATIVE_LONG:
                 default:
                     return $this->context->builder->call(
                         $this->context->lookupFunction('__value__readLong'),

@@ -7488,9 +7488,15 @@ class JIT {
                         throw new \LogicException('Missing required argument ' . $op->arg2);
                     }
                     if (isset($block->paramByRef[(int) $op->arg2])) {
+                        $recvOp = $block->getOperand($op->arg1);
+                        // getOperand may return a same-slot Temporary distinct from the CFG
+                        // Param.result Variable already bound in the prologue (#24162).
+                        if (!$this->context->hasVariableOp($recvOp)) {
+                            $this->context->getVariableFromOp($recvOp);
+                        }
                         $this->bindJitParamByReference(
                             $block,
-                            $block->getOperand($op->arg1),
+                            $recvOp,
                             $args[$recvSlot]
                         );
                     } else {
@@ -7683,7 +7689,24 @@ class JIT {
                     }
                     if (null !== $aliasOp) {
                         $this->maybeBindNamedVariable($aliasOp);
-                        $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
+                        // Only ternary/?? merge assigns need echo→phi redirect (#18052). Recording
+                        // every `$n = 1` made later by-ref updates invisible to echo (#24162).
+                        if (
+                            $forceCoalesce
+                            || (
+                                null !== $destOp
+                                && $this->context->coalesceAssignTargets->contains($destOp)
+                            )
+                            || $this->context->coalesceAssignTargets->contains($aliasOp)
+                        ) {
+                            $this->recordTernaryEchoPhiByAliasSlot(
+                                $block,
+                                $op,
+                                $destOp,
+                                $aliasOp,
+                                $rhsSlot
+                            );
+                        }
                     }
                     if ($op->arg1 === $op->arg2 && null !== $destOp) {
                         $this->maybeBindNamedVariable($destOp);
@@ -9188,7 +9211,13 @@ class JIT {
                                 if ($block->slotForOperand($scopeOp) !== $argOffset) {
                                     continue;
                                 }
-                                if ($scopeOp instanceof Operand\Variable) {
+                                if (
+                                    $scopeOp instanceof Operand\Variable
+                                    || (
+                                        $scopeOp instanceof Operand\Temporary
+                                        && null !== JIT\OperandName::resolve($scopeOp)
+                                    )
+                                ) {
                                     $echoOp = $scopeOp;
                                     break;
                                 }
@@ -9217,6 +9246,34 @@ class JIT {
                         }
                     }
                     JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
+                    // After ZEND_SEND_REF, namedVariableBindings holds the live boxed lvalue.
+                    // Coalesce/ternary echo-phi maps are keyed by SSA slot and can still name the
+                    // pre-call constant on the same slot — prefer the by-ref binding (#24162).
+                    $echoNameForByRef = JIT\OperandName::resolve($echoOp);
+                    if (
+                        null === $scriptGlobalEchoName
+                        && null !== $echoNameForByRef
+                        && '' !== $echoNameForByRef
+                        && isset($this->context->namedVariableBindings[$echoNameForByRef])
+                    ) {
+                        $byRefEcho = $this->context->namedVariableBindings[$echoNameForByRef];
+                        if (
+                            Variable::KIND_VARIABLE === $byRefEcho->kind
+                            && Variable::TYPE_VALUE === $byRefEcho->type
+                            && (
+                                null !== $byRefEcho->valueBoxAliasPtr
+                                || $byRefEcho->borrowedValueEntry
+                            )
+                        ) {
+                            $arg = $byRefEcho;
+                            JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $arg);
+                            JIT\ValueEchoHelper::echo(
+                                $this->context,
+                                JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                            );
+                            break;
+                        }
+                    }
                     if (null !== $this->context->ternaryEchoLiteralConditionSlot) {
                         $cond = $this->context->builder->load($this->context->ternaryEchoLiteralConditionSlot);
                         $ifLiteral = $this->context->ternaryEchoLiteralIf ?? '';
@@ -9247,31 +9304,59 @@ class JIT {
                         }
                     }
                     if (null === $scriptGlobalEchoName && null !== $echoSlot && isset($this->context->ternaryEchoPhiByAliasSlot[$echoSlot])) {
-                        $phiOp = $this->context->ternaryEchoPhiByAliasSlot[$echoSlot];
-                        if ($this->context->hasVariableOp($phiOp)) {
-                            $arg = $this->materializeCoalesceMergeSlotArgSend($block, $phiOp);
-                            if (Variable::TYPE_VALUE === $arg->type) {
+                        // Live boxed / by-ref locals must not be redirected to a stale assign RHS
+                        // (e.g. Literal(1) from `$n = 1` before `f($n)`) (#24162, #18052).
+                        $skipTernaryPhi = null !== $arg->valueBoxAliasPtr
+                            || (
+                                Variable::TYPE_VALUE === $arg->type
+                                && (
+                                    Variable::KIND_VARIABLE === $arg->kind
+                                    || $arg->functionStaticGlobal
+                                )
+                            );
+                        if (!$skipTernaryPhi) {
+                            $phiOp = $this->context->ternaryEchoPhiByAliasSlot[$echoSlot];
+                            if ($this->context->hasVariableOp($phiOp)) {
+                                $arg = $this->materializeCoalesceMergeSlotArgSend($block, $phiOp);
+                                if (Variable::TYPE_VALUE === $arg->type) {
+                                    JIT\ValueEchoHelper::echo(
+                                        $this->context,
+                                        JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
+                                    );
+                                    break;
+                                }
+                                if (Variable::TYPE_STRING === $arg->type) {
+                                    JIT\ValueEchoHelper::echoStringVariable($this->context, $arg);
+                                    break;
+                                }
+                            }
+                            $echoOp = $phiOp;
+                        }
+                    }
+                    if (Variable::KIND_VARIABLE === $arg->kind) {
+                        $slotType = $this->context->getStringFromType($arg->value->typeOf());
+                        // Alloca slots are `__value__*`; bare `__value__` is the struct.
+                        // Prefer valueBoxAliasPtr — by-ref send may pass the alias while
+                        // `$arg->value` still names a stale pre-promotion alloca (#24162).
+                        if (
+                            null !== $arg->valueBoxAliasPtr
+                            || '__value__' === $slotType
+                            || '__value__*' === $slotType
+                        ) {
+                            JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $arg);
+                            if (null !== $arg->valueBoxAliasPtr || Variable::TYPE_VALUE === $arg->type) {
                                 JIT\ValueEchoHelper::echo(
                                     $this->context,
                                     JIT\JitValueBox::valuePtrFromVariable($this->context, $arg)
                                 );
-                                break;
+                            } else {
+                                JIT\ValueEchoHelper::echo(
+                                    $this->context,
+                                    '__value__*' === $slotType
+                                        ? $arg->value
+                                        : JIT\JitValueBox::pointer($this->context, $arg->value)
+                                );
                             }
-                            if (Variable::TYPE_STRING === $arg->type) {
-                                JIT\ValueEchoHelper::echoStringVariable($this->context, $arg);
-                                break;
-                            }
-                        }
-                        $echoOp = $phiOp;
-                    }
-                    if (Variable::KIND_VARIABLE === $arg->kind) {
-                        $slotType = $this->context->getStringFromType($arg->value->typeOf());
-                        if ('__value__' === $slotType) {
-                            JIT\TypedPropertyUninitGuard::emitBeforeRead($this->context, $arg);
-                            JIT\ValueEchoHelper::echo(
-                                $this->context,
-                                JIT\JitValueBox::pointer($this->context, $arg->value)
-                            );
                             break;
                         }
                         if ('__string__' === $slotType && Variable::TYPE_STRING !== $arg->type) {
@@ -18507,6 +18592,12 @@ class JIT {
         $paramVar = $this->context->getVariableFromOp($paramOperand);
         JIT\ClosureHelper::bindCaptureSlotByReference($this->context, $paramVar, $callerArg);
         $this->context->setVariableOp($paramOperand, $paramVar);
+        // php-cfg uses a fresh SSA var for `$x = …` inside the callee; bind the name so
+        // assigns/reads share the aliased formal (#24162, Zend ZEND_RECV / SEND_REF).
+        $name = JIT\OperandName::resolve($paramOperand);
+        if (null !== $name && '' !== $name) {
+            $this->context->bindVariableByName($name, $paramVar);
+        }
     }
 
     /**
@@ -18762,58 +18853,28 @@ class JIT {
 
     private function ensureValueBoxLvalueForByRefPass(Operand $op, Variable $var): Variable
     {
-        if (Variable::TYPE_VALUE === $var->type || null !== $var->valueBoxAliasPtr) {
-            return JIT\ClosureHelper::referenceCapture($this->context, $var);
-        }
-        $slot = JIT\JitValueBox::alloc($this->context);
-        $native = $this->context->helper->loadValue($var);
-        switch ($var->type) {
-            case Variable::TYPE_NATIVE_LONG:
-                JIT\JitValueBox::writeLong($this->context, $slot, $native);
-                break;
-            case Variable::TYPE_NATIVE_BOOL:
-                JIT\JitValueBox::writeBool($this->context, $slot, $native);
-                break;
-            case Variable::TYPE_NATIVE_DOUBLE:
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeDouble'),
-                    JIT\JitValueBox::pointer($this->context, $slot),
-                    $native
-                );
-                break;
-            case Variable::TYPE_STRING:
-                $owned = $this->context->builder->call(
-                    $this->context->lookupFunction('__string__separate'),
-                    $native
-                );
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeString'),
-                    JIT\JitValueBox::pointer($this->context, $slot),
-                    $owned
-                );
-                break;
-            case Variable::TYPE_HASHTABLE:
-                $this->context->refcount->addref($native);
-                $this->context->builder->call(
-                    $this->context->lookupFunction('__value__writeHashtable'),
-                    JIT\JitValueBox::pointer($this->context, $slot),
-                    $native
-                );
-                break;
-            default:
-                throw new \LogicException(
-                    'By-reference call argument requires a boxed lvalue, got '
-                    . Variable::getStringType($var->type)
-                );
-        }
-        $boxed = new Variable($this->context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
-        $this->context->setVariableOp($op, $boxed);
+        // Promote the caller's lvalue in place. Copying into a fresh box left the
+        // original native/script-global binding unchanged, so AOT saw the pre-call
+        // value (or null on {main}) after return (#24162, Zend ZEND_SEND_REF).
+        $promoted = JIT\ClosureHelper::referenceCapture($this->context, $var);
+        $this->context->setVariableOp($op, $promoted);
         $name = JIT\OperandName::resolve($op);
         if (null !== $name) {
-            $this->context->bindVariableByName($name, $boxed);
+            $this->context->bindVariableByName($name, $promoted);
+        }
+        $block = $this->context->jitCurrentBlock;
+        if (null !== $block) {
+            $slot = $block->slotForOperand($op);
+            if (null !== $slot) {
+                foreach ($block->scopedOperands() as $scopeOp) {
+                    if ($block->slotForOperand($scopeOp) === $slot) {
+                        $this->context->setVariableOp($scopeOp, $promoted);
+                    }
+                }
+            }
         }
 
-        return JIT\ClosureHelper::referenceCapture($this->context, $boxed);
+        return $promoted;
     }
 
     private function collectParamDefaults(Block $block): array {
@@ -19126,8 +19187,19 @@ class JIT {
             return;
         }
         $writeNull = $this->context->lookupFunction('__value__writeNull');
+        $byRefParamNames = [];
+        foreach ($block->paramByRef as $paramIdx => $_) {
+            if (isset($block->paramNames[$paramIdx]) && '' !== $block->paramNames[$paramIdx]) {
+                $byRefParamNames[$block->paramNames[$paramIdx]] = true;
+            }
+        }
         foreach ($block->eachNamedScopeSlot() as [$name, $slotIdx]) {
             if ('this' === $name) {
+                continue;
+            }
+            // By-ref formals alias caller storage (ZEND_SEND_REF); nulling them would
+            // wipe the caller's lvalue after `$x = …` (#24162).
+            if (isset($byRefParamNames[$name])) {
                 continue;
             }
             $scopedOp = $block->operandForScopeSlot($slotIdx);
@@ -19138,7 +19210,16 @@ class JIT {
             if (Variable::KIND_VARIABLE !== $var->kind || Variable::TYPE_VALUE !== $var->type) {
                 continue;
             }
-            $this->context->builder->call($writeNull, $var->value);
+            // Formal storage was rebound to the caller's box (#24162).
+            if ($var->borrowedValueEntry || null !== $var->valueBoxAliasPtr) {
+                continue;
+            }
+            // value may already be a __value__* (bindCaptureSlotByReference).
+            $llvmTy = $this->context->getStringFromType($var->value->typeOf());
+            $nullPtr = '__value__*' === $llvmTy
+                ? $var->value
+                : JIT\JitValueBox::pointer($this->context, $var->value);
+            $this->context->builder->call($writeNull, $nullPtr);
         }
     }
 

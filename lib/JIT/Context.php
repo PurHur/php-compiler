@@ -2552,6 +2552,20 @@ class Context {
 
     public function getVariableFromOpInScopes(Operand $op): Variable
     {
+        // Prefer by-ref / name rebinds over a stale same-object scope entry. php-cfg
+        // uses distinct SSA Vars for `$n` (assign vs ARG_SEND vs echo); SEND_REF
+        // updates namedVariableBindings while the echo operand may still hold the
+        // pre-call constant (#24162).
+        $name = OperandName::resolve($op);
+        if (null !== $name && '' !== $name) {
+            $resolved = $this->resolveRefAliasName($name);
+            if (isset($this->namedVariableBindings[$resolved])) {
+                $bound = $this->namedVariableBindings[$resolved];
+                $this->scope->variables[$op] = $bound;
+
+                return $bound;
+            }
+        }
         if ($this->scope->variables->contains($op)) {
             return $this->scope->variables[$op];
         }

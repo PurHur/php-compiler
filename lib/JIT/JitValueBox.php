@@ -380,6 +380,11 @@ final class JitValueBox
             return;
         }
         if (Variable::TYPE_VALUE === $var->type) {
+            // Script-global slots are __value__**; always re-load via valuePtrFromVariable
+            // rather than caching one load() as valueBoxAliasPtr (#24162, #24009).
+            if ($var->functionStaticGlobal && Variable::KIND_VALUE === $var->kind) {
+                return;
+            }
             $var->valueBoxAliasPtr = self::valuePtrFromVariable($context, $var);
 
             return;

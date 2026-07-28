@@ -355,6 +355,7 @@ class Block {
             }
         }
         $fallback = null;
+        $namedTemp = null;
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] !== $offset) {
                 continue;
@@ -362,8 +363,20 @@ class Block {
             if ($operand instanceof VarOperand) {
                 return $operand;
             }
+            // Prefer a named Temporary (live CV) over a same-slot Literal so echo/reads
+            // after by-ref calls are not constant-folded to the pre-call value (#24162).
+            if (
+                $operand instanceof Operand\Temporary
+                && null !== self::resolveVariableName($operand)
+            ) {
+                $namedTemp = $operand;
+
+                continue;
+            }
             if ($operand instanceof Operand\Literal) {
-                $fallback = $operand;
+                if (null === $fallback) {
+                    $fallback = $operand;
+                }
 
                 continue;
             }
@@ -372,7 +385,7 @@ class Block {
             }
         }
 
-        return $fallback;
+        return $namedTemp ?? $fallback;
     }
 
     /**
