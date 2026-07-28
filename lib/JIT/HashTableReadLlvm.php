@@ -29,87 +29,22 @@ final class HashTableReadLlvm
             $context->builder->structGep($entryPtr, $valueMap['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        // Mask IS_REFCOUNTED so VM string tags (4|0x80) still match (#21921).
+        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
 
-        $stringBlock = BasicBlockHelper::append($context, 'ht_rb_string_'.$tag);
-        $htBlock = BasicBlockHelper::append($context, 'ht_rb_ht_'.$tag);
-        $checkHt = BasicBlockHelper::append($context, 'ht_rb_check_ht_'.$tag);
-        $checkObject = BasicBlockHelper::append($context, 'ht_rb_check_obj_'.$tag);
-        $objectBlock = BasicBlockHelper::append($context, 'ht_rb_object_'.$tag);
+        // TYPE_ENUM_CASE is not in JitValueBox::copyFromPointer — keep the object arm.
+        // Everything else (null/bool/double/long/string/ht/object) goes through the shared
+        // typed copy so null/bool/float slots are not misread as int(0) (#24232).
         $enumCaseBlock = BasicBlockHelper::append($context, 'ht_rb_enum_case_'.$tag);
-        $longBlock = BasicBlockHelper::append($context, 'ht_rb_long_'.$tag);
+        $copyBlock = BasicBlockHelper::append($context, 'ht_rb_copy_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_rb_done_'.$tag);
 
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
-        );
-        $context->builder->branchIf($isString, $stringBlock, $checkHt);
-
-        $context->builder->positionAtEnd($checkHt);
-        $isHt = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
-        );
-        $context->builder->branchIf($isHt, $htBlock, $checkObject);
-
-        $context->builder->positionAtEnd($checkObject);
-        $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
-        );
-        $checkEnumCase = BasicBlockHelper::append($context, 'ht_rb_check_enum_'.$tag);
-        $context->builder->branchIf($isObject, $objectBlock, $checkEnumCase);
-
-        $context->builder->positionAtEnd($checkEnumCase);
         $isEnumCase = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
+            $kind,
+            $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE & 0x7f, false)
         );
-        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $longBlock);
-
-        $context->builder->positionAtEnd($stringBlock);
-        $str = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $entryPtr
-        );
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $destPtr,
-            $owned
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($htBlock);
-        $childHt = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $entryPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $destPtr,
-            $childHt
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($objectBlock);
-        $obj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $entryPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $destPtr,
-            $obj
-        );
-        $context->builder->branch($done);
+        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $copyBlock);
 
         $context->builder->positionAtEnd($enumCaseBlock);
         $enumObj = $context->builder->call(
@@ -123,12 +58,8 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($done);
 
-        $context->builder->positionAtEnd($longBlock);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $destPtr,
-            $context->builder->call($context->lookupFunction('__value__readLong'), $entryPtr)
-        );
+        $context->builder->positionAtEnd($copyBlock);
+        JitValueBox::copyFromPointer($context, $slot, $entryPtr);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
@@ -160,8 +91,6 @@ final class HashTableReadLlvm
             $ht,
             $keyStr
         );
-        $valueMap = $context->structFieldMap['__value__'];
-        $i8 = $context->getTypeFromString('int8');
         $done = BasicBlockHelper::append($context, 'ht_sk_done_'.$tag);
         $isNullPtr = $context->builder->icmp(
             Builder::INT_EQ,
@@ -169,9 +98,10 @@ final class HashTableReadLlvm
             $valPtr->typeOf()->constNull()
         );
         $nullBlock = BasicBlockHelper::append($context, 'ht_sk_null_'.$tag);
-        $checkType = BasicBlockHelper::append($context, 'ht_sk_check_type_'.$tag);
-        $context->builder->branchIf($isNullPtr, $nullBlock, $checkType);
+        $copyBlock = BasicBlockHelper::append($context, 'ht_sk_copy_'.$tag);
+        $context->builder->branchIf($isNullPtr, $nullBlock, $copyBlock);
 
+        // Missing key → null (Zend undefined-index softens to null under @ / in some contexts).
         $context->builder->positionAtEnd($nullBlock);
         $context->builder->call(
             $context->lookupFunction('__value__writeNull'),
@@ -179,87 +109,9 @@ final class HashTableReadLlvm
         );
         $context->builder->branch($done);
 
-        $context->builder->positionAtEnd($checkType);
-        $typeByte = $context->builder->load(
-            $context->builder->structGep($valPtr, $valueMap['type'])
-        );
-
-        $stringBlock = BasicBlockHelper::append($context, 'ht_sk_string_'.$tag);
-        $htBlock = BasicBlockHelper::append($context, 'ht_sk_ht_'.$tag);
-        $checkHt = BasicBlockHelper::append($context, 'ht_sk_check_ht_'.$tag);
-        $checkObject = BasicBlockHelper::append($context, 'ht_sk_check_obj_'.$tag);
-        $objectBlock = BasicBlockHelper::append($context, 'ht_sk_object_'.$tag);
-        $longBlock = BasicBlockHelper::append($context, 'ht_sk_long_'.$tag);
-
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
-        );
-        $context->builder->branchIf($isString, $stringBlock, $checkHt);
-
-        $context->builder->positionAtEnd($checkHt);
-        $isHt = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
-        );
-        $context->builder->branchIf($isHt, $htBlock, $checkObject);
-
-        $context->builder->positionAtEnd($checkObject);
-        $isObject = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
-        );
-        $context->builder->branchIf($isObject, $objectBlock, $longBlock);
-
-        $context->builder->positionAtEnd($stringBlock);
-        $str = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $valPtr
-        );
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $destPtr,
-            $owned
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($htBlock);
-        $childHt = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $valPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $destPtr,
-            $childHt
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($objectBlock);
-        $obj = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $valPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $destPtr,
-            $obj
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($longBlock);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $destPtr,
-            $context->builder->call($context->lookupFunction('__value__readLong'), $valPtr)
-        );
+        // Shared typed copy — null/bool/double must not fall through to writeLong (#24232).
+        $context->builder->positionAtEnd($copyBlock);
+        JitValueBox::copyFromPointer($context, $slot, $valPtr);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
