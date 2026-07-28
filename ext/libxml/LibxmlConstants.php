@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\libxml;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * libxml2 parse/error/version constants (php-src ext/libxml/libxml.c / libxml.stub.php;
- * issues #6058, #11885, #24051).
+ * issues #6058, #11885, #24051, #24439).
  *
  * @see libxml2 parser.h — XML_PARSE_*
  * @see libxml2 xmlversion.h — LIBXML_VERSION / LIBXML_DOTTED_VERSION
@@ -34,7 +36,11 @@ final class LibxmlConstants
 
     public const LIBXML_ERR_FATAL = 3;
 
-    /** libxml2 XML_PARSE_* flags exposed to userland. */
+    /**
+     * libxml2 XML_PARSE_RECOVER — userland constant only on PHP 8.4+
+     * ({@see CompilerVersion::supportsLibxmlRecoverConstant()}; #24439).
+     * Class const retained for Dom\XMLDocument option masks (living API is 8.4+).
+     */
     public const LIBXML_RECOVER = 1;
 
     public const LIBXML_NOENT = 2;
@@ -124,8 +130,13 @@ final class LibxmlConstants
     /** @return array<string, int> */
     public static function parseFlagConstants(): array
     {
-        return [
-            'LIBXML_RECOVER' => self::LIBXML_RECOVER,
+        $flags = [];
+        // PHP 8.4+ only — absent from php-src 8.2 stubs (#24439).
+        if (CompilerVersion::supportsLibxmlRecoverConstant()) {
+            $flags['LIBXML_RECOVER'] = self::LIBXML_RECOVER;
+        }
+
+        return $flags + [
             'LIBXML_NOENT' => self::LIBXML_NOENT,
             'LIBXML_DTDLOAD' => self::LIBXML_DTDLOAD,
             'LIBXML_DTDATTR' => self::LIBXML_DTDATTR,
