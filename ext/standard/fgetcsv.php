@@ -108,7 +108,12 @@ final class fgetcsv extends Internal
             // php-src 8.4+: omitted $escape → E_DEPRECATED (#21179, file.c).
             VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'fgetcsv');
         }
-        JitCsvArg::validateFgetcsvCall($context, ...$args);
+        if (!JitCsvArg::validateFgetcsvCall($context, ...$args)) {
+            return $context->builder->pointerCast(
+                $context->constantFromInteger(0, 'int64'),
+                $context->getTypeFromString('__value__*')
+            );
+        }
 
         return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
     }

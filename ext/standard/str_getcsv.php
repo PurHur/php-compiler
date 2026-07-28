@@ -59,6 +59,8 @@ final class str_getcsv extends Internal
             // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
             VmCsvArg::emitOmittedEscapeDeprecation($frame, 'str_getcsv');
         }
+        // php-src 8.4+: multi-byte separator/enclosure/escape → ValueError (#24148, UPGRADING).
+        VmCsvArg::validateStrGetcsvOptions($separator, $enclosure, $escape);
         if (null === $frame->returnVar) {
             return;
         }
@@ -93,6 +95,14 @@ final class str_getcsv extends Internal
         } else {
             // php-src 8.4+: omitted $escape → E_DEPRECATED (#21174, file.c).
             VmCsvArg::emitJitOmittedEscapeDeprecation($context, 'str_getcsv');
+        }
+        // php-src 8.4+: multi-byte separator/enclosure/escape → ValueError (#24148, UPGRADING).
+        if (!JitCsvArg::validateStrGetcsvCall($context, ...$args)) {
+            // Compile-time ValueError already emitted; return a dummy __value__* (fputcsv pattern).
+            return $context->builder->pointerCast(
+                $context->constantFromInteger(0, 'int64'),
+                $context->getTypeFromString('__value__*')
+            );
         }
 
         return JitStrGetcsv::invoke($context, $input, $separator, $enclosure, $escape);
