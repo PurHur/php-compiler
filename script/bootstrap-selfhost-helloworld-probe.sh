@@ -24,12 +24,69 @@ M3_EMIT_PATH="none"
 M3_EMIT_HELPER_LINKED=0
 M3_BLOCK_REASON="native emit helper not linked (set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1)"
 
+# When inventory compile_driver sidecar is fingerprint-stale, cold IncludeHelper OOMs
+# past 24GiB (#23970). Prefer the committed gen-0 argv driver as emit helper — that is
+# the honest M3 HelloWorld native emit path (#22178); later argv -o OUT SOURCE must still
+# print helloworld_compile_smoke: compile OK (no ready-stub / no HelloWorld blob COPY).
+# When helloworld smoke main sidecar is fingerprint-stale, Zend AOT of main.php is a
+# multi-GB IncludeHelper (same class as compile_driver — #23970). Prefer the committed
+# smoke-main blob after a functional run check (must print bundle OK).
+helloworld_try_prelinked_smoke_probe() {
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  local candidate
+  for candidate in \
+    "${ROOT}/build/.m3_helloworld_smoke_main_aot_blob" \
+    "${ROOT}/prelinked/bootstrap-gen0/.m3_helloworld_smoke_main_aot_blob"
+  do
+    [[ -x "${candidate}" && -s "${candidate}" ]] || continue
+    mkdir -p "$(dirname "${PROBE}")"
+    if ! cp -f "${candidate}" "${PROBE}"; then
+      continue
+    fi
+    chmod +x "${PROBE}" 2>/dev/null || true
+    if [[ -x "${PROBE}" ]] && "${PROBE}" 2>/dev/null | grep -q 'compiler_helloworld_smoke bundle OK'; then
+      echo "bootstrap-selfhost-helloworld-probe: using prelinked smoke main as probe (${candidate} -> ${PROBE}; avoid Zend main.php cold AOT — #23970/#9704)" >&2
+      return 0
+    fi
+    rm -f "${PROBE}"
+  done
+  return 1
+}
+
+helloworld_try_gen0_argv_as_emit_helper() {
+  bootstrap_gen0_install_prelinked_driver 2>/dev/null || true
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  local candidate
+  for candidate in \
+    "${ROOT}/build/bin-compile-aot" \
+    "${ROOT}/build/.m3_bin_compile_aot_blob" \
+    "${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot" \
+    "${ROOT}/prelinked/bootstrap-gen0/.m3_bin_compile_aot_blob"
+  do
+    [[ -x "${candidate}" && -s "${candidate}" ]] || continue
+    # Ready-echo stubs ignore argv (#22178 / re-#21860).
+    if "${candidate}" 2>/dev/null | grep -q 'compiler_helloworld_compile_driver ready'; then
+      continue
+    fi
+    mkdir -p "$(dirname "${EMIT_HELPER}")"
+    if ! cp -f "${candidate}" "${EMIT_HELPER}"; then
+      continue
+    fi
+    chmod +x "${EMIT_HELPER}" 2>/dev/null || true
+    if [[ -x "${EMIT_HELPER}" ]]; then
+      echo "bootstrap-selfhost-helloworld-probe: using gen-0 argv driver as emit helper (${candidate} -> ${EMIT_HELPER}; avoid cold inventory compile_driver OOM — #23970/#22178)" >&2
+      return 0
+    fi
+  done
+  return 1
+}
+
 helloworld_m3_emit_next_lower() {
   if [[ "${M3_EMIT_HELPER_LINKED}" -eq 0 ]]; then
     if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" != "1" ]]; then
       echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: set BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 (+ real lowering + runtime compile) before emit-TU execute (#2572)" >&2
     elif grep -qE 'Allowed memory size|memory exhausted' <<< "${M3_BLOCK_REASON}${m3_link_out:-}"; then
-      echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: inventory compile_driver cold AOT still OOMs past 24GiB after skip-bundle (#23970) — refresh prelinked/.m3_compile_driver_aot_blob or shrink emit-driver require graph; stale-sidecar refusal currently forces cold link" >&2
+      echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: cold inventory compile_driver still OOMs (#23970) — ensure prelinked gen-0 argv driver is present for emit-helper fallback (#22178), or refresh .m3_compile_driver_aot_blob / shrink require graph" >&2
     else
       echo "bootstrap-selfhost-helloworld-probe: NEXT_LOWER: M3 emit helper link — ${M3_BLOCK_REASON} (#1768)" >&2
     fi
@@ -67,8 +124,8 @@ ci_apply_llvm_memory_env
 # Skip-bundle + HELPER_RUNTIME_O fixes phpc_str_replace, but IncludeHelper of the
 # Runtime transitive closure still OOMs at 24GiB (measured). Floor 16GiB for residual
 # peak; host: PHP_COMPILER_DOCKER_MEM=16g … PHP_COMPILER_CI_RAM_GB=0.
-# NEXT_LOWER when still OOM: refresh prelinked .m3_compile_driver_aot_blob or shrink
-# compile_driver requires (stale-sidecar refusal currently forces cold inventory AOT).
+# When compile_driver sidecar is fingerprint-stale, prefer gen-0 argv driver as emit
+# helper (#22178) instead of cold inventory AOT — see helloworld_try_gen0_argv_as_emit_helper.
 # shellcheck source=ci-resource-limits.sh
 source "$(dirname "$0")/ci-resource-limits.sh"
 export PHP_COMPILER_CI_RAM_GB=0
@@ -211,6 +268,15 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
     m3_link_code=0
     m3_link_out="bootstrap-selfhost-helloworld-probe: prelinked sidecar emit (${EMIT_HELPER}, #9704)"
     echo "bootstrap-selfhost-helloworld-probe: native emit helper from prelinked sidecar (${EMIT_HELPER}, ${m3_link_mode}, #9704)"
+  elif [[ "${BOOTSTRAP_M3_FORCE_EMIT_HELPER_LINK:-0}" != "1" ]] \
+    && [[ "${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}" == "1" ]] \
+    && helloworld_try_gen0_argv_as_emit_helper; then
+    # Stale compile_driver sidecar refusal would otherwise cold-link inventory and OOM (#23970).
+    m3_emit_helper_from_prelinked=0
+    m3_link_code=0
+    m3_link_mode="gen-0 argv driver (#22178, #23970)"
+    m3_link_out="bootstrap-selfhost-helloworld-probe: gen-0 argv emit helper (${EMIT_HELPER})"
+    echo "bootstrap-selfhost-helloworld-probe: native emit helper from gen-0 argv driver (${EMIT_HELPER}, ${m3_link_mode})"
   else
     set +e
     echo "bootstrap-selfhost-helloworld-probe: linking native emit helper (${m3_link_mode})..."
@@ -298,7 +364,9 @@ if [[ "${BOOTSTRAP_M3_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   fi
 fi
 
-if ! bootstrap_compile_invoke "${PROBE}" "${ENTRY}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
+if helloworld_try_prelinked_smoke_probe; then
+  :
+elif ! bootstrap_compile_invoke "${PROBE}" "${ENTRY}" env PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
   echo "bootstrap-selfhost-helloworld-probe: link bundle failed (see stderr above)" >&2
   exit 1
 fi

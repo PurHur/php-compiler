@@ -489,7 +489,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', $jit);
     }
 
-    /** Issue #23970: skip-bundle + helper-runtime O; 16G floor (bundling OOMs through 24G). */
+    /** Issue #23970: skip-bundle + helper-runtime O; 16G floor; gen-0 argv emit-helper fallback. */
     public function testHelloWorldProbeRaisesCompileDriverMemoryFloor(): void
     {
         $script = (string) file_get_contents(self::$root.'/script/bootstrap-selfhost-helloworld-probe.sh');
@@ -498,6 +498,11 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O=1', $script);
         $this->assertStringContainsString('PHP_COMPILER_CI_RAM_GB=0', $script);
         $this->assertStringContainsString('PHP_COMPILER_DOCKER_MEM=16g', $script);
+        $this->assertStringContainsString('helloworld_try_gen0_argv_as_emit_helper', $script);
+        $this->assertStringContainsString('using gen-0 argv driver as emit helper', $script);
+        $this->assertStringContainsString('avoid cold inventory compile_driver OOM', $script);
+        $this->assertStringContainsString('helloworld_try_prelinked_smoke_probe', $script);
+        $this->assertStringContainsString('using prelinked smoke main as probe', $script);
         $compile = (string) file_get_contents(self::$root.'/bin/compile.php');
         $this->assertStringContainsString("'16384M'", $compile);
         $this->assertStringContainsString('compile_driver.php', $compile);
@@ -513,8 +518,8 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('HelperRuntimeCache::enabled()', $strReplace);
         $makefile = (string) file_get_contents(self::$root.'/Makefile');
         $this->assertStringContainsString('PHP_COMPILER_HELPER_RUNTIME_O', $makefile);
-        $this->assertStringContainsString('still OOMs at 24GiB', $makefile);
-        $this->assertStringContainsString('cold AOT still OOMs past 24GiB', $script);
+        $this->assertStringContainsString('gen-0 argv driver as emit helper', $makefile);
+        $this->assertStringContainsString('avoid cold inventory compile_driver OOM', $script);
     }
 
     public function testHelloWorldProbeDocumentsEmitPathAndStrict(): void

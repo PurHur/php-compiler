@@ -377,8 +377,11 @@ bootstrap-selfhost-vm-driver-execute-probe:
 	./script/bootstrap-selfhost-vm-driver-execute-probe.sh
 # Inventory emit-helper (#23970): skip SourceBundler + HELPER_RUNTIME_O for phpc_str_replace.
 # Bundling OOMs through 24GiB; skip-bundle still OOMs at 24GiB on inventory-scale IncludeHelper
-# (measured 2026-07-27) — floor 16GiB for residual peak; host needs PHP_COMPILER_DOCKER_MEM≥16g.
-# Deeper fix: refresh gen-0 compile_driver sidecar or shrink the emit-driver require graph.
+# Inventory compile_driver emit-helper: skip-bundle + HELPER_RUNTIME_O (#23970). Bundling
+# OOMs through 24GiB; cold IncludeHelper also OOMs at 24GiB when the compile_driver
+# sidecar is fingerprint-stale. Probe falls back to gen-0 argv driver as emit helper
+# (#22178) before attempting that cold link. Floor 16GiB if cold link is forced.
+# Deeper fix remains: refresh .m3_compile_driver_aot_blob or shrink the require graph.
 bootstrap-selfhost-helloworld:
 	BOOTSTRAP_M3_LINK_COMPILE_DRIVER=1 \
 	BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING=1 \
