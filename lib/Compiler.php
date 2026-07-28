@@ -8563,6 +8563,7 @@ class Compiler {
 
     /**
      * Parameter defaults evaluated when the argument is omitted: `new Class()` (#6652).
+     * Unresolved ConstFetch / ClassConstFetch defaults defer like Zend (zend_compile_default_value, #24138).
      * First-class callables are not constant expressions (Zend/zend_compile.c, #9697).
      */
     protected function paramDefaultUsesRuntimeInit(Op\Expr\Param $param): bool
@@ -8572,6 +8573,10 @@ class Compiler {
         }
         if (null !== $this->paramDefaultFirstClassCallableExpr($param)) {
             $this->throwCompileLogic(ThrowInClassConstCompileCheck::MESSAGE);
+        }
+        // tryFoldParamDefaultSlot already failed — keep the AST and resolve at call time (#24138).
+        if (null !== $this->paramDefaultConstFetchExpr($param)) {
+            return true;
         }
 
         return false;
