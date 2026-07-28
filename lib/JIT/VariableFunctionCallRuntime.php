@@ -147,7 +147,7 @@ final class VariableFunctionCallRuntime
             if (null === $block) {
                 throw new \LogicException('VariableFunctionCallJitHelper.php parseAndCompile failed (#10135)');
             }
-            $jit = new JIT($context);
+            $jit = new \PHPCompiler\JIT($context);
             $jit->compile($block);
         });
         foreach (self::COMPILED_HELPERS as $logical) {
