@@ -909,24 +909,28 @@ final class VmDomXPath
             return self::collectDescendantAttributeNodes($ctx, $document, $matches[1], $namespaces, null, null);
         }
         // //tag[@attr='v']/@name — predicate then attribute axis (#21148).
+        // Unquoted numeric RHS uses XPath 1.0 number equality (#24333).
         if (preg_match(
-            '~^//([*\w][\w:-]*)\[@([^\]=]+)=["\']([^"\']*)["\']\]/@([\w.-]+)$~',
+            '~^//([*\w][\w:-]*)\[@([^\]=]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\]/@([\w.-]+)$~',
             $expression,
             $matches
         )) {
             $document = self::ownerDocumentOrSelf($context) ?? $context;
             $elementIds = self::collectDescendantElements($document, $matches[1], $namespaces);
+            $numeric = isset($matches[4]) && '' !== $matches[4];
+            $attrValue = $numeric ? $matches[4] : ($matches[3] ?? '');
             $elementIds = array_values(array_filter(
                 $elementIds,
                 static fn (int $id): bool => self::elementAttributeEquals(
                     DomRegistry::entry($id),
                     $matches[2],
-                    $matches[3],
-                    $namespaces
+                    $attrValue,
+                    $namespaces,
+                    $numeric
                 )
             ));
 
-            return self::attributeIdsFromElementIds($ctx, $elementIds, $matches[4], $namespaces);
+            return self::attributeIdsFromElementIds($ctx, $elementIds, $matches[5], $namespaces);
         }
         // //tag/@attr or //tag[n]/@attr — document-scoped (#21125).
         if (preg_match('~^//([*\w][\w:-]*)(?:\[(\d+)\])?/@([\w.-]+)$~', $expression, $matches)) {
@@ -1259,6 +1263,7 @@ final class VmDomXPath
      *     test: string,
      *     attr: ?string,
      *     attrValue: string,
+     *     attrNumeric: bool,
      *     position: ?int,
      *     fnPred: ?string,
      *     fnPredValue: string
@@ -1276,6 +1281,7 @@ final class VmDomXPath
                 'test' => $matches[1],
                 'attr' => null,
                 'attrValue' => '',
+                'attrNumeric' => false,
                 'position' => null,
                 'fnPred' => strtolower($matches[2]),
                 'fnPredValue' => $matches[4],
@@ -1291,6 +1297,7 @@ final class VmDomXPath
                 'test' => $matches[1],
                 'attr' => null,
                 'attrValue' => '',
+                'attrNumeric' => false,
                 'position' => null,
                 'fnPred' => 'text-eq',
                 'fnPredValue' => $matches[3],
@@ -1306,9 +1313,26 @@ final class VmDomXPath
                 'test' => $matches[1],
                 'attr' => null,
                 'attrValue' => '',
+                'attrNumeric' => false,
                 'position' => null,
                 'fnPred' => 'contains-text',
                 'fnPredValue' => $matches[3],
+            ];
+        }
+        // [@attr=N] — unquoted numeric literal; XPath 1.0 number equality (#24333).
+        if (preg_match(
+            '~^(.+?)\[@([^\]=]+)=([+-]?(?:\d+\.?\d*|\.\d+))\]$~',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => $matches[2],
+                'attrValue' => $matches[3],
+                'attrNumeric' => true,
+                'position' => null,
+                'fnPred' => null,
+                'fnPredValue' => '',
             ];
         }
         if (preg_match(
@@ -1320,6 +1344,7 @@ final class VmDomXPath
                 'test' => $matches[1],
                 'attr' => isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null,
                 'attrValue' => $matches[3] ?? '',
+                'attrNumeric' => false,
                 'position' => isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : null,
                 'fnPred' => null,
                 'fnPredValue' => '',
@@ -1330,6 +1355,7 @@ final class VmDomXPath
             'test' => $segment,
             'attr' => null,
             'attrValue' => '',
+            'attrNumeric' => false,
             'position' => null,
             'fnPred' => null,
             'fnPredValue' => '',
@@ -1390,8 +1416,8 @@ final class VmDomXPath
     }
 
     /**
-     * Apply optional [@attr='v'] / [n] / [local-name()="…"] / [text()=…] predicates
-     * (#19456, #20456, #21125, #22008).
+     * Apply optional [@attr='v'] / [@attr=N] / [n] / [local-name()="…"] / [text()=…] predicates
+     * (#19456, #20456, #21125, #22008, #24333).
      *
      * @param list<int>             $nodeIds
      * @param array<string, string> $namespaces
@@ -1405,7 +1431,8 @@ final class VmDomXPath
         ?int $position,
         array $namespaces,
         ?string $fnPred = null,
-        string $fnPredValue = ''
+        string $fnPredValue = '',
+        bool $attrNumeric = false
     ): array {
         if (null !== $attr) {
             $nodeIds = array_values(array_filter(
@@ -1414,7 +1441,8 @@ final class VmDomXPath
                     DomRegistry::entry($id),
                     $attr,
                     $attrValue,
-                    $namespaces
+                    $namespaces,
+                    $attrNumeric
                 )
             ));
         }
@@ -1540,7 +1568,8 @@ final class VmDomXPath
             $parsed['position'],
             $namespaces,
             $parsed['fnPred'],
-            $parsed['fnPredValue']
+            $parsed['fnPredValue'],
+            $parsed['attrNumeric']
         );
     }
 
@@ -1570,7 +1599,8 @@ final class VmDomXPath
                 $parsed['position'],
                 $namespaces,
                 $parsed['fnPred'],
-                $parsed['fnPredValue']
+                $parsed['fnPredValue'],
+                $parsed['attrNumeric']
             );
         }
         $ids = [];
@@ -1583,7 +1613,8 @@ final class VmDomXPath
             $parsed['position'],
             $namespaces,
             $parsed['fnPred'],
-            $parsed['fnPredValue']
+            $parsed['fnPredValue'],
+            $parsed['attrNumeric']
         );
     }
 
@@ -1684,13 +1715,17 @@ final class VmDomXPath
     }
 
     /**
+     * Attribute predicate match. Quoted RHS is string equality; unquoted numeric RHS
+     * uses XPath 1.0 number conversion (php-src/libxml; #24333).
+     *
      * @param array<string, string> $namespaces
      */
     private static function elementAttributeEquals(
         ?ObjectEntry $element,
         string $attrName,
         string $attrValue,
-        array $namespaces
+        array $namespaces,
+        bool $numericCompare = false
     ): bool {
         if (null === $element || !VmDom::isElement($element)) {
             return false;
@@ -1701,11 +1736,15 @@ final class VmDomXPath
             if (null === $namespace) {
                 return false;
             }
-
-            return VmDom::getAttributeNS($element, $namespace, $local) === $attrValue;
+            $actual = VmDom::getAttributeNS($element, $namespace, $local);
+        } else {
+            $actual = VmDom::getAttributeNS($element, null, $attrName);
+        }
+        if ($numericCompare) {
+            return self::compareNumbers(self::numberize($actual), '=', self::numberize($attrValue));
         }
 
-        return VmDom::getAttributeNS($element, null, $attrName) === $attrValue;
+        return $actual === $attrValue;
     }
 
     private static function isBooleanExpression(string $expression): bool
