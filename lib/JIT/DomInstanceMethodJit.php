@@ -114,10 +114,16 @@ final class DomInstanceMethodJit
         'domxpath::evaluate' => true,
         'domnodelist::item' => true,
         'domnodelist::getiterator' => true,
+        'domnamednodemap::getnameditem' => true,
+        'domnamednodemap::getnameditemns' => true,
         'domnamednodemap::getiterator' => true,
         'dom\\nodelist::getiterator' => true,
         'dom\\htmlcollection::getiterator' => true,
+        'dom\\namednodemap::getnameditem' => true,
+        'dom\\namednodemap::getnameditemns' => true,
         'dom\\namednodemap::getiterator' => true,
+        'dom\\dtdnamednodemap::getnameditem' => true,
+        'dom\\dtdnamednodemap::getnameditemns' => true,
         'dom\\dtdnamednodemap::getiterator' => true,
         'domtokenlist::getiterator' => true,
         'dom\\tokenlist::getiterator' => true,
@@ -397,10 +403,16 @@ final class DomInstanceMethodJit
                 return;
             }
             if ('domnodelist::getiterator' === $lc
+                || 'domnamednodemap::getnameditem' === $lc
+                || 'domnamednodemap::getnameditemns' === $lc
                 || 'domnamednodemap::getiterator' === $lc
                 || 'dom\\nodelist::getiterator' === $lc
                 || 'dom\\htmlcollection::getiterator' === $lc
+                || 'dom\\namednodemap::getnameditem' === $lc
+                || 'dom\\namednodemap::getnameditemns' === $lc
                 || 'dom\\namednodemap::getiterator' === $lc
+                || 'dom\\dtdnamednodemap::getnameditem' === $lc
+                || 'dom\\dtdnamednodemap::getnameditemns' === $lc
                 || 'dom\\dtdnamednodemap::getiterator' === $lc
                 || 'domtokenlist::getiterator' === $lc
                 || 'dom\\tokenlist::getiterator' === $lc
@@ -516,10 +528,16 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domxpath::evaluate');
             self::ensureProxy($context, 'domnodelist::item');
             self::ensureProxy($context, 'domnodelist::getiterator');
+            self::ensureProxy($context, 'domnamednodemap::getnameditem');
+            self::ensureProxy($context, 'domnamednodemap::getnameditemns');
             self::ensureProxy($context, 'domnamednodemap::getiterator');
             self::ensureProxy($context, 'dom\\nodelist::getiterator');
             self::ensureProxy($context, 'dom\\htmlcollection::getiterator');
+            self::ensureProxy($context, 'dom\\namednodemap::getnameditem');
+            self::ensureProxy($context, 'dom\\namednodemap::getnameditemns');
             self::ensureProxy($context, 'dom\\namednodemap::getiterator');
+            self::ensureProxy($context, 'dom\\dtdnamednodemap::getnameditem');
+            self::ensureProxy($context, 'dom\\dtdnamednodemap::getnameditemns');
             self::ensureProxy($context, 'dom\\dtdnamednodemap::getiterator');
             self::ensureProxy($context, 'domtokenlist::getiterator');
             self::ensureProxy($context, 'dom\\tokenlist::getiterator');
@@ -567,13 +585,13 @@ final class DomInstanceMethodJit
         'domelement' => ['setattribute', 'removeattribute'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item', 'getiterator'],
-        'domnamednodemap' => ['getiterator'],
+        'domnamednodemap' => ['getnameditem', 'getnameditemns', 'getiterator'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove', 'getiterator'],
         'dom\\tokenlist' => ['add', 'contains', 'item', 'toggle', 'remove', 'getiterator'],
         'dom\\nodelist' => ['getiterator'],
         'dom\\htmlcollection' => ['getiterator'],
-        'dom\\namednodemap' => ['getiterator'],
-        'dom\\dtdnamednodemap' => ['getiterator'],
+        'dom\\namednodemap' => ['getnameditem', 'getnameditemns', 'getiterator'],
+        'dom\\dtdnamednodemap' => ['getnameditem', 'getnameditemns', 'getiterator'],
     ];
 
     private static function ensureDomElementPropertyLayout(Context $context): void

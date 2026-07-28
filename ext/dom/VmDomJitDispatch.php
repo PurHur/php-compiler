@@ -550,6 +550,59 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMNamedNodeMap::getNamedItem() — local-name Attr lookup (php-src namednodemap.c; #24332).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function namedNodeMapGetNamedItem(ObjectEntry $namedNodeMap, array $extra): Variable
+    {
+        if (!VmDom::isNamedNodeMap($namedNodeMap)) {
+            throw new \Error('Call to undefined method '.$namedNodeMap->class->name.'::getNamedItem()');
+        }
+        $name = self::stringArg($extra[0] ?? self::missingArg('getNamedItem', 0), 'DOMNamedNodeMap::getNamedItem', 0);
+        $result = new Variable();
+        $node = VmDom::namedNodeMapGetNamedItem($namedNodeMap, $name);
+        if (null === $node) {
+            $result->null();
+        } else {
+            $result->object($node);
+        }
+
+        return $result;
+    }
+
+    /**
+     * DOMNamedNodeMap::getNamedItemNS() — JIT/AOT (#17515, #24332).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function namedNodeMapGetNamedItemNS(ObjectEntry $namedNodeMap, array $extra): Variable
+    {
+        if (!VmDom::isNamedNodeMap($namedNodeMap)) {
+            throw new \Error('Call to undefined method '.$namedNodeMap->class->name.'::getNamedItemNS()');
+        }
+        $namespace = self::nullableStringArg(
+            $extra[0] ?? self::missingArg('getNamedItemNS', 0),
+            'DOMNamedNodeMap::getNamedItemNS',
+            0
+        );
+        $localName = self::stringArg(
+            $extra[1] ?? self::missingArg('getNamedItemNS', 1),
+            'DOMNamedNodeMap::getNamedItemNS',
+            1
+        );
+        $result = new Variable();
+        $node = VmDom::namedNodeMapGetNamedItemNS($namedNodeMap, $namespace, $localName);
+        if (null === $node) {
+            $result->null();
+        } else {
+            $result->object($node);
+        }
+
+        return $result;
+    }
+
+    /**
      * IteratorAggregate::getIterator() — NodeList / NamedNodeMap / TokenList (#21298, #20884).
      *
      * @param list<Variable> $extra

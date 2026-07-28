@@ -17335,12 +17335,18 @@ class JIT {
                 return;
             }
             if ('object' === $declaringClassLc || '' === $declaringClassLc) {
-                // childNodes/attributes temps often lower as :object; ensure DOM list item()
-                // proxies before building class-id candidates (#21171 AOT, #18493).
+                // childNodes/attributes temps often lower as :object; ensure DOM list item() /
+                // NamedNodeMap getNamedItem* proxies before building class-id candidates
+                // (#21171 AOT, #18493, #24332).
                 if ('item' === $methodLc) {
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnodelist::item');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtokenlist::item');
                     JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\tokenlist::item');
+                }
+                if ('getnameditem' === $methodLc || 'getnameditemns' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnamednodemap::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\namednodemap::'.$methodLc);
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\dtdnamednodemap::'.$methodLc);
                 }
                 $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
                 if ([] !== $runtimeCandidates) {
@@ -17356,6 +17362,18 @@ class JIT {
                 // User-script AOT may omit DOMNodeList from allClassNamesById — still bind item().
                 if ('item' === $methodLc && $this->context->functionIsRegistered('domnodelist::item')) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnodelist::item');
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                // Same omission for DOMNamedNodeMap::getNamedItem* (#24332).
+                if (
+                    ('getnameditem' === $methodLc || 'getnameditemns' === $methodLc)
+                    && $this->context->functionIsRegistered('domnamednodemap::'.$methodLc)
+                ) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                        'domnamednodemap::'.$methodLc
+                    );
                     $this->context->scope->args = [$receiverVar];
 
                     return;
