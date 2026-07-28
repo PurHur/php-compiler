@@ -7543,7 +7543,11 @@ class JIT {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $aliasOp);
                         }
                         $this->assignOperand($aliasOp, $value, true);
-                        $this->recordListUnpackAssignSlot($aliasOp, $this->context->getVariableFromOp($aliasOp));
+                        $aliasVar = $this->context->getVariableFromOp($aliasOp);
+                        // `$f = function () use ($n) { ... }` — named storage assign must keep
+                        // ClosureWithCaptures on `$f` or AOT invoke drops use() snapshots (#24106).
+                        $this->preserveClosureInvokeMetadata($aliasOp, $aliasVar, $value);
+                        $this->recordListUnpackAssignSlot($aliasOp, $aliasVar);
                     } else {
                         if (null !== $aliasOp) {
                             $this->assignOperand($aliasOp, $value, $forceAssign);
@@ -13805,6 +13809,21 @@ class JIT {
         JIT\JitValueBox::publishAfterWrite($this->context, $orphanPtr);
     }
 
+    /** Keep Closure invoke proxy across assigns into locals / value boxes (#24106, #23973). */
+    private function preserveClosureInvokeMetadata(Operand $resultOp, Variable $result, Variable $value): void
+    {
+        if (null === $value->closureCall) {
+            return;
+        }
+        $result->closureCall = $value->closureCall;
+        $result->closureIsStatic = $value->closureIsStatic;
+        $result->closureIsMethodFake = $value->closureIsMethodFake;
+        $resolved = JIT\OperandName::resolve($resultOp);
+        if (null !== $resolved && '' !== $resolved) {
+            $this->context->bindVariableByName($resolved, $result);
+        }
+    }
+
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
@@ -13855,15 +13874,8 @@ class JIT {
                 // First-bind must keep Closure invoke metadata; dropping it forces
                 // RuntimeIndirectClosureCall over every {closure}_* in the module and
                 // mis-stores __value__ returns into __value__** (#23973, e20_closure).
-                if (null !== $value->closureCall) {
-                    $var->closureCall = $value->closureCall;
-                }
-                if ($value->closureIsStatic) {
-                    $var->closureIsStatic = true;
-                }
-                if ($value->closureIsMethodFake) {
-                    $var->closureIsMethodFake = true;
-                }
+                // Also bind by name so `$f = function() use ($n) {}` keeps captures (#24106).
+                $this->preserveClosureInvokeMetadata($resultOp, $var, $value);
 
                 return;
             }
@@ -13944,6 +13956,7 @@ class JIT {
                 $result->valueBoxAliasPtr,
                 $value
             );
+            $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $this->recordListUnpackAssignSlot($resultOp, $result);
 
             return;
@@ -14235,6 +14248,7 @@ class JIT {
                 $result->valueBoxAliasPtr,
                 $value
             );
+            $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
 
             return;
         }
@@ -14337,6 +14351,7 @@ class JIT {
                 JIT\JitValueBox::pointer($this->context, $result->value),
                 $value
             );
+            $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName($resolved, $result);
@@ -14405,6 +14420,7 @@ class JIT {
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
             $this->syncCompileTimeFloat($result, $value, $force);
+            $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             if ($value->isJitGenerator) {
                 $resolved = JIT\OperandName::resolve($resultOp);
                 if (null !== $resolved && '' !== $resolved) {
@@ -14576,7 +14592,7 @@ class JIT {
                         $valueRef,
                         $objVal
                     );
-                    $result->closureCall = $value->closureCall;
+                    $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
                     $result->compileTimeConstantName = $value->compileTimeConstantName;
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
 
@@ -14936,11 +14952,13 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_OBJECT === $value->type) {
+            // Boxing Closure into a value-typed local must keep invoke metadata (#24106).
             JIT\JitValueBox::assignToPointer(
                 $this->context,
                 JIT\JitValueBox::pointer($this->context, $result->value),
                 $value
             );
+            $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             $this->recordListUnpackAssignSlot($resultOp, $result);
             $result->addref();
 
