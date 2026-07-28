@@ -25,6 +25,8 @@ final class IteratorHelperRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('compileValidHashtable', $source);
         $this->assertStringContainsString('compileValidObjectKeys', $source);
         $this->assertStringContainsString('stringKeyNodeAt', $source);
+        $this->assertStringContainsString('foreach_packed_head', $source);
+        $this->assertStringNotContainsString('__hashtable__offsetIsSet', $source);
         $this->assertGreaterThan(600, substr_count($source, "\n") + 1);
     }
 

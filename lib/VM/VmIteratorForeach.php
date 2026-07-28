@@ -16,6 +16,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ObjectPropertyForeachHelper;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JitVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -317,19 +318,23 @@ final class VmIteratorForeach
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $slot = self::indexSlot($context, $slotKey);
-        $idx = $context->builder->load($slot);
-        $nextIdx = $context->builder->addNoSignedWrap($idx, $one);
-        $context->builder->store($nextIdx, $slot);
-
-        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
-        $inPacked = self::icmpUltSizeT($context, $nextIdx, $nextFree);
         $fn = $context->builder->getInsertBlock()->getParent();
+        $packedHead = $fn->appendBasicBlock('foreach_packed_head');
         $packedBody = $fn->appendBasicBlock('foreach_packed_body');
         $strInit = $fn->appendBasicBlock('foreach_str_init');
         $strWalk = $fn->appendBasicBlock('foreach_str_walk');
         $found = $fn->appendBasicBlock('foreach_found');
         $empty = $fn->appendBasicBlock('foreach_empty');
         $merge = $fn->appendBasicBlock('foreach_valid_merge');
+        $context->builder->branch($packedHead);
+
+        // Packed: mirror VM HashTable::iterValid — skip UNDEFINED holes only, not null (#24261).
+        $context->builder->positionAtEnd($packedHead);
+        $idx = $context->builder->load($slot);
+        $nextIdx = $context->builder->addNoSignedWrap($idx, $one);
+        $context->builder->store($nextIdx, $slot);
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $inPacked = self::icmpUltSizeT($context, $nextIdx, $nextFree);
         $context->builder->branchIf($inPacked, $packedBody, $strInit);
 
         $context->builder->positionAtEnd($packedBody);
@@ -345,11 +350,7 @@ final class VmIteratorForeach
             $typeByte,
             $i8->constInt(Variable::TYPE_UNDEFINED, false)
         );
-        $packedBump = $fn->appendBasicBlock('foreach_packed_bump');
-        $context->builder->branchIf($isDefined, $found, $packedBump);
-        $context->builder->positionAtEnd($packedBump);
-        $context->builder->store($context->builder->addNoSignedWrap($nextIdx, $one), $slot);
-        $context->builder->branch($packedBody);
+        $context->builder->branchIf($isDefined, $found, $packedHead);
 
         $context->builder->positionAtEnd($strInit);
         $strEntry = $fn->appendBasicBlock('foreach_str_entry');
