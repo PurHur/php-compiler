@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * #24137: nested json_decode(..., true) must compile; assoc true from ConstFetch Load.
  *
- * Runtime AOT HashTable fill remains int-wire (#20829) — tracked on the issue.
+ * Runtime AOT: literal JSON variable path green; json_encode→decode roundtrip blocked (#24137).
  */
 final class JitJsonDecodeRuntimeAssocTest extends TestCase
 {
@@ -34,6 +34,36 @@ final class JitJsonDecodeRuntimeAssocTest extends TestCase
         $this->assertFileExists($out);
         // Must not fail with "assoc flag must be a compile-time boolean".
         $this->assertFileDoesNotExist($out.'.fail');
+    }
+
+    public function testRuntimeAssocReproCompilesUnderAot(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $source = $root.'/test/repro/issue_24137_json_decode_runtime_assoc.php';
+        $out = $root.'/build/test-aot-json-decode-runtime-assoc-24137';
+        @mkdir(dirname($out), 0775, true);
+        $this->runCommand(
+            [PHP_BINARY, $root.'/bin/compile.php', '-o', $out, $source],
+            $root,
+            expectExit: 0
+        );
+        $this->assertFileExists($out);
+    }
+
+    public function testRuntimeLiteralJsonVariablePassesUnderAot(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $source = $root.'/test/repro/issue_24137_json_decode_runtime_json_literal.php';
+        $out = $root.'/build/test-aot-json-decode-runtime-json-literal-24137';
+        @mkdir(dirname($out), 0775, true);
+        $this->runCommand(
+            [PHP_BINARY, $root.'/bin/compile.php', '-o', $out, $source],
+            $root,
+            expectExit: 0
+        );
+        $this->assertFileExists($out);
+        $runOut = $this->runCommand([$out], $root, expectExit: 0);
+        $this->assertSame("1 1\n", $runOut);
     }
 
     /**

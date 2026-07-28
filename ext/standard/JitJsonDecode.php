@@ -71,21 +71,32 @@ final class JitJsonDecode
     public static function decodeRuntime(Context $context, JITVariable $json): Value
     {
         StringJsonDecode::ensureLinked($context);
-        // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #18852 TypeError).
-        $jsonString = JitStringBuiltinArg::lowerTrimFamilyString(
-            $context,
-            $json,
-            'json_decode',
-            0,
-            'json'
-        );
+        if (JITVariable::TYPE_VALUE === $json->type) {
+            // json_encode() boxes __string__* in __value__* — read + own before NestedJIT (#24137).
+            $jsonString = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::valuePtrFromVariable($context, $json)
+            );
+            $jsonString = $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $jsonString
+            );
+        } else {
+            // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #18852 TypeError).
+            $jsonString = JitStringBuiltinArg::lowerTrimFamilyString(
+                $context,
+                $json,
+                'json_decode',
+                0,
+                'json'
+            );
+        }
 
         return self::decodeRuntimeString($context, $jsonString);
     }
 
     public static function decodeRuntimeString(Context $context, Value $jsonString): Value
     {
-        // __compiler_json_decode returns __value__* (Unserialize #20785 / #20829 ABI).
         return $context->builder->call(
             $context->lookupFunction('__compiler_json_decode'),
             $jsonString

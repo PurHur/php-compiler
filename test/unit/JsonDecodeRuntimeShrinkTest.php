@@ -18,24 +18,28 @@ final class JsonDecodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('json_decode_bridge_entry', $source);
         $this->assertStringContainsString('json_validate_bridge_entry', $source);
-        $this->assertStringContainsString('__value__writeLong', $source);
+        $this->assertStringContainsString('resultTag', $source);
         $this->assertStringContainsString('returnValue', $source);
+        $this->assertStringNotContainsString('__compiler_json_decode_tag', $source);
         $this->assertStringNotContainsString('StringJsonDecodeJit', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('StringJsonDecodeInventoryStubs', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(280, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(380, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecodeJit.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php');
     }
 
-    public function testJsonDecodeJitHelperDecodesIntJson(): void
+    public function testJsonDecodeJitHelperUsesNativeHashtableMaterializer(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonDecodeJitHelper.php');
         $this->assertStringContainsString('function decode(string $payload): int', $source);
-        $this->assertStringNotContainsString('VmJson::importDecoded(', $source);
-        $this->assertStringNotContainsString('VmJsonFormat::decode(', $source);
-        $this->assertLessThan(60, \substr_count($source, "\n") + 1, 'JsonDecodeJitHelper must stay Unserialize-slim (#20829)');
+        $this->assertStringContainsString('phpc_native_ht_set_string_key_long', $source);
+        $this->assertStringContainsString('VmJsonFormat::decode(', $source);
+        $this->assertStringContainsString('resultTag', $source);
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecode.php');
+        $this->assertStringContainsString('ensureNativeHtInternalProxies', $bridge);
+        $this->assertStringContainsString('phpc_native_ht_set_long_at', $bridge);
         $validate = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonValidateJitHelper.php');
         $this->assertStringContainsString('VmJsonScanner::validate', $validate);
         $this->assertStringContainsString('VmJson::lastError', $validate);

@@ -86,7 +86,7 @@ final class JitJsonEncode
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $ptr,
-            $result
+            $context->builder->call($context->lookupFunction('__string__separate'), $result)
         );
         $context->builder->branch($doneBlock);
 
