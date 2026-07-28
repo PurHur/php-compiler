@@ -1,16 +1,9 @@
 --TEST--
-stdlib dns_get_record(null) — soft-null DEP+coerce on 8.4 forward profile (#24178, reverts #23858, ext/standard/dns.c)
+stdlib dns_get_record(null) — TypeError on 8.4 forward profile (#23858/#23856, reverts #21446, ext/standard/dns.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-set_error_handler(static function (int $no, string $msg): bool {
-    if (E_DEPRECATED === $no) {
-        echo "DEP\n";
-        return true;
-    }
-    return false;
-});
 try {
     var_export(dns_get_record(null));
     echo " COERCED\n";
@@ -25,7 +18,5 @@ try {
 }
 ?>
 --EXPECT--
-DEP
-array (
-) COERCED
+dns_get_record(): Argument #1 ($hostname) must be of type string, null given
 empty ok

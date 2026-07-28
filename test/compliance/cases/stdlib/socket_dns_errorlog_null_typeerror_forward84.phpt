@@ -1,5 +1,5 @@
 --TEST--
-stdlib error_log/gethostbyname/dns_get_record(null) soft-null + pfsockopen(null) TypeError (#24178 / #23823)
+stdlib error_log/pfsockopen/gethostbyname/dns_get_record(null) TypeError batch (#23858, reverts #21446)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -21,7 +21,7 @@ foreach (
 }
 ?>
 --EXPECT--
-error_log COERCED
+error_log: error_log(): Argument #1 ($message) must be of type string, null given
 pfsockopen: pfsockopen(): Argument #1 ($hostname) must be of type string, null given
-gethostbyname COERCED
-dns_get_record COERCED
+gethostbyname: gethostbyname(): Argument #1 ($hostname) must be of type string, null given
+dns_get_record: dns_get_record(): Argument #1 ($hostname) must be of type string, null given
