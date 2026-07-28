@@ -234,11 +234,25 @@ final class SplArrayStorage
         return \PHPCompiler\VM\HashTableJitHelper::duplicateCopy(self::state($object)['table']);
     }
 
-    /** php-src spl_array_object_exchange_array — replace backing array, return previous (#12964). */
+    /**
+     * php-src spl_array_object_exchange_array — replace backing array, return previous (#12964).
+     *
+     * Outstanding ArrayIterator / RecursiveArrayIterator instances share the live HashTable
+     * (php-src SPL_ARRAY_USE_OTHER via getIterator / ArrayIterator::__construct). Replacing only
+     * the ArrayObject store entry would leave them on the stale table (#24243); retarget every
+     * store row that still points at the previous HashTable identity. Iterator positions are kept
+     * (Zend does not rewind USE_OTHER iterators on exchange).
+     */
     public static function exchangeArray(ObjectEntry $object, HashTable $input): HashTable
     {
-        $old = self::state($object)['table']->duplicate();
-        self::$store[$object->id]['table'] = $input->duplicate();
+        $oldTable = self::state($object)['table'];
+        $old = $oldTable->duplicate();
+        $newTable = $input->duplicate();
+        foreach (self::$store as $id => $state) {
+            if ($state['table'] === $oldTable) {
+                self::$store[$id]['table'] = $newTable;
+            }
+        }
         self::$store[$object->id]['pos'] = 0;
 
         return $old;
