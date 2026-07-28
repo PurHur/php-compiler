@@ -129,6 +129,7 @@ final class StdlibModuleConstants
             'ZLIB_RLE' => 3,
             'ZLIB_FIXED' => 4,
             'ZLIB_DEFAULT_STRATEGY' => 0,
+            ...self::zlibVernumConstant(),
             'STREAM_PF_UNIX' => StdlibConstants::STREAM_PF_UNIX,
             'STREAM_PF_INET' => StdlibConstants::STREAM_PF_INET,
             'STREAM_SOCK_STREAM' => StdlibConstants::STREAM_SOCK_STREAM,
@@ -161,7 +162,43 @@ final class StdlibModuleConstants
             $out[strtoupper($lc)] = $value;
         }
 
-        return $out + GetDefinedConstantsParity::standardStringConstants();
+        return $out + self::zlibVersionConstant() + GetDefinedConstantsParity::standardStringConstants();
+    }
+
+    /**
+     * Pinned zlib identity for php-compiler:22.04-dev / Ubuntu 22.04 (zlib 1.2.11).
+     * Used when host Zend does not expose ZLIB_VERSION / ZLIB_VERNUM (AOT/self-host).
+     */
+    public const ZLIB_VERSION_FALLBACK = '1.2.11';
+
+    public const ZLIB_VERNUM_FALLBACK = 4784;
+
+    /**
+     * ZLIB_VERNUM — php-src ext/zlib/zlib.c (#24072). Prefer host Zend when present.
+     *
+     * @return array<string, int>
+     */
+    public static function zlibVernumConstant(): array
+    {
+        if (\defined('ZLIB_VERNUM')) {
+            return ['ZLIB_VERNUM' => (int) \constant('ZLIB_VERNUM')];
+        }
+
+        return ['ZLIB_VERNUM' => self::ZLIB_VERNUM_FALLBACK];
+    }
+
+    /**
+     * ZLIB_VERSION — php-src ext/zlib/zlib.c (#24072). Prefer host Zend when present.
+     *
+     * @return array<string, string>
+     */
+    public static function zlibVersionConstant(): array
+    {
+        if (\defined('ZLIB_VERSION')) {
+            return ['ZLIB_VERSION' => (string) \constant('ZLIB_VERSION')];
+        }
+
+        return ['ZLIB_VERSION' => self::ZLIB_VERSION_FALLBACK];
     }
 
     /**
