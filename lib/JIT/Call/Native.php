@@ -95,7 +95,21 @@ class Native implements Call {
     }
 
     public function call(Context $context, Variable ... $args): Value {
-        $sentArgs = $args;
+        return $this->callWithArgMap($context, $args);
+    }
+
+    /**
+     * Invoke with a parameter-index map so named-arg holes survive.
+     *
+     * PHP's `...$sparse` unpack renumbers integer keys, which turns `n(b: 7)` into
+     * a positional first argument. NamedArgs keeps param indices; pass that map here (#23972).
+     *
+     * @param array<int, Variable> $args
+     */
+    public function callWithArgMap(Context $context, array $args): Value {
+        ksort($args);
+        // CallArgv / func_get_args: values in parameter-index order (holes omitted from the pack).
+        $sentArgs = array_values($args);
         if (null !== $this->variadicArgIndex) {
             $this->enforceVariadicTrailingArgs($context, $args);
             $args = $this->packVariadicCallArgs($context, $args);

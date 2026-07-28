@@ -21,7 +21,7 @@ silently bakes in whichever flaky cases happened to pass that day.
 
 | case | cause |
 |---|---|
-| `e07_named` | compiler crash: `TypeError` in `BackedEnumFromJit::emitCallSiteStrictCheck()` — #23972 |
+| `e07_named` | ~~compiler crash~~ **fixed** in #23972 — sparse named-arg maps preserve param indices |
 | `e16_array_slice` | compiles; runtime still hits `print_r` thin-standalone gap (#23540) — slice itself fixed in #23991 |
 | `e04_usort` | **documented limitation** — array-callable / invokable comparators deferred |
 | `e08_spread` | variadic spread not lowered: `Unsupported cast for arg type int64 from __hashtable__*` |
