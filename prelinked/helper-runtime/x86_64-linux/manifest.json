@@ -1,10 +1,10 @@
 {
     "version": 1,
-    "generated_at": "2026-07-28T23:19:39+00:00",
+    "generated_at": "2026-07-28T23:45:04+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "89951f9981e2b0035d81",
-    "unit_count": 294,
-    "total_bytes": 339236439,
+    "unit_count": 297,
+    "total_bytes": 329776397,
     "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env)"
 }
