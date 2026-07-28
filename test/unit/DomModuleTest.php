@@ -391,11 +391,12 @@ $a = $doc->documentElement->firstChild;
 $b = $a->cloneNode(true);
 echo (int) $a->isEqualNode($b), "\n";
 echo (int) $a->isSameNode($b), "\n";
+echo (int) $a->isEqualNode(null), "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'dom_is_equal_node.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("1\n0\n", ob_get_clean());
+        self::assertSame("1\n0\n0\n", ob_get_clean());
     }
 
     public function test_dom_create_attribute_ns(): void

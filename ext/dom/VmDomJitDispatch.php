@@ -776,8 +776,15 @@ final class VmDomJitDispatch
      */
     public static function isEqualNode(ObjectEntry $node, array $extra): Variable
     {
-        $other = VariableObject::entry(($extra[0] ?? self::missingArg('isEqualNode', 0))->resolveIndirect());
+        $arg = ($extra[0] ?? self::missingArg('isEqualNode', 0))->resolveIndirect();
         $result = new Variable();
+        // php-src stub ?DOMNode — null other → false (#24462, ext/dom/node.c).
+        if (Variable::TYPE_NULL === $arg->type) {
+            $result->bool(false);
+
+            return $result;
+        }
+        $other = VariableObject::entry($arg);
         $result->bool(VmDom::isEqualNode($node, $other));
 
         return $result;
