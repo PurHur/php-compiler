@@ -135,7 +135,7 @@ final class ArrayIteratorBuiltin
         return SplArrayStorage::iteratorCurrent($object);
     }
 
-    public static function key(ObjectEntry $object): int|string
+    public static function key(ObjectEntry $object): int|string|null
     {
         return SplArrayStorage::iteratorKey($object);
     }
@@ -334,7 +334,9 @@ final class ArrayIteratorKey extends VmClassMethod
             return;
         }
         $key = ArrayIteratorBuiltin::key($object);
-        if (\is_int($key)) {
+        if (null === $key) {
+            $frame->returnVar->null();
+        } elseif (\is_int($key)) {
             $frame->returnVar->int($key);
         } else {
             $frame->returnVar->string((string) $key);
