@@ -16,4 +16,11 @@ final class NestedVmVariableToObjectTest extends TestCase
         $this->assertTrue(NestedVmVariableMethodLlvm::isNestedVariableMethod('resolveindirect'));
         $this->assertFalse(NestedVmVariableMethodLlvm::isNestedVariableMethod('missing'));
     }
+
+    /** Nested JIT Variable::duplicateFrom() for usort/uksort AOT (#24142). */
+    public function testDuplicateFromHandlerIsRegistered(): void
+    {
+        $this->assertTrue(NestedVmVariableMethodLlvm::isNestedVariableMethod('duplicatefrom'));
+        $this->assertTrue(NestedVmVariableMethodLlvm::isNestedVariableMethod('copyfrom'));
+    }
 }

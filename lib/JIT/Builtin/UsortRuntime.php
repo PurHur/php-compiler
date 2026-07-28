@@ -9,8 +9,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value;
 
 /**
@@ -52,6 +55,10 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
+            // Thin AOT has Context but not Runtime->vm — VmClosureCall cannot invoke (#24142 / #23540).
+            if ($context->isThinStandaloneAotMain()) {
+                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('usort'));
+            }
             self::sortPackedWithClosure($context, $array, $callback);
         } else {
             SortRuntime::sortPacked($context, $array);
@@ -66,6 +73,9 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
+            if ($context->isThinStandaloneAotMain()) {
+                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('uksort'));
+            }
             self::sortKeysWithClosure($context, $array, $callback);
         } else {
             KeySortRuntime::ksortByKey($context, $array);
@@ -80,6 +90,9 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
+            if ($context->isThinStandaloneAotMain()) {
+                throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('uasort'));
+            }
             self::sortValuesWithClosure($context, $array, $callback);
         } else {
             self::sortValuesByStrcmp($context, $array);
@@ -100,6 +113,12 @@ final class UsortRuntime
 
     public static function implement(Context $context): void
     {
+        // Thin standalone AOT: publish sg_vm_context before NestedJIT of UsortJitHelper
+        // (VmClosureCall needs an active VM context — #24142 / peer #17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+
         if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);
 
@@ -114,13 +133,13 @@ final class UsortRuntime
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-        $void = $context->getTypeFromString('void');
+        // Helpers return a rebuilt HT (NestedJIT-safe append/add) — #24142.
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_USORT_CLOSURE,
             'usort_packed_closure_bridge_entry',
             [$htPtr, $valuePtr],
-            $void,
+            $htPtr,
             self::USORT_CLOSURE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
@@ -131,7 +150,7 @@ final class UsortRuntime
             self::ABI_UKSORT_CLOSURE,
             'uksort_keys_closure_bridge_entry',
             [$htPtr, $valuePtr],
-            $void,
+            $htPtr,
             self::UKSORT_CLOSURE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
@@ -142,7 +161,7 @@ final class UsortRuntime
             self::ABI_UASORT_CLOSURE,
             'uasort_values_closure_bridge_entry',
             [$htPtr, $valuePtr],
-            $void,
+            $htPtr,
             self::UASORT_CLOSURE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
@@ -167,12 +186,12 @@ final class UsortRuntime
 
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call(
+        $sorted = $context->builder->call(
             $context->lookupFunction(self::ABI_USORT_CLOSURE),
             $ht,
             JitValueBox::valuePtrFromVariable($context, $callback)
         );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $sorted);
     }
 
     private static function sortKeysWithClosure(Context $context, JITVariable $array, JITVariable $callback): void
@@ -185,12 +204,12 @@ final class UsortRuntime
 
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call(
+        $sorted = $context->builder->call(
             $context->lookupFunction(self::ABI_UKSORT_CLOSURE),
             $ht,
             JitValueBox::valuePtrFromVariable($context, $callback)
         );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $sorted);
     }
 
     private static function sortValuesWithClosure(Context $context, JITVariable $array, JITVariable $callback): void
@@ -203,12 +222,12 @@ final class UsortRuntime
 
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $context->builder->call(
+        $sorted = $context->builder->call(
             $context->lookupFunction(self::ABI_UASORT_CLOSURE),
             $ht,
             JitValueBox::valuePtrFromVariable($context, $callback)
         );
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $sorted);
     }
 
     /** uasort() strcmp — string-key value sort in LLVM (#5698, asort_ parity). */

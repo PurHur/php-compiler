@@ -6,26 +6,30 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmActiveContextJitHelper;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * usort()/uksort() closure comparators for compiled JIT/AOT modules (#15518, php-in-PHP).
+ * usort()/uksort()/uasort() closure comparators for compiled JIT/AOT modules (#15518, php-in-PHP).
  *
- * SSOT shared with {@see usort_} / {@see uksort_} VM execute() closure paths
- * php-src: ext/standard/array.c — php_array_usort / php_array_uksort
+ * Returns a new HashTable built with NestedJIT-safe append/add/addIndex — avoids
+ * replacePackedValues/reorderKeyedPairs which lack NestedJIT lowering (#24142).
+ * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} → sg_vm_context (#17391).
+ *
+ * SSOT shared with {@see usort_} / {@see uksort_} / {@see uasort_} VM execute() closure paths
+ * php-src: ext/standard/array.c — php_array_usort / php_array_uksort / php_array_uasort
  */
 final class UsortJitHelper
 {
-    public static function sortPackedWithClosure(HashTable $ht, Variable $closure): void
+    public static function sortPackedWithClosure(HashTable $ht, Variable $closure): HashTable
     {
         if ($ht->getNumElements() < 2) {
-            return;
+            return $ht;
         }
+        // Inline context resolve — NestedJIT mis-types `: Context` returns as int (#20816 / #24142).
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
-            throw new \LogicException(
-                'UsortJitHelper::sortPackedWithClosure() requires an active VM context in this compiler build'
-            );
+            $ctx = VmActiveContextJitHelper::resolve();
         }
         $values = [];
         foreach ($ht->iterate(true) as $value) {
@@ -34,52 +38,51 @@ final class UsortJitHelper
             $values[] = $copy;
         }
         VmClosureCall::sortVariableValues($ctx, $values, VmClosureCall::resolve($closure));
-        self::writePackedValues($ht, $values);
+
+        return self::packedFromValues($values);
     }
 
-    public static function sortKeysWithClosure(HashTable $ht, Variable $closure): void
+    public static function sortKeysWithClosure(HashTable $ht, Variable $closure): HashTable
     {
         if ($ht->getNumElements() < 2) {
-            return;
+            return $ht;
         }
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
-            throw new \LogicException(
-                'UsortJitHelper::sortKeysWithClosure() requires an active VM context in this compiler build'
-            );
+            $ctx = VmActiveContextJitHelper::resolve();
         }
         $pairs = self::collectKeyedPairs($ht);
         VmClosureCall::sortKeyedPairsByKey($ctx, $pairs, VmClosureCall::resolve($closure));
-        self::reorderFromPairs($ht, $pairs);
+
+        return self::fromKeyedPairs($pairs);
     }
 
-    public static function sortValuesWithClosure(HashTable $ht, Variable $closure): void
+    public static function sortValuesWithClosure(HashTable $ht, Variable $closure): HashTable
     {
         if ($ht->getNumElements() < 2) {
-            return;
+            return $ht;
         }
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
-            throw new \LogicException(
-                'UsortJitHelper::sortValuesWithClosure() requires an active VM context in this compiler build'
-            );
+            $ctx = VmActiveContextJitHelper::resolve();
         }
         $pairs = self::collectKeyedPairs($ht);
         VmClosureCall::sortKeyedPairsByValue($ctx, $pairs, VmClosureCall::resolve($closure));
-        self::reorderFromPairs($ht, $pairs);
+
+        return self::fromKeyedPairs($pairs);
     }
 
     /**
      * @param list<Variable> $values
      */
-    private static function writePackedValues(HashTable $ht, array $values): void
+    private static function packedFromValues(array $values): HashTable
     {
-        if (VmArray::isList($ht)) {
-            $ht->replacePackedValues($values);
-
-            return;
+        $out = new HashTable();
+        foreach ($values as $value) {
+            $out->append($value);
         }
-        $ht->assignPackedList($values);
+
+        return $out;
     }
 
     /**
@@ -102,8 +105,17 @@ final class UsortJitHelper
     /**
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
-    private static function reorderFromPairs(HashTable $ht, array $pairs): void
+    private static function fromKeyedPairs(array $pairs): HashTable
     {
-        $ht->reorderKeyedPairs($pairs);
+        $out = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $value);
+            } else {
+                $out->add($key->toString(), $value);
+            }
+        }
+
+        return $out;
     }
 }
