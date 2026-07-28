@@ -1027,9 +1027,14 @@ class VM {
             return VmIsset::storedPropertyIsSet($props[$propName]);
         }
         // ArrayObject/ArrayIterator::ARRAY_AS_PROPS — backing keys as properties (spl_array.c; #22576).
+        // has_property(isset) shares spl_array_has_dimension null-check (#24398, peer #24251).
         if (SplArrayStorage::hasArrayAsProps($object)) {
             $key = new Variable(Variable::TYPE_STRING);
             $key->string($propName);
+            $native = $this->nativeSplArrayDimensionIsSet($object, $key);
+            if (null !== $native) {
+                return $native;
+            }
 
             return SplArrayStorage::offsetExists($object, $key);
         }
