@@ -17699,10 +17699,14 @@ class Compiler {
                             }
                         }
                         // json_decode('...', true, N) — hoisted true feeds assoc (arg 1), not trailing depth (#9489).
+                        // Also json_decode(json_encode($d), true) — arg0 is a nested FuncCall dead temp (#24137).
                         $jsonDecodeAssocArg = 'json_decode' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
                             && 1 === $argIndex
-                            && $this->isEmbeddedCallLiteralArg($callOp->args[0] ?? null)
-                            && $this->callArgIsDeadInlineTemporary($callArg);
+                            && $this->callArgIsDeadInlineTemporary($callArg)
+                            && (
+                                $this->isEmbeddedCallLiteralArg($callOp->args[0] ?? null)
+                                || $this->callArgIsDeadInlineTemporary($callOp->args[0] ?? null)
+                            );
                         // Hoisted true/false/null only feeds the trailing call arg (#9140, #9660).
                         if (
                             null !== $callArg
@@ -22199,6 +22203,28 @@ class Compiler {
             }
             if (3 === $argIndex) {
                 return $constProducer;
+            }
+        }
+        // json_decode(g(), true) / json_decode(json_encode($d), true) — FuncCall + bool ConstFetch (#24137).
+        if ('json_decode' === $inlineFuncName && \count($callArgs) >= 2 && \count($callArgs) < 4) {
+            $funcProducer = null;
+            $boolConstProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $funcProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\ConstFetch || $producer instanceof Op\Expr\ClassConstFetch) {
+                    $name = $this->staticNameFromOperand($producer->name);
+                    if (null !== $name && \in_array(strtolower($name), ['true', 'false'], true)) {
+                        $boolConstProducer = $producer;
+                    }
+                }
+            }
+            if (null !== $funcProducer && null !== $boolConstProducer) {
+                return match ($argIndex) {
+                    0 => $funcProducer,
+                    1 => $boolConstProducer,
+                    default => null,
+                };
             }
         }
         // json_decode(g(), true, 512, JSON_THROW_ON_ERROR) — FuncCall + ConstFetch preludes (#12009, #15441).

@@ -37,6 +37,8 @@ final class StringJsonDecodeRuntimeStandaloneTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../../ext/standard/json_decode.php');
         $this->assertStringContainsString('LLVMIsAConstantInt($var->value->value)', $source);
         $this->assertStringNotContainsString('$var->value->isAConstantInt()', $source);
+        // ConstFetch true/false is a Load — honor compileTimeConstantName (#24137).
+        $this->assertStringContainsString('compileTimeConstantName', $source);
     }
 
     public function testJsonDecodeJitCompileTimePathDoesNotCallHostJsonDecode(): void
