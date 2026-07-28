@@ -778,20 +778,22 @@ final class HashTable {
 
     /**
      * Remove and return the first element of a packed list array (no holes).
-     * Returns null when the array is empty.
+     * Returns a null-typed Variable when the array is empty (#24025 NestedJIT).
      */
-    public function shiftFirst(): ?Variable
+    public function shiftFirst(): Variable
     {
         $this->assertConsistent();
+        $result = new Variable();
         if (0 === $this->numElements) {
-            return null;
+            $result->null();
+
+            return $result;
         }
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('shiftFirst() only supports packed list arrays without holes');
         }
         $this->assertSeparatedForWrite();
         $firstBucket = $this->buckets->read(0);
-        $result = new Variable();
         $result->copyFrom($firstBucket->value->resolveIndirect());
         if ($this->isPackedList()) {
             for ($i = 0; $i < $this->numUsed - 1; ++$i) {

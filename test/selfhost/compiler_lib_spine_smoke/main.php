@@ -5300,6 +5300,8 @@ require_once __DIR__.'/../../../lib/JIT/Call/HashTableMergeStringKeysFrom.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableNestedReceiver.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTablePadCopy.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableSliceCopy.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableShiftFirst.php';
+require_once __DIR__.'/../../../lib/JIT/HashTableShiftLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayMapLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableSliceLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableUnionCopy.php';
