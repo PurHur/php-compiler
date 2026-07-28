@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * str_starts_with()/str_ends_with() JIT must use binary-safe JitStringSearch (#4390).
+ * str_starts_with()/str_ends_with() JIT must use binary-safe findOffset (#4390, #24161).
  *
  * @group llvm
  */
@@ -39,8 +39,8 @@ PHP;
         $runtime->jitCompileBlock($block);
 
         $bc = $runtime->loadJitContext()->module->printToString();
-        $this->assertStringContainsString('__phpc_string_find_substr', $bc);
-        $this->assertStringContainsString('call i32 @__phpc_string_find_substr', $bc);
+        $this->assertStringContainsString('memcmp', $bc);
+        $this->assertStringContainsString('call i32 @memcmp', $bc);
     }
 
     public function testStrEndsWithLowersToBinarySafeHelper(): void
@@ -56,7 +56,7 @@ PHP;
         $runtime->jitCompileBlock($block);
 
         $bc = $runtime->loadJitContext()->module->printToString();
-        $this->assertStringContainsString('__phpc_string_find_substr', $bc);
-        $this->assertStringContainsString('call i32 @__phpc_string_find_substr', $bc);
+        $this->assertStringContainsString('memcmp', $bc);
+        $this->assertStringContainsString('call i32 @memcmp', $bc);
     }
 }

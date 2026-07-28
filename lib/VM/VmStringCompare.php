@@ -115,6 +115,47 @@ final class VmStringCompare
         return $context->builder->select($bothNumeric, $numericCmp, $lexNorm);
     }
 
+    /** True when $haystack starts with the same bytes as $prefix (#24161). */
+    public static function prefixIdentical(Context $context, Value $haystack, Value $prefix): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i1 = $context->getTypeFromString('int1');
+        $falseVal = $i1->constInt(0, false);
+        $hayLen = $context->builder->load(
+            $context->builder->structGep($haystack, $map['length'])
+        );
+        $prefixLen = $context->builder->load(
+            $context->builder->structGep($prefix, $map['length'])
+        );
+        $lenOk = $context->builder->icmp(Builder::INT_SGE, $hayLen, $prefixLen);
+        $lenOkBb = BasicBlockHelper::append($context, 'jit_prefix_len_ok');
+        $lenBadBb = BasicBlockHelper::append($context, 'jit_prefix_len_bad');
+        $mergeBb = BasicBlockHelper::append($context, 'jit_prefix_done');
+        $context->builder->branchIf($lenOk, $lenOkBb, $lenBadBb);
+        $context->builder->positionAtEnd($lenBadBb);
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($lenOkBb);
+        $sizeT = $context->getTypeFromString('size_t');
+        $cmp = $context->builder->call(
+            $context->lookupFunction('memcmp'),
+            $context->builder->structGep($haystack, $map['value']),
+            $context->builder->structGep($prefix, $map['value']),
+            $context->builder->zExt($prefixLen, $sizeT)
+        );
+        $prefixEq = $context->builder->icmp(
+            Builder::INT_EQ,
+            $cmp,
+            $cmp->typeOf()->constInt(0, false)
+        );
+        $context->builder->branch($mergeBb);
+        $context->builder->positionAtEnd($mergeBb);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($falseVal, $lenBadBb);
+        $phi->addIncoming($prefixEq, $lenOkBb);
+
+        return $phi;
+    }
+
     /** True when $haystack ends with the same bytes as $suffix (inventory argv absolute paths — #3046). */
     public static function suffixIdentical(Context $context, Value $haystack, Value $suffix): Value
     {
