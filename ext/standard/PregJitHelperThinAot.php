@@ -9,8 +9,8 @@ use PHPCompiler\VM\HashTable;
 /**
  * Thin standalone AOT PregJitHelper — same symbols as PregJitHelper (#24115).
  *
- * Fast-path only (no VmPregNative). Captures leave empty matches until HT NestedJIT
- * is safe; match count and replace cover the primary segfault / empty-replace bugs.
+ * Fast-path only (no VmPregNative). Captures are string slots read by
+ * {@see PregMatchRuntime} LLVM bridge (NestedJIT cannot return `__hashtable__*`).
  */
 final class PregJitHelper
 {
@@ -72,9 +72,25 @@ final class PregJitHelper
         return 1;
     }
 
+    /** Always null — HT filled from lastCap* in PregMatchRuntime (#24115). */
     public static function takeLastMatchExHashTable(): ?HashTable
     {
         return null;
+    }
+
+    public static function thinMatchExCapCount(): int
+    {
+        $n = PregAotFastPath::lastCapCount();
+        if (0 === $n) {
+            return 0;
+        }
+
+        return $n;
+    }
+
+    public static function thinMatchExCap(int $index): string
+    {
+        return '' . PregAotFastPath::lastCap($index);
     }
 
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int

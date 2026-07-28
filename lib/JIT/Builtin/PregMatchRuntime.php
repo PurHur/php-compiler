@@ -7,11 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\Variable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
@@ -47,6 +49,10 @@ final class PregMatchRuntime
 
     private const TAKE_MATCH_EX_HT = 'PHPCompiler\\ext\\standard\\PregJitHelper::takeLastMatchExHashTable';
 
+    private const THIN_MATCH_EX_CAP_COUNT = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchExCapCount';
+
+    private const THIN_MATCH_EX_CAP = 'PHPCompiler\\ext\\standard\\PregJitHelper::thinMatchExCap';
+
     private const MATCH_ALL_EX_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::matchAllExArgv';
 
     private const TAKE_MATCH_ALL_EX_HT = 'PHPCompiler\\ext\\standard\\PregJitHelper::takeLastMatchAllExHashTable';
@@ -70,6 +76,8 @@ final class PregMatchRuntime
         self::MATCH_ALL_HELPER,
         self::MATCH_EX_HELPER,
         self::TAKE_MATCH_EX_HT,
+        self::THIN_MATCH_EX_CAP_COUNT,
+        self::THIN_MATCH_EX_CAP,
         self::MATCH_ALL_EX_HELPER,
         self::TAKE_MATCH_ALL_EX_HT,
         self::REPLACE_HELPER,
@@ -273,11 +281,12 @@ final class PregMatchRuntime
         $context->builder->branchIf($htNull, $emptyBb, $writeBb);
 
         $context->builder->positionAtEnd($emptyBb);
-        $emptyHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        // Thin AOT: takeLastMatchExHashTable is always null; fill from string caps (#24115).
+        $filledHt = self::emitThinMatchExHashtableFromCaps($context, $fn);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $fn->getParam(2),
-            $emptyHt
+            $filledHt
         );
         $context->builder->returnValue($countI64);
 
@@ -289,6 +298,64 @@ final class PregMatchRuntime
         );
         $context->builder->returnValue($countI64);
         $context->registerFunction($abiName, $fn);
+    }
+
+    /**
+     * Build $matches from PregJitHelper::thinMatchExCap* (NestedJIT-safe strings).
+     */
+    private static function emitThinMatchExHashtableFromCaps(Context $context, LlvmFunction $fn): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $capCountRaw = $context->builder->call(
+            self::helperFunction($context, self::THIN_MATCH_EX_CAP_COUNT)
+        );
+        $capCount = JitNestedHelperCoerce::scalarToI64($context, $capCountRaw, $capCountRaw->typeOf());
+        $hasCaps = $context->builder->icmp(
+            Builder::INT_SGT,
+            $capCount,
+            $i64->constInt(0, true)
+        );
+        $fillBb = $fn->appendBasicBlock('preg_match_ex_thin_fill');
+        $doneBb = $fn->appendBasicBlock('preg_match_ex_thin_done');
+        $context->builder->branchIf($hasCaps, $fillBb, $doneBb);
+
+        $context->builder->positionAtEnd($fillBb);
+        // Bound to 2 slots (full match + one capture group) for thin fast path.
+        $max = 2;
+        for ($i = 0; $i < $max; ++$i) {
+            $idxBb = $fn->appendBasicBlock('preg_match_ex_thin_cap_'.$i);
+            $skipBb = $fn->appendBasicBlock('preg_match_ex_thin_skip_'.$i);
+            $need = $context->builder->icmp(
+                Builder::INT_SGT,
+                $capCount,
+                $i64->constInt($i, true)
+            );
+            $context->builder->branchIf($need, $idxBb, $skipBb);
+
+            $context->builder->positionAtEnd($idxBb);
+            $capRaw = $context->builder->call(
+                self::helperFunction($context, self::THIN_MATCH_EX_CAP),
+                $i64->constInt($i, true)
+            );
+            $capStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $capRaw);
+            $slot = new Variable(
+                $context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $capStr
+            );
+            HashTableHelper::setAtIndex($context, $ht, $sizeT->constInt($i, false), $slot);
+            $context->builder->branch($skipBb);
+
+            $context->builder->positionAtEnd($skipBb);
+        }
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+
+        return $ht;
     }
 
     private static function implementReplaceBridge(Context $context): void

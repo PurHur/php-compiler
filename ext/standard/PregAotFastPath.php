@@ -6,12 +6,27 @@ namespace PHPCompiler\ext\standard;
 
 /**
  * Minimal NestedJIT-safe preg subset for thin AOT (#24115).
+ *
+ * Plain int/string returns only — no by-ref arrays, no union returns (NestedJIT
+ * otherwise mis-types returns as `__hashtable__*` / pointer garbage).
+ *
+ * Captures: {@see self::lastCap} / {@see self::lastCapCount} after a successful match.
+ * php-src: ext/pcre/php_pcre.c (covered patterns only)
  */
 final class PregAotFastPath
 {
+    private static string $cap0 = '';
+
+    private static string $cap1 = '';
+
+    private static int $capCount = 0;
+
     /** @return int -2 unsupported, -1 error, else 0/1 */
     public static function matchCount(string $pattern, string $subject, int $offset): int
     {
+        self::$cap0 = '';
+        self::$cap1 = '';
+        self::$capCount = 0;
         $kind = self::patternKind($pattern);
         if (0 === $kind) {
             return -2;
@@ -25,6 +40,24 @@ final class PregAotFastPath
         }
 
         return self::matchClassPlus($kind, $subject, $offset);
+    }
+
+    public static function lastCapCount(): int
+    {
+        return self::$capCount;
+    }
+
+    /** Rematerialize — NestedJIT must not return callee string ptrs as i64. */
+    public static function lastCap(int $index): string
+    {
+        if (0 === $index) {
+            return '' . self::$cap0;
+        }
+        if (1 === $index) {
+            return '' . self::$cap1;
+        }
+
+        return '';
     }
 
     public static function patternKind(string $pattern): int
@@ -89,6 +122,18 @@ final class PregAotFastPath
         return self::replaceClassPlus($kind, $replacement, $subject, $limit);
     }
 
+    private static function storeCaps(string $full, bool $hasGroup): void
+    {
+        self::$cap0 = $full;
+        if ($hasGroup) {
+            self::$cap1 = $full;
+            self::$capCount = 2;
+        } else {
+            self::$cap1 = '';
+            self::$capCount = 1;
+        }
+    }
+
     private static function matchLiteral(string $pattern, string $subject, int $offset): int
     {
         $delim = \substr($pattern, 0, 1);
@@ -100,11 +145,15 @@ final class PregAotFastPath
         $bodyLen = \strlen($body);
         $subLen = \strlen($subject);
         if (0 === $bodyLen) {
+            self::storeCaps('', false);
+
             return 1;
         }
         $i = $offset;
         while ($i + $bodyLen <= $subLen) {
             if (0 === \strncmp(\substr($subject, $i), $body, $bodyLen)) {
+                self::storeCaps($body, false);
+
                 return 1;
             }
             ++$i;
@@ -121,10 +170,17 @@ final class PregAotFastPath
         } elseif (6 === $kind || 7 === $kind) {
             $charClass = 4;
         }
+        $hasGroup = (3 === $kind || 5 === $kind || 7 === $kind);
         $subLen = \strlen($subject);
         $i = $offset;
         while ($i < $subLen) {
             if (self::charInClass(\substr($subject, $i, 1), $charClass)) {
+                $j = $i + 1;
+                while ($j < $subLen && self::charInClass(\substr($subject, $j, 1), $charClass)) {
+                    ++$j;
+                }
+                self::storeCaps(\substr($subject, $i, $j - $i), $hasGroup);
+
                 return 1;
             }
             ++$i;

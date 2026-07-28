@@ -22,6 +22,9 @@ final class PregAotFastPathTest extends TestCase
         $this->assertSame(3, PregAotFastPath::patternKind('/(\d+)/'));
         $this->assertSame(3, PregAotFastPath::patternKind('#(\d+)#'));
         $this->assertSame(1, PregAotFastPath::matchCount('/(\d+)/', 'ab 12 cd', 0));
+        $this->assertSame(2, PregAotFastPath::lastCapCount());
+        $this->assertSame('12', PregAotFastPath::lastCap(0));
+        $this->assertSame('12', PregAotFastPath::lastCap(1));
     }
 
     public function testSpacePlusReplace(): void
