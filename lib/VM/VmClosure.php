@@ -137,7 +137,15 @@ final class VmClosure
     {
         $src->addref();
         JitValueBox::promoteNativeLvalueToValueBox($context, $src);
-        if (null === $src->valueBoxAliasPtr) {
+        // Script globals stay unaliased — Native::compileArg reloads load(global) (#24162).
+        if (
+            null === $src->valueBoxAliasPtr
+            && !(
+                $src->functionStaticGlobal
+                && JitVariable::KIND_VALUE === $src->kind
+                && JitVariable::TYPE_VALUE === $src->type
+            )
+        ) {
             $src->valueBoxAliasPtr = JitValueBox::valuePtrFromVariable($context, $src);
         }
 
