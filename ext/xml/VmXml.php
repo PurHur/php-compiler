@@ -309,7 +309,8 @@ final class VmXml
 
         $records = [$primary];
         if (self::XML_ERR_TAG_NOT_FINISHED === $primary['code']) {
-            $secondary = self::detectPrematureEnd(trim($data));
+            // ltrim only — trailing newlines are significant for EOF line/column (#24319).
+            $secondary = self::detectPrematureEnd(ltrim($data));
             if (null !== $secondary && self::XML_ERR_UNCLOSED_NODE_TAG === $secondary['code']) {
                 $records[] = $secondary;
             }
@@ -323,7 +324,8 @@ final class VmXml
      */
     private static function validateWellFormed(string $data): ?array
     {
-        $trimmed = trim($data);
+        // Preserve trailing newlines for libxml EOF line/column on premature-end (#24319).
+        $trimmed = ltrim($data);
         if ('' === $trimmed) {
             return self::errorRecord(1, 1, 'Document is empty', 4, LibxmlConstants::LIBXML_ERR_FATAL, 0);
         }
@@ -351,7 +353,7 @@ final class VmXml
             return $unclosed;
         }
 
-        if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed)) {
+        if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>\s*$/s', $trimmed)) {
             return null;
         }
 
@@ -741,25 +743,98 @@ final class VmXml
     }
 
     /**
-     * Match libxml "Premature end of data in tag …" (XML_ERR_UNCLOSED_NODE_TAG; #14467).
+     * Match libxml "Premature end of data in tag …" (XML_ERR_UNCLOSED_NODE_TAG; #14467 / #24319).
+     *
+     * libxml2 reports the **innermost** still-open element (top of the element stack) at EOF,
+     * embeds that tag's open line in the message, and places LibXMLError line/column at EOF.
      *
      * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
      */
     private static function detectPrematureEnd(string $data): ?array
     {
-        if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $data, $open)) {
+        $len = \strlen($data);
+        if ($len < 1 || '<' !== $data[0]) {
             return null;
         }
-        $tag = $open[1];
-        if (preg_match('/<\/'.preg_quote($tag, '/').'>\s*$/s', $data)) {
+
+        /** @var list<array{name: string, openLine: int}> $stack */
+        $stack = [];
+        $scan = 0;
+        while ($scan < $len) {
+            if ('<' !== $data[$scan]) {
+                ++$scan;
+
+                continue;
+            }
+            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/s', $data, $close, 0, $scan)) {
+                $name = $close[1];
+                if ([] === $stack || end($stack)['name'] !== $name) {
+                    // Mismatch is handled elsewhere; do not invent a premature-end here.
+                    return null;
+                }
+                array_pop($stack);
+                $scan += \strlen($close[0]);
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/s', $data, $sc, 0, $scan)) {
+                $scan += \strlen($sc[0]);
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $data, $open, 0, $scan)) {
+                $openLine = 1 + substr_count(substr($data, 0, $scan), "\n");
+                $stack[] = ['name' => $open[1], 'openLine' => $openLine];
+                $scan += \strlen($open[0]);
+
+                continue;
+            }
+            // Incomplete start tag (no '>') — leave stack as-is (outer properly-opened tags).
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)/s', $data, $partial, 0, $scan)) {
+                break;
+            }
+            $cdata = self::parseCdataSectionAt($data, $scan);
+            if (null !== $cdata) {
+                $scan = $cdata['end'];
+
+                continue;
+            }
+            $comment = self::parseCommentAt($data, $scan);
+            if (null !== $comment) {
+                $scan = $comment['end'];
+
+                continue;
+            }
+            $pi = self::parseProcessingInstructionAt($data, $scan);
+            if (null !== $pi) {
+                $scan = $pi['end'];
+
+                continue;
+            }
+            ++$scan;
+        }
+
+        if ([] === $stack) {
             return null;
         }
-        $line = 1;
+
+        $top = $stack[\count($stack) - 1];
+        $tag = $top['name'];
+        $openLine = $top['openLine'];
+        // EOF position: after last byte; a trailing newline advances to column 1 of the next line.
+        if ($len > 0 && "\n" === $data[$len - 1]) {
+            $eofLine = 1 + substr_count($data, "\n");
+            $eofColumn = 1;
+        } else {
+            $lastNl = strrpos($data, "\n");
+            $eofLine = 1 + substr_count($data, "\n");
+            $eofColumn = false === $lastNl ? $len + 1 : $len - $lastNl;
+        }
 
         return self::errorRecord(
-            $line,
-            1,
-            "Premature end of data in tag {$tag} line {$line}",
+            $eofLine,
+            $eofColumn,
+            "Premature end of data in tag {$tag} line {$openLine}\n",
             self::XML_ERR_UNCLOSED_NODE_TAG,
             LibxmlConstants::LIBXML_ERR_FATAL
         );
@@ -827,10 +902,12 @@ final class VmXml
     {
         $line = 1 + substr_count(substr($data, 0, $tagPos), "\n");
         $message = \sprintf("Couldn't find end of Start Tag %s line %d", $tag, $line);
+        // libxml points at EOF (1-based past last byte), not the '<' of the open tag (#24319 / #18332).
+        $column = \strlen($data) + 1;
 
         return self::errorRecord(
             $line,
-            $tagPos + 1,
+            $column,
             $message,
             self::XML_ERR_TAG_NOT_FINISHED,
             LibxmlConstants::LIBXML_ERR_FATAL
