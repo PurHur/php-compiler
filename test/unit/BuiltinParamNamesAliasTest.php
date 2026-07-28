@@ -211,10 +211,10 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #10027 #23224 */
+    /** @covers issue #10027 #23224 #24039 */
     public function testTrimCharactersNamedParamResolves(): void
     {
-        foreach (['trim', 'ltrim', 'rtrim'] as $fn) {
+        foreach (['trim', 'ltrim', 'rtrim', 'chop'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
             self::assertSame(['string', 'characters'], $names);
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
