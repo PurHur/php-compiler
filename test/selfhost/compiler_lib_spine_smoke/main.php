@@ -5384,6 +5384,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/WeakReferenceGet.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XmlWriterMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/XsltMethod.php';
 require_once __DIR__.'/../../../lib/JIT/CallUnpackCompileTime.php';
+require_once __DIR__.'/../../../lib/JIT/CallUnpackExpand.php';
 require_once __DIR__.'/../../../lib/JIT/CallUnpackHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CastArrayNativeJit.php';
 require_once __DIR__.'/../../../lib/JIT/CastArrayShared.php';
