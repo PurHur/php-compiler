@@ -57,6 +57,15 @@ final class ArrayReduceCallbackPolicy
             .' for JIT/AOT in this compiler build; '.self::DEFERRED_KINDS.' are deferred (#142)';
     }
 
+    /**
+     * Thin standalone AOT has Context but not Runtime->vm — closures cannot run (#24117 / #23540).
+     */
+    public static function thinAotClosureRejectionMessage(): string
+    {
+        return 'array_reduce() with a Closure callback is not supported by thin standalone AOT in this build; '
+            .'use bin/vm.php or bin/jit.php';
+    }
+
     public static function vmRejectionMessage(): string
     {
         return 'array_reduce() callback must be a string user-function name in this compiler build; '
