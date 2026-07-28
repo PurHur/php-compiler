@@ -61,7 +61,7 @@ final class str_repeat extends Internal
             return InternalStrictArg::requireString($frame, 0, 'str_repeat', 'string')->toString();
         }
 
-        return VmString::coerceTrimFamilyStringArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'str_repeat',
             0,
@@ -69,13 +69,13 @@ final class str_repeat extends Internal
         );
     }
 
-    /** Soft-null DEP+coerce on forward profile (#21428, reverts #20080; ext/standard/string.c). */
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20080, ext/standard/string.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'str_repeat', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'str_repeat', 0, 'string');
+        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'str_repeat', 0, 'string');
     }
 }
