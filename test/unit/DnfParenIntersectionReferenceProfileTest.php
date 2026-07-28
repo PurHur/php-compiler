@@ -50,20 +50,42 @@ final class DnfParenIntersectionReferenceProfileTest extends TestCase
         $this->assertSame($source, DnfParenTypeRewriter::rewrite($source));
     }
 
-    public function testRuntimeRejectsMaintainerGapParamRepro(): void
+    public function testRejectorAllowsParenthesizedBitwiseAndOfBareNames(): void
     {
         if (CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
             $this->markTestSkipped('parenthesized DNF intersection types enabled on PHP 8.4.0+ target');
         }
-        $runtime = new Runtime();
-        try {
-            $runtime->parseAndCompile(
-                file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_dnf_paren_intersection_param.php'),
-                'maintainer_gap_dnf_paren_intersection_param.php'
-            );
-            $this->fail('Expected compile failure');
-        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
-            $this->assertStringContainsString('unexpected variable "$o"', $e->getMessage());
+        $source = <<<'PHP'
+<?php
+echo (E_ERROR & E_WARNING), "\n";
+echo (E_ALL & E_WARNING) !== 0 ? "y\n" : "n\n";
+var_export(E_ERROR & E_WARNING);
+PHP;
+        $this->assertNull(DnfParenTypeRewriter::referenceProfileSyntaxError($source));
+        $this->assertSame($source, DnfParenIntersectionSyntaxRejector::reject($source, 'bitand.php'));
+    }
+
+    public function testRejectorAllowsTernaryElseParenthesizedBitwiseAnd(): void
+    {
+        if (CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types enabled on PHP 8.4.0+ target');
         }
+        $source = '<?php $x ? ($a) : (E_ERROR & E_WARNING);';
+        $this->assertNull(DnfParenTypeRewriter::referenceProfileSyntaxError($source));
+    }
+
+    public function testRuntimeEvaluatesParenthesizedBitwiseAndBareNames(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo (E_ERROR & E_WARNING), "\n";
+echo (E_ALL & E_WARNING) !== 0 ? "y\n" : "n\n";
+var_export(E_ERROR & E_WARNING);
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'paren_bitand_bare_names.php'));
+        $this->assertSame("0\ny\n0\n", ob_get_clean());
     }
 }
