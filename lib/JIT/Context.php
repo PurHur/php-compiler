@@ -700,11 +700,24 @@ class Context {
         if (str_contains($lc, '\\') && !str_contains($lc, '::')) {
             $globalFn = substr($lc, strrpos($lc, '\\') + 1);
             if (isset($this->functionProxies[$globalFn])) {
-                return $this->functionProxies[$globalFn];
+                $existing = $this->functionProxies[$globalFn];
+                // Upgrade a prior NestedJIT silent-null stub once the builtin resolves (#24217).
+                if ($existing instanceof Call\ExternalMethod) {
+                    $internal = $this->resolveRegisteredInternalBuiltin($globalFn);
+                    if (null !== $internal) {
+                        $this->functionProxies[$globalFn] = $internal;
+                        $this->functionProxies[$lc] = $internal;
+
+                        return $internal;
+                    }
+                }
+
+                return $existing;
             }
             $internal = $this->resolveRegisteredInternalBuiltin($globalFn);
             if (null !== $internal) {
                 $this->functionProxies[$globalFn] = $internal;
+                $this->functionProxies[$lc] = $internal;
 
                 return $internal;
             }
@@ -728,31 +741,38 @@ class Context {
 
     private function resolveRegisteredInternalBuiltin(string $lc): ?FuncInternal
     {
+        // NsFuncCall qualifies unqualified helper calls as phpcompiler\ext\standard\substr;
+        // Func\Internal::getName() is the short builtin name (#24217).
+        $short = SelfHostBuiltinPolicy::normalizeName($lc);
         foreach ($this->modules as $module) {
             foreach ($module->getFunctions() as $func) {
                 if (!$func instanceof FuncInternal) {
                     continue;
                 }
-                if (strtolower($func->getName()) === $lc) {
+                $name = strtolower($func->getName());
+                if ($name === $lc || $name === $short) {
                     return $func;
                 }
             }
         }
 
         // Pre-registerModule NestedJIT (#15417): Context->modules is still empty so most
-        // builtins stay ExternalMethod stubs. Allow only known *JitHelper kernel leaves
-        // from Runtime modules so always-helper user-script AOT emits libc (#20290).
+        // builtins stay ExternalMethod stubs. Allow kernel leaves (#20290) and a narrow
+        // string/search allowlist so JitVmHelperLink helpers do not silent-null substr/
+        // strlen (#24217). Do NOT open full REQUIRED_FOR_BUNDLE here — that pulls
+        // array_pop/ob_* during NestedJIT and needs NestedVm methods not yet linked.
         if ([] === $this->modules
             && NestedJitCompileScope::isActive()
-            && self::isPreRegisterModuleNestedJitKernel($lc)
             && [] !== $this->runtime->modules
+            && (self::isPreRegisterModuleNestedJitKernel($short)
+                || self::isNestedJitHelperStdlibBuiltin($short))
         ) {
             foreach ($this->runtime->modules as $module) {
                 foreach ($module->getFunctions() as $func) {
                     if (!$func instanceof FuncInternal) {
                         continue;
                     }
-                    if (strtolower($func->getName()) === $lc) {
+                    if (strtolower($func->getName()) === $short) {
                         return $func;
                     }
                 }
@@ -763,8 +783,38 @@ class Context {
     }
 
     /**
+     * Stdlib builtins NestedJIT helpers may call before {@see registerModule()} (#24217).
+     *
+     * Keep this tight: broader REQUIRED_FOR_BUNDLE resolution during NestedJIT re-enters
+     * ArrayPop/ObOutput helper compile and fails on missing NestedVm HashTable methods.
+     */
+    private static function isNestedJitHelperStdlibBuiltin(string $short): bool
+    {
+        return match ($short) {
+            'substr',
+            'strlen',
+            'strpos',
+            'stripos',
+            'strrpos',
+            'trim',
+            'ltrim',
+            'rtrim',
+            'chop',
+            'strtolower',
+            'strtoupper',
+            'str_starts_with',
+            'str_ends_with',
+            'str_contains',
+            'sprintf',
+            'vsprintf' => true,
+            default => false,
+        };
+    }
+
+    /**
      * Kernels safe to resolve from Runtime modules during NestedJIT before
      * {@see registerModule()} — must not open the full stdlib Internal surface (#15417).
+     * Helper-safe string builtins are gated via {@see isNestedJitHelperStdlibBuiltin()} (#24217).
      */
     private static function isPreRegisterModuleNestedJitKernel(string $lc): bool
     {
@@ -2778,11 +2828,17 @@ class Context {
             // convert to PHP variable
             switch ($phpVar->type) {
                 case VMVariable::TYPE_NULL:
+                    // Real TYPE_NULL box — never a null __value__* (var_dump/print_r #24220).
+                    $slot = JitValueBox::alloc($this);
+                    $this->builder->call(
+                        $this->lookupFunction('__value__writeNull'),
+                        JitValueBox::pointer($this, $slot)
+                    );
                     $nullVar = new Variable(
                         $this,
-                        Variable::TYPE_NULL,
-                        Variable::KIND_VALUE,
-                        $this->getTypeFromString('__value__*')->constNull()
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VARIABLE,
+                        $slot
                     );
                     $nullVar->isNullConstant = true;
 
