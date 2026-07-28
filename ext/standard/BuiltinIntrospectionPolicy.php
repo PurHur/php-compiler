@@ -225,6 +225,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['is_soap_fault', 'use_soap_error_handler'], true)) {
             return \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'tidy_')) {
+            return \PHPCompiler\ext\tidy\TidyExtensionPolicy::advertisesExtension();
+        }
         if (str_starts_with($lc, 'gmp_')) {
             return \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();
         }
@@ -294,6 +297,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('soap' === $ext) {
             return \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension();
+        }
+        if ('tidy' === $ext) {
+            return \PHPCompiler\ext\tidy\TidyExtensionPolicy::advertisesExtension();
         }
         if ('gmp' === $ext) {
             return \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();

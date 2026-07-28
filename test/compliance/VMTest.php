@@ -28,6 +28,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\soap\SoapExtensionPolicy::isSoapComplianceCase($name)) {
                 continue;
             }
+            // Host without ext/tidy: withhold functional tidy_* cases; keep phantom (#23955).
+            if (!\PHPCompiler\ext\tidy\TidyExtensionPolicy::runsTidyCompliance($name)
+                && \PHPCompiler\ext\tidy\TidyExtensionPolicy::isTidyComplianceCase($name)) {
+                continue;
+            }
             // Host/profile without gmp: withhold functional gmp_* cases; keep phantom (#22860).
             if (!\PHPCompiler\ext\gmp\GmpExtensionPolicy::runsGmpCompliance($name)
                 && \PHPCompiler\ext\gmp\GmpExtensionPolicy::isGmpComplianceCase($name)) {
