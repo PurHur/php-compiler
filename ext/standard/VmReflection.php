@@ -412,9 +412,9 @@ final class VmReflection
     }
 
     /**
-     * get_declared_attributes() — user #[Attribute] class names (#6450).
+     * User #[Attribute] class names — helper for the phantom get_declared_attributes() (#6450 / #24222).
      *
-     * php-src: ext/reflection/php_reflection.c — PHP_FUNCTION(get_declared_attributes)
+     * php-src has no PHP_FUNCTION(get_declared_attributes); use ReflectionClass::getAttributes().
      */
     public static function declaredAttributesTable(Context $ctx): \PHPCompiler\VM\HashTable
     {
