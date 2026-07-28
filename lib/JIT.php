@@ -7481,6 +7481,12 @@ class JIT {
                         $packed = isset($args[$recvSlot])
                             ? $args[$recvSlot]
                             : JIT\HashTableHelper::emptyVariable($this->context);
+                        if (Variable::TYPE_HASHTABLE === $packed->type) {
+                            $packed = JIT\HashTableHelper::boxedArrayFromHashtable(
+                                $this->context,
+                                $packed
+                            );
+                        }
                         $this->assignOperand($block->getOperand($op->arg1), $packed, true);
                         break;
                     }
@@ -18258,6 +18264,21 @@ class JIT {
                 $functionName
             );
             if (null !== $namedUnpack) {
+                if (
+                    $toCall instanceof JIT\Call\Native
+                    && 1 === \count($namedUnpack[0])
+                    && Variable::TYPE_HASHTABLE === $namedUnpack[0][0]->type
+                ) {
+                    $expanded = JIT\CallUnpackExpand::expandPackedForNative(
+                        $this->context,
+                        $namedUnpack[0][0],
+                        $toCall
+                    );
+                    if (null !== $expanded) {
+                        return [$expanded, array_fill(0, \count($expanded), null)];
+                    }
+                }
+
                 return $namedUnpack;
             }
 
