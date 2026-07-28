@@ -22,6 +22,7 @@ final class MatchJITTest extends BaseTest
                 'match_identical_jit.phpt',
                 'match_guard_falsy_jit.phpt',
                 'match_unhandled_jit.phpt',
+                'match_unhandled_message_variable_24329_jit.phpt',
                 'match_enum_unhandled_jit.phpt',
                 'match_scalar_enum_arm_jit.phpt',
                 'match_enum_subject_scalar_arm_jit.phpt',

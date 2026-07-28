@@ -105,4 +105,19 @@ final class MatchUnhandledAbiResolveTest extends TestCase
         $out = ob_get_clean();
         $this->assertSame("UnhandledMatchError :: Unhandled match case 3\n", $out);
     }
+
+    /** Variable subjects must keep their value in the message (#24329, re-#23664). */
+    public function testUnhandledMatchVariableSubjectFormatsValue(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(
+            '<?php $v = 3; try { match ($v) { 0 => 0 }; } catch (UnhandledMatchError $e) {'
+            .' echo $e->getMessage(); }',
+            'match_unhandled_var_subject.php'
+        );
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        $this->assertSame('Unhandled match case 3', $out);
+    }
 }

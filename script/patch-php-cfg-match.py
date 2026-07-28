@@ -45,12 +45,19 @@ def main() -> int:
             return 1
     text = PARSER.read_text()
     if "lowerUnhandledMatchError" in text and "function parseExpr_Match" in text:
-        if "phpc_match_unhandled_operand_message" in text and "<?php\n\ndeclare(strict_types=1);" not in text[
+        # Require subject snapshot before message helper — otherwise variable subjects
+        # print "Unhandled match case NULL" (#24329, re-#23664).
+        match_region = text[
             text.find("function parseExpr_Match") : text.find("function parseExpr_UnaryMinus")
-        ]:
+        ]
+        if (
+            "phpc_match_unhandled_operand_message" in text
+            and "$subject = new Temporary()" in match_region
+            and "<?php\n\ndeclare(strict_types=1);" not in match_region
+        ):
             print(f"skip {PARSER} (match overlay current)")
             return 0
-        print(f"refresh {PARSER} (match overlay stale — UnhandledMatchError message helper #23664)")
+        print(f"refresh {PARSER} (match overlay stale — UnhandledMatchError subject snapshot #24329)")
 
     start = match_block_start(text)
     # Also recover from a corrupted insert that dropped class-method indent.
