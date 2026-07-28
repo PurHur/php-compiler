@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\JsonDecodeJitHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -35,7 +34,7 @@ final class StringJsonDecode
 
     private const TAG_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::resultTag';
 
-    private const DECODE_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::decode';
+    private const DECODE_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::decodeInto';
 
     private const INT_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::decodeInt';
 
@@ -255,21 +254,27 @@ final class StringJsonDecode
         $payload = $fn->getParam(0);
         // Own + pin: NestedJIT string-param addref/delref frees heap __string__* mid-call
         // (length survives, content UAF). Constant strings already use disableRefcount (#24137).
+        // Combined with ARG_RECV skip of raw formal rebind in JIT.php (#24137).
         $payloadOwned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             $payload
         );
         $context->refcount->disableRefcount($payloadOwned);
+        // Coerce against decodeInto's string param (#24137).
         $payloadArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
             $payloadOwned,
-            self::helperFunction($context, self::TAG_HELPER)->getParam(0)->typeOf()
+            self::helperFunction($context, self::DECODE_HELPER)->getParam(1)->typeOf()
         );
 
-        $tag = $context->builder->call(
-            self::helperFunction($context, self::TAG_HELPER),
-            $payloadArg
+        // Peek first byte in LLVM (__string__.value is trailing int8 payload, not int8*).
+        $strMap = $context->structFieldMap['__string__'];
+        $strLen = $context->builder->load(
+            $context->builder->structGep($payloadOwned, $strMap['length'])
         );
+        $bytesPtr = $context->builder->structGep($payloadOwned, $strMap['value']);
+        $firstByte = $context->builder->load($bytesPtr);
+        $firstExt = $context->builder->zExt($firstByte, $i64);
 
         $bbNull = $fn->appendBasicBlock('json_decode_bridge_null');
         $bbBool = $fn->appendBasicBlock('json_decode_bridge_bool');
@@ -278,14 +283,27 @@ final class StringJsonDecode
         $bbString = $fn->appendBasicBlock('json_decode_bridge_string');
         $bbArray = $fn->appendBasicBlock('json_decode_bridge_array');
         $bbMerge = $fn->appendBasicBlock('json_decode_bridge_merge');
+        $bbEmpty = $fn->appendBasicBlock('json_decode_bridge_empty');
+        $bbPeek = $fn->appendBasicBlock('json_decode_bridge_peek');
 
-        $switchInst = $context->builder->branchSwitch($tag, $bbNull, 6);
-        $switchInst->addCase($i64->constInt(JsonDecodeJitHelper::TAG_NULL, false), $bbNull);
-        $switchInst->addCase($i64->constInt(JsonDecodeJitHelper::TAG_BOOL, false), $bbBool);
-        $switchInst->addCase($i64->constInt(JsonDecodeJitHelper::TAG_INT, false), $bbInt);
-        $switchInst->addCase($i64->constInt(JsonDecodeJitHelper::TAG_FLOAT, false), $bbFloat);
-        $switchInst->addCase($i64->constInt(JsonDecodeJitHelper::TAG_STRING, false), $bbString);
-        $switchInst->addCase($i64->constInt(JsonDecodeJitHelper::TAG_ARRAY, false), $bbArray);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $strLen, $i64->constInt(0, false));
+        $context->builder->branchIf($empty, $bbEmpty, $bbPeek);
+
+        $context->builder->positionAtEnd($bbEmpty);
+        $context->builder->branch($bbNull);
+
+        $context->builder->positionAtEnd($bbPeek);
+        $switchInst = $context->builder->branchSwitch($firstExt, $bbNull, 8);
+        $switchInst->addCase($i64->constInt(\ord('{'), false), $bbArray);
+        $switchInst->addCase($i64->constInt(\ord('['), false), $bbArray);
+        $switchInst->addCase($i64->constInt(\ord('"'), false), $bbString);
+        $switchInst->addCase($i64->constInt(\ord('t'), false), $bbBool);
+        $switchInst->addCase($i64->constInt(\ord('f'), false), $bbBool);
+        $switchInst->addCase($i64->constInt(\ord('n'), false), $bbNull);
+        $switchInst->addCase($i64->constInt(\ord('-'), false), $bbInt);
+        for ($d = \ord('0'); $d <= \ord('9'); ++$d) {
+            $switchInst->addCase($i64->constInt($d, false), $bbInt);
+        }
 
         $context->builder->positionAtEnd($bbNull);
         $slotNull = JitValueBox::alloc($context);
@@ -359,13 +377,27 @@ final class StringJsonDecode
         $context->builder->branch($bbMerge);
 
         $context->builder->positionAtEnd($bbArray);
-        $htRaw = $context->builder->call(
-            self::helperFunction($context, self::DECODE_HELPER),
+        // Allocate HT in the bridge — NestedJIT cannot return HT* as i64 (#24137).
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $destI64 = JitNestedHelperCoerce::ptrToI64($context, $ht);
+        $destSlot = $context->builder->alloca($i64, 1);
+        $context->builder->store($destI64, $destSlot);
+        $destArg = $context->builder->load($destSlot);
+        $decodeHelper = self::helperFunction($context, self::DECODE_HELPER);
+        $destCoerced = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $destArg,
+            $decodeHelper->getParam(0)->typeOf()
+        );
+        $okRaw = $context->builder->call(
+            $decodeHelper,
+            $destCoerced,
             $payloadArg
         );
+        $ok = JitNestedHelperCoerce::coerceBridgeResult($context, $okRaw, $i64);
         $failed = $context->builder->icmp(
             Builder::INT_EQ,
-            $htRaw,
+            $ok,
             $i64->constInt(0, false)
         );
         $bbArrayFail = $fn->appendBasicBlock('json_decode_bridge_array_fail');
@@ -380,7 +412,6 @@ final class StringJsonDecode
         $context->builder->branch($bbMerge);
 
         $context->builder->positionAtEnd($bbArrayOk);
-        $ht = JitNestedHelperCoerce::i64ToTypedPtr($context, $htRaw, $htPtr);
         // Box HT into __value__* — raw HT* cast to value* is misread as int/NULL (#24137).
         $slotHt = JitValueBox::alloc($context);
         $ptrHt = JitValueBox::pointer($context, $slotHt);
