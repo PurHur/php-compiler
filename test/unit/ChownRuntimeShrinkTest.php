@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** chown()/chgrp() JIT routes through ChownJitHelper PHP not StringFsDirJit libc LLVM (#9585). */
+/** chown()/chgrp() JIT: ChownJitHelper via JitVmHelperLink (#9585, #24473). */
 final class ChownRuntimeShrinkTest extends TestCase
 {
     public function testStringFsDirJitDelegatesChownChgrpToRuntime(): void
@@ -26,9 +26,14 @@ final class ChownRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ChownRuntime.php');
         $this->assertStringContainsString('ChownJitHelper::chownArgv', $source);
         $this->assertStringContainsString('ChownJitHelper::chgrpArgv', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString("lookupFunction('chown')", $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(190, \substr_count($source, "\n") + 1);
     }
 
     public function testChownJitHelperMatchesVmFs(): void
