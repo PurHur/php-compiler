@@ -46,6 +46,31 @@ abstract class ModuleAbstract implements Module {
     }
 
     /**
+     * No declared dependencies by default (RELEASE-PLAN Phase 2.5).
+     *
+     * Overriding this is how an extension states an ordering constraint that is currently only
+     * implicit in Runtime::loadCoreModules() — e.g. ext/dom depends on libxml. Defaulting to none
+     * keeps every existing module behaving exactly as before.
+     *
+     * @return list<string>
+     */
+    public function getExtensionDependencies(): array
+    {
+        return [];
+    }
+
+    /**
+     * Default-enabled, matching today's behaviour: all 76 extensions load unconditionally.
+     *
+     * An extension that should be opt-in overrides this to false. Nothing selects on it yet — the
+     * declaration comes first so the set can be made selectable without a flag day.
+     */
+    public function isDefaultEnabled(): bool
+    {
+        return true;
+    }
+
+    /**
      * @return array<string, string>
      */
     public function getAdditionalExtensionVersions(): array

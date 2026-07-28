@@ -14,6 +14,19 @@ use PHPCompiler\Runtime;
  */
 class Module extends ModuleAbstract
 {
+
+    /**
+     * php-src ext/xml builds on ext/libxml (libxml2).
+     *
+     * Runtime::loadCoreModules() already loads them in this order; declaring it makes the
+     * constraint checkable instead of remembered (RELEASE-PLAN Phase 2.5).
+     *
+     * @return list<string>
+     */
+    public function getExtensionDependencies(): array
+    {
+        return ['libxml'];
+    }
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
