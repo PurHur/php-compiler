@@ -368,6 +368,13 @@ class JIT {
                         }
                         $this->context->scope->calledClassName = $declLc;
                     }
+                } elseif (!$this->queuedFuncIsClassMethodAlias($llvmFunc, $cfgBlock)) {
+                    // Free function after a method: do not keep the prior item's className.
+                    // Otherwise instanceMethodUsesThis() treats f() as M::f and ARG_RECV shifts
+                    // slots (c07_method "Missing required argument 1", #23971).
+                    $this->context->scope->className = '';
+                    $this->context->scope->classId = 0;
+                    $this->context->scope->calledClassName = '';
                 }
             } else {
                 foreach ($this->context->functions as $name => $candidate) {
@@ -16522,18 +16529,45 @@ class JIT {
             return true;
         }
         // Nested file JIT: func->class may be unset while scope carries the declaring class (#16075).
-        // Do not treat leftover scope->className as applying to {main} or closures — that adds a
-        // spurious __object__* parameter (standalone main call @internal_N() #22638; clone-with
-        // IIFE ARG_RECV "Missing required argument 0" after DECLARE_CLASS #23046 / re-#19130).
+        // Do not treat leftover scope->className as applying to {main}, closures, or free functions
+        // — that adds a spurious __object__* / thisParamOffset (standalone main #22638; clone-with
+        // IIFE #23046; c07_method f($m->g(1),$m->g(2)) "Missing required argument 1" #23971).
         if (
             '' !== $this->context->scope->className
             && '{main}' !== $block->func->name
             && 0 === (($block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE)
         ) {
-            return true;
+            $methodLc = strtolower($block->func->name);
+            $classLc = strtolower(ltrim($this->context->scope->className, '\\'));
+            $proxyLc = $classLc.'::'.$methodLc;
+            if (
+                $this->context->functionIsRegistered($proxyLc)
+                || isset($this->context->functions[$proxyLc])
+            ) {
+                return true;
+            }
         }
 
         return str_contains($block->func->getScopedName(), '::');
+    }
+
+    /**
+     * True when a queued LLVM function is registered as Class::method (NestedJIT #16075).
+     */
+    private function queuedFuncIsClassMethodAlias(PHPLLVM\Value $llvmFunc, Block $cfgBlock): bool
+    {
+        $methodLc = strtolower($cfgBlock->func->name);
+        foreach ($this->context->functions as $name => $candidate) {
+            if ($candidate !== $llvmFunc || !str_contains($name, '::')) {
+                continue;
+            }
+            [, $methodPart] = explode('::', $name, 2);
+            if (strtolower($methodPart) === $methodLc) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
