@@ -57,26 +57,51 @@ final class JitDomXPathQueryUserScript
             return self::boxNodeList($context, $nsCount);
         }
 
+        // //tag[@attr='v'|N]/@name — predicate then attribute axis (#21148, #24333).
+        if (preg_match(
+            '~^//([*\w][\w:-]*)\[@([^\]=]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\]/@([\w.-]+)$~',
+            trim($exprLit),
+            $axisMatches
+        )) {
+            $numeric = isset($axisMatches[4]) && '' !== $axisMatches[4];
+            $predValue = $numeric ? $axisMatches[4] : ($axisMatches[3] ?? '');
+            $count = DomParseSimpleXmlJitHelper::countMatchingTagAttributeAxisArgv(
+                $xml,
+                $axisMatches[1],
+                $axisMatches[2],
+                $predValue,
+                $axisMatches[5],
+                $numeric
+            );
+            self::$lastCacheKey = null;
+            DomUserScriptLiveTagListLlvm::initCount($context, $axisMatches[1], $count);
+
+            return self::boxNodeList($context, $count);
+        }
+
         if (!preg_match(
-            '~^//([*\w][\w:-]*)(?:\[@([^\]=]+)=["\']([^"\']*)["\']\])?$~',
+            '~^//([*\w][\w:-]*)(?:\[@([^\]=]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\])?$~',
             trim($exprLit),
             $matches
         )) {
             return null;
         }
         $tag = $matches[1];
-        if (!isset($matches[2])) {
+        if (!isset($matches[2]) || '' === $matches[2]) {
             self::$lastCacheKey = null;
             $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
             DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count);
 
             return self::boxNodeList($context, $count);
         }
+        $numeric = isset($matches[4]) && '' !== $matches[4];
+        $attrValue = $numeric ? $matches[4] : ($matches[3] ?? '');
         $matched = DomParseSimpleXmlJitHelper::matchDescendantAttributeArgv(
             $xml,
             $tag,
             $matches[2],
-            $matches[3]
+            $attrValue,
+            $numeric
         );
         if (null === $matched) {
             self::$lastCacheKey = null;
@@ -85,7 +110,7 @@ final class JitDomXPathQueryUserScript
             return self::boxNodeList($context, 0);
         }
         [$count, $text] = $matched;
-        self::$lastCacheKey = strtolower($tag.'@'.$matches[2].'='.$matches[3]);
+        self::$lastCacheKey = strtolower($tag.'@'.$matches[2].'='.$attrValue.($numeric ? '#n' : ''));
         DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count);
         $element = JitDomCreateElement::materializeElementWithTextContent($context, $tag, $text);
         $cacheKey = $context->builder->load(

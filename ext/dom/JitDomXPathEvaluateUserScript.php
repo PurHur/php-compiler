@@ -275,22 +275,24 @@ final class JitDomXPathEvaluateUserScript
             return null === $text ? 0 : 1;
         }
         if (!preg_match(
-            '~^//([*\w][\w:-]*)(?:\[@([^\]=]+)=["\']([^"\']*)["\']\])?$~',
+            '~^//([*\w][\w:-]*)(?:\[@([^\]=]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\])?$~',
             $inner,
             $matches
         )) {
             return null;
         }
         $tag = $matches[1];
-        if (!isset($matches[2])) {
+        if (!isset($matches[2]) || '' === $matches[2]) {
             return DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
         }
-
+        $numeric = isset($matches[4]) && '' !== $matches[4];
+        $attrValue = $numeric ? $matches[4] : ($matches[3] ?? '');
         $matched = DomParseSimpleXmlJitHelper::matchDescendantAttributeArgv(
             $xml,
             $tag,
             $matches[2],
-            $matches[3]
+            $attrValue,
+            $numeric
         );
 
         return null === $matched ? 0 : $matched[0];
@@ -298,25 +300,29 @@ final class JitDomXPathEvaluateUserScript
 
     /**
      * First string-value for //@attr, //tag/@attr, //tag[n]/@attr, //tag[@a=v]/@attr,
-     * //tag[@a=v], or //tag text (#19352, #21148).
+     * //tag[@a=v], or //tag text (#19352, #21148, #24333).
      */
     private static function stringForXPath(string $xml, string $inner): ?string
     {
         if (preg_match('~^//@([\w.-]+)$~', $inner, $matches)) {
             return DomParseSimpleXmlJitHelper::firstAttributeValueArgv($xml, $matches[1]);
         }
-        // //tag[@attr='v']/@name — attribute axis after predicate (#21148).
+        // //tag[@attr='v'|N]/@name — attribute axis after predicate (#21148, #24333).
         if (preg_match(
-            '~^//([*\w][\w:-]*)\[@([^\]=]+)=["\']([^"\']*)["\']\]/@([\w.-]+)$~',
+            '~^//([*\w][\w:-]*)\[@([^\]=]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\]/@([\w.-]+)$~',
             $inner,
             $matches
         )) {
+            $numeric = isset($matches[4]) && '' !== $matches[4];
+            $predValue = $numeric ? $matches[4] : ($matches[3] ?? '');
+
             return DomParseSimpleXmlJitHelper::matchingTagAttributeValueArgv(
                 $xml,
                 $matches[1],
                 $matches[2],
-                $matches[3],
-                $matches[4]
+                $predValue,
+                $matches[5],
+                $numeric
             );
         }
         if (preg_match('~^//([*\w][\w:-]*)(?:\[(\d+)\])?/@([\w.-]+)$~', $inner, $matches)) {
@@ -329,17 +335,20 @@ final class JitDomXPathEvaluateUserScript
                 $position
             );
         }
-        // //tag[@attr='v'] — element string-value (#21148).
+        // //tag[@attr='v'|N] — element string-value (#21148, #24333).
         if (preg_match(
-            '~^//([*\w][\w:-]*)\[@([^\]=]+)=["\']([^"\']*)["\']\]$~',
+            '~^//([*\w][\w:-]*)\[@([^\]=]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\]$~',
             $inner,
             $matches
         )) {
+            $numeric = isset($matches[4]) && '' !== $matches[4];
+            $attrValue = $numeric ? $matches[4] : ($matches[3] ?? '');
             $matched = DomParseSimpleXmlJitHelper::matchDescendantAttributeArgv(
                 $xml,
                 $matches[1],
                 $matches[2],
-                $matches[3]
+                $attrValue,
+                $numeric
             );
 
             return null === $matched ? '' : $matched[1];

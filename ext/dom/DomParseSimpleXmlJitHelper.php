@@ -42,7 +42,8 @@ final class DomParseSimpleXmlJitHelper
         string $xml,
         string $tag,
         string $attr,
-        string $value
+        string $value,
+        bool $numericCompare = false
     ): ?array {
         $tag = strtolower($tag);
         $attr = strtolower($attr);
@@ -56,8 +57,11 @@ final class DomParseSimpleXmlJitHelper
                 break;
             }
             $openTag = substr($xml, $pos, $gt - $pos + 1);
-            $attrNeedle = $attr.'="'.str_replace('"', '', $value).'"';
-            if (false !== stripos($openTag, $attrNeedle)) {
+            $matched = $numericCompare
+                ? self::openTagAttrMatches($openTag, $attr, $value, true)
+                : (false !== stripos($openTag, $attr.'="'.str_replace('"', '', $value).'"')
+                    || false !== stripos($openTag, $attr."='".str_replace("'", '', $value)."'"));
+            if ($matched) {
                 $close = stripos($xml, '</'.$tag.'>', $gt + 1);
                 if (false !== $close) {
                     $text = substr($xml, $gt + 1, $close - $gt - 1);
@@ -74,6 +78,44 @@ final class DomParseSimpleXmlJitHelper
         }
 
         return [$count, (string) $firstText];
+    }
+
+    /** Attribute value from an open tag, or null if absent. */
+    public static function openTagAttrValue(string $openTag, string $attr): ?string
+    {
+        $attr = strtolower($attr);
+        if (preg_match('/\b'.preg_quote($attr, '/').'\s*=\s*"([^"]*)"/i', $openTag, $m)
+            || preg_match("/\b".preg_quote($attr, '/')."\s*=\s*'([^']*)'/i", $openTag, $m)
+        ) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * String or XPath 1.0 number equality for an attribute on an open tag (#24333).
+     */
+    public static function openTagAttrMatches(
+        string $openTag,
+        string $attr,
+        string $expected,
+        bool $numericCompare
+    ): bool {
+        $actual = self::openTagAttrValue($openTag, $attr);
+        if (null === $actual) {
+            return false;
+        }
+        if (!$numericCompare) {
+            return 0 === strcasecmp($actual, $expected);
+        }
+        $left = trim($actual);
+        $right = trim($expected);
+        if ('' === $left || !is_numeric($left) || '' === $right || !is_numeric($right)) {
+            return false;
+        }
+
+        return (float) $left === (float) $right;
     }
 
     /** First attribute value for //@attr document order (#19352). */
@@ -148,7 +190,8 @@ final class DomParseSimpleXmlJitHelper
         string $tag,
         string $predAttr,
         string $predValue,
-        string $attr
+        string $attr,
+        bool $numericCompare = false
     ): ?string {
         $tag = strtolower($tag);
         $predAttr = strtolower($predAttr);
@@ -170,24 +213,62 @@ final class DomParseSimpleXmlJitHelper
                 break;
             }
             $openTag = substr($xml, $pos, $gt - $pos + 1);
-            $predNeedle = $predAttr.'="'.str_replace('"', '', $predValue).'"';
-            if (false === stripos($openTag, $predNeedle)) {
-                $predNeedle = $predAttr."='".str_replace("'", '', $predValue)."'";
-                if (false === stripos($openTag, $predNeedle)) {
-                    $offset = $pos + 1;
-                    continue;
-                }
+            if (!self::openTagAttrMatches($openTag, $predAttr, $predValue, $numericCompare)) {
+                $offset = $pos + 1;
+                continue;
             }
-            if (preg_match('/\b'.preg_quote($attr, '/').'\s*=\s*"([^"]*)"/i', $openTag, $m)
-                || preg_match("/\b".preg_quote($attr, '/')."\s*=\s*'([^']*)'/i", $openTag, $m)
-            ) {
-                return $m[1];
+            $actual = self::openTagAttrValue($openTag, $attr);
+            if (null !== $actual) {
+                return $actual;
             }
 
             return null;
         }
 
         return null;
+    }
+
+    /**
+     * Count //tag[@pred=v]/@attr nodes (elements matching pred that expose @attr) (#24333).
+     */
+    public static function countMatchingTagAttributeAxisArgv(
+        string $xml,
+        string $tag,
+        string $predAttr,
+        string $predValue,
+        string $attr,
+        bool $numericCompare = false
+    ): int {
+        $tag = strtolower($tag);
+        $predAttr = strtolower($predAttr);
+        $attr = strtolower($attr);
+        $needle = '<'.$tag;
+        $count = 0;
+        $offset = 0;
+        while (false !== ($pos = stripos($xml, $needle, $offset))) {
+            $after = $pos + \strlen($needle);
+            if ($after >= \strlen($xml)) {
+                break;
+            }
+            $next = $xml[$after];
+            if ('>' !== $next && '/' !== $next && ' ' !== $next) {
+                $offset = $pos + 1;
+                continue;
+            }
+            $gt = strpos($xml, '>', $pos);
+            if (false === $gt) {
+                break;
+            }
+            $openTag = substr($xml, $pos, $gt - $pos + 1);
+            if (self::openTagAttrMatches($openTag, $predAttr, $predValue, $numericCompare)
+                && null !== self::openTagAttrValue($openTag, $attr)
+            ) {
+                ++$count;
+            }
+            $offset = $pos + 1;
+        }
+
+        return $count;
     }
 
     /** First descendant element's concatenated text for //tag (#19352). */
