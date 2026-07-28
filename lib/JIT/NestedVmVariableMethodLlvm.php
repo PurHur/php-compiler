@@ -13,6 +13,9 @@ final class NestedVmVariableMethodLlvm
     private const METHOD_HANDLERS = [
         'resolveindirect' => Call\VariableResolveIndirect::class,
         'copyfrom' => Call\VariableCopyFrom::class,
+        // usort/uksort/uasort NestedJIT snapshots (#24142): value-box copyFrom is the
+        // NestedJIT stand-in for Variable::duplicateFrom (INDIRECT/ARRAY COW stays VM-side).
+        'duplicatefrom' => Call\VariableCopyFrom::class,
         'toobject' => Call\VariableToObject::class,
         'tostring' => Call\VariableToString::class,
         'toint' => Call\VariableToInt::class,
