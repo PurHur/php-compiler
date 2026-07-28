@@ -129,6 +129,13 @@ class Context {
     /** Most recent closure call proxy from TYPE_CLOSURE (register_shutdown_function, #3120). */
     public ?Call $lastClosureCallProxy = null;
 
+    /**
+     * TYPE_FROM_CALLABLE result slot => invoke proxy for FUNCCALL recovery (#24166).
+     *
+     * @var array<int, Call>
+     */
+    public array $fccClosureCallByResultSlot = [];
+
     /** Call-site file strict_types while lowering FUNCCALL (issues #156, #1229). */
     public bool $callerStrictTypes = false;
 
@@ -529,6 +536,13 @@ class Context {
                 && Variable::KIND_VALUE === $var->kind
                 && null === $var->valueBoxAliasPtr
             ) {
+                // FCC / Closure assigns still need invoke metadata on the stable lvalue (#24106, #24166).
+                if (null !== $var->closureCall) {
+                    $existing->closureCall = $var->closureCall;
+                    $existing->closureIsStatic = $var->closureIsStatic;
+                    $existing->closureIsMethodFake = $var->closureIsMethodFake;
+                }
+
                 return;
             }
         }

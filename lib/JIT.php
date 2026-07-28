@@ -10386,6 +10386,15 @@ class JIT {
                     } else {
                         $nameVar = $this->context->getVariableFromOp($nameOp);
                         $closureCall = JIT\ClosureHelper::resolveCall($this->context, $nameVar);
+                        if (null === $closureCall) {
+                            $nameSlot = $block->slotForOperand($nameOp);
+                            if (null !== $nameSlot) {
+                                $closureCall = $this->resolveFccClosureCallForCalleeSlot($block, $nameSlot);
+                                if (null !== $closureCall) {
+                                    $nameVar->closureCall = $closureCall;
+                                }
+                            }
+                        }
                         if (null !== $closureCall) {
                             $this->context->scope->toCall = $closureCall;
                             $this->context->scope->args = [];
@@ -11556,6 +11565,9 @@ class JIT {
                     break;
                 case OpCode::TYPE_FROM_CALLABLE:
                     $closureVar = JIT\FromCallableHelper::createClosureVariable($this->context, $block, $op);
+                    if (null !== $closureVar->closureCall) {
+                        $this->context->fccClosureCallByResultSlot[(int) $op->arg1] = $closureVar->closureCall;
+                    }
                     $this->assignOperand($block->getOperand($op->arg1), $closureVar, true);
                     break;
                 case OpCode::TYPE_BEGIN_SILENCE:
@@ -14065,6 +14077,31 @@ class JIT {
         if (null !== $resolved && '' !== $resolved) {
             $this->context->bindVariableByName($resolved, $result);
         }
+    }
+
+    /**
+     * Recover FCC invoke proxy when temp/local metadata was dropped before FUNCCALL_INIT (#24166).
+     */
+    private function resolveFccClosureCallForCalleeSlot(Block $block, int $nameSlot, array &$visited = []): ?JIT\Call
+    {
+        if (isset($visited[$nameSlot])) {
+            return null;
+        }
+        $visited[$nameSlot] = true;
+        if (isset($this->context->fccClosureCallByResultSlot[$nameSlot])) {
+            return $this->context->fccClosureCallByResultSlot[$nameSlot];
+        }
+        foreach ($block->opCodes as $prior) {
+            if (OpCode::TYPE_ASSIGN !== $prior->type || (int) $prior->arg2 !== $nameSlot) {
+                continue;
+            }
+            $resolved = $this->resolveFccClosureCallForCalleeSlot($block, (int) $prior->arg3, $visited);
+            if (null !== $resolved) {
+                return $resolved;
+            }
+        }
+
+        return null;
     }
 
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
