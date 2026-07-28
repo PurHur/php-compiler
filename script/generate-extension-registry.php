@@ -28,6 +28,25 @@ $root = dirname(__DIR__);
 $check = in_array('--check', $argv, true);
 $target = $root.'/lib/ExtensionRegistry.php';
 
+/**
+ * Build-time extension selection (RELEASE-PLAN Phase 2.5).
+ *
+ * Selection has to happen HERE rather than at runtime: the registry emits literal `new` expressions
+ * and the AOT compiler resolves them statically, so a module that is referenced is compiled in even
+ * if a runtime filter later skips loading it. Dropping the cost means dropping the reference.
+ *
+ * Identity is the ext/ DIRECTORY. getExtensionName() is not usable — 20 modules report 'standard'.
+ */
+$only = null;
+$without = [];
+foreach ($argv as $arg) {
+    if (str_starts_with($arg, '--only=')) {
+        $only = array_values(array_filter(array_map('trim', explode(',', substr($arg, 7)))));
+    } elseif (str_starts_with($arg, '--without=')) {
+        $without = array_values(array_filter(array_map('trim', explode(',', substr($arg, 10)))));
+    }
+}
+
 $runtimeSrc = (string) file_get_contents($root.'/lib/Runtime.php');
 
 // Prefer the hardcoded list while it still exists; once Runtime consumes the registry, the
@@ -50,6 +69,46 @@ if ([] === $order && is_file($target)) {
 if ([] === $order) {
     fwrite(STDERR, "generate-extension-registry: could not determine the load order\n");
     exit(2);
+}
+
+// Apply selection, then pull in declared dependencies so a selected extension never loses one.
+if (null !== $only || [] !== $without) {
+    $declaredDeps = [];
+    foreach ($order as $name) {
+        $modSrc = @file_get_contents($root.'/ext/'.$name.'/Module.php');
+        if (false !== $modSrc
+            && preg_match('/function getExtensionDependencies\(\): array\s*\{\s*return \[(.*?)\];/s', $modSrc, $dm)
+            && preg_match_all("/'([^']+)'/", $dm[1], $dn)
+        ) {
+            $declaredDeps[$name] = array_map('strtolower', $dn[1]);
+        }
+    }
+
+    $selected = null === $only ? $order : array_values(array_intersect($order, $only));
+    $selected = array_values(array_diff($selected, $without));
+
+    // Dependency closure: keeping dom must keep libxml, or the build loses it silently.
+    $changed = true;
+    while ($changed) {
+        $changed = false;
+        foreach ($selected as $name) {
+            foreach ($declaredDeps[$name] ?? [] as $dep) {
+                if (!in_array($dep, $selected, true) && in_array($dep, $order, true)) {
+                    $selected[] = $dep;
+                    $changed = true;
+                }
+            }
+        }
+    }
+
+    $pulled = array_diff($selected, null === $only ? array_diff($order, $without) : $only);
+    if ([] !== $pulled) {
+        fwrite(STDERR, 'generate-extension-registry: kept for declared dependencies: '
+            .implode(', ', $pulled)."\n");
+    }
+
+    // Preserve the original relative order — it is load-bearing and only partly declared.
+    $order = array_values(array_filter($order, static fn (string $n): bool => in_array($n, $selected, true)));
 }
 
 $missing = [];
