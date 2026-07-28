@@ -905,6 +905,24 @@ class VM {
         return null;
     }
 
+    /**
+     * php-src spl_array_has_dimension(isset) when offsetExists is the Internal SPL method (#24251).
+     * Returns null when ArrayAccess isset must stay offsetExists-only (user override / non-SPL).
+     */
+    private function nativeSplArrayDimensionIsSet(ObjectEntry $object, Variable $key): ?bool
+    {
+        if (!SplArrayStorage::hasState($object)) {
+            return null;
+        }
+        [$declaring, $methodLc] = $this->resolveInstanceMethod($object->class, 'offsetExists');
+        $func = $declaring->methods[$methodLc] ?? null;
+        if (!$func instanceof Func\Internal) {
+            return null;
+        }
+
+        return SplArrayStorage::dimensionIsSet($object, $key);
+    }
+
     public function invokeArrayAccessOffsetUnset(
         ObjectEntry $object,
         Variable $key,
@@ -8197,6 +8215,16 @@ restart:
                                 !$op->issetOnProperty
                                 && $this->objectImplementsArrayAccess($object)
                             ) {
+                                // ArrayObject/ArrayIterator native has_dimension(isset): null ≠ set (#24251).
+                                // User offsetExists overrides keep ArrayAccess isset == offsetExists (php-src).
+                                $nativeSplIsset = $this->nativeSplArrayDimensionIsSet(
+                                    $object,
+                                    $frame->scope[$op->arg3]
+                                );
+                                if (null !== $nativeSplIsset) {
+                                    $dst->bool($nativeSplIsset);
+                                    break;
+                                }
                                 // isset($obj[$k]) via ArrayAccess::offsetExists — not isset($obj->prop) (#19707).
                                 $existsOut = new Variable();
                                 $catchFrame = $this->invokeArrayAccessOffsetExists(
