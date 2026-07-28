@@ -25,6 +25,28 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertStringContainsString('HashTableReadLlvm::readIndexedToValueBox', $source);
     }
 
+    /**
+     * Indexed/string-key reads must use the shared typed copy — a long-only fallback
+     * misreads null/bool/double slots as int(0) (#24232).
+     */
+    public function testReadToValueBoxUsesSharedTypedCopy(): void
+    {
+        $read = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableReadLlvm.php');
+        $this->assertMatchesRegularExpression(
+            '/function readIndexedToValueBox\b[\s\S]*?JitValueBox::copyFromPointer/',
+            $read
+        );
+        $this->assertMatchesRegularExpression(
+            '/function readStringKeyToValueBox\b[\s\S]*?JitValueBox::copyFromPointer/',
+            $read
+        );
+        // Guard: do not reintroduce a long-only fallthrough in either reader.
+        $this->assertDoesNotMatchRegularExpression(
+            '/function readIndexedToValueBox\b[\s\S]*?__value__writeLong[\s\S]*?function readStringKeyToValueBox\b/',
+            $read
+        );
+    }
+
     public function testHashTableHelperDelegatesValueBoxDimReadLlvm(): void
     {
         $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
