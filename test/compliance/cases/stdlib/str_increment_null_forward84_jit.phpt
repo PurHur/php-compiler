@@ -1,5 +1,5 @@
 --TEST--
-JIT: stdlib str_increment()/str_decrement(null) ValueError on 8.4 (#24179, ext/standard/string.c)
+JIT: stdlib str_increment()/str_decrement(null) TypeError on 8.4 (#21005, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
@@ -27,6 +27,6 @@ try {
     echo "empty ValueError\n";
 }
 --EXPECT--
-str_increment ValueError
-str_decrement ValueError
+str_increment TypeError
+str_decrement TypeError
 empty ValueError
