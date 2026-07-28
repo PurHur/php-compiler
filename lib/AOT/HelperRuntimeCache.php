@@ -127,6 +127,20 @@ final class HelperRuntimeCache
         if (is_file($marker)) {
             return;
         }
+        // The marker lives under build/helper-runtime-cache, which is gitignored — so a CLEAN
+        // CHECKOUT never has it and every first user AOT build re-emitted the whole corpus, even
+        // when the committed per-arch cache was present and current. Measured: ~517s to compile
+        // `<?php echo "hi\n";` on a fresh tree, 5s once warm (#24302).
+        //
+        // The consumption path already reads prelinkedUnitsDir() alongside unitsDir(), so when the
+        // committed cache is current there is nothing to emit — warming is pure waste. Drop the
+        // marker and skip.
+        if (self::committedCacheIsCurrent()) {
+            @mkdir(\dirname($marker), 0755, true);
+            @file_put_contents($marker, 'ok (committed prelink current) '.gmdate('c')."\n");
+
+            return;
+        }
 
         $root = \dirname(__DIR__, 2);
         $script = $root.'/script/emit-helper-runtime-object.php';
@@ -141,6 +155,45 @@ final class HelperRuntimeCache
             // Any new units should be visible immediately.
             self::$helperIndex = null;
         }
+    }
+
+    /**
+     * Is the committed per-arch cache usable as-is for this build (#24302)?
+     *
+     * Deliberately conservative: it must exist, carry a core_fingerprint equal to the live one, and
+     * actually contain units. Any doubt falls through to the warmup, so a stale or partial committed
+     * cache still gets emitted rather than silently producing a build with missing helpers.
+     */
+    private static function committedCacheIsCurrent(): bool
+    {
+        $unitsDir = self::prelinkedUnitsDir();
+        $manifestPath = \dirname($unitsDir).'/manifest.json';
+        if (!is_file($manifestPath) || !is_dir($unitsDir)) {
+            return false;
+        }
+        $raw = @file_get_contents($manifestPath);
+        if (false === $raw) {
+            return false;
+        }
+        $manifest = json_decode($raw, true);
+        if (!\is_array($manifest)) {
+            return false;
+        }
+        $committed = (string) ($manifest['core_fingerprint'] ?? '');
+        if ('' === $committed || $committed !== self::coreFingerprint()) {
+            return false;
+        }
+        $entries = @scandir($unitsDir);
+        if (false === $entries) {
+            return false;
+        }
+        foreach ($entries as $entry) {
+            if ('.' !== $entry && '..' !== $entry && is_dir($unitsDir.'/'.$entry)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function runWarmupCommand(string $command): int
