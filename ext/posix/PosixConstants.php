@@ -37,6 +37,13 @@ final class PosixConstants
     public const RLIMIT_NOFILE = 7;
     public const RLIMIT_MEMLOCK = 8;
     public const RLIMIT_AS = 9;
+    /** Linux extended resource ids (php-src POSIX_RLIMIT_*; #24130). */
+    public const RLIMIT_LOCKS = 10;
+    public const RLIMIT_SIGPENDING = 11;
+    public const RLIMIT_MSGQUEUE = 12;
+    public const RLIMIT_NICE = 13;
+    public const RLIMIT_RTPRIO = 14;
+    public const RLIMIT_RTTIME = 15;
 
     /** User-facing unlimited sentinel for posix_setrlimit() (php-src POSIX_RLIMIT_INFINITY). */
     public const RLIMIT_INFINITY = -1;
@@ -82,6 +89,12 @@ final class PosixConstants
             'POSIX_RLIMIT_NOFILE' => self::RLIMIT_NOFILE,
             'POSIX_RLIMIT_MEMLOCK' => self::RLIMIT_MEMLOCK,
             'POSIX_RLIMIT_AS' => self::RLIMIT_AS,
+            'POSIX_RLIMIT_LOCKS' => self::RLIMIT_LOCKS,
+            'POSIX_RLIMIT_SIGPENDING' => self::RLIMIT_SIGPENDING,
+            'POSIX_RLIMIT_MSGQUEUE' => self::RLIMIT_MSGQUEUE,
+            'POSIX_RLIMIT_NICE' => self::RLIMIT_NICE,
+            'POSIX_RLIMIT_RTPRIO' => self::RLIMIT_RTPRIO,
+            'POSIX_RLIMIT_RTTIME' => self::RLIMIT_RTTIME,
             'POSIX_RLIMIT_INFINITY' => self::RLIMIT_INFINITY,
             // php-src registers POSIX_S_IF* (not bare S_IF* / not DIR/LNK) — #20517
             'POSIX_S_IFIFO' => self::S_IFIFO,
