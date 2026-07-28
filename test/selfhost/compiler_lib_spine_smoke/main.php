@@ -5359,6 +5359,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ReflectionPropertyIsFinal.php';
 
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeIndirectClosureCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeIndirectInstanceMethodCall.php';
+require_once __DIR__.'/../../../lib/JIT/Call/RuntimeIndirectStaticMethodCall.php';
 require_once __DIR__.'/../../../lib/JIT/Call/RuntimeVariableFunction.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementAddChild.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SimpleXMLElementAsXml.php';
