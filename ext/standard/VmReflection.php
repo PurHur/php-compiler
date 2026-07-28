@@ -71,10 +71,15 @@ final class VmReflection
         return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
     }
 
-    /** Max positional arity for get_parent_class() on the active profile (#17395). */
+    /**
+     * Max positional arity for get_parent_class() — always 1 (php-src stub, #23948).
+     *
+     * Prior PROFILE=8.4 path wrongly shared {@see CompilerVersion::supportsGetClassAllowString()}
+     * with get_class(); Zend never registered $allow_string on get_parent_class.
+     */
     public static function getParentClassMaxArgCount(): int
     {
-        return CompilerVersion::supportsGetClassAllowString() ? 2 : 1;
+        return 1;
     }
 
     public static function enforceGetClassMaxArgs(int $argc, string $function = 'get_class'): void
@@ -100,7 +105,9 @@ final class VmReflection
     }
 
     /**
-     * get_class()/get_parent_class() $allow_string operand (PHP 8.4, ext/standard/basic_functions.c).
+     * get_class() optional $allow_string operand (forward profile gate #17395).
+     *
+     * Not used by get_parent_class() — php-src arity is 1 (#23948).
      */
     public static function parseAllowStringArg(Frame $frame, string $function, int $argIndex): bool
     {
