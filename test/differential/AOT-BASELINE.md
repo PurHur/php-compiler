@@ -33,7 +33,7 @@ corpus*, not the language.
 
 | case | cause |
 |---|---|
-| `i14_nested_dim_assign` | `$g[1][0] = 9` reads back `3`, the original value — #24011 |
+| ~~`i14_nested_dim_assign`~~ | ~~`$g[1][0] = 9` reads back `3`~~ **fixed** — nested FETCH_DIM_W returns live child HT (#24011) |
 
 **Compile failures — triaged in #23971**
 

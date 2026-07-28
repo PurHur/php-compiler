@@ -152,6 +152,12 @@ final class HashTableHelper
         return HashTableReadLlvm::readIndexedToValueBox($context, $ht, $index);
     }
 
+    /** Live child HT at packed index for nested dim write (#24011). */
+    public static function readIndexedHashtable(Context $context, Value $ht, Value $index): Value
+    {
+        return HashTableReadLlvm::readIndexedHashtable($context, $ht, $index);
+    }
+
     /**
      * Lvalue marker for $arr['key'] = … without reading the old value first (#107).
      */
