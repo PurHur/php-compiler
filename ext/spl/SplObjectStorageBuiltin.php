@@ -434,12 +434,16 @@ final class SplObjectStorageBuiltin
         self::$store[$storage->id]['entries'][$key] = $stored;
     }
 
-    public static function getHash(Variable $object): string
+    public static function getHash(Variable $object, ?\PHPCompiler\VM\Context $context = null): string
     {
-        $resolved = self::requireStorageObject($object, 'getHash');
-        $id = WeakRefSupport::targetObjectId($resolved);
+        self::requireStorageObject($object, 'getHash');
 
-        return \sprintf('%016x%016x', $id, 0);
+        // php-src spl_object_storage_get_hash — same 32-hex as spl_object_hash() (#24292).
+        return \PHPCompiler\VM\ObjectHandleSupport::hashForObject(
+            $object,
+            'SplObjectStorage::getHash',
+            $context
+        );
     }
 
     private static function storageObjectKey(Variable $object, string $method): string
@@ -995,7 +999,7 @@ final class SplObjectStorageGetHash extends VmClassMethod
             return;
         }
         $frame->returnVar->string(
-            SplObjectStorageBuiltin::getHash($frame->calledArgs[1])
+            SplObjectStorageBuiltin::getHash($frame->calledArgs[1], $frame->vmContext)
         );
     }
 }

@@ -57,6 +57,22 @@ final class CycleCollector
         }
     }
 
+    /**
+     * Zend-visible object handle for spl_object_id / spl_object_hash / SplObjectStorage::getHash.
+     *
+     * Bootstrap ObjectEntries created before {@see captureRequestBaseline()} must not consume
+     * user-visible handles — first user object is handle 1 like php-src (#24292).
+     */
+    public static function userVisibleObjectHandle(int $objectId): int
+    {
+        $baseline = self::$baselineObjectMaxId;
+        if ($objectId > $baseline) {
+            return $objectId - $baseline;
+        }
+
+        return $objectId;
+    }
+
     public static function isEnabled(): bool
     {
         return GcToggleJitHelper::isEnabled();
