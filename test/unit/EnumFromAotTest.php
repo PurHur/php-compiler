@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPUnit\Framework\TestCase;
+
+/**
+ * AOT execute guard for BackedEnum::from() / ::tryFrom() (#24208).
+ *
+ * @group llvm
+ * @group aot
+ */
+final class EnumFromAotTest extends TestCase
+{
+    public function testAotBackedEnumFromAndTryFromExecute(): void
+    {
+        if (!LlvmToolchain::hasLibrary(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $root = dirname(__DIR__, 2);
+        $src = $this->writeScript($root, <<<'PHP'
+<?php
+enum Suit: string { case Hearts = 'H'; case Spades = 'S'; }
+enum Level: int { case Low = 1; case High = 9; }
+echo Suit::from('S')->value, "\n";
+echo Suit::tryFrom('x') === null ? "NULL\n" : "bad\n";
+echo Level::from(9)->name, "\n";
+PHP);
+        $bin = sys_get_temp_dir().'/phpc_enum_from_24208_'.getmypid().'.bin';
+        $compile = escapeshellarg(PHP_BINARY).' '.escapeshellarg($root.'/bin/compile.php')
+            .' -o '.escapeshellarg($bin).' '.escapeshellarg($src).' 2>&1';
+        exec($compile, $compileOut, $compileRc);
+        $this->assertSame(0, $compileRc, implode("\n", $compileOut));
+        $this->assertFileExists($bin);
+        try {
+            exec(escapeshellarg($bin).' 2>&1', $runOut, $runRc);
+            $this->assertSame(0, $runRc, implode("\n", $runOut));
+            $this->assertSame("S\nNULL\nHigh\n", implode("\n", $runOut)."\n");
+        } finally {
+            @unlink($src);
+            @unlink($bin);
+        }
+    }
+
+    private function writeScript(string $root, string $code): string
+    {
+        $dir = $root.'/var';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
+            $this->fail('Could not create var/ for enum from AOT probe');
+        }
+        $path = $dir.'/enum-from-aot-'.getmypid().'.php';
+        file_put_contents($path, $code);
+
+        return $path;
+    }
+}

@@ -6,73 +6,28 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitNativeString;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for BackedEnum::from() / ::tryFrom() via EnumFromJitHelper PHP (#10273).
+ * JIT/AOT lowering for BackedEnum::from() / ::tryFrom() (#10273, #24208).
  *
- * SSOT: {@see \PHPCompiler\VM\EnumFromJitHelper}, {@see \PHPCompiler\VM\BackedEnum}
+ * Matching and error text are emitted as LLVM IR — nested VM helpers that call stdlib builtins
+ * misbehave when reached from synthesized native enum::from() under thin standalone AOT (#24208).
+ *
+ * SSOT for coercion semantics: {@see \PHPCompiler\VM\EnumFromJitHelper}
  * php-src: Zend/zend_enum.c — zend_enum_from_case(), zend_try_enum_from_case()
  */
 final class BackedEnumFromRuntime
 {
-    private const HELPER_PATH = '/VM/EnumFromJitHelper.php';
-
-    private const NS = 'PHPCompiler\\VM\\EnumFromJitHelper::';
-
-    private const STRING_FROM_STRING = self::NS.'stringBackingFromString';
-
-    private const STRING_FROM_LONG = self::NS.'stringBackingFromLong';
-
-    private const STRING_FROM_DOUBLE = self::NS.'stringBackingFromDouble';
-
-    private const STRING_FROM_BOOL = self::NS.'stringBackingFromBool';
-
-    private const STRING_FROM_NULL = self::NS.'stringBackingFromNull';
-
-    private const INT_FROM_LONG = self::NS.'intBackingFromLong';
-
-    private const INT_FROM_DOUBLE = self::NS.'intBackingFromDouble';
-
-    private const INT_FROM_STRING = self::NS.'intBackingFromString';
-
-    private const MATCH_STRING_PACKED = self::NS.'matchStringBackingPacked';
-
-    private const MATCH_INT_CSV = self::NS.'matchIntBackingCsv';
-
-    private const FORMAT_STRING_VE = self::NS.'formatStringValueError';
-
-    private const FORMAT_INT_VE = self::NS.'formatIntValueError';
-
-    private const INT_TYPE_ERROR = self::NS.'intTypeErrorSuffix';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::STRING_FROM_STRING,
-        self::STRING_FROM_LONG,
-        self::STRING_FROM_DOUBLE,
-        self::STRING_FROM_BOOL,
-        self::STRING_FROM_NULL,
-        self::INT_FROM_LONG,
-        self::INT_FROM_DOUBLE,
-        self::INT_FROM_STRING,
-        self::MATCH_STRING_PACKED,
-        self::MATCH_INT_CSV,
-        self::FORMAT_STRING_VE,
-        self::FORMAT_INT_VE,
-        self::INT_TYPE_ERROR,
-    ];
-
     public static function ensureLinked(Context $context): void
     {
         self::ensureExternals($context);
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#10273');
     }
 
     public static function normalizeStringBacking(Context $context, Value $valuePtr): Value
@@ -137,7 +92,7 @@ final class BackedEnumFromRuntime
         $finiteEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeFloat);
         $context->builder->positionAtEnd($nonFiniteBlock);
-        $nonFiniteStr = self::callStringHelper($context, self::STRING_FROM_DOUBLE, $floatVal);
+        $nonFiniteStr = self::formatDoubleString($context, $floatVal);
         $nonFiniteEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeFloat);
         $context->builder->positionAtEnd($mergeFloat);
@@ -243,10 +198,9 @@ final class BackedEnumFromRuntime
         $floatBad = $fn->appendBasicBlock('enum_from_norm_int_float_bad');
         $context->builder->branchIf($isFinite, $floatOk, $floatBad);
         $context->builder->positionAtEnd($floatBad);
-        $badMsg = self::callStringHelper(
+        $badMsg = self::literalString(
             $context,
-            self::INT_TYPE_ERROR,
-            self::literalString($context, $className)
+            $className.'::from(): Argument #1 ($value) must be of type int, mixed given'
         );
         self::raiseTypeErrorFromString($context, $badMsg);
         $floatBadEnd = $context->builder->getInsertBlock();
@@ -299,10 +253,9 @@ final class BackedEnumFromRuntime
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($typeErrorEmit);
-        $message = self::callStringHelper(
+        $message = self::literalString(
             $context,
-            self::INT_TYPE_ERROR,
-            self::literalString($context, $className)
+            $className.'::from(): Argument #1 ($value) must be of type int, mixed given'
         );
         self::raiseTypeErrorFromString($context, $message);
         $context->builder->branch($doneBlock);
@@ -320,50 +273,12 @@ final class BackedEnumFromRuntime
         return $phi;
     }
 
-    public static function matchStringBacking(
-        Context $context,
-        Value $normalizedStr,
-        string $packedBackings,
-        int $caseCount
-    ): Value {
-        self::ensureLinked($context);
-        $i64 = $context->getTypeFromString('int64');
-        $packed = $context->builder->load($context->constantStringFromString($packedBackings));
-        $index = $context->builder->call(
-            JitVmHelperLink::lookupCompiled($context, self::MATCH_STRING_PACKED, '#10273'),
-            $normalizedStr,
-            $packed,
-            $i64->constInt($caseCount, false)
-        );
-
-        return $context->builder->truncOrBitCast($index, $i64);
-    }
-
-    public static function matchIntBacking(Context $context, Value $normalizedInt, string $backingCsv): Value
-    {
-        self::ensureLinked($context);
-        $i64 = $context->getTypeFromString('int64');
-        $csv = $context->builder->load($context->constantStringFromString($backingCsv));
-        $index = $context->builder->call(
-            JitVmHelperLink::lookupCompiled($context, self::MATCH_INT_CSV, '#10273'),
-            $normalizedInt,
-            $csv
-        );
-
-        return $context->builder->truncOrBitCast($index, $i64);
-    }
-
     public static function emitStringValueError(Context $context, string $className, Value $strPtr): void
     {
         self::ensureLinked($context);
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        $message = self::callStringHelper(
-            $context,
-            self::FORMAT_STRING_VE,
-            $strPtr,
-            self::literalString($context, $className)
-        );
+        $message = self::formatStringBackingValueError($context, $strPtr, $className);
         self::raiseValueErrorFromString($context, $message);
     }
 
@@ -372,21 +287,80 @@ final class BackedEnumFromRuntime
         self::ensureLinked($context);
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        $message = self::callStringHelper(
-            $context,
-            self::FORMAT_INT_VE,
-            $intVal,
-            self::literalString($context, $className)
-        );
+        $message = self::formatIntBackingValueError($context, $intVal, $className);
         self::raiseValueErrorFromString($context, $message);
     }
 
-    private static function callStringHelper(Context $context, string $logical, Value ...$args): Value
-    {
-        return $context->builder->call(
-            JitVmHelperLink::lookupCompiled($context, $logical, '#10273'),
-            ...$args
+    private static function formatStringBackingValueError(
+        Context $context,
+        Value $strPtr,
+        string $enumName
+    ): Value {
+        self::ensureExternals($context);
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $map = $context->structFieldMap['__string__'];
+        $data = $context->builder->pointerCast(
+            $context->builder->structGep($strPtr, $map['value']),
+            $charPtr
         );
+        $len = $context->builder->load(
+            $context->builder->structGep($strPtr, $map['length'])
+        );
+        $bufSize = $sizeT->constInt(256, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('"%.*s" is not a valid backing value for enum %s'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $context->builder->trunc($len, $i32),
+            $data,
+            $context->builder->pointerCast($context->constantFromString($enumName), $charPtr)
+        );
+        $outLen = $context->builder->zExt($written, $i64);
+        $str = $context->builder->call($context->lookupFunction('__string__init'), $outLen, $bufChar);
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+
+        return $str;
+    }
+
+    private static function formatIntBackingValueError(
+        Context $context,
+        Value $intVal,
+        string $enumName
+    ): Value {
+        self::ensureExternals($context);
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i64 = $context->getTypeFromString('int64');
+        $bufSize = $sizeT->constInt(192, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString('%lld is not a valid backing value for enum %s'),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $intVal,
+            $context->builder->pointerCast($context->constantFromString($enumName), $charPtr)
+        );
+        $outLen = $context->builder->zExt($written, $i64);
+        $str = $context->builder->call($context->lookupFunction('__string__init'), $outLen, $bufChar);
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+
+        return $str;
     }
 
     private static function literalString(Context $context, string $literal): Value
@@ -403,12 +377,28 @@ final class BackedEnumFromRuntime
 
     private static function raiseValueErrorFromString(Context $context, Value $messageStr): void
     {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
         self::raisePendingFromString($context, $messageStr, '__compiler_jit_raise_value_error');
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
     }
 
     private static function raiseTypeErrorFromString(Context $context, Value $messageStr): void
     {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
         self::raisePendingFromString($context, $messageStr, '__compiler_jit_raise_type_error');
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
     }
 
     private static function raisePendingFromString(Context $context, Value $messageStr, string $callee): void
