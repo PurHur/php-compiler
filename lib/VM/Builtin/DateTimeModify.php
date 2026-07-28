@@ -13,9 +13,9 @@ use PHPCompiler\VM\ErrorReporter;
 /**
  * DateTime::modify() / DateTimeImmutable::modify() — VM (#6132, #10733, #22663).
  *
- * php-src ext/date/php_date.c — PHP 8.2: E_WARNING + false; PHP 8.3+: EH_THROW
- * DateMalformedStringException (date_ce_date_malformed_string_exception). Procedural
- * date_modify() stays warning+false on all versions.
+ * php-src ext/date/php_date.c — mutable zim_DateTime_modify: E_WARNING + false on all
+ * profiles (date_modify() unchanged). Immutable zim_DateTimeImmutable_modify: PHP 8.2
+ * warning+false; PHP 8.3+ EH_THROW DateMalformedStringException (#22663, #24296).
  */
 final class DateTimeModify extends VmClassMethod
 {
@@ -43,11 +43,15 @@ final class DateTimeModify extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $throwOnMalformed = CompilerVersion::advertisesDateExceptionHierarchy();
         if (DateTimeSupport::isDateTimeImmutable($receiver)) {
             $updated = DateTimeSupport::tryWithModify($receiver, $modifier);
             if (false === $updated) {
-                self::failModify($frame, $label, $modifier, $throwOnMalformed);
+                self::failModify(
+                    $frame,
+                    $label,
+                    $modifier,
+                    CompilerVersion::advertisesDateExceptionHierarchy()
+                );
                 $frame->returnVar->bool(false);
 
                 return;
@@ -57,7 +61,8 @@ final class DateTimeModify extends VmClassMethod
             return;
         }
         if (!DateTimeSupport::tryModify($receiver, $modifier)) {
-            self::failModify($frame, $label, $modifier, $throwOnMalformed);
+            // Mutable DateTime::modify() — warning + false always (php-src date_object_modify).
+            self::failModify($frame, $label, $modifier, false);
             $frame->returnVar->bool(false);
 
             return;
