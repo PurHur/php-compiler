@@ -225,6 +225,7 @@ class Context {
     /** False-arm literal for {@see $ternaryEchoLiteralConditionSlot} redirect (#18784). */
     public ?string $ternaryEchoLiteralElse = null;
 
+
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
 
@@ -2607,6 +2608,16 @@ class Context {
             $mergeSlot = $block->slotForOperand($mergeOp);
             if (null !== $mergeSlot) {
                 $returnSlots[$mergeSlot] = true;
+            }
+        }
+        // Match/?: echo merge stack slots must survive trailing JUMPIF in the same
+        // block (second `echo match` after the first merge) (#24143).
+        foreach ($this->coalesceMergeSlotOperands as $mergeSlot => $mergeSlotOp) {
+            $returnOperands[$mergeSlotOp] = true;
+            $returnSlots[(int) $mergeSlot] = true;
+            $resolved = $block->slotForOperand($mergeSlotOp);
+            if (null !== $resolved) {
+                $returnSlots[$resolved] = true;
             }
         }
         $returnVarNames = [];
