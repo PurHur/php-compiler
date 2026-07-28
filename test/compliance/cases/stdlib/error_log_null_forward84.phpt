@@ -1,16 +1,9 @@
 --TEST--
-stdlib error_log(null) — soft-null DEP+coerce on 8.4 forward profile (#24178, reverts #23858, ext/standard/basic_functions.c)
+stdlib error_log(null) — TypeError on 8.4 forward profile (#23858, reverts #21446, ext/standard/basic_functions.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-set_error_handler(static function (int $no, string $msg): bool {
-    if (E_DEPRECATED === $no) {
-        echo "DEP\n";
-        return true;
-    }
-    return false;
-});
 try {
     var_export(error_log(null));
     echo " COERCED\n";
@@ -19,5 +12,4 @@ try {
 }
 ?>
 --EXPECT--
-DEP
-true COERCED
+error_log(): Argument #1 ($message) must be of type string, null given
