@@ -166,6 +166,13 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says str/crc (#23491)
             case 'crc32':
                 return ['string'];
+            // php-src ext/standard/string.stub.php — InternalArgInfo still says str1/str2/len (#23335)
+            case 'strcmp':
+            case 'strcasecmp':
+                return ['string1', 'string2'];
+            case 'strncmp':
+            case 'strncasecmp':
+                return ['string1', 'string2', 'length'];
             case 'substr':
                 return \PHPCompiler\CompilerVersion::supportsSubstrTruncate()
                     ? ['string', 'offset', 'length', 'truncate']
