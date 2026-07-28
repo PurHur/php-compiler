@@ -16,16 +16,24 @@ final class ListUnpackJitHelper
 {
     /**
      * Value-box operand is array when type tag is VM array or JIT hashtable (#9248).
+     *
+     * The value-box stores an i8 tag; ABI bridges may sign-extend (TYPE_HASHTABLE 135 → -121).
+     * Normalize before comparing (#23971 e08_spread).
      */
     public static function valueBoxIsArray(int $typeByte): bool
     {
+        $typeByte &= 0xff;
+
         return Variable::TYPE_ARRAY === $typeByte
-            || JitVariable::TYPE_HASHTABLE === $typeByte;
+            || (JitVariable::TYPE_HASHTABLE & 0xff) === $typeByte;
     }
 
     public static function valueBoxIsString(int $typeByte): bool
     {
-        return Variable::TYPE_STRING === $typeByte;
+        $typeByte &= 0xff;
+
+        return Variable::TYPE_STRING === $typeByte
+            || (JitVariable::TYPE_STRING & 0xff) === $typeByte;
     }
 
     /**

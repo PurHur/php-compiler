@@ -753,6 +753,15 @@ final class HashTableWriteLlvm
         }
         $ht = HashTableReadLlvm::loadHashtablePointer($context, $array);
         if (null === $key) {
+            if ($array->nextFreeElementFromRuntime) {
+                $map = $context->structFieldMap['__hashtable__'];
+                $index = $context->builder->load(
+                    $context->builder->structGep($ht, $map['nextFreeElement'])
+                );
+                self::setAtIndex($context, $ht, $index, $element);
+
+                return;
+            }
             $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
             ++$array->nextFreeElement;
             self::setAtIndex($context, $ht, $index, $element);
@@ -1188,8 +1197,17 @@ final class HashTableWriteLlvm
 
                 return;
             }
-            $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
-            ++$array->nextFreeElement;
+            $index = $array->nextFreeElementFromRuntime
+                ? $context->builder->load(
+                    $context->builder->structGep(
+                        $ht,
+                        $context->structFieldMap['__hashtable__']['nextFreeElement']
+                    )
+                )
+                : $context->constantFromInteger($array->nextFreeElement, 'size_t');
+            if (!$array->nextFreeElementFromRuntime) {
+                ++$array->nextFreeElement;
+            }
             self::setAtIndex($context, $ht, $index, $element);
 
             return;
@@ -1228,8 +1246,17 @@ final class HashTableWriteLlvm
         $context->builder->branchIf($consumedAll, $append, $useStr);
 
         $context->builder->positionAtEnd($append);
-        $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
-        ++$array->nextFreeElement;
+        $index = $array->nextFreeElementFromRuntime
+            ? $context->builder->load(
+                $context->builder->structGep(
+                    $ht,
+                    $context->structFieldMap['__hashtable__']['nextFreeElement']
+                )
+            )
+            : $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        if (!$array->nextFreeElementFromRuntime) {
+            ++$array->nextFreeElement;
+        }
         self::setAtIndex($context, $ht, $index, $element);
         $context->builder->branch($done);
 
@@ -1313,6 +1340,7 @@ final class HashTableWriteLlvm
         $srcPtr = $context->helper->loadValue($srcHt);
         self::spreadPackedInto($context, $dest, $srcPtr);
         self::spreadStringKeysInto($context, $dest, $srcPtr);
+        $dest->nextFreeElementFromRuntime = true;
     }
 
     private static function needsTraversableMaterialization(Context $context, Variable $source): bool
@@ -1362,8 +1390,14 @@ final class HashTableWriteLlvm
         $context->builder->branchIf($isSet, $append, $skip);
 
         $context->builder->positionAtEnd($append);
+        // Must use runtime nextFreeElement — addElement() bakes a compile-time constant
+        // index, so a loop would overwrite one slot ([0, ...[1,2,3]] → [0,3], #23971).
+        $destHt = HashTableReadLlvm::loadHashtablePointer($context, $dest);
+        $destNext = $context->builder->load(
+            $context->builder->structGep($destHt, $map['nextFreeElement'])
+        );
         $elem = HashTableReadLlvm::readIndexedToValueBox($context, $srcHt, $idx);
-        self::addElement($context, $dest, $elem, null);
+        self::setAtIndex($context, $destHt, $destNext, $elem);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skip);

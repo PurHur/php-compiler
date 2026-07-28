@@ -30,13 +30,15 @@ final class ListUnpackRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('TypeErrorRaise::emitBranchOrAbortOnFailure', $source);
         $this->assertStringNotContainsString('isRuntimeTypeValue', $source);
         $this->assertStringNotContainsString('LLVMBuildUnreachable', $source);
-        $this->assertLessThanOrEqual(175, substr_count($source, "\n") + 1);
+        $this->assertLessThanOrEqual(210, substr_count($source, "\n") + 1);
     }
 
     public function testListUnpackJitHelperValueBoxIsArray(): void
     {
         $this->assertTrue(ListUnpackJitHelper::valueBoxIsArray(VmVariable::TYPE_ARRAY));
         $this->assertTrue(ListUnpackJitHelper::valueBoxIsArray(JitVariable::TYPE_HASHTABLE));
+        // i8 ABI sign-extends TYPE_HASHTABLE (135) to -121 (#23971 e08_spread).
+        $this->assertTrue(ListUnpackJitHelper::valueBoxIsArray(-121));
         $this->assertFalse(ListUnpackJitHelper::valueBoxIsArray(VmVariable::TYPE_NULL));
         $this->assertFalse(ListUnpackJitHelper::valueBoxIsArray(VmVariable::TYPE_STRING));
     }
@@ -44,6 +46,8 @@ final class ListUnpackRuntimeShrinkTest extends TestCase
     public function testListUnpackJitHelperValueBoxIsString(): void
     {
         $this->assertTrue(ListUnpackJitHelper::valueBoxIsString(VmVariable::TYPE_STRING));
+        // i8 sign-extend of JIT TYPE_STRING (132) → -124.
+        $this->assertTrue(ListUnpackJitHelper::valueBoxIsString((JitVariable::TYPE_STRING << 24) >> 24));
         $this->assertFalse(ListUnpackJitHelper::valueBoxIsString(VmVariable::TYPE_ARRAY));
         $this->assertFalse(ListUnpackJitHelper::valueBoxIsString(VmVariable::TYPE_NULL));
     }

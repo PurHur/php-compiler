@@ -143,6 +143,11 @@ final class ListUnpackHelper
 
     public static function isDefinitelyArrayAtCompileTime(Variable $array): bool
     {
+        // INIT_ARRAY into a value-box sets valueBoxHashtable (#23971 e08).
+        if (!empty($array->valueBoxHashtable)) {
+            return true;
+        }
+
         return Variable::TYPE_HASHTABLE === $array->type
             || 0 !== ($array->type & Variable::IS_NATIVE_ARRAY);
     }
@@ -163,7 +168,11 @@ final class ListUnpackHelper
 
     public static function isArrayValue(Context $context, Variable $var): \PHPLLVM\Value
     {
-        if (Variable::TYPE_HASHTABLE === $var->type || ($var->type & Variable::IS_NATIVE_ARRAY)) {
+        if (
+            Variable::TYPE_HASHTABLE === $var->type
+            || ($var->type & Variable::IS_NATIVE_ARRAY)
+            || !empty($var->valueBoxHashtable)
+        ) {
             $i1 = $context->getTypeFromString('int1');
 
             return $i1->constInt(1, false);

@@ -363,20 +363,47 @@ final class HashTableHelper
     /**
      * Merge ARG_SEND entries that may include unpack markers (issue #1361).
      *
+     * Call-time `...$arr` allows string keys (named args). Do not use list-unpack's
+     * array_is_list guard — that is for `list()` / `[...$arr]` only (#23971).
+     *
      * @param list<Variable|array{unpack: Variable}> $entries
      */
     public static function mergeCallArgEntries(Context $context, array $entries): Variable
     {
-        CallUnpackRuntime::ensureLinked($context);
-
         if (1 === \count($entries)) {
             $only = $entries[0];
             if (\is_array($only) && isset($only['unpack'])) {
-                ListUnpackHelper::emitCallUnpackOperandCheck($context, $only['unpack']);
-                ListUnpackHelper::emitCheck($context, $only['unpack']);
+                $src = $only['unpack'];
+                if (
+                    !ListUnpackHelper::isDefinitelyArrayAtCompileTime($src)
+                    && Variable::TYPE_VALUE !== $src->type
+                    && Variable::TYPE_OBJECT !== $src->type
+                ) {
+                    CallUnpackRuntime::ensureLinked($context);
+                    ListUnpackHelper::emitCallUnpackOperandCheck($context, $src);
+                }
 
-                return self::coerceToPackedHashtable($context, $only['unpack']);
+                return self::coerceToPackedHashtableCopy($context, $src);
             }
+        }
+
+        $needsNonArrayGuard = false;
+        foreach ($entries as $entry) {
+            if (!\is_array($entry) || !isset($entry['unpack'])) {
+                continue;
+            }
+            $u = $entry['unpack'];
+            if (
+                !ListUnpackHelper::isDefinitelyArrayAtCompileTime($u)
+                && Variable::TYPE_VALUE !== $u->type
+                && Variable::TYPE_OBJECT !== $u->type
+            ) {
+                $needsNonArrayGuard = true;
+                break;
+            }
+        }
+        if ($needsNonArrayGuard) {
+            CallUnpackRuntime::ensureLinked($context);
         }
 
         $dest = self::emptyVariable($context);
@@ -388,9 +415,16 @@ final class HashTableHelper
         );
         foreach ($entries as $entry) {
             if (\is_array($entry) && isset($entry['unpack'])) {
-                ListUnpackHelper::emitCallUnpackOperandCheck($context, $entry['unpack']);
-                ListUnpackHelper::emitCheck($context, $entry['unpack']);
-                self::spreadInto($context, $destVar, $entry['unpack']);
+                $u = $entry['unpack'];
+                if (
+                    $needsNonArrayGuard
+                    && !ListUnpackHelper::isDefinitelyArrayAtCompileTime($u)
+                    && Variable::TYPE_VALUE !== $u->type
+                    && Variable::TYPE_OBJECT !== $u->type
+                ) {
+                    ListUnpackHelper::emitCallUnpackOperandCheck($context, $u);
+                }
+                self::spreadInto($context, $destVar, $u);
                 continue;
             }
             if (\is_array($entry) && isset($entry['named'])) {
@@ -408,6 +442,25 @@ final class HashTableHelper
         }
 
         return $destVar;
+    }
+
+    /**
+     * Like {@see coerceToPackedHashtable} but always returns an owned hashtable copy so
+     * call-time unpack does not alias script-global / value-box storage
+     * (`s(...$p)` then use `$v` — #23971 e08_spread).
+     */
+    public static function coerceToPackedHashtableCopy(Context $context, Variable $source): Variable
+    {
+        $packed = self::coerceToPackedHashtable($context, $source);
+        $ptr = $context->helper->loadValue($packed);
+        $copy = \PHPCompiler\JIT\Builtin\HashTableDuplicateRuntime::duplicate($context, $ptr);
+
+        return new Variable(
+            $context,
+            Variable::TYPE_HASHTABLE,
+            Variable::KIND_VALUE,
+            $copy
+        );
     }
 
     public static function emitIllegalOffsetType(Context $context, string $message = 'Illegal offset type'): void
