@@ -1904,4 +1904,25 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($params, 'params', 'stream_context_set_params'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($params, 'options', 'stream_context_set_params'));
     }
+
+    /** @covers issue #24038 */
+    public function testStrrchrStrriposNamedParamsResolve(): void
+    {
+        $strrchr = BuiltinParamNames::forFunction('strrchr');
+        self::assertSame(['haystack', 'needle'], $strrchr);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($strrchr, 'haystack', 'strrchr'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($strrchr, 'needle', 'strrchr'));
+
+        $strripos = BuiltinParamNames::forFunction('strripos');
+        self::assertSame(['haystack', 'needle', 'offset'], $strripos);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($strripos, 'haystack', 'strripos'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($strripos, 'needle', 'strripos'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($strripos, 'offset', 'strripos'));
+
+        // Sibling registration hole (same forFunction table as strstr/strchr)
+        $stristr = BuiltinParamNames::forFunction('stristr');
+        self::assertSame(['haystack', 'needle', 'before_needle'], $stristr);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($stristr, 'before_needle', 'stristr'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($stristr, 'part', 'stristr'));
+    }
 }
