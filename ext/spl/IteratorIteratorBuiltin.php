@@ -306,21 +306,25 @@ final class SplDualIteratorStorage
         return $maxDepth < 0 ? false : $maxDepth;
     }
 
-    public static function getSubIterator(ObjectEntry $object, ?int $level): ObjectEntry
+    /**
+     * php-src SPL_METHOD(RecursiveIteratorIterator, getSubIterator) — NULL for missing /
+     * negative levels (no OutOfBoundsException) (#24315).
+     */
+    public static function getSubIterator(ObjectEntry $object, ?int $level): ?ObjectEntry
     {
         $state = self::state($object);
         if (null === $level) {
             $level = self::getDepth($object);
         }
         if ($level < 0) {
-            throw new \OutOfBoundsException('Level must be a non-negative integer');
+            return null;
         }
         if (0 === $level) {
             return $state['inner'];
         }
         $stack = $state['stack'];
         if ($level >= \count($stack)) {
-            throw new \OutOfBoundsException('Level '.$level.' not found');
+            return null;
         }
 
         return $stack[$level]['iterator'];
@@ -1121,6 +1125,11 @@ final class RecursiveIteratorIteratorGetSubIterator extends VmClassMethod
             }
         }
         $inner = SplDualIteratorStorage::getSubIterator($object, $level);
+        if (null === $inner) {
+            $frame->returnVar->null();
+
+            return;
+        }
         SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
     }
@@ -1146,6 +1155,11 @@ final class RecursiveIteratorIteratorGetInnerIterator extends VmClassMethod
         // php-src RecursiveIteratorIterator::getInnerIterator — current stack
         // sub-iterator (SPL_FETCH_SUB_ELEMENT), not the original root (#20091).
         $inner = SplDualIteratorStorage::getSubIterator($object, null);
+        if (null === $inner) {
+            $frame->returnVar->null();
+
+            return;
+        }
         SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
     }
