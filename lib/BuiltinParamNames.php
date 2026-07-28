@@ -265,6 +265,10 @@ final class BuiltinParamNames
             case 'gethostbyname':
                 // php-src ext/standard/basic_functions.stub.php / dns.c (#23492)
                 return ['hostname'];
+            // php-src ext/ftp/ftp.stub.php — InternalArgInfo still says host (#23644)
+            case 'ftp_connect':
+            case 'ftp_ssl_connect':
+                return ['hostname', 'port', 'timeout'];
             case 'sort':
             case 'rsort':
                 // php-src ext/standard/basic_functions.stub.php — array, flags only (#23225).
