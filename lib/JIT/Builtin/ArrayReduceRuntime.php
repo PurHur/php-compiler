@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
+use PHPCompiler\JIT\ArrayReduceLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -55,18 +56,17 @@ final class ArrayReduceRuntime
         if (!ArrayReduceCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
-        self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $initialPtr = self::initialPtr($context, $initial);
         if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)) {
-            return $context->builder->call(
-                $context->lookupFunction(self::ABI_REDUCE_CLOSURE),
-                $ht,
-                JitValueBox::valuePtrFromVariable($context, $callback),
-                $initialPtr
-            );
+            // Pure LLVM + caller closureCall — NestedJIT RuntimeIndirect with ≥3 Closures
+            // intermittently free(): invalid pointer alongside ArrayMapLlvm (#24156).
+            NestedClosureInvokeLlvm::ensureLinked($context);
+
+            return ArrayReduceLlvm::reduceWithClosure($context, $ht, $callback, $initialPtr);
         }
 
+        self::ensureLinked($context);
         $name = $callback->compileTimeString;
         if (null === $name) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
