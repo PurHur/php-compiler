@@ -1137,9 +1137,14 @@ final class VmSimpleXml
         $contextNodes = self::xpathContextNodes($entry);
         $docKey = SimpleXmlRegistry::documentKey($entry);
 
-        // `//tag` / `//ns:tag` / `//tag[@attr="v"]` — absolute from document root (XPath //).
-        if (preg_match('~^//([\w:-]+)(?:\[@([\w:-]+)=["\']([^"\']*)["\']\])?$~', $expression, $m)) {
-            if (!self::isValidXPathNameTest($m[1]) || (isset($m[2]) && !self::isValidXPathNameTest($m[2]))) {
+        // `//tag` / `//ns:tag` / `//tag[@attr="v"]` / `//tag[@attr=N]` — absolute from document root (XPath //).
+        // Unquoted numeric RHS uses XPath 1.0 number equality (php-src/libxml; peer DOM #24333 / #24340).
+        if (preg_match(
+            '~^//([\w:-]+)(?:\[@([\w:-]+)=(?:["\']([^"\']*)["\']|([+-]?(?:\d+\.?\d*|\.\d+)))\])?$~',
+            $expression,
+            $m
+        )) {
+            if (!self::isValidXPathNameTest($m[1]) || (isset($m[2]) && '' !== $m[2] && !self::isValidXPathNameTest($m[2]))) {
                 self::warn($ctx, 'SimpleXMLElement::xpath(): Invalid expression', $frame);
 
                 return false;
@@ -1151,10 +1156,17 @@ final class VmSimpleXml
                 return false;
             }
             [$localName, $nsUri] = $resolved;
+            $numericCompare = isset($m[4]) && '' !== $m[4];
+            $attrName = isset($m[2]) && '' !== $m[2] ? $m[2] : null;
+            $attrExpected = $numericCompare ? $m[4] : ($m[3] ?? '');
             $root = SimpleXmlRegistry::rootState($docKey);
             foreach (self::collectDescendantsByQName($root, $localName, $nsUri, []) as $node) {
-                if (isset($m[2]) && (!\array_key_exists($m[2], $node->attributes) || $node->attributes[$m[2]] !== $m[3])) {
-                    continue;
+                if (null !== $attrName) {
+                    if (!\array_key_exists($attrName, $node->attributes)
+                        || !self::xpathAttributeEquals($node->attributes[$attrName], $attrExpected, $numericCompare)
+                    ) {
+                        continue;
+                    }
                 }
                 $var = new Variable();
                 $var->object(self::wrapNode($ctx, $entry->class, $node, $docKey));
@@ -1265,6 +1277,24 @@ final class VmSimpleXml
         // Subset gap: valid XPath we do not evaluate yet → empty node-set (not false).
         // Clearly-invalid forms already rejected above via isInvalidXPathExpression.
         return $ht;
+    }
+
+    /**
+     * Attribute predicate match for SimpleXML xpath. Quoted RHS is string equality;
+     * unquoted numeric RHS uses XPath 1.0 number conversion (php-src sxe.c / libxml; #24340).
+     */
+    private static function xpathAttributeEquals(string $actual, string $expected, bool $numericCompare): bool
+    {
+        if (!$numericCompare) {
+            return $actual === $expected;
+        }
+        $left = trim($actual);
+        $right = trim($expected);
+        if ('' === $left || !is_numeric($left) || '' === $right || !is_numeric($right)) {
+            return false;
+        }
+
+        return (float) $left === (float) $right;
     }
 
     /**
