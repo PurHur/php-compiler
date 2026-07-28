@@ -1,10 +1,11 @@
 --TEST--
-AOT: error_log(null) TypeError on 8.4 forward profile (#23858, reverts #21446, ext/standard/basic_functions.c)
+AOT: error_log(null) soft-null coerce on 8.4 forward profile (#24178, reverts #23858, ext/standard/basic_functions.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-error_log(null);
+var_export(error_log(null));
+echo "\n";
+?>
 --EXPECT--
---EXPECT_EXIT--
-255
+true

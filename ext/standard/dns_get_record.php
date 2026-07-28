@@ -17,8 +17,8 @@ use PHPLLVM\Value;
 /**
  * dns_get_record() — DNS record lookup (ext/standard/dns.c parity, #6392).
  *
- * Z_PARAM_STR $hostname — null TypeError under caller strict_types or 8.4 forward profile
- * (#23858/#23856, reverts #21446 soft-null; php-src ext/standard/dns.c).
+ * Z_PARAM_STR $hostname — null TypeError under caller strict_types only; PROFILE=8.4 soft-null DEP+coerce
+ * (#24178, reverts #23858 over-strict; php-src ext/standard/dns.c).
  *
  * VM: VmDns::dnsGetRecord(). JIT/AOT: JitDnsGetRecord compile-time materializer.
  *
@@ -41,7 +41,7 @@ final class dns_get_record extends Internal
             return;
         }
 
-        $hostname = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'dns_get_record', 0, 'hostname');
+        $hostname = VmString::trimFamilyStringArgForFrame($frame, 0, 'dns_get_record', 0, 'hostname');
         $type = StdlibConstants::DNS_A;
         if ($argc >= 2) {
             $typeVar = $frame->calledArgs[1]->resolveIndirect();
@@ -74,21 +74,21 @@ final class dns_get_record extends Internal
         }
 
         $hostnameArg = $args[0];
-        JitStringBuiltinArg::lowerZparamStr($context, $hostnameArg, 'dns_get_record', 0, 'hostname');
+        $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
+            || ($hostnameArg->isNullConstant ?? false);
+        if ($nullOperand && $context->callerStrictTypes) {
+            JitStringBuiltinArg::lowerZparamStr($context, $hostnameArg, 'dns_get_record', 0, 'hostname');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
 
         $literal = JitStringArg::compileTimeLiteral($hostnameArg);
         if (null === $literal) {
-            $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
-                || ($hostnameArg->isNullConstant ?? false);
             if ($nullOperand) {
-                if (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes) {
-                    // TypeError already emitted; skip DNS IR after abort (#23858).
-                    $slot = JitValueBox::alloc($context);
-
-                    return JitValueBox::pointer($context, $slot);
-                }
                 $literal = '';
             } else {
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $hostnameArg, 'dns_get_record', 0, 'hostname');
                 throw new \LogicException(
                     'dns_get_record() requires compile-time string hostname for JIT/AOT in this build'
                 );
