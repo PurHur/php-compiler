@@ -58,7 +58,7 @@ final class ArrayReduceCallbackPolicy
     }
 
     /**
-     * Thin AOT NestedClosureInvoke return still wrong (Object) — decline until green (#24156).
+     * Thin AOT Closures use NestedClosureInvoke (#24156) — message kept for diagnostics.
      */
     public static function thinAotClosureRejectionMessage(): string
     {

@@ -99,6 +99,11 @@ final class array_map extends Internal
 
     private static function lowerSingleArrayMap(Context $context, JITVariable $callback, JITVariable $array): Value
     {
+        // Closures are TYPE_OBJECT with closureCall — must not hit the php-src scalar invalid
+        // path (that returns a null value box and makes array_map() yield NULL under AOT) (#24156).
+        if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
+            return ArrayMapRuntime::mapSingle($context, $callback, $array);
+        }
         if (ArrayMapCallbackPolicy::isJitPhpSrcInvalidCallbackType($callback->type)) {
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitRaise($context, ArrayMapCallbackPolicy::invalidCallbackTypeError());

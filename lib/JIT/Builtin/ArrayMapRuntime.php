@@ -71,10 +71,12 @@ final class ArrayMapRuntime
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
-            self::ensureLinked($context);
+            // Pure LLVM + caller closureCall — NestedJIT helper new HashTable() aborts under
+            // thin AOT and snaps wrong multi-Closure candidates (#24156).
+            NestedClosureInvokeLlvm::ensureLinked($context);
             $ht = self::argToHashtable($context, $array);
 
-            return self::callMapClosure($context, $ht, $callback);
+            return ArrayMapLlvm::mapClosure($context, $ht, $callback);
         }
 
         $ht = self::argToHashtable($context, $array);

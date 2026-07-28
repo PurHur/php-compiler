@@ -43,11 +43,9 @@ final class VmClosureInvoke
     /** usort-family compare via {@see invokeVariable} (thin AOT NestedJIT, #24156). */
     public static function invokeVariableTwo(Variable $callback, Variable $a, Variable $b): int
     {
-        $copyA = new Variable();
-        $copyA->duplicateFrom($a);
-        $copyB = new Variable();
-        $copyB->duplicateFrom($b);
-        $result = self::invokeVariable($callback, $copyA, $copyB);
+        // Do not wrap in new Variable()+duplicateFrom — NestedJIT TYPE_OBJECT temps
+        // break NestedClosureInvoke arg ABI (#24156).
+        $result = self::invokeVariable($callback, $a, $b);
 
         return VmClosureCall::coerceUserSortCallbackResult($result);
     }

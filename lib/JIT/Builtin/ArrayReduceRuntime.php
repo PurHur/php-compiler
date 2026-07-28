@@ -113,9 +113,12 @@ final class ArrayReduceRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
+        // Do not NestedJIT-compile VmClosureInvoke.php here — that bakes NestedClosureInvoke
+        // candidates at first-helper time (before later Closures exist). Call sites use the
+        // NestedClosureInvoke proxy via initJitStaticCall instead (#24156).
         JitVmHelperLink::ensureCompiledBundle(
             $context,
-            [self::HELPER_PATH, self::CLOSURE_INVOKE_PATH],
+            [self::HELPER_PATH],
             self::COMPILED_HELPERS,
             '#24156'
         );

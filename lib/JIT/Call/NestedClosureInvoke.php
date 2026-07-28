@@ -28,8 +28,23 @@ final class NestedClosureInvoke implements Call
         }
         $closure = $args[0];
         $invokeArgs = \array_slice($args, 1);
+        // Always use RuntimeIndirectClosureCall so dispatch uses the Closure object's
+        // __closure_target at runtime — baking $closure->closureCall at NestedJIT/LLVM
+        // emit time is fine for single-Closure modules but free():invalid / wrong-target
+        // has been observed when multiple Closures share a module (#24156). Prefer
+        // closureCall only when it is the sole candidate.
         $candidates = VmClosure::closureCandidates($context);
+        if (null !== $closure->closureCall && 1 === \count($candidates)) {
+            $raw = $closure->closureCall->call($context, ...$invokeArgs);
+
+            return self::asValuePtr($context, $raw);
+        }
         if ([] === $candidates) {
+            if (null !== $closure->closureCall) {
+                $raw = $closure->closureCall->call($context, ...$invokeArgs);
+
+                return self::asValuePtr($context, $raw);
+            }
             throw new \LogicException(
                 'NestedClosureInvoke: no Closure candidates in module (#24156 / __closure_target)'
             );
@@ -55,9 +70,10 @@ final class NestedClosureInvoke implements Call
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         if ('int64' === $have || 'int32' === $have || 'int1' === $have) {
+            // Sign-extend — zExt of int32 -1 becomes 0xffffffff and breaks usort (#24156).
             $long = 'int64' === $have
                 ? $raw
-                : $context->builder->zExt($raw, $context->getTypeFromString('int64'));
+                : $context->builder->sExt($raw, $context->getTypeFromString('int64'));
             $context->builder->call($context->lookupFunction('__value__writeLong'), $ptr, $long);
 
             return $ptr;

@@ -79,7 +79,7 @@ final class UsortCallbackPolicy
     }
 
     /**
-     * Thin standalone AOT Closures lack ClosureState — NestedClosureInvoke return marshaling WIP (#24156).
+     * Thin AOT Closures use NestedClosureInvoke (#24156) — message kept for diagnostics.
      */
     public static function thinAotClosureRejectionMessage(string $function): string
     {
