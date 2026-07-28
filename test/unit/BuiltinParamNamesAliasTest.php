@@ -1603,6 +1603,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sid, 'newid', 'session_id'));
     }
 
+    /** @covers issue #24456 */
+    public function testFuncGetArgZendStubNamedPositionParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('func_get_arg');
+        self::assertSame(['position'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'position', 'func_get_arg'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $arg_num)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'arg_num', 'func_get_arg'));
+        self::assertSame(
+            ['position'],
+            BuiltinParamNames::paramNamesForInternalFunction('func_get_arg')
+        );
+    }
+
     /** @covers issue #23783 */
     public function testDateParseZendStubNamedParams(): void
     {
