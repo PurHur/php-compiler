@@ -1,26 +1,25 @@
 --TEST--
-AOT: array_pad() ArrayPadType enum 4th arg (PHP 8.4+, #17240, #17600, ext/standard/array.c)
+AOT: ArrayPadType enum never on PROFILE=8.4 (#24002, #17240)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-declare(strict_types=1);
-
-if (!enum_exists('ArrayPadType', false)) {
-    echo "skip\n";
-    exit(0);
-}
-
-$positive = array_pad([1], 4, 0, ArrayPadType::Positive);
-$negative = array_pad([1], 4, 0, ArrayPadType::Negative);
-$both = array_pad([1, 2], 5, 0, ARRAY_PAD_BOTH);
-
-echo count($positive), ':', $positive[0], '|', $positive[3], "\n";
-echo count($negative), ':', $negative[0], '|', $negative[3], "\n";
-echo count($both), ':', $both[2], '|', $both[4], "\n";
+echo enum_exists('ArrayPadType', false) ? "enum=1
+" : "enum=0
+";
+echo class_exists('ArrayPadType', false) ? "class=1
+" : "class=0
+";
+var_export(array_pad([1], 4, 0));
+echo "
+";
+?>
 --EXPECT--
-4:1|0
-4:0|1
-5:1|0
---EXPECT_EXIT--
-0
+enum=0
+class=0
+array (
+  0 => 1,
+  1 => 0,
+  2 => 0,
+  3 => 0,
+)

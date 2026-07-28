@@ -36,7 +36,7 @@ final class StdlibConstants
     public const STR_PAD_RIGHT = 1;
     public const STR_PAD_BOTH = 2;
 
-    /** array_pad() pad type (ext/standard/array.c, PHP 8.4+, #14993). */
+    /** array_pad() pad type constants — phantom vs php-src; gated by supportsArrayPadPadType() (#14993, #24002). */
     public const ARRAY_PAD_LEFT = 0;
     public const ARRAY_PAD_RIGHT = 1;
     public const ARRAY_PAD_BOTH = 2;

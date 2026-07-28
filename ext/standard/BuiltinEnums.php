@@ -400,9 +400,9 @@ final class BuiltinEnums
     }
 
     /**
-     * PHP 8.4 ArrayPadType: pure enum for array_pad() 4th $pad_type (#17240, #14993).
+     * Historical ArrayPadType registration (#17240, #14993) — never enabled under php-src-strict (#24002).
      *
-     * php-src forward profile: ext/standard/array.c — ArrayPadType (Positive / Negative)
+     * php-src has no ArrayPadType; {@see CompilerVersion::supportsArrayPadTypeEnum()} is always false.
      */
     private static function registerArrayPadType(Context $ctx): void
     {

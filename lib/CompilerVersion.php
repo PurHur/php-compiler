@@ -2662,32 +2662,26 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ArrayPadType builtin enum for array_pad() pad_type (#17240).
+     * ArrayPadType builtin enum for array_pad() pad_type (#17240, #24002).
      *
-     * Withheld on 8.4.0-dev reference profile — enable via PHP_COMPILER_PROFILE=8.4 forward profile.
+     * php-src never ships ArrayPadType (ext/standard/basic_functions.stub.php keeps
+     * {@code array_pad(array $array, int $length, mixed $value): array} only). Always false
+     * under php-src-strict — including PROFILE=8.4/8.5 (#24002).
      */
     public static function supportsArrayPadTypeEnum(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
-     * PHP 8.4+ array_pad() optional $pad_type + ARRAY_PAD_* constants (ext/standard/array.c, #14993, #22786).
+     * array_pad() optional $pad_type + ARRAY_PAD_* constants (#14993, #22786, #24002).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so PROFILE=8.2 and the 8.4.0-dev
-     * reference profile match Zend (no ARRAY_PAD_* / 4th arg). Enable via PHP_COMPILER_PROFILE=8.4+.
+     * php-src never defines ARRAY_PAD_* or a 4th parameter — direction is the sign of
+     * {@code $length}. Always false under php-src-strict — including PROFILE=8.4/8.5 (#24002).
      */
     public static function supportsArrayPadPadType(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**

@@ -1,5 +1,5 @@
 --TEST--
-ARRAY_PAD_* + array_pad() 4th arg withheld on PROFILE=8.2 (#22786)
+ARRAY_PAD_* + array_pad() 4th arg withheld on PROFILE=8.2 (#22786, #24002)
 --ENV--
 PHP_COMPILER_PROFILE=8.2
 --FILE--

@@ -321,10 +321,9 @@ final class BuiltinParamNames
                 return ['array', 'callback', 'mode'];
             case 'array_reduce':
                 return ['array', 'callback', 'initial'];
+            // php-src ext/standard/basic_functions.stub.php — arity 3; no $pad_type (#24002)
             case 'array_pad':
-                return \PHPCompiler\CompilerVersion::supportsArrayPadPadType()
-                    ? ['array', 'length', 'value', 'pad_type']
-                    : ['array', 'length', 'value'];
+                return ['array', 'length', 'value'];
             case 'array_combine':
                 return ['keys', 'values'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says keys/val (#23490)
