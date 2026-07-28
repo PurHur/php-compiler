@@ -24,6 +24,20 @@ PHP;
         self::assertStringNotContainsString('Call to undefined function', $stderr);
     }
 
+    /** Issue #24166: user-function FCC invoke must JIT-compile (not variable-function dispatch). */
+    public function testUserFunctionFirstClassCallableCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $code = <<<'PHP'
+<?php
+function dbl(int $n): int { return $n * 2; }
+echo (dbl(...))(21), "\n";
+PHP;
+        $stderr = $this->runJitProbeInSubprocess($code);
+        self::assertStringNotContainsString('Variable function calls not yet supported', $stderr);
+        self::assertStringNotContainsString('Class "PHPCompiler\\JIT\\JIT" not found', $stderr);
+    }
+
     public function testStaticMethodCallableCompiles(): void
     {
         $this->skipUnlessLlvmReady();
