@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmActiveContextJitHelper;
 use PHPCompiler\Web\Superglobals;
 
 /**
@@ -13,6 +14,7 @@ use PHPCompiler\Web\Superglobals;
  *
  * SSOT shared with {@see array_reduce} VM execute()
  * php-src: ext/standard/array.c — php_array_reduce()
+ * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} → sg_vm_context (#17391 / #24117).
  */
 final class ArrayReduceJitHelper
 {
@@ -57,11 +59,10 @@ final class ArrayReduceJitHelper
 
     public static function reduceWithClosure(HashTable $ht, Variable $closure, Variable $initialOrNull): Variable
     {
+        // Inline context resolve — NestedJIT mis-types `: Context` returns as int (#20816 / #24117).
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
-            throw new \LogicException(
-                'ArrayReduceJitHelper::reduceWithClosure() requires an active VM context in this compiler build'
-            );
+            $ctx = VmActiveContextJitHelper::resolve();
         }
         $closureState = VmClosureCall::resolve($closure);
         $hasInitial = Variable::TYPE_NULL !== $initialOrNull->type;

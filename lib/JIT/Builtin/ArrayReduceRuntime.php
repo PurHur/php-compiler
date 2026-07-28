@@ -9,7 +9,10 @@ use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value;
 
 /**
@@ -49,6 +52,11 @@ final class ArrayReduceRuntime
         if (!ArrayReduceCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
+        if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)
+            && $context->isThinStandaloneAotMain()
+        ) {
+            throw new \LogicException(ArrayReduceCallbackPolicy::thinAotClosureRejectionMessage());
+        }
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $initialPtr = self::initialPtr($context, $initial);
@@ -86,6 +94,11 @@ final class ArrayReduceRuntime
 
     public static function implement(Context $context): void
     {
+        // Thin standalone AOT: publish sg_vm_context before NestedJIT (#24117 / peer #17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+
         if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);
 
