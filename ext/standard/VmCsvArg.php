@@ -38,6 +38,25 @@ final class VmCsvArg
     }
 
     /**
+     * str_getcsv() single-byte delimiter checks — PHP 8.4+ only (#24148, php-src UPGRADING).
+     *
+     * Zend 8.2/8.3 still accept multi-byte separator/enclosure/escape; fgetcsv() had these
+     * ValueErrors earlier on both 8.2 and 8.4.
+     */
+    public static function validateStrGetcsvOptions(
+        string $separator,
+        string $enclosure,
+        string $escape,
+    ): void {
+        if (!self::shouldValidateStrGetcsvSingleChar()) {
+            return;
+        }
+        self::requireSingleChar('str_getcsv', $separator, 2, 'separator');
+        self::requireSingleChar('str_getcsv', $enclosure, 3, 'enclosure');
+        self::requireEmptyOrSingleChar('str_getcsv', $escape, 4, 'escape');
+    }
+
+    /**
      * php-src file.c — PHP 8.4 deprecates calling CSV builtins without an explicit $escape
      * (default will change). Gated on language profile ≥ 8.4 (explicit PROFILE=8.4 / stable 8.4.0+);
      * 8.4.0-dev reference profile without PROFILE stays silent like Zend 8.2 CI.
@@ -45,6 +64,12 @@ final class VmCsvArg
     public static function shouldDeprecateOmittedEscape(): bool
     {
         return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /** PHP 8.4+ str_getcsv() separator/enclosure/escape length ValueErrors (#24148). */
+    public static function shouldValidateStrGetcsvSingleChar(): bool
+    {
+        return self::shouldDeprecateOmittedEscape();
     }
 
     public static function omittedEscapeMessage(string $function): string

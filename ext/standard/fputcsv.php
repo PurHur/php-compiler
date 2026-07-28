@@ -99,7 +99,9 @@ final class fputcsv extends Internal
         if (null !== $compileTimeFailure) {
             return $compileTimeFailure;
         }
-        JitCsvArg::validateFputcsvCall($context, ...$args);
+        if (!JitCsvArg::validateFputcsvCall($context, ...$args)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         JitArrayElem::requireArrayParam($context, $args[1], 'fputcsv', 2, 'fields');
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
