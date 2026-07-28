@@ -347,12 +347,10 @@ final class ExceptionSupport
 
     public static function stampThrowableSite(ObjectEntry $receiver, string $file, int $line): void
     {
-        if ('' !== $file) {
-            $receiver->getProperty(self::PROP_FILE)->string($file);
-        }
-        if ($line > 0) {
-            $receiver->getProperty(self::PROP_LINE)->int($line);
-        }
+        // Always init typed file/line slots — Zend zend_exception_get_props; uninit
+        // prototypes fatal on getFile()/getLine() after engine Errors (#24397).
+        $receiver->getProperty(self::PROP_FILE)->string($file);
+        $receiver->getProperty(self::PROP_LINE)->int(max(0, $line));
     }
 
     public static function applyNativeLocation(\Throwable $native, string $file, int $line): void
@@ -476,6 +474,18 @@ final class ExceptionSupport
         $message = self::readOptionalStringProperty($entry, self::PROP_MESSAGE);
 
         return null !== $message && '' !== $message ? $message : 'Exception';
+    }
+
+    /** Safe file read — uninit typed prototype → '' (#24397, #6357). */
+    public static function readThrowableFile(ObjectEntry $entry): string
+    {
+        return self::readOptionalStringProperty($entry, self::PROP_FILE) ?? '';
+    }
+
+    /** Safe line read — uninit typed prototype → 0 (#24397, #6357). */
+    public static function readThrowableLine(ObjectEntry $entry): int
+    {
+        return self::readOptionalIntProperty($entry, self::PROP_LINE) ?? 0;
     }
 
     private static function readOptionalStringProperty(ObjectEntry $entry, string $prop): ?string

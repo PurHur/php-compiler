@@ -11586,11 +11586,43 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_FROM_CALLABLE:
-                    $closureVar = JIT\FromCallableHelper::createClosureVariable($this->context, $block, $op);
-                    if (null !== $closureVar->closureCall) {
-                        $this->context->fccClosureCallByResultSlot[(int) $op->arg1] = $closureVar->closureCall;
+                    try {
+                        $closureVar = JIT\FromCallableHelper::createClosureVariable($this->context, $block, $op);
+                        if (null !== $closureVar->closureCall) {
+                            $this->context->fccClosureCallByResultSlot[(int) $op->arg1] = $closureVar->closureCall;
+                        }
+                        $this->assignOperand($block->getOperand($op->arg1), $closureVar, true);
+                    } catch (\Error $e) {
+                        // Compile-time FCC reject → catchable runtime Error at FCC site (#24397).
+                        $file = '';
+                        $line = 0;
+                        if (null !== $op->sourceLocation) {
+                            $file = $op->sourceLocation->filename;
+                            $line = $op->sourceLocation->startLine;
+                        }
+                        if ('' === $file) {
+                            $file = $block->scriptPath();
+                            if ('' === $file) {
+                                $file = $this->context->jitAotEntryScriptPath;
+                            }
+                        }
+                        if ([] !== $this->context->tryCatch->handlerStack) {
+                            JIT\TryCatchHelper::emitCatchableClassError(
+                                $this->context,
+                                'Error',
+                                $e->getMessage(),
+                                $this,
+                                $file,
+                                $line
+                            );
+                        } else {
+                            JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                            JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                            JIT\Builtin\ErrorRaise::emitRaise($this->context, $e->getMessage());
+                            $this->context->builder->call($this->context->lookupFunction('abort'));
+                            $this->context->builder->clearInsertionPosition();
+                        }
                     }
-                    $this->assignOperand($block->getOperand($op->arg1), $closureVar, true);
                     break;
                 case OpCode::TYPE_BEGIN_SILENCE:
                     JIT\ErrorSilenceHelper::beginSilence($this->context);

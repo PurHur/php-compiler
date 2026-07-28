@@ -16,6 +16,7 @@ use PHPCompiler\JIT\Builtin\ScriptExit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin\UncaughtThrowPrinter;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\ExceptionSupport;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -447,7 +448,9 @@ final class TryCatchHelper
         Context $context,
         string $className,
         string $message,
-        ?\PHPCompiler\JIT $jit = null
+        ?\PHPCompiler\JIT $jit = null,
+        string $file = '',
+        int $line = 0
     ): void {
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
@@ -480,6 +483,27 @@ final class TryCatchHelper
             $msgStr
         );
         $object->storeInstanceProperty($obj, $className, 'message', $msgVar);
+
+        // Stamp file/line like zend_exception_get_props so getFile()/getLine() work (#24397).
+        if ('' === $file) {
+            $file = $context->jitAotEntryScriptPath;
+        }
+        if ('' === $file) {
+            $file = 'Unknown';
+        }
+        if ($line <= 0) {
+            $line = max(0, $context->callSiteLine);
+        }
+        $fileStr = $context->builder->load($context->constantStringFromString($file));
+        $fileVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $fileStr);
+        $object->storeInstanceProperty($obj, $className, ExceptionSupport::PROP_FILE, $fileVar);
+        $lineVar = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->constantFromInteger(max(0, $line))
+        );
+        $object->storeInstanceProperty($obj, $className, ExceptionSupport::PROP_LINE, $lineVar);
 
         $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
         $context->builder->branch($dispatchBb);
