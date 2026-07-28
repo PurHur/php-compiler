@@ -11,17 +11,19 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_json_decode via JsonDecodeJitHelper PHP (#9359, #13228, #20829).
  *
- * Embed + thin standalone AOT: {@see JsonDecodeJitHelper} NestedJIT int wire
- * (JsonEncode #20816 / Unserialize #20785 shape — no thin null stubs).
- * Validate/last_error live in {@see JsonValidateJitHelper} (separate NestedJIT TU).
- * Object/array NestedJIT returns are not yet thin-AOT safe.
+ * Embed + thin standalone AOT: assoc containers via {@see JsonDecodeJitHelper::decodeAssocArray}
+ * + {@see phpc_json_decode_assoc_ht}; scalars keep int-wire (#20829 / #24137).
  * php-src: ext/json/php_json.c — php_json_decode_ex / php_json_validate
  */
 final class StringJsonDecode
@@ -31,6 +33,14 @@ final class StringJsonDecode
     private const VALIDATE_HELPER_PATH = '/ext/standard/JsonValidateJitHelper.php';
 
     private const DECODE_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::decode';
+
+    private const IS_CONTAINER_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::isAssocContainer';
+
+    private const DECODE_ARRAY_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::decodeAssocArray';
+
+    private const ASSOC_HT_ABI = 'phpc_json_decode_assoc_ht';
+
+    private const ASSOC_HT_BRIDGE_ENTRY = 'json_decode_assoc_ht_entry';
 
     private const VALIDATE_HELPER = 'PHPCompiler\\ext\\standard\\JsonValidateJitHelper::validate';
 
@@ -49,6 +59,8 @@ final class StringJsonDecode
     /** @var list<string> */
     private const DECODE_COMPILED_HELPERS = [
         self::DECODE_HELPER,
+        self::IS_CONTAINER_HELPER,
+        self::DECODE_ARRAY_HELPER,
     ];
 
     /** @var list<string> */
@@ -89,6 +101,13 @@ final class StringJsonDecode
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+        foreach (['null', 'bool', 'int', 'string', 'float', 'array', 'copyfrom', 'resolveindirect'] as $varMethod) {
+            NestedVmVariableMethodLlvm::ensureMethod($context, $varMethod);
+        }
+        foreach (['add', 'addindex', 'updateindex', 'append'] as $htMethod) {
+            NestedVmHashTableMethodLlvm::ensureMethod($context, $htMethod);
+        }
+        self::ensureHashtableValueHelpers($context);
 
         $decodeProbe = $context->module->getNamedFunction('__compiler_json_decode');
         $validateProbe = $context->module->getNamedFunction('__compiler_json_validate');
@@ -113,6 +132,7 @@ final class StringJsonDecode
             return;
         }
 
+        self::implementAssocHtBridge($context);
         self::implementDecodeBridge($context);
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
@@ -175,8 +195,25 @@ final class StringJsonDecode
         return $fn;
     }
 
+    private static function implementAssocHtBridge(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ASSOC_HT_ABI,
+            self::ASSOC_HT_BRIDGE_ENTRY,
+            [$strPtr],
+            $htPtr,
+            self::DECODE_ARRAY_HELPER,
+            self::DECODE_HELPER_PATH,
+            [self::DECODE_ARRAY_HELPER],
+            '#24137'
+        );
+    }
+
     /**
-     * NestedJIT decode(): int → box as `__value__*` (#20829 / #20785).
+     * NestedJIT decode(): container HT or int scalar → box as `__value__*` (#20829 / #24137).
      */
     private static function implementDecodeBridge(Context $context): void
     {
@@ -206,12 +243,40 @@ final class StringJsonDecode
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::DECODE_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $payload = $fn->getParam(0);
-        $helperFn = self::helperFunction($context, self::DECODE_HELPER);
         $payloadArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
             $payload,
-            $helperFn->getParam(0)->typeOf()
+            $strPtr
         );
+        // Own encode temps/views before NestedJIT decode (#24137 / peer #5965).
+        $payloadArg = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $payloadArg
+        );
+
+        $containerBb = $fn->appendBasicBlock('json_decode_container');
+        $scalarBb = $fn->appendBasicBlock('json_decode_scalar');
+        $isContainerRaw = $context->builder->call(
+            self::helperFunction($context, self::IS_CONTAINER_HELPER),
+            $payloadArg
+        );
+        $isContainer = JitNestedHelperCoerce::coerceHelperScalarResult($context, $isContainerRaw, $i64);
+        $isContainerTrue = $context->builder->icmp(
+            Builder::INT_NE,
+            $isContainer,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($isContainerTrue, $containerBb, $scalarBb);
+
+        $context->builder->positionAtEnd($containerBb);
+        $ht = $context->builder->call(
+            $context->lookupFunction(self::ASSOC_HT_ABI),
+            $payloadArg
+        );
+        $context->builder->returnValue(self::boxHashtableValue($context, $ht));
+
+        $context->builder->positionAtEnd($scalarBb);
+        $helperFn = self::helperFunction($context, self::DECODE_HELPER);
         $raw = $context->builder->call($helperFn, $payloadArg);
         $long = JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64);
         $slot = JitValueBox::alloc($context);
@@ -223,6 +288,43 @@ final class StringJsonDecode
         );
         $context->builder->returnValue($outPtr);
         $context->registerFunction($abiName, $fn);
+    }
+
+    private static function boxHashtableValue(Context $context, Value $ht): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptr,
+            $ht
+        );
+        $context->refcount->addref($ht);
+
+        return $ptr;
+    }
+
+    private static function ensureHashtableValueHelpers(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $voidTy = $context->getTypeFromString('void');
+
+        foreach ([
+            ['__value__writeHashtable', $voidTy, [$valuePtr, $htPtr]],
+            ['__string__separate', $strPtr, [$strPtr]],
+        ] as [$name, $ret, $params]) {
+            try {
+                $context->lookupFunction($name);
+            } catch (\Throwable) {
+                $fn = $context->module->addFunction(
+                    $name,
+                    $context->context->functionType($ret, false, ...$params)
+                );
+                $context->registerFunction($name, $fn);
+            }
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void

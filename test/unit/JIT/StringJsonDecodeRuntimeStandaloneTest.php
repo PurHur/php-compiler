@@ -28,7 +28,8 @@ final class StringJsonDecodeRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('StringJsonDecodeJit', $runtime);
         $this->assertStringNotContainsString('phpc_json_decode.c', $runtime);
         $helper = (string) file_get_contents(__DIR__.'/../../../ext/standard/JsonDecodeJitHelper.php');
-        $this->assertStringContainsString('function decode(string $payload): int', $helper);
+        $this->assertStringContainsString('function decodeAssocArray(string $payload): HashTable', $helper);
+        $this->assertStringContainsString('function decodeInt(string $payload): int', $helper);
         $this->assertFileExists(__DIR__.'/../../../ext/standard/JsonValidateJitHelper.php');
     }
 

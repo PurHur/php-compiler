@@ -18,13 +18,15 @@ final class JsonDecodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('json_decode_bridge_entry', $source);
         $this->assertStringContainsString('json_validate_bridge_entry', $source);
-        $this->assertStringContainsString('__value__writeLong', $source);
+        $this->assertStringContainsString('__value__writeHashtable', $source);
+        $this->assertStringContainsString('decodeAssocArray', $source);
+        $this->assertStringContainsString('NestedVmHashTableMethodLlvm', $source);
         $this->assertStringContainsString('returnValue', $source);
         $this->assertStringNotContainsString('StringJsonDecodeJit', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('StringJsonDecodeInventoryStubs', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(280, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(500, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecodeJit.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php');
     }
@@ -32,10 +34,13 @@ final class JsonDecodeRuntimeShrinkTest extends TestCase
     public function testJsonDecodeJitHelperDecodesIntJson(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonDecodeJitHelper.php');
-        $this->assertStringContainsString('function decode(string $payload): int', $source);
+        $this->assertStringContainsString('function decodeAssocArray(string $payload): HashTable', $source);
+        $this->assertStringContainsString('function decodeInt(string $payload): int', $source);
+        $this->assertStringContainsString('VmJsonFormat::decode', $source);
         $this->assertStringNotContainsString('VmJson::importDecoded(', $source);
-        $this->assertStringNotContainsString('VmJsonFormat::decode(', $source);
-        $this->assertLessThan(60, \substr_count($source, "\n") + 1, 'JsonDecodeJitHelper must stay Unserialize-slim (#20829)');
+        $this->assertStringContainsString('function decode(string $payload): int', $source);
+        $this->assertStringContainsString('function decodeAssocArray(string $payload): HashTable', $source);
+        $this->assertLessThan(220, \substr_count($source, "\n") + 1, 'JsonDecodeJitHelper assoc container decode (#24137)');
         $validate = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonValidateJitHelper.php');
         $this->assertStringContainsString('VmJsonScanner::validate', $validate);
         $this->assertStringContainsString('VmJson::lastError', $validate);

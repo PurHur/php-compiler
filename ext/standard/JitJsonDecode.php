@@ -85,10 +85,15 @@ final class JitJsonDecode
 
     public static function decodeRuntimeString(Context $context, Value $jsonString): Value
     {
-        // __compiler_json_decode returns __value__* (Unserialize #20785 / #20829 ABI).
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $jsonString
+        );
+
+        // __compiler_json_decode returns __value__* (Unserialize #20785 / #20829).
         return $context->builder->call(
             $context->lookupFunction('__compiler_json_decode'),
-            $jsonString
+            $owned
         );
     }
 
