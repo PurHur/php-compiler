@@ -31,14 +31,27 @@ foreach (scandir($root.'/ext') ?: [] as $entry) {
 }
 ksort($onDisk);
 
-// 2. The load list, in order, as Runtime actually loads it.
-$runtimeSrc = (string) file_get_contents($root.'/lib/Runtime.php');
-$loaded = [];
-if (preg_match('/private function loadCoreModules\(\): void \{(.*?)\n    \}/s', $runtimeSrc, $m)) {
-    if (preg_match_all('/\$this->load\(new ext\\\\([A-Za-z0-9_]+)\\\\Module\)/', $m[1], $mm)) {
-        $loaded = $mm[1];
+// The real order, from the generated registry (falling back to Runtime on older trees).
+$order = [];
+$registryPath = $root.'/lib/ExtensionRegistry.php';
+if (is_file($registryPath)
+    && preg_match_all(
+        '/new \\\\PHPCompiler\\\\ext\\\\([A-Za-z0-9_]+)\\\\Module\\(\\)/',
+        (string) file_get_contents($registryPath),
+        $rm
+    )
+) {
+    $order = $rm[1];
+} else {
+    // Pre-registry trees still carry the hardcoded list in Runtime::loadCoreModules().
+    $runtimeSrc = (string) file_get_contents($root.'/lib/Runtime.php');
+    if (preg_match('/private function loadCoreModules\\(\\): void \\{(.*?)\\n    \\}/s', $runtimeSrc, $m)
+        && preg_match_all('/\\$this->load\\(new ext\\\\([A-Za-z0-9_]+)\\\\Module\\)/', $m[1], $mm)
+    ) {
+        $order = $mm[1];
     }
 }
+$loaded = $order;
 
 // 3. File counts — Phase 2.5 sizes the core/optional split by these.
 $fileCount = static function (string $dir): int {

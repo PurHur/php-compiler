@@ -22,13 +22,25 @@ declare(strict_types=1);
 $root = dirname(__DIR__);
 $json = in_array('--json', $argv, true);
 
-// The real order, as Runtime loads it.
-$runtimeSrc = (string) file_get_contents($root.'/lib/Runtime.php');
+// The real order, from the generated registry (falling back to Runtime on older trees).
 $order = [];
-if (preg_match('/private function loadCoreModules\(\): void \{(.*?)\n    \}/s', $runtimeSrc, $m)
-    && preg_match_all('/\$this->load\(new ext\\\\([A-Za-z0-9_]+)\\\\Module\)/', $m[1], $mm)
+$registryPath = $root.'/lib/ExtensionRegistry.php';
+if (is_file($registryPath)
+    && preg_match_all(
+        '/new \\\\PHPCompiler\\\\ext\\\\([A-Za-z0-9_]+)\\\\Module\\(\\)/',
+        (string) file_get_contents($registryPath),
+        $rm
+    )
 ) {
-    $order = $mm[1];
+    $order = $rm[1];
+} else {
+    // Pre-registry trees still carry the hardcoded list in Runtime::loadCoreModules().
+    $runtimeSrc = (string) file_get_contents($root.'/lib/Runtime.php');
+    if (preg_match('/private function loadCoreModules\\(\\): void \\{(.*?)\\n    \\}/s', $runtimeSrc, $m)
+        && preg_match_all('/\\$this->load\\(new ext\\\\([A-Za-z0-9_]+)\\\\Module\\)/', $m[1], $mm)
+    ) {
+        $order = $mm[1];
+    }
 }
 if ([] === $order) {
     fwrite(STDERR, "check-extension-dependencies: could not parse Runtime::loadCoreModules()\n");

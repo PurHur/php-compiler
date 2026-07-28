@@ -223,82 +223,13 @@ class Runtime {
     }
 
     private function loadCoreModules(): void {
-        $this->load(new ext\types\Module);
-        $this->load(new ext\spl\Module);
-        $this->load(new ext\ds\Module);
-        $this->load(new ext\intl\Module);
-        $this->load(new ext\zip\Module);
-        $this->load(new ext\libxml\Module);
-        $this->load(new ext\dom\Module);
-        $this->load(new ext\xsl\Module);
-        $this->load(new ext\simplexml\Module);
-        $this->load(new ext\xml\Module);
-        $this->load(new ext\xmlrpc\Module);
-        $this->load(new ext\wddx\Module);
-        $this->load(new ext\xmlreader\Module);
-        $this->load(new ext\xmlwriter\Module);
-        $this->load(new ext\gd\Module);
-        $this->load(new ext\exif\Module);
-        $this->load(new ext\fileinfo\Module);
-        $this->load(new ext\iconv\Module);
-        $this->load(new ext\gettext\Module);
-        $this->load(new ext\mbstring\Module);
-        $this->load(new ext\filter\Module);
-        $this->load(new ext\calendar\Module);
-        $this->load(new ext\ldap\Module);
-        $this->load(new ext\session\Module);
-        $this->load(new ext\bcmath\Module);
-        $this->load(new ext\gmp\Module);
-        $this->load(new ext\stats\Module);
-        $this->load(new ext\opcache\Module);
-        $this->load(new ext\openssl\Module);
-        $this->load(new ext\curl\Module);
-        $this->load(new ext\hash\Module);
-        $this->load(new ext\posix\Module);
-        $this->load(new ext\inotify\Module);
-        $this->load(new ext\pcntl\Module);
-        $this->load(new ext\sockets\Module);
-        $this->load(new ext\zmq\Module);
-        $this->load(new ext\ftp\Module);
-        $this->load(new ext\soap\Module);
-        $this->load(new ext\ffi\Module);
-        $this->load(new ext\ctype\Module);
-        $this->load(new ext\tokenizer\Module);
-        $this->load(new ext\random\Module);
-        $this->load(new ext\igbinary\Module);
-        $this->load(new ext\msgpack\Module);
-        $this->load(new ext\simdjson\Module);
-        $this->load(new ext\yaml\Module);
-        $this->load(new ext\redis\Module);
-        $this->load(new ext\mongodb\Module);
-        $this->load(new ext\snmp\Module);
-        $this->load(new ext\zstd\Module);
-        $this->load(new ext\lzf\Module);
-        $this->load(new ext\lz4\Module);
-        $this->load(new ext\bz2\Module);
-        $this->load(new ext\brotli\Module);
-        $this->load(new ext\sodium\Module);
-        $this->load(new ext\sqlite3\Module);
-        $this->load(new ext\pgsql\Module);
-        $this->load(new ext\odbc\Module);
-        $this->load(new ext\dba\Module);
-        $this->load(new ext\mailparse\Module);
-        $this->load(new ext\enchant\Module);
-        $this->load(new ext\gnupg\Module);
-        $this->load(new ext\pspell\Module);
-        $this->load(new ext\mysqli\Module);
-        $this->load(new ext\tidy\Module);
-        $this->load(new ext\pdo\Module);
-        $this->load(new ext\phar\Module);
-        $this->load(new ext\uri\Module);
-        $this->load(new ext\uuid\Module);
-        $this->load(new ext\uploadprogress\Module);
-        $this->load(new ext\apcu\Module);
-        $this->load(new ext\sysvshm\Module);
-        $this->load(new ext\sysvsem\Module);
-        $this->load(new ext\sysvmsg\Module);
-        $this->load(new ext\reflection\Module);
-        $this->load(new ext\standard\Module);
+        // Generated list — see script/generate-extension-registry.php and RELEASE-PLAN Phase 2.5.
+        // Adding an extension used to mean editing this core file; it now means adding a directory
+        // and regenerating. Order is unchanged from the 76 hardcoded loads this replaced, verified
+        // identical at generation time and by test/unit/ExtensionRegistryOrderTest.php.
+        foreach (ExtensionRegistry::defaultModules() as $module) {
+            $this->load($module);
+        }
     }
 
     public function loadJit(): JIT {
