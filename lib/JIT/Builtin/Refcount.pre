@@ -182,6 +182,9 @@ class Refcount extends Builtin {
     }
 
     public function disableRefcount(PHPLLVM\Value $value): void {
+        // NOTE: compile{} expands `$ref.typeinfo = …` to insertValue without store.
+        // Hand-implemented in Refcount.php with store (#24226 / #24137). Keep the .php
+        // store when regenerating from .pre.
         compile {
             $virtual = (__ref__virtual*) $value;
             $ref = $virtual->ref;

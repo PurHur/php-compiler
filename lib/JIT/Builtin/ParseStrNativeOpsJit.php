@@ -102,6 +102,23 @@ final class ParseStrNativeOpsJit
         );
     }
 
+    public static function setLongAt(Context $context, JITVariable $htPtr, JITVariable $index, JITVariable $value): void
+    {
+        $ht = self::htFromI64($context, $htPtr);
+        $sizeT = $context->getTypeFromString('size_t');
+        $idx = $context->builder->zext(
+            JitLongArg::lower($context, $index, 'phpc_native_ht index'),
+            $sizeT
+        );
+        $longVal = JitLongArg::lower($context, $value, 'phpc_native_ht long value');
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setLongAt'),
+            $ht,
+            $idx,
+            $longVal
+        );
+    }
+
     private static function htFromI64(Context $context, JITVariable $ptr): Value
     {
         $htPtrTy = $context->getTypeFromString('__hashtable__*');

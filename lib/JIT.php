@@ -7506,7 +7506,23 @@ class JIT {
                             $args[$recvSlot]
                         );
                     } else {
-                        $this->assignOperand($block->getOperand($op->arg1), $args[$recvSlot]);
+                        // NestedJIT prologue already bind+separate string formals via
+                        // prepareNestedJitCalleeParamArgument. Re-assigning the raw LLVM
+                        // formal here empties heap __string__* content under user-script
+                        // AOT (length ok, bytes gone / UAF) — json_decode encode→decode
+                        // (#24137). Skip ARG_RECV overwrite when the recv op is bound.
+                        $recvOp = $block->getOperand($op->arg1);
+                        if (
+                            JIT\NestedJitCompileScope::isActive()
+                            && Variable::TYPE_STRING === $args[$recvSlot]->type
+                            && $this->context->hasVariableOp($recvOp)
+                        ) {
+                            break;
+                        }
+                        $this->assignOperand(
+                            $recvOp,
+                            $this->prepareNestedJitCalleeParamArgument($args[$recvSlot])
+                        );
                     }
                     break;
                 case OpCode::TYPE_ASSIGN:
