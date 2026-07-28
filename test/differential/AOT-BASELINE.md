@@ -41,7 +41,7 @@ corpus*, not the language.
 |---|---|
 | `e07_named` | compiler crash: `TypeError` in `BackedEnumFromJit::emitCallSiteStrictCheck()` — #23972 |
 | `e16_array_slice` | compiles; runtime still hits `print_r` thin-standalone gap (#23540) — slice itself fixed in #23991 |
-| `e30_array_lit_dim_assign_shift` | **regression** — `HashTable::shiftFirst()` exists (`lib/VM/HashTable.php:783`) but is unresolved for AOT; third instance of #23974's pattern — #24025 |
+| `e30_array_lit_dim_assign_shift` | compiles after #24025 (`HashTableShiftFirst`); runtime still hits master `json_encode` AOT segfault (also on `json_encode(1)`) |
 | `e04_usort` | **documented limitation** — array-callable / invokable comparators deferred |
 | `e08_spread` | variadic spread not lowered: `Unsupported cast for arg type int64 from __hashtable__*` |
 | `c07_method` | `Missing required argument 1` on a two-argument call whose arity is correct |
