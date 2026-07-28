@@ -360,7 +360,7 @@ final class VmMbstring
 
     public static function validateMode(int $mode, string $function, int $argIndex = 1): int
     {
-        if ($mode < MbstringConstants::MB_CASE_UPPER || $mode > MbstringConstants::MB_CASE_TITLE) {
+        if ($mode < MbstringConstants::MB_CASE_UPPER || $mode > MbstringConstants::MB_CASE_FOLD_SIMPLE) {
             throw new \ValueError(sprintf(
                 '%s(): Argument #%d ($mode) must be one of the MB_CASE_* constants',
                 $function,
@@ -798,16 +798,33 @@ final class VmMbstring
             );
         }
 
+        $utf8 = 'UTF-8' === $encoding;
+
         return match ($mode) {
-            MbstringConstants::MB_CASE_UPPER => 'UTF-8' === $encoding
+            MbstringConstants::MB_CASE_UPPER => $utf8
                 ? self::utf8Upper($source)
                 : self::asciiUpper($source),
-            MbstringConstants::MB_CASE_LOWER => 'UTF-8' === $encoding
+            MbstringConstants::MB_CASE_LOWER => $utf8
                 ? self::utf8Lower($source)
                 : self::asciiLower($source),
-            MbstringConstants::MB_CASE_TITLE => 'UTF-8' === $encoding
+            MbstringConstants::MB_CASE_TITLE => $utf8
                 ? self::utf8Title($source)
                 : self::asciiTitle($source),
+            MbstringConstants::MB_CASE_FOLD => $utf8
+                ? self::utf8Fold($source)
+                : self::asciiLower($source),
+            MbstringConstants::MB_CASE_UPPER_SIMPLE => $utf8
+                ? self::utf8UpperSimple($source)
+                : self::asciiUpper($source),
+            MbstringConstants::MB_CASE_LOWER_SIMPLE => $utf8
+                ? self::utf8LowerSimple($source)
+                : self::asciiLower($source),
+            MbstringConstants::MB_CASE_TITLE_SIMPLE => $utf8
+                ? self::utf8TitleSimple($source)
+                : self::asciiTitle($source),
+            MbstringConstants::MB_CASE_FOLD_SIMPLE => $utf8
+                ? self::utf8FoldSimple($source)
+                : self::asciiLower($source),
             default => throw new \ValueError('mb_convert_case(): Argument #2 ($mode) must be one of the MB_CASE_* constants'),
         };
     }
@@ -836,6 +853,67 @@ final class VmMbstring
         return $out;
     }
 
+    private static function utf8Fold(string $source): string
+    {
+        $out = '';
+        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+            foreach (Utf8CaseMap::toFoldCodepoints($cp) as $foldCp) {
+                $out .= self::encodeUtf8Codepoint($foldCp);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function utf8UpperSimple(string $source): string
+    {
+        $out = '';
+        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+            $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toUpperSimple($cp));
+        }
+
+        return $out;
+    }
+
+    private static function utf8LowerSimple(string $source): string
+    {
+        $out = '';
+        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+            $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLowerSimple($cp));
+        }
+
+        return $out;
+    }
+
+    private static function utf8FoldSimple(string $source): string
+    {
+        $out = '';
+        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+            $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toFoldSimple($cp));
+        }
+
+        return $out;
+    }
+
+    private static function utf8TitleSimple(string $source): string
+    {
+        $out = '';
+        $upperNext = true;
+        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+            if ($upperNext) {
+                $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toUpperSimple($cp));
+                $upperNext = false;
+            } else {
+                $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLowerSimple($cp));
+            }
+            if (Utf8CaseMap::isTitleDelimiter($cp)) {
+                $upperNext = true;
+            }
+        }
+
+        return $out;
+    }
+
     private static function utf8Title(string $source): string
     {
         $out = '';
@@ -845,7 +923,8 @@ final class VmMbstring
                 $upperCps = Utf8CaseMap::toUpperCodepoints($cp);
                 $out .= self::encodeUtf8Codepoint($upperCps[0]);
                 for ($ui = 1, $un = \count($upperCps); $ui < $un; ++$ui) {
-                    $out .= self::encodeUtf8Codepoint($upperCps[$ui]);
+                    // SpecialCasing title is first upper + remaining lower (ß→Ss, ﬃ→Ffi).
+                    $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLower($upperCps[$ui]));
                 }
                 $upperNext = false;
             } else {

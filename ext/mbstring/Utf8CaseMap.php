@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * UTF-8 Unicode simple case mapping (php-src ext/mbstring/libmbfl; subset for UTF-8/ASCII parity).
+ * UTF-8 Unicode case mapping (php-src ext/mbstring/php_unicode.c + unicode_data.h; #7014, #24050).
+ *
+ * Full modes apply 1:N SpecialCasing / CaseFolding expansions; *_SIMPLE modes are 1:1 only
+ * (multi-only mappings leave the codepoint unchanged — matches Zend MB_CASE_*_SIMPLE).
  */
 final class Utf8CaseMap
 {
@@ -13,20 +16,31 @@ final class Utf8CaseMap
     private const UPPER_SPECIAL = [
         0xB5 => 0x39C, // micro sign -> Greek capital Mu
         0xFF => 0x178, // Latin small letter y with diaeresis -> capital
-        0x130 => 0x49, // Turkish dotless i -> I
-        0x131 => 0x49, // Turkish dotless i -> I (duplicate path)
+        0x131 => 0x49, // Latin small letter dotless i -> I
         0x17F => 0x53, // long s -> S
         0x3C2 => 0x3A3, // Greek final sigma -> Sigma
     ];
 
-    /** @var array<int, list<int>> Unicode simple upper expansions (1:N codepoints). */
+    /** @var array<int, list<int>> Unicode full upper expansions (1:N codepoints). */
     private const UPPER_EXPANSION = [
-        0xDF => [0x53, 0x53], // Latin small letter sharp S -> SS (php-src libmbfl)
+        0xDF => [0x53, 0x53], // Latin small letter sharp S -> SS
+        0xFB00 => [0x46, 0x46], // ﬀ
+        0xFB01 => [0x46, 0x49], // ﬁ
+        0xFB02 => [0x46, 0x4C], // ﬂ
+        0xFB03 => [0x46, 0x46, 0x49], // ﬃ
+        0xFB04 => [0x46, 0x46, 0x4C], // ﬄ
+        0xFB05 => [0x53, 0x54], // ﬅ
+        0xFB06 => [0x53, 0x54], // ﬆ
     ];
 
-    /** @var array<int, list<int>> Unicode simple lower expansions (1:N codepoints). */
+    /** @var array<int, list<int>> Unicode full lower expansions (1:N codepoints). */
     private const LOWER_EXPANSION = [
         0x130 => [0x69, 0x307], // LATIN CAPITAL LETTER I WITH DOT ABOVE -> i + combining dot
+    ];
+
+    /** Simple lower when full lower is 1:N only (php_unicode_tolower_simple). */
+    private const LOWER_SIMPLE_SPECIAL = [
+        0x130 => 0x69, // İ -> i (no combining dot)
     ];
 
     /** @var array<int, int> */
@@ -35,6 +49,30 @@ final class Utf8CaseMap
         0x178 => 0xFF,
         0x49 => 0x69, // I -> i (ASCII path handles most)
         0x3A3 => 0x3C3,
+    ];
+
+    /**
+     * Full case-fold expansions (CaseFolding.txt status F) — php_unicode_tofold_full.
+     *
+     * @var array<int, list<int>>
+     */
+    private const FOLD_EXPANSION = [
+        0xDF => [0x73, 0x73], // ß -> ss
+        0x130 => [0x69, 0x307], // İ -> i + combining dot
+        0xFB00 => [0x66, 0x66], // ﬀ -> ff
+        0xFB01 => [0x66, 0x69], // ﬁ -> fi
+        0xFB02 => [0x66, 0x6C], // ﬂ -> fl
+        0xFB03 => [0x66, 0x66, 0x69], // ﬃ -> ffi
+        0xFB04 => [0x66, 0x66, 0x6C], // ﬄ -> ffl
+        0xFB05 => [0x73, 0x74], // ﬅ -> st
+        0xFB06 => [0x73, 0x74], // ﬆ -> st
+    ];
+
+    /** 1:1 fold mappings that differ from plain lower (CaseFolding C/S). */
+    private const FOLD_SPECIAL = [
+        0xB5 => 0x3BC, // µ -> μ
+        0x17F => 0x73, // ſ -> s
+        0x3C2 => 0x3C3, // ς -> σ
     ];
 
     /**
@@ -59,6 +97,58 @@ final class Utf8CaseMap
         }
 
         return [self::toLower($codepoint)];
+    }
+
+    /**
+     * Full Unicode case fold (MB_CASE_FOLD) — php_unicode_tofold_full.
+     *
+     * @return list<int>
+     */
+    public static function toFoldCodepoints(int $codepoint): array
+    {
+        if (isset(self::FOLD_EXPANSION[$codepoint])) {
+            return self::FOLD_EXPANSION[$codepoint];
+        }
+
+        return [self::toFoldSimple($codepoint)];
+    }
+
+    /** 1:1 upper (MB_CASE_UPPER_SIMPLE) — no multi-char SpecialCasing. */
+    public static function toUpperSimple(int $codepoint): int
+    {
+        if (isset(self::UPPER_EXPANSION[$codepoint])) {
+            return $codepoint;
+        }
+
+        return self::toUpper($codepoint);
+    }
+
+    /** 1:1 lower (MB_CASE_LOWER_SIMPLE). */
+    public static function toLowerSimple(int $codepoint): int
+    {
+        if (isset(self::LOWER_SIMPLE_SPECIAL[$codepoint])) {
+            return self::LOWER_SIMPLE_SPECIAL[$codepoint];
+        }
+        if (isset(self::LOWER_EXPANSION[$codepoint])) {
+            return $codepoint;
+        }
+
+        return self::toLower($codepoint);
+    }
+
+    /**
+     * 1:1 case fold (MB_CASE_FOLD_SIMPLE) — multi-only CaseFolding F entries unchanged.
+     */
+    public static function toFoldSimple(int $codepoint): int
+    {
+        if (isset(self::FOLD_EXPANSION[$codepoint])) {
+            return $codepoint;
+        }
+        if (isset(self::FOLD_SPECIAL[$codepoint])) {
+            return self::FOLD_SPECIAL[$codepoint];
+        }
+
+        return self::toLower($codepoint);
     }
 
     public static function toUpper(int $codepoint): int

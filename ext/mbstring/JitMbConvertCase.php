@@ -64,9 +64,14 @@ final class JitMbConvertCase
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
 
         return match ($mode) {
-            MbstringConstants::MB_CASE_UPPER => self::lowerToUpper($context, $copy),
-            MbstringConstants::MB_CASE_LOWER => self::upperToLower($context, $copy),
-            MbstringConstants::MB_CASE_TITLE => self::asciiTitle($context, $copy),
+            MbstringConstants::MB_CASE_UPPER,
+            MbstringConstants::MB_CASE_UPPER_SIMPLE => self::lowerToUpper($context, $copy),
+            MbstringConstants::MB_CASE_LOWER,
+            MbstringConstants::MB_CASE_LOWER_SIMPLE,
+            MbstringConstants::MB_CASE_FOLD,
+            MbstringConstants::MB_CASE_FOLD_SIMPLE => self::upperToLower($context, $copy),
+            MbstringConstants::MB_CASE_TITLE,
+            MbstringConstants::MB_CASE_TITLE_SIMPLE => self::asciiTitle($context, $copy),
             default => throw new \ValueError(
                 'mb_convert_case(): Argument #2 ($mode) must be one of the MB_CASE_* constants'
             ),
