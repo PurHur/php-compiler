@@ -67,7 +67,8 @@ final class VmSodium
 
     public const CRYPTO_GENERICHASH_KEYBYTES_MIN = 16;
 
-    public const CRYPTO_GENERICHASH_KEYBYTES_MAX = 32;
+    /** libsodium crypto_generichash_KEYBYTES_MAX (blake2b key up to 64; #24110). */
+    public const CRYPTO_GENERICHASH_KEYBYTES_MAX = 64;
 
     /** Opaque BLAKE2b state size (libsodium crypto_generichash_statebytes(); #20062). */
     public const CRYPTO_GENERICHASH_STATEBYTES = 384;
@@ -156,6 +157,9 @@ final class VmSodium
     public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_ABYTES = 17;
 
     public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES = 52;
+
+    /** libsodium crypto_secretstream_xchacha20poly1305_MESSAGEBYTES_MAX (#24110). */
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_MESSAGEBYTES_MAX = 274877906816;
 
     public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE = 0;
 
