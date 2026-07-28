@@ -466,6 +466,9 @@ final class BuiltinParamNames
             case 'trigger_error':
             case 'user_error':
                 return ['message', 'error_level'];
+            // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says arg_num (#24456)
+            case 'func_get_arg':
+                return ['position'];
             // php-src ext/session/session.stub.php — Reflection OK but forFunction empty (#23846)
             case 'session_set_cookie_params':
                 return ['lifetime', 'path', 'domain', 'secure', 'httponly'];
