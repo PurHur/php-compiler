@@ -39,6 +39,60 @@ final class PcntlConstants
     public const SIGPWR = 30;
     public const SIGSYS = 31;
 
+    /** Signal aliases (php-src ext/pcntl/pcntl.stub.php; #24111). */
+    public const SIGCLD = 17; // alias of SIGCHLD
+    public const SIGIOT = 6;  // alias of SIGABRT
+
+    /** Real-time signal range (Linux x86_64; php-src SIGRTMIN/SIGRTMAX). */
+    public const SIGRTMIN = 34;
+    public const SIGRTMAX = 64;
+
+    /**
+     * siginfo_t.si_code selectors for pcntl_sigwaitinfo() (Linux signal.h; #24111).
+     * Values match Zend 8.2 on this image (glibc).
+     */
+    public const SI_USER = 0;
+    public const SI_KERNEL = 128;
+    public const SI_QUEUE = -1;
+    public const SI_TIMER = -2;
+    public const SI_MESGQ = -3;
+    public const SI_ASYNCIO = -4;
+    public const SI_SIGIO = -5;
+    public const SI_TKILL = -6;
+
+    public const CLD_EXITED = 1;
+    public const CLD_KILLED = 2;
+    public const CLD_DUMPED = 3;
+    public const CLD_TRAPPED = 4;
+    public const CLD_STOPPED = 5;
+    public const CLD_CONTINUED = 6;
+
+    public const BUS_ADRALN = 1;
+    public const BUS_ADRERR = 2;
+    public const BUS_OBJERR = 3;
+
+    public const FPE_INTDIV = 1;
+    public const FPE_INTOVF = 2;
+    public const FPE_FLTDIV = 3;
+    public const FPE_FLTOVF = 4;
+    public const FPE_FLTUND = 5;
+    public const FPE_FLTRES = 6;
+    public const FPE_FLTINV = 7;
+    public const FPE_FLTSUB = 8;
+
+    public const SEGV_MAPERR = 1;
+    public const SEGV_ACCERR = 2;
+
+    public const POLL_IN = 1;
+    public const POLL_OUT = 2;
+    public const POLL_MSG = 3;
+    public const POLL_ERR = 4;
+    public const POLL_PRI = 5;
+    public const POLL_HUP = 6;
+
+    public const TRAP_BRKPT = 1;
+    public const TRAP_TRACE = 2;
+
     /** waitpid(2) WNOHANG — return immediately if no child has exited (issue #3327). */
     public const WNOHANG = 1;
 
@@ -187,6 +241,45 @@ final class PcntlConstants
             'SIGIO' => self::SIGIO,
             'SIGPWR' => self::SIGPWR,
             'SIGSYS' => self::SIGSYS,
+            'SIGCLD' => self::SIGCLD,
+            'SIGIOT' => self::SIGIOT,
+            'SIGRTMIN' => self::SIGRTMIN,
+            'SIGRTMAX' => self::SIGRTMAX,
+            'SI_USER' => self::SI_USER,
+            'SI_KERNEL' => self::SI_KERNEL,
+            'SI_QUEUE' => self::SI_QUEUE,
+            'SI_TIMER' => self::SI_TIMER,
+            'SI_MESGQ' => self::SI_MESGQ,
+            'SI_ASYNCIO' => self::SI_ASYNCIO,
+            'SI_SIGIO' => self::SI_SIGIO,
+            'SI_TKILL' => self::SI_TKILL,
+            'CLD_EXITED' => self::CLD_EXITED,
+            'CLD_KILLED' => self::CLD_KILLED,
+            'CLD_DUMPED' => self::CLD_DUMPED,
+            'CLD_TRAPPED' => self::CLD_TRAPPED,
+            'CLD_STOPPED' => self::CLD_STOPPED,
+            'CLD_CONTINUED' => self::CLD_CONTINUED,
+            'BUS_ADRALN' => self::BUS_ADRALN,
+            'BUS_ADRERR' => self::BUS_ADRERR,
+            'BUS_OBJERR' => self::BUS_OBJERR,
+            'FPE_INTDIV' => self::FPE_INTDIV,
+            'FPE_INTOVF' => self::FPE_INTOVF,
+            'FPE_FLTDIV' => self::FPE_FLTDIV,
+            'FPE_FLTOVF' => self::FPE_FLTOVF,
+            'FPE_FLTUND' => self::FPE_FLTUND,
+            'FPE_FLTRES' => self::FPE_FLTRES,
+            'FPE_FLTINV' => self::FPE_FLTINV,
+            'FPE_FLTSUB' => self::FPE_FLTSUB,
+            'SEGV_MAPERR' => self::SEGV_MAPERR,
+            'SEGV_ACCERR' => self::SEGV_ACCERR,
+            'POLL_IN' => self::POLL_IN,
+            'POLL_OUT' => self::POLL_OUT,
+            'POLL_MSG' => self::POLL_MSG,
+            'POLL_ERR' => self::POLL_ERR,
+            'POLL_PRI' => self::POLL_PRI,
+            'POLL_HUP' => self::POLL_HUP,
+            'TRAP_BRKPT' => self::TRAP_BRKPT,
+            'TRAP_TRACE' => self::TRAP_TRACE,
         ];
     }
 
