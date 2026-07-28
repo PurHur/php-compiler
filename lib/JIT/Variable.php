@@ -221,6 +221,12 @@ final class Variable {
     private static int $lvalueCounter = 0;
     public int $nextFreeElement = 0;
 
+    /**
+     * After a runtime spread loop, packed appends must load nextFreeElement from the
+     * hashtable struct — the compile-time counter is stale (#23971).
+     */
+    public bool $nextFreeElementFromRuntime = false;
+
     public function __construct(
         Context $context, 
         int $type, 

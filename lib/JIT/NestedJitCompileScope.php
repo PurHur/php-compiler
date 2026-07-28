@@ -57,6 +57,14 @@ final class NestedJitCompileScope
         // Nested helper compile sets scope->className (e.g. CaseCompareJitHelper); leaking it
         // makes later user-script $obj->method() resolve against the helper class (#22680 AOT).
         $savedClassName = $context->scope->className;
+        // Mid-call NestedJIT (e.g. CallUnpackRuntime → ListUnpackJitHelper) mutates toCall/args.
+        // FUNCCALL_EXEC re-reads scope->toCall after resolveJitOutgoingCall; without restore the
+        // packed spread hashtable is invoked as valueBoxIsArray(int) (#23971 e08_spread).
+        $savedToCall = $context->scope->toCall;
+        $savedArgs = $context->scope->args;
+        $savedArgOperands = $context->scope->argOperands;
+        $savedMagicCallMethodName = $context->scope->magicCallMethodName;
+        $savedPreserveNewResultOnNullCall = $context->scope->preserveNewResultOnNullCall;
         // Nested helper compile of ErrorSilence/etc. can mutate tryCatch->handlerStack while
         // lowering inside an outer try — DEP then loses catchable ValueError (#22680).
         $savedHandlerStack = $context->tryCatch->handlerStack;
@@ -64,6 +72,11 @@ final class NestedJitCompileScope
         $context->scope->blockEntryStorage = new \SplObjectStorage();
         $context->scope->variables = new \SplObjectStorage();
         $context->namedVariableBindings = [];
+        $context->scope->toCall = null;
+        $context->scope->args = [];
+        $context->scope->argOperands = [];
+        $context->scope->magicCallMethodName = null;
+        $context->scope->preserveNewResultOnNullCall = false;
         $prevStubEnv = self::clearStubEnvForNestedHelperCompile();
         try {
             $context->builder->clearInsertionPosition();
@@ -77,6 +90,11 @@ final class NestedJitCompileScope
             $context->scope->variables = $savedVariables;
             $context->namedVariableBindings = $savedNamedBindings;
             $context->scope->className = $savedClassName;
+            $context->scope->toCall = $savedToCall;
+            $context->scope->args = $savedArgs;
+            $context->scope->argOperands = $savedArgOperands;
+            $context->scope->magicCallMethodName = $savedMagicCallMethodName;
+            $context->scope->preserveNewResultOnNullCall = $savedPreserveNewResultOnNullCall;
             $context->tryCatch->handlerStack = $savedHandlerStack;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;
