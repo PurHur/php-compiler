@@ -56,8 +56,6 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            // Thin AOT: NestedClosureInvoke ABI lands (#24156) but return marshaling still
-            // yields Object/SIGSEGV — keep honest decline until that is green.
             if ($context->isThinStandaloneAotMain()) {
                 throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('usort'));
             }

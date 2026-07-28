@@ -56,7 +56,6 @@ final class ArrayReduceRuntime
         if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)
             && $context->isThinStandaloneAotMain()
         ) {
-            // NestedClosureInvoke hits candidates=1 but returns Object (#24156) — keep decline.
             throw new \LogicException(ArrayReduceCallbackPolicy::thinAotClosureRejectionMessage());
         }
         self::ensureLinked($context);

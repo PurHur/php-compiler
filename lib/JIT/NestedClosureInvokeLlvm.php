@@ -21,6 +21,7 @@ final class NestedClosureInvokeLlvm
             return;
         }
         $context->functionProxies[self::PROXY] = new NestedClosureInvoke();
+        $context->functionReturnType[self::PROXY] = '__value__*';
         $id = $context->type->object->lookup('PHPCompiler\\ext\\standard\\VmClosureCall');
         $context->type->object->defineMethodVisibility(
             $id,

@@ -12480,7 +12480,10 @@ class JIT {
             if (
                 $this->context->hasVariableOp($result)
                 && ('__value__*' === $llvmTy || '__value__' === $llvmTy)
-                && $this->context->scope->toCall instanceof CoreFunc\Internal
+                && (
+                    $this->context->scope->toCall instanceof CoreFunc\Internal
+                    || $this->context->scope->toCall instanceof JIT\Call\NestedClosureInvoke
+                )
             ) {
                 $prior = $this->context->getVariableFromOp($result);
                 if (Variable::TYPE_VALUE !== $prior->type) {
@@ -17847,6 +17850,19 @@ class JIT {
             $parentScopeAllows
         );
         $proxyName = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
+        // Spine-compiled VmClosureCall::invokeVariable bypasses functionProxies via direct
+        // LLVM calls; thin-AOT Closures need NestedClosureInvoke (#24156).
+        if (
+            'invokevariable' === $methodLc
+            && str_ends_with($declaringClassLc, 'vmclosurecall')
+            && isset($this->context->functionProxies[JIT\NestedClosureInvokeLlvm::PROXY])
+            && $this->context->functionProxies[JIT\NestedClosureInvokeLlvm::PROXY] instanceof JIT\Call\NestedClosureInvoke
+        ) {
+            $this->context->scope->toCall = $this->context->functionProxies[JIT\NestedClosureInvokeLlvm::PROXY];
+            $this->context->scope->args = [];
+
+            return;
+        }
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ($this->context->type->object->isEnumClassLc($declaringClassLc)
                 && \in_array($methodLc, ['cases', 'from', 'tryfrom'], true)) {
