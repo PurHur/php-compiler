@@ -839,8 +839,10 @@ final class BuiltinParamNames
                 return ['microseconds'];
             case 'http_response_code':
                 return ['response_code'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says expires (#23360)
             case 'setcookie':
-                return ['name', 'value', 'expires', 'path', 'domain', 'secure', 'httponly'];
+            case 'setrawcookie':
+                return ['name', 'value', 'expires_or_options', 'path', 'domain', 'secure', 'httponly'];
             case 'trim':
             case 'ltrim':
             case 'rtrim':
