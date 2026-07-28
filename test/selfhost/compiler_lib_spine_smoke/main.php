@@ -3778,6 +3778,7 @@ require_once __DIR__.'/../../../ext/standard/phpc_mm_free_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_environ_mirror_into_ht.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_alloc.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_hashtable_at.php';
+require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_long_at.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_at.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_key.php';
 require_once __DIR__.'/../../../ext/standard/phpc_native_ht_set_string_key_ht.php';

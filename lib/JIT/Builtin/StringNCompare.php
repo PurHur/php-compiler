@@ -6,12 +6,12 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for memcmp()/strncmp() via NCompareJitHelper PHP (#15364).
+ * JIT/AOT link for memcmp()/strncmp() via NCompareJitHelper PHP (#15364, #24410).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureBridge} → ensureCompiled (peer StringIdate #24382).
  * Uses dedicated phpc_* ABIs on __string__* — does not replace libc memcmp/strncmp
  * used by {@see \PHPCompiler\VM\VmStringCompare} and {@see LibcExtern}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}
@@ -36,40 +36,36 @@ final class StringNCompare
 
     public static function ensureMemcmpLinked(Context $context): void
     {
-        NestedJitCompileScope::run($context, static function () use ($context): void {
-            $strPtr = $context->getTypeFromString('__string__*');
-            $i64 = $context->getTypeFromString('int64');
-            JitVmHelperLink::ensureBridge(
-                $context,
-                self::ABI_MEMCMP,
-                'phpc_memcmp_bridge_entry',
-                [$strPtr, $strPtr, $i64],
-                $i64,
-                self::MEMCMP_HELPER,
-                self::HELPER_PATH,
-                self::COMPILED_HELPERS,
-                '#15364'
-            );
-        });
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_MEMCMP,
+            'phpc_memcmp_bridge_entry',
+            [$strPtr, $strPtr, $i64],
+            $i64,
+            self::MEMCMP_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#15364'
+        );
     }
 
     public static function ensureStrncmpLinked(Context $context): void
     {
-        NestedJitCompileScope::run($context, static function () use ($context): void {
-            $strPtr = $context->getTypeFromString('__string__*');
-            $i64 = $context->getTypeFromString('int64');
-            JitVmHelperLink::ensureBridge(
-                $context,
-                self::ABI_STRNCMP,
-                'phpc_strncmp_bridge_entry',
-                [$strPtr, $strPtr, $i64],
-                $i64,
-                self::STRNCMP_HELPER,
-                self::HELPER_PATH,
-                self::COMPILED_HELPERS,
-                '#15364'
-            );
-        });
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_STRNCMP,
+            'phpc_strncmp_bridge_entry',
+            [$strPtr, $strPtr, $i64],
+            $i64,
+            self::STRNCMP_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#15364'
+        );
     }
 
     public static function ensureStandaloneBodies(Context $context): void
