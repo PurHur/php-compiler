@@ -1,5 +1,7 @@
 --TEST--
 Stdlib: assert() throws AssertionError when assert.exception=1 (#3316)
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 ini_set('zend.assertions', '1');

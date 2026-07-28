@@ -1,5 +1,7 @@
 --TEST--
 stdlib assert() — Stringable $description TypeError (#18191, ext/standard/assert.c)
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 ini_set('assert.active', '1');

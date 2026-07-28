@@ -1,6 +1,8 @@
 --TEST--
 Stdlib: assert() AssertionError JIT (#3316)
 --JIT--
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 ini_set('zend.assertions', '1');

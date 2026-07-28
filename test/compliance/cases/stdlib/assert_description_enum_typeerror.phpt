@@ -1,5 +1,7 @@
 --TEST--
 Stdlib: assert() — enum case description TypeError on failure (#7171, ext/standard/assert.c, php-src-strict)
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 ini_set('zend.assertions', '1');

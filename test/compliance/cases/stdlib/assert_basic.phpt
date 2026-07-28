@@ -1,5 +1,7 @@
 --TEST--
 Stdlib: assert() — pass and fail with warning (VM, #3157)
+--INI--
+zend.assertions=1
 --FILE--
 <?php
 ini_set('zend.assertions', '1');

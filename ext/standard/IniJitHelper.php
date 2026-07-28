@@ -858,7 +858,12 @@ final class IniJitHelper
     private static function assertIniSet(string $key, string $newValue): ?string
     {
         if ('zend.assertions' === $key) {
-            return AssertOptionsJitHelper::iniSetZendAssertionsFromString($newValue);
+            $result = AssertOptionsJitHelper::iniSetZendAssertionsFromString($newValue);
+            if (null === $result) {
+                TriggerErrorJitHelper::warning(AssertOptionsJitHelper::MSG_ZEND_ASSERTIONS_PHP_INI_ONLY);
+            }
+
+            return $result;
         }
         if ('assert.active' === $key) {
             return AssertOptionsJitHelper::iniSetActiveFromString($newValue);
