@@ -10326,8 +10326,10 @@ class JIT {
                     $this->emitJitLateStaticCallSiteBinding($callArgs);
                     if (
                         $this->context->scope->toCall instanceof JIT\Call\Native
-                        && [] !== $callArgs
+                        && isset($callArgs[0])
+                        && $callArgs[0] instanceof Variable
                     ) {
+                        // Named-arg maps may omit index 0 (`n(b: 7)`); only check when present (#23972).
                         JIT\BackedEnumFromJit::emitCallSiteStrictCheck(
                             $this->context,
                             $this->context->scope->toCall,
@@ -10338,7 +10340,7 @@ class JIT {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
                     $this->promoteCompileTimeStringOnCallArgs($block, $callOperands, $callArgs);
-                    $this->context->scope->toCall->call($this->context, ...$callArgs);
+                    $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     JIT\NoDiscardCallGuard::emitAfterDiscardedReturn($this->context, $this->context->scope->toCall);
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;
@@ -10536,8 +10538,10 @@ class JIT {
                     $this->emitJitLateStaticCallSiteBinding($callArgs);
                     if (
                         $this->context->scope->toCall instanceof JIT\Call\Native
-                        && [] !== $callArgs
+                        && isset($callArgs[0])
+                        && $callArgs[0] instanceof Variable
                     ) {
+                        // Named-arg maps may omit index 0 (`n(b: 7)`); only check when present (#23972).
                         JIT\BackedEnumFromJit::emitCallSiteStrictCheck(
                             $this->context,
                             $this->context->scope->toCall,
@@ -10590,7 +10594,7 @@ class JIT {
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
-                    $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
+                    $result = $this->invokeJitCall($this->context->scope->toCall, $callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
                     $this->context->jitXmlrpcEncodeValueOperand = $savedXmlrpcEncodeValueOperand;
@@ -17755,6 +17759,20 @@ class JIT {
         }
 
         return JIT\NamedOptionalCallArgs::densifyForSpread($this->context, $callArgs, \count($paramNames));
+    }
+
+    /**
+     * Dispatch a resolved call, preserving named-arg parameter indices for Native (#23972).
+     *
+     * @param array<int, Variable> $callArgs
+     */
+    private function invokeJitCall(JIT\Call $toCall, array $callArgs): \PHPLLVM\Value
+    {
+        if ($toCall instanceof JIT\Call\Native) {
+            return $toCall->callWithArgMap($this->context, $callArgs);
+        }
+
+        return $toCall->call($this->context, ...array_values($callArgs));
     }
 
     /**

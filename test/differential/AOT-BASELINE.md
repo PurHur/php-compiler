@@ -39,7 +39,7 @@ corpus*, not the language.
 
 | case | cause |
 |---|---|
-| `e07_named` | compiler crash: `TypeError` in `BackedEnumFromJit::emitCallSiteStrictCheck()` — #23972 |
+| `e07_named` | ~~compiler crash~~ **fixed** in #23972 — sparse named-arg maps preserve param indices |
 | `e16_array_slice` | compiles; runtime still hits `print_r` thin-standalone gap (#23540) — slice itself fixed in #23991 |
 | `e30_array_lit_dim_assign_shift` | **regression** — `HashTable::shiftFirst()` exists (`lib/VM/HashTable.php:783`) but is unresolved for AOT; third instance of #23974's pattern — #24025 |
 | `e04_usort` | **documented limitation** — array-callable / invokable comparators deferred |
