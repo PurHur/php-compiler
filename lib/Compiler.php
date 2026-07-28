@@ -24961,13 +24961,32 @@ class Compiler {
             return null;
         }
         // probe('label', nested_call()) — ConstFetch+FuncCall preludes belong to nested call (#15846).
+        // str_contains(print_r(..., true), 'zzz') — trailing outer literal; ConstFetch feeds nested (#24372).
         if (
             property_exists($callOp, 'args')
             && \is_array($callOp->args)
-            && isset($callOp->args[0])
-            && $this->isEmbeddedCallLiteralArg($callOp->args[0])
         ) {
-            return null;
+            if (
+                isset($callOp->args[0])
+                && $this->isEmbeddedCallLiteralArg($callOp->args[0])
+            ) {
+                return null;
+            }
+            foreach ($callOp->args as $outerArg) {
+                if ($this->isEmbeddedCallLiteralArg($outerArg)) {
+                    if (
+                        $this->hoistedConstFetchFeedsNestedSiblingFuncCallArg(
+                            $const,
+                            $callIndex - 2,
+                            $callIndex,
+                            $block->orig->children
+                        )
+                    ) {
+                        return null;
+                    }
+                    break;
+                }
+            }
         }
 
         return [$const, $func];
@@ -24975,6 +24994,10 @@ class Compiler {
 
     /**
      * explode(PATH_SEPARATOR, get_include_path()) — final ARG_SEND must bind ConstFetch + sibling FuncCall (#15833).
+     *
+     * Not for `str_contains(print_r(..., true), 'zzz')`: the ConstFetch feeds the *nested* callee, and the
+     * outer needle is an embedded literal — remapping arg #1 onto the nested EXEC_RETURN made needles
+     * alias the haystack (#24372).
      *
      * @param list<OpCode> $emitOps
      */
@@ -24994,6 +25017,7 @@ class Compiler {
                 isset($cfgCallOp->args[0])
                 && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0])
             )
+            || $this->isEmbeddedCallLiteralArg($cfgCallOp->args[$argIndex] ?? null)
             || $this->consumerImmediateUnaryHoistedDeadTempArgZero($cfgCallOp, $block)
         ) {
             return null;
@@ -25006,6 +25030,23 @@ class Compiler {
             return null;
         }
         [$constFetch, $funcProducer] = $constFuncPrelude;
+        // ConstFetch true/false/null before nested print_r/var_export feeds that callee, not outer args (#24372).
+        if ($constFetch instanceof Op\Expr\ConstFetch) {
+            $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+            $constIndex = array_search($constFetch, $block->orig->children, true);
+            if (
+                \is_int($callIndex)
+                && \is_int($constIndex)
+                && $this->hoistedConstFetchFeedsNestedSiblingFuncCallArg(
+                    $constFetch,
+                    $constIndex,
+                    $callIndex,
+                    $block->orig->children
+                )
+            ) {
+                return null;
+            }
+        }
         $target = match ($argIndex) {
             0 => $constFetch,
             1 => $funcProducer,
