@@ -5304,6 +5304,7 @@ require_once __DIR__.'/../../../lib/JIT/ArrayMapLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableSliceLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableUnionCopy.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableUnshiftPrepend.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableShiftFirst.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableUpdateIndex.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableValuesCopy.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableWriteNested.php';

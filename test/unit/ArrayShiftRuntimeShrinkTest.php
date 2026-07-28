@@ -9,13 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_shift() JIT routes through ArrayShiftJitHelper PHP not ArrayBuiltinHelper LLVM (#12672, #14318). */
+/** array_shift() AOT uses HashTableShiftFirst LLVM; VM uses ArrayShiftJitHelper (#12672, #24025). */
 final class ArrayShiftRuntimeShrinkTest extends TestCase
 {
-    public function testArrayShiftRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayShiftRuntimeUsesHashTableShiftFirstNotHelperBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayShiftRuntime.php');
-        $this->assertStringContainsString('ArrayShiftJitHelper', $runtime);
+        $this->assertStringContainsString('HashTableShiftFirst', $runtime);
+        $this->assertStringContainsString('ArrayShiftJitHelper', $runtime); // VM SSOT named in docblock
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::shiftFirst', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
@@ -25,6 +27,10 @@ final class ArrayShiftRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_shift.php');
         $this->assertStringContainsString('ArrayShiftRuntime::shift', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::shiftFirst', $builtin);
+
+        $this->assertTrue(
+            \PHPCompiler\JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod('shiftfirst')
+        );
     }
 
     public function testArrayShiftJitHelperShiftsFirstElement(): void

@@ -34,6 +34,8 @@ final class NestedVmHashTableMethodLlvm
         'slicecopy' => Call\HashTableSliceCopy::class,
         'mergestringkeysfrom' => Call\HashTableMergeStringKeysFrom::class,
         'unshiftprepend' => Call\HashTableUnshiftPrepend::class,
+        // NestedJIT-safe packed/string shift for ArrayShiftJitHelper (#24025 / #12672).
+        'shiftfirst' => Call\HashTableShiftFirst::class,
         'find' => Call\HashTableFind::class,
         'findindex' => Call\HashTableFindIndex::class,
         // COW duplicate / array union for HashTableJitHelper NestedJIT (#23548).
