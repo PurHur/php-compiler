@@ -1954,6 +1954,27 @@ final class ReflectionSupport
         return null !== $block->variadicParamIndex && $block->variadicParamIndex === $paramIndex;
     }
 
+    /**
+     * php-src zim_reflection_parameter_isVariadic — user Func\PHP blocks + internals (#24461).
+     *
+     * Internals have no user block; re-resolving via {@see resolveParameterBlock()} throws
+     * "Function …() does not exist". Use BuiltinParamNames / BuiltinInternalArgInfo instead
+     * (same path as {@see parameterIsOptional()} / {@see isReflectionFunctionVariadic()}).
+     */
+    public static function parameterIsVariadicForReflection(Context $ctx, ObjectEntry $reflection): bool
+    {
+        if (self::parameterIsInternal($ctx, $reflection)) {
+            $index = self::parameterIndexForReflection($reflection);
+            $callableLc = strtolower(self::internalCallableName($ctx, $reflection));
+
+            return self::internalParameterIsVariadic($ctx, $reflection, $callableLc, $index);
+        }
+        $block = self::resolveParameterBlock($ctx, $reflection);
+        $index = self::parameterIndexForReflection($reflection);
+
+        return self::parameterIsVariadic($block, $index);
+    }
+
     public static function parameterIsOptional(Context $ctx, ObjectEntry $reflection): bool
     {
         if (self::parameterIsInternal($ctx, $reflection)) {

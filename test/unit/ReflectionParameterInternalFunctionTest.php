@@ -27,4 +27,23 @@ PHP;
         $out = ob_get_clean();
         $this->assertSame("string\nstring\ncallback\ncallable\n", $out);
     }
+
+    /** @covers issue #24461 — zim_reflection_parameter_isVariadic on internals */
+    public function testInternalFunctionParameterIsVariadic(): void
+    {
+        $rt = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo (new ReflectionParameter('strlen', 0))->isVariadic() ? "T\n" : "F\n";
+echo (new ReflectionParameter('array_map', 2))->isVariadic() ? "T\n" : "F\n";
+echo (new ReflectionParameter('call_user_func', 1))->isVariadic() ? "T\n" : "F\n";
+echo (new ReflectionParameter('sprintf', 0))->isVariadic() ? "T\n" : "F\n";
+echo (new ReflectionParameter('pack', 1))->isVariadic() ? "T\n" : "F\n";
+PHP;
+        $block = $rt->parseAndCompile($code, 'reflection_parameter_is_variadic_internal.php');
+        ob_start();
+        $rt->run($block);
+        $out = ob_get_clean();
+        $this->assertSame("F\nT\nT\nF\nT\n", $out);
+    }
 }
