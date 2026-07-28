@@ -33,6 +33,32 @@ Several cases are order-dependent or flaky (`stdlib/hrtime*`, `proc_get_status_b
 regression individually, several times, on both sides** before reporting it. Every one investigated
 so far turned out to fail on master too.
 
+#### Running them
+
+Serial `VMTest` is ~4 h over 8,812 cases, which is why it does not get run per change. Shard it:
+
+```bash
+script/shard-compliance.sh --suite=VMTest --shards=24 --shard=3   # one shard
+script/compliance-baseline.sh --collect --suite=VMTest            # all shards -> baseline
+script/compliance-baseline.sh --diff    --suite=VMTest            # current vs committed baseline
+```
+
+Shards are round-robin by sorted case index — `stdlib` is 63% of the corpus, so contiguous slicing
+would leave one shard entirely inside it. Each shard writes a `.failed` file of case **names**;
+`--diff` reports regressions and fixes as set differences and exits non-zero only on regressions.
+
+Three things the tooling refuses to do, each because it has burned someone:
+
+- **Diff a partial shard set.** Unrun cases read as newly *passing*, i.e. a large fake improvement.
+- **Union results from different `--shards=N` runs.** Some cases double-count, others vanish.
+- **Report success when the filter matched nothing.** Case names contain `/`; unescaped, it closes
+  the PHP regex delimiter and PHPUnit prints "No tests executed!" with **exit code 0**.
+
+`test/compliance/quarantine.txt` excludes cases from both sides of the diff. It is for cases that
+flip between two runs of **the same commit**, proven by two runs — not for cases with a reputation
+for flakiness. A flaky case inside a baseline manufactures phantom regressions; one in the
+differential corpus already produced a "regression" that measured 17/30 vs 17/30 (#24226).
+
 ### 3. Silent wrong output is the characteristic failure mode
 
 The compliance suite asserts against **recorded** expectations, so it only catches what someone
