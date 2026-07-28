@@ -613,6 +613,13 @@ final class BuiltinParamNames
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says returned_strong_result (#23626)
             case 'openssl_random_pseudo_bytes':
                 return ['length', 'strong_result'];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says method/raw_output/key (#24365)
+            case 'openssl_digest':
+                return ['data', 'digest_algo', 'binary'];
+            case 'openssl_sign':
+                return ['data', 'signature', 'private_key', 'algorithm'];
+            case 'openssl_verify':
+                return ['data', 'signature', 'public_key', 'algorithm'];
             case 'openssl_encrypt':
                 // php-src ext/openssl/openssl.stub.php (#21135)
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad', 'tag_length'];
