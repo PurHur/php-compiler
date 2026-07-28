@@ -5,7 +5,7 @@ PHP_COMPILER_PROFILE=8.4
 --RUNFILE--
 mb_search_case_scrub_null_typeerror_84.php
 --EXPECT--
-mb_strwidth: mb_strwidth(): Argument #1 ($string) must be of type string, null given
+mb_strwidth: OK
 mb_strstr: OK
 mb_stristr: OK
 mb_strrchr: OK

@@ -345,7 +345,7 @@ final class JitValueBox
                 return;
             case Variable::TYPE_HASHTABLE:
                 $ht = $context->helper->loadValue($value);
-                $context->refcount->addref($ht);
+                // writeHashtable addrefs (#24226).
                 $context->builder->call(
                     $context->lookupFunction('__value__writeHashtable'),
                     $destPtr,
@@ -356,7 +356,6 @@ final class JitValueBox
         }
         if (ArrayBuiltinHelper::isNativeArray($value->type)) {
             $ht = ArrayBuiltinHelper::loadHashTable($context, $value);
-            $context->refcount->addref($ht);
             $context->builder->call(
                 $context->lookupFunction('__value__writeHashtable'),
                 $destPtr,
@@ -428,7 +427,6 @@ final class JitValueBox
                 break;
             case Variable::TYPE_HASHTABLE:
                 $ht = $context->helper->loadValue($var);
-                $context->refcount->addref($ht);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeHashtable'),
                     $ptr,
@@ -547,6 +545,7 @@ final class JitValueBox
             $context->lookupFunction('__value__readHashtable'),
             $srcPtr
         );
+        // writeHashtable addrefs internally (same as writeObject, #24226).
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $destPtr,
@@ -563,6 +562,7 @@ final class JitValueBox
             $context->lookupFunction('__value__readObject'),
             $srcPtr
         );
+        // writeObject addrefs internally (#4096); do not addref here.
         $context->builder->call(
             $context->lookupFunction('__value__writeObject'),
             $destPtr,
@@ -721,7 +721,6 @@ final class JitValueBox
                 );
                 break;
             case Variable::TYPE_HASHTABLE:
-                $context->refcount->addref($native);
                 $context->builder->call(
                     $context->lookupFunction('__value__writeHashtable'),
                     self::pointer($context, $slot),
@@ -737,7 +736,6 @@ final class JitValueBox
             default:
                 if (ArrayBuiltinHelper::isNativeArray($var->type)) {
                     $ht = ArrayBuiltinHelper::loadHashTable($context, $var);
-                    $context->refcount->addref($ht);
                     $context->builder->call(
                         $context->lookupFunction('__value__writeHashtable'),
                         self::pointer($context, $slot),

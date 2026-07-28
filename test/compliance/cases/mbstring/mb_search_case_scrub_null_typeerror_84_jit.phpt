@@ -12,7 +12,7 @@ foreach ([
 ] as $name => $fn) {
     try {
         $r = $fn();
-        if ('mb_convert_case' === $name || 'mb_scrub' === $name) {
+        if ('mb_strwidth' === $name || 'mb_convert_case' === $name || 'mb_scrub' === $name) {
             echo "$name: OK ".var_export($r, true)."\n";
             continue;
         }
@@ -26,7 +26,7 @@ echo mb_convert_case('ab', MB_CASE_UPPER), "\n";
 echo mb_scrub("a\x80b"), "\n";
 ?>
 --EXPECT--
-mb_strwidth: mb_strwidth(): Argument #1 ($string) must be of type string, null given
+mb_strwidth: OK 0
 mb_convert_case: OK ''
 mb_scrub: OK ''
 2

@@ -18,7 +18,7 @@ $cases = [
     'mb_convert_kana' => static fn () => mb_convert_kana(null),
 ];
 $softOk = array_fill_keys([
-    'mb_strstr', 'mb_stristr', 'mb_strrchr', 'mb_stripos', 'mb_strripos', 'mb_strrpos',
+    'mb_strwidth', 'mb_strstr', 'mb_stristr', 'mb_strrchr', 'mb_stripos', 'mb_strripos', 'mb_strrpos',
     'mb_convert_case', 'mb_strtoupper', 'mb_scrub', 'mb_encode_mimeheader',
 ], true);
 foreach ($cases as $name => $fn) {

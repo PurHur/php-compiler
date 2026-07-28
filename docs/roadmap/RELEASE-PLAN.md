@@ -38,9 +38,23 @@ Work in this order. Each phase exists because the next one is worthless without 
 
 Nothing else matters while defects can land unnoticed.
 
-1. **CI on `lib/**`, `ext/**`.** Today: zero. This is the single highest-value change in the plan.
-   Start with the cheap tier — `php -l`, unit suite, nikic preflight (18 s), differential sweep —
-   so it fits a PR turnaround.
+1. **CI on `lib/**`, `ext/**`.** ~~Today: zero.~~ **LANDED 2026-07-28** —
+   `.github/workflows/compiler-gate.yml` runs on `lib/**`, `ext/**`, `bin/**`, `patches/**` and the
+   differential corpus. Cheap tier, in order: nikic preflight (18 s) → `script/aot-smoke.sh` →
+   differential sweep (VM). Measured on master: preflight 0, smoke 8/8, VM **109/109**, ~12 min.
+
+   The AOT sweep runs as a **separate, non-gating** job behind `workflow_dispatch`, because it is
+   not green on master and AGENTS.md §2 requires comparing failing case *names* against
+   `AOT-BASELINE.md` — a human judgement. Failing a job on its exit status would make adding a case
+   that pins a known bug look like a regression, and the usual response to that is to stop adding
+   cases.
+
+   **Why the smoke test is the load-bearing part:** on 2026-07-28 three commits made *every* AOT
+   binary fail — #24188 and #24196 (startup segfault, #24194) and #24227 (unlinked symbol, #24230).
+   All three were caught by hand and reverted (#24195, #24197, #24231). `script/aot-smoke.sh`
+   returns 0/8 with exit 1 on the first of those commits and 8/8 on master, so it distinguishes
+   "the toolchain is broken" from "a feature is broken" in ~90 s. Every sweep run during those
+   windows reported mass failure that had nothing to do with what it was testing.
 2. **Differential sweep as a gate**, VM *and* AOT (`script/differential-sweep.sh`, merged #23444).
    It found all 24 argument defects and would have caught #23471/#23472. Extend cases toward the
    shapes users actually write.

@@ -66,6 +66,9 @@ class Refcount extends Builtin {
     }
 
     private function implementInit(): void {
+        // NOTE: compile{} expands `$ref.refcount = …` to insertValue without store.
+        // The generated Refcount.php hand-stores the aggregate (#24226). Re-run the
+        // .pre expander carefully or keep the .php store fix when regenerating.
         compile {
             function __ref__init($typeinfo, $refVirtual) {
                 $ref = $refVirtual->ref;
