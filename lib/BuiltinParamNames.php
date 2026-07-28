@@ -269,6 +269,13 @@ final class BuiltinParamNames
             case 'ftp_connect':
             case 'ftp_ssl_connect':
                 return ['hostname', 'port', 'timeout'];
+            // php-src ext/ftp/ftp.stub.php — InternalArgInfo still says stream/local_file/… (#23656)
+            case 'ftp_login':
+                return ['ftp', 'username', 'password'];
+            case 'ftp_get':
+                return ['ftp', 'local_filename', 'remote_filename', 'mode', 'offset'];
+            case 'ftp_put':
+                return ['ftp', 'remote_filename', 'local_filename', 'mode', 'offset'];
             case 'sort':
             case 'rsort':
                 // php-src ext/standard/basic_functions.stub.php — array, flags only (#23225).

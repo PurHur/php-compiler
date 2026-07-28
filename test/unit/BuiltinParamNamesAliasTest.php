@@ -1943,6 +1943,41 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #23656 */
+    public function testFtpLoginGetPutNamedParamsResolve(): void
+    {
+        $login = BuiltinParamNames::forFunction('ftp_login');
+        self::assertSame(['ftp', 'username', 'password'], $login);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($login, 'ftp', 'ftp_login'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($login, 'stream', 'ftp_login'));
+        self::assertSame(
+            ['ftp', 'username', 'password'],
+            BuiltinParamNames::paramNamesForInternalFunction('ftp_login')
+        );
+
+        $get = BuiltinParamNames::forFunction('ftp_get');
+        self::assertSame(['ftp', 'local_filename', 'remote_filename', 'mode', 'offset'], $get);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($get, 'local_filename', 'ftp_get'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($get, 'offset', 'ftp_get'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($get, 'local_file', 'ftp_get'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($get, 'resume_pos', 'ftp_get'));
+        self::assertSame(
+            ['ftp', 'local_filename', 'remote_filename', 'mode', 'offset'],
+            BuiltinParamNames::paramNamesForInternalFunction('ftp_get')
+        );
+
+        $put = BuiltinParamNames::forFunction('ftp_put');
+        self::assertSame(['ftp', 'remote_filename', 'local_filename', 'mode', 'offset'], $put);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($put, 'remote_filename', 'ftp_put'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($put, 'local_filename', 'ftp_put'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($put, 'remote_file', 'ftp_put'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($put, 'startpos', 'ftp_put'));
+        self::assertSame(
+            ['ftp', 'remote_filename', 'local_filename', 'mode', 'offset'],
+            BuiltinParamNames::paramNamesForInternalFunction('ftp_put')
+        );
+    }
+
     /** @covers issue #24365 */
     public function testOpensslDigestSignVerifyNamedParamsResolve(): void
     {
