@@ -29,6 +29,8 @@ final class BuiltinParamNames
             'datetimezone::__construct' => ['timezone'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still snake_case + phantom object (#23666)
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
+            // php-src ext/reflection/php_reflection.stub.php — InternalArgInfo marks object required (#24433)
+            'reflectionmethod::getclosure' => ['object='],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says spec (#23707)
             'dateinterval::__construct' => ['duration'],
             'errorexception::__construct' => ['message=', 'code=', 'severity=', 'filename=', 'line=', 'previous='],

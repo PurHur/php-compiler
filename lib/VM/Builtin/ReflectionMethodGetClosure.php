@@ -13,7 +13,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
-/** ReflectionMethod::getClosure(?object $object) — VM (#6663, ext/reflection/php_reflection.c). */
+/** ReflectionMethod::getClosure(?object $object = null) — VM (#6663, #24433, ext/reflection/php_reflection.c). */
 final class ReflectionMethodGetClosure extends VmClassMethod
 {
     public function __construct()
@@ -26,6 +26,13 @@ final class ReflectionMethodGetClosure extends VmClassMethod
         $argc = \count($frame->calledArgs);
         if ($argc < 1) {
             throw new \LogicException('ReflectionMethod::getClosure() expects a receiver');
+        }
+        // User arity excludes $this (php-src ReflectionMethod::getClosure, #24433).
+        $userArgc = $argc - 1;
+        if ($userArgc > 1) {
+            throw new \ArgumentCountError(
+                'ReflectionMethod::getClosure() expects at most 1 argument, '.$userArgc.' given'
+            );
         }
         $reflection = ReflectionSupport::requireReflectionMethod($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
