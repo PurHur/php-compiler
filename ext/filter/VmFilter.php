@@ -45,7 +45,7 @@ final class VmFilter
     public const FILTER_FLAG_ALLOW_FRACTION = 0x1000;
     public const FILTER_FLAG_ALLOW_THOUSAND = 0x2000;
     public const FILTER_FLAG_ALLOW_SCIENTIFIC = 0x4000;
-    public const FILTER_FLAG_PATH_REQUIRED = 0x010000;
+    public const FILTER_FLAG_PATH_REQUIRED = 0x040000;
     public const FILTER_FLAG_QUERY_REQUIRED = 0x080000;
     public const FILTER_FLAG_IPV4 = 0x00100000;
     public const FILTER_FLAG_IPV6 = 0x00200000;
