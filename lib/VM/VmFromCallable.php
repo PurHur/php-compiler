@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithBinding;
 use PHPCompiler\JIT\ClosureBindHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\MethodVisibility;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -87,7 +87,7 @@ final class VmFromCallable
             $proxyName = self::resolveStaticProxyName($context, $block, $declaringClassLc, $methodLc, $className, $methodName);
             $proxy = $context->resolveFunctionProxy($proxyName);
 
-            return self::wrapCallableProxy($context, $proxy);
+            return self::wrapCallableProxy($context, $proxy, $proxyName);
         }
 
         $lc = strtolower($name);
@@ -97,15 +97,18 @@ final class VmFromCallable
             throw new \Error("Call to undefined function {$lc}()");
         }
 
-        return self::wrapCallableProxy($context, $context->resolveFunctionProxy($lc));
+        return self::wrapCallableProxy($context, $context->resolveFunctionProxy($lc), $lc);
     }
 
-    /** FCC closures invoke via {@see JitVariable::$closureCall}, not TARGET_PROPERTY indirection. */
-    private static function wrapCallableProxy(Context $context, Call $proxy): JitVariable
+    /** FCC closures invoke via {@see JitVariable::$closureCall}; also register __closure_target for AOT (#24166). */
+    private static function wrapCallableProxy(Context $context, Call $proxy, string $targetLc): JitVariable
     {
+        $targetLc = strtolower($targetLc);
+        $context->fccCallableProxies[$targetLc] = $proxy;
         $classId = $context->type->object->lookup('Closure');
         $obj = $context->type->object->allocate($classId);
         $context->type->object->markObjectConstructed($obj);
+        VmClosure::storeInvokeTarget($context, $obj, $targetLc);
         $var = new JitVariable($context, JitVariable::TYPE_OBJECT, JitVariable::KIND_VALUE, $obj);
         $var->closureCall = $proxy;
 
@@ -152,7 +155,7 @@ final class VmFromCallable
         );
         $boundScope->compileTimeString = (string) $scopeName;
         $closureCall = new ClosureWithBinding($inner, $receiverVar, $boundScope);
-        $closureVar = self::wrapCallableProxy($context, $closureCall);
+        $closureVar = self::wrapCallableProxy($context, $closureCall, $proxyName);
         $closureVar->closureIsMethodFake = true;
         ClosureBindHelper::ensureClosureBindingProperties($context);
         ClosureBindHelper::storeMethodFakeClosureFlag(

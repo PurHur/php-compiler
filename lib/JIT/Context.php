@@ -52,6 +52,13 @@ class Context {
     public array $functionProxies = [];
 
     /**
+     * First-class callable targets (function/static names) => invoke proxy (#24166).
+     *
+     * @var array<string, Call>
+     */
+    public array $fccCallableProxies = [];
+
+    /**
      * Lowercase logical callee => optional #[\NoDiscard] message (#5663).
      *
      * @var array<string, string|null>

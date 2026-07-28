@@ -227,13 +227,21 @@ final class VmClosure
         if (JitVariable::TYPE_OBJECT !== $receiver->type && JitVariable::TYPE_VALUE !== $receiver->type) {
             return null;
         }
-        $candidates = self::closureCandidates($context);
+        $candidates = array_merge(
+            self::closureCandidates($context),
+            $context->fccCallableProxies
+        );
         if ([] === $candidates) {
             return null;
         }
         $classId = $context->type->object->lookup('Closure');
 
         return new RuntimeIndirectClosureCall($receiver, $candidates, $classId);
+    }
+
+    public static function storeInvokeTarget(Context $context, Value $obj, string $targetLc): void
+    {
+        self::storeTargetName($context, $obj, $targetLc);
     }
 
     private static function storeTargetName(Context $context, Value $obj, string $internalName): void

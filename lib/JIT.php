@@ -14156,6 +14156,7 @@ class JIT {
                 $value
             );
             JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
+            $this->preserveClosureInvokeMetadata($resultOp, $globalTarget, $value);
             $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
             $this->context->setVariableOp($resultOp, $globalTarget);
             $globalName = JIT\OperandName::resolve($resultOp);
@@ -14508,6 +14509,7 @@ class JIT {
                     $value
                 );
                 JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
+                $this->preserveClosureInvokeMetadata($resultOp, $globalTarget, $value);
                 $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
                 $this->context->setVariableOp($resultOp, $globalTarget);
                 $globalName = JIT\OperandName::resolve($resultOp);
@@ -15021,6 +15023,7 @@ class JIT {
                     JIT\JitValueBox::valuePtrFromVariable($this->context, $globalTarget),
                     $value
                 );
+                $this->preserveClosureInvokeMetadata($resultOp, $globalTarget, $value);
                 $this->context->setVariableOp($resultOp, $globalTarget);
                 $globalName = JIT\OperandName::resolve($resultOp);
                 if (null === $globalName || '' === $globalName) {
