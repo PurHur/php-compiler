@@ -8,9 +8,12 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
- * DOM node type constants (php-src ext/dom/dom_ce.h, php_dom.c; issues #6140, #23138).
+ * DOM node type + libxml attribute-type constants (php-src ext/dom/php_dom.stub.php,
+ * php_dom.c; issues #6140, #23138, #24098).
  *
  * Global PHP names match php-src REGISTER_LONG_CONSTANT (XML_PI_NODE for PI).
+ * Atype globals are distinct from node-type names even when numeric values overlap
+ * (e.g. XML_ATTRIBUTE_ID atype 2 vs XML_ATTRIBUTE_NODE node type 2).
  */
 final class DomConstants
 {
@@ -51,6 +54,32 @@ final class DomConstants
 
     /** Namespace declaration node (libxml XML_NAMESPACE_DECL; php-src DOMNameSpaceNode; #20097). */
     public const XML_NAMESPACE_DECL_NODE = 18;
+
+    /**
+     * libxml xmlAttributeType / attr->atype (php-src php_dom.stub.php; #24098).
+     * Used by DOMAttr::isId() when atype == XML_ATTRIBUTE_ID.
+     */
+    public const XML_ATTRIBUTE_CDATA = 1;
+
+    public const XML_ATTRIBUTE_ID = 2;
+
+    public const XML_ATTRIBUTE_IDREF = 3;
+
+    public const XML_ATTRIBUTE_IDREFS = 4;
+
+    /**
+     * php-src registers this name with @cvalue XML_ATTRIBUTE_ENTITIES (libxml value 6),
+     * not XML_ATTRIBUTE_ENTITY (5) — see ext/dom/php_dom.stub.php.
+     */
+    public const XML_ATTRIBUTE_ENTITY = 6;
+
+    public const XML_ATTRIBUTE_NMTOKEN = 7;
+
+    public const XML_ATTRIBUTE_NMTOKENS = 8;
+
+    public const XML_ATTRIBUTE_ENUMERATION = 9;
+
+    public const XML_ATTRIBUTE_NOTATION = 10;
 
     /**
      * php-src DOM_PHP_ERR (0) — internal/generic DOM error; registered as global (#23138).
@@ -104,7 +133,8 @@ final class DomConstants
     public const DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20;
 
     /**
-     * Libxml node-type globals + DOM_PHP_ERR (php-src ext/dom/php_dom.c; #23138).
+     * Libxml node-type + attribute-type globals + DOM_PHP_ERR
+     * (php-src ext/dom/php_dom.c / php_dom.stub.php; #23138, #24098).
      *
      * @return array<string, int>
      */
@@ -132,6 +162,16 @@ final class DomConstants
             'XML_NAMESPACE_DECL_NODE' => self::XML_NAMESPACE_DECL_NODE,
             // Alias of XML_NAMESPACE_DECL_NODE (php-src REGISTER_LONG_CONSTANT).
             'XML_LOCAL_NAMESPACE' => self::XML_NAMESPACE_DECL_NODE,
+            // libxml xmlAttributeType (distinct names from node types; #24098).
+            'XML_ATTRIBUTE_CDATA' => self::XML_ATTRIBUTE_CDATA,
+            'XML_ATTRIBUTE_ID' => self::XML_ATTRIBUTE_ID,
+            'XML_ATTRIBUTE_IDREF' => self::XML_ATTRIBUTE_IDREF,
+            'XML_ATTRIBUTE_IDREFS' => self::XML_ATTRIBUTE_IDREFS,
+            'XML_ATTRIBUTE_ENTITY' => self::XML_ATTRIBUTE_ENTITY,
+            'XML_ATTRIBUTE_NMTOKEN' => self::XML_ATTRIBUTE_NMTOKEN,
+            'XML_ATTRIBUTE_NMTOKENS' => self::XML_ATTRIBUTE_NMTOKENS,
+            'XML_ATTRIBUTE_ENUMERATION' => self::XML_ATTRIBUTE_ENUMERATION,
+            'XML_ATTRIBUTE_NOTATION' => self::XML_ATTRIBUTE_NOTATION,
             'DOM_PHP_ERR' => self::DOM_PHP_ERR,
         ];
     }
