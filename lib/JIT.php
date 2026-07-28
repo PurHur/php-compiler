@@ -778,8 +778,14 @@ class JIT {
             if (OpCode::TYPE_ASSIGN !== $branchOp->type) {
                 continue;
             }
-            $destSlot = $branch->slotForOperand($branch->getOperand($branchOp->arg1));
-            $aliasSlot = $branch->slotForOperand($branch->getOperand($branchOp->arg2));
+            // Incomplete ASSIGN operands (NestedJIT VmPregEngine ternaries) — skip (#24115 / #16075).
+            $destOp = $branch->getOperand($branchOp->arg1);
+            $aliasOp = $branch->getOperand($branchOp->arg2);
+            if (null === $destOp && null === $aliasOp) {
+                continue;
+            }
+            $destSlot = null !== $destOp ? $branch->slotForOperand($destOp) : null;
+            $aliasSlot = null !== $aliasOp ? $branch->slotForOperand($aliasOp) : null;
             if ($destSlot !== $phiSlot && $aliasSlot !== $phiSlot) {
                 continue;
             }
@@ -826,8 +832,13 @@ class JIT {
             if (OpCode::TYPE_ASSIGN !== $branchOp->type) {
                 continue;
             }
-            $destSlot = $branch->slotForOperand($branch->getOperand($branchOp->arg1));
-            $aliasSlot = $branch->slotForOperand($branch->getOperand($branchOp->arg2));
+            $destOp = $branch->getOperand($branchOp->arg1);
+            $aliasOp = $branch->getOperand($branchOp->arg2);
+            if (null === $destOp && null === $aliasOp) {
+                continue;
+            }
+            $destSlot = null !== $destOp ? $branch->slotForOperand($destOp) : null;
+            $aliasSlot = null !== $aliasOp ? $branch->slotForOperand($aliasOp) : null;
             if ($destSlot !== $phiSlot && $aliasSlot !== $phiSlot) {
                 continue;
             }
@@ -8076,24 +8087,39 @@ class JIT {
                     JIT\HashTableHelper::initArray($this->context, $result);
                     $result->compileTimeEmptyArrayLiteral = null === $op->arg2;
                     if (null !== $op->arg2) {
-                        $element = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                        $key = $this->jitArrayElementKeyVariable($block, $op->arg3);
-                        JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
-                        $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
+                        $elementOp = $block->getOperand($op->arg2);
+                        // NestedJIT VmPregEngine can emit INIT_ARRAY with a dangling arg2 index (#24115).
+                        if (null !== $elementOp) {
+                            $element = $this->context->getVariableFromOp($elementOp);
+                            $key = $this->jitArrayElementKeyVariable($block, $op->arg3);
+                            JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
+                            $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
+                        }
                     }
                     break;
                 case OpCode::TYPE_ADD_ARRAY_ELEMENT:
-                    $result = $this->context->getVariableFromOp($block->getOperand($op->arg1));
-                    $element = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $resultOp = $block->getOperand($op->arg1);
+                    $elementOp = $block->getOperand($op->arg2);
+                    // NestedJIT VmPregEngine may omit array element operands (#24115).
+                    if (null === $resultOp || null === $elementOp) {
+                        break;
+                    }
+                    $result = $this->context->getVariableFromOp($resultOp);
+                    $element = $this->context->getVariableFromOp($elementOp);
                     $key = $this->jitArrayElementKeyVariable($block, $op->arg3);
                     JIT\HashTableHelper::addElement($this->context, $result, $element, $key);
                     $this->bumpNativeArrayNextFreeForExplicitIntKey($result, $op->arg3, $block);
                     break;
                 case OpCode::TYPE_ARRAY_SPREAD:
+                    $destOp = $block->getOperand($op->arg1);
+                    $srcOp = $block->getOperand($op->arg2);
+                    if (null === $destOp || null === $srcOp) {
+                        break;
+                    }
                     JIT\HashTableHelper::spreadInto(
                         $this->context,
-                        $this->context->getVariableFromOp($block->getOperand($op->arg1)),
-                        $this->context->getVariableFromOp($block->getOperand($op->arg2))
+                        $this->context->getVariableFromOp($destOp),
+                        $this->context->getVariableFromOp($srcOp)
                     );
                     break;
                 case OpCode::TYPE_LIST_UNPACK_CHECK:

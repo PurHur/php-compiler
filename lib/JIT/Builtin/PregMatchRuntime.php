@@ -25,6 +25,9 @@ use llvm\LLVMValueRef_ptr;
  *
  * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\PregJitHelper}
  * (IniRuntime #21200 / IncludePath #20877 shape — no dishonest Kernel stub fork).
+ * Common metacharacter patterns under thin AOT use {@see PregJitHelperThinAot} +
+ * {@see \PHPCompiler\ext\standard\PregAotFastPath} (#24115) until VmPregEngine NestedJIT
+ * lands (#16075).
  * preg_replace_callback uses PHP match loop + thin LLVM callback invoke (#13736).
  * php-src: ext/pcre/php_pcre.c
  */
@@ -513,16 +516,27 @@ final class PregMatchRuntime
 
         $runtime = $context->runtime;
         $root = \dirname(__DIR__, 3);
-        // VmPregNative delegates to VmPregPure; compile pattern + native facade — VmPregPure stays
-        // external until nested VmPregEngine lowering (BoundVariable) is ready (#16075 tier-2 execute).
-        // VmPregPattern must compile here (modifier loop avoids nested match-on-offset IR bug).
+        // Thin standalone AOT: VmPregPure NestedJIT still hits CFG/property gaps (#16075).
+        // Use PregJitHelperThinAot (fast paths, no Native→Pure) to avoid AOT segfault (#24115).
+        // JIT/embed keeps PregJitHelper + Native (Pure resolves under MCJIT).
+        $helperRel = $context->isThinStandaloneAotMain()
+            ? '/ext/standard/PregJitHelperThinAot.php'
+            : self::HELPER_PATH;
         $paths = [
             $root.'/ext/standard/StdlibConstants.php',
             $root.'/ext/standard/VmPregPattern.php',
             $root.'/ext/standard/VmPregNative.php',
             $root.'/ext/standard/VmPregMatches.php',
-            $root.self::HELPER_PATH,
+            $root.$helperRel,
         ];
+        // Thin AOT helper does not call Native/Matches — skip compiling them.
+        if ($context->isThinStandaloneAotMain()) {
+            $paths = [
+                $root.'/ext/standard/StdlibConstants.php',
+                $root.'/ext/standard/PregAotFastPath.php',
+                $root.$helperRel,
+            ];
+        }
         foreach (['add', 'updateindex', 'append'] as $htMethod) {
             NestedVmHashTableMethodLlvm::ensureMethod($context, $htMethod);
         }
