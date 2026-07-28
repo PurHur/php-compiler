@@ -9,22 +9,30 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_sum() JIT routes all operands through ArraySumJitHelper PHP not ArrayBuiltinHelper LLVM (#12590, #14358, #18133). */
+/**
+ * array_sum() AOT emits via ArraySumLlvm (caller-frame), not NestedJIT Variable ABI (#12590, #24167).
+ * VM execute() still uses ArraySumJitHelper PHP.
+ */
 final class ArraySumRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 7680;
 
-    public function testArraySumRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArraySumRuntimeUsesInlineLlvmNotNestedJitBridge(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArraySumRuntime.php');
-        $this->assertStringContainsString('ArraySumJitHelper', $runtime);
+        $this->assertStringContainsString('ArraySumLlvm::sum', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
+        $this->assertStringNotContainsString('__array_sum__fold', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arraySum', $runtime);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_sum.php');
         $this->assertStringContainsString('ArraySumRuntime::sum', $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arraySum', $builtin);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArraySumLlvm.php');
+        $this->assertStringContainsString('ArraySumJitHelper', $llvm);
+        $this->assertStringContainsString('#24167', $llvm);
     }
 
     public function testArrayBuiltinHelperLineBudgetAfterNativeSumLlvmDeletion(): void

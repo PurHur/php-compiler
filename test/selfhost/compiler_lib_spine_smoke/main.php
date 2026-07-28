@@ -4625,6 +4625,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayShiftRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArraySliceRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArraySpliceRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArraySumRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/ArraySumLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayUniqueRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayUnshiftRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayUserSetOpsRuntime.php';
