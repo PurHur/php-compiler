@@ -9367,11 +9367,18 @@ final class VmDom
         if (!self::isNamedNodeMap($namedNodeMap)) {
             throw new \LogicException('DOMNamedNodeMap::getNamedItem() called on non-namednodemap in this compiler build');
         }
-        // php-src namednodemap.c — lookup by nodeName for Attr, Entity, and Notation members (#20734).
+        // php-src namednodemap.c — Attr maps use libxml xmlHasProp (local name); Entity/Notation
+        // maps use xmlHashLookup by declaration name / nodeName (#20734, #24332).
         $state = DomRegistry::state($namedNodeMap);
         foreach ($state->listNodeIds as $nodeId) {
             $node = DomRegistry::entry($nodeId);
             if (null === $node) {
+                continue;
+            }
+            if (self::isAttr($node)) {
+                if (self::readLocalName($node) === $name) {
+                    return $node;
+                }
                 continue;
             }
             if (DomRegistry::state($node)->nodeName === $name) {
