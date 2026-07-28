@@ -682,7 +682,13 @@ class VM {
                 ? $this->invokeVmClassMethod($func, $caller, $result, ...$extraArgs)
                 : $this->invokeVmClassMethod($func, $caller, $result, $thisVar, ...$extraArgs);
             if (null !== $catchFrame) {
-                throw new VM\MagicMethodInvocationAborted();
+                // __toString coercion: catch already ran on nested stack — abort the cast (#4284).
+                // Foreach / other invokes: catch is prepared but not run — defer to outer runFrames
+                // so FilterIterator::accept() (etc.) throws stay user-catchable (#24286, #24297).
+                if ($this->context->coercingObjectToString) {
+                    throw new VM\MagicMethodInvocationAborted();
+                }
+                throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
             }
 
             return $result;
@@ -8646,6 +8652,10 @@ restart:
                             $iter->reset();
                             $this->context->objectPropertyIterators[$op->arg1] = $iter;
                             break;
+                        } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                            // Iterator protocol throw (FilterIterator::accept, …) — do not re-wrap (#24286).
+                            $frame = $redirect->catchFrame;
+                            goto restart;
                         } catch (\Exception $e) {
                             // zend_interfaces.c — bad getIterator() return is Exception, not TypeError (#19729).
                             $catchFrame = $this->dispatchVmEngineException($e->getMessage(), $frame);
