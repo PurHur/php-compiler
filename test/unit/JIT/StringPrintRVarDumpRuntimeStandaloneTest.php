@@ -42,4 +42,14 @@ final class StringPrintRVarDumpRuntimeStandaloneTest extends TestCase
             $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source, $bridge);
         }
     }
+
+    /** #24220 — literal null at call site can be a null __value__* in thin AOT. */
+    public function testThinScalarBridgeGuardsNullValuePointer(): void
+    {
+        foreach (['StringPrintR.php', 'StringVarDump.php'] as $bridge) {
+            $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/'.$bridge);
+            $this->assertStringContainsString('null __value__*', $source, $bridge);
+            $this->assertStringContainsString('constNull()', $source, $bridge);
+        }
+    }
 }
