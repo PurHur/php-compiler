@@ -17907,13 +17907,58 @@ class JIT {
             }
             throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
         }
-        // parent:: / self:: dispatch to resolved code but must not clobber late-static scope
-        // (#12245 parent, #21983 self).
-        if (!$parentScope && !$selfScope) {
+        $staticScope = 'static' === strtolower(ltrim((string) $classOp->value, '\\'));
+        // parent:: / self:: / static:: are forwarding calls: they dispatch to resolved code but must
+        // not clobber late-static scope (#12245 parent, #21983 self, #24169 static).
+        if (!$parentScope && !$selfScope && !$staticScope) {
             $this->context->scope->lateStaticCallClassId = $declaringClassId;
         }
-        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+        $this->context->scope->toCall = $staticScope
+            ? $this->resolveJitLateStaticDispatch($declaringClassLc, $methodLc, $proxyName)
+            : $this->context->resolveFunctionProxy($proxyName);
         $this->context->scope->args = [];
+    }
+
+    /**
+     * A method body is lowered once and shared by the whole hierarchy, so `static::m()` cannot be
+     * resolved at compile time — `Child::m()` and `Base::m()` run the same code. Dispatch on the
+     * late-static class id the call site stored instead (#24169).
+     *
+     * Returns the plain proxy when no subclass overrides the method, so ordinary static calls emit
+     * no dispatch chain at all.
+     */
+    private function resolveJitLateStaticDispatch(
+        string $declaringClassLc,
+        string $methodLc,
+        string $proxyName
+    ): JIT\Call {
+        $fallback = $this->context->resolveFunctionProxy($proxyName);
+        if (!JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context)) {
+            return $fallback;
+        }
+        $objects = $this->context->type->object;
+        if (!$objects->hasDeclaredClass($declaringClassLc)) {
+            return $fallback;
+        }
+        $candidates = [];
+        foreach ($objects->classIdsInstanceOf($declaringClassLc) as $classId) {
+            $nameLc = strtolower(ltrim($objects->classNameForId($classId), '\\'));
+            if ('' === $nameLc || $nameLc === $declaringClassLc) {
+                continue;
+            }
+            $ownProxy = $this->resolveJitStaticMethodProxyName($nameLc, $methodLc);
+            // Same proxy => this subclass inherits the declaring implementation; the fallback arm
+            // already covers it, and emitting a compare for it would only grow the chain.
+            if ($ownProxy === $proxyName || !$this->context->functionIsRegistered($ownProxy)) {
+                continue;
+            }
+            $candidates[$classId] = $this->context->resolveFunctionProxy($ownProxy);
+        }
+        if ([] === $candidates) {
+            return $fallback;
+        }
+
+        return new JIT\Call\RuntimeLateStaticMethodCall($methodLc, $candidates, $fallback);
     }
 
     /**
