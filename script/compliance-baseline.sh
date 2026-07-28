@@ -91,6 +91,18 @@ if [ "$have" = "MIXED" ]; then
     echo "  Results from different --shards=N runs cannot be unioned. Remove the stale ones." >&2
     exit 2
 fi
+timeouts=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.timeout" 2>/dev/null | LC_ALL=C sort)
+if [ -n "$timeouts" ]; then
+    echo "compliance-baseline: TIMED-OUT SHARDS present — the result set is incomplete:" >&2
+    for t in $timeouts; do
+        echo "  $(basename "$t"): $(grep '^stalled_on=' "$t" 2>/dev/null | cut -d= -f2-)" >&2
+    done
+    echo "  A timed-out shard writes a .failed file that LOOKS complete; every case it never" >&2
+    echo "  reached would read as newly-passing on the next diff. Fix or disable the hanging case," >&2
+    echo "  then re-run those shards." >&2
+    exit 2
+fi
+
 if [ "$want" -gt 0 ] && [ "$have" -lt "$want" ]; then
     # A partial set looks exactly like "these cases got fixed" on the next diff. Refuse it.
     echo "compliance-baseline: INCOMPLETE — ${have} of ${want} shards have results." >&2

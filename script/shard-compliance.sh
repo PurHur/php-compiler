@@ -136,9 +136,21 @@ grep -oE "^##teamcity\[testFailed name='[^']*'" "$LOG" 2>/dev/null \
     | LC_ALL=C sort -u > "$FAILED_FILE"
 failed="$(wc -l < "$FAILED_FILE" | tr -d ' ')"
 
+TIMEOUT_MARKER="${LOG_DIR}/${SUITE}-${SHARD}-of-${SHARDS}.timeout"
+rm -f "$TIMEOUT_MARKER"
 if [ "$rc" -eq 124 ]; then
+    # A timed-out shard leaves a .failed file that looks complete. Collecting it would silently
+    # bake a PARTIAL shard into the baseline, and every case it never reached would later read as
+    # newly-passing. Drop a marker so compliance-baseline.sh refuses the set.
+    last_started="$(grep -oE "^##teamcity\[testStarted name='[^']*'" "$LOG" 2>/dev/null | tail -1 | sed "s/.*name='//; s/'$//")"
+    {
+        echo "timeout after ${SHARD_TIMEOUT}s"
+        echo "executed=${executed} failed_before_stall=${failed}"
+        echo "stalled_on=${last_started:-<unknown>}"
+    } > "$TIMEOUT_MARKER"
     echo "shard-compliance: TIMEOUT after ${SHARD_TIMEOUT}s — ${executed} executed, ${failed} failed before the stall" >&2
-    echo "  partial results kept in ${FAILED_FILE} (this is why --teamcity is used)" >&2
+    echo "  stalled on: ${last_started:-<unknown>}" >&2
+    echo "  partial results kept in ${FAILED_FILE}; ${TIMEOUT_MARKER} marks the set incomplete" >&2
     exit 124
 fi
 
