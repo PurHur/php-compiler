@@ -333,13 +333,20 @@ final class VmIteratorForeach
         $context->builder->branchIf($inPacked, $packedBody, $strInit);
 
         $context->builder->positionAtEnd($packedBody);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $nextIdx
+        // Zend FE_FETCH_R: skip unset holes only — null elements are valid iteration targets.
+        // offsetIsSet treats TYPE_NULL like a hole (isset semantics) and skips forever (#24261).
+        $entry = HashTableHelper::listEntryPointer($context, $ht, $nextIdx);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($entry, $context->structFieldMap['__value__']['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isDefined = $context->builder->icmp(
+            Builder::INT_NE,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_UNDEFINED, false)
         );
         $packedBump = $fn->appendBasicBlock('foreach_packed_bump');
-        $context->builder->branchIf($isSet, $found, $packedBump);
+        $context->builder->branchIf($isDefined, $found, $packedBump);
         $context->builder->positionAtEnd($packedBump);
         $context->builder->store($context->builder->addNoSignedWrap($nextIdx, $one), $slot);
         $context->builder->branch($packedBody);
