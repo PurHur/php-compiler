@@ -705,6 +705,9 @@ final class BuiltinParamNames
                 return ['algo', 'data', 'binary', 'options'];
             case 'hash_hmac':
                 return ['algo', 'data', 'key', 'binary'];
+            // php-src ext/hash/hash.stub.php — InternalArgInfo still says raw_output (#24377)
+            case 'hash_hmac_file':
+                return ['algo', 'filename', 'key', 'binary'];
             // php-src ext/hash/hash.stub.php — InternalArgInfo had options/key swapped (#23585)
             case 'hash_init':
                 return ['algo', 'flags', 'key', 'options'];
