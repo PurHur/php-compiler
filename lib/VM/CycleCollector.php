@@ -233,6 +233,9 @@ final class CycleCollector
         }
 
         foreach ($arrayCandidates as $arrayId => $table) {
+            if (WeakRefSupport::isInternalTableForLiveWeakMap($table)) {
+                continue;
+            }
             if (self::referencesCandidateArrayObjectPeer($table, $candidates)) {
                 HashTableRegistry::release($table);
                 ++$collected;
