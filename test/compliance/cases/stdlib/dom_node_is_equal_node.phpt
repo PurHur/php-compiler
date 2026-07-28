@@ -1,5 +1,5 @@
 --TEST--
-stdlib DOMNode::isEqualNode() structural equality (#15195, ext/dom/node.c)
+stdlib DOMNode::isEqualNode() structural equality (#15195, #24462, ext/dom/node.c)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -22,9 +22,12 @@ $doc2 = new DOMDocument();
 $doc2->loadXML('<root><a id="2"/></root>');
 $d = $doc2->documentElement->firstChild;
 echo (int) $a->isEqualNode($d), "\n";
+// php-src stub ?DOMNode — null → false (#24462)
+echo (int) $a->isEqualNode(null), "\n";
 ?>
 --EXPECT--
 1
 1
+0
 0
 0

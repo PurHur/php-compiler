@@ -274,6 +274,12 @@ final class DomLivingApiRuntime
 
     public static function invokeIsEqualNode(Context $context, Variable $receiver, Variable $other): Value
     {
+        // php-src stub ?DOMNode — compile-time null → false (#24462, ext/dom/node.c).
+        if (Variable::TYPE_NULL === $other->type || $other->isNullConstant) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_isequal_null_const');
+
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::isEqualNodeViaTagName($context, $receiver, $other);
         }
