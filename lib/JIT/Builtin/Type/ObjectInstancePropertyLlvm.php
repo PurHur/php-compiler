@@ -131,7 +131,18 @@ final class ObjectInstancePropertyLlvm
 
                     return $var;
                 }
+                // Slot holds a pointer to the native scalar (int64*/double*/int1*), not the
+                // scalar bits themselves. Casting void*→int64 (ptrtoint) or void*→double
+                // (illegal bitcast) made promoted float props fail verify and int props
+                // read the wrong value when a __value__* was stored (#24008).
                 $llvmType = Variable::getStringType($propset[2]);
+                if (\in_array($propset[2], [
+                    Variable::TYPE_NATIVE_LONG,
+                    Variable::TYPE_NATIVE_BOOL,
+                    Variable::TYPE_NATIVE_DOUBLE,
+                ], true)) {
+                    $llvmType .= '*';
+                }
                 $typed = $context->builder->pointerCast(
                     $loaded,
                     $context->getTypeFromString($llvmType)
