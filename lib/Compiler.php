@@ -5267,7 +5267,8 @@ class Compiler {
 
     /**
      * Skip ArrayDimFetch stmts consumed by isset()/empty()/unset(), including nested dim chains
-     * (`$a['x']['y']`) where only the innermost is adjacent to isset/empty (#21991).
+     * (`$a['x']['y']`) where only the innermost is adjacent to isset/empty (#21991), and sibling
+     * dims before multi-target unset (`unset($o->a[$k], $o->b[$k])`) (#24250).
      *
      * @param Op[] $ops
      */
@@ -5278,25 +5279,31 @@ class Compiler {
         Block $block
     ): bool {
         $opCount = count($ops);
-        if ($i + 1 >= $opCount) {
-            return false;
-        }
-        $next = $ops[$i + 1];
-        if (
-            $this->isArrayDimFetchOnlyIssetVar($fetch, $next)
-            || $this->isArrayDimFetchOnlyEmptyVar($fetch, $next, $block)
-            || $this->isArrayDimFetchOnlyUnsetVar($fetch, $next)
-        ) {
-            return true;
-        }
-        if (!$next instanceof Op\Expr\ArrayDimFetch) {
-            return false;
-        }
-        if (!$this->arrayDimFetchConsumesPriorResult($next, $fetch)) {
+        for ($j = $i + 1; $j < $opCount; ++$j) {
+            $next = $ops[$j];
+            if (
+                $this->isArrayDimFetchOnlyIssetVar($fetch, $next)
+                || $this->isArrayDimFetchOnlyEmptyVar($fetch, $next, $block)
+                || $this->isArrayDimFetchOnlyUnsetVar($fetch, $next)
+            ) {
+                return true;
+            }
+            if ($next instanceof Op\Expr\ArrayDimFetch) {
+                if ($this->arrayDimFetchConsumesPriorResult($next, $fetch)) {
+                    return $this->isArrayDimFetchSkippedForIssetEmptyOrUnset($next, $ops, $j, $block);
+                }
+                // Sibling dim fetch before multi-target unset/isset/empty (#24250).
+                continue;
+            }
+            if ($next instanceof Op\Expr\PropertyFetch) {
+                // Property prelude for a later sibling dim (`$this->a[$k], $this->b[$k]`) (#24250).
+                continue;
+            }
+
             return false;
         }
 
-        return $this->isArrayDimFetchSkippedForIssetEmptyOrUnset($next, $ops, $i + 1, $block);
+        return false;
     }
 
     private function arrayDimFetchConsumesPriorResult(
