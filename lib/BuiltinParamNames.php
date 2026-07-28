@@ -1124,6 +1124,9 @@ final class BuiltinParamNames
             // php-src ext/xml/xml.stub.php — InternalArgInfo still has shdl/ehdl (#23624)
             case 'xml_set_element_handler':
                 return ['parser', 'start_handler', 'end_handler'];
+            // php-src ext/xml/xml.stub.php — InternalArgInfo still has &obj (#23946)
+            case 'xml_set_object':
+                return ['parser', 'object'];
             // php-src ext/xml/xml.stub.php — InternalArgInfo still says isfinal (#23605)
             case 'xml_parse':
                 return ['parser', 'data', 'is_final='];
