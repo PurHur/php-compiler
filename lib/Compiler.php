@@ -10806,6 +10806,7 @@ class Compiler {
                         || $this->errorSuppressEndBlockCallArgHasTrailingComparisonProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingConcatProducer($endCompiled, $endChild, (int) $argIndex)
                         || $this->errorSuppressEndBlockCallArgHasTrailingClosureProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasTrailingBitmaskProducer($endCompiled, $endChild, (int) $argIndex)
                     ) {
                         continue;
                     }
@@ -19067,13 +19068,38 @@ class Compiler {
      */
     private function slotForRecentInlineArithmeticCallArg(Block $block, array $emitOps): ?string
     {
-        foreach (array_reverse($emitOps) as $op) {
-            if ($this->isInlineArithmeticResultOpcode($op->type)) {
-                return (string) $op->arg1;
-            }
+        // Do not cross an intervening call result — e.g. json_encode(iterator_to_array(...))
+        // after `new C(..., CONST|CONST)` must not steal the bitmask OR slot (#24369 / #10474).
+        $fromOps = $this->slotForRecentInlineArithmeticCallArgInOps($emitOps);
+        if (null !== $fromOps) {
+            return $fromOps;
         }
-        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
-            $op = $block->opCodes[$i];
+
+        return $this->slotForRecentInlineArithmeticCallArgInOps($block->opCodes);
+    }
+
+    /**
+     * @param list<OpCode> $ops
+     */
+    private function slotForRecentInlineArithmeticCallArgInOps(array $ops): ?string
+    {
+        $skippedCurrentCallInit = false;
+        for ($i = \count($ops) - 1; $i >= 0; --$i) {
+            $op = $ops[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                if (!$skippedCurrentCallInit) {
+                    $skippedCurrentCallInit = true;
+                    continue;
+                }
+
+                return null;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type
+            ) {
+                return null;
+            }
             if ($this->isInlineArithmeticResultOpcode($op->type)) {
                 return (string) $op->arg1;
             }
@@ -41721,8 +41747,79 @@ class Compiler {
         if ($this->errorSuppressEndBlockCallArgHasTrailingClosureProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
+        if ($this->errorSuppressEndBlockCallArgHasTrailingBitmaskProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
+    }
+
+    /**
+     * Trailing inline bitmask / scalar option prelude before a post-@ call/ctor feeds this
+     * dead-temp arg — not the @ return (#24369, #18523 family).
+     *
+     * Example: `@mkdir($dir); new FilesystemIterator($dir, CURRENT_AS_PATHNAME | SKIP_DOTS)`.
+     * Only the trailing non-embedded arg binds the prelude so `@stat; foo($stat, F|F)` still
+     * forwards the suppress result on arg #0.
+     */
+    private function errorSuppressEndBlockCallArgHasTrailingBitmaskProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        if ((int) $argIndex !== $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $callIndex = array_search($cfgCallOp, $children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        $producer = null;
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
+            $prev = $children[$i] ?? null;
+            if (
+                $prev instanceof Op\Expr\ConstFetch
+                || $prev instanceof Op\Expr\ClassConstFetch
+            ) {
+                continue;
+            }
+            if ($prev instanceof Op\Expr\Assign) {
+                $prev = $prev->expr;
+            }
+            if (
+                $this->isArithmeticInlineCallArgProducer($prev)
+                || $prev instanceof Op\Expr\UnaryMinus
+                || $prev instanceof Op\Expr\UnaryPlus
+                || $prev instanceof Op\Expr\BitwiseNot
+                || $prev instanceof Op\Expr\Cast
+            ) {
+                $producer = $prev;
+            }
+            break;
+        }
+        if (null === $producer) {
+            return false;
+        }
+        if (
+            null !== $producer->result
+            && $this->operandsReferToSameVariable($producer->result, $callArg)
+        ) {
+            return true;
+        }
+
+        // php-cfg allocates a distinct dead arg temp from the BitwiseOr/Plus result (#18523, #24369).
+        return true;
     }
 
     /**
