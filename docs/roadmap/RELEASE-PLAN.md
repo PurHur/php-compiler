@@ -213,6 +213,29 @@ day. Master merges ~4 commits/hour, ~56% touching lowering sources. Any artifact
    intra-spine class references cross a directory boundary). A single 6,519-file translation unit
    running ~4.6 h and OOMing becomes incremental, parallel and resumable — the model already exists
    in `HelperRuntimeCache` + `emit-helper-runtime-object.php`.
+
+   **MEASURED 2026-07-28 (#24429): the blocker is cross-chunk binding, not partitioning.** Built
+   three chunks as standalone TUs — an entry file requiring exactly one directory's spine files:
+
+   | chunk | files | wall | result |
+   |---|---|---|---|
+   | `ext/spl` | 51 | 34 s | `Unsupported property store from int1 to __hashtable__*` |
+   | `ext/sockets` | 55 | 11 s | `Call to undefined method object::int()` |
+   | `lib/VM` | 681 | 144 s | `Call to undefined method object::currentexecutingframe()` |
+
+   All fail, and `PHP_COMPILER_REPORT_EXTERNAL_STUBS=1` reports **0** in each case — not because
+   there are no unbound edges but because the compile aborts before the report runs. So the probe's
+   own suggested next step (count the stubs on a real chunk build) is not yet reachable.
+
+   The errors are exactly the predicted shape: a chunk calls a method on a class in another chunk and
+   the compiler cannot bind it by declaration. `HelperRuntimeCache::tryProvide` already does this for
+   helper units; extending it to spine chunks **is** the work of this item. Do that first, then count
+   unbound edges, then parallelise — parallelising first yields fast builds that silently miscompile
+   at every boundary (#579).
+
+   Encouraging: `lib/VM` (681 files) reached 144 s before erroring — a lower bound, but the right
+   order of magnitude for per-chunk emits in minutes rather than a 4.6 h monolith with no
+   checkpointing.
 10. **Treat gen-0 as a release artifact, not a per-commit invariant.** Rebuild under a merge freeze,
     verify by function, tag, ship. Between releases, report staleness honestly
     (`bootstrap-gen0-staleness.php` already does) instead of restamping to green.
