@@ -92,6 +92,33 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         );
     }
 
+    public function testSprintfJitHelperCoercesNullForPercentSAndD(): void
+    {
+        $nullBlob = "\x00";
+        $nullVar = new Variable();
+        $nullVar->null();
+        $this->assertSame('', SprintfJitHelper::sprintfArgv('%s', $nullBlob));
+        $this->assertSame('0', SprintfJitHelper::sprintfArgv('%d', $nullBlob));
+        $this->assertSame('<>', SprintfJitHelper::sprintfArgv('<%s>', $nullBlob));
+        $this->assertSame('|0', SprintfJitHelper::sprintfArgv('%s|%d', $nullBlob.$nullBlob));
+        $this->assertSame(
+            VmSprintf::format('%s', [$nullVar]),
+            SprintfJitHelper::sprintfArgv('%s', $nullBlob)
+        );
+        $this->assertSame(
+            VmSprintf::format('%d', [$nullVar]),
+            SprintfJitHelper::sprintfArgv('%d', $nullBlob)
+        );
+        $this->assertSame(
+            VmSprintf::format('<%s>', [$nullVar]),
+            SprintfJitHelper::sprintfArgv('<%s>', $nullBlob)
+        );
+        $this->assertSame(
+            VmSprintf::format('%s|%d', [$nullVar, $nullVar]),
+            SprintfJitHelper::sprintfArgv('%s|%d', $nullBlob.$nullBlob)
+        );
+    }
+
     public function testSprintfJitHelperSequentialMultiArgDecimals(): void
     {
         $blob = "\x01".\pack('q', 2)."\x01".\pack('q', 4);
