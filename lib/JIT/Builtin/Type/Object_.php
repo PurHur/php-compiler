@@ -6244,6 +6244,110 @@ class Object_ extends Type {
             }
         }
 
+        // Native scalar slots must not receive a boxed __value__* (#24008). The generic
+        // TYPE_VALUE store below would otherwise write the box pointer into an int64*
+        // slot; later reads interpret the box header as the integer (e.g. 1025).
+        if (Variable::TYPE_NATIVE_LONG === $propertyType) {
+            $longVal = null;
+            if (Variable::TYPE_NATIVE_LONG === $value->type) {
+                $longVal = $this->context->helper->loadValue($value);
+            } elseif (Variable::TYPE_VALUE === $value->type) {
+                $valuePtr = Variable::KIND_VARIABLE === $value->kind
+                    ? JitValueBox::pointer($this->context, $value->value)
+                    : $value->value;
+                $longVal = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readLong'),
+                    $valuePtr
+                );
+            } elseif (Variable::TYPE_NATIVE_DOUBLE === $value->type) {
+                $longVal = $this->context->builder->truncOrBitCast(
+                    $this->context->helper->loadValue($value),
+                    $this->context->getTypeFromString('int64')
+                );
+            } elseif (Variable::TYPE_NATIVE_BOOL === $value->type) {
+                $longVal = $this->context->builder->zExt(
+                    $this->context->helper->loadValue($value),
+                    $this->context->getTypeFromString('int64')
+                );
+            }
+            if (null !== $longVal) {
+                $nativeType = $this->context->getTypeFromString('int64');
+                $nativePtr = $this->context->memory->malloc($nativeType);
+                $this->context->builder->store($longVal, $nativePtr);
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($nativePtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
+        }
+
+        if (Variable::TYPE_NATIVE_DOUBLE === $propertyType) {
+            $doubleVal = null;
+            if (Variable::TYPE_NATIVE_DOUBLE === $value->type) {
+                $doubleVal = $this->context->helper->loadValue($value);
+            } elseif (Variable::TYPE_VALUE === $value->type) {
+                $valuePtr = Variable::KIND_VARIABLE === $value->kind
+                    ? JitValueBox::pointer($this->context, $value->value)
+                    : $value->value;
+                $doubleVal = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readDouble'),
+                    $valuePtr
+                );
+            } elseif (Variable::TYPE_NATIVE_LONG === $value->type) {
+                $doubleVal = $this->context->builder->siToFp(
+                    $this->context->helper->loadValue($value),
+                    $this->context->getTypeFromString('double')
+                );
+            }
+            if (null !== $doubleVal) {
+                $nativeType = $this->context->getTypeFromString('double');
+                $nativePtr = $this->context->memory->malloc($nativeType);
+                $this->context->builder->store($doubleVal, $nativePtr);
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($nativePtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
+        }
+
+        if (Variable::TYPE_NATIVE_BOOL === $propertyType) {
+            $boolVal = null;
+            if (Variable::TYPE_NATIVE_BOOL === $value->type) {
+                $boolVal = $this->context->helper->loadValue($value);
+            } elseif (Variable::TYPE_VALUE === $value->type) {
+                $valuePtr = Variable::KIND_VARIABLE === $value->kind
+                    ? JitValueBox::pointer($this->context, $value->value)
+                    : $value->value;
+                $boolVal = $this->context->builder->truncOrBitCast(
+                    $this->context->builder->call(
+                        $this->context->lookupFunction('__value__readLong'),
+                        $valuePtr
+                    ),
+                    $this->context->getTypeFromString('int1')
+                );
+            } elseif (Variable::TYPE_NATIVE_LONG === $value->type) {
+                $boolVal = $this->context->builder->truncOrBitCast(
+                    $this->context->helper->loadValue($value),
+                    $this->context->getTypeFromString('int1')
+                );
+            }
+            if (null !== $boolVal) {
+                $nativeType = $this->context->getTypeFromString('int1');
+                $nativePtr = $this->context->memory->malloc($nativeType);
+                $this->context->builder->store($boolVal, $nativePtr);
+                $this->context->builder->store(
+                    $this->context->builder->pointerCast($nativePtr, $voidPtr),
+                    $slot
+                );
+
+                return;
+            }
+        }
+
         $valueType = $this->context->getTypeFromString('__value__');
         $heapVal = $this->context->memory->malloc($valueType);
         $heapPtr = $this->context->builder->pointerCast(

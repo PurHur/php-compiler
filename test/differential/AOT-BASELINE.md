@@ -27,23 +27,13 @@ barely.
 three of which are silent wrong output. Read any "the sweep is green" claim as being about *this
 corpus*, not the language.
 
-## The 20 failing cases
+## Remaining failing cases (post-`556c97d1d` fixes applied)
 
-**Ordinary PHP — silent wrong output (#24008–#24011)**
+**Ordinary PHP — silent wrong output**
 
 | case | cause |
 |---|---|
-| `i09_ctor_promotion` | promoted property reads `1025` not `4`; `(new Sq(4))->area()` = `1050625`. A classic constructor works — #24008 |
-| `i10_null_coalesce_assign` | `??=` leaves the variable empty, for null **and** non-null — #24009 |
 | `i14_nested_dim_assign` | `$g[1][0] = 9` reads back `3`, the original value — #24011 |
-
-**Ordinary PHP — compile failures (#24010)**
-
-| case | cause |
-|---|---|
-| `i11_foreach_by_ref` | `Current basic block has no parent function` (internal invariant) |
-| `i12_nested_foreach` | `Unknown array write op: PHPCfg\Op\Iterator\Value`; a *single* foreach is fine |
-| `i13_sort` | `sort`/`ksort` fail to compile; `sort()` alone segfaults at runtime |
 
 **Compile failures — triaged in #23971**
 
@@ -67,7 +57,6 @@ standalone AOT does not have. These are **not** silent failures — they say so 
 
 | case | cause |
 |---|---|
-| `g07a_int_string_resource_collision` | **regression** — heap corruption, **7/20 runs correct**; was 5/5 clean earlier. Carries `@differential-repeat: 10` — #24024 |
 | `g07_inc_resource` | `++$resource` TypeError message prints a literal `\n` and omits the stack trace |
 
 ## Fixed since `96ddddeb1`
@@ -77,14 +66,24 @@ standalone AOT does not have. These are **not** silent failures — they say so 
 Earlier the same day: `c04_concat`, `c10_builtin`, `c11_strcmp`, `d04_concat_dim`, `e05_sprintf`,
 `e09_nested_calls`, `e15_str_fns`, `e24_compare`, `g03_exception_caught`, `g05_float_render`.
 
+## Fixed since this capture (`556c97d1d`)
+
+Verified on current master with `script/differential-sweep.sh --aot --repeat 5` (g07a at `--repeat 10`):
+
+| case | fix |
+|---|---|
+| `i09_ctor_promotion` | #24008 / #24043 |
+| `i10_null_coalesce_assign` | #24009 / #24026 |
+| `i11_foreach_by_ref`, `i12_nested_foreach`, `i13_sort` | #24010 / #24022 |
+| `g07a_int_string_resource_collision` | #24024 / #24044 — was 7/20; now **10/10** |
+
+This regeneration caught `e30` and `g07a` as regressions no individual verification would have
+surfaced. `g07a` carries `@differential-repeat: 10` so a plain sweep re-runs it.
+
 ## Keeping this honest
 
 Regenerate after any batch of lowering work and update the SHA. A baseline that silently drifts is
 worse than none: it makes a live regression look like an unchanged failure.
-
-**This regeneration earned that.** It caught two regressions no individual verification would have
-surfaced — `e30` (stopped compiling) and `g07a` (heap corruption at 7/20, which a single-run check
-passes 35% of the time).
 
 Note also that a name-diff only catches *newly failing* cases — it cannot see a case getting
 **worse** while remaining in the failing set, which is how a `sprintf` wrong-output bug became heap

@@ -127,11 +127,11 @@ final class Variable {
     public bool $borrowedValueEntry = false;
 
     /**
-     * Dead php-cfg Concat temp in echo/call args (#23798, #23842).
+     * Dead php-cfg Concat temp in echo/call args (#23798, #23842, #24024).
      *
-     * Skip delref in freeDeadVariables — ownership is either an entry alloca that outlives
-     * the block, or a KIND_VALUE link in an ephemeral concat chain that must not be
-     * free()+addref balanced via assignOperand (multi-var encapsed heap corruption).
+     * Skip delref in freeDeadVariables — ownership is an entry alloca that outlives
+     * the block. Each ConcatList link gets its own entry alloca so LLVM cannot
+     * stack-color dead fopen() value boxes into concat temps (#24024).
      */
     public bool $ephemeralConcatTemp = false;
 

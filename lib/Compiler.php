@@ -7344,6 +7344,14 @@ class Compiler {
                     } else {
                         $block->paramTypeConstraints[$slot] = $mapped;
                     }
+                    // php-cfg leaves Param result Temporary->type null; stamp the declared
+                    // PHPTypes so JIT fromOp allocates a native slot (int/float/bool), not a
+                    // __value__ box. Without this, constructor promotion stores a value-box
+                    // pointer into a native-long property and reads back garbage (#24008).
+                    $operand = $block->getOperand($slot);
+                    if (null !== $operand && null === $operand->type) {
+                        $operand->type = $rawType;
+                    }
                 }
             }
         }
