@@ -41,6 +41,12 @@ echo (int) defined('OPENSSL_RAW_DATA');
 echo OPENSSL_RAW_DATA;
 echo (int) defined('OPENSSL_ZERO_PADDING');
 echo OPENSSL_ZERO_PADDING;
+echo (int) defined('OPENSSL_PKCS1_PADDING');
+echo OPENSSL_PKCS1_PADDING;
+echo (int) defined('OPENSSL_NO_PADDING');
+echo OPENSSL_NO_PADDING;
+echo (int) defined('OPENSSL_PKCS1_OAEP_PADDING');
+echo OPENSSL_PKCS1_OAEP_PADDING;
 echo (int) defined('OPENSSL_ALGO_SHA256');
 echo OPENSSL_ALGO_SHA256;
 echo (int) extension_loaded('openssl');
@@ -49,7 +55,8 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'openssl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('11111111111111121711', ob_get_clean());
+        // padding trio from registeredConstants() (#24071): defined+1, defined+3, defined+4
+        self::assertSame('11111111111111121113141711', ob_get_clean());
     }
 
     public function test_openssl_cipher_key_length_aes_256_cbc(): void

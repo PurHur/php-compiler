@@ -20,11 +20,8 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
-        foreach (array_merge([
-            'OPENSSL_RAW_DATA' => OpensslConstants::OPENSSL_RAW_DATA,
-            'OPENSSL_ZERO_PADDING' => OpensslConstants::OPENSSL_ZERO_PADDING,
-            'OPENSSL_DONT_ZERO_PAD_KEY' => OpensslConstants::OPENSSL_DONT_ZERO_PAD_KEY,
-        ], OpensslConstants::algorithmConstants(), OpensslConstants::pkcs7Constants(), OpensslConstants::cmsConstants(), OpensslConstants::cipherConstants(), OpensslConstants::x509PurposeConstants()) as $name => $value) {
+        // Use registeredConstants() so PKCS1/OAEP/NO padding reach defineConstant (#24071).
+        foreach (OpensslConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
