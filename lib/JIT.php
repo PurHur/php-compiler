@@ -8412,7 +8412,13 @@ class JIT {
                             JIT\StringOffsetHelper::emitAssignOpError($this->context);
                             break;
                         }
-                        if ($this->concatDeadOperandNeedsEntryAlloca($block, $destOp, $leftOp)) {
+                        if (
+                            $this->concatDeadOperandNeedsEntryAlloca($block, $destOp, $leftOp)
+                            || $left->ephemeralConcatTemp
+                        ) {
+                            // Fresh entry alloca per ConcatList link. KIND_VALUE-only continuation
+                            // stack-colors with dead fopen() __value__* slots under AOT and
+                            // heap-corrupts on 4-var encapsed echo (#24024 / re-#23842).
                             $this->assignEphemeralConcatOperand(
                                 $block,
                                 $destOp,
@@ -8422,13 +8428,6 @@ class JIT {
                                 $leftOp,
                                 $rightOp
                             );
-                        } elseif ($left->ephemeralConcatTemp) {
-                            // Continuing an ephemeral concat chain (ConcatList intermediates via
-                            // entry alloca). Avoid assignOperand free()+addref — that imbalances
-                            // freeDeadVariables on long encapsed strings (#23842 3+/4-var).
-                            $newVal = $this->compileConcatIntoNewString($left, $right, $leftOp, $rightOp);
-                            $newVal->ephemeralConcatTemp = true;
-                            $this->context->setVariableOp($destOp, $newVal);
                         } else {
                             $newVal = $this->compileConcatIntoNewString($left, $right, $leftOp, $rightOp);
                             $this->assignOperand($destOp, $newVal, true);
@@ -8450,23 +8449,17 @@ class JIT {
                                 JIT\StringOffsetHelper::emitAssignOpError($this->context);
                                 break;
                             }
-                            if ($left->ephemeralConcatTemp) {
-                                // ConcatList intermediate: continue KIND_VALUE ephemeral chain
-                                // instead of another entry alloca (#23842 4-var).
-                                $newVal = $this->compileConcatIntoNewString($left, $right, $leftOp, $rightOp);
-                                $newVal->ephemeralConcatTemp = true;
-                                $this->context->setVariableOp($destOp, $newVal);
-                            } else {
-                                $this->assignEphemeralConcatOperand(
-                                    $block,
-                                    $destOp,
-                                    $left,
-                                    $right,
-                                    $func,
-                                    $leftOp,
-                                    $rightOp
-                                );
-                            }
+                            // Always entry-alloca for unset Concat.result (including ephemeral
+                            // chain continuations) — KIND_VALUE links corrupt under AOT (#24024).
+                            $this->assignEphemeralConcatOperand(
+                                $block,
+                                $destOp,
+                                $left,
+                                $right,
+                                $func,
+                                $leftOp,
+                                $rightOp
+                            );
                             $this->maybeRefreshIncludeBindingsBeforeUse();
                             break;
                         }
@@ -15914,9 +15907,10 @@ class JIT {
     /**
      * Entry-alloca ephemeral concat when the left operand is a named {@see Operand\Variable} (#23798).
      *
-     * Unnamed ConcatList chain links continue via KIND_VALUE + {@see Variable::$ephemeralConcatTemp}
-     * instead (#23842); named Temporaries still use assignOperand on the first dead link so
-     * `$s . '1'` consecutive echoes stay correct.
+     * ConcatList chain continuations also use entry alloca (via {@see Variable::$ephemeralConcatTemp}
+     * in the CONCAT handler) — KIND_VALUE-only links stack-color with dead fopen() value boxes and
+     * heap-corrupt under AOT (#24024). Named Temporaries still use assignOperand on the first dead
+     * link so `$s . '1'` consecutive echoes stay correct.
      */
     private function concatDeadOperandNeedsEntryAlloca(Block $block, Operand $destOp, ?Operand $leftOp): bool
     {
