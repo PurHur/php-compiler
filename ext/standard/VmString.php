@@ -52,7 +52,7 @@ final class VmString
      * introspection name args (function_exists/class_exists/defined/…) soft-null (#21281).
      * htmlspecialchars/htmlentities/nl2br/addslashes soft-null on 8.4 (#21405/#21406; reverts #21351 TypeError).
      * convert_uudecode soft-null on 8.4 (#21420; empty decode → warning+false like Zend).
-     * str_increment/str_decrement are Z_PARAM_STR TypeError on 8.4 (#21005), not soft-null.
+     * str_increment/str_decrement soft-null on 8.4 then empty ValueError (#24179, reverts #21005).
      * substr_compare soft-null on 8.4 (#21515, reverts #20164 TypeError; peers strncmp #21317).
      * glob()/fnmatch() pattern soft-null on 8.4 (#21366, ext/standard/file.c, fnmatch.c).
      * error_log($message), pfsockopen hostname, gethostbyname($hostname), dns_get_record($hostname)
@@ -91,6 +91,7 @@ final class VmString
      * preg_match/preg_match_all/preg_split/preg_grep $pattern (#21479, reverts #20226),
      * substr_count/substr_replace haystack (#21196), ord() character (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
+     * str_increment/str_decrement soft-null on 8.4 then empty ValueError (#24179, reverts #21005),
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
      * substr_compare haystack/needle (#21515, reverts #20164 TypeError),

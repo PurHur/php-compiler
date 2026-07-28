@@ -121,6 +121,7 @@ final class JitStringBuiltinArg
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode (#21189),
      * substr_count/substr_replace haystack (#21196), ord() (#21222),
      * chunk_split/str_pad/wordwrap/soundex/metaphone/strcmp/strcasecmp (#21190),
+     * str_increment/str_decrement soft-null on 8.4 then empty ValueError (#24179, reverts #21005),
      * levenshtein/similar_text/strcspn/strspn/strtok($string) (#21195),
      * strncmp/strncasecmp/strnatcmp/strnatcasecmp/strcoll (#21317),
      * substr_compare haystack/needle (#21515, reverts #20164 TypeError),
