@@ -588,6 +588,17 @@ final class BuiltinParamNames
             case 'openssl_cipher_iv_length':
             case 'openssl_cipher_key_length':
                 return ['cipher_algo'];
+            // php-src ext/opcache/opcache.stub.php — InternalArgInfo still says script (#23834)
+            case 'opcache_compile_file':
+            case 'opcache_is_script_cached':
+                return ['filename'];
+            case 'opcache_invalidate':
+                return ['filename', 'force='];
+            case 'opcache_get_status':
+                return ['include_scripts='];
+            case 'opcache_get_configuration':
+            case 'opcache_reset':
+                return [];
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says returned_strong_result (#23626)
             case 'openssl_random_pseudo_bytes':
                 return ['length', 'strong_result'];

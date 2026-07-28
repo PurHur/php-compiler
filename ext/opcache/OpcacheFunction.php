@@ -19,7 +19,7 @@ abstract class OpcacheFunction extends Internal
         throw new \LogicException($this->getName().'() is not implemented for JIT in this compiler build (issue #4421)');
     }
 
-    protected function optionalBoolArg(Frame $frame, int $index, bool $default): bool
+    protected function optionalBoolArg(Frame $frame, int $index, bool $default, string $paramName = 'include_scripts'): bool
     {
         if (\count($frame->calledArgs) <= $index) {
             return $default;
@@ -30,7 +30,7 @@ abstract class OpcacheFunction extends Internal
                 '%s(): Argument #%d ($%s) must be of type bool, %s given',
                 $this->getName(),
                 $index + 1,
-                0 === $index ? 'include_scripts' : 'arg',
+                $paramName,
                 self::debugTypeName($var)
             ));
         }

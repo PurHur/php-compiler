@@ -19,6 +19,9 @@ class Module extends ModuleAbstract
             new opcache_get_status(),
             new opcache_get_configuration(),
             new opcache_reset(),
+            new opcache_compile_file(),
+            new opcache_invalidate(),
+            new opcache_is_script_cached(),
         ];
     }
 }
