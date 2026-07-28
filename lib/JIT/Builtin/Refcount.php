@@ -182,175 +182,75 @@ class Refcount extends Builtin {
     }
 
     private function implementInit(): void {
-        $fn___c4ca4238a0b923820dcc509a6f75849b = $this->context->lookupFunction('__ref__init');
-    $block___c4ca4238a0b923820dcc509a6f75849b = $fn___c4ca4238a0b923820dcc509a6f75849b->appendBasicBlock('main');
-    $this->context->builder->positionAtEnd($block___c4ca4238a0b923820dcc509a6f75849b);
-    $typeinfo = $fn___c4ca4238a0b923820dcc509a6f75849b->getParam(0);
-    $refVirtual = $fn___c4ca4238a0b923820dcc509a6f75849b->getParam(1);
-    
-    $offset = $this->context->structFieldIndex($refVirtual, 'ref');
-                    $ref = $this->context->builder->load(
-                        $this->context->builder->structGep($refVirtual, $offset)
-                    );
-    $structType = $ref->typeOf();
-                $offset = $this->context->structFieldMap[$structType->getName()]['refcount'];
-
-                $this->context->builder->insertValue(
-                    $ref, 
-                    $structType->getElementAtIndex($offset)->constInt(0, false),
-                    $offset
-                );
-    $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['typeinfo'];
-                $this->context->builder->insertValue(
-                    $ref, 
-                    $typeinfo,
-                    $offset
-                );
-    $this->context->builder->returnVoid();
-    
-    $this->context->builder->clearInsertionPosition();
+        // insertValue returns a new aggregate — must store it (#24226: prior codegen
+        // discarded the SSA value, so refcount/typeinfo never hit memory).
+        $fn = $this->context->lookupFunction('__ref__init');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $typeinfo = $fn->getParam(0);
+        $refVirtual = $fn->getParam(1);
+        $refField = $this->context->structFieldIndex($refVirtual, 'ref');
+        $refPtr = $this->context->builder->structGep($refVirtual, $refField);
+        $ref = $this->context->builder->load($refPtr);
+        $structType = $ref->typeOf();
+        $rcOff = $this->context->structFieldMap[$structType->getName()]['refcount'];
+        $tiOff = $this->context->structFieldMap[$structType->getName()]['typeinfo'];
+        $ref = $this->context->builder->insertValue(
+            $ref,
+            $structType->getElementAtIndex($rcOff)->constInt(0, false),
+            $rcOff
+        );
+        $ref = $this->context->builder->insertValue($ref, $typeinfo, $tiOff);
+        $this->context->builder->store($ref, $refPtr);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
     } 
 
     private function implementAddref(): void {
-        $fn___eccbc87e4b5ce2fe28308fd9f2a7baf3 = $this->context->lookupFunction('__ref__addref');
-    $block___eccbc87e4b5ce2fe28308fd9f2a7baf3 = $fn___eccbc87e4b5ce2fe28308fd9f2a7baf3->appendBasicBlock('main');
-    $this->context->builder->positionAtEnd($block___eccbc87e4b5ce2fe28308fd9f2a7baf3);
-    $refVirtual = $fn___eccbc87e4b5ce2fe28308fd9f2a7baf3->getParam(0);
-    
-    $isNull = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $refVirtual, $refVirtual->typeOf()->constNull());
-    $bool = $this->context->castToBool($isNull);
-                $prev = $this->context->builder->getInsertBlock();
-                $ifBlock = $prev->insertBasicBlock('ifBlock');
-                $prev->moveBefore($ifBlock);
-                
-                $endBlock[] = $tmp = $ifBlock->insertBasicBlock('endBlock');
-                    $this->context->builder->branchIf($bool, $ifBlock, $tmp);
-                
-                $this->context->builder->positionAtEnd($ifBlock);
-                { $this->context->builder->returnVoid();
-    }
-                if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                    $this->context->builder->branch(end($endBlock));
-                }
-                
-                $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $offset = $this->context->structFieldIndex($refVirtual, 'ref');
-                    $ref = $this->context->builder->load(
-                        $this->context->builder->structGep($refVirtual, $offset)
-                    );
-    $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['typeinfo'];
-                    $typeinfo = $this->context->builder->extractValue($ref, $offset);
-    $__type = $this->context->getTypeFromString('int32');
-                        
-                    
-                    $__kind = $__type->getKind();
-                    $__value = self::TYPE_INFO_REFCOUNTED;
-                    switch ($__kind) {
-                        case \PHPLLVM\Type::KIND_INTEGER:
-                            if (!is_object($__value)) {
-                                $refMask = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    if ($__other_type->getWidth() >= $__type->getWidth()) {
-                                        $refMask = $this->context->builder->truncOrBitCast($__value, $__type);
-                                    } else {
-                                        $refMask = $this->context->builder->zExtOrBitCast($__value, $__type);
-                                    }
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    
-                                    $refMask = $this->context->builder->fpToSi($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $refMask = $this->context->builder->ptrToInt($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (int, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_DOUBLE:
-                            if (!is_object($__value)) {
-                                $refMask = $__type->constReal(self::TYPE_INFO_REFCOUNTED);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    
-                                    $refMask = $this->context->builder->siToFp($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    $refMask = $this->context->builder->fpCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_ARRAY:
-                        case \PHPLLVM\Type::KIND_POINTER:
-                            if (!is_object($__value)) {
-                                // this is very likely very wrong...
-                                $refMask = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    $refMask = $this->context->builder->intToPtr($__value, $__type);
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                    // $__tmp = $this->context->builder->($__value, $this->context->context->int64Type());
-                                    // $(result) = $this->context->builder->intToPtr($__tmp, $__type);
-                                    // break;
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $refMask = $this->context->builder->pointerCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        default:
-                            throw new \LogicException("Unsupported type cast: " . $__type->toString());
-                    }
-    $__right = $this->context->builder->intCast($refMask, $typeinfo->typeOf());
-                            
-                            
-                        
+        // insertValue is pure SSA — store the updated __ref__ or addref is a no-op (#24226).
+        $fn = $this->context->lookupFunction('__ref__addref');
+        $entry = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($entry);
+        $refVirtual = $fn->getParam(0);
+        $i32 = $this->context->getTypeFromString('int32');
 
-                        $isCounted = $this->context->builder->bitwiseAnd($typeinfo, $__right);
-    $bool = $this->context->castToBool($isCounted);
-                $prev = $this->context->builder->getInsertBlock();
-                $ifBlock = $prev->insertBasicBlock('ifBlock');
-                $prev->moveBefore($ifBlock);
-                
-                $endBlock[] = $tmp = $ifBlock->insertBasicBlock('endBlock');
-                    $this->context->builder->branchIf($bool, $ifBlock, $tmp);
-                
-                $this->context->builder->positionAtEnd($ifBlock);
-                { $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['refcount'];
-                    $current = $this->context->builder->extractValue($ref, $offset);
-    $current = $this->context->builder->add($current, $current->typeOf()->constInt(1, false));
-    $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['refcount'];
-                $this->context->builder->insertValue(
-                    $ref, 
-                    $current,
-                    $offset
-                );
-    }
-                if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                    $this->context->builder->branch(end($endBlock));
-                }
-                
-                $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $this->context->builder->returnVoid();
-    
-    $this->context->builder->clearInsertionPosition();
+        $isNull = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $refVirtual,
+            $refVirtual->typeOf()->constNull()
+        );
+        $nullBlock = $fn->appendBasicBlock('addref_null');
+        $body = $fn->appendBasicBlock('addref_body');
+        $this->context->builder->branchIf($isNull, $nullBlock, $body);
+        $this->context->builder->positionAtEnd($nullBlock);
+        $this->context->builder->returnVoid();
+
+        $this->context->builder->positionAtEnd($body);
+        $refField = $this->context->structFieldIndex($refVirtual, 'ref');
+        $refPtr = $this->context->builder->structGep($refVirtual, $refField);
+        $ref = $this->context->builder->load($refPtr);
+        $structName = $ref->typeOf()->getName();
+        $tiOff = $this->context->structFieldMap[$structName]['typeinfo'];
+        $rcOff = $this->context->structFieldMap[$structName]['refcount'];
+        $typeinfo = $this->context->builder->extractValue($ref, $tiOff);
+        $refMask = $i32->constInt(self::TYPE_INFO_REFCOUNTED, false);
+        $isCounted = $this->context->builder->bitwiseAnd($typeinfo, $refMask);
+        $incBlock = $fn->appendBasicBlock('addref_inc');
+        $done = $fn->appendBasicBlock('addref_done');
+        $this->context->builder->branchIf(
+            $this->context->castToBool($isCounted),
+            $incBlock,
+            $done
+        );
+        $this->context->builder->positionAtEnd($incBlock);
+        $current = $this->context->builder->extractValue($ref, $rcOff);
+        $next = $this->context->builder->add($current, $current->typeOf()->constInt(1, false));
+        $ref = $this->context->builder->insertValue($ref, $next, $rcOff);
+        $this->context->builder->store($ref, $refPtr);
+        $this->context->builder->branch($done);
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
     }
 
     private function implementDelref(): void {
@@ -377,9 +277,8 @@ class Refcount extends Builtin {
                 
                 $this->context->builder->positionAtEnd(array_pop($endBlock));
     $offset = $this->context->structFieldIndex($refVirtual, 'ref');
-                    $ref = $this->context->builder->load(
-                        $this->context->builder->structGep($refVirtual, $offset)
-                    );
+                    $refPtr = $this->context->builder->structGep($refVirtual, $offset);
+                    $ref = $this->context->builder->load($refPtr);
     $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['typeinfo'];
                     $typeinfo = $this->context->builder->extractValue($ref, $offset);
     $__type = $this->context->getTypeFromString('int32');
@@ -479,11 +378,13 @@ class Refcount extends Builtin {
                     $current = $this->context->builder->extractValue($ref, $offset);
     $current = $this->context->builder->sub($current, $current->typeOf()->constInt(1, false));
     $offset = $this->context->structFieldMap[$ref->typeOf()->getName()]['refcount'];
-                $this->context->builder->insertValue(
+                // Persist decremented count before free-or-keep (#24226).
+                $ref = $this->context->builder->insertValue(
                     $ref, 
                     $current,
                     $offset
                 );
+                $this->context->builder->store($ref, $refPtr);
     $__right = $current->typeOf()->constInt(0, false);
                             
                         

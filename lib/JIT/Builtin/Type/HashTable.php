@@ -1907,6 +1907,14 @@ class HashTable extends Type
         $ptrField = $this->context->builder->structGep($value, $map['value']);
         $htSlot = $this->context->builder->pointerCast($ptrField, $htPtr->pointerType(0));
         $this->context->builder->store($hashtable, $htSlot);
+        // Match writeObject: retain the HT for the value-box owner (#24226 e08_spread).
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__addref'),
+            $this->context->builder->pointerCast(
+                $hashtable,
+                $this->context->getTypeFromString('__ref__virtual*')
+            )
+        );
         $this->context->builder->returnVoid();
         $this->context->builder->clearInsertionPosition();
     }

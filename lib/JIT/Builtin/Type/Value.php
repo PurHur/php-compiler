@@ -258,210 +258,72 @@ class Value extends Type {
     }
 
     protected function implementValueDelref(): void {
-        $fn___c4ca4238a0b923820dcc509a6f75849b = $this->context->lookupFunction('__value__valueDelref');
-    $block___c4ca4238a0b923820dcc509a6f75849b = $fn___c4ca4238a0b923820dcc509a6f75849b->appendBasicBlock('main');
-    $this->context->builder->positionAtEnd($block___c4ca4238a0b923820dcc509a6f75849b);
-    $value = $fn___c4ca4238a0b923820dcc509a6f75849b->getParam(0);
-    
-    $offset = $this->context->structFieldIndex($value, 'type');
-                    $oldType = $this->context->builder->load(
-                        $this->context->builder->structGep($value, $offset)
-                    );
-    $__type = $this->context->getTypeFromString('int8');
-    $zeroType = $__type->constInt(0, false);
-    $isNullType = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $oldType, $zeroType);
-    $nullDelrefBlock = $fn___c4ca4238a0b923820dcc509a6f75849b->appendBasicBlock('value_delref_null');
-    $contDelrefBlock = $fn___c4ca4238a0b923820dcc509a6f75849b->appendBasicBlock('value_delref_cont');
-    $this->context->builder->branchIf($isNullType, $nullDelrefBlock, $contDelrefBlock);
-    $this->context->builder->positionAtEnd($nullDelrefBlock);
-    $this->context->builder->returnVoid();
-    $this->context->builder->positionAtEnd($contDelrefBlock);
-                        
-                    
-                    $__kind = $__type->getKind();
-                    $__value = Variable::IS_REFCOUNTED;
-                    switch ($__kind) {
-                        case \PHPLLVM\Type::KIND_INTEGER:
-                            if (!is_object($__value)) {
-                                $mask = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    if ($__other_type->getWidth() >= $__type->getWidth()) {
-                                        $mask = $this->context->builder->truncOrBitCast($__value, $__type);
-                                    } else {
-                                        $mask = $this->context->builder->zExtOrBitCast($__value, $__type);
-                                    }
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    
-                                    $mask = $this->context->builder->fpToSi($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $mask = $this->context->builder->ptrToInt($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (int, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_DOUBLE:
-                            if (!is_object($__value)) {
-                                $mask = $__type->constReal(Variable::IS_REFCOUNTED);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    
-                                    $mask = $this->context->builder->siToFp($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    $mask = $this->context->builder->fpCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_ARRAY:
-                        case \PHPLLVM\Type::KIND_POINTER:
-                            if (!is_object($__value)) {
-                                // this is very likely very wrong...
-                                $mask = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    $mask = $this->context->builder->intToPtr($__value, $__type);
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                    // $__tmp = $this->context->builder->($__value, $this->context->context->int64Type());
-                                    // $(result) = $this->context->builder->intToPtr($__tmp, $__type);
-                                    // break;
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $mask = $this->context->builder->pointerCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        default:
-                            throw new \LogicException("Unsupported type cast: " . $__type->toString());
-                    }
-    $__right = $this->context->builder->intCast($mask, $oldType->typeOf());
-                            
-                            
-                        
+        // Only string/object/hashtable payloads store a heap pointer in value[].
+        // TYPE_VALUE and scalars must not load value[] as __ref__virtual* (#24226).
+        $fn = $this->context->lookupFunction('__value__valueDelref');
+        $entry = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($entry);
+        $value = $fn->getParam(0);
+        $i8 = $this->context->getTypeFromString('int8');
+        $typeGep = $this->context->builder->structGep(
+            $value,
+            $this->context->structFieldIndex($value, 'type')
+        );
+        $oldType = $this->context->builder->load($typeGep);
+        $zeroType = $i8->constInt(0, false);
+        $nullBlock = $fn->appendBasicBlock('value_delref_null');
+        $contBlock = $fn->appendBasicBlock('value_delref_cont');
+        $doneBlock = $fn->appendBasicBlock('value_delref_done');
+        $isNullType = $this->context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $oldType, $zeroType);
+        $this->context->builder->branchIf($isNullType, $nullBlock, $contBlock);
 
-                        $isCounted = $this->context->builder->bitwiseAnd($oldType, $__right);
-    $bool = $this->context->castToBool($isCounted);
-                $prev = $this->context->builder->getInsertBlock();
-                $ifBlock = $prev->insertBasicBlock('ifBlock');
-                $prev->moveBefore($ifBlock);
-                
-                $endBlock[] = $tmp = $ifBlock->insertBasicBlock('endBlock');
-                    $this->context->builder->branchIf($bool, $ifBlock, $tmp);
-                
-                $this->context->builder->positionAtEnd($ifBlock);
-                { $offset = $this->context->structFieldIndex($value, 'value');
-                    $ptr = $this->context->builder->structGep($value, $offset);
-    $__type = $this->context->getTypeFromString('__ref__virtual*');
-                        
-                    
-                    $__kind = $__type->getKind();
-                    $__value = $ptr;
-                    switch ($__kind) {
-                        case \PHPLLVM\Type::KIND_INTEGER:
-                            if (!is_object($__value)) {
-                                $virtual = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    if ($__other_type->getWidth() >= $__type->getWidth()) {
-                                        $virtual = $this->context->builder->truncOrBitCast($__value, $__type);
-                                    } else {
-                                        $virtual = $this->context->builder->zExtOrBitCast($__value, $__type);
-                                    }
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    
-                                    $virtual = $this->context->builder->fpToSi($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $virtual = $this->context->builder->ptrToInt($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (int, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_DOUBLE:
-                            if (!is_object($__value)) {
-                                $virtual = $__type->constReal($ptr);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    
-                                    $virtual = $this->context->builder->siToFp($__value, $__type);
-                                    
-                                    break;
-                                case \PHPLLVM\Type::KIND_DOUBLE:
-                                    $virtual = $this->context->builder->fpCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        case \PHPLLVM\Type::KIND_ARRAY:
-                        case \PHPLLVM\Type::KIND_POINTER:
-                            if (!is_object($__value)) {
-                                // this is very likely very wrong...
-                                $virtual = $__type->constInt($__value, false);
-                                break;
-                            }
-                            $__other_type = $__value->typeOf();
-                            switch ($__other_type->getKind()) {
-                                case \PHPLLVM\Type::KIND_INTEGER:
-                                    $virtual = $this->context->builder->intToPtr($__value, $__type);
-                                    break;
-                                case \PHPLLVM\Type::KIND_ARRAY:
-                                    // $__tmp = $this->context->builder->($__value, $this->context->context->int64Type());
-                                    // $(result) = $this->context->builder->intToPtr($__tmp, $__type);
-                                    // break;
-                                case \PHPLLVM\Type::KIND_POINTER:
-                                    $virtual = $this->context->builder->pointerCast($__value, $__type);
-                                    break;
-                                default:
-                                    throw new \LogicException("Unknown how to handle type pair (double, " . $__other_type->toString() . ")");
-                            }
-                            break;
-                        default:
-                            throw new \LogicException("Unsupported type cast: " . $__type->toString());
-                    }
-    $this->context->builder->call(
-                    $this->context->lookupFunction('__ref__delref') , 
-                    $virtual
-                    
-                );
-    }
-                if ($this->context->builder->getInsertBlock()->getTerminator() === null) {
-                    $this->context->builder->branch(end($endBlock));
-                }
-                
-                $this->context->builder->positionAtEnd(array_pop($endBlock));
-    $this->context->builder->returnVoid();
-    
-    $this->context->builder->clearInsertionPosition();
+        $this->context->builder->positionAtEnd($nullBlock);
+        $this->context->builder->returnVoid();
+
+        $this->context->builder->positionAtEnd($contBlock);
+        $kind = $this->context->builder->and($oldType, $i8->constInt(0x7f, false));
+        $isString = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_STRING & 0x7f, false)
+        );
+        $isObject = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false)
+        );
+        $isHt = $this->context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $kind,
+            $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false)
+        );
+        $isPtr = $this->context->builder->bitwiseOr(
+            $isString,
+            $this->context->builder->bitwiseOr($isObject, $isHt)
+        );
+        $releaseBlock = $fn->appendBasicBlock('value_delref_release');
+        $this->context->builder->branchIf($isPtr, $releaseBlock, $doneBlock);
+
+        $this->context->builder->positionAtEnd($releaseBlock);
+        $valueField = $this->context->builder->structGep(
+            $value,
+            $this->context->structFieldIndex($value, 'value')
+        );
+        $ptrSlot = $this->context->builder->pointerCast(
+            $valueField,
+            $this->context->getTypeFromString('__ref__virtual*')->pointerType(0)
+        );
+        $held = $this->context->builder->load($ptrSlot);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__ref__delref'),
+            $held
+        );
+        $this->context->builder->branch($doneBlock);
+
+        $this->context->builder->positionAtEnd($doneBlock);
+        $this->context->builder->store($zeroType, $typeGep);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
     }
 
     protected function implementValueToNumeric(): void {

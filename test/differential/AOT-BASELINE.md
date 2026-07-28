@@ -43,7 +43,7 @@ corpus*, not the language.
 | `e16_array_slice` | compiles; runtime still hits `print_r` thin-standalone gap (#23540) — slice itself fixed in #23991 |
 | `e30_array_lit_dim_assign_shift` | ~~regression / segfault~~ **fixed** in #24055 — dim-write orphan box sync + nested `[$a]` value-box hashtable dispatch |
 | `e04_usort` | **documented limitation** — array-callable / invokable comparators deferred |
-| `e08_spread` | ~~variadic cast crash~~ **fixed** (#23971) — NestedJIT `toCall` isolation, call-unpack without list-isList guard, owned HT copy, runtime `nextFreeElement` on spread loops |
+| `e08_spread` | ~~variadic cast crash~~ **fixed** (#23971) — NestedJIT `toCall` isolation, call-unpack without list-isList guard, owned HT copy, runtime `nextFreeElement` on spread loops; ~~intermittent `free(): invalid pointer`~~ **fixed** (#24226) — `__ref__*` stores insertValue results, `valueDelref` loads heap pointers for string/object/HT, `writeHashtable` addrefs like `writeObject` |
 | ~~`c07_method`~~ | ~~`Missing required argument 1` on a two-argument call whose arity is correct~~ **fixed** — free function after class no longer inherits leftover `scope->className` (#23971) |
 
 **`var_dump()` / `print_r()` of non-scalars — one limitation, six cases**
