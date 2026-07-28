@@ -1,0 +1,17 @@
+# Compliance cases that flip between runs of the SAME commit.
+#
+# These are excluded from both sides of the baseline diff by script/compliance-baseline.sh, because
+# a flaky case in a baseline manufactures phantom regressions. That has already cost real time: an
+# e08_spread "regression" in the differential corpus turned out to be 17/30 vs 17/30 noise, and two
+# sweeps of the same master disagreed about k06/m04 (#24388).
+#
+# ENTRY HERE IS A BUG, NOT A RESTING PLACE. Every line needs a reason and an issue, and the goal is
+# to empty this file. A case that merely FAILS belongs in the baseline; only a case that both passes
+# and fails on one commit belongs here.
+#
+# Format: <case name>    # reason (#issue)
+#
+# Nothing is listed yet on purpose. RELEASE-PLAN Phase 1.4 names hrtime_*, proc_get_status_basic,
+# interface_abstract_static_call and dnf_return_type_error as suspected flaky, but suspicion is not
+# measurement — each needs two full runs of one commit showing it on one side and not the other
+# before it is quarantined here. Adding them on reputation would hide real regressions.
