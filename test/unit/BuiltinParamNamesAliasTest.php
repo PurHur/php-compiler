@@ -859,9 +859,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($http, 'response_code', 'http_response_code'));
 
         $cookie = BuiltinParamNames::forFunction('setcookie');
-        self::assertSame(['name', 'value', 'expires', 'path', 'domain', 'secure', 'httponly'], $cookie);
+        self::assertSame(['name', 'value', 'expires_or_options', 'path', 'domain', 'secure', 'httponly'], $cookie);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($cookie, 'name', 'setcookie'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($cookie, 'value', 'setcookie'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($cookie, 'expires_or_options', 'setcookie'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($cookie, 'expires', 'setcookie'));
+
+        $raw = BuiltinParamNames::forFunction('setrawcookie');
+        self::assertSame(['name', 'value', 'expires_or_options', 'path', 'domain', 'secure', 'httponly'], $raw);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($raw, 'name', 'setrawcookie'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($raw, 'expires_or_options', 'setrawcookie'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($raw, 'expires', 'setrawcookie'));
     }
 
     /** @covers issue #17370 */
