@@ -1260,8 +1260,13 @@ final class CompilerVersion
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
      * ("Cannot declare property … final, the final modifier is allowed only for methods…").
-     * Forward profile via `PHP_COMPILER_PROFILE=8.4` enables parse/compile of `final public $x`.
+     * `version_compare` treats `8.4.0-dev` as below `8.4.0`, so unset `PHP_COMPILER_PROFILE`
+     * keeps this false (#24316, re-#24216). Forward profile via `PHP_COMPILER_PROFILE=8.4`
+     * enables parse/compile of `final public $x`.
      * php-src: Zend/zend_inheritance.c — Cannot override final property.
+     *
+     * Compliance reject cases must SKIPIF on PROFILE env, not this method — otherwise a
+     * wrongly-true gate would skip the guard and reopen the regression silently.
      */
     public static function supportsFinalProperties(): bool
     {
@@ -1943,6 +1948,18 @@ final class CompilerVersion
     public static function supportsClassConstants(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * get_declared_attributes() — never registered in php-src (#24222, re-#6450).
+     *
+     * php-src: ext/reflection/php_reflection.c has no PHP_FUNCTION(get_declared_attributes);
+     * attribute discovery is ReflectionClass::getAttributes() / peers only. Forever off under
+     * php-src-strict (including PROFILE=8.4) until php-src adds the builtin.
+     */
+    public static function advertisesGetDeclaredAttributes(): bool
+    {
+        return false;
     }
 
     /**

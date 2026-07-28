@@ -15,7 +15,8 @@ use PHPLLVM\Value;
 /**
  * get_declared_attributes() — list user attribute classes (#6450).
  *
- * php-src: ext/reflection/php_reflection.c — PHP_FUNCTION(get_declared_attributes)
+ * Phantom vs php-src: never registered in ext/reflection/php_reflection.c (#24222).
+ * Kept unregistered under {@see \PHPCompiler\CompilerVersion::advertisesGetDeclaredAttributes()}.
  */
 final class get_declared_attributes_ extends Internal
 {

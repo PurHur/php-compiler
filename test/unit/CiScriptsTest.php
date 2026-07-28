@@ -491,6 +491,7 @@ final class CiScriptsTest extends TestCase
         $this->assertStringContainsString('--json', $body);
         $this->assertStringContainsString('user_release_ready', $body);
         $this->assertStringContainsString('run_gate_bootstrap_inventory', $body);
+        $this->assertStringContainsString('check-helper-runtime-prelink.php --strict', $body);
         $this->assertStringContainsString('ci_ensure_generated_doc', $body);
         $this->assertStringContainsString('script/bootstrap-inventory.php', $body);
         $this->assertStringContainsString('release-readiness-json-emit.php', $body);

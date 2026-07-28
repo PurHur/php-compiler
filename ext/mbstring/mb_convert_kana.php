@@ -11,7 +11,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mb_convert_kana() — Japanese kana width conversion (php-src ext/mbstring/mbstring.c; #13099). */
+/**
+ * mb_convert_kana() — Japanese kana width conversion (php-src ext/mbstring/mbstring.c; #13099).
+ *
+ * Zend Z_PARAM_STR soft-null + DEP on $string/$mode (not TypeError) under PROFILE=8.4 — #24209,
+ * peer #24176 (mb_trim / mb_ucfirst family).
+ */
 final class mb_convert_kana extends Internal
 {
     public function __construct()
@@ -28,24 +33,14 @@ final class mb_convert_kana extends Internal
                 $argc
             ));
         }
-        if (null === $frame->returnVar) {
-            return;
-        }
-
-        $str = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_convert_kana',
-            0,
-            'string'
-        );
+        // Zend 8.4 ZPP soft-null + DEP (not TypeError) — #24209, peer #24176.
+        $str = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_convert_kana', 0, 'string');
         $option = null;
         if ($argc >= 2) {
-            $option = VmString::coerceZparamStrBuiltinArg(
-                $frame->calledArgs[1],
-                'mb_convert_kana',
-                1,
-                'mode'
-            );
+            $option = VmString::trimFamilyStringArgForFrame($frame, 1, 'mb_convert_kana', 1, 'mode');
+        }
+        if (null === $frame->returnVar) {
+            return;
         }
         $encoding = 'UTF-8';
         if (3 === $argc) {

@@ -106,9 +106,17 @@ final class AppendIteratorBuiltin
         return $state['iterators'][$index];
     }
 
-    public static function iteratorIndex(ObjectEntry $object): int
+    /**
+     * php-src spl_append_it_get_iterator_index: null when no current inner
+     * (empty / exhausted past last iterator), else the active inner index.
+     */
+    public static function iteratorIndex(ObjectEntry $object): ?int
     {
         self::ensureState($object);
+        // currentIterator() is null when index is OOB — same condition as !valid().
+        if (null === self::currentIterator($object)) {
+            return null;
+        }
 
         return self::$store[$object->id]['index'];
     }
@@ -405,7 +413,12 @@ final class AppendIteratorGetIteratorIndex extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(AppendIteratorBuiltin::iteratorIndex($object));
+        $index = AppendIteratorBuiltin::iteratorIndex($object);
+        if (null === $index) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->int($index);
+        }
     }
 }
 

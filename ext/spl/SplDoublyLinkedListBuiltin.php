@@ -183,10 +183,16 @@ final class SplDoublyLinkedListBuiltin
         return $pos >= 0 && $pos < self::count($object);
     }
 
+    /**
+     * php-src SplDoublyLinkedList::current — NULL when iterator not valid (#24326).
+     */
     public static function current(ObjectEntry $object): Variable
     {
         if (!self::valid($object)) {
-            throw new \RuntimeException('Called current() on invalid iterator position');
+            $null = new Variable();
+            $null->null();
+
+            return $null;
         }
         $pos = self::iteratorPosition($object);
         $result = new Variable();

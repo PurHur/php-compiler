@@ -49,6 +49,9 @@ final class BuiltinIntrospectionPolicy
         if ('generator_to_array' === $lc) {
             return CompilerVersion::advertisesGeneratorToArray();
         }
+        if ('get_declared_attributes' === $lc) {
+            return CompilerVersion::advertisesGetDeclaredAttributes();
+        }
         if (\in_array($lc, ['attribute_exists', 'class_meth_exists', 'unitenum_exists'], true)) {
             return CompilerVersion::advertisesPhp84ReflectionProbeBuiltins();
         }

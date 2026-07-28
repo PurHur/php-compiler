@@ -110,11 +110,12 @@ final class ScopeBuiltinJitHelper
                 return $key;
 
             case VmScope::EXTR_PREFIX_IF_EXISTS:
+                // php_extract: set → prefixed; absent/IS_UNDEF → import unprefixed (#24330).
                 if ($varExists) {
                     return self::prefixVarName($prefix ?? '', $key);
                 }
 
-                return null;
+                return $key;
 
             case VmScope::EXTR_PREFIX_SAME:
                 if (!$varExists) {

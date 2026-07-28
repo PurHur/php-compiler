@@ -15,7 +15,7 @@ mb_strrpos: OK
 mb_convert_case: OK
 mb_strtoupper: OK
 mb_scrub: OK
-mb_str_split: mb_str_split(): Argument #1 ($string) must be of type string, null given
+mb_str_split: OK
 mb_encode_mimeheader: OK
 mb_decode_mimeheader: mb_decode_mimeheader(): Argument #1 ($string) must be of type string, null given
-mb_convert_kana: mb_convert_kana(): Argument #1 ($string) must be of type string, null given
+mb_convert_kana: OK

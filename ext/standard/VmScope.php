@@ -192,6 +192,12 @@ final class VmScope
         return ScopeBuiltinJitHelper::resolveExtractFinalName($key, $varExists, $extractType, $prefix);
     }
 
+    /**
+     * php-src php_extract: a CV "exists" only when the symbol is set (not IS_UNDEF).
+     * Compile-allocated slots start as TYPE_NULL placeholders without initializedSlots —
+     * those must count as absent for EXTR_SKIP / EXTR_IF_EXISTS (#24309, #24310).
+     * After unset(), the slot is TYPE_UNDEFINED even if initializedSlots was previously set.
+     */
     private static function callerNameExists(Frame $caller, string $name): bool
     {
         $slot = self::slotForName($caller, $name);
@@ -200,7 +206,7 @@ final class VmScope
                 return false;
             }
 
-            return isset($caller->initializedSlots[$slot]) || self::callerVarIsSet($caller->scope[$slot]);
+            return isset($caller->initializedSlots[$slot]) && self::callerVarIsSet($caller->scope[$slot]);
         }
         $var = self::callerVariable($caller, $name);
         if (null === $var) {

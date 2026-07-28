@@ -3886,9 +3886,10 @@ final class VmDom
         self::ensureDocument($document);
         self::rejectEmptyLoadSource($xml, 'DOMDocument::loadXML()');
 
-        // trim() for parse structure, but keep leading bytes so getLineNo matches libxml (#20795).
+        // ltrim for parse structure; keep leading byte count for getLineNo (#20795).
+        // Preserve trailing newlines so premature-end EOF line/column match libxml (#24319).
         $leadingLen = \strlen($xml) - \strlen(ltrim($xml));
-        $trimmed = trim($xml);
+        $trimmed = ltrim($xml);
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $dtdDefaultAttrs = self::parseDoctypeDefaultAttributes($trimmed);
@@ -3913,7 +3914,8 @@ final class VmDom
                     $validationError['code'],
                     $validationError['column'],
                     $frame,
-                    $validationError['level']
+                    $validationError['level'],
+                    $validationError['line']
                 );
             }
 
@@ -4533,7 +4535,8 @@ final class VmDom
         int $code,
         int $column,
         ?\PHPCompiler\Frame $frame,
-        int $level = LibxmlConstants::LIBXML_ERR_ERROR
+        int $level = LibxmlConstants::LIBXML_ERR_ERROR,
+        int $line = 1
     ): void {
         VmLibxml::handleError($ctx, [
             'level' => $level,
@@ -4541,8 +4544,8 @@ final class VmDom
             'column' => $column,
             'message' => $message,
             'file' => '',
-            'line' => 1,
-        ], $frame, null, 'DOMDocument::loadXML(): '.rtrim($message).' in Entity, line: 1');
+            'line' => $line,
+        ], $frame, null, 'DOMDocument::loadXML(): '.rtrim($message).' in Entity, line: '.$line);
     }
 
     /**
@@ -4682,7 +4685,8 @@ final class VmDom
                 $validationError['code'],
                 $validationError['column'],
                 $frame,
-                $validationError['level']
+                $validationError['level'],
+                $validationError['line']
             );
         }
     }
