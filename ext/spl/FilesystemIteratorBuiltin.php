@@ -365,6 +365,10 @@ final class RecursiveDirectoryIteratorHasChildren extends VmClassMethod
         if (!DirectoryIteratorStorage::valid($object)) {
             return false;
         }
+        // php-src spl_filesystem_dir_has_children — never recurse into . / .. (#24291).
+        if (DirectoryIteratorStorage::isDot($object)) {
+            return false;
+        }
         $path = DirectoryIteratorStorage::pathname($object);
         if (!is_dir($path)) {
             return false;
