@@ -833,7 +833,8 @@ final class BuiltinParamNames
             case 'getopt':
                 return ['short_options', 'long_options', 'rest_index'];
             case 'call_user_func':
-                return ['callback'];
+                // php-src ext/standard/basic_functions.stub.php — callable $callback, mixed ...$args (#24461)
+                return ['callback', 'args'];
             case 'call_user_func_array':
                 return ['callback', 'args'];
             case 'is_callable':

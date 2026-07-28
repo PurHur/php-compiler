@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ReflectionSupport;
 
-/** ReflectionParameter::isVariadic() — VM (#4385, ext/reflection/php_reflection.c). */
+/** ReflectionParameter::isVariadic() — VM (#4385, #24461, ext/reflection/php_reflection.c). */
 final class ReflectionParameterIsVariadic extends VmClassMethod
 {
     public function __construct()
@@ -20,10 +20,11 @@ final class ReflectionParameterIsVariadic extends VmClassMethod
     {
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
-        $block = ReflectionSupport::resolveParameterBlock($ctx, $receiver);
-        $index = ReflectionSupport::parameterIndexForReflection($receiver);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(ReflectionSupport::parameterIsVariadic($block, $index));
+            // Internals must not resolve a user Block (#24461, zim_reflection_parameter_isVariadic).
+            $frame->returnVar->bool(
+                ReflectionSupport::parameterIsVariadicForReflection($ctx, $receiver)
+            );
         }
     }
 }
