@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6605 |
-| Phase A inventory files (M2 ratio SSOT) | 6605 |
+| PHP files on vm.php path | 6607 |
+| Phase A inventory files (M2 ratio SSOT) | 6607 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21345 |
+| Source constructs flagged (warnings) | 21350 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3084,7 +3084,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/UploadTempJitHelper.php` | 0 | 1 |
 | `ext/standard/UrldecodeJitHelper.php` | 0 | 1 |
 | `ext/standard/UrlencodeJitHelper.php` | 0 | 1 |
-| `ext/standard/UsortJitHelper.php` | 0 | 4 |
+| `ext/standard/UsortJitHelper.php` | 0 | 6 |
 | `ext/standard/Utf8EndecDeprecation.php` | 0 | 1 |
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8Latin1JitHelper.php` | 0 | 1 |
@@ -5542,6 +5542,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/HashTableKeysCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableKeysMatchingCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableMergeStringKeysFrom.php` | 0 | 2 |
+| `lib/JIT/Call/HashTableMutateNested.php` | 0 | 1 |
 | `lib/JIT/Call/HashTableNestedReceiver.php` | 0 | 1 |
 | `lib/JIT/Call/HashTablePadCopy.php` | 0 | 2 |
 | `lib/JIT/Call/HashTableShiftFirst.php` | 0 | 1 |
@@ -5664,6 +5665,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/GlobalsTableInit.php` | 0 | 1 |
 | `lib/JIT/HashTableCowLlvm.php` | 0 | 3 |
 | `lib/JIT/HashTableHelper.php` | 0 | 9 |
+| `lib/JIT/HashTableMutateNestedLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableNestedExportLlvm.php` | 0 | 1 |
 | `lib/JIT/HashTableReadLlvm.php` | 0 | 7 |
 | `lib/JIT/HashTableShiftLlvm.php` | 0 | 1 |
@@ -5730,7 +5732,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/NestedContextMethodLlvm.php` | 0 | 2 |
 | `lib/JIT/NestedJitCompileScope.php` | 0 | 1 |
 | `lib/JIT/NestedVmActiveContextLlvm.php` | 0 | 2 |
-| `lib/JIT/NestedVmHashTableMethodLlvm.php` | 0 | 2 |
+| `lib/JIT/NestedVmHashTableMethodLlvm.php` | 0 | 3 |
 | `lib/JIT/NestedVmObjectMethodLlvm.php` | 0 | 1 |
 | `lib/JIT/NestedVmVariableMethodLlvm.php` | 0 | 2 |
 | `lib/JIT/NoDiscardCallGuard.php` | 0 | 2 |
@@ -9777,58 +9779,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 6968)
 - new DOMException (line 7010)
 - new Error (line 7018)
-- new ObjectEntry (line 7763)
-- new DomNodeState (line 7765)
-- new DOMException (line 8370)
-- new Variable (line 8443)
-- new DOMException (line 8734)
-- new DOMException (line 8900)
-- new DOMException (line 8945)
-- new ObjectEntry (line 9049)
-- new DomNodeState (line 9053)
-- new Variable (line 9060)
-- new ObjectEntry (line 9078)
-- new DomNodeState (line 9082)
-- new Variable (line 9089)
-- new ObjectEntry (line 9107)
-- new DomNodeState (line 9111)
-- new Variable (line 9118)
-- new DOMException (line 9201)
-- new ObjectEntry (line 9519)
-- new DomNodeState (line 9523)
-- new Variable (line 9532)
-- new ObjectEntry (line 9582)
-- new DomNodeState (line 9585)
-- new Variable (line 9593)
-- new Variable (line 9798)
-- new DOMException (line 9935)
-- new DOMException (line 9942)
-- new DOMException (line 9977)
-- new Variable (line 10087)
-- new DOMException (line 11181)
-- new Variable (line 11240)
-- new Variable (line 11263)
-- new Variable (line 11292)
-- new Variable (line 11330)
-- new DOMException (line 11341)
+- new ObjectEntry (line 7765)
+- new DomNodeState (line 7767)
+- new DOMException (line 8379)
+- new Variable (line 8456)
+- new DOMException (line 8747)
+- new DOMException (line 8913)
+- new DOMException (line 8958)
+- new ObjectEntry (line 9062)
+- new DomNodeState (line 9066)
+- new Variable (line 9073)
+- new ObjectEntry (line 9091)
+- new DomNodeState (line 9095)
+- new Variable (line 9102)
+- new ObjectEntry (line 9120)
+- new DomNodeState (line 9124)
+- new Variable (line 9131)
+- new DOMException (line 9214)
+- new ObjectEntry (line 9532)
+- new DomNodeState (line 9536)
+- new Variable (line 9545)
+- new ObjectEntry (line 9595)
+- new DomNodeState (line 9598)
+- new Variable (line 9606)
+- new Variable (line 9811)
+- new DOMException (line 9948)
+- new DOMException (line 9955)
+- new DOMException (line 9990)
+- new Variable (line 10100)
+- new DOMException (line 11194)
+- new Variable (line 11253)
+- new Variable (line 11276)
+- new Variable (line 11305)
 - new Variable (line 11343)
-- new DOMException (line 11517)
-- new DOMException (line 11544)
-- new DOMException (line 11580)
-- new DOMException (line 11688)
-- new DOMException (line 11696)
-- new DOMException (line 11709)
-- new DOMException (line 11720)
-- new DOMException (line 11725)
-- new DOMException (line 11751)
-- new DOMException (line 11772)
-- new DOMException (line 11830)
-- new DOMException (line 11835)
-- new DOMException (line 11838)
-- new DOMException (line 11841)
-- new DOMException (line 11870)
-- new Error (line 13068)
-- new Error (line 13072)
+- new DOMException (line 11354)
+- new Variable (line 11356)
+- new DOMException (line 11530)
+- new DOMException (line 11557)
+- new DOMException (line 11593)
+- new DOMException (line 11702)
+- new DOMException (line 11710)
+- new DOMException (line 11723)
+- new DOMException (line 11734)
+- new DOMException (line 11739)
+- new DOMException (line 11765)
+- new DOMException (line 11786)
+- new DOMException (line 11844)
+- new DOMException (line 11849)
+- new DOMException (line 11852)
+- new DOMException (line 11855)
+- new DOMException (line 11884)
+- new Error (line 13082)
+- new Error (line 13086)
 - 497 class method(s)
 - 4 closure(s)
 
@@ -24757,14 +24759,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ArrayReduceJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 25)
-- new Variable (line 31)
-- new Variable (line 36)
-- new Variable (line 43)
-- new Variable (line 70)
-- new Variable (line 76)
-- new Variable (line 81)
-- new Variable (line 88)
+- new Variable (line 27)
+- new Variable (line 33)
+- new Variable (line 38)
+- new Variable (line 45)
+- new Variable (line 71)
+- new Variable (line 77)
+- new Variable (line 82)
+- new Variable (line 89)
 - 2 class method(s)
 
 ### `ext/standard/ArrayReplaceJitHelper.php`
@@ -30379,9 +30381,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/UsortJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
-- new Variable (line 92)
-- new Variable (line 94)
+- new Variable (line 36)
+- new HashTable (line 80)
+- new Variable (line 95)
+- new Variable (line 97)
+- new HashTable (line 110)
 - 6 class method(s)
 
 ### `ext/standard/Utf8EndecDeprecation.php`
@@ -42579,13 +42583,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 17061)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 17173)
 - new JIT\Call\VmCoerceVariableToString (line 17297)
-- new JIT\Call\IncludePathResolverResolve (line 17591)
-- new Variable (line 18673)
-- new VM (line 18717)
-- new VM\Variable (line 18726)
-- new Variable (line 18747)
-- new Variable (line 18793)
-- new Variable (line 19317)
+- new JIT\Call\IncludePathResolverResolve (line 17594)
+- new Variable (line 18676)
+- new VM (line 18720)
+- new VM\Variable (line 18729)
+- new Variable (line 18750)
+- new Variable (line 18796)
+- new Variable (line 19320)
 - 383 class method(s)
 - 7 closure(s)
 
@@ -42643,7 +42647,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayReduceCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/AsymmetricVisibilityGuard.php`
 
@@ -46584,6 +46588,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 35)
 - 2 class method(s)
 
+### `lib/JIT/Call/HashTableMutateNested.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/HashTableNestedReceiver.php`
 
 **Warnings** (review for bootstrap subset):
@@ -47446,6 +47455,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 458)
 - 42 class method(s)
 
+### `lib/JIT/HashTableMutateNestedLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/HashTableNestedExportLlvm.php`
 
 **Warnings** (review for bootstrap subset):
@@ -47477,19 +47491,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 726)
 - new Variable (line 1285)
-- new Variable (line 1318)
-- new Variable (line 1437)
-- new Variable (line 1444)
-- new Variable (line 1504)
-- new Variable (line 1520)
-- new Variable (line 1536)
-- new Variable (line 1578)
-- new Variable (line 1621)
-- new Variable (line 1623)
-- new Variable (line 1743)
-- new Variable (line 1767)
-- new Variable (line 1880)
-- new Variable (line 1898)
+- new Variable (line 1323)
+- new Variable (line 1442)
+- new Variable (line 1449)
+- new Variable (line 1509)
+- new Variable (line 1525)
+- new Variable (line 1541)
+- new Variable (line 1583)
+- new Variable (line 1626)
+- new Variable (line 1628)
+- new Variable (line 1748)
+- new Variable (line 1772)
+- new Variable (line 1885)
+- new Variable (line 1903)
 - 40 class method(s)
 
 ### `lib/JIT/HeaderCallbackPolicy.php`
@@ -47868,7 +47882,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmHashTableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\HashTableWriteNested (line 66)
+- new Call\HashTableWriteNested (line 70)
+- new Call\HashTableMutateNested (line 72)
 - 2 class method(s)
 
 ### `lib/JIT/NestedVmObjectMethodLlvm.php`
@@ -47879,7 +47894,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmVariableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\VariableWriteNested (line 43)
+- new Call\VariableWriteNested (line 46)
 - 2 class method(s)
 
 ### `lib/JIT/NoDiscardCallGuard.php`
@@ -48166,7 +48181,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/UsortCallbackPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/ValueEchoHelper.php`
 
