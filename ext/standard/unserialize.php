@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -46,7 +47,11 @@ final class unserialize extends Internal
         if ($argc > 1) {
             $optionsVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_ARRAY !== $optionsVar->type) {
-                throw new \LogicException('unserialize() options must be an array in this compiler build');
+                // php-src ext/standard/var.c — Z_PARAM_ARRAY for options (#24149).
+                throw new \TypeError(
+                    'unserialize(): Argument #2 ($options) must be of type array, '
+                    .EnumCaseSupport::typeNameForVariable($optionsVar).' given'
+                );
             }
             $options = self::extractUnserializeOptions($optionsVar);
         }
@@ -190,13 +195,18 @@ final class unserialize extends Internal
                     }
                     $options['allowed_classes'] = $allowed;
                 } else {
-                    throw new \LogicException('allowed_classes must be of type bool or array');
+                    // php-src ext/standard/var.c — php_var_unserialize_with_options (#24149).
+                    throw new \TypeError(self::allowedClassesOptionTypeErrorMessage($resolved));
                 }
                 continue;
             }
             if ('max_depth' === $key) {
                 if (Variable::TYPE_INTEGER !== $resolved->type) {
-                    throw new \LogicException('max_depth must be of type int');
+                    // php-src ext/standard/var.c — Option "max_depth" must be int (#24149).
+                    throw new \TypeError(
+                        'unserialize(): Option "max_depth" must be of type int, '
+                        .EnumCaseSupport::typeNameForVariable($resolved).' given'
+                    );
                 }
                 $options['max_depth'] = $resolved->toInt();
                 continue;
@@ -215,6 +225,54 @@ final class unserialize extends Internal
     private static function extractUnserializeOptions(Variable $optionsVar): array
     {
         return self::parseUnserializeOptionsArray($optionsVar);
+    }
+
+    /**
+     * Zend message for wrong-type allowed_classes (php-src ext/standard/var.c; #24149).
+     */
+    public static function allowedClassesOptionTypeErrorMessage(Variable $value): string
+    {
+        return 'unserialize(): Option "allowed_classes" must be of type array|bool, '
+            .EnumCaseSupport::typeNameForVariable($value).' given';
+    }
+
+    /**
+     * Zend message for wrong-type allowed_classes from a native PHP value (#24149).
+     */
+    public static function allowedClassesOptionTypeErrorMessageFromMixed(mixed $value): string
+    {
+        return 'unserialize(): Option "allowed_classes" must be of type array|bool, '
+            .self::zendMixedTypeName($value).' given';
+    }
+
+    private static function zendMixedTypeName(mixed $value): string
+    {
+        if (\is_object($value)) {
+            return $value::class;
+        }
+        if (null === $value) {
+            return 'null';
+        }
+        if (\is_bool($value)) {
+            return 'bool';
+        }
+        if (\is_int($value)) {
+            return 'int';
+        }
+        if (\is_float($value)) {
+            return 'float';
+        }
+        if (\is_string($value)) {
+            return 'string';
+        }
+        if (\is_array($value)) {
+            return 'array';
+        }
+        if (\is_resource($value)) {
+            return 'resource';
+        }
+
+        return 'mixed';
     }
 
     /** php-src var_unserializer.c — E_WARNING on max_depth, then E_NOTICE + error_get_last (#13715, #9206). */
