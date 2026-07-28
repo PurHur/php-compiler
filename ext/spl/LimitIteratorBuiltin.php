@@ -132,7 +132,8 @@ final class SplLimitIteratorStorage
 
     public static function current(Frame $frame, ObjectEntry $object): Variable
     {
-        if (!self::state($object)['rewound']) {
+        // php-src proxies current only while limit window is valid (#24271).
+        if (!self::valid($frame, $object)) {
             $null = new Variable(Variable::TYPE_NULL);
             $null->null();
 
@@ -144,7 +145,7 @@ final class SplLimitIteratorStorage
 
     public static function key(Frame $frame, ObjectEntry $object): Variable
     {
-        if (!self::state($object)['rewound']) {
+        if (!self::valid($frame, $object)) {
             $null = new Variable(Variable::TYPE_NULL);
             $null->null();
 
