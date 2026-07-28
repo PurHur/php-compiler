@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 
@@ -69,7 +70,30 @@ final class JitReturnPending
         if (null === $returnVar) {
             throw new \LogicException('JIT return-through-finally requires a return value');
         }
-        $ptr = JitValueBox::valuePtrFromVariable($context, $returnVar);
+        // Always copy into a function-lifetime pending slot. Storing a pointer to a
+        // catch-local fromLiteral alloca is unsafe: that store may not dominate the
+        // return, so resume-after-finally reads freed/uninit memory (#24105).
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        if (Variable::TYPE_STRING === $returnVar->type) {
+            // Prefer the compile-time bytes when present — rematerialize at the return
+            // site instead of loading a possibly-undominated fromLiteral temp.
+            if (null !== $returnVar->compileTimeString) {
+                $str = $builder->load(
+                    $context->constantStringFromString($returnVar->compileTimeString)
+                );
+            } else {
+                $str = JitStringArg::lower(
+                    $context,
+                    $returnVar,
+                    'return-through-finally'
+                );
+            }
+            $owned = $builder->call($context->lookupFunction('__string__separate'), $str);
+            $builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
+        } else {
+            JitValueBox::assignToPointer($context, $ptr, $returnVar);
+        }
         $builder->call(
             $context->lookupFunction('phpc_jit_set_return_pending'),
             $ptr,

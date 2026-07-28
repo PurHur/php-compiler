@@ -7081,8 +7081,20 @@ class JIT {
             if (null !== $this->context->activeFunction) {
                 $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
             }
-            $retval = $this->loadPendingReturnValue($valuePtr, $expected);
-            $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
+            // Prefer the LLVM return type: untyped PHP functions return __value__ even when
+            // functionReturnType is unset — defaulting to readLong corrupted null/bool/float
+            // pending returns after finally (#24105).
+            $llvmRet = null;
+            $sig = JIT\BasicBlockHelper::llvmFunctionSignatureType($func);
+            if (null !== $sig) {
+                $llvmRet = $this->context->getStringFromType($sig->getReturnType());
+            }
+            if ('__value__' === $llvmRet || '__value__' === $expected) {
+                $retval = $builder->load($valuePtr);
+            } else {
+                $retval = $this->loadPendingReturnValue($valuePtr, $expected ?? $llvmRet);
+                $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
+            }
             $builder->returnValue($retval);
         }
     }
