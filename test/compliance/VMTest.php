@@ -780,6 +780,7 @@ class VMTest extends BaseTest {
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))
+                && !str_starts_with($name, 'zlib/')
                 && !str_contains($name, 'extension_loaded_zip')
                 // Phar ZIP via ZipEngine (pure PHP) — not ZipArchive advertisement (#21675/#21676/#21678).
                 && !str_contains($name, 'phar_convert_to_data_zip')
