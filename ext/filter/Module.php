@@ -17,7 +17,7 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinEnums::register($runtime->vmContext);
-        foreach (FilterConstants::REGISTERED as $name => $value) {
+        foreach (FilterConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
