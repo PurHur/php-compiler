@@ -97,8 +97,12 @@ final class KanaConvert
 
     private static function parseOptions(?string $option): int
     {
-        if (null === $option || '' === $option) {
+        // php-src: omitted $mode defaults to "KV"; explicit empty (incl. null soft-coerce #24209) is no-op.
+        if (null === $option) {
             return self::HAN2ZEN_KATAKANA | self::HAN2ZEN_GLUE;
+        }
+        if ('' === $option) {
+            return 0;
         }
 
         $opt = 0;
