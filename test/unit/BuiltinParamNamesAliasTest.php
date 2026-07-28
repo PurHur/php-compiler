@@ -1827,4 +1827,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'errcode', 'stream_socket_server'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'errstring', 'stream_socket_server'));
     }
+
+    /** @covers issue #23938 */
+    public function testStreamSocketAcceptGetNameZendStubNamedParams(): void
+    {
+        $accept = BuiltinParamNames::forFunction('stream_socket_accept');
+        self::assertSame(['socket', 'timeout', 'peer_name'], $accept);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($accept, 'socket', 'stream_socket_accept'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($accept, 'peer_name', 'stream_socket_accept'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($accept, 'serverstream', 'stream_socket_accept'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($accept, 'peername', 'stream_socket_accept'));
+
+        $getName = BuiltinParamNames::forFunction('stream_socket_get_name');
+        self::assertSame(['socket', 'remote'], $getName);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($getName, 'socket', 'stream_socket_get_name'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($getName, 'remote', 'stream_socket_get_name'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($getName, 'stream', 'stream_socket_get_name'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($getName, 'want_peer', 'stream_socket_get_name'));
+    }
 }
