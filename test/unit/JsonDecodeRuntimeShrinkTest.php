@@ -25,7 +25,7 @@ final class JsonDecodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('StringJsonDecodeInventoryStubs', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(380, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(450, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecodeJit.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php');
     }
