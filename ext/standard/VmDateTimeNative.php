@@ -429,6 +429,19 @@ final class VmDateTimeNative
 
             return self::weekdayOfWeekParseResult(strtolower($matches[1]), $when, $base, $tzName);
         }
+        // php-src — "next week Monday" (same as "Monday next week"; week token first) (#24018).
+        if (1 === preg_match(
+            '/^(this|next|last|previous)\s+week\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $time,
+            $matches
+        )) {
+            $when = strtolower($matches[1]);
+            if ('previous' === $when) {
+                $when = 'last';
+            }
+
+            return self::weekdayOfWeekParseResult(strtolower($matches[2]), $when, $base, $tzName);
+        }
         // php-src parse_date.re — back of / front of hour (#23936).
         if (1 === preg_match('/^(back|front)\s+of\s+(.+)$/i', $time, $matches)) {
             return self::backFrontOfHourParseResult(strtolower($matches[1]), trim($matches[2]), $base, $tzName);
@@ -512,6 +525,9 @@ final class VmDateTimeNative
         $ordinal = 'first|second|third|fourth|fifth|last';
         $suffixPatterns = [
             '/^(.+?)\s+((?:next|last|previous|this)\s+(?:'.$weekday.'))$/i',
+            // Week + weekday either order (#23936 / #24018).
+            '/^(.+?)\s+((?:'.$weekday.')\s+(?:this|next|last|previous)\s+week)$/i',
+            '/^(.+?)\s+((?:this|next|last|previous)\s+week\s+(?:'.$weekday.'))$/i',
             '/^(.+?)\s+((?:'.$weekday.'))$/i',
             '/^(.+?)\s+((?:first|last)\s+day\s+of\s+(?:next|this|last)\s+month)$/i',
             // Nth weekday of month — named year or this|next|last (#19550).
