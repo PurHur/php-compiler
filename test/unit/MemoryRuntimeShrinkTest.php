@@ -9,13 +9,22 @@ use PHPCompiler\JIT\Builtin\MemoryRuntime;
 use PHPCompiler\VM\MemoryAccounting;
 use PHPUnit\Framework\TestCase;
 
-/** MemoryRuntime routes through MemoryJitHelper PHP not RSS/statm LLVM (#9377). */
+/**
+ * MemoryRuntime routes through MemoryJitHelper PHP via JitVmHelperLink (#9377 / #24058).
+ */
 final class MemoryRuntimeShrinkTest extends TestCase
 {
     public function testMemoryRuntimeRoutesThroughMemoryJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MemoryRuntime.php');
         $this->assertStringContainsString('MemoryJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('emitReadRssBytes', $source);
         $this->assertStringNotContainsString('/proc/self/statm', $source);
         $this->assertStringNotContainsString('GLOBAL_PEAK_EMALLOC', $source);
