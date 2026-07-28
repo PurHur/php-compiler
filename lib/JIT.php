@@ -509,6 +509,93 @@ class JIT {
     }
 
     /**
+     * Match `echo match(...)` — JUMPIF chain where arms assign into a shared merge ECHO slot (#24143).
+     *
+     * php-cfg seeds the result with NULL then fans out IDENTICAL+JUMPIF arms; the else of the outer
+     * JUMPIF is another JUMPIF, so {@see jumpIfTargetsEchoMerge} never fires. Thin AOT then echoes
+     * an uninitialized / type-confused phi and segfaults after c:main_before_php (JIT is fine).
+     */
+    private function jumpIfTargetsMatchEchoMerge(?Block $ifBlock, ?Block $elseBlock): bool
+    {
+        return null !== $this->matchEchoMergeBlock($ifBlock, $elseBlock);
+    }
+
+    private function matchEchoMergeBlock(?Block $ifBlock, ?Block $elseBlock): ?Block
+    {
+        if (null === $ifBlock || null === $elseBlock) {
+            return null;
+        }
+        $ifMerge = $this->branchJumpMergeBlock($ifBlock);
+        if (null === $ifMerge) {
+            return null;
+        }
+        $echoSlot = $this->mergeEchoSlot($ifMerge);
+        if (null === $echoSlot || null !== $this->ternaryReturnPhiOperand($ifMerge)) {
+            return null;
+        }
+        if (!$this->blockAssignsToEchoSlot($ifBlock, $echoSlot)) {
+            return null;
+        }
+        $elseMerge = $this->branchJumpMergeBlock($elseBlock);
+        if ($elseMerge === $ifMerge && $this->blockAssignsToEchoSlot($elseBlock, $echoSlot)) {
+            return $ifMerge;
+        }
+
+        return $this->matchJumpIfChainReachesEchoMerge($elseBlock, $ifMerge, $echoSlot)
+            ? $ifMerge
+            : null;
+    }
+
+    private function matchJumpIfChainReachesEchoMerge(Block $block, Block $merge, int $echoSlot): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_JUMPIF !== $op->type) {
+                continue;
+            }
+
+            return $this->matchArmOrChainReachesEchoMerge($op->block1, $merge, $echoSlot)
+                && $this->matchArmOrChainReachesEchoMerge($op->block2, $merge, $echoSlot);
+        }
+
+        return false;
+    }
+
+    private function matchArmOrChainReachesEchoMerge(?Block $block, Block $merge, int $echoSlot): bool
+    {
+        if (null === $block) {
+            return false;
+        }
+        if ($this->branchJumpMergeBlock($block) === $merge && $this->blockAssignsToEchoSlot($block, $echoSlot)) {
+            return true;
+        }
+
+        return $this->matchJumpIfChainReachesEchoMerge($block, $merge, $echoSlot);
+    }
+
+    private function blockAssignsToEchoSlot(Block $block, int $echoSlot): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && null !== $op->arg2 && (int) $op->arg2 === $echoSlot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Shared match/?: merge ECHO operand (alias temp), not the per-arm ASSIGN result. */
+    private function mergeEchoOperand(Block $mergeBlock): ?Operand
+    {
+        foreach ($mergeBlock->opCodes as $mergeOp) {
+            if (OpCode::TYPE_ECHO === $mergeOp->type && null !== $mergeOp->arg1) {
+                return $mergeBlock->getOperand($mergeOp->arg1);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Literal ?: echo arms after side effects in the JUMPIF block need merge-block redirect (#18784, #23915).
      *
      * Pure literal ternaries with nothing before the JUMPIF keep the default assign path; enabling
@@ -9727,6 +9814,10 @@ class JIT {
                     $isTernaryEchoMerge = 0 === $this->context->inlineIncludeDepth
                         && !$isTernaryReturnMerge
                         && $this->jumpIfTargetsEchoMerge($op->block1, $op->block2, $block, $i);
+                    $isMatchEchoMerge = 0 === $this->context->inlineIncludeDepth
+                        && !$isTernaryReturnMerge
+                        && !$isTernaryEchoMerge
+                        && $this->jumpIfTargetsMatchEchoMerge($op->block1, $op->block2);
                     if ($isTernaryReturnMerge) {
                         $mergeBlock = $this->branchJumpMergeBlock($op->block1);
                         assert(null !== $mergeBlock);
@@ -9762,6 +9853,32 @@ class JIT {
                             }
                             $echoSlot = $this->mergeEchoSlot($mergeBlock);
                             if (null !== $echoSlot && $needsStackPhi) {
+                                $this->context->coalesceMergeSlotOperands[$echoSlot] = $ternaryMergeEcho;
+                            }
+                        }
+                    } elseif ($isMatchEchoMerge) {
+                        // Always stack-phi the shared echo alias — per-arm ASSIGN results differ (#24143).
+                        $mergeBlock = $this->matchEchoMergeBlock($op->block1, $op->block2);
+                        assert(null !== $mergeBlock);
+                        $ternaryMergeEcho = $this->mergeEchoOperand($mergeBlock);
+                        if (null !== $ternaryMergeEcho) {
+                            $this->context->coalesceAssignTargets[$ternaryMergeEcho] = true;
+                            $this->ensureCoalesceMergeStackSlot($ternaryMergeEcho);
+                            $echoVar = $this->context->getVariableFromOp($ternaryMergeEcho);
+                            // Pin so later arms keep writing this alloca even if the Temporary is
+                            // re-promoted while a trailing stmt shares the merge block (#24143).
+                            if (
+                                Variable::TYPE_VALUE === $echoVar->type
+                                && Variable::KIND_VARIABLE === $echoVar->kind
+                                && null === $echoVar->valueBoxAliasPtr
+                            ) {
+                                $echoVar->valueBoxAliasPtr = JIT\JitValueBox::valuePtrFromVariable(
+                                    $this->context,
+                                    $echoVar
+                                );
+                            }
+                            $echoSlot = $this->mergeEchoSlot($mergeBlock);
+                            if (null !== $echoSlot) {
                                 $this->context->coalesceMergeSlotOperands[$echoSlot] = $ternaryMergeEcho;
                             }
                         }
