@@ -134,6 +134,20 @@ final class StringVarDump
 
         $context->builder->positionAtEnd($entry);
         $arg = $fn->getParam(0);
+        // Literal `null` can arrive as a null __value__* (no box) — load would SIGSEGV (#24220).
+        $nullPtrBlock = $fn->appendBasicBlock('var_dump_thin_null_ptr');
+        $havePtr = $fn->appendBasicBlock('var_dump_thin_have_ptr');
+        $isNullPtr = $context->builder->icmp(
+            Builder::INT_EQ,
+            $arg,
+            $valuePtr->constNull()
+        );
+        $context->builder->branchIf($isNullPtr, $nullPtrBlock, $havePtr);
+        $context->builder->positionAtEnd($nullPtrBlock);
+        ValueEchoHelper::echoLiteral($context, "NULL\n");
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($havePtr);
+
         $map = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($arg, $map['type'])
