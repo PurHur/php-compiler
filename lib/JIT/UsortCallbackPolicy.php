@@ -79,7 +79,7 @@ final class UsortCallbackPolicy
     }
 
     /**
-     * Thin standalone AOT has VM Context but not Runtime->vm — closures cannot run (#24142 / #23540).
+     * Thin standalone AOT Closures lack ClosureState — NestedClosureInvoke return marshaling WIP (#24156).
      */
     public static function thinAotClosureRejectionMessage(string $function): string
     {

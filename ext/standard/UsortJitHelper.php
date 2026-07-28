@@ -37,7 +37,7 @@ final class UsortJitHelper
             $copy->duplicateFrom($value);
             $values[] = $copy;
         }
-        VmClosureCall::sortVariableValues($ctx, $values, VmClosureCall::resolve($closure));
+        VmClosureCall::sortVariableValuesViaTarget($values, $closure);
 
         return self::packedFromValues($values);
     }
@@ -52,7 +52,7 @@ final class UsortJitHelper
             $ctx = VmActiveContextJitHelper::resolve();
         }
         $pairs = self::collectKeyedPairs($ht);
-        VmClosureCall::sortKeyedPairsByKey($ctx, $pairs, VmClosureCall::resolve($closure));
+        VmClosureCall::sortKeyedPairsByKeyViaTarget($pairs, $closure);
 
         return self::fromKeyedPairs($pairs);
     }
@@ -67,7 +67,7 @@ final class UsortJitHelper
             $ctx = VmActiveContextJitHelper::resolve();
         }
         $pairs = self::collectKeyedPairs($ht);
-        VmClosureCall::sortKeyedPairsByValue($ctx, $pairs, VmClosureCall::resolve($closure));
+        VmClosureCall::sortKeyedPairsByValueViaTarget($pairs, $closure);
 
         return self::fromKeyedPairs($pairs);
     }

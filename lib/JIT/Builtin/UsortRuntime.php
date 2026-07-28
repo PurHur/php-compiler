@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -55,7 +56,8 @@ final class UsortRuntime
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
         if (UsortCallbackPolicy::isClosureJitLowerable($callback)) {
-            // Thin AOT has Context but not Runtime->vm — VmClosureCall cannot invoke (#24142 / #23540).
+            // Thin AOT: NestedClosureInvoke ABI lands (#24156) but return marshaling still
+            // yields Object/SIGSEGV — keep honest decline until that is green.
             if ($context->isThinStandaloneAotMain()) {
                 throw new \LogicException(UsortCallbackPolicy::thinAotClosureRejectionMessage('usort'));
             }
@@ -118,6 +120,7 @@ final class UsortRuntime
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
+        NestedClosureInvokeLlvm::ensureLinked($context);
 
         if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);

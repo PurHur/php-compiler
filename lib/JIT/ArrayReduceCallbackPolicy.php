@@ -58,7 +58,7 @@ final class ArrayReduceCallbackPolicy
     }
 
     /**
-     * Thin standalone AOT has Context but not Runtime->vm — closures cannot run (#24117 / #23540).
+     * Thin AOT NestedClosureInvoke return still wrong (Object) — decline until green (#24156).
      */
     public static function thinAotClosureRejectionMessage(): string
     {

@@ -64,7 +64,6 @@ final class ArrayReduceJitHelper
         if (null === $ctx) {
             $ctx = VmActiveContextJitHelper::resolve();
         }
-        $closureState = VmClosureCall::resolve($closure);
         $hasInitial = Variable::TYPE_NULL !== $initialOrNull->type;
         $carry = null;
         if ($hasInitial) {
@@ -84,7 +83,7 @@ final class ArrayReduceJitHelper
             } else {
                 $carryArg = $carry;
             }
-            $carry = VmClosureCall::invoke($ctx, $closureState, $carryArg, $item);
+            $carry = VmClosureCall::invokeVariable($closure, $carryArg, $item);
         }
         $out = new Variable();
         if ($empty) {

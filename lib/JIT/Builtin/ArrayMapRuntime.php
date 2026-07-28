@@ -12,6 +12,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -179,6 +180,7 @@ final class ArrayMapRuntime
 
     private static function implementClosureBridges(Context $context): void
     {
+        NestedClosureInvokeLlvm::ensureLinked($context);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         JitVmHelperLink::ensureBridge(

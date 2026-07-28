@@ -9,6 +9,7 @@ use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedClosureInvokeLlvm;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
@@ -55,6 +56,7 @@ final class ArrayReduceRuntime
         if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)
             && $context->isThinStandaloneAotMain()
         ) {
+            // NestedClosureInvoke hits candidates=1 but returns Object (#24156) — keep decline.
             throw new \LogicException(ArrayReduceCallbackPolicy::thinAotClosureRejectionMessage());
         }
         self::ensureLinked($context);
@@ -98,6 +100,7 @@ final class ArrayReduceRuntime
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
+        NestedClosureInvokeLlvm::ensureLinked($context);
 
         if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);

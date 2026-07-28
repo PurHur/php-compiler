@@ -41,6 +41,27 @@ final class VmClosureCall
         return $state;
     }
 
+    /**
+     * Invoke a Closure Variable — NestedJIT proxy uses {@see \PHPCompiler\JIT\Call\NestedClosureInvoke}
+     * for thin-AOT `__closure_target` (#24156). VM path uses ClosureState when present.
+     */
+    public static function invokeVariable(Variable $callback, Variable ...$args): Variable
+    {
+        $callback = $callback->resolveIndirect();
+        if (self::isClosure($callback)) {
+            $ctx = \PHPCompiler\Web\Superglobals::getActiveContext();
+            if (null === $ctx) {
+                $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
+            }
+
+            return self::invoke($ctx, self::resolve($callback), ...$args);
+        }
+
+        throw new \LogicException(
+            'Callback object is not invokable as a closure in this compiler build (#24156)'
+        );
+    }
+
     public static function invoke(Context $context, ClosureState $closure, Variable ...$args): Variable
     {
         $copies = [];
@@ -75,6 +96,20 @@ final class VmClosureCall
         $copyB = new Variable();
         $copyB->duplicateFrom($b);
         $result = self::invoke($context, $closure, $copyA, $copyB);
+
+        return self::coerceUserSortCallbackResult($result);
+    }
+
+    /**
+     * usort-family compare via {@see invokeVariable} (thin AOT NestedJIT, #24156).
+     */
+    public static function invokeVariableTwo(Variable $callback, Variable $a, Variable $b): int
+    {
+        $copyA = new Variable();
+        $copyA->duplicateFrom($a);
+        $copyB = new Variable();
+        $copyB->duplicateFrom($b);
+        $result = self::invokeVariable($callback, $copyA, $copyB);
 
         return self::coerceUserSortCallbackResult($result);
     }
@@ -208,8 +243,24 @@ final class VmClosureCall
     }
 
     /**
-     * Sort [key, value] pairs in place by key using a closure comparator (uksort subset).
+     * Thin-AOT NestedJIT sort — Closure Variable, no ClosureState (#24156).
      *
+     * @param list<Variable> $values
+     */
+    public static function sortVariableValuesViaTarget(
+        array &$values,
+        Variable $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (Variable $a, Variable $b) use ($closure, $descending): int {
+            $result = self::invokeVariableTwo($closure, $a, $b);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($values, $cmp);
+    }
+
+    /**
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
     public static function sortKeyedPairsByKey(
@@ -227,8 +278,22 @@ final class VmClosureCall
     }
 
     /**
-     * Sort [key, value] pairs in place by value using a closure comparator (uasort subset).
-     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByKeyViaTarget(
+        array &$pairs,
+        Variable $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (array $a, array $b) use ($closure, $descending): int {
+            $result = self::invokeVariableTwo($closure, $a[0], $b[0]);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($pairs, $cmp);
+    }
+
+    /**
      * @param list<array{0: Variable, 1: Variable}> $pairs
      */
     public static function sortKeyedPairsByValue(
@@ -239,6 +304,22 @@ final class VmClosureCall
     ): void {
         $cmp = static function (array $a, array $b) use ($context, $closure, $descending): int {
             $result = self::invokeTwo($context, $closure, $a[1], $b[1]);
+
+            return $descending ? -$result : $result;
+        };
+        ZendSort::sort($pairs, $cmp);
+    }
+
+    /**
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public static function sortKeyedPairsByValueViaTarget(
+        array &$pairs,
+        Variable $closure,
+        bool $descending = false
+    ): void {
+        $cmp = static function (array $a, array $b) use ($closure, $descending): int {
+            $result = self::invokeVariableTwo($closure, $a[1], $b[1]);
 
             return $descending ? -$result : $result;
         };

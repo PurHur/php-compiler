@@ -59,16 +59,9 @@ final class ArrayMapJitHelper
 
     public static function mapWithClosure(HashTable $src, Variable $closure): HashTable
     {
-        $ctx = Superglobals::getActiveContext();
-        if (null === $ctx) {
-            throw new \LogicException(
-                'ArrayMapJitHelper::mapWithClosure() requires an active VM context in this compiler build'
-            );
-        }
-        $closureState = VmClosureCall::resolve($closure);
         $out = new HashTable();
         foreach ($src->exportKeyValuePairs(true) as [$key, $value]) {
-            $mapped = VmClosureCall::invokeOne($ctx, $closureState, $value);
+            $mapped = VmClosureCall::invokeVariable($closure, $value);
             self::appendKeyed($out, $key, $mapped);
         }
 
@@ -80,18 +73,12 @@ final class ArrayMapJitHelper
      */
     public static function mapWithClosureMultiple(HashTable $sources, Variable $closure): HashTable
     {
-        $ctx = Superglobals::getActiveContext();
-        if (null === $ctx) {
-            throw new \LogicException(
-                'ArrayMapJitHelper::mapWithClosureMultiple() requires an active VM context in this compiler build'
-            );
-        }
         $tables = [];
         foreach ($sources->iterate(true) as $value) {
             $tables[] = $value->resolveIndirect()->toArray();
         }
 
-        return self::mapWithClosureMultipleTables($ctx, $tables, VmClosureCall::resolve($closure));
+        return self::mapWithClosureMultipleTablesViaTarget($tables, $closure);
     }
 
     /**
@@ -111,6 +98,30 @@ final class ArrayMapJitHelper
                 $rowArgs[] = self::valueAtKey($ht, $key);
             }
             $mapped = VmClosureCall::invoke($ctx, $closure, ...$rowArgs);
+            $out->addIndex($destIdx++, $mapped);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Thin-AOT NestedJIT multi-array map (#24156).
+     *
+     * @param list<HashTable> $sources
+     */
+    private static function mapWithClosureMultipleTablesViaTarget(
+        array $sources,
+        Variable $closure
+    ): HashTable {
+        $out = new HashTable();
+        $first = $sources[0];
+        $destIdx = 0;
+        foreach ($first->exportKeyValuePairs(true) as [$key, $_value]) {
+            $rowArgs = [];
+            foreach ($sources as $ht) {
+                $rowArgs[] = self::valueAtKey($ht, $key);
+            }
+            $mapped = VmClosureCall::invokeVariable($closure, ...$rowArgs);
             $out->addIndex($destIdx++, $mapped);
         }
 
