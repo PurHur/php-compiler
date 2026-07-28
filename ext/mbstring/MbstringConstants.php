@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 /**
- * mbstring extension constants (php-src ext/mbstring/mbstring.c; #7014, #24050).
+ * mbstring extension constants (php-src ext/mbstring/mbstring.c; #7014, #24050, #24083).
  */
 final class MbstringConstants
 {
@@ -19,9 +19,27 @@ final class MbstringConstants
     public const MB_CASE_TITLE_SIMPLE = 6;
     public const MB_CASE_FOLD_SIMPLE = 7;
 
-    /** @return array<string, int> */
+    /**
+     * Fallback when host Zend does not define MB_ONIGURUMA_VERSION (AOT/self-host).
+     * Matches Ubuntu 22.04 libonig5 (6.9.7) used by the pinned docker image.
+     */
+    public const MB_ONIGURUMA_VERSION = '6.9.7';
+
+    /**
+     * Case-mode ints plus Oniguruma identity string (php-src mbstring.c MINIT; #24083).
+     *
+     * Prefer host Zend MB_ONIGURUMA_VERSION when present so VM matches the linked
+     * Oniguruma on the same box (php-src-strict). Fall back to the pinned Ubuntu
+     * 22.04 identity for AOT/self-host without host mbstring.
+     *
+     * @return array<string, int|string>
+     */
     public static function registeredConstants(): array
     {
+        $oniguruma = \defined('MB_ONIGURUMA_VERSION')
+            ? (string) \constant('MB_ONIGURUMA_VERSION')
+            : self::MB_ONIGURUMA_VERSION;
+
         return [
             'MB_CASE_UPPER' => self::MB_CASE_UPPER,
             'MB_CASE_LOWER' => self::MB_CASE_LOWER,
@@ -31,6 +49,7 @@ final class MbstringConstants
             'MB_CASE_LOWER_SIMPLE' => self::MB_CASE_LOWER_SIMPLE,
             'MB_CASE_TITLE_SIMPLE' => self::MB_CASE_TITLE_SIMPLE,
             'MB_CASE_FOLD_SIMPLE' => self::MB_CASE_FOLD_SIMPLE,
+            'MB_ONIGURUMA_VERSION' => $oniguruma,
         ];
     }
 }

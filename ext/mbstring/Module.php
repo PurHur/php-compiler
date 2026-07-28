@@ -19,7 +19,11 @@ class Module extends ModuleAbstract
         parent::init($runtime);
         foreach (MbstringConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
-            $var->int($value);
+            if (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int($value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
     }
