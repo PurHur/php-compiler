@@ -30,7 +30,8 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_DOUBLE null rejection on PHP 8.4 forward profile (ext/standard/math.c fpow/fadd; #19182).
+     * Z_PARAM_DOUBLE null rejection on PHP 8.4 forward profile (fadd/fsub/fmul only; #19182).
+     * fpow uses Z_PARAM_DOUBLE soft-null like pow/sqrt (#24177).
      */
     public static function requiresForwardProfileStrictDoubleNull(): bool
     {
@@ -640,7 +641,7 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_DOUBLE null → TypeError on PHP 8.4 forward profile (fadd/fsub/fmul/fpow only; #19182, #20432).
+     * Z_PARAM_DOUBLE null → TypeError on PHP 8.4 forward profile (fadd/fsub/fmul only; #19182, #20432).
      *
      * @throws \TypeError when operand is null on PROFILE=8.4+
      */
