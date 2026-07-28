@@ -504,6 +504,11 @@ final class SplCachingIteratorStorage
         }
     }
 
+    public static function hasState(ObjectEntry $object): bool
+    {
+        return isset(self::$store[$object->id]);
+    }
+
     /** @return array{inner: ObjectEntry, flags: int, index: int, cached: ?Variable, cachedKey: ?Variable, fullCache: HashTable, innerPinKey: string} */
     private static function state(ObjectEntry $object): array
     {

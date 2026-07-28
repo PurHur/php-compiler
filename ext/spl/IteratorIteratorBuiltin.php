@@ -53,6 +53,10 @@ final class IteratorIteratorBuiltin
         $entry->methods['getinneriterator'] = new IteratorIteratorGetInnerIterator();
         $entry->methodVisibility['getinneriterator'] = $pub;
         $entry->methodNames['getinneriterator'] = 'getInnerIterator';
+        // php-src spl_dual_it_call_method — forward unknown methods to the inner iterator (#24287).
+        $entry->methods['__call'] = new IteratorIteratorCall();
+        $entry->methodVisibility['__call'] = $pub;
+        $entry->methodNames['__call'] = '__call';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -77,7 +81,12 @@ final class IteratorIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['getinneriterator']);
+        return isset(
+            $entry->methods['rewind'],
+            $entry->methods['valid'],
+            $entry->methods['getinneriterator'],
+            $entry->methods['__call']
+        );
     }
 }
 
@@ -1045,6 +1054,66 @@ final class IteratorIteratorGetInnerIterator extends VmClassMethod
         $inner = SplDualIteratorStorage::inner($object);
         SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
+    }
+}
+
+/**
+ * php-src spl_dual_it_call_method — forward unknown methods to the inner iterator (#24287).
+ * Undefined methods report the inner class name (Zend get_method on the wrapped object).
+ */
+final class IteratorIteratorCall extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__call');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            IteratorIteratorBuiltin::CLASS_LC,
+            'IteratorIterator::__call()'
+        );
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'IteratorIterator::__call() expects exactly 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $method = $frame->calledArgs[1]->resolveIndirect()->toString();
+        $argsVar = $frame->calledArgs[2]->resolveIndirect();
+        $inner = self::resolveInnerIterator($object);
+        SplIteratorSupport::ensurePinnedObjectAlive($inner);
+        if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
+            throw new \LogicException('IteratorIterator::__call() requires VM runtime');
+        }
+        $vm = $frame->vmContext->runtime->vm;
+        if (!$vm->hasInstanceMethod($inner->class, strtolower($method))) {
+            throw new \Error('Call to undefined method '.$inner->class->name.'::'.$method.'()');
+        }
+        $extra = [];
+        if (Variable::TYPE_ARRAY === $argsVar->type) {
+            foreach ($argsVar->toArray()->iterateKeyed(true) as [, $valueVar]) {
+                $extra[] = $valueVar;
+            }
+        }
+        $result = [] === $extra
+            ? $vm->invokeInstanceMethod($inner, $method)
+            : $vm->invokeInstanceMethod($inner, $method, ...$extra);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->copyFrom($result);
+        }
+    }
+
+    private static function resolveInnerIterator(ObjectEntry $object): ObjectEntry
+    {
+        // CachingIterator / RecursiveCachingIterator keep inner in their own store (#24287).
+        if (SplCachingIteratorStorage::hasState($object)) {
+            return SplCachingIteratorStorage::inner($object);
+        }
+
+        return SplDualIteratorStorage::inner($object);
     }
 }
 

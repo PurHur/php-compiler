@@ -15991,6 +15991,16 @@ restart:
 
                 return null;
             }
+            // Zend zend_std_get_method — __call is looked up on parents too (#24287 dual-it proxies).
+            $magicCallClass = $this->findMagicCallClass(strtolower($class->name));
+            if (null !== $magicCallClass && $magicCallClass !== $class) {
+                $frame->magicCallMethodName = $methodName;
+                $frame->call = $magicCallClass->methods['__call'];
+                $frame->callArgs = [$receiver];
+                $frame->callArgEntries = [];
+
+                return null;
+            }
             if (str_starts_with($e->getMessage(), 'Call to undefined method ')
                 || str_starts_with($e->getMessage(), 'Call to undefined static method ')) {
                 return $this->dispatchVmError(
@@ -17599,6 +17609,30 @@ restart:
             }
             $entry->properties[] = $property;
         }
+    }
+
+    /**
+     * Walk the class hierarchy for __call (Zend zend_std_get_method; dual-it proxies #24287).
+     */
+    protected function findMagicCallClass(string $lcClass): ?ClassEntry
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($this->context->classes[$lcClass])) {
+                break;
+            }
+            $class = $this->context->classes[$lcClass];
+            if (isset($class->methods['__call'])) {
+                return $class;
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $lcClass = $class->parentLc;
+        }
+
+        return null;
     }
 
     /**
