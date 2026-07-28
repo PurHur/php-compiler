@@ -29,6 +29,11 @@ final class VmFsReadPure
     /**
      * Read a byte slice from a regular file (php-src ext/standard/file.c offset/length).
      *
+     * Reads via the open stream until EOF (or $length) — never caps with filesize().
+     * PHP's stat cache stays stale across content writes until clearstatcache, but
+     * file_get_contents must still return fresh bytes (php-src php_stream_copy_to_mem;
+     * #24339 FILE_APPEND mid-read).
+     *
      * @return string|false false on open/read failure; '' when offset is past EOF
      */
     public static function readSlice(string $path, int $offset = 0, ?int $length = null): string|false
@@ -43,29 +48,22 @@ final class VmFsReadPure
             return false;
         }
 
-        $fileSize = @\filesize($path);
-        if (false === $fileSize) {
-            if (0 !== $offset) {
+        if ($offset < 0) {
+            if (0 !== @\fseek($fp, 0, \SEEK_END)) {
                 @\fclose($fp);
 
                 return false;
             }
-            $content = self::readStreaming($fp, $length);
-            @\fclose($fp);
+            $fileSize = @\ftell($fp);
+            if (false === $fileSize) {
+                @\fclose($fp);
 
-            return $content;
-        }
-
-        if ($offset < 0) {
+                return false;
+            }
             $offset = $fileSize + $offset;
             if ($offset < 0) {
                 $offset = 0;
             }
-        }
-        if ($offset > $fileSize) {
-            @\fclose($fp);
-
-            return '';
         }
 
         if (0 !== $offset && 0 !== @\fseek($fp, $offset, \SEEK_SET)) {
@@ -74,44 +72,16 @@ final class VmFsReadPure
             return false;
         }
 
-        $toRead = null === $length ? $fileSize - $offset : $length;
-        if ($toRead < 0) {
-            @\fclose($fp);
-
-            return '';
-        }
-        if ($offset + $toRead > $fileSize) {
-            $toRead = $fileSize - $offset;
-        }
-        if (0 === $toRead) {
-            // /proc pseudo-files report size 0 but stream content (e.g. /proc/self/environ, #11744).
-            if (0 === $offset) {
-                $content = self::readStreaming($fp, $length);
-                @\fclose($fp);
-
-                return $content;
-            }
+        if (null !== $length && $length < 0) {
             @\fclose($fp);
 
             return '';
         }
 
-        $parts = [];
-        $remaining = $toRead;
-        while ($remaining > 0) {
-            $chunk = min(self::CHUNK, $remaining);
-            $data = @\fread($fp, $chunk);
-            if (false === $data || '' === $data) {
-                @\fclose($fp);
-
-                return false === $data ? false : ('' === $parts ? '' : implode('', $parts));
-            }
-            $parts[] = $data;
-            $remaining -= \strlen($data);
-        }
+        $content = self::readStreaming($fp, $length);
         @\fclose($fp);
 
-        return '' === $parts ? '' : implode('', $parts);
+        return $content;
     }
 
     /**

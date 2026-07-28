@@ -46,6 +46,30 @@ final class VmFsReadPureRuntimeShrinkTest extends TestCase
         @unlink($path);
     }
 
+    /** #24339 — stream-to-EOF must not trust stale filesize() after FILE_APPEND. */
+    public function testAppendAfterMidReadReturnsFreshBytesWithoutClearstat(): void
+    {
+        if (!VmFsReadPure::available()) {
+            $this->markTestSkipped('host fopen unavailable');
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'phpc_read_append_');
+        $this->assertNotFalse($path);
+        @unlink($path);
+
+        $this->assertSame(1, VmFs::filePutContents($path, 'a', \FILE_APPEND));
+        $this->assertSame('a', VmFsReadPure::read($path));
+        // Populate host PHP stat cache (filesize) without clearstatcache.
+        $this->assertSame(1, filesize($path));
+        $this->assertSame(1, VmFs::filePutContents($path, 'b', \FILE_APPEND));
+        $this->assertSame('ab', VmFsReadPure::read($path));
+        $this->assertSame(1, filesize($path), 'filesize stays stale until clearstatcache like Zend');
+        clearstatcache(true, $path);
+        $this->assertSame(2, filesize($path));
+
+        @unlink($path);
+    }
+
     public function testReadNativeFallsBackToPureWhenFfiDisabled(): void
     {
         if (!VmFsReadPure::available()) {
