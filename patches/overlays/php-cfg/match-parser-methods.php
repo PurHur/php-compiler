@@ -76,14 +76,24 @@
      * Message via phpc_match_unhandled_operand_message (smart_str_append_scalar /
      * "of type …") — not (string) cast, which leaks strings and Array-warns.
      *
+     * Snapshot `$cond` into a fresh temp in this block before the helper call. Cross-block
+     * ARG_SEND of a named subject CV was remapped onto the null match-result seed, so
+     * variable subjects always printed "Unhandled match case NULL" (#24329, re-#23664).
+     *
      * php-src: Zend/zend_execute.c — zend_match_unhandled_error()
      * php-src: Zend/zend_smart_str.c — smart_str_append_scalar
      */
     private function lowerUnhandledMatchError(Operand $cond, array $attrs): void
     {
+        $subject = new Temporary();
+        $this->block->children[] = new Op\Expr\Assign(
+            $subject,
+            $this->readVariable($cond),
+            $attrs
+        );
         $msg = new Op\Expr\FuncCall(
             $this->readVariable(new Literal('phpc_match_unhandled_operand_message')),
-            [$cond],
+            [$this->readVariable($subject)],
             $attrs
         );
         $this->block->children[] = $msg;
