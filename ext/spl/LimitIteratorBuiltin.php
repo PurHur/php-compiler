@@ -106,18 +106,14 @@ final class SplLimitIteratorStorage
 
     public static function rewind(Frame $frame, ObjectEntry $object): void
     {
+        // php-src LimitIterator::rewind — dual_it_rewind then spl_limit_it_seek(offset).
+        // SeekableIterator inners (e.g. ArrayIterator) throw OutOfBoundsException when
+        // offset is past the end; non-seekable inners advance via next() without throwing (#24295).
         $state = &self::$store[$object->id];
         $state['rewound'] = true;
         $state['pos'] = 0;
         SplDualIteratorStorage::callInner($frame, $state['inner'], 'rewind');
-        for ($i = 0; $i < $state['offset']; ++$i) {
-            $valid = SplDualIteratorStorage::callInner($frame, $state['inner'], 'valid')->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $valid->type || !$valid->toBool()) {
-                break;
-            }
-            SplDualIteratorStorage::callInner($frame, $state['inner'], 'next');
-            ++$state['pos'];
-        }
+        self::seek($frame, $object, $state['offset']);
     }
 
     public static function valid(Frame $frame, ObjectEntry $object): bool
@@ -196,9 +192,9 @@ final class SplLimitIteratorStorage
         $state['rewound'] = true;
         $inner = $state['inner'];
         if ($pos !== $state['pos'] && self::innerHasSeek($frame, $inner)) {
-            $posVar = new Variable(Variable::TYPE_INTEGER);
-            $posVar->int($pos);
-            SplDualIteratorStorage::callInnerWithArg($frame, $inner, 'seek', $posVar);
+            // Call storage seek directly — nested invokeInstanceMethod(ArrayIterator::seek)
+            // finds the outer user catch and is swallowed as MagicMethodInvocationAborted (#24295).
+            self::seekInnerDirect($frame, $inner, $pos);
             $state['pos'] = $pos;
         } elseif ($pos < $state['pos']) {
             SplDualIteratorStorage::callInner($frame, $inner, 'rewind');
@@ -221,6 +217,31 @@ final class SplLimitIteratorStorage
                 ++$state['pos'];
             }
         }
+    }
+
+    /**
+     * Seek a SeekableIterator inner without nested VmClassMethod invoke when possible.
+     * Native throws from this stack are dispatched from LimitIterator's handler (#24295).
+     */
+    private static function seekInnerDirect(Frame $frame, ObjectEntry $inner, int $pos): void
+    {
+        if (SplArrayStorage::hasState($inner)) {
+            SplArrayStorage::seekIterator($inner, $pos);
+
+            return;
+        }
+        $lc = strtolower(ltrim($inner->class->name, '\\'));
+        if (DirectoryIteratorBuiltin::CLASS_LC === $lc
+            || FilesystemIteratorBuiltin::CLASS_LC === $lc
+            || GlobIteratorBuiltin::CLASS_LC === $lc
+            || RecursiveDirectoryIteratorBuiltin::CLASS_LC === $lc) {
+            DirectoryIteratorBuiltin::seek($inner, $pos);
+
+            return;
+        }
+        $posVar = new Variable(Variable::TYPE_INTEGER);
+        $posVar->int($pos);
+        SplDualIteratorStorage::callInnerWithArg($frame, $inner, 'seek', $posVar);
     }
 
     private static function innerHasSeek(Frame $frame, ObjectEntry $inner): bool
