@@ -93,19 +93,25 @@ binding. Six of nine fail.
 |---|---|---|
 | `k01` readonly promoted properties | ok | — |
 | `k02` named arguments, out-of-order + skipped default | ok | — |
-| `k03` `static::m()` through an overriding subclass | **`11` vs `21`** | #24169 |
-| `k04` by-reference parameter | ok | #24162 |
+| `k03` `static::m()` through an overriding subclass | ~~`11` vs `21`~~ **fixed** #24182 | #24169 |
+| `k04` by-reference parameter | ~~no output at all~~ **fixed** #24185 | #24162 |
 | `k05` `str_starts_with()` | **`false` on matching input** | #24161 |
 | `k06` backed enum with `match($this)` | compile failure | #24163 |
 | `k07` first-class callable `f(...)` | compile failure (builtins core-dump) | #24166 |
 | `k08` spread into fixed untyped params | ok — see the warning below | — |
 | `k09` variadic pack used as an array | **`Object` vs `6`** | #24167 |
 
-`k03` and `k09` are the ones to note, because both sit next to a case that already passes. `j02`
-covers late static binding via `new static()` and `static::class` and is green; method dispatch
-through `static::` was never reached. `e08_spread` covers variadic spread and is green; it only ever
-feeds the pack to `implode()`, and `array_sum()` on the same pack returns `Object`. **A green case
-bounds the shape it actually executes, not the feature it is named after.**
+`k03` and `k09` are the ones to note, because both sat next to a case that already passes. `j02`
+covers late static binding via `new static()` and `static::class` and was green throughout; method
+dispatch through `static::` was never reached, and resolved to the parent. `e08_spread` covers
+variadic spread and is green; it only ever feeds the pack to `implode()`, and `array_sum()` on the
+same pack returns `Object`. **A green case bounds the shape it actually executes, not the feature it
+is named after.**
+
+`k03` is fixed (#24182). Verified against master's implementation at `--repeat 3` on six shapes the
+single corpus case does not reach — `static::` alone, `self::` alone as a control, both in one
+expression, a subclass with no override, three-deep inheritance where the grandchild inherits the
+override, and two-hop `static::` forwarding — all 8/8. Reproducers in `build/micro/z/`.
 
 ## Do not run two sweep containers against the same bind mount
 
