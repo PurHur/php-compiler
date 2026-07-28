@@ -41,7 +41,7 @@ corpus*, not the language.
 |---|---|
 | `e07_named` | ~~compiler crash~~ **fixed** in #23972 — sparse named-arg maps preserve param indices |
 | `e16_array_slice` | compiles; runtime still hits `print_r` thin-standalone gap (#23540) — slice itself fixed in #23991 |
-| `e30_array_lit_dim_assign_shift` | **regression** — `HashTable::shiftFirst()` exists (`lib/VM/HashTable.php:783`) but is unresolved for AOT; third instance of #23974's pattern — #24025 |
+| `e30_array_lit_dim_assign_shift` | ~~regression / segfault~~ **fixed** in #24055 — dim-write orphan box sync + nested `[$a]` value-box hashtable dispatch |
 | `e04_usort` | **documented limitation** — array-callable / invokable comparators deferred |
 | `e08_spread` | variadic spread not lowered: `Unsupported cast for arg type int64 from __hashtable__*` |
 | `c07_method` | `Missing required argument 1` on a two-argument call whose arity is correct |
@@ -76,6 +76,7 @@ Verified on current master with `script/differential-sweep.sh --aot --repeat 5` 
 | `i10_null_coalesce_assign` | #24009 / #24026 |
 | `i11_foreach_by_ref`, `i12_nested_foreach`, `i13_sort` | #24010 / #24022 |
 | `g07a_int_string_resource_collision` | #24024 / #24044 — was 7/20; now **10/10** |
+| `e30_array_lit_dim_assign_shift` | #24055 — orphan dim-write sync + nested `[$a]` hashtable dispatch; **10/10** |
 
 This regeneration caught `e30` and `g07a` as regressions no individual verification would have
 surfaced. `g07a` carries `@differential-repeat: 10` so a plain sweep re-runs it.

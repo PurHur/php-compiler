@@ -13782,6 +13782,22 @@ class JIT {
         );
     }
 
+    /**
+     * prepareIndexWrite / prepareStringKeyWrite allocate an orphan __value__ box plus HT
+     * write markers. Assigns commit into the HT (#21947); keep the orphan box in sync so
+     * later reads of the same Variable (chained `$r = $a[i] = v`, array-literal elements)
+     * observe the expression value rather than an empty box (#24055).
+     */
+    private function syncDimWriteOrphanValueBox(Variable $dimLvalue, Variable $value): void
+    {
+        if (Variable::TYPE_VALUE !== $dimLvalue->type || Variable::KIND_VARIABLE !== $dimLvalue->kind) {
+            return;
+        }
+        $orphanPtr = JIT\JitValueBox::pointer($this->context, $dimLvalue->value);
+        JIT\JitValueBox::assignToPointer($this->context, $orphanPtr, $value);
+        JIT\JitValueBox::publishAfterWrite($this->context, $orphanPtr);
+    }
+
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {
         $branchMergeTarget = $force && $this->context->coalesceAssignTargets->contains($resultOp);
         $resolvedName = JIT\OperandName::resolve($resultOp);
@@ -14124,11 +14140,14 @@ class JIT {
                 $result->writableValueBoxKey,
                 $value
             );
+            $this->syncDimWriteOrphanValueBox($result, $value);
 
             return;
         }
-        // prepareStringKeyWrite / prepareIndexWrite lvalues: commit into the HT, not the
-        // orphan value-box slot (null assigns otherwise drop the key — #21947).
+        // prepareStringKeyWrite / prepareIndexWrite lvalues: must commit into the HT
+        // (null assigns otherwise drop the key — #21947). Also sync the orphan value-box
+        // so `$r0 = $a[0] = 99` / array-literal packing can read the assign expression
+        // value from the same Variable (#24055; AOT e30).
         if (null !== $result->writableHt && null !== $result->writableStringKey) {
             JIT\HashTableHelper::setAtStringKey(
                 $this->context,
@@ -14136,6 +14155,7 @@ class JIT {
                 $result->writableStringKey,
                 $value
             );
+            $this->syncDimWriteOrphanValueBox($result, $value);
 
             return;
         }
@@ -14146,6 +14166,7 @@ class JIT {
                 $result->writableIndex,
                 $value
             );
+            $this->syncDimWriteOrphanValueBox($result, $value);
 
             return;
         }

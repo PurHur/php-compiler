@@ -49,6 +49,7 @@ final class HashTableWriteLlvm
         $nullBlock = BasicBlockHelper::append($context, 'ht_idx_vb_null_'.$tag);
         $objectBlock = BasicBlockHelper::append($context, 'ht_idx_vb_object_'.$tag);
         $enumCaseBlock = BasicBlockHelper::append($context, 'ht_idx_vb_enum_'.$tag);
+        $hashtableBlock = BasicBlockHelper::append($context, 'ht_idx_vb_ht_'.$tag);
         $done = BasicBlockHelper::append($context, 'ht_idx_vb_done_'.$tag);
 
         $isString = $context->builder->icmp(
@@ -110,7 +111,17 @@ final class HashTableWriteLlvm
             $typeByte,
             $i8->constInt(\PHPCompiler\VM\Variable::TYPE_ENUM_CASE, false)
         );
-        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $longBlock);
+        // Nested arrays in value boxes must not fall through to setLongAt (#24055 / [$a] AOT).
+        $checkHt = BasicBlockHelper::append($context, 'ht_idx_vb_check_ht_'.$tag);
+        $context->builder->branchIf($isEnumCase, $enumCaseBlock, $checkHt);
+
+        $context->builder->positionAtEnd($checkHt);
+        $isHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_HASHTABLE, false)
+        );
+        $context->builder->branchIf($isHt, $hashtableBlock, $done);
 
         $context->builder->positionAtEnd($stringBlock);
         $str = $context->builder->call(
@@ -195,6 +206,19 @@ final class HashTableWriteLlvm
             $ht,
             $index,
             $enumObj
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($hashtableBlock);
+        $childHt = $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $valuePtr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setHashtableAt'),
+            $ht,
+            $index,
+            $childHt
         );
         $context->builder->branch($done);
 
