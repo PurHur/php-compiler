@@ -203,22 +203,39 @@ final class DomCreateElementJitHelper
 
     public static function replaceChildrenArgv1(ObjectEntry $parent, Variable $a1): void
     {
-        self::replaceChildrenFromVariables($parent, $a1);
+        self::replaceChildrenFromResolved($parent, [$a1->resolveIndirect()]);
     }
 
     public static function replaceChildrenArgv2(ObjectEntry $parent, Variable $a1, Variable $a2): void
     {
-        self::replaceChildrenFromVariables($parent, $a1, $a2);
+        self::replaceChildrenFromResolved($parent, [
+            $a1->resolveIndirect(),
+            $a2->resolveIndirect(),
+        ]);
     }
 
     public static function replaceChildrenArgv3(ObjectEntry $parent, Variable $a1, Variable $a2, Variable $a3): void
     {
-        self::replaceChildrenFromVariables($parent, $a1, $a2, $a3);
+        self::replaceChildrenFromResolved($parent, [
+            $a1->resolveIndirect(),
+            $a2->resolveIndirect(),
+            $a3->resolveIndirect(),
+        ]);
     }
 
-    public static function replaceChildrenArgv4(ObjectEntry $parent, Variable $a1, Variable $a2, Variable $a3, Variable $a4): void
-    {
-        self::replaceChildrenFromVariables($parent, $a1, $a2, $a3, $a4);
+    public static function replaceChildrenArgv4(
+        ObjectEntry $parent,
+        Variable $a1,
+        Variable $a2,
+        Variable $a3,
+        Variable $a4
+    ): void {
+        self::replaceChildrenFromResolved($parent, [
+            $a1->resolveIndirect(),
+            $a2->resolveIndirect(),
+            $a3->resolveIndirect(),
+            $a4->resolveIndirect(),
+        ]);
     }
 
     public static function replaceChildrenObjectArgv0(ObjectEntry $parent): void
@@ -318,14 +335,15 @@ final class DomCreateElementJitHelper
         return DomRegistry::entry($childId);
     }
 
-    private static function replaceChildrenFromVariables(ObjectEntry $parent, Variable ...$args): void
+    /**
+     * @param list<Variable> $resolved
+     */
+    private static function replaceChildrenFromResolved(ObjectEntry $parent, array $resolved): void
     {
         $ctx = VmDomJitFrame::vmContext();
         $canonical = DomRegistry::entry($parent->id) ?? $parent;
-        $resolved = [];
-        foreach ($args as $arg) {
-            $resolved[] = $arg->resolveIndirect();
-        }
+        // Avoid foreach over Variable ...$args — NestedJIT mis-lowers it as object-property
+        // foreach on PHPCompiler\VM\Variable (0 visible props after #23430; #24247).
         VmDom::replaceChildrenLiveStandardNodes($ctx, $canonical, $resolved);
         if ($canonical !== $parent) {
             VmDom::mirrorNodeLinkProperties($parent, $canonical);

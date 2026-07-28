@@ -247,15 +247,19 @@ final class VmObjectPropertyForeach
     ): JitVariable {
         $classId = $context->type->object->lookup(strtolower(ltrim($className, '\\')));
         $props = self::visiblePropertySets($context, $classId);
+        // Empty visible set: compileValid() never yields; fetch is unreachable (#24247 / re-#23430).
+        if ([] === $props) {
+            $context->builder->call($context->lookupFunction('abort'));
+            $slot = JitValueBox::alloc($context);
+
+            return new JitVariable($context, JitVariable::TYPE_VALUE, JitVariable::KIND_VARIABLE, $slot);
+        }
         $fn = $context->builder->getInsertBlock()->getParent();
         $done = $fn->appendBasicBlock('foreach_objprop_prop_done');
         $objectType = $context->type->object;
         $entry = $context->builder->getInsertBlock();
         $checkBlock = $entry;
         $fetched = null;
-        if ([] === $props) {
-            throw new \LogicException('foreach object property fetch requires at least one visible instance property');
-        }
         foreach ($props as $i => $propset) {
             if ($checkBlock !== $entry) {
                 $context->builder->positionAtEnd($checkBlock);
@@ -275,9 +279,6 @@ final class VmObjectPropertyForeach
             TypedPropertyUninitGuard::emitBeforeRead($context, $fetched);
             $context->builder->branch($done);
             $checkBlock = $nextCheck;
-        }
-        if (null === $fetched) {
-            throw new \LogicException('foreach object property fetch requires at least one instance property');
         }
         $context->builder->positionAtEnd($checkBlock);
         $context->builder->call($context->lookupFunction('abort'));
