@@ -24,10 +24,13 @@ use PHPCompiler\JIT\Context;
  *   v1 (legacy, no deps):     sha256(legacy lowering core + unit source)
  *
  * Global inputs ({@see coreFingerprint}) are only composer.lock, patches, and
- * LLVM path — editing lib/JIT.php no longer invalidates the whole corpus.
- * Emit records the NestedJIT closure in deps[]; editing one reached lowering
- * invalidates only units that listed it. Legacy manifests keep the old
- * JIT-core key until re-emitted so the committed prelinked tier stays usable.
+ * LLVM library identity (#24381) — content hash of libLLVM-9.so.1, not the
+ * install path string, so host `.llvm` and Docker `/opt/llvm9` with the same
+ * bytes share a fingerprint. Editing lib/JIT.php no longer invalidates the
+ * whole corpus. Emit records the NestedJIT closure in deps[]; editing one
+ * reached lowering invalidates only units that listed it. Legacy manifests
+ * keep the old JIT-core key until re-emitted so the committed prelinked tier
+ * stays usable.
  *
  * Opt-in: PHP_COMPILER_HELPER_RUNTIME_O=1.
  */
@@ -160,9 +163,10 @@ final class HelperRuntimeCache
     /**
      * Is the committed per-arch cache usable as-is for this build (#24302)?
      *
-     * Deliberately conservative: it must exist, carry a core_fingerprint equal to the live one, and
-     * actually contain units. Any doubt falls through to the warmup, so a stale or partial committed
-     * cache still gets emitted rather than silently producing a build with missing helpers.
+     * Deliberately conservative: it must exist, carry a core_fingerprint equal to the live one
+     * (or an equivalent LLVM-path alias — #24381), and actually contain units. Any doubt falls
+     * through to the warmup, so a stale or partial committed cache still gets emitted rather
+     * than silently producing a build with missing helpers.
      */
     private static function committedCacheIsCurrent(): bool
     {
@@ -180,7 +184,7 @@ final class HelperRuntimeCache
             return false;
         }
         $committed = (string) ($manifest['core_fingerprint'] ?? '');
-        if ('' === $committed || $committed !== self::coreFingerprint()) {
+        if ('' === $committed || !self::coreFingerprintMatches($committed)) {
             return false;
         }
         $entries = @scandir($unitsDir);
@@ -228,12 +232,14 @@ final class HelperRuntimeCache
     }
 
     /**
-     * Global inputs only (#23458): composer.lock, patches, LLVM path.
+     * Global inputs only (#23458 / #24381): composer.lock, patches, LLVM library.
      *
      * Deliberately excludes lib/JIT.php / Context.php / Runtime.php — those change
      * most days and were switching the whole corpus off. Per-unit deps[] cover the
      * NestedJIT closure instead. Content hashes (not mtime) so committed prelinked
-     * units stay shareable across clones.
+     * units stay shareable across clones. LLVM is identified by libLLVM-9.so.1
+     * bytes (#24381), not the install path, so host `.llvm` and Docker `/opt/llvm9`
+     * with identical libraries share one fingerprint.
      */
     public static function coreFingerprint(): string
     {
@@ -276,10 +282,123 @@ final class HelperRuntimeCache
         return $legacy = substr(hash('sha256', implode("\n", $parts)), 0, 20);
     }
 
+    /**
+     * Stable LLVM identity for the global fingerprint (#24381).
+     *
+     * Prefer hashing libLLVM-9.so.1 at PHP_COMPILER_LLVM_PATH when present; if the
+     * env path has no library, fall back to a path token so distinct missing installs
+     * still diverge. Never fall through to another install dir when the env path is
+     * set — that would hide an intentional LLVM_PATH override.
+     */
+    public static function llvmIdentityToken(): string
+    {
+        static $token = null;
+        if (null !== $token) {
+            return $token;
+        }
+        $env = (string) getenv('PHP_COMPILER_LLVM_PATH');
+        if ('' !== $env) {
+            $so = rtrim($env, '/').'/libLLVM-9.so.1';
+            if (is_file($so)) {
+                return $token = 'lib:'.(string) hash_file('sha256', $so);
+            }
+
+            return $token = 'path:'.$env;
+        }
+        $root = \dirname(__DIR__, 2);
+        foreach ([$root.'/.llvm', '/opt/llvm9'] as $dir) {
+            $so = $dir.'/libLLVM-9.so.1';
+            if (is_file($so)) {
+                return $token = 'lib:'.(string) hash_file('sha256', $so);
+            }
+        }
+
+        return $token = 'path:';
+    }
+
+    /**
+     * Live core fingerprint plus pre-#24381 path-keyed cores that hash the same libLLVM (#24381).
+     *
+     * Committed caches built with `/opt/llvm9` must stay fresh on a host whose
+     * `PHP_COMPILER_LLVM_PATH` points at an identical `.llvm` tree.
+     *
+     * @return list<string>
+     */
+    public static function equivalentCoreFingerprints(): array
+    {
+        static $list = null;
+        if (null !== $list) {
+            return $list;
+        }
+        $cores = [self::coreFingerprint()];
+        $liveLib = self::llvmLibSha256OrNull();
+        if (null === $liveLib) {
+            return $list = $cores;
+        }
+        $root = \dirname(__DIR__, 2);
+        foreach (array_unique(array_filter([
+            (string) getenv('PHP_COMPILER_LLVM_PATH'),
+            $root.'/.llvm',
+            '/opt/llvm9',
+        ])) as $dir) {
+            $so = rtrim($dir, '/').'/libLLVM-9.so.1';
+            if (is_file($so)) {
+                if (hash_file('sha256', $so) !== $liveLib) {
+                    continue;
+                }
+                $cores[] = self::coreFingerprintWithLlvmToken($dir);
+                continue;
+            }
+            // Host often has only `.llvm`; Docker only `/opt/llvm9`. When the live
+            // lib identity is known, also accept the other canonical path token so
+            // committed caches keyed on either install string stay fresh (#24381).
+            if ('/opt/llvm9' === $dir || str_ends_with(rtrim($dir, '/'), '/.llvm')) {
+                $cores[] = self::coreFingerprintWithLlvmToken($dir);
+            }
+        }
+
+        return $list = array_values(array_unique($cores));
+    }
+
+    public static function coreFingerprintMatches(string $candidate): bool
+    {
+        return \in_array($candidate, self::equivalentCoreFingerprints(), true);
+    }
+
+    private static function llvmLibSha256OrNull(): ?string
+    {
+        $token = self::llvmIdentityToken();
+        if (str_starts_with($token, 'lib:')) {
+            return substr($token, 4);
+        }
+
+        return null;
+    }
+
+    /** Pre-#24381 material: LLVM install path string + lock + patches. */
+    private static function coreFingerprintWithLlvmToken(string $llvmToken): string
+    {
+        $root = \dirname(__DIR__, 2);
+        $parts = [$llvmToken];
+        foreach ([
+            $root.'/composer.lock',
+            $root.'/script/apply-patches.sh',
+        ] as $file) {
+            $parts[] = substr($file, \strlen($root)).':'.@hash_file('sha256', $file);
+        }
+        $patchFiles = glob($root.'/patches/*.patch') ?: [];
+        sort($patchFiles, SORT_STRING);
+        foreach ($patchFiles as $patch) {
+            $parts[] = substr($patch, \strlen($root)).':'.@hash_file('sha256', $patch);
+        }
+
+        return substr(hash('sha256', implode("\n", $parts)), 0, 20);
+    }
+
     private static function globalFingerprintMaterial(): string
     {
         $root = \dirname(__DIR__, 2);
-        $parts = [(string) getenv('PHP_COMPILER_LLVM_PATH')];
+        $parts = [self::llvmIdentityToken()];
         foreach ([
             $root.'/composer.lock',
             $root.'/script/apply-patches.sh',
@@ -425,8 +544,31 @@ final class HelperRuntimeCache
 
     public static function manifestFingerprintMatches(array $manifest, string $unitSourceAbsPath): bool
     {
-        return isset($manifest['fingerprint'])
-            && $manifest['fingerprint'] === self::expectedFingerprintForManifest($manifest, $unitSourceAbsPath);
+        if (!isset($manifest['fingerprint'])) {
+            return false;
+        }
+        $stored = (string) $manifest['fingerprint'];
+        if ($stored === self::expectedFingerprintForManifest($manifest, $unitSourceAbsPath)) {
+            return true;
+        }
+        // #24381: unit fps embed coreFingerprint; accept path-keyed cores that
+        // identify the same libLLVM-9.so.1 bytes as the live install.
+        if (!isset($manifest['deps']) || !\is_array($manifest['deps'])) {
+            return false;
+        }
+        $deps = [];
+        foreach ($manifest['deps'] as $dep) {
+            if (\is_string($dep) && '' !== $dep) {
+                $deps[] = $dep;
+            }
+        }
+        foreach (self::equivalentCoreFingerprints() as $core) {
+            if ($stored === self::fingerprintV2WithCore($unitSourceAbsPath, $deps, $core)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -457,10 +599,18 @@ final class HelperRuntimeCache
      */
     public static function fingerprintV2(string $unitSourceAbsPath, array $depsRelPaths): string
     {
+        return self::fingerprintV2WithCore($unitSourceAbsPath, $depsRelPaths, self::coreFingerprint());
+    }
+
+    /**
+     * @param list<string> $depsRelPaths
+     */
+    public static function fingerprintV2WithCore(string $unitSourceAbsPath, array $depsRelPaths, string $core): string
+    {
         $root = \dirname(__DIR__, 2);
         $source = @file_get_contents($unitSourceAbsPath);
         $parts = [
-            self::coreFingerprint(),
+            $core,
             'v2',
             (string) $source,
         ];

@@ -37,7 +37,7 @@ if (!is_dir($unitsDir)) {
 if (is_file($archManifestPath)) {
     $archManifest = json_decode((string) file_get_contents($archManifestPath), true);
     $committedCore = \is_array($archManifest) ? (string) ($archManifest['core_fingerprint'] ?? '') : '';
-    if ('' !== $committedCore && $committedCore !== $liveCore) {
+    if ('' !== $committedCore && !HelperRuntimeCache::coreFingerprintMatches($committedCore)) {
         fwrite(STDOUT, sprintf(
             "check-helper-runtime-prelink: core_fingerprint mismatch — committed %s vs live %s (#24302)\n",
             $committedCore,
