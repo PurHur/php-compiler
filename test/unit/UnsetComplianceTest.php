@@ -24,6 +24,7 @@ final class UnsetComplianceTest extends BaseTest
             'unset_array_int_key.phpt',
             'unset_property.phpt',
             'unset_this_property.phpt',
+            'unset_object_array_dim.phpt',
             'unset_multi.phpt',
         ] as $file) {
             yield $file => self::parsePHPT($dir.'/'.$file, $file);

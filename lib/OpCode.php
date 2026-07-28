@@ -400,10 +400,23 @@ class OpCode {
         return self::TYPE_ASSIGN_REF === $op->type && $op->arg2 === $destSlot;
     }
 
-    /** True when this opcode uses {@see $destSlot} as the container for dim write ([]/key assign, #6775). */
+    /**
+     * True when this opcode uses {@see $destSlot} as the container for dim mutation
+     * ($prop[]= / $prop[k]= write, or unset($prop[k]) — #6775, #24250).
+     *
+     * Property R-mode fetches must alias live storage for these consumers; a copy makes
+     * the mutation a no-op on the instance property (Zend zend_execute.c ZEND_UNSET_DIM).
+     */
     public static function destSlotUsedAsDimWriteContainer(self $op, int $destSlot): bool
     {
-        return self::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type && $op->arg2 === $destSlot;
+        if (self::TYPE_ARRAY_DIM_FETCH_WRITE === $op->type && $op->arg2 === $destSlot) {
+            return true;
+        }
+        // unset($container[$dim]) — arg2 is container, arg3 is dim (#24250).
+        return self::TYPE_UNSET === $op->type
+            && $op->arg2 === $destSlot
+            && null !== $op->arg3
+            && !$op->unsetOnProperty;
     }
 
     /** True when this opcode reads {@see $destSlot} as lhs in fetch-op-assign compound lowering (#6438). */

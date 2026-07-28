@@ -7839,9 +7839,9 @@ restart:
                                 break;
                             }
                             VM\TypedPropertyCheck::assertReadable($propSlot);
-                            // `$obj->arr[] =` needs a live alias into property storage. Plain R-mode
-                            // fetches must copy: an indirect alias makes ternary/`&&` phi self-ASSIGN
-                            // look like a property write (readonly / DOM read-only / skipped `__get`) (#23986).
+                            // `$obj->arr[]=` / unset($obj->arr[$k]) need a live alias into property storage.
+                            // Plain R-mode fetches must copy: an indirect alias makes ternary/`&&` phi self-ASSIGN
+                            // look like a property write (readonly / DOM read-only / skipped `__get`) (#23986, #24250).
                             if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
                                 $result->indirect($propSlot);
                             } else {
@@ -9958,16 +9958,48 @@ restart:
         return OpCode::destSlotUsedAsCompoundAssignRead($next, $destSlot);
     }
 
-    /** True when fetch dest is the container for a following dim write ($prop[] = / $prop[k] =, #6775). */
+    /**
+     * True when fetch dest is the container for a following dim mutation
+     * ($prop[]= / $prop[k]=, or unset($prop[k]) — #6775, #24250).
+     *
+     * Multi-target unset batches PropertyFetch ops before TYPE_UNSET, so look beyond the
+     * immediate next opcode through sibling fetches / other unsets (#24250).
+     */
     private function propertyFetchDestUsedAsDimWriteContainer(Frame $frame, OpCode $op): bool
     {
         $destSlot = (int) $op->arg1;
-        $next = $frame->block->opCodes[$frame->pos] ?? null;
-        if (null === $next) {
+        $ops = $frame->block->opCodes;
+        $n = \count($ops);
+        for ($i = $frame->pos; $i < $n; ++$i) {
+            $next = $ops[$i];
+            if (OpCode::destSlotUsedAsDimWriteContainer($next, $destSlot)) {
+                return true;
+            }
+            if (
+                OpCode::TYPE_PROPERTY_FETCH === $next->type
+                || OpCode::TYPE_PROPERTY_FETCH_WRITE === $next->type
+            ) {
+                if ((int) $next->arg1 === $destSlot) {
+                    // Same temp redefined before a dim mutation — not an aliasing consumer.
+                    return false;
+                }
+                continue;
+            }
+            if (
+                OpCode::TYPE_ARRAY_DIM_FETCH === $next->type
+                || OpCode::TYPE_ARRAY_DIM_FETCH_WRITE === $next->type
+            ) {
+                continue;
+            }
+            if (OpCode::TYPE_UNSET === $next->type) {
+                // unset of a different container; keep scanning for ours.
+                continue;
+            }
+
             return false;
         }
 
-        return OpCode::destSlotUsedAsDimWriteContainer($next, $destSlot);
+        return false;
     }
 
     private function containerNeedsHookedDimWriteBack(Variable $containerSlot): bool
