@@ -17,7 +17,7 @@ use PHPLLVM\Value;
  * str_decrement() — PHP 8.3 alphanumeric string decrement (issue #3102).
  *
  * php-src: ext/standard/string.c — PHP_FUNCTION(str_decrement) / Z_PARAM_STR
- * Null → TypeError on 8.4 forward profile (#21005); empty string → ValueError.
+ * Null → deprecate+coerce then empty ValueError on 8.4 forward profile (#24179, reverts #21005).
  */
 final class str_decrement extends Internal
 {
@@ -49,18 +49,24 @@ final class str_decrement extends Internal
         }
 
         $input = self::jitStringArg($context, $args[0]);
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[0],
+            $input,
+            'str_decrement(): Argument #1 ($string) must not be empty'
+        );
 
         return StringStrIncdec::invokeDecrement($context, $input);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#21005, ext/standard/string.c). */
+    /** Soft-null on forward profile — Zend 8.4 deprecate+coerce then empty ValueError (#24179). */
     private static function vmStringArg(Frame $frame): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, 0, 'str_decrement', 'string')->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'str_decrement',
             0,
@@ -80,7 +86,7 @@ final class str_decrement extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'str_decrement',

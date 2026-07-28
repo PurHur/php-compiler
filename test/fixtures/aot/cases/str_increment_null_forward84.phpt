@@ -1,5 +1,5 @@
 --TEST--
-AOT: str_increment(null) — TypeError on 8.4 forward profile (#21005, ext/standard/string.c)
+AOT: str_increment(null) — ValueError on 8.4 forward profile (#24179, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
