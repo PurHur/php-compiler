@@ -436,4 +436,106 @@ PHP;
         self::assertSame($gettypeReturnSlot, $lastVarExportSendSlot, 'var_export must read gettype return, not @settype');
         self::assertNotContains($lastVarExportSendSlot, $suppressReturnSlots, 'var_export must not alias @settype return');
     }
+
+    public function testFilesystemIteratorInlineBitmaskFlagsAfterAtMkdirStayInt(): void
+    {
+        $dir = sys_get_temp_dir() . '/phpc_atfsi_ut_' . getmypid();
+        @mkdir($dir);
+        file_put_contents($dir . '/a.txt', '1');
+
+        $code = <<<PHP
+<?php
+\$dir = {$this->exportPhpString($dir)};
+@mkdir(\$dir);
+\$it = new FilesystemIterator(\$dir, FilesystemIterator::CURRENT_AS_PATHNAME | FilesystemIterator::SKIP_DOTS);
+echo json_encode(iterator_to_array(\$it, false));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'at_fsi_inline_bitmask.php');
+
+        $mkdirReturnSlot = null;
+        $bitwiseOrSlot = null;
+        $flagsSendSlot = null;
+        $iteratorToArrayReturnSlot = null;
+        $jsonEncodeSendSlot = null;
+        $walk = static function (Block $b) use (
+            &$walk,
+            &$mkdirReturnSlot,
+            &$bitwiseOrSlot,
+            &$flagsSendSlot,
+            &$iteratorToArrayReturnSlot,
+            &$jsonEncodeSendSlot
+        ): void {
+            $inSuppress = null !== $b->orig && $b->orig instanceof \PHPCfg\ErrorSuppressBlock;
+            $pendingInit = null;
+            $newArgOrdinal = -1;
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                    $bitwiseOrSlot = $op->arg1;
+                }
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $pendingInit = true;
+                    $newArgOrdinal = -1;
+                    continue;
+                }
+                if (OpCode::TYPE_NEW === $op->type) {
+                    $newArgOrdinal = 0;
+                    $pendingInit = false;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    if ($inSuppress && null === $mkdirReturnSlot) {
+                        $mkdirReturnSlot = $op->arg1;
+                    } elseif (null === $iteratorToArrayReturnSlot && null !== $bitwiseOrSlot) {
+                        $iteratorToArrayReturnSlot = $op->arg1;
+                    }
+                    $pendingInit = false;
+                    continue;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type) {
+                    if ($newArgOrdinal >= 0) {
+                        if (1 === $newArgOrdinal) {
+                            $flagsSendSlot = $op->arg1;
+                        }
+                        ++$newArgOrdinal;
+                    } elseif (null !== $iteratorToArrayReturnSlot && null === $jsonEncodeSendSlot) {
+                        $jsonEncodeSendSlot = $op->arg1;
+                    }
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $walk($sub);
+                    }
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotNull($bitwiseOrSlot, 'inline CONST|CONST must emit BITWISE_OR');
+        self::assertNotNull($flagsSendSlot, 'FilesystemIterator flags ARG_SEND');
+        self::assertSame($bitwiseOrSlot, $flagsSendSlot, 'flags ARG_SEND must use BITWISE_OR result, not @mkdir bool');
+        self::assertNotSame($mkdirReturnSlot, $flagsSendSlot, 'flags must not alias @mkdir return');
+        self::assertNotNull($iteratorToArrayReturnSlot, 'iterator_to_array return');
+        self::assertNotNull($jsonEncodeSendSlot, 'json_encode ARG_SEND');
+        self::assertSame(
+            $iteratorToArrayReturnSlot,
+            $jsonEncodeSendSlot,
+            'json_encode must read iterator_to_array, not stale bitmask OR (#24369)'
+        );
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame(json_encode([$dir . '/a.txt']), $out);
+
+        foreach (glob($dir . '/*') ?: [] as $f) {
+            @unlink($f);
+        }
+        @rmdir($dir);
+    }
+
+    private function exportPhpString(string $value): string
+    {
+        return var_export($value, true);
+    }
 }
