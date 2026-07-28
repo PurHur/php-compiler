@@ -280,16 +280,20 @@ final class phpc_match_unhandled_format_scalar extends Internal
         }
 
         // max_len > 0: quote the full string (truncate/escape on VM path; short subjects OK).
+        // JitStringConcat::concat ends in a fresh continue block — PHI predecessors must be the
+        // *actual* terminator blocks, not $nonEmptyBlock (#24388 / LLVM "PHI node entries do not
+        // match predecessors" + "Instruction does not dominate all uses").
         $open = $context->builder->load($context->constantStringFromString("'"));
         $close = $context->builder->load($context->constantStringFromString("'"));
         $mid = JitStringConcat::concat($context, $open, $strPtr);
         $full = JitStringConcat::concat($context, $mid, $close);
+        $nonEmptyEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $phi = $context->builder->phi($context->getTypeFromString('__string__*'));
         $phi->addIncoming($emptyMsg, $emptyBlock);
-        $phi->addIncoming($full, $nonEmptyBlock);
+        $phi->addIncoming($full, $nonEmptyEnd);
 
         return $phi;
     }
