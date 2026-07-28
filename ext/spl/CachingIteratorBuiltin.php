@@ -168,8 +168,17 @@ final class SplCachingIteratorStorage
         return self::state($object)['flags'];
     }
 
+    /**
+     * php-src CachingIterator::setFlags — once CIT_CALL_TOSTRING is set it cannot
+     * be cleared ("Unsetting flag CALL_TO_STRING is not possible"; #24252).
+     */
     public static function setFlags(ObjectEntry $object, int $flags): void
     {
+        $current = self::$store[$object->id]['flags'];
+        if (0 !== ($current & CachingIteratorBuiltin::CALL_TOSTRING)
+            && 0 === ($flags & CachingIteratorBuiltin::CALL_TOSTRING)) {
+            throw new \InvalidArgumentException('Unsetting flag CALL_TO_STRING is not possible');
+        }
         self::$store[$object->id]['flags'] = $flags;
     }
 
