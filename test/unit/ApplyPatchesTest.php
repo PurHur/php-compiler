@@ -852,6 +852,11 @@ PHP;
             $body,
             'php-cfg-match overlay must lower UnhandledMatchError for enum/scalar subjects (#5448)'
         );
+        self::assertStringContainsString(
+            '$subject = new Temporary()',
+            $body,
+            'php-cfg-match overlay must snapshot match subject before message helper (#24329)'
+        );
     }
 
     public function testVerifyCriticalLanguagePatchesIncludesEnumBodyOverlays(): void

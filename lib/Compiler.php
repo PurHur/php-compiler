@@ -18317,6 +18317,20 @@ class Compiler {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
+        // UnhandledMatchError helpers take the match *subject*, never the seeded result temp.
+        // Remapping `$v` / expr subjects onto the null seed yields "Unhandled match case NULL" (#24329, #5448).
+        $callee = strtolower($this->resolveCfgFuncCallName($callOp) ?? '');
+        if (
+            'phpc_match_unhandled_operand_message' === $callee
+            || 'phpc_match_unhandled_operand_is_object' === $callee
+            || 'phpc_match_unhandled_format_scalar' === $callee
+        ) {
+            return null;
+        }
+        // Named CVs are never the dead match-result phi temp (#24329).
+        if (null !== Block::resolveVariableName($arg)) {
+            return null;
+        }
         $isCallArg = false;
         foreach ($callOp->args as $callArg) {
             if ($callArg === $arg || $this->operandsReferToSameVariable($callArg, $arg)) {
@@ -18349,6 +18363,15 @@ class Compiler {
                     && property_exists($child, 'result')
                     && null !== $child->result
                     && $this->operandsReferToSameVariable($child->result, $arg)
+                ) {
+                    return null;
+                }
+                // Subject is Identical left operand in the arm test block (#24329).
+                if (
+                    $child instanceof Op\Expr\BinaryOp\Identical
+                    && property_exists($child, 'left')
+                    && null !== $child->left
+                    && $this->operandsReferToSameVariable($child->left, $arg)
                 ) {
                     return null;
                 }
