@@ -26,10 +26,27 @@ require $root.'/vendor/autoload.php';
 $strict = in_array('--strict', $argv, true);
 $arch = HelperRuntimeCache::archKey();
 $unitsDir = HelperRuntimeCache::prelinkedUnitsDir();
+$archManifestPath = \dirname($unitsDir).'/manifest.json';
+$liveCore = HelperRuntimeCache::coreFingerprint();
 
 if (!is_dir($unitsDir)) {
     fwrite(STDOUT, "check-helper-runtime-prelink: no committed cache for {$arch} (cold builds compile helpers locally)\n");
     exit($strict ? 1 : 0);
+}
+
+if (is_file($archManifestPath)) {
+    $archManifest = json_decode((string) file_get_contents($archManifestPath), true);
+    $committedCore = \is_array($archManifest) ? (string) ($archManifest['core_fingerprint'] ?? '') : '';
+    if ('' !== $committedCore && $committedCore !== $liveCore) {
+        fwrite(STDOUT, sprintf(
+            "check-helper-runtime-prelink: core_fingerprint mismatch — committed %s vs live %s (#24302)\n",
+            $committedCore,
+            $liveCore
+        ));
+        if ($strict) {
+            exit(1);
+        }
+    }
 }
 
 $fresh = 0;
