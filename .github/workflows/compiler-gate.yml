@@ -1,0 +1,130 @@
+# Correctness gate for the compiler itself.
+#
+# Until this existed there was NO CI on lib/** or ext/**: bootstrap-spine-gate.yml carries a paths:
+# filter that excludes them, so a PR touching lowering got zero checks and `gh pr view` reported
+# CLEAN — which means "no checks configured", not "checks passed" (AGENTS.md §1).
+#
+# The cost of that gap, measured on 2026-07-28 alone: three separate commits shipped to master that
+# made EVERY AOT binary fail (#24194 twice — startup segfault; #24230 — unlinked symbol). Each was
+# caught by hand and reverted (#24195, #24197, #24231). Any differential sweep run in those windows
+# reported mass failure unrelated to what it was testing.
+#
+# Tiers run cheapest-first so the common failure is reported in minutes rather than at the end.
+# Note: GitHub Actions does not support YAML anchors, so the paths list is duplicated below.
+name: Compiler gate
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'lib/**'
+      - 'ext/**'
+      - 'bin/**'
+      - 'patches/**'
+      - 'script/differential-sweep.sh'
+      - 'script/aot-smoke.sh'
+      - 'test/differential/**'
+      - '.github/workflows/compiler-gate.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'lib/**'
+      - 'ext/**'
+      - 'bin/**'
+      - 'patches/**'
+      - 'script/differential-sweep.sh'
+      - 'script/aot-smoke.sh'
+      - 'test/differential/**'
+      - '.github/workflows/compiler-gate.yml'
+  workflow_dispatch:
+    inputs:
+      run_aot_sweep:
+        description: 'Also run the full AOT differential sweep (~30 min, not green on master)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+concurrency:
+  group: compiler-gate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compiler-gate:
+    name: Lint + AOT smoke + VM differential
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dev image
+        run: |
+          if ! docker image inspect php-compiler:22.04-dev >/dev/null 2>&1; then
+            docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
+          fi
+
+      - name: Compiler gates (Docker)
+        run: |
+          docker run --rm -m 10g \
+            -e PHP_COMPILER_LLVM_PATH=/opt/llvm9 \
+            -e PHP_COMPILER_MEMORY_LIMIT=1536M \
+            -e PHP_COMPILER_LLVM_MEMORY_LIMIT=8192M \
+            -v "$PWD:/compiler" -w /compiler \
+            php-compiler:22.04-dev bash -lc '
+              set -euo pipefail
+              composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh
+
+              # Tier 0 — syntax. Seconds. A parse error in a spine file has killed multi-hour
+              # bootstrap runs hours in (#23022), so this runs before anything expensive.
+              echo "=== nikic spine preflight (~18s) ==="
+              php script/bootstrap-spine-nikic-preflight.php
+
+              # Tier 1 — does the compiler still produce a working binary AT ALL?
+              # This is the check that would have caught all three 2026-07-28 breakages in minutes.
+              echo "=== AOT smoke ==="
+              script/aot-smoke.sh
+
+              # Tier 2 — correctness against Zend on the VM path. Green on master, so a failure
+              # here is a real regression and the job should fail on it.
+              echo "=== differential sweep (VM) ==="
+              script/differential-sweep.sh --repeat 2
+            '
+
+  aot-differential:
+    name: AOT differential sweep (informational)
+    needs: compiler-gate
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_aot_sweep == 'true'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build dev image
+        run: |
+          if ! docker image inspect php-compiler:22.04-dev >/dev/null 2>&1; then
+            docker build -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:22.04-dev .
+          fi
+
+      # Deliberately NOT a pass/fail gate. The AOT sweep is not green on master, so its exit status
+      # is meaningless on its own — AGENTS.md §2 says to compare failing case NAMES against
+      # test/differential/AOT-BASELINE.md, which is a human judgement. Failing the job on a non-zero
+      # exit would make the honest move (adding a case that pins a known bug) look like a
+      # regression, and the usual response to that is to stop adding cases.
+      - name: AOT sweep (reports, does not gate)
+        continue-on-error: true
+        run: |
+          docker run --rm -m 10g \
+            -e PHP_COMPILER_LLVM_PATH=/opt/llvm9 \
+            -e PHP_COMPILER_MEMORY_LIMIT=1536M \
+            -e PHP_COMPILER_LLVM_MEMORY_LIMIT=8192M \
+            -v "$PWD:/compiler" -w /compiler \
+            php-compiler:22.04-dev bash -lc '
+              set -uo pipefail
+              composer install --no-interaction --ignore-platform-reqs -q
+              script/apply-patches.sh
+              script/differential-sweep.sh --aot --repeat 3 || true
+              echo
+              echo "Compare the failing case NAMES above against test/differential/AOT-BASELINE.md."
+              echo "A name that is not in the baseline is a regression; the exit status is not."
+            '
