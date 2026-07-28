@@ -72,14 +72,11 @@ final class JitJsonDecode
     {
         StringJsonDecode::ensureLinked($context);
         if (JITVariable::TYPE_VALUE === $json->type) {
-            // json_encode() boxes __string__* in __value__* — read + own before NestedJIT (#24137).
+            // json_encode() boxes __string__* in __value__* — read before NestedJIT (#24137).
+            // Bridge owns+pins via separate+disableRefcount (heap strings vs constant pins).
             $jsonString = $context->builder->call(
                 $context->lookupFunction('__value__readString'),
                 JitValueBox::valuePtrFromVariable($context, $json)
-            );
-            $jsonString = $context->builder->call(
-                $context->lookupFunction('__string__separate'),
-                $jsonString
             );
         } else {
             // Soft-null DEP+coerce on 8.4 — Zend Z_PARAM_STR (#21223; reverts #18852 TypeError).

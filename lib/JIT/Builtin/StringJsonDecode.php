@@ -253,10 +253,13 @@ final class StringJsonDecode
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::DECODE_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $payload = $fn->getParam(0);
+        // Own + pin: NestedJIT string-param addref/delref frees heap __string__* mid-call
+        // (length survives, content UAF). Constant strings already use disableRefcount (#24137).
         $payloadOwned = $context->builder->call(
             $context->lookupFunction('__string__separate'),
             $payload
         );
+        $context->refcount->disableRefcount($payloadOwned);
         $payloadArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
             $payloadOwned,
