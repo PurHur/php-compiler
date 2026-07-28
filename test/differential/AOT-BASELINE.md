@@ -93,7 +93,7 @@ binding. Six of nine fail.
 |---|---|---|
 | `k01` readonly promoted properties | ok | — |
 | `k02` named arguments, out-of-order + skipped default | ok | — |
-| `k03` `static::m()` through an overriding subclass | **`11` vs `21`** | #24169 |
+| `k03` `static::m()` through an overriding subclass | ~~`11` vs `21`~~ **fixed** | #24169 |
 | `k04` by-reference parameter | **no output at all** | #24162 |
 | `k05` `str_starts_with()` | **`false` on matching input** | #24161 |
 | `k06` backed enum with `match($this)` | compile failure | #24163 |
