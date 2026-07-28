@@ -355,8 +355,9 @@ PHP;
         self::assertTrue($registry['c']['chunk']['getParameterized'] ?? false);
     }
 
-    public function testLowersStaticPropertyHooks(): void
+    public function testRejectsStaticPropertyHooksOnForwardProfile(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class Box {
@@ -367,11 +368,9 @@ class Box {
     private static ?string $v = null;
 }
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src, 'static_hooks.php');
-        self::assertStringContainsString('public static string $label;', $out);
-        self::assertStringContainsString('public static function __phpc_property_get_label(): string', $out);
-        self::assertStringContainsString('public static function __phpc_property_set_label(string $value): void', $out);
-        self::assertTrue($registry['box']['label']['static'] ?? false);
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(PropertyHooks::STATIC_HOOK_COMPILE_ERROR);
+        (new PropertyHooks())->process($src, 'static_hooks.php');
     }
 
     public function testLowersSetBlockHookWithNestedBackingField(): void

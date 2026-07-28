@@ -14,7 +14,7 @@ use PHPCompiler\CompilerVersion;
  */
 final class PropertyHooks
 {
-    /** Legacy message retained for tests/docs; static hooks compile since #6931 (PHP 8.4, zend_property_hooks.c). */
+    /** php-src: Zend/zend_compile.c — hooks apply to object properties only (#24281, re-#9725). */
     public const STATIC_HOOK_COMPILE_ERROR = 'Cannot declare hooks for static property';
 
     /** php-src: Zend/zend_compile.c — `private(set)` decl + hook block requires set hook (#12203). */
@@ -102,6 +102,16 @@ final class PropertyHooks
         return (new self())->locateDefaultInitializerWithHookBlockSyntaxError($code);
     }
 
+    /**
+     * Static property + hook block on forward profile; php-src rejects at compile time (#24281).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function staticPropertyHookSyntaxError(string $code): ?array
+    {
+        return (new self())->locateStaticPropertyHookSyntaxError($code);
+    }
+
     public static function virtualHookedDefaultCompileError(string $className, string $propName): string
     {
         return sprintf(self::VIRTUAL_HOOKED_DEFAULT_COMPILE_ERROR, $className, $propName);
@@ -170,6 +180,70 @@ final class PropertyHooks
                 return $error;
             }
             $offset = $bodyEnd + 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    private function locateStaticPropertyHookSyntaxError(string $code): ?array
+    {
+        $offset = 0;
+        $len = strlen($code);
+        while ($offset < $len) {
+            $decl = $this->findNextDeclarable($code, $offset);
+            if (null === $decl) {
+                break;
+            }
+            [$declPos, , ] = $decl;
+            $braceOpen = strpos($code, '{', $declPos);
+            if (false === $braceOpen) {
+                break;
+            }
+            $span = $this->matchingBraceSpan($code, $braceOpen);
+            if (null === $span) {
+                $offset = $braceOpen + 1;
+                continue;
+            }
+            [$bodyStart, $bodyEnd] = $span;
+            $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
+            $error = $this->locateStaticPropertyHookInBody($code, $bodyStart + 1, $body);
+            if (null !== $error) {
+                return $error;
+            }
+            $offset = $bodyEnd + 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    private function locateStaticPropertyHookInBody(string $fullCode, int $bodyOffsetInFull, string $body): ?array
+    {
+        $offset = 0;
+        $len = strlen($body);
+        while ($offset < $len) {
+            $hook = $this->findNextPropertyHookDecl($body, $offset);
+            if (null === $hook) {
+                return null;
+            }
+            [$prop, $varStart, $hookOpen] = $hook;
+            $declPrefix = substr($body, max(0, $varStart - 200), $varStart - max(0, $varStart - 200));
+            $propDeclHead = rtrim(substr($body, $varStart, $hookOpen - $varStart));
+            [$priorMembers, $ownDeclPrefix] = $this->splitPropertyDeclPrefix($declPrefix);
+            $ownDeclHead = $ownDeclPrefix.$propDeclHead;
+            if (preg_match('/\bstatic\b/', $ownDeclHead)) {
+                return [
+                    'line' => self::lineAtOffset($fullCode, $bodyOffsetInFull + $hookOpen),
+                    'message' => self::STATIC_HOOK_COMPILE_ERROR,
+                ];
+            }
+            $hookSpan = $this->matchingBraceSpan($body, $hookOpen);
+            $offset = null === $hookSpan ? $hookOpen + 1 : $hookSpan[1] + 1;
         }
 
         return null;
@@ -1125,6 +1199,13 @@ final class PropertyHooks
             $declPrefix = $priorMembers.$ownDeclPrefix;
             $ownDeclHead = $ownDeclPrefix.$propDeclHead;
             $isStatic = (bool) preg_match('/\bstatic\b/', $ownDeclHead);
+            if ($isStatic && CompilerVersion::supportsPropertyHooks()) {
+                throw new CompileFatal(
+                    $filename,
+                    self::lineAtOffset($fullCode, $bodyOffsetInFile + $hookOpen),
+                    self::STATIC_HOOK_COMPILE_ERROR
+                );
+            }
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
                 $body,
                 $declStart,

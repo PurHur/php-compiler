@@ -26,6 +26,11 @@ final class PropertyHookSyntaxRejector
             throw new CompileFatal($filename, $defaultWithHook['line'], $defaultWithHook['message']);
         }
         if (CompilerVersion::supportsPropertyHooks()) {
+            $staticHook = PropertyHooks::staticPropertyHookSyntaxError($code);
+            if (null !== $staticHook) {
+                throw new CompileFatal($filename, $staticHook['line'], $staticHook['message']);
+            }
+
             return $code;
         }
         $error = PropertyHooks::referenceProfileHookSyntaxError($code);

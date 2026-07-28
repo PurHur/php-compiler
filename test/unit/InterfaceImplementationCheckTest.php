@@ -246,13 +246,11 @@ interface I {
 class Bad implements I {}
 PHP;
         $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Class Bad must implement 1 interface property');
-        $this->expectExceptionMessage('I::$p');
-        $this->expectExceptionMessage('{ get; set; }');
+        $this->expectExceptionMessage(\PHPCompiler\SourcePreprocessor\PropertyHooks::STATIC_HOOK_COMPILE_ERROR);
         $runtime->parseAndCompile($code, 'missing_iface_static_property.php');
     }
 
-    public function testImplementedInterfaceStaticPropertyHookCompiles(): void
+    public function testImplementedInterfaceStaticPropertyHookRejected(): void
     {
         $this->skipUnlessPropertyHooksEnabled();
         $runtime = new Runtime();
@@ -270,11 +268,9 @@ class Good implements I {
 }
 echo Good::$p, "\n";
 PHP;
-        $block = $runtime->parseAndCompile($code, 'iface_static_property_ok.php');
-        $this->assertNotNull($block);
-        ob_start();
-        $runtime->run($block);
-        $this->assertSame("a\n", ob_get_clean());
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(\PHPCompiler\SourcePreprocessor\PropertyHooks::STATIC_HOOK_COMPILE_ERROR);
+        $runtime->parseAndCompile($code, 'iface_static_property_ok.php');
     }
 
     public function testConcreteClassAbstractPropertyHookFailsAtCompileTime(): void
