@@ -1813,4 +1813,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         // Legacy InternalArgInfo name must not resolve (Zend rejects $res)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'res', 'get_resource_type'));
     }
+
+    /** @covers issue #23937 */
+    public function testStreamSocketServerZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('stream_socket_server');
+        self::assertSame(['address', 'error_code', 'error_message', 'flags', 'context'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'address', 'stream_socket_server'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'error_code', 'stream_socket_server'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'error_message', 'stream_socket_server'));
+        // Legacy InternalArgInfo names must not resolve
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'localaddress', 'stream_socket_server'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'errcode', 'stream_socket_server'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'errstring', 'stream_socket_server'));
+    }
 }

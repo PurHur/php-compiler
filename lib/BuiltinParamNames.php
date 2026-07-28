@@ -511,6 +511,9 @@ final class BuiltinParamNames
                 return ['from', 'to', 'length', 'offset'];
             case 'stream_socket_client':
                 return ['address', 'error_code', 'error_message', 'timeout', 'flags', 'context'];
+            // php-src ext/standard/streamsfuncs.stub.php — InternalArgInfo still says localaddress/errcode/errstring (#23937)
+            case 'stream_socket_server':
+                return ['address', 'error_code', 'error_message', 'flags', 'context'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says format; omits context (#23598)
             case 'get_headers':
                 return ['url', 'associative', 'context'];
