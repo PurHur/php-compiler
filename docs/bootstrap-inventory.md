@@ -41124,7 +41124,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/HelperRuntimeCache.php`
 
 **Warnings** (review for bootstrap subset):
-- 37 class method(s)
+- 43 class method(s)
 - 3 closure(s)
 
 ### `lib/AOT/HelperUnitGlobalCtor.php`
