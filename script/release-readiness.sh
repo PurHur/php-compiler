@@ -290,6 +290,10 @@ FAILED=0
 # --- Quick bundle ---
 run_gate_bootstrap_inventory || FAILED=1
 
+run_gate helper-runtime-prelink "check-helper-runtime-prelink.php --strict (#24302)" \
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-helper-runtime-prelink.php --strict \
+  || FAILED=1
+
 run_gate spine-coverage "check-selfhost-spine-coverage-sync" \
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-selfhost-spine-coverage-sync.php \
   || FAILED=1
