@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmFsGlob;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\Frame;
@@ -85,8 +86,17 @@ final class GlobIteratorStorage
 
     public static function open(ObjectEntry $object, string $pattern, int $flags = 0): void
     {
-        $result = VmFsGlob::glob($pattern, $flags);
+        // php-src GlobIterator stores FilesystemIterator flags separately from glob()
+        // flags — only GLOB_* bits are passed to php_glob (#24254 / re-#22306).
+        $globFlags = $flags & StdlibConstants::GLOB_AVAILABLE_FLAGS;
+        $result = VmFsGlob::glob($pattern, $globFlags);
         $paths = false === $result ? [] : array_values($result);
+        if (0 !== ($flags & FilesystemIteratorBuiltin::SKIP_DOTS)) {
+            $paths = array_values(array_filter(
+                $paths,
+                static fn (string $path): bool => '.' !== basename($path) && '..' !== basename($path)
+            ));
+        }
 
         self::$store[$object->id] = [
             'pattern' => $pattern,
