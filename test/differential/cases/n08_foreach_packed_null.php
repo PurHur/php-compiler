@@ -1,5 +1,5 @@
 <?php
-// FAILS ON AOT — #24261. foreach over a PACKED array containing null does not terminate: no output
+// #24261 — foreach over a PACKED array containing null must terminate and count all elements.
 // at all, killed at the sweep timeout (exit 124 under a 10s cap when run directly).
 //
 // Bounding evidence, all measured:

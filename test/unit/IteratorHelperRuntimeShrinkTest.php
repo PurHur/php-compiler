@@ -27,4 +27,12 @@ final class IteratorHelperRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('stringKeyNodeAt', $source);
         $this->assertGreaterThan(600, substr_count($source, "\n") + 1);
     }
+
+    /** Packed foreach must not use isset() to skip null slots (#24261). */
+    public function testPackedForeachValidSkipsUndefinedNotNull(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/VM/VmIteratorForeach.php');
+        $this->assertStringContainsString('TYPE_UNDEFINED', $source);
+        $this->assertStringNotContainsString('__hashtable__offsetIsSet', $source);
+    }
 }
