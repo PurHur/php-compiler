@@ -430,6 +430,19 @@ final class BuiltinParamNames
             // php-src ext/session/session.stub.php — InternalArgInfo still says newid (#23402)
             case 'session_id':
                 return ['id'];
+            // php-src ext/session/session.stub.php — open required; close…update_timestamp optional (#23958)
+            case 'session_set_save_handler':
+                return [
+                    'open',
+                    'close=',
+                    'read=',
+                    'write=',
+                    'destroy=',
+                    'gc=',
+                    'create_sid=',
+                    'validate_sid=',
+                    'update_timestamp=',
+                ];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says error_type (#23402)
             case 'trigger_error':
             case 'user_error':
