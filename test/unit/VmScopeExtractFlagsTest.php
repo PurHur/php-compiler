@@ -50,6 +50,19 @@ final class VmScopeExtractFlagsTest extends TestCase
         );
     }
 
+    /** EXTR_PREFIX_IF_EXISTS: set → prefix; absent → unprefixed (#24330). */
+    public function testResolveExtractFinalNameExtrPrefixIfExists(): void
+    {
+        $this->assertSame(
+            'p_a',
+            ScopeBuiltinJitHelper::resolveExtractFinalName('a', true, VmScope::EXTR_PREFIX_IF_EXISTS, 'p')
+        );
+        $this->assertSame(
+            'b',
+            ScopeBuiltinJitHelper::resolveExtractFinalName('b', false, VmScope::EXTR_PREFIX_IF_EXISTS, 'p')
+        );
+    }
+
     public function testExtrConstantsMatchStdlib(): void
     {
         $this->assertSame(0, VmScope::EXTR_OVERWRITE);
