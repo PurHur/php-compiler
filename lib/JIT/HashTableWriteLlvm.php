@@ -753,18 +753,18 @@ final class HashTableWriteLlvm
         }
         $ht = HashTableReadLlvm::loadHashtablePointer($context, $array);
         if (null === $key) {
-            if ($array->nextFreeElementFromRuntime) {
-                $map = $context->structFieldMap['__hashtable__'];
-                $index = $context->builder->load(
-                    $context->builder->structGep($ht, $map['nextFreeElement'])
-                );
-                self::setAtIndex($context, $ht, $index, $element);
-
-                return;
-            }
-            $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
-            ++$array->nextFreeElement;
+            // Always load nextFreeElement at runtime. A compile-time counter is safe only for
+            // straight-line INIT_ARRAY / sequential `$a[]=` sites compiled once each; a single
+            // `$x[] =` inside foreach/while is one call site that runs N times and would keep
+            // writing the same baked index (generator foreach → only last yield kept, #24145;
+            // same shape as spread loops #23971).
+            $map = $context->structFieldMap['__hashtable__'];
+            $index = $context->builder->load(
+                $context->builder->structGep($ht, $map['nextFreeElement'])
+            );
             self::setAtIndex($context, $ht, $index, $element);
+            $array->nextFreeElementFromRuntime = true;
+            ++$array->nextFreeElement;
 
             return;
         }
@@ -1288,7 +1288,12 @@ final class HashTableWriteLlvm
         $ht = HashTableReadLlvm::loadHashtablePointer($context, $array);
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
-        $index = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+        // Runtime nextFreeElement — a compile-time counter is one index for the whole
+        // `$x[] =` call site; inside foreach/while that overwrites slot 0 (#24145, #23971).
+        $index = $context->builder->load(
+            $context->builder->structGep($ht, $map['nextFreeElement'])
+        );
+        $array->nextFreeElementFromRuntime = true;
         ++$array->nextFreeElement;
         $one = $sizeT->constInt(1, false);
         $need = $context->builder->addNoSignedWrap($index, $one);
