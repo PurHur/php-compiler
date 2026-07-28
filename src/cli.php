@@ -198,6 +198,35 @@ if (!function_exists('php_compiler_cli_sync_host_exception_ignore_args')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_sync_host_exception_string_param_max_len')) {
+    /**
+     * Inherit host {@code php -d zend.exception_string_param_max_len=...} into the guest VM (#24487).
+     *
+     * Guest argv {@code bin/vm.php -d zend.exception_string_param_max_len=0} wins via
+     * {@see php_compiler_cli_apply_ini_overrides}; otherwise mirror host {@code ini_get}
+     * (php.ini or host {@code -d}) so UnhandledMatchError / getTraceAsString truncation
+     * matches Zend when the override is applied to the host PHP binary.
+     *
+     * @param array<string, mixed> $options
+     */
+    function php_compiler_cli_sync_host_exception_string_param_max_len(\PHPCompiler\VM\Context $ctx, array $options): void
+    {
+        $overrides = $options['-d'] ?? null;
+        if (is_array($overrides)) {
+            foreach ($overrides as $key => $_) {
+                if (is_string($key) && 0 === strcasecmp($key, 'zend.exception_string_param_max_len')) {
+                    return;
+                }
+            }
+        }
+        $raw = @\ini_get('zend.exception_string_param_max_len');
+        if (false === $raw) {
+            return;
+        }
+        \PHPCompiler\ext\standard\VmIni::set($ctx, 'zend.exception_string_param_max_len', (string) $raw);
+    }
+}
+
 if (!function_exists('php_compiler_cli_resolve_user_path')) {
     /**
      * Resolve a user-supplied relative path against the pre-chdir invocation cwd.
