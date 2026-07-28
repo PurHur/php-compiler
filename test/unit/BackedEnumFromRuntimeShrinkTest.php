@@ -26,4 +26,16 @@ final class BackedEnumFromRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitVmHelperLink', $source);
         $this->assertStringNotContainsString('matchStringBackingPacked', $source);
     }
+
+    /** Invalid from() raises catchable throw-pending ValueError, not immediate abort (#24219). */
+    public function testBackedEnumFromValueErrorUsesThrowPendingNotAbort(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/BackedEnumFromRuntime.php');
+        $this->assertStringContainsString('phpc_jit_set_throw_pending', $source);
+        $this->assertStringContainsString('raiseValueErrorFromString', $source);
+        $raisePos = strpos($source, 'function raiseValueErrorFromString');
+        $this->assertNotFalse($raisePos);
+        $raiseBody = substr($source, $raisePos, 1200);
+        $this->assertStringNotContainsString('phpc_jit_abort_if_pending_type_error', $raiseBody);
+    }
 }

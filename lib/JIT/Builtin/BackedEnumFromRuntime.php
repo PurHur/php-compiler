@@ -7,9 +7,11 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\JitThrow;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitNativeString;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -375,17 +377,43 @@ final class BackedEnumFromRuntime
         );
     }
 
+    /**
+     * Invalid backing value — catchable ValueError (#24219).
+     *
+     * Synthesized {@code Enum::from()} is a separate LLVM function, so try/catch lives in the
+     * caller. Set throw-pending (object) for catchable dispatch and the type-error pending
+     * message for uncaught abort text; {@see TryCatchHelper::emitCheckPendingThrowAfterCall}.
+     */
     private static function raiseValueErrorFromString(Context $context, Value $messageStr): void
     {
+        JitThrow::registerDeclarations($context);
+        JitThrow::ensureLinked($context);
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        self::raisePendingFromString($context, $messageStr, '__compiler_jit_raise_value_error');
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
-        } else {
-            $context->builder->call($context->lookupFunction('abort'));
-            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+
+        $object = $context->type->object;
+        $classId = $object->lookup('ValueError');
+        $obj = $object->allocate($classId);
+        $object->markObjectConstructed($obj);
+        $msgVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $messageStr
+        );
+        $object->storeInstanceProperty($obj, 'ValueError', 'message', $msgVar);
+
+        $handler = TryCatchHelper::resolveThrowHandler($context);
+        if (null !== $handler && null !== $handler->dispatchBb) {
+            $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+            $context->builder->branch($handler->dispatchBb);
+
+            return;
         }
+
+        // Cross-function: object pending for try/catch + string pending for uncaught abort.
+        $context->builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+        self::raisePendingFromString($context, $messageStr, '__compiler_jit_raise_value_error');
     }
 
     private static function raiseTypeErrorFromString(Context $context, Value $messageStr): void

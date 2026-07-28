@@ -114,6 +114,8 @@ final class BackedEnumFromJit
             $context->builder->returnValue(self::returnNullValue($context));
         } else {
             BackedEnumFromRuntime::emitStringValueError($context, $className, $normalized);
+            // ValueError is pending for the caller try/catch (#24219); still return a slot.
+            $context->builder->returnValue(self::returnNullValue($context));
         }
     }
 
@@ -155,6 +157,8 @@ final class BackedEnumFromJit
             $context->builder->returnValue(self::returnNullValue($context));
         } else {
             BackedEnumFromRuntime::emitIntValueError($context, $className, $normalized);
+            // ValueError is pending for the caller try/catch (#24219); still return a slot.
+            $context->builder->returnValue(self::returnNullValue($context));
         }
     }
 
