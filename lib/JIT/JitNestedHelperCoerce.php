@@ -476,6 +476,13 @@ final class JitNestedHelperCoerce
         if ('__string__*' === $wantStr) {
             return self::extractStringPtrFromHelperResult($context, $raw);
         }
+        if ('__value__*' === $wantStr) {
+            if (self::isValueBox($context, $raw)) {
+                return self::valueBoxPtrFromHelperResult($context, $raw);
+            }
+
+            return $raw;
+        }
         if ('double' === $wantStr || 'float' === $wantStr) {
             $extracted = self::extractDoubleFromHelperResult($context, $raw);
             if ('float' === $wantStr && $extracted->typeOf() !== $wantTy) {

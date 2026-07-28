@@ -21,7 +21,7 @@ final class UsortThinAotClosureDeclineTest extends TestCase
     public function testNestedClosureInvokeScaffoldingPresent(): void
     {
         $this->assertSame(
-            'phpcompiler\\ext\\standard\\vmclosurecall::invokevariable',
+            'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariable',
             NestedClosureInvokeLlvm::PROXY
         );
         $usort = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/UsortRuntime.php');

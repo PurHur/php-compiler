@@ -61,7 +61,7 @@ final class ArrayMapJitHelper
     {
         $out = new HashTable();
         foreach ($src->exportKeyValuePairs(true) as [$key, $value]) {
-            $mapped = VmClosureCall::invokeVariable($closure, $value);
+            $mapped = VmClosureInvoke::invokeVariable($closure, $value);
             self::appendKeyed($out, $key, $mapped);
         }
 
@@ -121,7 +121,7 @@ final class ArrayMapJitHelper
             foreach ($sources as $ht) {
                 $rowArgs[] = self::valueAtKey($ht, $key);
             }
-            $mapped = VmClosureCall::invokeVariable($closure, ...$rowArgs);
+            $mapped = VmClosureInvoke::invokeVariable($closure, ...$rowArgs);
             $out->addIndex($destIdx++, $mapped);
         }
 

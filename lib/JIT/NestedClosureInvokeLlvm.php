@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Call\NestedClosureInvoke;
  */
 final class NestedClosureInvokeLlvm
 {
-    public const PROXY = 'phpcompiler\\ext\\standard\\vmclosurecall::invokevariable';
+    public const PROXY = 'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariable';
 
     public static function ensureLinked(Context $context): void
     {
@@ -22,7 +22,7 @@ final class NestedClosureInvokeLlvm
         }
         $context->functionProxies[self::PROXY] = new NestedClosureInvoke();
         $context->functionReturnType[self::PROXY] = '__value__*';
-        $id = $context->type->object->lookup('PHPCompiler\\ext\\standard\\VmClosureCall');
+        $id = $context->type->object->lookup('PHPCompiler\\ext\\standard\\VmClosureInvoke');
         $context->type->object->defineMethodVisibility(
             $id,
             'invokevariable',

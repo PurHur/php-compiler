@@ -76,6 +76,8 @@ final class HelperRuntimeCache
         'phpcompiler\\ext\\standard\\usortjithelper::sortvalueswithclosure' => true,
         'phpcompiler\\ext\\standard\\arraymapjithelper::mapwithclosure' => true,
         'phpcompiler\\ext\\standard\\arraymapjithelper::mapwithclosuremultiple' => true,
+        'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariable' => true,
+        'phpcompiler\\ext\\standard\\vmclosureinvoke::invokevariabletwo' => true,
     ];
 
     private static bool $loggedHit = false;

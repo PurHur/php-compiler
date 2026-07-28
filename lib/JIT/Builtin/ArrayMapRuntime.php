@@ -41,6 +41,8 @@ final class ArrayMapRuntime
 
     private const HELPER_PATH = '/ext/standard/ArrayMapJitHelper.php';
 
+    private const CLOSURE_INVOKE_PATH = '/ext/standard/VmClosureInvoke.php';
+
     private const MAP_NULL = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapNullIdentity';
 
     private const MAP_NULL_MULTIPLE = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapNullZipMultiple';

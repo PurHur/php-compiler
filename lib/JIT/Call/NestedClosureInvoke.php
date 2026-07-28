@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * NestedJIT invoke for thin-AOT Closures via {@see RuntimeIndirectClosureCall} (#24156).
  *
  * AOT Closures carry {@see VmClosure::TARGET_PROPERTY}, not {@see \PHPCompiler\VM\ObjectEntry::$closureState}.
- * Static method proxy: {@see \PHPCompiler\ext\standard\VmClosureCall::invokeVariable}.
+ * Static method proxy: {@see \PHPCompiler\ext\standard\VmClosureInvoke::invokeVariable}.
  * Always returns `__value__*` so NestedJIT can materialize a Variable result.
  */
 final class NestedClosureInvoke implements Call

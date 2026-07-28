@@ -22,6 +22,6 @@ final class ArrayReduceThinAotClosureDeclineTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayReduceRuntime.php');
         $this->assertStringContainsString('NestedClosureInvokeLlvm::ensureLinked', $runtime);
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ArrayReduceJitHelper.php');
-        $this->assertStringContainsString('VmClosureCall::invokeVariable', $helper);
+        $this->assertStringContainsString('VmClosureInvoke::invokeVariable', $helper);
     }
 }

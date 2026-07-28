@@ -83,7 +83,7 @@ final class ArrayReduceJitHelper
             } else {
                 $carryArg = $carry;
             }
-            $carry = VmClosureCall::invokeVariable($closure, $carryArg, $item);
+            $carry = VmClosureInvoke::invokeVariable($closure, $carryArg, $item);
         }
         $out = new Variable();
         if ($empty) {

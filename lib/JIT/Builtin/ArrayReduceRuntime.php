@@ -31,6 +31,8 @@ final class ArrayReduceRuntime
 
     private const HELPER_PATH = '/ext/standard/ArrayReduceJitHelper.php';
 
+    private const CLOSURE_INVOKE_PATH = '/ext/standard/VmClosureInvoke.php';
+
     private const REDUCE_BUILTIN_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReduceJitHelper::reduceWithBuiltin';
 
     private const REDUCE_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReduceJitHelper::reduceWithClosure';
@@ -53,15 +55,13 @@ final class ArrayReduceRuntime
         if (!ArrayReduceCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
-        if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)
-            && $context->isThinStandaloneAotMain()
-        ) {
-            throw new \LogicException(ArrayReduceCallbackPolicy::thinAotClosureRejectionMessage());
-        }
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $initialPtr = self::initialPtr($context, $initial);
         if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)) {
+            if ($context->isThinStandaloneAotMain()) {
+                throw new \LogicException(ArrayReduceCallbackPolicy::thinAotClosureRejectionMessage());
+            }
             return $context->builder->call(
                 $context->lookupFunction(self::ABI_REDUCE_CLOSURE),
                 $ht,
@@ -116,6 +116,12 @@ final class ArrayReduceRuntime
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
+        JitVmHelperLink::ensureCompiledBundle(
+            $context,
+            [self::HELPER_PATH, self::CLOSURE_INVOKE_PATH],
+            self::COMPILED_HELPERS,
+            '#24156'
+        );
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_REDUCE_BUILTIN,

@@ -37,6 +37,8 @@ final class UsortRuntime
 
     private const HELPER_PATH = '/ext/standard/UsortJitHelper.php';
 
+    private const CLOSURE_INVOKE_PATH = '/ext/standard/VmClosureInvoke.php';
+
     private const USORT_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\UsortJitHelper::sortPackedWithClosure';
 
     private const UKSORT_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\UsortJitHelper::sortKeysWithClosure';
