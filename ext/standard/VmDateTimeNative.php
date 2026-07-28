@@ -465,7 +465,7 @@ final class VmDateTimeNative
 
             return self::weekdayOfWeekParseResult(strtolower($matches[2]), $when, $base, $tzName);
         }
-        // php-src parse_date.re — back of / front of hour (#23936).
+        // php-src parse_date.re — back of / front of hour24 (+ optional date remainder) (#23936, #24395).
         if (1 === preg_match('/^(back|front)\s+of\s+(.+)$/i', $time, $matches)) {
             return self::backFrontOfHourParseResult(strtolower($matches[1]), trim($matches[2]), $base, $tzName);
         }
@@ -2405,6 +2405,9 @@ final class VmDateTimeNative
     /**
      * php-src parse_date.re — back of H → H:15; front of H → (H-1):45 (#23936).
      *
+     * Timelib matches `hour24` then continues scanning; a glued ISO/yy date remainder
+     * (e.g. `back of 2024-01-15` → hour 20 + `24-01-15`) sets that calendar day (#24395).
+     *
      * @return array{timestamp: int, microsecond: int}|null
      */
     private static function backFrontOfHourParseResult(
@@ -2413,9 +2416,16 @@ final class VmDateTimeNative
         int $base,
         string $tzName
     ): ?array {
+        $hourPart = trim($hourPart);
         $clock = self::tryParseHourToken($hourPart);
+        $ymd = null;
         if (null === $clock) {
-            return null;
+            $split = self::trySplitBackFrontHourAndDate($hourPart);
+            if (null === $split) {
+                return null;
+            }
+            $clock = $split[0];
+            $ymd = $split[1];
         }
         $hour = $clock;
         $minute = 0;
@@ -2427,7 +2437,134 @@ final class VmDateTimeNative
             $minute = 45;
         }
 
+        if (null !== $ymd) {
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    $ymd[0],
+                    $ymd[1],
+                    $ymd[2],
+                    $hour,
+                    $minute,
+                    0,
+                    $tzName
+                ),
+                'microsecond' => 0,
+            ];
+        }
+
         return self::timeOfDayOnBase($base, $hour, $minute, 0, $tzName);
+    }
+
+    /**
+     * Timelib backof|frontof: consume hour24 (+ optional meridian), then a date remainder (#24395).
+     *
+     * @return array{0: int, 1: array{0: int, 1: int, 2: int}}|null [hour, [Y, m, d]]
+     */
+    private static function trySplitBackFrontHourAndDate(string $part): ?array
+    {
+        // Spaced forms: "9 2024-01-15", "9am 2024-01-15", "09 2024-01-15".
+        if (1 === preg_match('/^(2[0-4]|[01]?[0-9])\s*(am|pm)?\s+(.+)$/i', $part, $matches)) {
+            $hour = self::applyBackFrontMeridian((int) $matches[1], $matches[2] ?? '');
+            if (null === $hour) {
+                return null;
+            }
+            $ymd = self::tryParseBackFrontDateRemainder(trim($matches[3]));
+            if (null !== $ymd) {
+                return [$hour, $ymd];
+            }
+        }
+
+        // Glued meridian + date: "9am2024-01-15".
+        if (1 === preg_match('/^(2[0-4]|[01]?[0-9])\s*(am|pm)(.+)$/i', $part, $matches)) {
+            $hour = self::applyBackFrontMeridian((int) $matches[1], $matches[2]);
+            if (null === $hour) {
+                return null;
+            }
+            $ymd = self::tryParseBackFrontDateRemainder(trim($matches[3]));
+            if (null !== $ymd) {
+                return [$hour, $ymd];
+            }
+        }
+
+        // Glued digits (longest hour24): "2024-01-15" → hour 20 + "24-01-15".
+        if (1 === preg_match('/^(2[0-4]|[01][0-9])(.*)$/', $part, $matches)) {
+            $rest = $matches[2];
+            if ('' !== $rest && 1 !== preg_match('/^\s*(am|pm)/i', $rest)) {
+                $ymd = self::tryParseBackFrontDateRemainder(ltrim($rest));
+                if (null !== $ymd) {
+                    return [(int) $matches[1], $ymd];
+                }
+            }
+        }
+        if (1 === preg_match('/^([0-9])(.*)$/', $part, $matches)) {
+            $rest = $matches[2];
+            if ('' !== $rest && 1 !== preg_match('/^\s*(am|pm)/i', $rest)) {
+                $ymd = self::tryParseBackFrontDateRemainder(ltrim($rest));
+                if (null !== $ymd) {
+                    return [(int) $matches[1], $ymd];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Date remainder after hour24 — YYYY-M-D or YY-M-D (timelib 00–69→20xx, 70–99→19xx).
+     *
+     * @return array{0: int, 1: int, 2: int}|null
+     */
+    private static function tryParseBackFrontDateRemainder(string $rest): ?array
+    {
+        $rest = trim($rest);
+        if ('' === $rest) {
+            return null;
+        }
+        if (1 === preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $rest, $matches)) {
+            $month = (int) $matches[2];
+            $day = (int) $matches[3];
+            if ($month < 1 || $month > 12 || $day < 1 || $day > 31) {
+                return null;
+            }
+
+            return [(int) $matches[1], $month, $day];
+        }
+        if (1 === preg_match('/^(\d{2})-(\d{1,2})-(\d{1,2})$/', $rest, $matches)) {
+            $yy = (int) $matches[1];
+            $month = (int) $matches[2];
+            $day = (int) $matches[3];
+            if ($month < 1 || $month > 12 || $day < 1 || $day > 31) {
+                return null;
+            }
+            $year = $yy <= 69 ? 2000 + $yy : 1900 + $yy;
+
+            return [$year, $month, $day];
+        }
+
+        return null;
+    }
+
+    private static function applyBackFrontMeridian(int $hour, string $ampm): ?int
+    {
+        $ampm = strtolower(trim($ampm));
+        if ('' === $ampm) {
+            if ($hour > 24) {
+                return null;
+            }
+
+            return $hour;
+        }
+        if ($hour < 1 || $hour > 12) {
+            return null;
+        }
+        if ('pm' === $ampm && $hour < 12) {
+            $hour += 12;
+        }
+        if ('am' === $ampm && 12 === $hour) {
+            $hour = 0;
+        }
+
+        return $hour;
     }
 
     /** Parse hour token for back/front of: "9", "9am", "17", "5pm". */
@@ -2435,19 +2572,7 @@ final class VmDateTimeNative
     {
         $token = trim($token);
         if (1 === preg_match('/^(\d{1,2})\s*(am|pm)$/i', $token, $matches)) {
-            $hour = (int) $matches[1];
-            $ampm = strtolower($matches[2]);
-            if ($hour < 1 || $hour > 12) {
-                return null;
-            }
-            if ('pm' === $ampm && $hour < 12) {
-                $hour += 12;
-            }
-            if ('am' === $ampm && 12 === $hour) {
-                $hour = 0;
-            }
-
-            return $hour;
+            return self::applyBackFrontMeridian((int) $matches[1], $matches[2]);
         }
         if (1 === preg_match('/^(\d{1,2})$/', $token, $matches)) {
             $hour = (int) $matches[1];
