@@ -1,14 +1,20 @@
 <?php
+/**
+ * #24002 — ArrayPadType / ARRAY_PAD_* are phantoms; assert absence + sign-of-length pad.
+ */
 declare(strict_types=1);
 
-if (!enum_exists('ArrayPadType', false)) {
-    echo "fail: ArrayPadType enum not registered\n";
+if (enum_exists('ArrayPadType', false)) {
+    echo "fail: ArrayPadType enum must not be registered\n";
+    exit(1);
+}
+if (defined('ARRAY_PAD_BOTH')) {
+    echo "fail: ARRAY_PAD_BOTH must not be defined\n";
     exit(1);
 }
 
-$p = array_pad([1], 4, 0, ArrayPadType::Positive);
-$n = array_pad([1], 4, 0, ArrayPadType::Negative);
-$b = array_pad([1, 2], 5, 0, ARRAY_PAD_BOTH);
+$p = array_pad([1], 4, 0);
+$n = array_pad([1], -4, 0);
 
 if (4 !== count($p) || 1 !== $p[0] || 0 !== $p[3]) {
     echo "fail positive\n";
@@ -16,10 +22,6 @@ if (4 !== count($p) || 1 !== $p[0] || 0 !== $p[3]) {
 }
 if (4 !== count($n) || 0 !== $n[0] || 1 !== $n[3]) {
     echo "fail negative\n";
-    exit(1);
-}
-if (5 !== count($b) || 0 !== $b[0] || 1 !== $b[2] || 0 !== $b[4]) {
-    echo "fail both\n";
     exit(1);
 }
 

@@ -18,7 +18,8 @@ use PHPLLVM\Value;
 /**
  * array_pad() for packed list arrays (subset of PHP; JIT via ArrayPadRuntime PHP bridge).
  *
- * PHP 8.4+ optional 4th $pad_type + ARRAY_PAD_* constants (#14993).
+ * php-src arity is 3 — pad direction is the sign of $length. Optional $pad_type /
+ * ARRAY_PAD_* / ArrayPadType are phantoms and stay gated off (#14993, #24002).
  */
 final class array_pad extends Internal
 {

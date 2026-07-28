@@ -8,7 +8,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPUnit\Framework\TestCase;
 
-/** Issue #14993 / #22786 — ARRAY_PAD_* gated to language profile ≥ 8.4. */
+/** Issue #14993 / #22786 / #24002 — ARRAY_PAD_* never advertised (php-src-strict). */
 final class ArrayPadPadTypeConstantsTest extends TestCase
 {
     public function testArrayPadConstantsInCoreIntByName(): void
@@ -20,12 +20,26 @@ final class ArrayPadPadTypeConstantsTest extends TestCase
         self::assertContains('array_pad_left', StdlibConstants::CORE_FETCH_NAMES);
     }
 
-    public function testArrayPadConstantsGatedOffOnProfile82(): void
+    public function testArrayPadPadTypeGateAlwaysOff(): void
+    {
+        self::assertFalse(CompilerVersion::supportsArrayPadPadType());
+        self::assertFalse(CompilerVersion::supportsArrayPadTypeEnum());
+    }
+
+    /**
+     * @dataProvider provideProfiles
+     */
+    public function testArrayPadConstantsWithheldOnEveryProfile(string $profile): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.2');
+        if ('' === $profile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$profile);
+        }
         try {
             self::assertFalse(CompilerVersion::supportsArrayPadPadType());
+            self::assertFalse(CompilerVersion::supportsArrayPadTypeEnum());
             self::assertNull(StdlibConstants::coreIntByName('array_pad_left'));
             self::assertNull(StdlibConstants::coreIntByName('array_pad_right'));
             self::assertNull(StdlibConstants::coreIntByName('array_pad_both'));
@@ -39,37 +53,12 @@ final class ArrayPadPadTypeConstantsTest extends TestCase
         }
     }
 
-    public function testArrayPadConstantsAvailableOnProfile84(): void
+    /** @return iterable<string, array{0: string}> */
+    public static function provideProfiles(): iterable
     {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
-        try {
-            self::assertTrue(CompilerVersion::supportsArrayPadPadType());
-            self::assertSame(0, StdlibConstants::coreIntByName('array_pad_left'));
-            self::assertSame(1, StdlibConstants::coreIntByName('array_pad_right'));
-            self::assertSame(2, StdlibConstants::coreIntByName('array_pad_both'));
-        } finally {
-            if (false === $prev || '' === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
-    }
-
-    public function testArrayPadConstantsWithheldOnReferenceProfile(): void
-    {
-        $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE');
-        try {
-            self::assertFalse(CompilerVersion::supportsArrayPadPadType());
-            self::assertNull(StdlibConstants::coreIntByName('array_pad_left'));
-        } finally {
-            if (false === $prev || '' === $prev) {
-                putenv('PHP_COMPILER_PROFILE');
-            } else {
-                putenv('PHP_COMPILER_PROFILE='.$prev);
-            }
-        }
+        yield 'unset' => [''];
+        yield '8.2' => ['8.2'];
+        yield '8.4' => ['8.4'];
+        yield '8.5' => ['8.5'];
     }
 }
