@@ -16,6 +16,7 @@ use PHPLLVM\Value;
 /**
  * get_parent_class() — parent class from extends chain (issue #3483).
  *
+ * php-src: Zend/zend_builtin_functions.stub.php — arity 1 (`object_or_class` only, #23948)
  * php-src: ext/standard/class.c — PHP_FUNCTION(get_parent_class)
  */
 final class get_parent_class_ extends Internal
@@ -33,34 +34,28 @@ final class get_parent_class_ extends Internal
         $argc = \count($frame->calledArgs);
         VmReflection::enforceGetParentClassMaxArgs($argc);
         if ($argc < 1) {
-            throw new \LogicException('get_parent_class() requires one or two arguments in this compiler build');
+            throw new \LogicException('get_parent_class() requires one argument in this compiler build');
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $allowString = false;
-        if (2 === $argc) {
-            $allowString = VmReflection::parseAllowStringArg($frame, 'get_parent_class', 1);
-        }
         $ctx = VmReflection::requireContext($frame);
         $arg = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_STRING === $arg->type) {
-            if (!$allowString) {
-                $className = $arg->toString();
-                $classLc = strtolower(VmReflection::normalizeGlobalIntrospectionName($className));
-                if (!isset($ctx->classes[$classLc])) {
-                    $ctx->autoloadClass($className);
-                }
-                if (!isset($ctx->classes[$classLc])) {
-                    throw new \TypeError(\sprintf(
-                        self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR,
-                        'string'
-                    ));
-                }
+            $className = $arg->toString();
+            $classLc = strtolower(VmReflection::normalizeGlobalIntrospectionName($className));
+            if (!isset($ctx->classes[$classLc])) {
+                $ctx->autoloadClass($className);
+            }
+            if (!isset($ctx->classes[$classLc])) {
+                throw new \TypeError(\sprintf(
+                    self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR,
+                    'string'
+                ));
             }
             $className = VmReflection::resolveAllowStringClassName(
                 $ctx,
-                $arg->toString(),
+                $className,
                 'get_parent_class',
                 'object_or_class'
             );
@@ -93,9 +88,6 @@ final class get_parent_class_ extends Internal
                 return;
             }
             $entry = $arg->toObject()->class;
-        } elseif (Variable::TYPE_STRING === $arg->type) {
-            VmReflection::stringArg($arg, 'get_parent_class() class name', 0);
-            $entry = VmReflection::resolveClassEntry($ctx, $arg->toString());
         } else {
             VmClassHas::requireObjectOrValidClassName($arg, 'get_parent_class');
         }
@@ -116,27 +108,17 @@ final class get_parent_class_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        $maxArgs = VmReflection::getParentClassMaxArgCount();
-        if ($argc > $maxArgs) {
+        if ($argc > 1) {
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitArgumentCountError(
                 $context,
-                \sprintf('get_parent_class() expects at most %d argument%s, %d given', $maxArgs, 1 === $maxArgs ? '' : 's', $argc)
+                'get_parent_class() expects at most 1 argument, '.$argc.' given'
             );
 
             return $context->getTypeFromString('int32')->constInt(0, false);
         }
         if ($argc < 1) {
-            throw new \LogicException('get_parent_class() requires one or two arguments in this compiler build');
-        }
-        if (2 === $argc && !\PHPCompiler\CompilerVersion::supportsGetClassAllowString()) {
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitArgumentCountError(
-                $context,
-                'get_parent_class() expects at most 1 argument, 2 given'
-            );
-
-            return $context->getTypeFromString('int32')->constInt(0, false);
+            throw new \LogicException('get_parent_class() requires one argument in this compiler build');
         }
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'get_parent_class() class name');
