@@ -1609,6 +1609,11 @@ class Block {
             if (null !== $frame->closureCall) {
                 $return->closureCall = $frame->closureCall;
             }
+            // Bound Closure::bind/bindTo scope must survive ?? / if / try CFG edges (#24335).
+            // Methods fall back to func->class; top-level bound closures only have calledClass.
+            if (null !== $frame->calledClass && '' !== $frame->calledClass) {
+                $return->calledClass = $frame->calledClass;
+            }
             if (null !== $frame->generatorState) {
                 $return->generatorState = $frame->generatorState;
             }
