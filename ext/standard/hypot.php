@@ -26,17 +26,19 @@ final class hypot extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'hypot', 2);
-        $x = VmMath::parseDoubleBuiltinArg(
+        $x = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'hypot',
             1,
-            'x'
+            'x',
+            $frame
         );
-        $y = VmMath::parseDoubleBuiltinArg(
+        $y = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'hypot',
             2,
-            'y'
+            'y',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
@@ -52,7 +54,16 @@ final class hypot extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'hypot', 2)) {
             return $context->getTypeFromString('double')->constReal(0.0);
         }
-        [$x, $y] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'hypot', 'x', 'y', 'float');
+        [$x, $y] = JitFdiv::lowerOperands(
+            $context,
+            $args[0],
+            $args[1],
+            'hypot',
+            'x',
+            'y',
+            'float',
+            true
+        );
 
         return MathHypot::invoke($context, $x, $y);
     }
