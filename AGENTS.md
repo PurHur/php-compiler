@@ -59,6 +59,12 @@ flip between two runs of **the same commit**, proven by two runs — not for cas
 for flakiness. A flaky case inside a baseline manufactures phantom regressions; one in the
 differential corpus already produced a "regression" that measured 17/30 vs 17/30 (#24226).
 
+**Do not change the corpus while a multi-shard run is in flight** (#24498). Shard membership is
+`index % SHARDS` over the sorted case list, so adding, removing or disabling one case reshuffles
+every case sorting after it. Disable a hanging case *after* the run, then re-run **all** shards —
+not just the one that stalled. Cases sorting before the change are unaffected, so a spot check on
+early entries will show nothing wrong.
+
 ### 3. Silent wrong output is the characteristic failure mode
 
 The compliance suite asserts against **recorded** expectations, so it only catches what someone
