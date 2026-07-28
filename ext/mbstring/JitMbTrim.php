@@ -39,11 +39,9 @@ final class JitMbTrim
         if (!isset($args[0])) {
             return null;
         }
+        // Zend 8.4 soft-null + DEP (#24176). Do not fold null — fall through to VM execute.
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #1 ($string) must be of type string, null given',
-                $function
-            ));
+            return null;
         }
         $string = JitStringArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString ?? null;
         if (null === $string) {

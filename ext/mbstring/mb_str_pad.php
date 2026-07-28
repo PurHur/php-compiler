@@ -33,12 +33,8 @@ final class mb_str_pad extends Internal
                 $argc
             ));
         }
-        $input = VmString::coerceTypedStringBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_str_pad',
-            0,
-            'string'
-        );
+        // Zend 8.4 ZPP soft-null + DEP (not TypeError) — #24176, reverts #19184/#22373.
+        $input = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_str_pad', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }

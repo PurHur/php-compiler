@@ -23,12 +23,10 @@ final class JitMbStrPad
             throw new \LogicException('mb_str_pad() requires two to five arguments');
         }
 
-        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
-            throw new \TypeError(\sprintf(
-                'mb_str_pad(): Argument #1 ($string) must be of type string, null given'
-            ));
-        }
-        $inputLit = $args[0]->compileTimeString ?? null;
+        // Zend 8.4 soft-null + DEP (#24176). Do not compile-time fold null→'' —
+        // empty pad fold currently segfaults under thin AOT; use soft-null lower.
+        $nullInput = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        $inputLit = $nullInput ? null : ($args[0]->compileTimeString ?? null);
         $lengthLit = self::compileTimeInt($context, $args[1]);
         $padLit = $argc >= 3 ? ($args[2]->compileTimeString ?? ' ') : ' ';
         $padTypeLit = 1;
@@ -47,7 +45,7 @@ final class JitMbStrPad
             );
         }
 
-        $input = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'mb_str_pad', 0, 'string');
+        $input = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'mb_str_pad', 0, 'string');
         $length = JitStrictIntArg::lower($context, $args[1], 'mb_str_pad', 2, 'length');
         if ($argc >= 3) {
             $padString = JitStringBuiltinArg::lower($context, $args[2], 'mb_str_pad', 2, 'pad_string');

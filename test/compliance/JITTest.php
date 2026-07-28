@@ -245,7 +245,8 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsMbUcfirstLcfirst()
                 && (str_contains($name, 'mb_ucfirst') || str_contains($name, 'mb_lcfirst'))
-                && !str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
+                && !str_contains($name, 'mb_ucfirst_lcfirst_phantom')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             if (CompilerVersion::supportsMbUcfirstLcfirst()
@@ -448,9 +449,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'pdo_connect_profile82')) {
                 continue;
             }
+            // Functional mb_trim_*_forward* cases set PROFILE via --ENV--; always include (#24176).
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
-                && !str_contains($name, 'mb_trim_phantom')) {
+                && !str_contains($name, 'mb_trim_phantom')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             // Foldable mb_trim + try/catch ValueError still breaks MCJIT IR parentFunction (#23883);

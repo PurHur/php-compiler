@@ -400,7 +400,8 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsMbUcfirstLcfirst()
                 && (str_contains($name, 'mb_ucfirst') || str_contains($name, 'mb_lcfirst'))
-                && !str_contains($name, 'mb_ucfirst_lcfirst_phantom')) {
+                && !str_contains($name, 'mb_ucfirst_lcfirst_phantom')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             if (CompilerVersion::supportsMbUcfirstLcfirst()
@@ -517,9 +518,11 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_create_from_callable_profile')) {
                 continue;
             }
+            // Functional mb_trim_*_forward* cases set PROFILE via --ENV--; always include (#24176).
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
-                && !str_contains($name, 'mb_trim_phantom')) {
+                && !str_contains($name, 'mb_trim_phantom')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             if (!CompilerVersion::supportsMbUcwords()
