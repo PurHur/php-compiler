@@ -58,6 +58,34 @@ PHP;
         $runtime->parseAndCompile($code, 'final_plain_reject_ref.php');
     }
 
+    /**
+     * @covers issue #24316 — construct + write must never run on reference profile
+     * (issue table: declare=ok / write=… is the failure mode when the gate is skipped).
+     */
+    public function testPlainFinalPropertyConstructWriteRejectedOnReferenceProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE']);
+        self::assertFalse(\PHPCompiler\CompilerVersion::supportsFinalProperties());
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    final public string $x = 'a';
+}
+$o = new C();
+echo "declare=ok value={$o->x}\n";
+$o->x = 'b';
+echo "write={$o->x}\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Cannot declare property C::$x final, the final modifier is allowed only for methods, classes, and class constants'
+        );
+        $runtime->parseAndCompile($code, 'final_plain_construct_write_reject_ref.php');
+    }
+
     /** @covers issue #23403 — static finals must also reject when supportsFinalProperties() is false */
     public function testFinalStaticPropertyRejectedOnReferenceProfile(): void
     {
