@@ -1931,8 +1931,10 @@ final class VmMbstring
                 ));
             }
         }
-        $source = VmString::coerceTypedStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Zend 8.4 ZPP soft-null + DEP (not TypeError) — #24176, reverts #17132.
+        $source = VmString::trimFamilyStringArgForFrame(
+            $frame,
+            0,
             $function,
             0,
             'string'

@@ -42,6 +42,7 @@ final class VmString
      * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181 #21209 #21557).
      * base64_encode/base64_decode, urlencode/urldecode/rawurlencode/rawurldecode, parse_url soft-null (#21188).
      * mb_strlen/mb_substr/mb_strpos and iconv/iconv_strlen(+substr/strpos/strrpos input) soft-null (#21197).
+     * mb_trim/mb_ltrim/mb_rtrim/mb_ucfirst/mb_lcfirst/mb_str_pad soft-null (#24176, reverts #17132/#19433/#19184).
      * preg_match/preg_replace/preg_split/preg_match_all/preg_replace_callback*
      * $subject (and str_replace family $subject) soft-null likewise (#21198, #21318).
      * preg_match/preg_match_all/preg_split/preg_grep $pattern soft-null (#21479, reverts #20226).
@@ -84,6 +85,7 @@ final class VmString
      * mb_strtolower/mb_convert_encoding/mb_substr_count string inputs (#21282),
      * mb_strcut/mb_strimwidth/mb_encode_mimeheader string inputs (#21430),
      * mb_scrub/mb_detect_encoding string inputs (#21516, reverts #21061/#20225 TypeError),
+     * mb_trim/mb_ltrim/mb_rtrim/mb_ucfirst/mb_lcfirst/mb_str_pad string inputs (#24176, reverts #17132/#19433/#19184 TypeError),
      * function_exists/class_exists/interface_exists/trait_exists/enum_exists/
      * extension_loaded/defined/constant/method_exists/property_exists/define name args (#21281),
      * preg_match/preg_split/preg_match_all $subject (#21198, #21318), and substr/strpos/strstr/explode string

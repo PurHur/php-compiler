@@ -32,8 +32,8 @@ final class mb_lcfirst extends Internal
                 $argc
             ));
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19433, mbstring.c).
-        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_lcfirst', 0, 'string');
+        // Zend 8.4 ZPP soft-null + DEP (not TypeError) — #24176, reverts #19433.
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_lcfirst', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
