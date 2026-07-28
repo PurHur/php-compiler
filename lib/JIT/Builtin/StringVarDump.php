@@ -127,6 +127,8 @@ final class StringVarDump
         $boolBlock = $fn->appendBasicBlock('var_dump_thin_bool');
         $longBlock = $fn->appendBasicBlock('var_dump_thin_long');
         $doubleBlock = $fn->appendBasicBlock('var_dump_thin_double');
+        $nullBlock = $fn->appendBasicBlock('var_dump_thin_null');
+        $stringBlock = $fn->appendBasicBlock('var_dump_thin_string');
         $fallback = $fn->appendBasicBlock('var_dump_thin_fallback');
         $done = $fn->appendBasicBlock('var_dump_thin_done');
 
@@ -195,7 +197,8 @@ final class StringVarDump
             $kind,
             $i8->constInt(JitVariable::TYPE_NATIVE_DOUBLE, false)
         );
-        $context->builder->branchIf($isDouble, $doubleBlock, $fallback);
+        $afterDouble = $fn->appendBasicBlock('var_dump_thin_after_double');
+        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
 
         $context->builder->positionAtEnd($doubleBlock);
         $doubleVal = $context->builder->call(
@@ -208,6 +211,56 @@ final class StringVarDump
             $doubleVal
         );
         ValueEchoHelper::echoLiteral($context, ")\n");
+        $context->builder->branch($done);
+
+        // null and string are scalars too — without these arms they reached the non-scalar abort,
+        // so var_dump(null) and var_dump('hi') died in thin AOT (#24220).
+        $context->builder->positionAtEnd($afterDouble);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_NULL, false)
+        );
+        $afterNull = $fn->appendBasicBlock('var_dump_thin_after_null');
+        $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+
+        $context->builder->positionAtEnd($nullBlock);
+        ValueEchoHelper::echoLiteral($context, "NULL\n");
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterNull);
+        // TYPE_STRING carries IS_REFCOUNTED; $kind is already masked with 0x7f above.
+        $isString = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i8->constInt(JitVariable::TYPE_STRING & 0x7f, false)
+        );
+        $context->builder->branchIf($isString, $stringBlock, $fallback);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strPtr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $arg
+        );
+        $lenOffset = $context->structFieldIndex($strPtr, 'length');
+        $strLen = $context->builder->load(
+            $context->builder->structGep($strPtr, $lenOffset)
+        );
+        ValueEchoHelper::echoLiteral($context, 'string(');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_ll'),
+            $strLen
+        );
+        ValueEchoHelper::echoLiteral($context, ') "');
+        // Byte-exact echo: var_dump() must not stop at an embedded NUL, so length-bounded like
+        // ValueEchoHelper::echoStringVariable() rather than a C-string echo.
+        $valOffset = $context->structFieldIndex($strPtr, 'value');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_echo_substr'),
+            $context->builder->structGep($strPtr, $valOffset),
+            $context->builder->zExt($strLen, $context->getTypeFromString('size_t'))
+        );
+        ValueEchoHelper::echoLiteral($context, "\"\n");
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($fallback);
