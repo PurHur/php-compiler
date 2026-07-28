@@ -346,7 +346,10 @@ final class SplCachingIteratorStorage
         $cache->offsetUnset($keyVar);
     }
 
-    public static function toString(ObjectEntry $object): string
+    /**
+     * php-src CachingIterator::__toString / CIT_CALL_TOSTRING — convert_to_string on current (#24256).
+     */
+    public static function toString(Frame $frame, ObjectEntry $object): string
     {
         $state = self::state($object);
         if ($state['index'] < 0 || null === $state['cached']) {
@@ -360,8 +363,19 @@ final class SplCachingIteratorStorage
             Variable::TYPE_FLOAT => (string) $resolved->toFloat(),
             Variable::TYPE_BOOLEAN => $resolved->toBool() ? '1' : '',
             Variable::TYPE_NULL => '',
+            Variable::TYPE_ARRAY => 'Array',
+            Variable::TYPE_OBJECT => self::stringifyObjectCurrent($frame, $resolved->toObject()),
             default => 'Object',
         };
+    }
+
+    private static function stringifyObjectCurrent(Frame $frame, ObjectEntry $current): string
+    {
+        if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
+            throw new \LogicException('CachingIterator::__toString() requires VM runtime');
+        }
+
+        return $frame->vmContext->runtime->vm->castObjectToString($current);
     }
 
     private static function updateCache(Frame $frame, ObjectEntry $object): void
@@ -850,7 +864,7 @@ final class CachingIteratorToString extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(SplCachingIteratorStorage::toString($object));
+        $frame->returnVar->string(SplCachingIteratorStorage::toString($frame, $object));
     }
 }
 
