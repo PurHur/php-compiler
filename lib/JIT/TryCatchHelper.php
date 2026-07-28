@@ -108,6 +108,11 @@ final class TryCatchHelper
         ?Variable $returnVar
     ): bool {
         $handler = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        // Catch-arm lowering detaches from handlerStack so throws use outer handlers;
+        // return-through-finally still needs this try's finally (#24105).
+        if (null === $handler || null === $handler->finallyOp) {
+            $handler = $context->tryCatch->returnFinallyStack[array_key_last($context->tryCatch->returnFinallyStack)] ?? null;
+        }
         if (null === $handler || null === $handler->finallyOp) {
             return false;
         }
@@ -211,10 +216,16 @@ final class TryCatchHelper
         }
         $mergeBb = $mergeHeaderBb;
         $builder->positionAtEnd($branchBlock);
+        // Pin finally BB before dispatch so catch arms can branch to it, but compile
+        // the finally body only after dispatch exists — epilogue used to call
+        // dispatchBbFor mid-finally and rebuild catch wiring via wrapper !== (#24105).
+        if (null !== $handler->finallyOp) {
+            self::finallyBbFor($jit, $func, $context, $handler, $args, false);
+        }
+        $handler->dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
         if (null !== $handler->finallyOp) {
             self::ensureFinallyLowering($jit, $func, $context, $handler, $args);
         }
-        $handler->dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
         self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
         $savedTrySynthetic = $tryOp->block1->syntheticCfgBranch;
         $tryOp->block1->syntheticCfgBranch = true;
@@ -251,7 +262,15 @@ final class TryCatchHelper
         if (null === $branchBlock->getTerminator()) {
             $builder->branch($tryEntry);
         }
-        if (null !== $elseExit && null !== $elseEntryBb && $elseExit !== $mergeBlock) {
+        // try/finally rewrites the try-body JUMP to the finally CFG (#2114); that is
+        // not a try-else arm — recompiling it here would fight ensureFinallyLowering (#24105).
+        $finallyCfg = $handler->finallyOp->block1 ?? null;
+        if (
+            null !== $elseExit
+            && null !== $elseEntryBb
+            && $elseExit !== $mergeBlock
+            && $elseExit !== $finallyCfg
+        ) {
             $savedInsert = $builder->getInsertBlock();
             $savedElseSynthetic = $elseExit->syntheticCfgBranch;
             $elseExit->syntheticCfgBranch = true;
@@ -575,13 +594,35 @@ final class TryCatchHelper
     ): BasicBlock {
         if (null !== $handler->dispatchBb) {
             $parent = $handler->dispatchBb->getParent();
-            if ($parent instanceof Function_ && $parent === $func) {
+            // PHPLLVM wraps the same LLVMValueRef in distinct PHP objects; === misses (#24105).
+            if ($parent instanceof Function_ && self::sameLlvmFunction($parent, $func)) {
                 return $handler->dispatchBb;
             }
             $handler->dispatchBb = null;
         }
 
         return $handler->dispatchBb = self::buildDispatch($jit, $func, $context, $handler, $args);
+    }
+
+    /** True when two Function_ wrappers refer to the same LLVM function (#24105). */
+    private static function sameLlvmFunction(Function_ $a, Function_ $b): bool
+    {
+        if ($a === $b) {
+            return true;
+        }
+        if ($a instanceof \PHPLLVM\LLVMAbstract\Value
+            && $b instanceof \PHPLLVM\LLVMAbstract\Value) {
+            $va = $a->value;
+            $vb = $b->value;
+            if ($va === $vb) {
+                return true;
+            }
+            if (is_object($va) && is_object($vb) && isset($va->cdata, $vb->cdata)) {
+                return $va->cdata === $vb->cdata;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -596,7 +637,7 @@ final class TryCatchHelper
     ): BasicBlock {
         if (null !== $handler->dispatchBb) {
             $existing = $handler->dispatchBb->getParent();
-            if ($existing instanceof Function_ && $existing === $func) {
+            if ($existing instanceof Function_ && self::sameLlvmFunction($existing, $func)) {
                 return $handler->dispatchBb;
             }
         }
@@ -649,6 +690,13 @@ final class TryCatchHelper
             // (#4886, #10527 — buildDispatch runs before compileSubBlock in beginTry).
             $savedThrowHandlerStack = $context->tryCatch->handlerStack;
             self::detachHandlerFromThrowStack($context, $handler);
+            // Keep finally visible to deferReturnIfNeeded while detached (#24105).
+            $pushedReturnFinally = false;
+            if (null !== $handler->finallyOp) {
+                $context->tryCatch->returnFinallyStack[] = $handler;
+                $pushedReturnFinally = true;
+            }
+            try {
             if (null !== $catchOp->arg3) {
                 $operand = $catchOp->block1->getOperand((int) $catchOp->arg3);
                 $caughtVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $pendingObj);
@@ -705,6 +753,15 @@ final class TryCatchHelper
                 }
             }
             $context->tryCatch->handlerStack = $savedThrowHandlerStack;
+            } finally {
+                if ($pushedReturnFinally) {
+                    $retStack = &$context->tryCatch->returnFinallyStack;
+                    $idx = array_search($handler, $retStack, true);
+                    if (false !== $idx) {
+                        array_splice($retStack, $idx, 1);
+                    }
+                }
+            }
 
             $nextCatch = $noMatchBb;
             $builder->positionAtEnd($nextCatch);
@@ -755,6 +812,11 @@ final class TryCatchHelper
         }
         $handler = array_pop($context->tryCatch->handlerStack);
         unset($context->tryCatch->mergeHandlers[spl_object_id($handler->mergeBlock)]);
+        $retStack = &$context->tryCatch->returnFinallyStack;
+        $idx = array_search($handler, $retStack, true);
+        if (false !== $idx) {
+            array_splice($retStack, $idx, 1);
+        }
     }
 
     private static function loadThrownObject(Context $context, Variable $thrown): Value
@@ -932,7 +994,8 @@ final class TryCatchHelper
             return $handler->finallyEpilogueBb;
         }
         $mergeBb = $context->scope->blockStorage[$handler->mergeBlock] ?? null;
-        $dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
+        // Do not call dispatchBbFor here — it is unused and forced catch lowering before
+        // beginTry finished wiring the handler (#24105).
         $epilogue = self::appendBlock($func, 'try_finally_epilogue_'.self::blockSuffix($handler));
         $handler->finallyEpilogueBb = $epilogue;
         $builder = $context->builder;
@@ -955,8 +1018,12 @@ final class TryCatchHelper
             $builder->branchIf($hasThrowBool, $propagate, $uncaught);
         }
         $builder->positionAtEnd($propagate);
-        self::popHandler($context);
-        $outer = $context->tryCatch->handlerStack[array_key_last($context->tryCatch->handlerStack)] ?? null;
+        // Peek at the enclosing handler without popping — popHandler here runs at
+        // compile time and would drop the active try before the try body is lowered,
+        // so throws never branch to dispatch (#24105).
+        $stack = $context->tryCatch->handlerStack;
+        $n = \count($stack);
+        $outer = $n >= 2 ? $stack[$n - 2] : null;
         if (null !== $outer && null !== $outer->dispatchBb) {
             $builder->branch($outer->dispatchBb);
         } else {

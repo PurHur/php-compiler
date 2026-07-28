@@ -12,6 +12,14 @@ final class TryCatchState
     /** @var array<int, TryCatchHandler> */
     public array $mergeHandlers = [];
 
+    /**
+     * Handlers with finally for return-through-finally (#4246 / #24105).
+     * Survives catch-arm detach from {@see handlerStack} so `return` in catch still runs finally.
+     *
+     * @var list<TryCatchHandler>
+     */
+    public array $returnFinallyStack = [];
+
     /** Fresh try/catch stack for a JIT Context (avoids `new TryCatchState` in Context.php — #3027). */
     public static function create(): self
     {
@@ -26,5 +34,6 @@ final class TryCatchState
     {
         $this->handlerStack = [];
         $this->mergeHandlers = [];
+        $this->returnFinallyStack = [];
     }
 }
