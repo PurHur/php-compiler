@@ -378,7 +378,7 @@ final class VmSerialize
             return true;
         }
         if (!\is_array($allowed)) {
-            throw new \LogicException('allowed_classes must be of type bool or array');
+            throw new \TypeError(unserialize::allowedClassesOptionTypeErrorMessageFromMixed($allowed));
         }
         foreach ($allowed as $entry) {
             if (\is_string($entry) && 0 === \strcasecmp($entry, $className)) {
