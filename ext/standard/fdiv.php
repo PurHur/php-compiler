@@ -29,17 +29,19 @@ final class fdiv extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, self::FUNCTION, 2);
-        $a = VmMath::parseDoubleBuiltinArg(
+        $a = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             self::FUNCTION,
             1,
-            'num1'
+            'num1',
+            $frame
         );
-        $b = VmMath::parseDoubleBuiltinArg(
+        $b = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             self::FUNCTION,
             2,
-            'num2'
+            'num2',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
@@ -52,7 +54,16 @@ final class fdiv extends Internal
         if (!$this->requireExactJitArgCount($context, $args, self::FUNCTION, 2)) {
             return $context->getTypeFromString('double')->constReal(0.0);
         }
-        [$left, $right] = JitFdiv::lowerOperands($context, $args[0], $args[1]);
+        [$left, $right] = JitFdiv::lowerOperands(
+            $context,
+            $args[0],
+            $args[1],
+            self::FUNCTION,
+            'num1',
+            'num2',
+            'float',
+            true
+        );
 
         return $context->builder->fdiv($left, $right);
     }

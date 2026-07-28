@@ -27,17 +27,19 @@ final class atan2 extends Internal
     {
         // php-src ext/standard/math.c — ArgumentCountError (#21982).
         $this->requireExactArgCount($frame, 'atan2', 2);
-        $y = VmMath::parseDoubleBuiltinArg(
+        $y = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'atan2',
             1,
-            'y'
+            'y',
+            $frame
         );
-        $x = VmMath::parseDoubleBuiltinArg(
+        $x = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'atan2',
             2,
-            'x'
+            'x',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
@@ -53,7 +55,16 @@ final class atan2 extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'atan2', 2)) {
             return $context->getTypeFromString('double')->constReal(0.0);
         }
-        [$y, $x] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'atan2', 'y', 'x', 'float');
+        [$y, $x] = JitFdiv::lowerOperands(
+            $context,
+            $args[0],
+            $args[1],
+            'atan2',
+            'y',
+            'x',
+            'float',
+            true
+        );
 
         return MathAtan2::invoke($context, $y, $x);
     }

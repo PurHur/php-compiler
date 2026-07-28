@@ -27,17 +27,19 @@ final class fmod extends Internal
     {
         // php-src ext/standard/math.c — ArgumentCountError (#21982).
         $this->requireExactArgCount($frame, 'fmod', 2);
-        $num1 = VmMath::parseDoubleBuiltinArg(
+        $num1 = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'fmod',
             1,
-            'num1'
+            'num1',
+            $frame
         );
-        $num2 = VmMath::parseDoubleBuiltinArg(
+        $num2 = VmMath::parseForwardProfileStrictDoubleBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'fmod',
             2,
-            'num2'
+            'num2',
+            $frame
         );
         if (null === $frame->returnVar) {
             return;
@@ -53,7 +55,16 @@ final class fmod extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'fmod', 2)) {
             return $context->getTypeFromString('double')->constReal(0.0);
         }
-        [$left, $right] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'fmod', 'num1', 'num2', 'float');
+        [$left, $right] = JitFdiv::lowerOperands(
+            $context,
+            $args[0],
+            $args[1],
+            'fmod',
+            'num1',
+            'num2',
+            'float',
+            true
+        );
 
         return MathFmod::invoke($context, $left, $right);
     }

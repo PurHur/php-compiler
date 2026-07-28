@@ -641,7 +641,8 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_DOUBLE null → TypeError on PHP 8.4 forward profile (fadd/fsub/fmul only; #19182, #20432).
+     * Z_PARAM_DOUBLE null → TypeError on PHP 8.4 forward profile
+     * (fadd/fsub/fmul/fdiv/fmod/hypot/atan2/nextafter $toward; #19182, #20432, #24198).
      *
      * @throws \TypeError when operand is null on PROFILE=8.4+
      */
