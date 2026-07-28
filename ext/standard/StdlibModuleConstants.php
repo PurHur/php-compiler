@@ -130,6 +130,9 @@ final class StdlibModuleConstants
             'ZLIB_FIXED' => 4,
             'ZLIB_DEFAULT_STRATEGY' => 0,
             ...self::zlibVernumConstant(),
+            // Legacy encoding aliases — php-src ext/zlib/zlib.c (#24052)
+            'FORCE_GZIP' => 31,
+            'FORCE_DEFLATE' => 15,
             'STREAM_PF_UNIX' => StdlibConstants::STREAM_PF_UNIX,
             'STREAM_PF_INET' => StdlibConstants::STREAM_PF_INET,
             'STREAM_SOCK_STREAM' => StdlibConstants::STREAM_SOCK_STREAM,
@@ -227,7 +230,7 @@ final class StdlibModuleConstants
                 unset($standard[$name]);
                 continue;
             }
-            if (str_starts_with($name, 'ZLIB_')) {
+            if (str_starts_with($name, 'ZLIB_') || str_starts_with($name, 'FORCE_')) {
                 $zlib[$name] = $value;
                 unset($standard[$name]);
             } elseif (str_starts_with($name, 'JSON_')) {

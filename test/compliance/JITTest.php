@@ -918,6 +918,7 @@ class JITTest extends BaseTest {
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))
+                && !str_starts_with($name, 'zlib/')
                 && !str_contains($name, 'extension_loaded_zip')) {
                 continue;
             }
