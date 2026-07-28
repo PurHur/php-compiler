@@ -4440,6 +4440,7 @@ require_once __DIR__.'/../../../ext/zstd/zstd_compress.php';
 require_once __DIR__.'/../../../ext/zstd/zstd_decompress.php';
 require_once __DIR__.'/../../../ext/zstd/zstd_uncompress.php';
 require_once __DIR__.'/../../../lib/AOT/AutoloadDiscovery.php';
+require_once __DIR__.'/../../../lib/AOT/ExternalMethodBind.php';
 require_once __DIR__.'/../../../lib/AOT/HelperRuntimeCache.php';
 require_once __DIR__.'/../../../lib/AOT/HelperUnitGlobalCtor.php';
 require_once __DIR__.'/../../../lib/AOT/Linker.php';

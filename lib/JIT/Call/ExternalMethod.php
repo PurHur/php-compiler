@@ -17,7 +17,11 @@ use PHPLLVM\Value;
 /**
  * Compile-time no-op for instance/static methods on classes not lowered into the bundle (#579).
  *
- * Returns null; does not invoke Zend or vendor code at runtime.
+ * Returns null by default; does not invoke Zend or vendor code at runtime.
+ *
+ * When a helper-runtime / chunk manifest knows the symbol, {@see \PHPCompiler\AOT\ExternalMethodBind}
+ * upgrades the call to a real extern (#24429). Unreached stubs stay null so ordinary builds that
+ * carry harmless stubs do not grow unresolved link symbols (#24227).
  */
 final class ExternalMethod implements Call
 {
@@ -31,6 +35,10 @@ final class ExternalMethod implements Call
 
     public function call(Context $context, Variable ...$args): Value
     {
+        $bound = \PHPCompiler\AOT\ExternalMethodBind::tryBind($context, $this->proxyName);
+        if (null !== $bound && !($bound instanceof self)) {
+            return $bound->call($context, ...$args);
+        }
         $context->recordExternalMethodStub($this->proxyName);
         self::emitStubReachedWarning($context, $this->proxyName);
         $slot = JitValueBox::alloc($context);

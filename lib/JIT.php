@@ -17501,6 +17501,30 @@ class JIT {
                     return;
                 }
             }
+            // Spine split-TU / external-only class: fall through to ExternalMethod (null or
+            // bound extern) instead of aborting — otherwise chunk builds never reach the stub
+            // report (external_method_stubs=0 with rc=2, #24429).
+            $fallthroughClassId = null;
+            if (
+                '' !== $declaringClassLc
+                && 'object' !== $declaringClassLc
+                && $this->context->type->object->hasDeclaredClass($declaringClassLc)
+            ) {
+                $fallthroughClassId = $this->context->type->object->lookup($declaringClassLc);
+            }
+            if (
+                ($this->shouldUseSelfHostJitStubs() && $this->isSelfHostBundledClassPrefix($declaringClassLc))
+                || \PHPCompiler\AOT\ExternalMethodBind::allowUnresolvedMethodFallthrough(
+                    $this->context,
+                    $declaringClassLc,
+                    $fallthroughClassId
+                )
+            ) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
         $receiverUserType = $receiverOp->type?->userType;

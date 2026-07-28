@@ -667,6 +667,11 @@ class Context {
 
             return $internal;
         }
+        // Known helper-runtime / chunk-manifest symbols → real extern, not null (#24429).
+        $bound = \PHPCompiler\AOT\ExternalMethodBind::tryBind($this, $proxyName);
+        if (null !== $bound) {
+            return $bound;
+        }
         $this->functionProxies[$lc] = new Call\ExternalMethod($proxyName);
 
         return $this->functionProxies[$lc];
@@ -683,6 +688,10 @@ class Context {
                     $this->functionProxies[$lc] = $internal;
 
                     return $internal;
+                }
+                $bound = \PHPCompiler\AOT\ExternalMethodBind::tryBind($this, $proxyName);
+                if (null !== $bound && !($bound instanceof Call\ExternalMethod)) {
+                    return $bound;
                 }
             }
 
