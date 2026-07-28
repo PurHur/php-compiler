@@ -212,7 +212,21 @@ final class json_decode extends Internal
 
     private static function compileTimeBool(Context $context, JITVariable $var): ?bool
     {
-        if (JITVariable::KIND_VALUE !== $var->kind) {
+        // ConstFetch true/false is loaded from a module global — LLVMIsAConstantInt
+        // sees the Load, not the initializer. Prefer the folded name (#24137).
+        if (null !== $var->compileTimeConstantName) {
+            $name = strtolower($var->compileTimeConstantName);
+            if ('true' === $name) {
+                return true;
+            }
+            if ('false' === $name) {
+                return false;
+            }
+        }
+        if (null !== $var->compileTimeLong) {
+            return 0 !== $var->compileTimeLong;
+        }
+        if (null === $var->value) {
             return null;
         }
         $lib = $context->llvm->lib;

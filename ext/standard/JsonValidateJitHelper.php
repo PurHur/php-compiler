@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * json_validate() / json_last_error*() NestedJIT helpers (#9359, #20829).
  *
- * Split from {@see JsonDecodeJitHelper} so int-wire decode NestedJIT stays Unserialize-slim.
+ * Split from {@see JsonDecodeJitHelper} so validate NestedJIT stays independent of decode.
  * php-src: ext/json/php_json.c
  */
 final class JsonValidateJitHelper
