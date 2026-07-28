@@ -1,6 +1,4 @@
 <?php
-// AOT: match($this) on backed enum — UnhandledMatchError "of type" path must keep the builder
-// insert point after GetClassRuntime::ensureLinked (#24163).
 enum Suit: string {
     case Hearts = 'H';
     case Spades = 'S';
@@ -8,4 +6,5 @@ enum Suit: string {
         return match($this) { Suit::Hearts => 'red', Suit::Spades => 'black' };
     }
 }
+// Use case fetch (not from()) — BackedEnum::from() is a separate pre-existing AOT segfault.
 echo Suit::Hearts->value, ' ', Suit::Spades->color(), "\n";
