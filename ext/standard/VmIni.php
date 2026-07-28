@@ -897,6 +897,7 @@ final class VmIni
                 break;
             case 'pcre.backtrack_limit':
                 self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
+                VmPregLimits::setBacktrackLimit(self::$pcreBacktrackLimit);
                 break;
             case 'pcre.jit':
                 self::$pcreJit = true;
@@ -932,6 +933,7 @@ final class VmIni
             return false;
         }
         self::$pcreBacktrackLimit = $parsed;
+        VmPregLimits::setBacktrackLimit($parsed);
 
         return $old;
     }

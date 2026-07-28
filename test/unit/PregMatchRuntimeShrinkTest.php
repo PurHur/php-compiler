@@ -26,6 +26,8 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PregJitHelper', $source);
         $this->assertStringContainsString('replaceCallbackArgv', $source);
         $this->assertStringContainsString('PregCallbackInvokeJitHelper', $source);
+        $this->assertStringContainsString('PregJitHelperThinAot', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringContainsString('StringFormat::ensureLinked', $source);
@@ -33,7 +35,6 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm', $source);
         $this->assertStringNotContainsString('PregMatchUserScriptLlvm', $source);
         $this->assertStringNotContainsString('JitPregMatchKernel', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PregMatchUserScriptLlvm.php');

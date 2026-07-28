@@ -127,6 +127,17 @@ final class PregJitHelper
         return $ht;
     }
 
+    /** Thin-AOT capture bridge stubs — real impl in PregJitHelperThinAot (#24115). */
+    public static function thinMatchExCapCount(): int
+    {
+        return 0;
+    }
+
+    public static function thinMatchExCap(int $index): string
+    {
+        return '';
+    }
+
     /** @return int match count, or -1 on PCRE error */
     public static function matchAllExArgv(string $pattern, string $subject, int $flags, int $offset): int
     {
