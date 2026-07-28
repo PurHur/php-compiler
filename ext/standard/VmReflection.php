@@ -853,9 +853,13 @@ final class VmReflection
     }
 
     /**
-     * is_callable() class-string probe — instance methods are not statically invokable (#12545).
+     * is_callable() class-string / "Class::method" probe (php-src zend_is_callable_ex).
      *
-     * php-src: ext/standard/basic_functions.c — zend_is_callable_at_frame
+     * Static methods: normal visibility from the caller frame.
+     * Instance methods: false from global / unrelated scopes (#12545); true when the
+     * caller class is the named class or a subclass *and* the method is visible (#23996).
+     *
+     * php-src: Zend/zend_execute_API.c — zend_is_callable_ex / zend_is_callable_at_frame
      */
     public static function isStaticallyCallableMethod(
         Context $ctx,
@@ -920,7 +924,15 @@ final class VmReflection
                     }
                 }
 
-                return false;
+                // Instance method via class-string: only when caller is in the named
+                // class hierarchy and can see the method (Zend/zend_execute_API.c).
+                return self::isInstanceMethodCallableViaClassString(
+                    $ctx,
+                    $vis,
+                    $walk,
+                    $lcClass,
+                    $callerClassLc
+                );
             }
             if (null === $class->parentLc) {
                 break;
@@ -929,6 +941,29 @@ final class VmReflection
         }
 
         return self::classHasStaticMagicCall($ctx, $lcClass);
+    }
+
+    /**
+     * Class-string / "Class::method" form for a non-static method (#23996 / #12545).
+     *
+     * Zend requires the caller frame's class to be the named class or a subclass of it;
+     * visibility alone is not enough (unrelated scopes stay false even for public).
+     */
+    private static function isInstanceMethodCallableViaClassString(
+        Context $ctx,
+        int $visibilityFlags,
+        string $declaringClassLc,
+        string $namedClassLc,
+        ?string $callerClassLc
+    ): bool {
+        if (null === $callerClassLc) {
+            return false;
+        }
+        if (!self::isSameOrSubclassOf($ctx, $callerClassLc, $namedClassLc)) {
+            return false;
+        }
+
+        return self::isMethodCallableFromScope($ctx, $visibilityFlags, $declaringClassLc, $callerClassLc);
     }
 
     private static function classHasStaticMagicCall(Context $ctx, string $lcClass): bool
