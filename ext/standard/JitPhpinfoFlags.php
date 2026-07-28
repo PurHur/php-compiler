@@ -21,7 +21,7 @@ final class JitPhpinfoFlags
     {
         $i32 = $context->getTypeFromString('int32');
         if (null === $arg) {
-            return $i32->constInt(VmInfo::INFO_ALL, true);
+            return $i32->constInt(VmInfo::allFlagsI32(), true);
         }
         $compileTime = self::compileTimePhpinfoFlags($context, $arg);
         if (null !== $compileTime) {
@@ -35,7 +35,7 @@ final class JitPhpinfoFlags
     {
         $i32 = $context->getTypeFromString('int32');
         if (null === $arg) {
-            return $i32->constInt(VmInfo::CREDITS_ALL, true);
+            return $i32->constInt(VmInfo::allFlagsI32(), true);
         }
         $compileTime = self::compileTimePhpcreditsFlags($context, $arg);
         if (null !== $compileTime) {
@@ -119,7 +119,7 @@ final class JitPhpinfoFlags
             self::emitPhpinfoTypeError($context, 'mixed');
             $i32 = $context->getTypeFromString('int32');
 
-            return $i32->constInt(VmInfo::INFO_ALL, true);
+            return $i32->constInt(VmInfo::allFlagsI32(), true);
         }
 
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -139,7 +139,7 @@ final class JitPhpinfoFlags
         );
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
         $context->builder->positionAtEnd($nullBlock);
-        $nullVal = $i32->constInt(VmInfo::INFO_ALL, true);
+        $nullVal = $i32->constInt(VmInfo::allFlagsI32(), true);
         $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($afterNull);
         $context->builder->positionAtEnd($afterNull);
@@ -175,7 +175,7 @@ final class JitPhpinfoFlags
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($badBlock);
         self::emitPhpinfoTypeError($context, self::runtimeTypeLabel($context, $arg));
-        $badVal = $i32->constInt(VmInfo::INFO_ALL, true);
+        $badVal = $i32->constInt(VmInfo::allFlagsI32(), true);
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($mergeBlock);
 
@@ -197,7 +197,7 @@ final class JitPhpinfoFlags
             self::emitPhpcreditsTypeError($context, 'mixed');
             $i32 = $context->getTypeFromString('int32');
 
-            return $i32->constInt(VmInfo::CREDITS_ALL, true);
+            return $i32->constInt(VmInfo::allFlagsI32(), true);
         }
 
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -217,7 +217,7 @@ final class JitPhpinfoFlags
         );
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
         $context->builder->positionAtEnd($nullBlock);
-        $nullVal = $i32->constInt(VmInfo::CREDITS_ALL, true);
+        $nullVal = $i32->constInt(VmInfo::allFlagsI32(), true);
         $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($afterNull);
         $context->builder->positionAtEnd($afterNull);
@@ -239,7 +239,7 @@ final class JitPhpinfoFlags
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($badBlock);
         self::emitPhpcreditsTypeError($context, self::runtimeTypeLabel($context, $arg));
-        $badVal = $i32->constInt(VmInfo::CREDITS_ALL, true);
+        $badVal = $i32->constInt(VmInfo::allFlagsI32(), true);
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($mergeBlock);
 
@@ -258,7 +258,7 @@ final class JitPhpinfoFlags
         if (null === $enumMap || !isset($enumMap['class_id'])) {
             self::emitPhpinfoTypeError($context, 'object');
 
-            return $i32->constInt(VmInfo::INFO_ALL, true);
+            return $i32->constInt(VmInfo::allFlagsI32(), true);
         }
         $classId = $context->builder->load(
             $context->builder->structGep($valuePtr, $enumMap['class_id'])
@@ -267,7 +267,7 @@ final class JitPhpinfoFlags
         if (null === $infoViewId) {
             self::emitPhpinfoTypeError($context, 'object');
 
-            return $i32->constInt(VmInfo::INFO_ALL, true);
+            return $i32->constInt(VmInfo::allFlagsI32(), true);
         }
         $okBlock = BasicBlockHelper::append($context, 'phpinfo_infoview_ok');
         $badBlock = BasicBlockHelper::append($context, 'phpinfo_infoview_bad');

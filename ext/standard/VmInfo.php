@@ -33,7 +33,11 @@ final class VmInfo
 
     public const INFO_LICENSE = 64;
 
-    public const INFO_ALL = -1;
+    /**
+     * php-src REGISTER_LONG_CONSTANT INFO_ALL / CREDITS_ALL — all bits set.
+     * On 64-bit Zend this surfaces as userland int 4294967295 (not signed -1) (#24135).
+     */
+    public const INFO_ALL = 4294967295;
 
     /** php-src PHP_CREDITS_* (ext/standard/info.c). */
     public const CREDITS_GROUP = 1;
@@ -52,7 +56,8 @@ final class VmInfo
 
     public const CREDITS_WEB = 128;
 
-    public const CREDITS_ALL = -1;
+    /** Same uint32-max identity as INFO_ALL (php-src CREDITS_ALL; #24135). */
+    public const CREDITS_ALL = 4294967295;
 
     /** phpinfo(INFO_CREDITS) → php_print_credits(CREDITS_ALL & ~FULLPAGE) (ext/standard/info.c, #16347). */
     private const PHPINFO_CREDITS_FLAGS =
@@ -521,7 +526,7 @@ final class VmInfo
 
     private static function infoFlagSelected(int $flags, int $section): bool
     {
-        if (self::INFO_ALL === $flags) {
+        if (self::isInfoAll($flags)) {
             return true;
         }
 
@@ -537,10 +542,26 @@ final class VmInfo
         return 0 !== ($flags & $section);
     }
 
-    /** CREDITS_ALL is -1; userland constant may surface as uint32 max (#16367). */
+    /**
+     * INFO_ALL / CREDITS_ALL are uint32 max (4294967295); callers may still pass signed -1
+     * (same bits). #24135 / #16367.
+     */
+    private static function isInfoAll(int $flags): bool
+    {
+        return self::INFO_ALL === $flags || 0xFFFFFFFF === ($flags & 0xFFFFFFFF);
+    }
+
     private static function isCreditsAll(int $flags): bool
     {
         return self::CREDITS_ALL === $flags || 0xFFFFFFFF === ($flags & 0xFFFFFFFF);
+    }
+
+    /**
+     * Signed i32 bit pattern for LLVM i32 materialization of INFO_ALL / CREDITS_ALL.
+     */
+    public static function allFlagsI32(): int
+    {
+        return -1;
     }
 
     private static function generalSectionHtml(): string
