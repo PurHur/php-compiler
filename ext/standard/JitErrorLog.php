@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for error_log() (#3380 JIT/AOT; Z_PARAM_STR null #23858, reverts #21446). */
+/** LLVM lowering for error_log() (#3380 JIT/AOT; Z_PARAM_STR null soft-null on 8.4 #24178). */
 final class JitErrorLog
 {
     private const FILE_APPEND = 8;
@@ -28,16 +28,7 @@ final class JitErrorLog
             return self::lowerFileAppend($context, $message, $destination);
         }
 
-        $msgStr = JitStringBuiltinArg::lowerZparamStr($context, $message, 'error_log', 0, 'message');
-        $nullOperand = JITVariable::TYPE_NULL === $message->type
-            || ($message->isNullConstant ?? false);
-        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
-            // TypeError already emitted; skip runtime call after abort (#23858).
-            $slot = JitValueBox::alloc($context);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-
+        $msgStr = self::lowerMessageString($context, $message);
         $savedInsert = null;
         try {
             $savedInsert = $context->builder->getInsertBlock();
@@ -80,14 +71,7 @@ final class JitErrorLog
         }
 
         $pathStr = JitFilestatArg::lowerFilename($context, $destination, 'error_log');
-        $msgStr = JitStringBuiltinArg::lowerZparamStr($context, $message, 'error_log', 0, 'message');
-        $nullOperand = JITVariable::TYPE_NULL === $message->type
-            || ($message->isNullConstant ?? false);
-        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
-            $slot = JitValueBox::alloc($context);
-
-            return JitValueBox::pointer($context, $slot);
-        }
+        $msgStr = self::lowerMessageString($context, $message);
         $flags = $context->getTypeFromString('int64')->constInt(self::FILE_APPEND, false);
         $result = JitFilePutContents::invoke($context, $pathStr, $msgStr, $flags);
         $i64 = $context->getTypeFromString('int64');
@@ -108,6 +92,21 @@ final class JitErrorLog
         );
 
         return self::boolFromI1($context, $ok);
+    }
+
+    private static function lowerMessageString(Context $context, JITVariable $message): Value
+    {
+        $nullOperand = JITVariable::TYPE_NULL === $message->type
+            || ($message->isNullConstant ?? false);
+        if ($nullOperand && $context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerZparamStr($context, $message, 'error_log', 0, 'message');
+        }
+        if ($nullOperand) {
+            // Compile-time / constant null → "" without DEP IR (AOT-safe fold; VM emits DEP).
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $message, 'error_log', 0, 'message');
     }
 
     private static function tryCompileTimeMessageType(Context $context, ?JITVariable $arg): ?int

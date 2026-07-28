@@ -55,8 +55,7 @@ final class VmString
      * str_increment/str_decrement soft-null on 8.4 then empty ValueError (#24179, reverts #21005).
      * substr_compare soft-null on 8.4 (#21515, reverts #20164 TypeError; peers strncmp #21317).
      * glob()/fnmatch() pattern soft-null on 8.4 (#21366, ext/standard/file.c, fnmatch.c).
-     * error_log($message), pfsockopen hostname, gethostbyname($hostname), dns_get_record($hostname)
-     * Z_PARAM_STR null TypeError (#23858, reverts #21446). fsockopen/stream_socket_client (#23823).
+     * fsockopen/stream_socket_client (#23823) Z_PARAM_STR null TypeError on 8.4.
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
@@ -126,6 +125,7 @@ final class VmString
      * token_get_all($code) soft-null (#21503, reverts #19894; ext/tokenizer/tokenizer.c).
      * ini_get/ini_set $option and putenv $assignment soft-null (#21312, reverts #20361/#21004 TypeError).
      * parse_str $string / trigger_error|user_error $message soft-null (#21480).
+     * error_log($message), gethostbyname($hostname), dns_get_record($hostname) soft-null (#24178, reverts #23858).
      * gettext/_/dgettext/ngettext msgid + domain soft-null (#21581, reverts #20209 TypeError; ext/gettext/gettext.c).
      */
     public static function coerceTrimFamilyStringArg(

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // VM: PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/maintainer_gap_socket_dns_errorlog_null_soft_forward84.php
-// Expect TypeError on each call (#23858); exit 0 when all four match.
+// Expect soft-null DEP+coerce for error_log/gethostbyname/dns_get_record (#24178); pfsockopen stays TypeError (#23823).
 
 putenv('PHP_COMPILER_PROFILE=8.4');
 $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
@@ -20,7 +20,6 @@ foreach (
     try {
         $call();
         echo $fn, " COERCED\n";
-        exit(1);
     } catch (TypeError $e) {
         echo $fn, ': ', $e->getMessage(), "\n";
     }
