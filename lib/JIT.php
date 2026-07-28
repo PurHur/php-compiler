@@ -6921,6 +6921,10 @@ class JIT {
     /**
      * Lower a finally CFG arm at entry (#4246).
      *
+     * finallyBbFor pre-seeds blockStorage[finally] before calling here; without
+     * allowRecompile the body is skipped and finally is an empty fall-through (#24105).
+     * syntheticCfgBranch suppresses void-main returnVoid so the epilogue edge remains.
+     *
      * @param list<Variable> $args
      */
     public function compileFinallyAtEntry(
@@ -6935,7 +6939,15 @@ class JIT {
         }
 
         $this->context->inlineIncludeExitBlock = null;
-        $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, false, ...$args);
+        // Mirror compileCatchArmAtEntry (#23641 / #24105): re-lower at the pinned
+        // finally BB and keep the tail open for TryCatchHelper's epilogue branch.
+        $savedSynthetic = $block->syntheticCfgBranch;
+        $block->syntheticCfgBranch = true;
+        try {
+            $exit = $this->compileBlockInternal($func, $block, $limit, $entryBlock, 0, true, ...$args);
+        } finally {
+            $block->syntheticCfgBranch = $savedSynthetic;
+        }
         if (null !== $this->context->inlineIncludeExitBlock) {
             $exit = $this->context->inlineIncludeExitBlock;
         }
