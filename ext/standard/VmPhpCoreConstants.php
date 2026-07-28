@@ -95,6 +95,10 @@ final class VmPhpCoreConstants
         if (null !== $path) {
             return self::fromPhpValue($path);
         }
+        $mainExtra = self::mainCoreExtraValueLoose($name);
+        if (null !== $mainExtra) {
+            return self::fromPhpValue($mainExtra);
+        }
         $compiler = self::compilerVersionConstantLoose($name);
         if (null !== $compiler) {
             return self::fromPhpValue($compiler);
@@ -117,6 +121,10 @@ final class VmPhpCoreConstants
         $path = self::pathConstantValue($name);
         if (null !== $path) {
             return self::fromPhpValue($path);
+        }
+        $mainExtra = self::mainCoreExtraValueExact($name);
+        if (null !== $mainExtra) {
+            return self::fromPhpValue($mainExtra);
         }
         $compiler = self::compilerVersionConstantExact($name);
         if (null !== $compiler) {
@@ -166,16 +174,15 @@ final class VmPhpCoreConstants
                 $entries[$name] = $var;
             }
         }
-        $entries['DEFAULT_INCLUDE_PATH'] = self::fromPhpValue(self::defaultIncludePath());
-        $entries['PEAR_INSTALL_DIR'] = self::fromPhpValue(self::pearInstallDir());
-        $entries['PEAR_EXTENSION_DIR'] = self::fromPhpValue(self::pearExtensionDir());
-        $zts = self::fromPhpValue((bool) (self::compilerVersionConstantExact('PHP_ZTS') ?? 0));
-        if (null !== $zts) {
-            $entries['ZEND_THREAD_SAFE'] = $zts;
-        }
-        $debug = self::fromPhpValue((bool) (self::compilerVersionConstantExact('PHP_DEBUG') ?? 0));
-        if (null !== $debug) {
-            $entries['ZEND_DEBUG_BUILD'] = $debug;
+        foreach (['DEFAULT_INCLUDE_PATH', 'PEAR_INSTALL_DIR', 'PEAR_EXTENSION_DIR', 'ZEND_THREAD_SAFE', 'ZEND_DEBUG_BUILD'] as $name) {
+            $value = self::mainCoreExtraValueExact($name);
+            if (null === $value) {
+                continue;
+            }
+            $var = self::fromPhpValue($value);
+            if (null !== $var) {
+                $entries[$name] = $var;
+            }
         }
 
         return $entries;
@@ -266,6 +273,48 @@ final class VmPhpCoreConstants
     public static function directorySeparatorValue(): string
     {
         return self::pathConstantValue('DIRECTORY_SEPARATOR') ?? (self::isWindowsPlatform() ? '\\' : '/');
+    }
+
+    /**
+     * main/main.c + Zend/zend_constants.c extras already listed in categorizedCoreEntries()
+     * but historically omitted from fetch/fetchExact (#24081).
+     *
+     * @return int|string|bool|null
+     */
+    private static function mainCoreExtraValueExact(string $name): int|string|bool|null
+    {
+        if (\array_key_exists($name, self::UPLOAD_ERR_VALUES)) {
+            return self::UPLOAD_ERR_VALUES[$name];
+        }
+
+        return match ($name) {
+            'DEFAULT_INCLUDE_PATH' => self::defaultIncludePath(),
+            'PEAR_INSTALL_DIR' => self::pearInstallDir(),
+            'PEAR_EXTENSION_DIR' => self::pearExtensionDir(),
+            // Match categorizedCoreEntries() historically: PHP_ZTS/PHP_DEBUG via CompilerVersion only
+            // (host PHP_* live in CORE_NAMES scalar path; ZEND_* mirror the 0-default when unset).
+            'ZEND_THREAD_SAFE' => (bool) (self::compilerVersionConstantExact('PHP_ZTS') ?? 0),
+            'ZEND_DEBUG_BUILD' => (bool) (self::compilerVersionConstantExact('PHP_DEBUG') ?? 0),
+            default => null,
+        };
+    }
+
+    /** @return int|string|bool|null */
+    private static function mainCoreExtraValueLoose(string $name): int|string|bool|null
+    {
+        $upper = strtoupper($name);
+        if (\array_key_exists($upper, self::UPLOAD_ERR_VALUES)) {
+            return self::UPLOAD_ERR_VALUES[$upper];
+        }
+
+        return match ($upper) {
+            'DEFAULT_INCLUDE_PATH' => self::defaultIncludePath(),
+            'PEAR_INSTALL_DIR' => self::pearInstallDir(),
+            'PEAR_EXTENSION_DIR' => self::pearExtensionDir(),
+            'ZEND_THREAD_SAFE' => self::mainCoreExtraValueExact('ZEND_THREAD_SAFE'),
+            'ZEND_DEBUG_BUILD' => self::mainCoreExtraValueExact('ZEND_DEBUG_BUILD'),
+            default => null,
+        };
     }
 
     private static function defaultIncludePath(): string
