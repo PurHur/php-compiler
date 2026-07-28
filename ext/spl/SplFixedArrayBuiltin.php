@@ -175,8 +175,13 @@ final class SplFixedArrayBuiltin
         if (!self::indexInRange($object, $index)) {
             return false;
         }
+        if (!isset(self::state($object)['slots'][$index])) {
+            return false;
+        }
+        // php-src spl_fixedarray_object_has_dimension — null slots are non-existent (#24255).
+        $slot = self::state($object)['slots'][$index]->resolveIndirect();
 
-        return isset(self::state($object)['slots'][$index]);
+        return !$slot->isUndefined() && Variable::TYPE_NULL !== $slot->type;
     }
 
     public static function offsetGet(ObjectEntry $object, Variable $offset): Variable
