@@ -950,10 +950,7 @@ class Object_ extends Type {
 
                 continue;
             }
-            $constEntry = isset($entry['global'])
-                ? ['type' => $entry['type'], 'global' => $entry['global']]
-                : ['type' => $entry['type'], 'value' => $entry['value']];
-            $var = $this->jitConstantFromEntry($constEntry);
+            $var = $this->jitConstantFromEntry($this->propertyDefaultConstEntry($entry));
             $this->propertyStore($slot, $var, $entry['propertyType']);
         }
     }
@@ -2420,10 +2417,7 @@ class Object_ extends Type {
 
                     return;
                 }
-                $constEntry = isset($entry['global'])
-                    ? ['type' => $entry['type'], 'global' => $entry['global']]
-                    : ['type' => $entry['type'], 'value' => $entry['value']];
-                $var = $this->jitConstantFromEntry($constEntry);
+                $var = $this->jitConstantFromEntry($this->propertyDefaultConstEntry($entry));
                 $this->propertyStore($slot, $var, $entry['propertyType']);
 
                 return;
@@ -4243,6 +4237,12 @@ class Object_ extends Type {
         if (($left['type'] ?? null) !== ($right['type'] ?? null)) {
             return false;
         }
+        if (isset($left['vmTable']) || isset($right['vmTable'])) {
+            return $this->vmHashTablesCompatible(
+                $left['vmTable'] ?? null,
+                $right['vmTable'] ?? null
+            );
+        }
         foreach (['value', 'string', 'integer', 'float', 'bool'] as $key) {
             if (($left[$key] ?? null) !== ($right[$key] ?? null)) {
                 return false;
@@ -4250,6 +4250,76 @@ class Object_ extends Type {
         }
 
         return true;
+    }
+
+    /**
+     * Trait/class property default array tables must match element-wise (#24086).
+     */
+    private function vmHashTablesCompatible($left, $right): bool
+    {
+        if (!$left instanceof \PHPCompiler\VM\HashTable || !$right instanceof \PHPCompiler\VM\HashTable) {
+            return false;
+        }
+        if ($left->getNumElements() !== $right->getNumElements()) {
+            return false;
+        }
+        $rightByKey = [];
+        foreach ($right->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $rightByKey[$this->vmScalarFingerprint($keyVar)] = $this->vmScalarFingerprint($valueVar);
+        }
+        foreach ($left->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $key = $this->vmScalarFingerprint($keyVar);
+            if (!array_key_exists($key, $rightByKey)) {
+                return false;
+            }
+            if ($rightByKey[$key] !== $this->vmScalarFingerprint($valueVar)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function vmScalarFingerprint(VMVariable $value): string
+    {
+        $resolved = $value->resolveIndirect();
+        switch ($resolved->type) {
+            case VMVariable::TYPE_NULL:
+                return 'n';
+            case VMVariable::TYPE_INTEGER:
+                return 'i:'.$resolved->toInt();
+            case VMVariable::TYPE_FLOAT:
+                return 'f:'.$resolved->toFloat();
+            case VMVariable::TYPE_BOOLEAN:
+                return 'b:'.($resolved->toBool() ? '1' : '0');
+            case VMVariable::TYPE_STRING:
+                return 's:'.$resolved->toString();
+            case VMVariable::TYPE_ARRAY:
+                $parts = [];
+                foreach ($resolved->toArray()->iterateKeyed(true) as [$k, $v]) {
+                    $parts[] = $this->vmScalarFingerprint($k).'='.$this->vmScalarFingerprint($v);
+                }
+
+                return 'a:'.implode(',', $parts);
+            default:
+                return 'u:'.$resolved->type;
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $entry
+     * @return array{type: int, value?: mixed, global?: string, vmTable?: \PHPCompiler\VM\HashTable}
+     */
+    private function propertyDefaultConstEntry(array $entry): array
+    {
+        if (isset($entry['global'])) {
+            return ['type' => $entry['type'], 'global' => $entry['global']];
+        }
+        if (isset($entry['vmTable'])) {
+            return ['type' => $entry['type'], 'vmTable' => $entry['vmTable']];
+        }
+
+        return ['type' => $entry['type'], 'value' => $entry['value']];
     }
 
     /**
@@ -4365,12 +4435,25 @@ class Object_ extends Type {
                 if ($propset[1] !== $name) {
                     continue;
                 }
-                // Per-instance empty array default (Zend zend_objects.c; bootstrap array_value_box).
-                $this->propertyDefaults[$classId][$propset[3]] = [
-                    'propertyType' => $propset[2],
-                    'type' => Variable::TYPE_HASHTABLE,
-                    'emptyArray' => true,
-                ];
+                $table = $value->toArray();
+                if (!$table instanceof \PHPCompiler\VM\HashTable) {
+                    throw new \LogicException('Property array default must be a HashTable');
+                }
+                // Per-instance array default (Zend zend_objects.c). Empty → fresh alloc;
+                // non-empty → rebuild from the folded VM table at each `new` (#24086).
+                if (0 === $table->getNumElements()) {
+                    $this->propertyDefaults[$classId][$propset[3]] = [
+                        'propertyType' => $propset[2],
+                        'type' => Variable::TYPE_HASHTABLE,
+                        'emptyArray' => true,
+                    ];
+                } else {
+                    $this->propertyDefaults[$classId][$propset[3]] = [
+                        'propertyType' => $propset[2],
+                        'type' => Variable::TYPE_HASHTABLE,
+                        'vmTable' => $table,
+                    ];
+                }
 
                 return;
             }
