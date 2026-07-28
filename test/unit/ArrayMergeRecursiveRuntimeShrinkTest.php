@@ -9,7 +9,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_merge_recursive() JIT routes through ArrayMergeRecursiveJitHelper PHP (#10183, #14423). */
+/**
+ * array_merge_recursive() NestedJIT via JitVmHelperLink::ensureCompiled (#10183 / #24107 / peer #24077).
+ */
 final class ArrayMergeRecursiveRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -28,14 +30,22 @@ final class ArrayMergeRecursiveRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/phpc_array_merge_recursive.c');
     }
 
-    public function testJitLoweringUsesPhpHelperNotArrayBuiltinHelperLlvm(): void
+    public function testArrayMergeRecursiveRuntimeUsesJitVmHelperLink(): void
     {
         $runtime = file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php');
         $this->assertIsString($runtime);
         $this->assertStringContainsString('ArrayMergeRecursiveJitHelper', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
+        $this->assertStringNotContainsString('parseAndCompile', $runtime);
+        $this->assertStringNotContainsString('new JIT(', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $runtime);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::mergeRecursive', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::mergeRecursiveOverlay', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
 
         $builtin = file_get_contents($this->repoRoot.'/ext/standard/array_merge_recursive.php');
         $this->assertIsString($builtin);
