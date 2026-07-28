@@ -441,30 +441,149 @@ final class JitJsonDecode
         throw new \LogicException('json_decode() property type not supported for JIT materialization');
     }
 
+    /**
+     * Assoc-mode hashtable from decoded PHP array (#24116).
+     *
+     * Integer keys use packed {@see __hashtable__set*At} (Zend json_decode lists);
+     * string keys use the associative path. Scalars keep their JSON types — not
+     * stringified — matching {@see VmJson::importAssoc} / object-mode materialize.
+     *
+     * @param array<string|int, mixed> $data
+     */
     private static function buildHashtableFromPhp(Context $context, array $data): Value
     {
         $ht = HashTableHelper::alloc($context);
         foreach ($data as $key => $value) {
-            $keyStr = $context->builder->load($context->constantStringFromString((string) $key));
-            if (\is_array($value)) {
-                $child = self::buildHashtableFromPhp($context, $value);
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyHashtable'),
-                    $ht,
-                    $keyStr,
-                    $child
-                );
+            if (\is_int($key)) {
+                self::storeIndexValueAssoc($context, $ht, $key, $value);
                 continue;
             }
-            $context->builder->call(
-                $context->lookupFunction('__hashtable__setStringKeyString'),
-                $ht,
-                $keyStr,
-                self::scalarToJitString($context, $value)
-            );
+            $keyStr = $context->builder->load($context->constantStringFromString((string) $key));
+            self::storeStringKeyValueAssoc($context, $ht, $keyStr, $value);
         }
 
         return $ht;
+    }
+
+    private static function storeIndexValueAssoc(Context $context, Value $ht, int $index, mixed $value): void
+    {
+        $idx = $context->getTypeFromString('size_t')->constInt($index, false);
+        if (\is_array($value)) {
+            $child = self::buildHashtableFromPhp($context, $value);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setHashtableAt'),
+                $ht,
+                $idx,
+                $child
+            );
+
+            return;
+        }
+        if (\is_bool($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setBoolAt'),
+                $ht,
+                $idx,
+                $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false)
+            );
+
+            return;
+        }
+        if (\is_int($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setLongAt'),
+                $ht,
+                $idx,
+                $context->getTypeFromString('int64')->constInt($value, false)
+            );
+
+            return;
+        }
+        if (\is_float($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setDoubleAt'),
+                $ht,
+                $idx,
+                $context->getTypeFromString('double')->constReal($value, false)
+            );
+
+            return;
+        }
+        if (null === $value) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setNullAt'),
+                $ht,
+                $idx
+            );
+
+            return;
+        }
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $ht,
+            $idx,
+            $context->builder->load($context->constantStringFromString((string) $value))
+        );
+    }
+
+    private static function storeStringKeyValueAssoc(Context $context, Value $ht, Value $keyStr, mixed $value): void
+    {
+        if (\is_array($value)) {
+            $child = self::buildHashtableFromPhp($context, $value);
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                $ht,
+                $keyStr,
+                $child
+            );
+
+            return;
+        }
+        if (\is_bool($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyBool'),
+                $ht,
+                $keyStr,
+                $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false)
+            );
+
+            return;
+        }
+        if (\is_int($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyLong'),
+                $ht,
+                $keyStr,
+                $context->getTypeFromString('int64')->constInt($value, false)
+            );
+
+            return;
+        }
+        if (\is_float($value)) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyDouble'),
+                $ht,
+                $keyStr,
+                $context->getTypeFromString('double')->constReal($value, false)
+            );
+
+            return;
+        }
+        if (null === $value) {
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyNull'),
+                $ht,
+                $keyStr
+            );
+
+            return;
+        }
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            $context->builder->load($context->constantStringFromString((string) $value))
+        );
     }
 
     private static function scalarToJitString(Context $context, mixed $value): Value
