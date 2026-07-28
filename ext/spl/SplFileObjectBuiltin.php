@@ -960,13 +960,9 @@ final class SplFileObjectFgetcsv extends VmClassMethod
             );
         }
         VmCsvArg::validateFgetcsvOptions($separator, $enclosure, $escape);
-        $row = VmFs::fgetcsv(
-            SplFileObjectStorage::handle($object),
-            null,
-            $separator,
-            $enclosure,
-            $escape
-        );
+        // php-src SplFileObject::fgetcsv → spl_filesystem_file_read_csv (#24290),
+        // not raw stream fgetcsv() which collapses the trailing empty row to false.
+        $row = SplFileObjectStorage::fgetcsv($object, $separator, $enclosure, $escape);
         if (false === $row) {
             $frame->returnVar->bool(false);
 

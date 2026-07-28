@@ -318,6 +318,40 @@ final class SplFileObjectStorage
         return $state['currentLine'] ?? false;
     }
 
+    /**
+     * php-src SplFileObject::fgetcsv — spl_filesystem_file_read_csv (#24290).
+     * Trailing empty line after a final newline is array(null), not false.
+     *
+     * @return list<string|null>|false
+     */
+    public static function fgetcsv(
+        ObjectEntry $object,
+        string $separator,
+        string $enclosure,
+        string $escape,
+    ): array|false {
+        $state = &self::$state[$object->id];
+        $lineAdd = (null !== $state['currentLine'] || null !== $state['currentCsv']) ? 1 : 0;
+        $savedSep = $state['separator'];
+        $savedEnc = $state['enclosure'];
+        $savedEsc = $state['escape'];
+        $state['separator'] = $separator;
+        $state['enclosure'] = $enclosure;
+        $state['escape'] = $escape;
+        $readLen = $state['maxLineLen'] > 0 ? $state['maxLineLen'] + 1 : null;
+        try {
+            if (!self::readCsvLineEx($object, $lineAdd, $readLen)) {
+                return false;
+            }
+
+            return $state['currentCsv'] ?? false;
+        } finally {
+            $state['separator'] = $savedSep;
+            $state['enclosure'] = $savedEnc;
+            $state['escape'] = $savedEsc;
+        }
+    }
+
     private static function readLineForIterator(ObjectEntry $object, bool $silent): bool
     {
         return self::readLine($object, $silent);
