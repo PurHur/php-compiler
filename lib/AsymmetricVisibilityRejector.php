@@ -82,13 +82,6 @@ final class AsymmetricVisibilityRejector
 
     private static function lineOfFirstAsymmetricSyntax(string $code): int
     {
-        foreach (['(set)', '(get)'] as $needle) {
-            $pos = stripos($code, $needle);
-            if (false !== $pos) {
-                return substr_count(substr($code, 0, $pos), "\n") + 1;
-            }
-        }
-
-        return 1;
+        return AsymmetricVisibilityRewriter::findFirstAsymmetricSyntaxLine($code);
     }
 }

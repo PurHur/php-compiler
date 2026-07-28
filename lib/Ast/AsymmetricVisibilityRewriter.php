@@ -47,7 +47,22 @@ final class AsymmetricVisibilityRewriter
 
     public static function containsAsymmetricVisibilitySyntax(string $source): bool
     {
-        return self::hasAsymmetricVisibilitySyntax($source);
+        // php-src: Zend/zend_language_scanner.l ST_NOWDOC/ST_HEREDOC — body is data, not tokens (#24460).
+        return self::hasAsymmetricVisibilitySyntax(self::blankOpaqueRegions($source));
+    }
+
+    /** 1-based line of first `(set)` / `(get)` outside comments and string literals, or 1 (#24460). */
+    public static function findFirstAsymmetricSyntaxLine(string $source): int
+    {
+        $inspectable = self::blankOpaqueRegions($source);
+        foreach (['(set)', '(get)'] as $needle) {
+            $pos = stripos($inspectable, $needle);
+            if (false !== $pos) {
+                return substr_count(substr($inspectable, 0, $pos), "\n") + 1;
+            }
+        }
+
+        return 1;
     }
 
     /**
@@ -58,8 +73,9 @@ final class AsymmetricVisibilityRewriter
      */
     public static function findMultipleAccessModifierLine(string $source): int
     {
+        $inspectable = self::blankOpaqueRegions($source);
         $lineNum = 0;
-        foreach (explode("\n", $source) as $line) {
+        foreach (explode("\n", $inspectable) as $line) {
             ++$lineNum;
             if (!self::isInspectableAsymmetricLine($line, self::SET_MODIFIER_NEEDLE)) {
                 continue;
@@ -72,16 +88,16 @@ final class AsymmetricVisibilityRewriter
             }
         }
 
-        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+        if (!preg_match('/\b__construct\b/i', $inspectable) || !preg_match('/\(\s*set\s*\)/i', $inspectable)) {
             return 0;
         }
 
         $offset = 0;
-        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $inspectable, $m, PREG_OFFSET_CAPTURE, $offset)) {
             $openPos = $m[0][1] + strlen($m[0][0]) - 1;
-            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            $paramsText = self::extractBalancedParenContent($inspectable, $openPos);
             if (null !== $paramsText && self::paramsViolateMultipleSetModifierRulesForReferenceProfile($paramsText)) {
-                $constructLine = substr_count(substr($source, 0, $openPos), "\n") + 1;
+                $constructLine = substr_count(substr($inspectable, 0, $openPos), "\n") + 1;
                 $relative = self::offsetOfMultipleSetModifierInParams($paramsText);
                 if ($relative >= 0) {
                     return $constructLine + substr_count(substr($paramsText, 0, $relative), "\n");
@@ -98,8 +114,9 @@ final class AsymmetricVisibilityRewriter
     /** 1-based line of first bare `(set)` without explicit read visibility, or 0 (#15446). */
     public static function findBareSetModifierLine(string $source): int
     {
+        $inspectable = self::blankOpaqueRegions($source);
         $lineNum = 0;
-        foreach (explode("\n", $source) as $line) {
+        foreach (explode("\n", $inspectable) as $line) {
             ++$lineNum;
             if (!self::isInspectableAsymmetricLine($line, self::SET_MODIFIER_NEEDLE)) {
                 continue;
@@ -112,18 +129,18 @@ final class AsymmetricVisibilityRewriter
             }
         }
 
-        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+        if (!preg_match('/\b__construct\b/i', $inspectable) || !preg_match('/\(\s*set\s*\)/i', $inspectable)) {
             return 0;
         }
 
         $offset = 0;
-        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $inspectable, $m, PREG_OFFSET_CAPTURE, $offset)) {
             $openPos = $m[0][1] + strlen($m[0][0]) - 1;
-            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            $paramsText = self::extractBalancedParenContent($inspectable, $openPos);
             if (null !== $paramsText) {
                 $relative = self::offsetOfBareSetModifierInParams($paramsText);
                 if ($relative >= 0) {
-                    return substr_count(substr($source, 0, $openPos), "\n") + 1
+                    return substr_count(substr($inspectable, 0, $openPos), "\n") + 1
                         + substr_count(substr($paramsText, 0, $relative), "\n");
                 }
             }
@@ -162,9 +179,10 @@ final class AsymmetricVisibilityRewriter
      */
     public static function findParenthesizedAsymmetricSetModifierError(string $source): ?array
     {
+        $inspectable = self::blankOpaqueRegions($source);
         if (!preg_match(
             '/\(\s*(?<token>private|protected|public)\s*\(\s*set\s*\)\s*\)/i',
-            $source,
+            $inspectable,
             $match,
             PREG_OFFSET_CAPTURE
         )) {
@@ -175,7 +193,7 @@ final class AsymmetricVisibilityRewriter
         $tokenPos = $match['token'][1];
 
         return [
-            'line' => substr_count(substr($source, 0, $tokenPos), "\n") + 1,
+            'line' => substr_count(substr($inspectable, 0, $tokenPos), "\n") + 1,
             'token' => $token,
         ];
     }
@@ -203,6 +221,52 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
+     * Blank comments / string / heredoc-nowdoc bodies while preserving newlines (#24460).
+     *
+     * Detection helpers use this so asymmetric-visibility text inside ST_NOWDOC / ST_HEREDOC
+     * (and ordinary string literals) is not treated as declarations — matching Zend's scanner.
+     */
+    private static function blankOpaqueRegions(string $source): string
+    {
+        $tokens = token_get_all($source);
+        $out = '';
+        $inHeredoc = false;
+        foreach ($tokens as $token) {
+            if (is_string($token)) {
+                if ($inHeredoc) {
+                    $out .= preg_replace('/[^\r\n]/', ' ', $token) ?? $token;
+                    continue;
+                }
+                $out .= $token;
+                continue;
+            }
+            [$id, $text] = $token;
+            if (T_START_HEREDOC === $id) {
+                $inHeredoc = true;
+                $out .= $text;
+                continue;
+            }
+            if (T_END_HEREDOC === $id) {
+                $inHeredoc = false;
+                $out .= $text;
+                continue;
+            }
+            $opaque = $inHeredoc
+                || T_COMMENT === $id
+                || T_DOC_COMMENT === $id
+                || T_CONSTANT_ENCAPSED_STRING === $id
+                || T_ENCAPSED_AND_WHITESPACE === $id;
+            if ($opaque) {
+                $out .= preg_replace('/[^\r\n]/', ' ', $text) ?? $text;
+                continue;
+            }
+            $out .= $text;
+        }
+
+        return $out;
+    }
+
+    /**
      * @return array{0: string, 1: array<string, string>}
      */
     private static function maskLiteralsAndComments(string $source): array
@@ -211,13 +275,36 @@ final class AsymmetricVisibilityRewriter
         $masked = '';
         $map = [];
         $index = 0;
+        $inHeredoc = false;
         foreach ($tokens as $token) {
             if (is_string($token)) {
+                if ($inHeredoc) {
+                    $placeholder = "\0PHPC_ASYM_MASK_{$index}\0";
+                    $map[$placeholder] = $token;
+                    $masked .= $placeholder;
+                    ++$index;
+                    continue;
+                }
                 $masked .= $token;
                 continue;
             }
             [$id, $text] = $token;
-            if (T_COMMENT === $id || T_DOC_COMMENT === $id || T_CONSTANT_ENCAPSED_STRING === $id) {
+            if (T_START_HEREDOC === $id) {
+                $inHeredoc = true;
+                $masked .= $text;
+                continue;
+            }
+            if (T_END_HEREDOC === $id) {
+                $inHeredoc = false;
+                $masked .= $text;
+                continue;
+            }
+            $opaque = $inHeredoc
+                || T_COMMENT === $id
+                || T_DOC_COMMENT === $id
+                || T_CONSTANT_ENCAPSED_STRING === $id
+                || T_ENCAPSED_AND_WHITESPACE === $id;
+            if ($opaque) {
                 $placeholder = "\0PHPC_ASYM_MASK_{$index}\0";
                 $map[$placeholder] = $text;
                 $masked .= $placeholder;
