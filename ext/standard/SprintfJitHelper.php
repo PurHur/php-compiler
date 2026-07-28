@@ -50,12 +50,15 @@ final class SprintfJitHelper
             return self::padLeftZeros((string) $n, 3);
         }
 
-        // %d — including empty-array argv tag (0x05) → 0 (#18532).
+        // %d — including empty-array argv tag (0x05) → 0 (#18532); TAG_NULL → 0 (#24258).
         // Build via concat (not bare `(string)$n` return): NestedJIT user-script AOT
         // intermittently `free(): invalid pointer` when the helper returns a fresh
         // int-to-string alone (#23871). Sequential path uses the same concat shape.
         if (2 === $fmtLen && '%' === $format[0] && 'd' === $format[1]) {
             if (1 === $packLen && self::isByte($packedArgs[0], 5)) {
+                return '0';
+            }
+            if (1 === $packLen && self::isByte($packedArgs[0], 0)) {
                 return '0';
             }
             $n = self::readPackedLong($packedArgs, $packLen);
@@ -123,9 +126,13 @@ final class SprintfJitHelper
                 if (null === $n) {
                     return null;
                 }
+                $size = self::packedArgByteSizeAtOffset($packedArgs, $packLen, $cursor);
+                if (null === $size) {
+                    return null;
+                }
                 // NestedJIT: `$cursor += N` with a non-literal is unreliable (#23871).
                 $k = 0;
-                while ($k < 9) {
+                while ($k < $size) {
                     ++$cursor;
                     ++$k;
                 }
@@ -139,7 +146,7 @@ final class SprintfJitHelper
                 if (null === $s) {
                     return null;
                 }
-                $size = self::packedStringByteSizeAtOffset($packedArgs, $packLen, $cursor);
+                $size = self::packedArgByteSizeAtOffset($packedArgs, $packLen, $cursor);
                 if (null === $size) {
                     return null;
                 }
@@ -164,12 +171,19 @@ final class SprintfJitHelper
     /** NestedJIT-safe packed long read — no by-ref cursor (#23799, #23871). */
     private static function readPackedLongAtOffset(string $packed, int $packLen, int $offset): ?int
     {
-        if ($offset + 9 > $packLen) {
+        if ($offset >= $packLen) {
             return null;
         }
         $p = 0;
         while ($p < $offset) {
             ++$p;
+        }
+        // php-src formatted_print.c — null coerces to 0 for %d (#24258).
+        if (self::isByte($packed[$p], 0)) {
+            return 0;
+        }
+        if ($offset + 9 > $packLen) {
+            return null;
         }
         if (!self::isByte($packed[$p], 1)) {
             return null;
@@ -186,14 +200,64 @@ final class SprintfJitHelper
         return $n;
     }
 
-    private static function packedStringByteSizeAtOffset(string $packed, int $packLen, int $offset): ?int
+    private static function packedArgByteSizeAtOffset(string $packed, int $packLen, int $offset): ?int
     {
-        if ($offset + 9 > $packLen) {
+        if ($offset >= $packLen) {
             return null;
         }
         $p = 0;
         while ($p < $offset) {
             ++$p;
+        }
+        $tag = self::byteOrd($packed[$p]);
+        if (0 === $tag) {
+            return 1;
+        }
+        if (1 === $tag || 2 === $tag) {
+            return 9;
+        }
+        if (3 === $tag) {
+            return 2;
+        }
+        if (5 === $tag) {
+            return 1;
+        }
+        if (4 !== $tag) {
+            return null;
+        }
+        if ($offset + 9 > $packLen) {
+            return null;
+        }
+        ++$p;
+        $len = 0;
+        $i = 0;
+        while ($i < 8) {
+            $len |= self::byteOrd($packed[$p]) << (8 * $i);
+            ++$p;
+            ++$i;
+        }
+        if ($len < 0 || $offset + 9 + $len > $packLen) {
+            return null;
+        }
+
+        return 9 + $len;
+    }
+
+    private static function packedStringByteSizeAtOffset(string $packed, int $packLen, int $offset): ?int
+    {
+        $size = self::packedArgByteSizeAtOffset($packed, $packLen, $offset);
+        if (null === $size) {
+            return null;
+        }
+        if ($offset >= $packLen) {
+            return null;
+        }
+        $p = 0;
+        while ($p < $offset) {
+            ++$p;
+        }
+        if (self::isByte($packed[$p], 0)) {
+            return 1;
         }
         if (!self::isByte($packed[$p], 4)) {
             return null;
@@ -215,15 +279,22 @@ final class SprintfJitHelper
 
     private static function readPackedStringValueAtOffset(string $packed, int $packLen, int $offset): ?string
     {
+        if ($offset >= $packLen) {
+            return null;
+        }
+        $p = 0;
+        while ($p < $offset) {
+            ++$p;
+        }
+        // php-src formatted_print.c — null coerces to '' for %s (#24258).
+        if (self::isByte($packed[$p], 0)) {
+            return '';
+        }
         $size = self::packedStringByteSizeAtOffset($packed, $packLen, $offset);
         if (null === $size) {
             return null;
         }
         $len = $size - 9;
-        $p = 0;
-        while ($p < $offset) {
-            ++$p;
-        }
         // Skip TAG_STRING + 8-byte length.
         $skip = 0;
         while ($skip < 9) {
@@ -559,6 +630,14 @@ final class SprintfJitHelper
     /** @param-out int $cursor */
     private static function readPackedLongAt(string $packed, int $packLen, int &$cursor): ?int
     {
+        if ($cursor >= $packLen) {
+            return null;
+        }
+        if (self::isByte($packed[$cursor], 0)) {
+            ++$cursor;
+
+            return 0;
+        }
         if ($cursor + 9 > $packLen || !self::isByte($packed[$cursor], 1)) {
             return null;
         }
@@ -577,6 +656,14 @@ final class SprintfJitHelper
     /** @param-out int $cursor */
     private static function readPackedStringAt(string $packed, int $packLen, int &$cursor): ?string
     {
+        if ($cursor >= $packLen) {
+            return null;
+        }
+        if (self::isByte($packed[$cursor], 0)) {
+            ++$cursor;
+
+            return '';
+        }
         // TAG_STRING (4) + 8-byte little-endian length + bytes.
         if ($cursor + 9 > $packLen || !self::isByte($packed[$cursor], 4)) {
             return null;
@@ -692,8 +779,11 @@ final class SprintfJitHelper
 
     private static function readPackedLong(string $packed, int $packLen): ?int
     {
-        // TAG_LONG (1) + 8-byte little-endian int64.
+        // TAG_NULL → 0 (#24258); TAG_LONG (1) + 8-byte little-endian int64.
         // Index with ++ only — `$packed[$i + 1]` miscompiles under NestedJIT (#23871).
+        if (1 === $packLen && self::isByte($packed[0], 0)) {
+            return 0;
+        }
         if ($packLen < 9 || !self::isByte($packed[0], 1)) {
             return null;
         }
