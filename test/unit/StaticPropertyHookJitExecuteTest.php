@@ -34,7 +34,7 @@ private string $repoRoot;
         }
     }
 
-    public function testStaticPropertyHookSetDoublesOnJit(): void
+    public function testStaticPropertyHookCompileRejectedOnJit(): void
     {
         $jit = realpath($this->repoRoot.'/bin/jit.php');
         if (false === $jit) {
@@ -45,6 +45,7 @@ private string $repoRoot;
             $this->markTestSkipped('issue_4807_static_property_hook_jit.php repro missing');
         }
         $env = $this->llvmProcessEnv();
+        $env['PHP_COMPILER_PROFILE'] = '8.4';
         $cmd = array_merge(
             LlvmToolchain::envPrefix($this->repoRoot),
             [PHP_BINARY, $jit, $script]
@@ -63,10 +64,8 @@ private string $repoRoot;
         fclose($pipes[2]);
         $exit = proc_close($proc);
         $combined = trim(($stdout !== false ? $stdout : '').($stderr !== false ? $stderr : ''));
-        if (0 !== $exit) {
-            $this->fail('bin/jit.php static property hook repro failed (exit '.$exit.'): '.$combined);
-        }
-        $this->assertStringContainsString('6', $combined);
+        $this->assertNotSame(0, $exit, 'expected compile failure: '.$combined);
+        $this->assertStringContainsString('Cannot declare hooks for static property', $combined);
     }
 
     private function jitRuntimeProbeOk(): bool
