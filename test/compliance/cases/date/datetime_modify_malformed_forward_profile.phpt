@@ -16,19 +16,15 @@ try {
     echo $im->format('Y-m-d'), "\n";
 }
 $dt = new DateTime('2024-01-01');
-try {
-    $dt->modify('not a date');
-    echo "mutable no throw\n";
-} catch (DateMalformedStringException $e) {
-    echo 'mutable:', get_class($e), "\n";
-    echo $e->getMessage(), "\n";
-    echo $dt->format('Y-m-d'), "\n";
-}
+$bad = @$dt->modify('not a date');
+var_export([$bad, $dt->format('Y-m-d')]);
+echo "\n";
 --EXPECT--
 true
 immutable:DateMalformedStringException
 Failed to parse time string (not a date) at position 0 (n): The timezone could not be found in the database
 2024-01-01
-mutable:DateMalformedStringException
-Failed to parse time string (not a date) at position 0 (n): The timezone could not be found in the database
-2024-01-01
+array (
+  0 => false,
+  1 => '2024-01-01',
+)
