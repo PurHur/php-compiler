@@ -1942,4 +1942,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
             );
         }
     }
+
+    /** @covers issue #24365 */
+    public function testOpensslDigestSignVerifyNamedParamsResolve(): void
+    {
+        $digest = BuiltinParamNames::forFunction('openssl_digest');
+        self::assertSame(['data', 'digest_algo', 'binary'], $digest);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($digest, 'data', 'openssl_digest'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($digest, 'digest_algo', 'openssl_digest'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($digest, 'binary', 'openssl_digest'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($digest, 'method', 'openssl_digest'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($digest, 'raw_output', 'openssl_digest'));
+        self::assertSame(
+            ['data', 'digest_algo', 'binary'],
+            BuiltinParamNames::paramNamesForInternalFunction('openssl_digest')
+        );
+
+        $sign = BuiltinParamNames::forFunction('openssl_sign');
+        self::assertSame(['data', 'signature', 'private_key', 'algorithm'], $sign);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($sign, 'private_key', 'openssl_sign'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($sign, 'algorithm', 'openssl_sign'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sign, 'key', 'openssl_sign'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sign, 'method', 'openssl_sign'));
+
+        $verify = BuiltinParamNames::forFunction('openssl_verify');
+        self::assertSame(['data', 'signature', 'public_key', 'algorithm'], $verify);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($verify, 'public_key', 'openssl_verify'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($verify, 'algorithm', 'openssl_verify'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($verify, 'key', 'openssl_verify'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($verify, 'method', 'openssl_verify'));
+    }
 }
