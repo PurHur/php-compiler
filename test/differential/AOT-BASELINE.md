@@ -81,6 +81,45 @@ Verified on current master with `script/differential-sweep.sh --aot --repeat 5` 
 This regeneration caught `e30` and `g07a` as regressions no individual verification would have
 surfaced. `g07a` carries `@differential-repeat: 10` so a plain sweep re-runs it.
 
+## Batch 3 — modern PHP (`k01`–`k09`)
+
+Measured on `412a8cf79`, uncontended: **VM 9/9**, **AOT 3/9** (`--repeat 2` / `--repeat 3`).
+
+Batches 1 and 2 covered everyday PHP. This batch covers constructs that postdate the corpus:
+readonly properties, named arguments, enums, first-class callables, argument spread, late static
+binding. Six of nine fail.
+
+| case | state | issue |
+|---|---|---|
+| `k01` readonly promoted properties | ok | — |
+| `k02` named arguments, out-of-order + skipped default | ok | — |
+| `k03` `static::m()` through an overriding subclass | **`11` vs `21`** | #24169 |
+| `k04` by-reference parameter | **no output at all** | #24162 |
+| `k05` `str_starts_with()` | **`false` on matching input** | #24161 |
+| `k06` backed enum with `match($this)` | compile failure | #24163 |
+| `k07` first-class callable `f(...)` | compile failure (builtins core-dump) | #24166 |
+| `k08` spread into fixed untyped params | ok — see the warning below | — |
+| `k09` variadic pack used as an array | **`Object` vs `6`** | #24167 |
+
+`k03` and `k09` are the ones to note, because both sit next to a case that already passes. `j02`
+covers late static binding via `new static()` and `static::class` and is green; method dispatch
+through `static::` was never reached. `e08_spread` covers variadic spread and is green; it only ever
+feeds the pack to `implode()`, and `array_sum()` on the same pack returns `Object`. **A green case
+bounds the shape it actually executes, not the feature it is named after.**
+
+## Do not run two sweep containers against the same bind mount
+
+I reported `k08` as silent wrong output (`0` instead of `6`) and had to retract it. The probe that
+produced that number was running **concurrently with a second sweep container over the same
+bind-mounted repo**, so both built through the same helper-runtime cache in `/app`. Re-measured
+alone, the identical program passes **10/10**.
+
+This failure mode is dangerous precisely because it does not look flaky: it produced a stable,
+plausible wrong answer across all three runs of a `--repeat 3` sweep. `--repeat` does not defend
+against it, because every repeat shares the contaminated artifact. Only re-running alone does.
+
+Some existing "flaky case" attributions in this file may deserve re-measurement under that lens.
+
 ## Keeping this honest
 
 Regenerate after any batch of lowering work and update the SHA. A baseline that silently drifts is
