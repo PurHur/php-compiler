@@ -29,13 +29,8 @@ final class mb_strwidth extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('mb_strwidth() requires one or two arguments');
         }
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21061, mbstring.c).
-        $string = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_strwidth',
-            0,
-            'string'
-        );
+        // Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src mbstring.c; #24257).
+        $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'mb_strwidth', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
