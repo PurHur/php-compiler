@@ -1925,4 +1925,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($stristr, 'before_needle', 'stristr'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($stristr, 'part', 'stristr'));
     }
+
+    /** @covers issue #23644 */
+    public function testFtpConnectHostnameNamedParamsResolve(): void
+    {
+        foreach (['ftp_connect', 'ftp_ssl_connect'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['hostname', 'port', 'timeout'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'hostname', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'port', $fn));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'timeout', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'host', $fn));
+            self::assertSame(
+                ['hostname', 'port', 'timeout'],
+                BuiltinParamNames::paramNamesForInternalFunction($fn)
+            );
+        }
+    }
 }
