@@ -192,7 +192,7 @@ final class SplDualIteratorStorage
 
     private const RS_NEXT = 4;
 
-    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, inIteration: bool, innerPinKey: string}> */
+    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, flags: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, inIteration: bool, innerPinKey: string}> */
     private static array $store = [];
 
     public static function hasStateFor(ObjectEntry $object): bool
@@ -225,6 +225,7 @@ final class SplDualIteratorStorage
             'inner' => SplIteratorSupport::pinObject($inner, $pinKey),
             'recursive' => false,
             'mode' => IteratorIteratorBuiltin::LEAVES_ONLY,
+            'flags' => 0,
             'stack' => [],
             'maxDepth' => -1,
             'rewound' => false,
@@ -242,6 +243,7 @@ final class SplDualIteratorStorage
             'inner' => SplIteratorSupport::pinObject($inner, $pinKey),
             'recursive' => false,
             'mode' => IteratorIteratorBuiltin::LEAVES_ONLY,
+            'flags' => 0,
             'stack' => [],
             'maxDepth' => -1,
             'rewound' => true,
@@ -251,16 +253,20 @@ final class SplDualIteratorStorage
         ]);
     }
 
-    public static function initRecursive(ObjectEntry $object, ObjectEntry $inner, int $mode): void
+    public static function initRecursive(ObjectEntry $object, ObjectEntry $inner, int $mode, int $flags = 0): void
     {
         // php-src spl_recursive_it_it_construct — inner iterator on stack at RS_START (#16904).
         // Pin once: stack[0] aliases the same ObjectEntry as inner (#6138).
+        // mode and flags are separate (php-src intern->mode / intern->flags); do not OR
+        // CATCH_GET_CHILD into mode — but if callers pass it as mode (common misuse), the
+        // advance switch must leave unknown modes unmatched so parents yield (#24293).
         $pinKey = 'dual:'.$object->id.':inner';
         $pinned = SplIteratorSupport::pinObject($inner, $pinKey);
         self::replaceStore($object->id, [
             'inner' => $pinned,
             'recursive' => true,
             'mode' => $mode,
+            'flags' => $flags,
             'stack' => [
                 ['iterator' => $pinned, 'state' => self::RS_START],
             ],
@@ -273,7 +279,7 @@ final class SplDualIteratorStorage
     }
 
     /**
-     * @param array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, inIteration: bool, innerPinKey: string} $state
+     * @param array{inner: ObjectEntry, recursive: bool, mode: int, flags: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, inIteration: bool, innerPinKey: string} $state
      */
     private static function replaceStore(int $objectId, array $state): void
     {
@@ -559,7 +565,7 @@ final class SplDualIteratorStorage
         return $object;
     }
 
-    /** @return array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool} */
+    /** @return array{inner: ObjectEntry, recursive: bool, mode: int, flags: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -649,19 +655,26 @@ final class SplDualIteratorStorage
                         $entry['state'] = self::RS_NEXT;
                         continue 2;
                     }
-                    $mode = self::traversalMode($state['mode']);
-                    if (self::iteratorHasChildren($frame, $object, $iterator, $level, $state)) {
+                    // php-src spl_recursive_it_move_forward_ex — switch(object->mode) with no
+                    // default: unknown modes (e.g. CATCH_GET_CHILD OR'd into mode = 16) fall
+                    // through and yield the current element without descending (#24293).
+                    $mode = $state['mode'];
+                    $hasChildren = self::iteratorHasChildren($frame, $object, $iterator, $level, $state);
+                    if ($hasChildren) {
                         if (self::canDescend($state, $level)) {
+                            if (IteratorIteratorBuiltin::LEAVES_ONLY === $mode
+                                || IteratorIteratorBuiltin::CHILD_FIRST === $mode) {
+                                self::descendIntoChildren($frame, $object, $level);
+                                continue 2;
+                            }
                             if (IteratorIteratorBuiltin::SELF_FIRST === $mode) {
                                 $entry['state'] = self::RS_CHILD;
                                 self::callTraversalHook($frame, $object, 'nextElement');
 
                                 return;
                             }
-                            self::descendIntoChildren($frame, $object, $level);
-                            continue 2;
-                        }
-                        if (IteratorIteratorBuiltin::LEAVES_ONLY === $mode) {
+                            // Unknown mode: yield without descending (php-src switch fallthrough).
+                        } elseif (IteratorIteratorBuiltin::LEAVES_ONLY === $mode) {
                             $entry['state'] = self::RS_NEXT;
                             continue 2;
                         }
@@ -672,7 +685,7 @@ final class SplDualIteratorStorage
                     return;
                 case self::RS_SELF:
                     self::callTraversalHook($frame, $object, 'nextElement');
-                    if (IteratorIteratorBuiltin::SELF_FIRST === self::traversalMode($state['mode'])) {
+                    if (IteratorIteratorBuiltin::SELF_FIRST === $state['mode']) {
                         $entry['state'] = self::RS_CHILD;
                     } else {
                         $entry['state'] = self::RS_NEXT;
@@ -690,12 +703,17 @@ final class SplDualIteratorStorage
     {
         $state = &self::$store[$object->id];
         $entry = &$state['stack'][$level];
-        $child = self::getChildren($frame, $entry['iterator']);
+        $child = self::tryGetChildren($frame, $object, $entry['iterator']);
+        if (null === $child) {
+            // CATCH_GET_CHILD: skip this element after getChildren threw (#24293 / php-src).
+            $entry['state'] = self::RS_NEXT;
+
+            return;
+        }
         $stackIndex = \count($state['stack']);
         SplIteratorSupport::pinObject($child, 'dual-stack:'.$child->id.':'.$stackIndex);
         self::invokeInner($frame, $child, 'rewind');
-        $mode = self::traversalMode($state['mode']);
-        if (IteratorIteratorBuiltin::CHILD_FIRST === $mode) {
+        if (IteratorIteratorBuiltin::CHILD_FIRST === $state['mode']) {
             $entry['state'] = self::RS_SELF;
         } else {
             $entry['state'] = self::RS_NEXT;
@@ -718,9 +736,9 @@ final class SplDualIteratorStorage
         $vm->invokeInstanceMethod($object, $method);
     }
 
-    private static function traversalMode(int $mode): int
+    private static function catchesGetChild(ObjectEntry $object): bool
     {
-        return $mode & 0x0F;
+        return 0 !== (self::state($object)['flags'] & IteratorIteratorBuiltin::CATCH_GET_CHILD);
     }
 
     private static function stackTop(ObjectEntry $object): ?ObjectEntry
@@ -740,7 +758,7 @@ final class SplDualIteratorStorage
         return Variable::TYPE_BOOLEAN === $valid->type && $valid->toBool();
     }
 
-    /** @param array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int} $state */
+    /** @param array{inner: ObjectEntry, recursive: bool, mode: int, flags: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int} $state */
     private static function iteratorHasChildren(
         Frame $frame,
         ObjectEntry $object,
@@ -754,12 +772,20 @@ final class SplDualIteratorStorage
         if (!InterfaceCheck::entryImplements($iterator->class, 'recursiveiterator', $frame->vmContext)) {
             return false;
         }
-        $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
+        try {
+            $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
+        } catch (\Throwable $e) {
+            if (self::catchesGetChild($object)) {
+                // php-src: clear exception; treat as no-children path → yield current.
+                return false;
+            }
+            throw $e;
+        }
 
         return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
     }
 
-    /** @param array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int} $state */
+    /** @param array{inner: ObjectEntry, recursive: bool, mode: int, flags: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int} $state */
     private static function canDescend(array $state, int $level): bool
     {
         if ($state['maxDepth'] < 0) {
@@ -782,9 +808,31 @@ final class SplDualIteratorStorage
         if (!InterfaceCheck::entryImplements($iterator->class, 'recursiveiterator', $ctx)) {
             return false;
         }
-        $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
+        try {
+            $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
+        } catch (\Throwable $e) {
+            if (self::catchesGetChild($wrapper)) {
+                return false;
+            }
+            throw $e;
+        }
 
         return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+    }
+
+    /**
+     * @return ObjectEntry|null null when CATCH_GET_CHILD swallowed a getChildren failure
+     */
+    private static function tryGetChildren(Frame $frame, ObjectEntry $wrapper, ObjectEntry $iterator): ?ObjectEntry
+    {
+        try {
+            return self::getChildren($frame, $iterator);
+        } catch (\Throwable $e) {
+            if (self::catchesGetChild($wrapper)) {
+                return null;
+            }
+            throw $e;
+        }
     }
 
     private static function getChildren(Frame $frame, ObjectEntry $iterator): ObjectEntry
@@ -903,13 +951,20 @@ final class RecursiveIteratorIteratorConstruct extends VmClassMethod
             $frame->calledArgs[1]
         );
         $mode = IteratorIteratorBuiltin::LEAVES_ONLY;
+        $flags = 0;
         if (isset($frame->calledArgs[2])) {
             $modeArg = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_INTEGER === $modeArg->type) {
                 $mode = $modeArg->toInt();
             }
         }
-        SplDualIteratorStorage::initRecursive($object, $inner, $mode);
+        if (isset($frame->calledArgs[3])) {
+            $flagsArg = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $flagsArg->type) {
+                $flags = $flagsArg->toInt();
+            }
+        }
+        SplDualIteratorStorage::initRecursive($object, $inner, $mode, $flags);
     }
 }
 
