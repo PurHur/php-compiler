@@ -1045,8 +1045,21 @@ final class Variable {
                     return $boxed;
                 }
                 $index = self::materializePackedIndex($this->context, $dim, $forWrite);
-                if ($forWrite) {
+                // Scalar $arr[i]=… uses prepareIndexWrite; nested FETCH_DIM_W ($arr[i][j]=…)
+                // must return the live child HT so the inner write persists (#24011; string keys
+                // already branch on TYPE_ARRAY above — zend_execute.c ZEND_FETCH_DIM_W).
+                if ($forWrite && (null === $expectedType || Type::TYPE_ARRAY !== $expectedType->type)) {
                     return HashTableHelper::prepareIndexWrite($this->context, $ht, $index);
+                }
+                if ($forWrite && null !== $expectedType && Type::TYPE_ARRAY === $expectedType->type) {
+                    $childHt = HashTableHelper::readIndexedHashtable($this->context, $ht, $index);
+
+                    return new Variable(
+                        $this->context,
+                        self::TYPE_HASHTABLE,
+                        self::KIND_VALUE,
+                        $childHt
+                    );
                 }
                 if (null !== $expectedType && Type::TYPE_STRING === $expectedType->type) {
                     if (!$propertyBacked && !$this->borrowedHashtable) {

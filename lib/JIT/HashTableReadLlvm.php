@@ -791,6 +791,20 @@ final class HashTableReadLlvm
         return $context->builder->inBoundsGep($values, $index);
     }
 
+    /**
+     * Live child hashtable at a packed index (nested FETCH_DIM_W intermediate, #24011).
+     * Mirrors {@see Builtin\Type\HashTable} `__hashtable__readStringKeyHashtable` for int keys.
+     */
+    public static function readIndexedHashtable(Context $context, Value $ht, Value $index): Value
+    {
+        $entry = self::listEntryPointer($context, $ht, $index);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readHashtable'),
+            $entry
+        );
+    }
+
     public static function readStringAt(Context $context, Value $ht, Value $index): Value
     {
         $entry = self::listEntryPointer($context, $ht, $index);
