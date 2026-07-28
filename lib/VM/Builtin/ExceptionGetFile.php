@@ -24,6 +24,8 @@ final class ExceptionGetFile extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->copyFrom($receiver->getProperty(ExceptionSupport::PROP_FILE));
+        // Typed file may still be an uninit prototype on older engine Error paths (#24397).
+        $file = ExceptionSupport::readThrowableFile($receiver);
+        $frame->returnVar->string($file);
     }
 }

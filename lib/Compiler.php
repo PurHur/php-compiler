@@ -40002,11 +40002,14 @@ class Compiler {
                 $this->throwCompileLogic('First-class new callable requires a literal class name');
             }
 
-            return [new OpCode(
+            $fromNew = new OpCode(
                 OpCode::TYPE_FROM_CALLABLE,
                 $result,
                 $this->compileStringLiteralSlot('new '.$classOperand->value, $block)
-            )];
+            );
+            $this->assignSourceMetadata($fromNew, $expr);
+
+            return [$fromNew];
         }
 
         if (1 === $expr->kind) {
@@ -40022,11 +40025,15 @@ class Compiler {
             $this->throwCompileLogic('Unknown first-class callable kind');
         }
 
-        return [new OpCode(
+        $fromCallable = new OpCode(
             OpCode::TYPE_FROM_CALLABLE,
             $result,
             $callableSlot
-        )];
+        );
+        // FCC Error throw site needs opcode line for getLine() (#24397, zend_exceptions.c).
+        $this->assignSourceMetadata($fromCallable, $expr);
+
+        return [$fromCallable];
     }
 
     /**
@@ -40050,6 +40057,7 @@ class Compiler {
             $callableSlot
         );
         $fromCallable->fromCallableParentScope = $parentScope;
+        $this->assignSourceMetadata($fromCallable, $expr);
 
         return [
             new OpCode(

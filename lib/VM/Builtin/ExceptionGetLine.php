@@ -24,6 +24,8 @@ final class ExceptionGetLine extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->copyFrom($receiver->getProperty(ExceptionSupport::PROP_LINE));
+        // Typed line may still be an uninit prototype on older engine Error paths (#24397).
+        $line = ExceptionSupport::readThrowableLine($receiver);
+        $frame->returnVar->int($line);
     }
 }
