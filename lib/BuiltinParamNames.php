@@ -514,6 +514,12 @@ final class BuiltinParamNames
             // php-src ext/standard/streamsfuncs.stub.php — InternalArgInfo still says localaddress/errcode/errstring (#23937)
             case 'stream_socket_server':
                 return ['address', 'error_code', 'error_message', 'flags', 'context'];
+            // php-src streamsfuncs.stub.php — InternalArgInfo still says serverstream/peername (#23938)
+            case 'stream_socket_accept':
+                return ['socket', 'timeout', 'peer_name'];
+            // php-src streamsfuncs.stub.php — InternalArgInfo still says stream/want_peer (#23938)
+            case 'stream_socket_get_name':
+                return ['socket', 'remote'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says format; omits context (#23598)
             case 'get_headers':
                 return ['url', 'associative', 'context'];
