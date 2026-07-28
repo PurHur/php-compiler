@@ -4561,6 +4561,7 @@ require_once __DIR__.'/../../../lib/EncapsedCoalesceRejector.php';
 require_once __DIR__.'/../../../lib/EnumCaseListRewriter.php';
 require_once __DIR__.'/../../../lib/EnumCaseListSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/ExitFunctionSyntaxRejector.php';
+require_once __DIR__.'/../../../lib/ExtensionRegistry.php';
 require_once __DIR__.'/../../../lib/Func/JIT.php';
 require_once __DIR__.'/../../../lib/Func/PHP.php';
 require_once __DIR__.'/../../../lib/GenericArrayTypeSourceRewriter.php';
