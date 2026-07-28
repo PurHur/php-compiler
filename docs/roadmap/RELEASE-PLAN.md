@@ -161,6 +161,42 @@ Direction:
 time, not in binary size, not in startup. Report gen-0 file count, hello-world binary size and cold
 build wall time before and after.
 
+### MEASURED 2026-07-28 — for user binaries this is ALREADY TRUE
+
+Ran that acceptance test rather than assuming it. Regenerating `lib/ExtensionRegistry.php` with 6
+extensions instead of 76 and rebuilding hello world:
+
+| registry | hello-world binary | cold build |
+|---|---|---|
+| all 76 extensions | 17,148,584 B | 6 s |
+| 6 extensions (`standard, spl, types, ctype, hash, random`) | **17,148,944 B** | 6 s |
+
+The minimal build is **360 bytes larger** — i.e. no change. Two further measurements explain why:
+
+- `nm` finds **zero** `curl`/`mongodb`/`snmp`/`ldap` symbols in a hello-world binary built with the
+  full 76-extension registry. Unused extensions are not linked in at all.
+- A script that *does* call an extension grows the binary by ~572 KB (`bcadd`), so linking is
+  demand-driven and already working.
+
+The binary is dominated by `.text` at ~15 MB — the runtime and compiler core, not extensions.
+
+**Consequence: Phase 2.5 must not be justified by user binary size or user build time.** That
+benefit already exists. The two justifications that survive are:
+
+1. **Extensibility** — "a new extension is a directory, not a core edit". Delivered by the generated
+   registry (#24418): the 76 hardcoded loads are gone, and `--only=` / `--without=` select a set at
+   build time with declared dependencies pulled in automatically.
+2. **The compiler's OWN build cost** — the 6,519-file spine compiled as one translation unit, which
+   is the multi-hour gen-0 problem. That is real, and it is what the per-module translation-unit
+   split in the second half of this phase addresses.
+
+This correction matters because the phase is sized above at "37% fewer files", which implies a
+proportional win for users. Measured, that win is not there to collect.
+
+Selection happens at generation time, not runtime, and that is forced: the registry emits literal
+`new` expressions which the AOT compiler resolves statically, so a referenced module is compiled in
+regardless of any runtime filter. Dropping the cost means dropping the reference.
+
 **OPEN:** which extensions form the default set? Suggest the ones the language itself leans on
 (`standard`, `spl`, `types`, `ctype`, `hash`, `random`) and treat the rest as opt-in.
 
