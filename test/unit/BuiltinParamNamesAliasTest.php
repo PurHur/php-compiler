@@ -1186,6 +1186,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_hmac_file'));
     }
 
+    /** @covers issue #24459 */
+    public function testImageTypeToExtensionMimeTypeZendStubNamedParams(): void
+    {
+        $ext = BuiltinParamNames::forFunction('image_type_to_extension');
+        self::assertSame(['image_type', 'include_dot='], $ext);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ext, 'image_type', 'image_type_to_extension'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ext, 'include_dot', 'image_type_to_extension'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ext, 'imagetype', 'image_type_to_extension'));
+
+        $mime = BuiltinParamNames::forFunction('image_type_to_mime_type');
+        self::assertSame(['image_type'], $mime);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($mime, 'image_type', 'image_type_to_mime_type'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($mime, 'imagetype', 'image_type_to_mime_type'));
+    }
+
     /** @covers issue #23642 */
     public function testInflateDeflateInitZendStubNamedParams(): void
     {
