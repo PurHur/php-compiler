@@ -520,6 +520,15 @@ final class BuiltinParamNames
             // php-src streamsfuncs.stub.php — InternalArgInfo still says stream/want_peer (#23938)
             case 'stream_socket_get_name':
                 return ['socket', 'remote'];
+            // php-src streamsfuncs.stub.php — InternalArgInfo still says fp/buffer (#23939)
+            case 'stream_set_write_buffer':
+                return ['stream', 'size'];
+            // php-src stream context stubs — InternalArgInfo still says wrappername/optionname (#23939)
+            case 'stream_context_set_option':
+                return ['context', 'wrapper_or_options', 'option_name', 'value'];
+            // php-src stream context stubs — InternalArgInfo still says options (#23939)
+            case 'stream_context_set_params':
+                return ['context', 'params'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says format; omits context (#23598)
             case 'get_headers':
                 return ['url', 'associative', 'context'];

@@ -1845,4 +1845,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($getName, 'stream', 'stream_socket_get_name'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($getName, 'want_peer', 'stream_socket_get_name'));
     }
+
+    /** @covers issue #23939 */
+    public function testStreamBufferContextZendStubNamedParams(): void
+    {
+        $buf = BuiltinParamNames::forFunction('stream_set_write_buffer');
+        self::assertSame(['stream', 'size'], $buf);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($buf, 'stream', 'stream_set_write_buffer'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($buf, 'size', 'stream_set_write_buffer'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($buf, 'fp', 'stream_set_write_buffer'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($buf, 'buffer', 'stream_set_write_buffer'));
+
+        $opt = BuiltinParamNames::forFunction('stream_context_set_option');
+        self::assertSame(['context', 'wrapper_or_options', 'option_name', 'value'], $opt);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($opt, 'wrapper_or_options', 'stream_context_set_option'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($opt, 'option_name', 'stream_context_set_option'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($opt, 'wrappername', 'stream_context_set_option'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($opt, 'optionname', 'stream_context_set_option'));
+
+        $params = BuiltinParamNames::forFunction('stream_context_set_params');
+        self::assertSame(['context', 'params'], $params);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($params, 'params', 'stream_context_set_params'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($params, 'options', 'stream_context_set_params'));
+    }
 }
