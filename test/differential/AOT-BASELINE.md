@@ -44,7 +44,7 @@ corpus*, not the language.
 | `e30_array_lit_dim_assign_shift` | ~~regression / segfault~~ **fixed** in #24055 — dim-write orphan box sync + nested `[$a]` value-box hashtable dispatch |
 | `e04_usort` | **documented limitation** — array-callable / invokable comparators deferred |
 | `e08_spread` | variadic spread not lowered: `Unsupported cast for arg type int64 from __hashtable__*` |
-| `c07_method` | `Missing required argument 1` on a two-argument call whose arity is correct |
+| ~~`c07_method`~~ | ~~`Missing required argument 1` on a two-argument call whose arity is correct~~ **fixed** — free function after class no longer inherits leftover `scope->className` (#23971) |
 
 **`var_dump()` / `print_r()` of non-scalars — one limitation, six cases**
 
