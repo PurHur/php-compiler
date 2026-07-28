@@ -113,6 +113,58 @@ single corpus case does not reach — `static::` alone, `self::` alone as a cont
 expression, a subclass with no override, three-deep inheritance where the grandchild inherits the
 override, and two-hop `static::` forwarding — all 8/8. Reproducers in `build/micro/z/`.
 
+## Batch 4 — backed enums (`m01`–`m04`)
+
+Measured on `e9df7b25c`, uncontended: **VM 4/4**, **AOT 2/4** (`--repeat 2` / `--repeat 3`).
+
+The corpus had **no enum case at all**. Four short programs, two of them crash.
+
+| case | state | issue |
+|---|---|---|
+| `m01` case constant, `->value`, concat | ok | — |
+| `m02` `cases()` and a plain static method | ok | — |
+| `m03` `Suit::from('S')` | **segfault, no output** | #24208 |
+| `m04` `match($this)` in an enum method | compile failure | #24163 residual |
+
+`m01`/`m02` exist to make `m03` attributable: they prove the enum declaration, case table, backing
+values and static dispatch all work, so the crash is `from()`/`tryFrom()` specifically rather than
+"enums are unsupported". `m03` crashes even when the result is discarded, on both string- and
+int-backed enums.
+
+`m04` fails with `Cannot coerce JIT type __object__* to string for concat` in a method declared
+`: string` whose arms are all string literals — the match lowering appears to yield its operand
+instead of the selected arm. `match($this->value)` compiles.
+
+## Corrections to the k-batch entries above
+
+Two k-batch rows were fixed and then measured as still failing, so do not trust the fix commit alone:
+
+- `k06` — #24163's fix removed the original `phpc_match_unhandled_operand_is_object()` error but the
+  case still fails to compile, now with the `__object__*` concat error above. Reopened.
+- `k09` — #24202 landed for #24167 but the variadic-pack shape is unchanged: `array_sum($v)` on a
+  spread pack still prints `Object` instead of `6`, measured directly on master with the fix in.
+  Reopened.
+
+Both are the recurring pattern in this file: **a correct fix moved the failure rather than removing
+it.** Re-measure the case, never infer from the issue being closed.
+
+## Smoke-check the toolchain before believing any sweep
+
+On 2026-07-28 two commits (#24188, #24196) made **every AOT binary segfault at startup**, and the
+k-batch read **0/9** — every case, including four fixed hours earlier. Nothing was wrong with the
+cases. Reverted in #24195 and #24197 (the first revert alone was not enough; the second commit
+reproduced it independently).
+
+Before attributing a mass failure to anything, compile and run:
+
+```php
+<?php echo "hi\n";
+```
+
+If that segfaults, the toolchain is broken and the sweep tells you nothing. This is also what makes
+a genuine crash attributable: `m03` shares the `after c:main_before_php` signature, and the smoke
+check passing is what proves it belongs to `from()` rather than to the toolchain.
+
 ## Do not run two sweep containers against the same bind mount
 
 I reported `k08` as silent wrong output (`0` instead of `6`) and had to retract it. The probe that
