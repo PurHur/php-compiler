@@ -378,8 +378,16 @@ final class StringJsonDecode
 
         $context->builder->positionAtEnd($bbArrayOk);
         $ht = JitNestedHelperCoerce::i64ToTypedPtr($context, $htRaw, $htPtr);
+        // Box HT into __value__* — raw HT* cast to value* is misread as int/NULL (#24137).
+        $slotHt = JitValueBox::alloc($context);
+        $ptrHt = JitValueBox::pointer($context, $slotHt);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $ptrHt,
+            $ht
+        );
         $context->refcount->addref($ht);
-        $castHt = $context->builder->pointerCast($ht, $voidPtr);
+        $castHt = $context->builder->pointerCast($ptrHt, $voidPtr);
         $context->builder->branch($bbMerge);
 
         $context->builder->positionAtEnd($bbMerge);
