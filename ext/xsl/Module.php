@@ -16,6 +16,19 @@ use PHPCompiler\VM;
  */
 class Module extends ModuleAbstract
 {
+
+    /**
+     * php-src ext/xsl builds on ext/libxml (libxml2) and ext/dom.
+     *
+     * Runtime::loadCoreModules() already loads them in this order; declaring it makes the
+     * constraint checkable instead of remembered (RELEASE-PLAN Phase 2.5).
+     *
+     * @return list<string>
+     */
+    public function getExtensionDependencies(): array
+    {
+        return ['libxml', 'dom'];
+    }
     public function getExtensionVersion(): string
     {
         if (XsltHostBridge::available()) {

@@ -15,6 +15,19 @@ use PHPCompiler\Runtime;
  */
 class Module extends ModuleAbstract
 {
+
+    /**
+     * php-src ext/dom builds on ext/libxml (libxml2).
+     *
+     * Runtime::loadCoreModules() already loads them in this order; declaring it makes the
+     * constraint checkable instead of remembered (RELEASE-PLAN Phase 2.5).
+     *
+     * @return list<string>
+     */
+    public function getExtensionDependencies(): array
+    {
+        return ['libxml'];
+    }
     /** php-src ext/dom/php_dom.h DOM_API_VERSION — libxml DOM module version (#15439). */
     private const DOM_API_VERSION = '20031129';
 

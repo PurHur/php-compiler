@@ -26,6 +26,28 @@ interface Module
     public function getAdditionalExtensionNames(): array;
 
     /**
+     * Extensions that must be loaded before this one (RELEASE-PLAN Phase 2.5).
+     *
+     * Today the load order is a hand-maintained list in Runtime::loadCoreModules(), where the
+     * ordering constraints are real but implicit — libxml before dom, dom before xsl/simplexml.
+     * Declaring them here lets the order be derived and checked instead of remembered.
+     *
+     * Names are extension names as returned by getExtensionName() (e.g. 'libxml'), lowercase.
+     *
+     * @return list<string>
+     */
+    public function getExtensionDependencies(): array;
+
+    /**
+     * Is this extension part of the default build set?
+     *
+     * Every extension returns true today, which is exactly the current behaviour: all 76 are loaded
+     * unconditionally and a script that never touches an extension still pays for it. This is the
+     * declaration a per-build extension set will select on; nothing consumes it for that yet.
+     */
+    public function isDefaultEnabled(): bool;
+
+    /**
      * Logical extension versions bundled with this module (e.g. pcre in standard).
      *
      * @return array<string, string> lowercase extension name => version
