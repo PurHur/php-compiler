@@ -445,6 +445,38 @@ final class HashTableHelper
     }
 
     /**
+     * Box a native {@see __hashtable__*} into a value-boxed array local (#24167 k09).
+     *
+     * Variadic recv passes a packed HT; builtins like array_sum() need TYPE_VALUE with an
+     * array tag (implode tolerates raw HT via {@see ArrayBuiltinHelper::loadHashTable}).
+     */
+    public static function boxedArrayFromHashtable(Context $context, Variable $ht): Variable
+    {
+        if (Variable::TYPE_HASHTABLE !== $ht->type) {
+            throw new \LogicException(
+                'boxedArrayFromHashtable requires TYPE_HASHTABLE, got '.Variable::getStringType($ht->type)
+            );
+        }
+        $slot = JitValueBox::alloc($context);
+        $ptr = $context->helper->loadValue($ht);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            JitValueBox::pointer($context, $slot),
+            $ptr
+        );
+        $context->refcount->addref($ptr);
+        $var = new Variable(
+            $context,
+            Variable::TYPE_VALUE,
+            Variable::KIND_VARIABLE,
+            $slot
+        );
+        $var->valueBoxHashtable = true;
+
+        return $var;
+    }
+
+    /**
      * Like {@see coerceToPackedHashtable} but always returns an owned hashtable copy so
      * call-time unpack does not alias script-global / value-box storage
      * (`s(...$p)` then use `$v` — #23971 e08_spread).

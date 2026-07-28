@@ -9,6 +9,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\CallUnpackJitHelper;
 use PHPCompiler\VM\CallUnpackSupport;
+use PHPCompiler\VM\NamedArgs as VmNamedArgs;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPCfg\Operand;
 
@@ -81,23 +82,37 @@ final class CallUnpackCompileTime
             return null;
         }
 
-        $jitEntries = self::jitEntriesFromVmEntries($vmEntries, $jit);
-        $jitOperands = array_fill(0, \count($jitEntries), null);
-
         try {
-            return NamedArgs::resolveOutgoing(
-                $jitEntries,
-                $jitOperands,
+            $vmResolved = VmNamedArgs::resolve(
+                $vmEntries,
                 $paramNames,
                 $variadicIndex,
                 $functionName,
-                null,
                 null !== $functionName
             );
         } catch (\ArgumentCountError|\Error|\TypeError|\ValueError $e) {
             // Runtime binding errors must not abort AOT compile (#23449).
             return null;
         }
+
+        $jitResult = [];
+        $jitOperands = [];
+        foreach ($vmResolved as $idx => $vmVar) {
+            $jitVar = $jit->jitVariableFromVmConstantForCallUnpack($vmVar->resolveIndirect());
+            if (
+                null !== $variadicIndex
+                && (int) $idx === $variadicIndex
+                && Variable::TYPE_HASHTABLE === $jitVar->type
+            ) {
+                $jitVar->variadicElementChecksDone = true;
+            }
+            $jitResult[(int) $idx] = $jitVar;
+            $jitOperands[(int) $idx] = null;
+        }
+        ksort($jitResult);
+        ksort($jitOperands);
+
+        return [$jitResult, $jitOperands];
     }
 
     public static function tryCompileTimeArrayFromOperand(Block $block, Operand $operand): ?VmVariable
@@ -200,32 +215,6 @@ final class CallUnpackCompileTime
         }
 
         return self::tryCompileTimeArrayFromSlot($block, $valueSlot, $visited);
-    }
-
-    /**
-     * @param list<array{0: string, 1?: mixed, 2?: VmVariable}> $vmEntries
-     *
-     * @return list<Variable|array{named: string, value: Variable}>
-     */
-    private static function jitEntriesFromVmEntries(array $vmEntries, JIT $jit): array
-    {
-        $out = [];
-        foreach ($vmEntries as $entry) {
-            if ('p' === $entry[0]) {
-                $out[] = $jit->jitVariableFromVmConstantForCallUnpack(
-                    $entry[1]->resolveIndirect()
-                );
-                continue;
-            }
-            $out[] = [
-                'named' => (string) $entry[1],
-                'value' => $jit->jitVariableFromVmConstantForCallUnpack(
-                    $entry[2]->resolveIndirect()
-                ),
-            ];
-        }
-
-        return $out;
     }
 
     public static function tryCompileTimeValueFromJitVariable(Variable $var): ?VmVariable
