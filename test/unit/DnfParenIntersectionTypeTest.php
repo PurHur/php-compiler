@@ -139,6 +139,13 @@ PHP;
         $this->assertSame("'ok'\ntrue\n", ob_get_clean());
     }
 
+    public function testRewriterDoesNotUnwrapParenthesizedBitwiseAndExpr(): void
+    {
+        $source = '<?php echo (E_ERROR & E_WARNING); var_export(E_ALL & E_WARNING);';
+        $rewritten = DnfParenTypeRewriter::rewrite($source);
+        $this->assertSame($source, $rewritten);
+    }
+
     public function testRewriterDoesNotTouchCallArgumentParens(): void
     {
         $source = '<?php var_export(returns() instanceof Both);';

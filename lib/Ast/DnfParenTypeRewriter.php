@@ -17,6 +17,7 @@ use PHPCompiler\ReferenceProfileTokenScan;
  * `(I1&I2)|null`, `A|(B&C)`, and `(A|B)&C` must keep their parens — only unwrap bare
  * intersection-only leaves when the closing `)` is not part of a larger DNF type.
  * php-parser accepts `A|(B&C)` but not the unwrapped `A|B&C` (#11745).
+ * Expression `(Name & Name)` / call-arg `foo(Name & Name)` must not be treated as types (#24131).
  *
  * php-src: Zend/zend_compile.c — zend_compile_type / DNF normalization.
  */
@@ -69,6 +70,12 @@ final class DnfParenTypeRewriter
             }
 
             if (self::isCatchTypeParenContext($tokens, $i)) {
+                ++$i;
+                continue;
+            }
+
+            // `(Name & Name)` is a valid bitwise expr; only type-position leaves are 8.3+ (#24131).
+            if (!self::isTypePositionIntersectionParen($tokens, $i, $close)) {
                 ++$i;
                 continue;
             }
@@ -151,6 +158,13 @@ final class DnfParenTypeRewriter
                 continue;
             }
 
+            // Do not unwrap expr parens / call args: `(E_ERROR & E_WARNING)` (#24131).
+            if (!self::isTypePositionIntersectionParen($tokens, $i, $close)) {
+                $out .= self::tokenText($tok);
+                ++$i;
+                continue;
+            }
+
             foreach ($inner as $innerTok) {
                 $out .= self::tokenText($innerTok);
             }
@@ -158,6 +172,127 @@ final class DnfParenTypeRewriter
         }
 
         return $out;
+    }
+
+    /**
+     * Parenthesized intersection leaves only in type positions (param/property/return/const).
+     * Expression forms like `echo (E_ERROR & E_WARNING)` and `foo(A & B)` must stay exprs (#24131).
+     *
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function isTypePositionIntersectionParen(array $tokens, int $open, int $close): bool
+    {
+        $n = \count($tokens);
+        $after = self::skipIgnorable($tokens, $close + 1, $n);
+        if ($after < $n && \is_array($tokens[$after]) && T_VARIABLE === $tokens[$after][0]) {
+            // `(I1&I2) $param` / `public (I1&I2) $prop`
+            return true;
+        }
+
+        $before = self::previousNonIgnorableIndex($tokens, $open - 1);
+        if (null === $before) {
+            return false;
+        }
+
+        // Typed class const: `const (I1&I2) NAME = …` (PHP 8.3+).
+        if ($after < $n && \is_array($tokens[$after])
+            && \in_array($tokens[$after][0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED, T_NAME_RELATIVE], true)
+            && \is_array($tokens[$before]) && T_CONST === $tokens[$before][0]
+        ) {
+            return true;
+        }
+
+        // Return type: `function f(): (I1&I2)` / `fn(): (I1&I2) =>` — not ternary `$a ? ($b) : (X&Y)`.
+        if (':' !== self::tokenText($tokens[$before])) {
+            return false;
+        }
+        $beforeColon = self::previousNonIgnorableIndex($tokens, $before - 1);
+        if (null === $beforeColon || ')' !== self::tokenText($tokens[$beforeColon])) {
+            // Named arg `foo(bar: (A&B))` — expression.
+            return false;
+        }
+
+        return self::closesFunctionLikeParamList($tokens, $beforeColon);
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function previousNonIgnorableIndex(array $tokens, int $from): ?int
+    {
+        for ($i = $from; $i >= 0; --$i) {
+            $tok = $tokens[$i];
+            if (\is_array($tok) && self::isIgnorable($tok[0])) {
+                continue;
+            }
+
+            return $i;
+        }
+
+        return null;
+    }
+
+    /**
+     * True when `$closeParen` closes `function`/`fn`/method parameter list (return-type `):`).
+     *
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function closesFunctionLikeParamList(array $tokens, int $closeParen): bool
+    {
+        $open = self::findMatchingOpenParen($tokens, $closeParen);
+        if (null === $open) {
+            return false;
+        }
+
+        $i = self::previousNonIgnorableIndex($tokens, $open - 1);
+        while (null !== $i) {
+            $tok = $tokens[$i];
+            $text = self::tokenText($tok);
+            if ('&' === $text) {
+                // `function &(): (A&B)` by-ref return function.
+                $i = self::previousNonIgnorableIndex($tokens, $i - 1);
+                continue;
+            }
+            if (!\is_array($tok)) {
+                return false;
+            }
+            if (\in_array($tok[0], [T_STRING, T_NAME_QUALIFIED, T_NAME_FULLY_QUALIFIED, T_NAME_RELATIVE], true)) {
+                // Method/function name before `(params)`.
+                $i = self::previousNonIgnorableIndex($tokens, $i - 1);
+                continue;
+            }
+            if (\in_array($tok[0], [
+                T_PUBLIC, T_PROTECTED, T_PRIVATE, T_FINAL, T_ABSTRACT, T_STATIC, T_READONLY,
+            ], true)) {
+                $i = self::previousNonIgnorableIndex($tokens, $i - 1);
+                continue;
+            }
+
+            return T_FUNCTION === $tok[0] || T_FN === $tok[0];
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function findMatchingOpenParen(array $tokens, int $close): ?int
+    {
+        $depth = 0;
+        for ($i = $close; $i >= 0; --$i) {
+            $text = self::tokenText($tokens[$i]);
+            if (')' === $text) {
+                ++$depth;
+            } elseif ('(' === $text) {
+                --$depth;
+                if (0 === $depth) {
+                    return $i;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
