@@ -34,6 +34,9 @@ final class NestedVmHashTableMethodLlvmTest extends TestCase
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('slicecopy'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('duplicate'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('unioncopy'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('replacepackedvalues'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('assignpackedlist'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('reorderkeyedpairs'));
     }
 
     /** Issue #20533 — thin AOT gate via isThinStandaloneAotMain, not StreamIo defer bag. */

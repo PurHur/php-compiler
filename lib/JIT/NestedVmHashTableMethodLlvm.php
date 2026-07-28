@@ -46,6 +46,10 @@ final class NestedVmHashTableMethodLlvm
         'addindex' => Call\HashTableWriteNested::class,
         'updateindex' => Call\HashTableWriteNested::class,
         'append' => Call\HashTableWriteNested::class,
+        // In-place mutators for usort/asort peers (#24157).
+        'replacepackedvalues' => Call\HashTableMutateNested::class,
+        'assignpackedlist' => Call\HashTableMutateNested::class,
+        'reorderkeyedpairs' => Call\HashTableMutateNested::class,
     ];
 
     public static function ensureMethod(Context $context, string $methodLc): bool
@@ -64,6 +68,8 @@ final class NestedVmHashTableMethodLlvm
         }
         if (Call\HashTableWriteNested::class === $handler) {
             $context->functionProxies[$proxyName] = new Call\HashTableWriteNested($methodLc);
+        } elseif (Call\HashTableMutateNested::class === $handler) {
+            $context->functionProxies[$proxyName] = new Call\HashTableMutateNested($methodLc);
         } else {
             $context->functionProxies[$proxyName] = new $handler();
         }
