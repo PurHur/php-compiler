@@ -19740,14 +19740,21 @@ restart:
         return null !== $frame->listUnpackAssignMergeBlock;
     }
 
-    /** {main} indirect wrappers may alias the same global CV as a named-assign dest (#16040, #15183). */
+    /**
+     * {main} temps may share the same Variable object as a named local CV (#16040, #15183).
+     *
+     * JUMPIF dead-temp release must not null that shared storage — e.g. ternary merge assign
+     * result slot aliased with `$t`, then nested `$t[1][0]` in a later ternary sees null (#24017).
+     * Use {@see Block::isNamedAssignDestSlot()} — the private index array is not visible here.
+     */
     private function vmDeadTempReleaseWouldClobberNamedLocal(Frame $frame, int $slot): bool
     {
         if (!$frame->block->isMainScript() || !isset($frame->scope[$slot])) {
             return false;
         }
+        $slotVar = $frame->scope[$slot];
         try {
-            $target = $frame->scope[$slot]->resolveIndirect();
+            $target = $slotVar->resolveIndirect();
         } catch (\LogicException) {
             return false;
         }
@@ -19755,11 +19762,15 @@ restart:
             if ($namedSlot === $slot || !isset($frame->scope[$namedSlot])) {
                 continue;
             }
-            if (!isset($frame->block->namedAssignDestSlotIndexes[$namedSlot])) {
+            if (!$frame->block->isNamedAssignDestSlot($namedSlot)) {
                 continue;
             }
+            $namedVar = $frame->scope[$namedSlot];
+            if ($namedVar === $slotVar) {
+                return true;
+            }
             try {
-                if ($frame->scope[$namedSlot]->resolveIndirect() === $target) {
+                if ($namedVar->resolveIndirect() === $target) {
                     return true;
                 }
             } catch (\LogicException) {

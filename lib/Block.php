@@ -253,6 +253,12 @@ class Block {
         $this->namedAssignDestSlotIndexes[$slot] = true;
     }
 
+    /** True when $slot is a registered `$local = …` assign destination (#16040, #24017). */
+    public function isNamedAssignDestSlot(int $slot): bool
+    {
+        return isset($this->namedAssignDestSlotIndexes[$slot]);
+    }
+
     public function registerAssignResultLvalue(int $resultSlot, int $lvalueSlot): void
     {
         $this->assignResultToLvalueSlot[$resultSlot] = $lvalueSlot;
