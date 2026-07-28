@@ -8,13 +8,23 @@ use PHPCompiler\ext\standard\StrspnJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** strspn()/strcspn() JIT routes through StrspnJitHelper PHP not inline LLVM (#14700). */
+/**
+ * StringStrspn NestedJIT via JitVmHelperLink::ensureCompiled (#24174 / peer #24094).
+ */
 final class StrspnRuntimeShrinkTest extends TestCase
 {
     public function testStringStrspnUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrspn.php');
         $this->assertStringContainsString('StrspnJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStrspn.php');
 
         $lowering = (string) file_get_contents(__DIR__.'/../../ext/standard/SpnJitLowering.php');
