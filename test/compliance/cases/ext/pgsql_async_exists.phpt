@@ -1,5 +1,7 @@
 --TEST--
 ext/pgsql async send/result/cancel/notify APIs exist when libpq advertises (#20636, #20681)
+--ENV--
+PHP_COMPILER_ENABLE_PGSQL=1
 --FILE--
 <?php
 declare(strict_types=1);

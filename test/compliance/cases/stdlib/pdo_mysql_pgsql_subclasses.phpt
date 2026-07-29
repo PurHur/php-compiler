@@ -1,6 +1,7 @@
 --TEST--
 Pdo\Mysql / Pdo\Pgsql subclasses (#20548)
 --ENV--
+PHP_COMPILER_ENABLE_PGSQL=1
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php

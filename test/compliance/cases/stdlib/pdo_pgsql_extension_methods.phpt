@@ -1,6 +1,7 @@
 --TEST--
 pdo_pgsql extension_loaded + PDO::pgsql* methods (#20566)
 --ENV--
+PHP_COMPILER_ENABLE_PGSQL=1
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php

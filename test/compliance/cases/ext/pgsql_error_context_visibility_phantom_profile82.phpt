@@ -1,6 +1,7 @@
 --TEST--
 ext/pgsql pg_set_error_context_visibility withheld on PROFILE=8.2 (#22620, re-#20674)
 --ENV--
+PHP_COMPILER_ENABLE_PGSQL=1
 PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php

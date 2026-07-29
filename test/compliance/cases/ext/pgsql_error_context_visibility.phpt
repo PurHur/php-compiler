@@ -1,10 +1,17 @@
 --TEST--
 ext/pgsql pg_set_error_context_visibility + PGSQL_SHOW_CONTEXT_* (#20674 / #22620)
 --ENV--
+PHP_COMPILER_ENABLE_PGSQL=1
 PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
-if (!function_exists('pg_connect')) die('skip no pg_connect (libpq FFI)');
+// Host Zend often lacks ext/pgsql; in-tree path uses PHP_COMPILER_ENABLE_PGSQL (#24994).
+if (!extension_loaded('pgsql')) {
+    $en = getenv('PHP_COMPILER_ENABLE_PGSQL');
+    if (!is_string($en) || '' === trim($en) || in_array(strtolower(trim($en)), ['0', 'false', 'off', 'no'], true)) {
+        die('skip pgsql withheld');
+    }
+}
 ?>
 --FILE--
 <?php

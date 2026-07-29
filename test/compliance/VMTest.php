@@ -706,8 +706,9 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'oracle')) {
                 continue;
             }
-            if (!\PHPCompiler\ext\pgsql\PgsqlExtensionPolicy::advertisesBuiltins()
-                && str_contains($name, 'pgsql_')) {
+            // Functional pgsql cases set PHP_COMPILER_ENABLE_PGSQL via --ENV--; module phantoms when withheld (#24994).
+            if (!\PHPCompiler\ext\pgsql\PgsqlExtensionPolicy::runsPgsqlCompliance($name)
+                && \PHPCompiler\ext\pgsql\PgsqlExtensionPolicy::isPgsqlComplianceCase($name)) {
                 continue;
             }
             if (!CompilerVersion::supportsBz2()
