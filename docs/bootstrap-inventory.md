@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6622 |
-| Phase A inventory files (M2 ratio SSOT) | 6622 |
+| PHP files on vm.php path | 6623 |
+| Phase A inventory files (M2 ratio SSOT) | 6623 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21328 |
+| Source constructs flagged (warnings) | 21332 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -54,6 +54,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/NumberCompare.php` | 0 | 2 |
 | `ext/bcmath/NumberConstruct.php` | 0 | 2 |
 | `ext/bcmath/NumberDiv.php` | 0 | 2 |
+| `ext/bcmath/NumberDivmod.php` | 0 | 3 |
 | `ext/bcmath/NumberFloor.php` | 0 | 2 |
 | `ext/bcmath/NumberFrom.php` | 0 | 2 |
 | `ext/bcmath/NumberMod.php` | 0 | 2 |
@@ -64,7 +65,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/NumberSqrt.php` | 0 | 1 |
 | `ext/bcmath/NumberSub.php` | 0 | 2 |
 | `ext/bcmath/NumberToString.php` | 0 | 1 |
-| `ext/bcmath/VmBcMathNumber.php` | 0 | 25 |
+| `ext/bcmath/VmBcMathNumber.php` | 0 | 26 |
 | `ext/bcmath/VmBcmath.php` | 0 | 5 |
 | `ext/bcmath/bcadd.php` | 0 | 1 |
 | `ext/bcmath/bcceil.php` | 0 | 1 |
@@ -6767,6 +6768,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/bcmath/NumberDivmod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new HashTable (line 47)
+- 1 class method(s)
+
 ### `ext/bcmath/NumberFloor.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6844,18 +6852,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new NumberMul (line 64)
 - new NumberDiv (line 65)
 - new NumberMod (line 66)
-- new NumberPow (line 67)
-- new NumberSqrt (line 68)
-- new NumberFloor (line 69)
-- new NumberCeil (line 70)
-- new NumberRound (line 71)
-- new NumberCompare (line 72)
-- new NumberToString (line 73)
-- new NumberSerialize (line 75)
-- new NumberUnserialize (line 76)
-- new ObjectEntry (line 104)
-- new Variable (line 106)
-- new Variable (line 331)
+- new NumberDivmod (line 68)
+- new NumberPow (line 69)
+- new NumberSqrt (line 70)
+- new NumberFloor (line 71)
+- new NumberCeil (line 72)
+- new NumberRound (line 73)
+- new NumberCompare (line 74)
+- new NumberToString (line 75)
+- new NumberSerialize (line 77)
+- new NumberUnserialize (line 78)
+- new ObjectEntry (line 106)
+- new Variable (line 108)
+- new Variable (line 333)
 - 19 class method(s)
 
 ### `ext/bcmath/VmBcmath.php`

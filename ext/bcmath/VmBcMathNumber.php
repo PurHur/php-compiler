@@ -64,6 +64,8 @@ final class VmBcMathNumber
             'mul' => new NumberMul(),
             'div' => new NumberDiv(),
             'mod' => new NumberMod(),
+            // php-src BcMath\Number::divmod — quotient + remainder Number pair (#24611).
+            'divmod' => new NumberDivmod(),
             'pow' => new NumberPow(),
             'sqrt' => new NumberSqrt(),
             'floor' => new NumberFloor(),
