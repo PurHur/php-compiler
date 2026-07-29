@@ -115,4 +115,40 @@ PHP;
             ob_get_clean()
         );
     }
+
+    /** @covers issue #25065 */
+    public function testReflectionUnionTypeExpandsIterable(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(): iterable|false { return false; }
+function g(iterable $x) {}
+function h(?iterable $x) {}
+function i(iterable|string $x) {}
+function j(iterable|null $x) {}
+$rt = (new ReflectionFunction('f'))->getReturnType();
+echo (string) $rt, "\n";
+foreach ($rt->getTypes() as $t) {
+    echo 'part:', (string) $t, "\n";
+}
+echo 'bare=', (string) (new ReflectionFunction('g'))->getParameters()[0]->getType(), "\n";
+echo 'null=', (string) (new ReflectionFunction('h'))->getParameters()[0]->getType(), "\n";
+echo 'str=', (string) (new ReflectionFunction('i'))->getParameters()[0]->getType(), "\n";
+echo 'ornull=', (string) (new ReflectionFunction('j'))->getParameters()[0]->getType(), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'reflection_iterable_union.php'));
+        $this->assertSame(
+            "Traversable|array|false\n"
+            ."part:Traversable\n"
+            ."part:array\n"
+            ."part:false\n"
+            ."bare=iterable\n"
+            ."null=?iterable\n"
+            ."str=Traversable|array|string\n"
+            ."ornull=Traversable|array|null\n",
+            ob_get_clean()
+        );
+    }
 }
