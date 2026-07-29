@@ -152,6 +152,11 @@ final class MethodVisibility
             if (null !== $isSameOrSubclassOf && $isSameOrSubclassOf($callerClassLc, $declaringClassLc)) {
                 return;
             }
+            // Zend allows protected access anywhere in the inheritance chain — parent can call
+            // child's protected method (static:: late-static-binding, zend_object_handlers.c).
+            if (null !== $isSameOrSubclassOf && $isSameOrSubclassOf($declaringClassLc, $callerClassLc)) {
+                return;
+            }
             self::deny(
                 $visibilityFlags,
                 $declaringClassDisplay,
