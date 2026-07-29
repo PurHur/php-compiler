@@ -225,11 +225,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #10637 */
+    /** @covers issue #10637 / #24449 — stub shape callback + ...args (basic_functions.stub.php) */
     public function testCallUserFuncVariadicNamedParamMetadata(): void
     {
         $names = BuiltinParamNames::forFunction('call_user_func');
-        self::assertSame(['callback'], $names);
+        self::assertSame(['callback', 'args'], $names);
         self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('call_user_func'));
         self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('call_user_func'));
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('call_user_func'));
