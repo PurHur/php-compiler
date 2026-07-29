@@ -65,6 +65,17 @@ every case sorting after it. Disable a hanging case *after* the run, then re-run
 not just the one that stalled. Cases sorting before the change are unaffected, so a spot check on
 early entries will show nothing wrong.
 
+The same applies to the **scripts and the working tree generally**. Long runs execute in a container
+bind-mounting the repo (`-v /root/php-compiler:/app`), and each shard re-invokes
+`script/shard-compliance.sh` from disk. So an edit, a merge, or a `git pull` during a run lands
+*inside* the running job. It has already happened here: `shard-compliance.sh` changed 2.5 h into a
+24-shard run, so shards 0–1 used one version and shards 2+ another. That change only added a marker
+file, so the partition was unaffected — but had it touched shard selection, half the run would have
+used a different partition with no sign in the results.
+
+While a long run is in flight: edit only files the run does not read, and do not `git pull`. Land
+anything that touches the run's own scripts afterwards.
+
 ### 3. Silent wrong output is the characteristic failure mode
 
 The compliance suite asserts against **recorded** expectations, so it only catches what someone
