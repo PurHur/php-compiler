@@ -2204,4 +2204,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
             BuiltinParamNames::paramNamesForInternalFunction('stream_context_get_options')
         );
     }
+
+    /** @covers issue #24492 */
+    public function testOpensslPkeyExportNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('openssl_pkey_export');
+        self::assertSame(['key', 'output', 'passphrase', 'options'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'key', 'openssl_pkey_export'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'output', 'openssl_pkey_export'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'passphrase', 'openssl_pkey_export'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'openssl_pkey_export'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'out', 'openssl_pkey_export'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'config_args', 'openssl_pkey_export'));
+        self::assertSame(
+            ['key', 'output', 'passphrase', 'options'],
+            BuiltinParamNames::paramNamesForInternalFunction('openssl_pkey_export')
+        );
+
+        $toFile = BuiltinParamNames::forFunction('openssl_pkey_export_to_file');
+        self::assertSame(['key', 'output_filename', 'passphrase', 'options'], $toFile);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($toFile, 'output_filename', 'openssl_pkey_export_to_file'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($toFile, 'outfilename', 'openssl_pkey_export_to_file'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($toFile, 'config_args', 'openssl_pkey_export_to_file'));
+    }
 }

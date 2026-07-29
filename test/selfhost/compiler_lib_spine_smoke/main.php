@@ -3689,7 +3689,6 @@ require_once __DIR__.'/../../../ext/standard/lcfirst.php';
 require_once __DIR__.'/../../../ext/standard/lcg_value.php';
 require_once __DIR__.'/../../../ext/standard/lchgrp_.php';
 require_once __DIR__.'/../../../ext/standard/lchown_.php';
-require_once __DIR__.'/../../../ext/standard/ldexp.php';
 require_once __DIR__.'/../../../ext/standard/levenshtein.php';
 require_once __DIR__.'/../../../ext/standard/link_.php';
 require_once __DIR__.'/../../../ext/standard/linkinfo.php';

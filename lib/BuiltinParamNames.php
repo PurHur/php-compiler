@@ -397,8 +397,6 @@ final class BuiltinParamNames
                 return ['num', 'precision', 'mode'];
             case 'frexp':
                 return ['arg1', 'exp'];
-            case 'ldexp':
-                return ['num', 'exp'];
             case 'clearstatcache':
                 return ['clear_realpath_cache', 'filename'];
             case 'mkdir':
@@ -662,6 +660,11 @@ final class BuiltinParamNames
             // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says configargs (#24491)
             case 'openssl_pkey_new':
                 return ['options'];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says out/config_args / outfilename (#24492)
+            case 'openssl_pkey_export':
+                return ['key', 'output', 'passphrase', 'options'];
+            case 'openssl_pkey_export_to_file':
+                return ['key', 'output_filename', 'passphrase', 'options'];
             case 'openssl_encrypt':
                 // php-src ext/openssl/openssl.stub.php (#21135)
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad', 'tag_length'];

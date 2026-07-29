@@ -1612,9 +1612,11 @@ final class VmOpenssl
     /**
      * openssl_pkey_export() — export OpenSSLAsymmetricKey to PEM (php-src ext/openssl/xp.c; #6295).
      *
+     * Third arg is passphrase (string|null), matching openssl.stub.php — not a config array (#24492).
+     *
      * @return string|false
      */
-    public static function pkeyExportPem(Variable $keyArg, ?Variable $configVar, ?Frame $frame = null): string|false
+    public static function pkeyExportPem(Variable $keyArg, ?string $passphrase, ?Frame $frame = null): string|false
     {
         if (!VmOpensslPkeyNative::available()) {
             self::userWarning('openssl_pkey_export(): OpenSSL is unavailable in this compiler build', $frame);
@@ -1623,22 +1625,6 @@ final class VmOpenssl
         }
 
         $pem = self::coercePkeyPem($keyArg, 'openssl_pkey_export', 0, 'key');
-        $passphrase = null;
-        if (null !== $configVar) {
-            $configVar = $configVar->resolveIndirect();
-            if (Variable::TYPE_ARRAY === $configVar->type) {
-                foreach ($configVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
-                    if (Variable::TYPE_STRING !== $keyVar->type) {
-                        continue;
-                    }
-                    if ('passphrase' === $keyVar->toString()
-                        && Variable::TYPE_STRING === $valueVar->resolveIndirect()->type) {
-                        $passphrase = $valueVar->resolveIndirect()->toString();
-                    }
-                }
-            }
-        }
-
         $exported = VmOpensslPkeyNative::exportPrivateKeyPem($pem, $passphrase);
         if (false === $exported) {
             self::userWarning('openssl_pkey_export(): Cannot export key', $frame);

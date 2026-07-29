@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6629 |
-| Phase A inventory files (M2 ratio SSOT) | 6629 |
+| PHP files on vm.php path | 6628 |
+| Phase A inventory files (M2 ratio SSOT) | 6628 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21353 |
+| Source constructs flagged (warnings) | 21351 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1531,7 +1531,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_pkcs7_sign.php` | 0 | 2 |
 | `ext/openssl/openssl_pkcs7_verify.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_derive.php` | 0 | 2 |
-| `ext/openssl/openssl_pkey_export.php` | 0 | 2 |
+| `ext/openssl/openssl_pkey_export.php` | 0 | 3 |
 | `ext/openssl/openssl_pkey_export_to_file.php` | 0 | 3 |
 | `ext/openssl/openssl_pkey_free.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_get_details.php` | 0 | 2 |
@@ -2909,7 +2909,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/MkdirJitHelper.php` | 0 | 1 |
 | `ext/standard/MktimeJitHelper.php` | 0 | 1 |
 | `ext/standard/ModfJitHelper.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 849 |
+| `ext/standard/Module.php` | 0 | 848 |
 | `ext/standard/ModuleRegistry.php` | 0 | 2 |
 | `ext/standard/MultisortJitHelper.php` | 0 | 2 |
 | `ext/standard/NCompareJitHelper.php` | 0 | 1 |
@@ -3890,7 +3890,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/lcg_value.php` | 0 | 1 |
 | `ext/standard/lchgrp_.php` | 0 | 1 |
 | `ext/standard/lchown_.php` | 0 | 1 |
-| `ext/standard/ldexp.php` | 0 | 1 |
 | `ext/standard/levenshtein.php` | 0 | 5 |
 | `ext/standard/link_.php` | 0 | 2 |
 | `ext/standard/linkinfo.php` | 0 | 1 |
@@ -4983,7 +4982,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/GcToggleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GetBrowserRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GetClassRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/GetHeadersRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/GetHeadersRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GetcwdJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/GethostbyaddrRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GethostbynamelRuntime.php` | 0 | 1 |
@@ -18426,10 +18425,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 92)
 - new Variable (line 1014)
-- new HashTable (line 2418)
-- new Variable (line 2420)
-- new HashTable (line 2431)
-- new Variable (line 2433)
+- new HashTable (line 2404)
+- new Variable (line 2406)
+- new HashTable (line 2417)
+- new Variable (line 2419)
 - 70 class method(s)
 
 ### `ext/openssl/VmOpensslCipherNative.php`
@@ -18756,14 +18755,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_pkey_export.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 37)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkey_export_to_file.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 37)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkey_free.php`
@@ -28652,7 +28652,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new atan2 (line 130)
 - new fmod (line 131)
 - new modf (line 132)
-- new ldexp (line 133)
 - new frexp (line 134)
 - new fdiv (line 135)
 - new fpow (line 136)
@@ -32298,93 +32297,93 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 519)
 - new Variable (line 525)
 - new Variable (line 532)
-- new Variable (line 1482)
-- new Variable (line 1486)
-- new Variable (line 1503)
-- new Variable (line 1515)
-- new Variable (line 1533)
-- new Variable (line 1544)
-- new Variable (line 1562)
-- new Variable (line 1566)
-- new Variable (line 1663)
-- new Variable (line 1667)
-- new Variable (line 1777)
-- new Variable (line 1781)
-- new Variable (line 1791)
-- new Variable (line 1795)
-- new Variable (line 1834)
-- new Variable (line 1838)
-- new Variable (line 1883)
-- new Variable (line 1894)
-- new Variable (line 1898)
-- new Variable (line 1924)
-- new Variable (line 1938)
-- new Variable (line 1956)
-- new Variable (line 2086)
-- new Variable (line 2103)
-- new Variable (line 2112)
-- new Variable (line 2155)
-- new Variable (line 2301)
-- new Variable (line 2305)
-- new Variable (line 2425)
-- new Variable (line 2446)
-- new Variable (line 2465)
-- new Variable (line 2481)
-- new Variable (line 2487)
-- new Variable (line 2506)
-- new Variable (line 2527)
-- new Variable (line 2782)
-- new Variable (line 2786)
-- new Error (line 2803)
-- new Error (line 2809)
-- new Error (line 2832)
-- new Error (line 2835)
-- new Variable (line 2894)
-- new Variable (line 2899)
-- new Variable (line 2951)
-- new Variable (line 2965)
-- new Variable (line 3339)
-- new ClassProperty (line 3341)
-- new Variable (line 3364)
-- new ClassProperty (line 3366)
-- new Variable (line 3555)
-- new Variable (line 3559)
-- new Variable (line 3579)
-- new Variable (line 3590)
-- new Variable (line 3615)
-- new Variable (line 3630)
-- new Variable (line 3655)
-- new Variable (line 3671)
-- new Variable (line 3685)
-- new Variable (line 3783)
-- new Variable (line 3797)
-- new Variable (line 3962)
-- new Variable (line 3967)
-- new Error (line 3987)
-- new Error (line 3991)
-- new Variable (line 4076)
-- new Variable (line 4082)
-- new Variable (line 4088)
-- new Variable (line 4134)
-- new Variable (line 4139)
-- new Variable (line 4168)
-- new Variable (line 4178)
-- new Variable (line 4184)
-- new Variable (line 4206)
-- new Variable (line 4227)
-- new HashTable (line 4261)
-- new Variable (line 4278)
-- new Variable (line 4280)
-- new HashTable (line 4381)
-- new Variable (line 4413)
-- new Variable (line 4415)
-- new HashTable (line 4428)
-- new Variable (line 4435)
-- new Variable (line 4446)
-- new HashTable (line 4461)
-- new Variable (line 4464)
-- new HashTable (line 4483)
-- new Variable (line 4486)
+- new Variable (line 1481)
+- new Variable (line 1485)
+- new Variable (line 1502)
+- new Variable (line 1514)
+- new Variable (line 1532)
+- new Variable (line 1543)
+- new Variable (line 1561)
+- new Variable (line 1565)
+- new Variable (line 1662)
+- new Variable (line 1666)
+- new Variable (line 1776)
+- new Variable (line 1780)
+- new Variable (line 1790)
+- new Variable (line 1794)
+- new Variable (line 1833)
+- new Variable (line 1837)
+- new Variable (line 1882)
+- new Variable (line 1893)
+- new Variable (line 1897)
+- new Variable (line 1923)
+- new Variable (line 1937)
+- new Variable (line 1955)
+- new Variable (line 2085)
+- new Variable (line 2102)
+- new Variable (line 2111)
+- new Variable (line 2154)
+- new Variable (line 2300)
+- new Variable (line 2304)
+- new Variable (line 2424)
+- new Variable (line 2445)
+- new Variable (line 2464)
+- new Variable (line 2480)
+- new Variable (line 2486)
+- new Variable (line 2505)
+- new Variable (line 2526)
+- new Variable (line 2781)
+- new Variable (line 2785)
+- new Error (line 2802)
+- new Error (line 2808)
+- new Error (line 2831)
+- new Error (line 2834)
+- new Variable (line 2893)
+- new Variable (line 2898)
+- new Variable (line 2950)
+- new Variable (line 2964)
+- new Variable (line 3338)
+- new ClassProperty (line 3340)
+- new Variable (line 3363)
+- new ClassProperty (line 3365)
+- new Variable (line 3554)
+- new Variable (line 3558)
+- new Variable (line 3578)
+- new Variable (line 3589)
+- new Variable (line 3614)
+- new Variable (line 3629)
+- new Variable (line 3654)
+- new Variable (line 3670)
+- new Variable (line 3684)
+- new Variable (line 3782)
+- new Variable (line 3796)
+- new Variable (line 3961)
+- new Variable (line 3966)
+- new Error (line 3986)
+- new Error (line 3990)
+- new Variable (line 4075)
+- new Variable (line 4081)
+- new Variable (line 4087)
+- new Variable (line 4133)
+- new Variable (line 4138)
+- new Variable (line 4167)
+- new Variable (line 4177)
+- new Variable (line 4183)
+- new Variable (line 4205)
+- new Variable (line 4226)
+- new HashTable (line 4260)
+- new Variable (line 4277)
+- new Variable (line 4279)
+- new HashTable (line 4380)
+- new Variable (line 4412)
+- new Variable (line 4414)
+- new HashTable (line 4427)
+- new Variable (line 4434)
+- new Variable (line 4445)
+- new HashTable (line 4460)
+- new Variable (line 4463)
+- new HashTable (line 4482)
+- new Variable (line 4485)
 - 198 class method(s)
 - 2 closure(s)
 
@@ -35732,11 +35731,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/lchown_.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
-### `ext/standard/ldexp.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -41548,8 +41542,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1520)
-- new ArgumentCountError (line 1531)
+- new ArgumentCountError (line 1523)
+- new ArgumentCountError (line 1534)
 - 18 class method(s)
 - 1 closure(s)
 
@@ -43613,7 +43607,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GetHeadersRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 111)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/GetcwdJit.php`
