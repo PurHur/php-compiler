@@ -601,16 +601,18 @@ final class BuiltinClasses
         // Zend/zend_weakrefs.c — ArrayAccess + Countable + IteratorAggregate (#22267).
         $entry->interfaces = ['arrayaccess', 'countable', 'iteratoraggregate'];
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
-        $entry->properties[] = new ClassProperty(
-            WeakRefSupport::MAP_PROPERTY,
-            null,
-            $arrayProto
-        );
-        $entry->properties[] = new ClassProperty(
-            WeakRefSupport::MAP_KEYS_PROPERTY,
-            null,
-            $arrayProto
-        );
+        // Engine storage only — Zend WeakMap has no PHP-visible props; DEBUG/VAR_EXPORT
+        // use zend_weakmap_get_properties_for (Zend/zend_weakrefs.c; #24522).
+        foreach (
+            [
+                WeakRefSupport::MAP_PROPERTY,
+                WeakRefSupport::MAP_KEYS_PROPERTY,
+            ] as $mapPropName
+        ) {
+            $mapProp = new ClassProperty($mapPropName, null, $arrayProto);
+            $mapProp->phpInvisible = true;
+            $entry->properties[] = $mapProp;
+        }
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry->constructor = new WeakMapConstruct();
         $entry->methods['__construct'] = $entry->constructor;

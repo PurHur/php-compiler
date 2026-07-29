@@ -2205,6 +2205,10 @@ class VM {
 
             return $props;
         }
+        // WeakMap: Zend zend_weakmap_get_properties_for(DEBUG) — key/value pairs, not storage (#24522).
+        if (WeakRefSupport::isWeakMap($object)) {
+            return WeakRefSupport::debugInfoEntries($object);
+        }
         if ($this->hasInstanceMethod($object->class, '__debuginfo')) {
             $result = $this->invokeInstanceMethod($object, '__debugInfo')->resolveIndirect();
             if (Variable::TYPE_NULL === $result->type) {
@@ -2585,6 +2589,10 @@ class VM {
         // Zend zend_exceptions.c — SensitiveParameterValue get_properties_for(VAR_EXPORT) is empty (#23042).
         if (VM\SensitiveParamSupport::CLASS_NAME === $object->class->name
             || strtolower(VM\SensitiveParamSupport::CLASS_NAME) === $lc) {
+            return [];
+        }
+        // Zend zend_weakrefs.c — WeakMap get_properties_for(VAR_EXPORT) returns NULL (#24522).
+        if (WeakRefSupport::isWeakMap($object)) {
             return [];
         }
 
