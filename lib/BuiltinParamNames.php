@@ -152,6 +152,10 @@ final class BuiltinParamNames
             'fiber::__construct' => ['callback'],
             // php-src Zend/zend_weakrefs.stub.php — InternalArgInfo empty (#24592)
             'weakreference::create' => ['object'],
+            // php-src Zend/zend_closures.stub.php — InternalArgInfo still says old/to/scope (#24591)
+            'closure::bind' => ['closure', 'newThis', 'newScope='],
+            'closure::bindto' => ['newThis', 'newScope='],
+            'closure::call' => ['newThis', '...args'],
             default => null,
         };
     }
@@ -1401,6 +1405,18 @@ final class BuiltinParamNames
         $meta = self::zendInternalVariadicReflectionArity($name);
         if (null !== $meta) {
             return $meta['index'];
+        }
+        // Explicit stub tables may encode ...$name (class methods + free functions, #24591).
+        $names = str_contains($name, '::')
+            ? self::forClassMethod(strtolower($name))
+            : self::forFunction($name);
+        if (null !== $names) {
+            foreach ($names as $index => $label) {
+                $n = ltrim((string) $label, '&');
+                if (str_starts_with($n, '...')) {
+                    return $index;
+                }
+            }
         }
 
         return BuiltinInternalArgInfo::variadicParamIndexForFunction($name);

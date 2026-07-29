@@ -2570,6 +2570,11 @@ final class ReflectionSupport
         int $index,
     ): bool {
         if (str_contains($callableLc, '::')) {
+            // Prefer BuiltinParamNames stub override (Closure::call ...args, #24591).
+            $variadic = BuiltinParamNames::variadicParamIndexForFunction($callableLc);
+            if (null !== $variadic) {
+                return $variadic === $index;
+            }
             [$class, $method] = explode('::', $callableLc, 2);
             if (!BuiltinInternalArgInfo::methodIsVariadic($class, $method)) {
                 return false;
@@ -3085,6 +3090,10 @@ final class ReflectionSupport
         }
         $className = self::classNameFromReflection($reflection);
         $methodName = self::methodNameFromReflection($reflection);
+        $qualified = strtolower($className).'::'.strtolower($methodName);
+        if (null !== BuiltinParamNames::variadicParamIndexForFunction($qualified)) {
+            return true;
+        }
 
         return BuiltinInternalArgInfo::methodIsVariadic($className, $methodName);
     }

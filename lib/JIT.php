@@ -18555,10 +18555,22 @@ class JIT {
             $names = BuiltinParamNames::forFunction($toCall->name)
                 ?? BuiltinParamNames::forClassMethod($toCall->name);
 
-            return [$names ?? [], null];
+            return [$names ?? [], BuiltinParamNames::variadicParamIndexForFunction($toCall->name)];
         }
         if ($toCall instanceof CoreFunc\Internal) {
             $name = $toCall->getName();
+            // VmClassMethod Internals are registered under bare names ('bind'); prefer
+            // Closure::… stub tables when the active proxy key is qualified (#24591).
+            $qualified = $this->jitQualifiedProxyNameForCall($toCall);
+            if (null !== $qualified) {
+                $names = BuiltinParamNames::forClassMethod($qualified);
+                if (null !== $names) {
+                    return [
+                        $names,
+                        BuiltinParamNames::variadicParamIndexForFunction($qualified),
+                    ];
+                }
+            }
             $names = BuiltinParamNames::forFunction($name)
                 ?? BuiltinParamNames::forClassMethod($name);
 
@@ -18573,14 +18585,52 @@ class JIT {
 
             return [$toCall->paramNames, \is_int($variadic) ? $variadic : null];
         }
+        if ($toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall) {
+            // Closure::$c->call(newThis: …) / bindTo — candidate set is class-id keyed (#24591).
+            $qualified = 'closure::'.$toCall->methodLc;
+            $names = BuiltinParamNames::forClassMethod($qualified);
+            if (null !== $names) {
+                return [
+                    $names,
+                    BuiltinParamNames::variadicParamIndexForFunction($qualified),
+                ];
+            }
+        }
+        $qualified = $this->jitQualifiedProxyNameForCall($toCall);
+        if (null !== $qualified) {
+            $names = BuiltinParamNames::forClassMethod($qualified)
+                ?? BuiltinParamNames::paramNamesForInternalFunction($qualified);
+            if (null !== $names && [] !== $names) {
+                return [
+                    $names,
+                    BuiltinParamNames::variadicParamIndexForFunction($qualified),
+                ];
+            }
+        }
         if (isset($toCall->name) && \is_string($toCall->name) && '' !== $toCall->name) {
             $names = BuiltinParamNames::forClassMethod($toCall->name)
                 ?? BuiltinParamNames::forFunction($toCall->name);
 
-            return [$names ?? [], null];
+            return [$names ?? [], BuiltinParamNames::variadicParamIndexForFunction($toCall->name)];
         }
 
         return [[], null];
+    }
+
+    /** Reverse-lookup class::method proxy key for a dedicated JIT Call object (#24591). */
+    private function jitQualifiedProxyNameForCall(JIT\Call $toCall): ?string
+    {
+        foreach ($this->context->functionProxies as $proxyName => $proxy) {
+            if ($proxy !== $toCall) {
+                continue;
+            }
+            $name = (string) $proxyName;
+            if (str_contains($name, '::')) {
+                return strtolower($name);
+            }
+        }
+
+        return null;
     }
 
     private function jitInternalBuiltinFunctionName(JIT\Call $toCall): ?string
@@ -18589,7 +18639,17 @@ class JIT {
             return $toCall->name;
         }
         if ($toCall instanceof CoreFunc\Internal) {
-            return $toCall->getName();
+            return $this->jitQualifiedProxyNameForCall($toCall) ?? $toCall->getName();
+        }
+        $qualified = $this->jitQualifiedProxyNameForCall($toCall);
+        if (null !== $qualified) {
+            return $qualified;
+        }
+        if ($toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall) {
+            $qualified = 'closure::'.$toCall->methodLc;
+            if (null !== BuiltinParamNames::forClassMethod($qualified)) {
+                return $qualified;
+            }
         }
         if (isset($toCall->name) && \is_string($toCall->name) && '' !== $toCall->name) {
             return $toCall->name;
@@ -18611,11 +18671,23 @@ class JIT {
         if (isset($toCall->namedArgsReceiverPrefix) && \is_int($toCall->namedArgsReceiverPrefix)) {
             return max(0, $toCall->namedArgsReceiverPrefix);
         }
-        if (!$toCall instanceof JIT\Call\Native || [] === $toCall->argTypes) {
-            return 0;
+        if ($toCall instanceof JIT\Call\Native && [] !== $toCall->argTypes) {
+            return '__object__*' === $this->context->getStringFromType($toCall->argTypes[0]) ? 1 : 0;
+        }
+        // Instance-method proxies prepend $this before user args (Closure::call/bindTo, #24591).
+        if ($toCall instanceof JIT\Call\RuntimeIndirectInstanceMethodCall
+            || $toCall instanceof JIT\Call\ClosureBindTo
+        ) {
+            return 1;
+        }
+        $qualified = $this->jitQualifiedProxyNameForCall($toCall);
+        if (null !== $qualified) {
+            if (str_ends_with($qualified, '::call') || str_ends_with($qualified, '::bindto')) {
+                return 1;
+            }
         }
 
-        return '__object__*' === $this->context->getStringFromType($toCall->argTypes[0]) ? 1 : 0;
+        return 0;
     }
 
     /**

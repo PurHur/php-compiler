@@ -15493,7 +15493,10 @@ restart:
             if (null !== $qualified) {
                 $names = BuiltinParamNames::forClassMethod($qualified);
                 if (null !== $names) {
-                    return [$names, null];
+                    return [
+                        $names,
+                        BuiltinParamNames::variadicParamIndexForFunction(strtolower($qualified)),
+                    ];
                 }
             }
             $name = $call->getName();
