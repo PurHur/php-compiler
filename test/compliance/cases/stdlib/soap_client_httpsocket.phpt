@@ -1,5 +1,5 @@
 --TEST--
-Stdlib: SoapClient::$httpsocket declared null (fixture / pre-HTTP) (#23904, ext/soap/soap.stub.php)
+Stdlib: SoapClient::$httpsocket null for fixture / pre-HTTP (#23904/#24913, ext/soap/soap.stub.php)
 --FILE--
 <?php
 declare(strict_types=1);
