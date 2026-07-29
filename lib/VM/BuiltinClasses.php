@@ -240,7 +240,6 @@ use PHPCompiler\VM\Builtin\ReflectionZendExtensionGetVersion;
 use PHPCompiler\VM\Builtin\ReflectionZendExtensionToString;
 use PHPCompiler\VM\Builtin\ReflectionFiberConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetCallable;
-use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFile;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingLine;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetFiber;
@@ -846,10 +845,13 @@ final class BuiltinClasses
         $rm->methodVisibility['getdeclaringclass'] = $pub;
         $rm->methods['isdeprecated'] = new ReflectionMethodIsDeprecated();
         $rm->methodVisibility['isdeprecated'] = $pub;
-        $rm->methods['getdeprecatedmessage'] = new ReflectionMethodGetDeprecatedMessage();
-        $rm->methodVisibility['getdeprecatedmessage'] = $pub;
-        $rm->methods['getdeprecatedversion'] = new ReflectionMethodGetDeprecatedVersion();
-        $rm->methodVisibility['getdeprecatedversion'] = $pub;
+        // getDeprecatedMessage/Version are PHP 8.4+ (#[\Deprecated] metadata) — absent on 8.2 (#25058).
+        if (CompilerVersion::supportsReflectionClassPhp84Apis()) {
+            $rm->methods['getdeprecatedmessage'] = new ReflectionMethodGetDeprecatedMessage();
+            $rm->methodVisibility['getdeprecatedmessage'] = $pub;
+            $rm->methods['getdeprecatedversion'] = new ReflectionMethodGetDeprecatedVersion();
+            $rm->methodVisibility['getdeprecatedversion'] = $pub;
+        }
         $rm->methods['hasprototype'] = new ReflectionMethodHasPrototype();
         $rm->methodVisibility['hasprototype'] = $pub;
         $rm->methods['hasreturntype'] = new ReflectionMethodHasReturnType();
@@ -1547,6 +1549,7 @@ final class BuiltinClasses
         $rfiber->methodVisibility['__construct'] = $pub;
         // Fiber state probes (isStarted/isSuspended/isRunning/isTerminated) live on Fiber
         // only — php-src ReflectionFiber does not advertise them (#22422).
+        // getExecutingFiber is not a php-src ReflectionFiber API (#25058; was non-Zend #6793).
         foreach (
             [
                 'getfiber' => new ReflectionFiberGetFiber(),
@@ -1554,11 +1557,10 @@ final class BuiltinClasses
                 'getexecutingfile' => new ReflectionFiberGetExecutingFile(),
                 'gettrace' => new ReflectionFiberGetTrace(),
                 'getcallable' => new ReflectionFiberGetCallable(),
-                'getexecutingfiber' => new ReflectionFiberGetExecutingFiber(),
             ] as $name => $method
         ) {
             $rfiber->methods[$name] = $method;
-            $rfiber->methodVisibility[$name] = 'getexecutingfiber' === $name ? ($pub | CfgFunc::FLAG_STATIC) : $pub;
+            $rfiber->methodVisibility[$name] = $pub;
         }
         $ctx->classes[ReflectionSupport::REFLECTION_FIBER] = $rfiber;
 

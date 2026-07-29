@@ -5879,7 +5879,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionIsPersistent.p
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionIsTemporary.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionToString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberConstruct.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFiber.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFile.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingLine.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetFiber.php';

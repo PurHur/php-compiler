@@ -1943,7 +1943,8 @@ final class CompilerVersion
 
     /**
      * PHP 8.4+ ReflectionClass::{getDeprecatedMessage,getDeprecatedVersion,getLazyPropertyNames,
-     * getReadOnlyProperties,isStatic} (ext/reflection/php_reflection.stub.php, #22599; re-#6917/#6606).
+     * getReadOnlyProperties,isStatic} and ReflectionMethod::{getDeprecatedMessage,getDeprecatedVersion}
+     * (ext/reflection/php_reflection.stub.php, #22599, #25058; re-#6917/#6606).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev / PROFILE=8.2 matches Zend 8.2
      * (methods absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
