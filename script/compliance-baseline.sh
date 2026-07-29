@@ -63,10 +63,10 @@ EXECUTED_BASELINE="${BASELINE_DIR}/${SUITE}.executed"
 #   VMTest:stdlib/hrtime_nanosecond_precision   # only quarantined under VMTest
 #   stdlib/something                            # quarantined under every suite
 #
-# Without scoping, one entry hides the case everywhere. Measured: hrtime_nanosecond_precision flips
-# between VMTest runs of one commit (#24870) but fails STABLY under JITTest in both runs of
-# e7de99700 — quarantining it globally dropped a stable JITTest failure from the baseline, which is
-# the same "real failure made invisible" harm the quarantine itself caused in #24726.
+# Without scoping, one entry hides the case everywhere. Measured pre-#24870: hrtime_nanosecond_precision
+# flipped between VMTest runs of one commit but failed under JITTest in both runs of e7de99700 —
+# quarantining it globally dropped a stable JITTest failure from the baseline (#24726 shape).
+# #24870 widened the PHPT assertion; the quarantine entry was removed.
 quarantined() {
     if [ -f "$QUARANTINE" ]; then
         sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$QUARANTINE" \
