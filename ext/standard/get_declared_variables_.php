@@ -11,7 +11,10 @@ use PHPCompiler\JIT\ScopeBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** get_declared_variables() — list of caller local names (issue #4780). */
+/**
+ * get_declared_variables() — phantom vs php-src (#24223, re-#4780). Kept for spine compile only;
+ * not registered in Module.php. Use get_defined_vars().
+ */
 final class get_declared_variables_ extends Internal
 {
     public function __construct()

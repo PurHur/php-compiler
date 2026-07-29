@@ -52,6 +52,10 @@ final class BuiltinIntrospectionPolicy
         if ('get_declared_attributes' === $lc) {
             return CompilerVersion::advertisesGetDeclaredAttributes();
         }
+        // get_declared_functions / get_declared_variables — phantoms vs php-src (#24223); never advertise.
+        if (\in_array($lc, ['get_declared_functions', 'get_declared_variables'], true)) {
+            return false;
+        }
         if (\in_array($lc, ['attribute_exists', 'class_meth_exists', 'unitenum_exists'], true)) {
             return CompilerVersion::advertisesPhp84ReflectionProbeBuiltins();
         }

@@ -11,9 +11,8 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * get_declared_functions() — internal and user function name lists (issue #3739).
- *
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_functions)
+ * get_declared_functions() — phantom vs php-src (#24223, re-#4780). Kept for spine compile only;
+ * not registered in Module.php. Use get_defined_functions().
  */
 final class get_declared_functions_ extends Internal
 {

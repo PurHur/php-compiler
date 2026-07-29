@@ -725,13 +725,13 @@ class Module extends ModuleAbstract
             ...(CompilerVersion::supportsClassConstants() ? [new class_constants_()] : []),
             new get_defined_constants_(),
             new get_defined_vars_(),
-            new get_declared_variables_(),
+            // get_declared_variables() — phantom vs php-src (#24223, re-#4780); Zend has get_defined_vars().
             new get_declared_interfaces_(),
             new get_declared_classes_(),
             new get_declared_traits_(),
             // get_declared_attributes() — phantom vs php-src (#24222, re-#6450); never advertise.
             ...(CompilerVersion::advertisesGetDeclaredAttributes() ? [new get_declared_attributes_()] : []),
-            new get_declared_functions_(),
+            // get_declared_functions() — phantom vs php-src (#24223, re-#4780); Zend has get_defined_functions().
             new get_defined_functions_(),
             new get_included_files_(),
             new get_included_files_('get_required_files'),

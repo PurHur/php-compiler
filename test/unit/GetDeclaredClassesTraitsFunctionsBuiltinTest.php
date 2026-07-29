@@ -29,6 +29,7 @@ final class GetDeclaredClassesTraitsFunctionsBuiltinTest extends BaseTest
             'get_declared_traits_nested_probe_arg.phpt',
             'get_declared_functions.phpt',
             'get_declared_functions_jit.phpt',
+            'get_declared_variables.phpt',
             'get_defined_functions.phpt',
             'get_defined_functions_jit.phpt',
         ] as $file) {
