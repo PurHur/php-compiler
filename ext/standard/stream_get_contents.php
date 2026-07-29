@@ -23,6 +23,9 @@ use PHPLLVM\Value;
  */
 final class stream_get_contents extends Internal
 {
+    /** php-src ext/standard/file.c — PHP_FUNCTION(stream_get_contents) length range. */
+    private const LENGTH_RANGE_ERROR = 'stream_get_contents(): Argument #2 ($length) must be greater than or equal to -1';
+
     public function execute(Frame $frame): void
     {
         if (!isset($frame->calledArgs[0])) {
@@ -40,6 +43,10 @@ final class stream_get_contents extends Internal
         $offset = -1;
         if (isset($frame->calledArgs[1])) {
             $maxlength = self::parseLengthArg($frame->calledArgs[1]->resolveIndirect());
+            // php-src file.c: if (maxlength < -1) ValueError (#24560).
+            if ($maxlength < -1) {
+                throw new \ValueError(self::LENGTH_RANGE_ERROR);
+            }
         }
         if (isset($frame->calledArgs[2])) {
             $offset = VmMath::parseIntBuiltinArg(
@@ -77,6 +84,7 @@ final class stream_get_contents extends Internal
         );
         if ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             $maxlength = JitStreamGetContents::lowerLengthArg($context, $args[1]);
+            JitStreamGetContents::emitRuntimeLengthRangeGuard($context, $maxlength);
         } else {
             $maxlength = $i64->constInt(-1, true);
         }
