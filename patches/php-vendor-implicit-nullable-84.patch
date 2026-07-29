@@ -39,10 +39,10 @@
              $this->parents[] = $parent;
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php
-@@ -58,7 +58,7 @@
- 
+@@ -60,7 +60,7 @@
      /** @var bool */
      public $strictTypes = false;
+ 
 -    public function __construct(string $name, int $flags, Op\Type $returnType, Operand $class = null, array $attributes = [])
 +    public function __construct(string $name, int $flags, Op\Type $returnType, ?Operand $class = null, array $attributes = [])
      {
@@ -130,8 +130,8 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php
 @@ -45,7 +45,7 @@
-     /** PHP 8.4 lazy property modifier recovered from phpc-lazy-property marker (#16813). */
-     public bool $propertyLazy = false;
+     /** PHP 8.4 asymmetric get visibility (0 = same as write; issue #5059). */
+     public int $getVisibility = 0;
  
 -    public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, Operand $defaultVar = null, Block $defaultBlock = null, array $attributes = [])
 +    public function __construct(Operand $name, int $visibility, bool $static, Op\Type $declaredType, ?Operand $defaultVar = null, ?Block $defaultBlock = null, array $attributes = [])
@@ -173,16 +173,16 @@
      }
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -60,7 +60,7 @@
- 
-     protected $anonId = 0;
+@@ -66,7 +66,7 @@
+     /** @var array<string, int> occurrence cursor for token matching per parse() (#6549) */
+     private array $newExprMatchCursor = [];
  
 -    public function __construct(AstParser $astParser, AstTraverser $astTraverser = null)
 +    public function __construct(AstParser $astParser, ?AstTraverser $astTraverser = null)
      {
          $this->astParser = $astParser;
          if (! $astTraverser) {
-@@ -181,7 +181,7 @@
+@@ -190,7 +190,7 @@
          throw new \RuntimeException('Unknown Node Encountered : '.$type);
      }
  
