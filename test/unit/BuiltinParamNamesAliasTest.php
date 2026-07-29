@@ -1497,6 +1497,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_hmac_file'));
     }
 
+    /** @covers issue #25068 */
+    public function testHashZendStubOptionalDefaults(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash');
+        self::assertSame(['algo', 'data', 'binary=', 'options='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'algo', 'hash'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'data', 'hash'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'binary', 'hash'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'hash'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('hash'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('hash'));
+        self::assertSame('array', BuiltinInternalArgInfo::stubParamTypeOverride('hash', 3));
+        $infoBinary = ['name' => 'binary', 'type' => 'bool', 'isOptional' => true];
+        $infoOptions = ['name' => 'options', 'type' => 'array', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('hash', 2, $infoBinary, false));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('hash', 3, $infoOptions, false));
+        $binary = new Variable();
+        $options = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($binary, 'hash', 2, $infoBinary));
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($options, 'hash', 3, $infoOptions));
+        self::assertFalse($binary->toBool());
+        self::assertSame(Variable::TYPE_ARRAY, $options->type);
+    }
+
     /** @covers issue #23586 */
     public function testHashFinalZendStubNamedParams(): void
     {
