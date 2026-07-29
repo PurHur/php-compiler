@@ -993,6 +993,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'country', 'timezone_identifiers_list'));
     }
 
+    /** @covers issue #24550 */
+    public function testPhpinfoZendStubNamedFlagsParam(): void
+    {
+        $names = BuiltinParamNames::forFunction('phpinfo');
+        self::assertSame(['flags'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'phpinfo'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $what)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'what', 'phpinfo'));
+    }
+
     /** @covers issue #23275 */
     public function testMktimeGmmktimeZendStubNamedParams(): void
     {

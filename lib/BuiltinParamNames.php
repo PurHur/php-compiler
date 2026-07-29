@@ -1206,6 +1206,9 @@ final class BuiltinParamNames
                 return ['data', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
             case 'simplexml_load_file':
                 return ['filename', 'class_name', 'options', 'namespace_or_prefix', 'is_prefix'];
+            // php-src ext/standard/info.stub.php — InternalArgInfo still says what (#24550)
+            case 'phpinfo':
+                return ['flags'];
         }
 
         return null;
