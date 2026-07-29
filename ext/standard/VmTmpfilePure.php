@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\standard;
  * tmpfile() without host tmpfile() — anonymous plainfile via VmFsTempnamPure (#9033, #12813).
  *
  * php-src: ext/standard/streams.c — PHP_FUNCTION(tmpfile)
- * main/streams/php_stream_temp.c — unlinked temp path + STDIO fd
+ * main/streams/php_stream_temp.c — temp path visible until fclose (#24786)
  */
 final class VmTmpfilePure
 {
@@ -26,10 +26,13 @@ final class VmTmpfilePure
         $path = VmFsTempnamPure::mkstemp($dir, 'php');
         if (false !== $path) {
             $handle = VmFsOpenNative::open($path, 'r+b');
-            VmFsUnlink::unlink($path);
             if (false !== $handle) {
+                // php-src main/php_open_temporary_file — path stays on disk until fclose (#24786).
+                VmFs::registerTmpfileUnlinkOnClose($handle, $path);
+
                 return $handle;
             }
+            VmFsUnlink::unlink($path);
         }
 
         return VmPhpMemoryStream::open('php://temp', 'w+b');
