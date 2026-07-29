@@ -514,6 +514,9 @@ final class BuiltinParamNames
                 return ['stream', 'format', 'vars'];
             case 'fprintf':
                 return ['stream', 'format', 'values'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says args (#24535)
+            case 'vfprintf':
+                return ['stream', 'format', 'values'];
             case 'pack':
                 return ['format', 'values'];
             case 'array_merge':
