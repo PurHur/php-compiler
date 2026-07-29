@@ -104,21 +104,21 @@ final class VmCalendar
         );
     }
 
-    public static function jdtounix(int $jday): int
+    public static function jdtounix(int $julianDay): int
     {
         $maxJd = self::UNIX_EPOCH_JD + intdiv(\PHP_INT_MAX, self::SECS_PER_DAY);
-        if ($jday < self::UNIX_EPOCH_JD || $jday > $maxJd) {
+        if ($julianDay < self::UNIX_EPOCH_JD || $julianDay > $maxJd) {
             throw new \ValueError(
-                \sprintf('jdtounix(): Argument #1 ($jday) must be between %d and %d', self::UNIX_EPOCH_JD, $maxJd)
+                \sprintf('jdtounix(): Argument #1 ($julian_day) must be between %d and %d', self::UNIX_EPOCH_JD, $maxJd)
             );
         }
 
-        return ($jday - self::UNIX_EPOCH_JD) * self::SECS_PER_DAY;
+        return ($julianDay - self::UNIX_EPOCH_JD) * self::SECS_PER_DAY;
     }
 
-    public static function easterDate(int $year): int
+    public static function easterDate(int $year, int $mode = CalendarConstants::CAL_EASTER_DEFAULT): int
     {
-        $easter = self::easterDays($year, CalendarConstants::CAL_EASTER_DEFAULT);
+        $easter = self::easterDays($year, $mode);
         if ($easter < 11) {
             $month = 3;
             $day = $easter + 21;

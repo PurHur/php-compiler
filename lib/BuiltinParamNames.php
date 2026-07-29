@@ -212,6 +212,11 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — Reflection OK but BuiltinParamNames missing (#23462)
             case 'checkdate':
                 return ['month', 'day', 'year'];
+            // php-src ext/calendar/calendar.stub.php — InternalArgInfo still says jday (#24509)
+            case 'jdtounix':
+                return ['julian_day'];
+            case 'easter_date':
+                return ['year=', 'mode='];
             case 'getdate':
                 return ['timestamp'];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says date (#23783)
