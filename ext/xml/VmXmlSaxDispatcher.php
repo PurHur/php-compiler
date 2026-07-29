@@ -35,16 +35,7 @@ final class VmXmlSaxDispatcher
         if (null === $state) {
             return;
         }
-        $handlers = $state['handlers'];
-        // Proceed when any SAX handler is registered — including NS-only (#20323).
-        $anyHandler = false;
-        foreach ($handlers as $handler) {
-            if (null !== $handler) {
-                $anyHandler = true;
-                break;
-            }
-        }
-        if (!$anyHandler) {
+        if (!self::hasAnyHandler($state)) {
             return;
         }
 
@@ -59,6 +50,210 @@ final class VmXmlSaxDispatcher
             return;
         }
         $dispatcher->parseDocument($trimmed);
+    }
+
+    /**
+     * Stream SAX events as complete tokens appear in the accumulated buffer (#24657).
+     *
+     * Start-element handlers fire when a full start tag is buffered (Expat), without waiting
+     * for the matching end tag or document well-formedness. Character data is held until the
+     * next markup boundary or $isFinal (matches libxml-compat Zend coalescing).
+     *
+     * @param array<string, mixed> $state
+     *
+     * @return array<string, mixed>
+     */
+    public static function dispatchIncremental(
+        Context $ctx,
+        ObjectEntry $parser,
+        array $state,
+        bool $isFinal,
+        ?Frame $frame = null
+    ): array {
+        if (!self::hasAnyHandler($state)) {
+            return $state;
+        }
+
+        $buffer = (string) ($state['buffer'] ?? '');
+        if ('' === $buffer && !$isFinal) {
+            return $state;
+        }
+
+        $dispatcher = new self($ctx, $parser, $state, $frame);
+        $dispatcher->nsBindings = $state['saxNsBindings'] ?? ['' => ''];
+        /** @var list<array{rawTag: string, tag: string, endMarkup: string, nsBindings: array<string, string>}> $openStack */
+        $openStack = $state['saxOpenStack'] ?? [];
+        $pos = (int) ($state['saxConsumed'] ?? 0);
+        $pending = (string) ($state['saxPendingCdata'] ?? '');
+
+        // Strip XML decl / DOCTYPE once at the start of the stream (#20333).
+        if (0 === $pos && '' === $pending && [] === $openStack) {
+            $stripped = VmXml::stripXmlDeclAndDoctypeKeepMisc(ltrim($buffer));
+            if ($stripped !== $buffer) {
+                // Re-base: buffer keeps original for validateWellFormed; SAX scans stripped view
+                // via advancing past the prefix length in the original when possible.
+                $prefixLen = \strlen($buffer) - \strlen(ltrim($buffer));
+                $declStripped = VmXml::stripXmlDeclAndDoctypeKeepMisc(substr($buffer, $prefixLen));
+                $removed = \strlen(substr($buffer, $prefixLen)) - \strlen($declStripped);
+                $pos = $prefixLen + $removed;
+            }
+        }
+
+        $len = \strlen($buffer);
+        while ($pos < $len) {
+            $depth = \count($openStack);
+            if (0 === $depth) {
+                $pos = self::skipWhitespace($buffer, $pos);
+                if ($pos >= $len) {
+                    break;
+                }
+            }
+
+            if ('<' !== $buffer[$pos]) {
+                $textEnd = strpos($buffer, '<', $pos);
+                if (false === $textEnd) {
+                    $pending .= substr($buffer, $pos);
+                    $pos = $len;
+                    break;
+                }
+                $pending .= substr($buffer, $pos, $textEnd - $pos);
+                $pos = $textEnd;
+                if ('' !== $pending && $depth > 0) {
+                    $dispatcher->invokeCharacterData($pending);
+                    $pending = '';
+                }
+
+                continue;
+            }
+
+            $comment = VmXml::parseCommentAt($buffer, $pos);
+            if (null !== $comment) {
+                if ('' !== $pending && $depth > 0) {
+                    $dispatcher->invokeCharacterData($pending);
+                    $pending = '';
+                }
+                $raw = substr($buffer, $pos, $comment['end'] - $pos);
+                $dispatcher->invokeDefault($raw);
+                $pos = $comment['end'];
+
+                continue;
+            }
+            // Incomplete comment — wait for more input.
+            if (str_starts_with(substr($buffer, $pos), '<!--') && false === strpos($buffer, '-->', $pos)) {
+                break;
+            }
+
+            $pi = VmXml::parseProcessingInstructionAt($buffer, $pos);
+            if (null !== $pi) {
+                if ('' !== $pending && $depth > 0) {
+                    $dispatcher->invokeCharacterData($pending);
+                    $pending = '';
+                }
+                $raw = substr($buffer, $pos, $pi['end'] - $pos);
+                $dispatcher->invokeProcessingInstruction($raw, $pi['target'], $pi['data']);
+                $pos = $pi['end'];
+
+                continue;
+            }
+            if (str_starts_with(substr($buffer, $pos), '<?') && false === strpos($buffer, '?>', $pos)) {
+                break;
+            }
+
+            $cdata = VmXml::parseCdataSectionAt($buffer, $pos);
+            if (null !== $cdata) {
+                if ('' !== $pending && $depth > 0) {
+                    $dispatcher->invokeCharacterData($pending);
+                    $pending = '';
+                }
+                $dispatcher->invokeCharacterData($cdata['data']);
+                $pos = $cdata['end'];
+
+                continue;
+            }
+            if (str_starts_with(substr($buffer, $pos), '<![CDATA[') && false === strpos($buffer, ']]>', $pos)) {
+                break;
+            }
+
+            // End tag.
+            if ($pos + 1 < $len && '/' === $buffer[$pos + 1]) {
+                if (!preg_match('/\G<\/([A-Za-z_][\w:.-]*)\s*>/s', $buffer, $close, 0, $pos)) {
+                    break; // incomplete end tag
+                }
+                if ('' !== $pending && $depth > 0) {
+                    $dispatcher->invokeCharacterData($pending);
+                    $pending = '';
+                }
+                if ([] === $openStack) {
+                    break;
+                }
+                $frameOpen = array_pop($openStack);
+                $dispatcher->nsBindings = $frameOpen['nsBindings'];
+                $dispatcher->invokeElementEnd($frameOpen['tag'], $frameOpen['endMarkup']);
+                $pos += \strlen($close[0]);
+
+                continue;
+            }
+
+            // Start / empty-element tag.
+            if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?(\/?)>/s', $buffer, $open, 0, $pos)) {
+                break; // incomplete start tag
+            }
+            if ('' !== $pending && $depth > 0) {
+                $dispatcher->invokeCharacterData($pending);
+                $pending = '';
+            }
+
+            $rawTag = $open[1];
+            $attrSpec = $open[2] ?? '';
+            $selfClose = isset($open[3]) && '/' === $open[3];
+            $savedBindings = $dispatcher->nsBindings;
+            $dispatcher->applyNamespaceDeclarations($attrSpec);
+            $attrs = $dispatcher->attributesForHandlers($attrSpec);
+            $tag = $dispatcher->expandElementName($rawTag);
+            $startMarkup = '<'.$rawTag.$attrSpec.'>';
+            $endMarkup = '</'.$rawTag.'>';
+            $dispatcher->invokeElementStart($tag, $attrs, $startMarkup);
+            $pos += \strlen($open[0]);
+
+            if ($selfClose) {
+                $dispatcher->invokeElementEnd($tag, $endMarkup);
+                $dispatcher->nsBindings = $savedBindings;
+            } else {
+                $openStack[] = [
+                    'rawTag' => $rawTag,
+                    'tag' => $tag,
+                    'endMarkup' => $endMarkup,
+                    'nsBindings' => $savedBindings,
+                ];
+            }
+        }
+
+        if ($isFinal && '' !== $pending) {
+            $dispatcher->invokeCharacterData($pending);
+            $pending = '';
+        }
+
+        $state['saxConsumed'] = $pos;
+        $state['saxPendingCdata'] = $pending;
+        $state['saxNsBindings'] = $dispatcher->nsBindings;
+        $state['saxOpenStack'] = $openStack;
+        if ($isFinal || ([] === $openStack && $pos >= $len && '' === $pending)) {
+            $state['saxDispatched'] = true;
+        }
+
+        return $state;
+    }
+
+    /** @param array<string, mixed> $state */
+    private static function hasAnyHandler(array $state): bool
+    {
+        foreach ($state['handlers'] as $handler) {
+            if (null !== $handler) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private Context $ctx;

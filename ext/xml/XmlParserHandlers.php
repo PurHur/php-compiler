@@ -51,6 +51,13 @@ final class XmlParserHandlers
             // Accumulated feed for xml_parse(..., $is_final=false) chunks (php-src XML_Parse; #24647).
             'buffer' => '',
             'saxDispatched' => false,
+            // Incremental SAX cursor (#24657) — bytes of buffer already scanned for handlers.
+            'saxConsumed' => 0,
+            'saxPendingCdata' => '',
+            /** @var array<string, string> */
+            'saxNsBindings' => ['' => ''],
+            /** @var list<array{rawTag: string, tag: string, endMarkup: string, nsBindings: array<string, string>}> */
+            'saxOpenStack' => [],
             // After is_final=true Expat rejects further XML_Parse (php-src; #24647).
             'finished' => false,
             'nsAware' => false,

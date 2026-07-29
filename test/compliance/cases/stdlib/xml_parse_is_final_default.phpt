@@ -35,10 +35,9 @@ xml_set_element_handler(
         $out[] = '-'.$name;
     }
 );
-// Non-final incomplete chunk must succeed (Expat); handler timing for partial
-// tokens may differ until the document is well-formed (#24647).
+// Non-final incomplete chunk must succeed and fire start tags already complete (#24657).
 $c1 = xml_parse($p, '<r><a', false);
-echo 'c1='.(int) $c1, "\n";
+echo 'c1='.(int) $c1.' out='.implode(',', $out), "\n";
 $c2 = xml_parse($p, '/></r>', true);
 echo 'c2='.(int) $c2.' out='.implode(',', $out), "\n";
 xml_parser_free($p);
@@ -52,6 +51,6 @@ xml_parser_free($p);
 --EXPECT--
 ok=1 out=+R,+A,-A,-R
 ok=1 out=+R,+A,-A,-R
-c1=1
+c1=1 out=+R
 c2=1 out=+R,+A,-A,-R
 mismatch=0 err=76
