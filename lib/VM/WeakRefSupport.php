@@ -480,4 +480,33 @@ final class WeakRefSupport
 
         return null;
     }
+
+    /**
+     * Zend zend_weakmap_get_properties_for(ZEND_PROP_PURPOSE_DEBUG) bag (#24522).
+     *
+     * Indexed entries: each value is array("key" => object, "value" => …). Non-DEBUG
+     * purposes (var_export / get_object_vars) return empty — handlers return NULL in
+     * php-src, so MAP_PROPERTY / MAP_KEYS_PROPERTY stay phpInvisible.
+     *
+     * @return array<int, Variable>
+     */
+    public static function debugInfoEntries(ObjectEntry $weakMap): array
+    {
+        $entries = [];
+        $i = 0;
+        foreach (WeakMapIterator::collectLivePairs($weakMap) as [$key, $value]) {
+            $pairHt = new HashTable();
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key->resolveIndirect());
+            $pairHt->addNew('key', $keyCopy);
+            $valueCopy = new Variable();
+            $valueCopy->copyFrom($value->resolveIndirect());
+            $pairHt->addNew('value', $valueCopy);
+            $pair = new Variable();
+            $pair->array($pairHt);
+            $entries[$i++] = $pair;
+        }
+
+        return $entries;
+    }
 }
