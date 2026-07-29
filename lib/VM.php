@@ -17539,26 +17539,31 @@ restart:
             }
         }
         foreach ($parent->methods as $name => $method) {
-            if (!isset($entry->methods[$name])) {
-                $vis = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
-                // Private methods are not inherited into subclass tables (Zend zend_inheritance).
-                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
-                    continue;
-                }
-                // PDO_*_Ext driver methods stay on PDO only (#21552).
-                if (isset($parent->methodNotInherited[$name])) {
-                    continue;
-                }
-                $entry->methods[$name] = $method;
-                $entry->methodVisibility[$name] = $vis;
-                if (isset($parent->methodDeclaringClassLc[$name])) {
-                    $entry->methodDeclaringClassLc[$name] = $parent->methodDeclaringClassLc[$name];
-                }
-                if (isset($parent->methodDeprecated[$name])) {
-                    $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];
-                }
-                $entry->methodNames[$name] = $parent->methodNames[$name] ?? $name;
+            $vis = $parent->methodVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            // Private methods are not inherited into subclass tables (Zend zend_inheritance).
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                continue;
             }
+            if (isset($entry->methods[$name])) {
+                // Child (or trait) redeclared a non-private parent final method (#24884).
+                // Same-script compile is covered by FinalMethodOverrideCheck; cross-eval needs
+                // this runtime path (see final class const #22329 / final property #22988).
+                $this->rejectChildOverrideOfFinalMethod($entry, $parent, $name);
+                continue;
+            }
+            // PDO_*_Ext driver methods stay on PDO only (#21552).
+            if (isset($parent->methodNotInherited[$name])) {
+                continue;
+            }
+            $entry->methods[$name] = $method;
+            $entry->methodVisibility[$name] = $vis;
+            if (isset($parent->methodDeclaringClassLc[$name])) {
+                $entry->methodDeclaringClassLc[$name] = $parent->methodDeclaringClassLc[$name];
+            }
+            if (isset($parent->methodDeprecated[$name])) {
+                $entry->methodDeprecated[$name] = $parent->methodDeprecated[$name];
+            }
+            $entry->methodNames[$name] = $parent->methodNames[$name] ?? $name;
         }
         foreach ($parent->staticProperties as $name => $storage) {
             if (!isset($entry->staticProperties[$name])) {
@@ -19521,6 +19526,35 @@ restart:
             $childDisplay,
             $ownerDisplay,
             $constDisplay
+        ));
+    }
+
+    /**
+     * php-src zend_inheritance.c — "Cannot override final method %s::%s()" (#24884, #4263).
+     * Same-script compile is FinalMethodOverrideCheck; cross-eval/include hits this path.
+     */
+    private function rejectChildOverrideOfFinalMethod(
+        ClassEntry $entry,
+        ClassEntry $parent,
+        string $methodLc
+    ): void {
+        $vis = $parent->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        if (($vis & \PHPCfg\Func::FLAG_FINAL) === 0) {
+            return;
+        }
+        $methodDisplay = $entry->methodNames[$methodLc]
+            ?? $parent->methodNames[$methodLc]
+            ?? $methodLc;
+        $declaringLc = $parent->methodDeclaringClassLc[$methodLc]
+            ?? strtolower(ltrim($parent->name, '\\'));
+        $ownerDisplay = $parent->name;
+        if (isset($this->context->classes[$declaringLc])) {
+            $ownerDisplay = $this->context->classes[$declaringLc]->name;
+        }
+        throw new \CompileError(sprintf(
+            'Cannot override final method %s::%s()',
+            $ownerDisplay,
+            $methodDisplay
         ));
     }
 
