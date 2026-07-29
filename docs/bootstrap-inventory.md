@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6631 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21356 |
+| Source constructs flagged (warnings) | 21359 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -195,7 +195,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_strerror.php` | 0 | 2 |
 | `ext/curl/curl_unescape.php` | 0 | 3 |
 | `ext/curl/curl_upkeep.php` | 0 | 2 |
-| `ext/curl/curl_version.php` | 0 | 2 |
+| `ext/curl/curl_version.php` | 0 | 3 |
 | `ext/dba/BuiltinClasses.php` | 0 | 1 |
 | `ext/dba/DbaExtensionPolicy.php` | 0 | 1 |
 | `ext/dba/DbaFunction.php` | 0 | 1 |
@@ -5637,7 +5637,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/VariableWriteNested.php` | 0 | 1 |
 | `lib/JIT/Call/VmActiveContextResolve.php` | 0 | 1 |
 | `lib/JIT/Call/VmCoerceVariableToString.php` | 0 | 1 |
-| `lib/JIT/Call/WeakMapMethod.php` | 0 | 2 |
+| `lib/JIT/Call/WeakMapMethod.php` | 0 | 3 |
 | `lib/JIT/Call/WeakReferenceCreate.php` | 0 | 1 |
 | `lib/JIT/Call/WeakReferenceGet.php` | 0 | 1 |
 | `lib/JIT/Call/XmlWriterMethod.php` | 0 | 1 |
@@ -6509,7 +6509,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/WeakMapInternalIteratorHandler.php` | 0 | 3 |
 | `lib/VM/WeakMapIterator.php` | 0 | 2 |
 | `lib/VM/WeakRefRegistry.php` | 0 | 3 |
-| `lib/VM/WeakRefSupport.php` | 0 | 11 |
+| `lib/VM/WeakRefSupport.php` | 0 | 12 |
 | `lib/VM/ZendDeclaredInterfaces.php` | 0 | 2 |
 | `lib/Visitor/ExitFunctionResolver.php` | 0 | 1 |
 | `lib/Visitor/InOperatorResolver.php` | 0 | 2 |
@@ -7464,11 +7464,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 62)
-- new Variable (line 64)
-- new HashTable (line 66)
-- new Variable (line 68)
-- 7 class method(s)
+- new HashTable (line 111)
+- new Variable (line 113)
+- new HashTable (line 115)
+- new Variable (line 117)
+- 8 class method(s)
 
 ### `ext/curl/VmCurlEasy.php`
 
@@ -7736,8 +7736,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/curl_version.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 24)
-- 1 class method(s)
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 45)
+- 2 class method(s)
 
 ### `ext/dba/BuiltinClasses.php`
 
@@ -47149,8 +47150,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Call/WeakMapMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 165)
-- 9 class method(s)
+- new Variable (line 148)
+- new Variable (line 289)
+- 10 class method(s)
 
 ### `lib/JIT/Call/WeakReferenceCreate.php`
 
@@ -51586,7 +51588,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/WeakMapOffsetGet.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 43)
+- new Variable (line 42)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/WeakMapOffsetSet.php`
@@ -53768,15 +53770,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 51)
-- new Variable (line 142)
-- new Variable (line 148)
-- new Variable (line 193)
-- new Variable (line 302)
-- new HashTable (line 498)
-- new Variable (line 499)
-- new Variable (line 502)
-- new Variable (line 505)
-- 28 class method(s)
+- new Error (line 139)
+- new Variable (line 164)
+- new Variable (line 170)
+- new Variable (line 215)
+- new Variable (line 324)
+- new HashTable (line 520)
+- new Variable (line 521)
+- new Variable (line 524)
+- new Variable (line 527)
+- 30 class method(s)
 - 1 closure(s)
 
 ### `lib/VM/ZendDeclaredInterfaces.php`
