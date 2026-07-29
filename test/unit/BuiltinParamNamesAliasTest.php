@@ -932,10 +932,40 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::variadicParamIndexForFunction('array_map'));
 
         $filter = BuiltinParamNames::forFunction('array_filter');
-        self::assertSame(['array', 'callback', 'mode'], $filter);
+        self::assertSame(['array', 'callback=', 'mode='], $filter);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($filter, 'array', 'array_filter'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($filter, 'callback', 'array_filter'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($filter, 'mode', 'array_filter'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('array_filter'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('array_filter'));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'array_filter',
+            1,
+            ['name' => 'callback', 'type' => '?callable', 'isOptional' => true],
+            false
+        ));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'array_filter',
+            2,
+            ['name' => 'mode', 'type' => 'int', 'isOptional' => true],
+            false
+        ));
+        $cbDef = new Variable();
+        $modeDef = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $cbDef,
+            'array_filter',
+            1,
+            ['name' => 'callback', 'type' => '?callable', 'isOptional' => true]
+        ));
+        self::assertSame(Variable::TYPE_NULL, $cbDef->type);
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $modeDef,
+            'array_filter',
+            2,
+            ['name' => 'mode', 'type' => 'int', 'isOptional' => true]
+        ));
+        self::assertSame(0, $modeDef->toInt());
 
         $reduce = BuiltinParamNames::forFunction('array_reduce');
         self::assertSame(['array', 'callback', 'initial'], $reduce);

@@ -43,17 +43,19 @@ final class array_filter extends Internal
         }
         $src = VmArray::requireArrayParam($frame->calledArgs[0], 'array_filter', 1, 'array');
         $out = new HashTable();
-        if (1 === $argc) {
+        // Named mode: alone leaves a hole at callback (php-src array.stub.php; #24843).
+        $callbackArg = \array_key_exists(1, $frame->calledArgs) ? $frame->calledArgs[1] : null;
+        $mode = 0;
+        if (\array_key_exists(2, $frame->calledArgs) && null !== $frame->calledArgs[2]) {
+            $mode = $frame->calledArgs[2]->resolveIndirect()->toInt();
+        }
+        if (null === $callbackArg) {
             self::filterDefault($src, $out);
             $frame->returnVar->array($out);
 
             return;
         }
-        $mode = 0;
-        if (3 === $argc) {
-            $mode = $frame->calledArgs[2]->resolveIndirect()->toInt();
-        }
-        [$closure, $internal, $userFn] = VmArrayFilterCallback::resolve($frame, $frame->calledArgs[1]);
+        [$closure, $internal, $userFn] = VmArrayFilterCallback::resolve($frame, $callbackArg);
         if (null === $closure && null === $internal && null === $userFn) {
             self::filterDefault($src, $out);
             $frame->returnVar->array($out);
@@ -80,13 +82,18 @@ final class array_filter extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('array_filter() requires one to three arguments in this compiler build');
         }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_filter', 1, 'array');
+        // Null / omitted callback → soft falsy filter (mode ignored); php-src array.c (#24843).
         if ($argc >= 2) {
+            $callback = $args[1];
+            if (JITVariable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
+                return ArrayFilterRuntime::filterDefault($context, $args[0]);
+            }
             throw new \LogicException(
                 'array_filter() with a callback is not supported by the JIT compiler in this build'
             );
         }
-        TypeErrorRaise::ensureLinked($context);
-        JitArrayElem::requireArrayParam($context, $args[0], 'array_filter', 1, 'array');
 
         return ArrayFilterRuntime::filterDefault($context, $args[0]);
     }

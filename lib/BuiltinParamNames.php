@@ -411,8 +411,9 @@ final class BuiltinParamNames
                 return ['array', 'rest'];
             case 'array_map':
                 return ['callback', 'array', 'arrays'];
+            // php-src ext/standard/array.stub.php — ?callable $callback = null, int $mode = 0 (#24843)
             case 'array_filter':
-                return ['array', 'callback', 'mode'];
+                return ['array', 'callback=', 'mode='];
             case 'array_reduce':
                 return ['array', 'callback', 'initial'];
             // php-src ext/standard/basic_functions.stub.php — arity 3; no $pad_type (#24002)
