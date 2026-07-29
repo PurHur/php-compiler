@@ -52,8 +52,10 @@ final class ReflectionTypeSupport
             );
         }
         if ($type instanceof CfgType\Union_) {
+            // php-src: iterable in a union expands to Traversable|array (#25065); bare iterable stays named.
+            $members = self::expandIterableInUnionMembers($type->types);
             // ReflectionType::__toString — ?T for T|null; DNF parens via cfgTypeString (#23065).
-            return self::buildUnionObject($ctx, $type->types, self::cfgTypeStringForDump($type));
+            return self::buildUnionObject($ctx, $members, self::cfgTypeStringForDump(new CfgType\Union_($members)));
         }
         if ($type instanceof CfgType\Intersection) {
             return self::buildIntersectionObject($ctx, $type->types, self::cfgTypeString($type));
@@ -97,7 +99,8 @@ final class ReflectionTypeSupport
         if ($type instanceof CfgType\Union_) {
             $parts = [];
             // php-src zend_type_to_string_resolved — list types then MAY_BE_* order (#23487).
-            foreach (self::sortUnionMembersLikeZend($type->types) as $member) {
+            // iterable → Traversable|array when composing a multi-member union (#25065).
+            foreach (self::sortUnionMembersLikeZend(self::expandIterableInUnionMembers($type->types)) as $member) {
                 // DNF parentheses around intersection groups in a union (#23065).
                 $parts[] = self::formatUnionMember($member);
             }
@@ -149,9 +152,12 @@ final class ReflectionTypeSupport
             return self::cfgTypeString($type);
         }
         if ($type instanceof CfgType\Union_) {
+            // Expand iterable before deciding ?T vs multi-member dump (#25065):
+            // iterable|null → Traversable|array|null (not ?iterable).
+            $members = self::expandIterableInUnionMembers($type->types);
             $nonNull = [];
             $sawNull = false;
-            foreach ($type->types as $member) {
+            foreach ($members as $member) {
                 if (
                     ($member instanceof CfgType\Literal && 'null' === strtolower($member->name))
                     || $member instanceof CfgType\Nullable
@@ -174,9 +180,64 @@ final class ReflectionTypeSupport
                     return '?'.self::cfgTypeString($only);
                 }
             }
+
+            return self::cfgTypeString(new CfgType\Union_($members));
         }
 
         return self::cfgTypeString($type);
+    }
+
+    /**
+     * php-src reflection: bare `iterable` / `?iterable` stay ReflectionNamedType; in a union,
+     * iterable is an alias for Traversable|array (ZEND_TYPE_IS_ITERABLE_FALLBACK / #25065).
+     *
+     * @param list<CfgType> $members
+     * @return list<CfgType>
+     */
+    private static function expandIterableInUnionMembers(array $members): array
+    {
+        $out = [];
+        $sawTraversable = false;
+        $sawArray = false;
+        foreach ($members as $member) {
+            if ($member instanceof CfgType\Literal && 'iterable' === strtolower($member->name)) {
+                if (!$sawTraversable) {
+                    $out[] = new CfgType\Literal('Traversable');
+                    $sawTraversable = true;
+                }
+                if (!$sawArray) {
+                    $out[] = new CfgType\Literal('array');
+                    $sawArray = true;
+                }
+                continue;
+            }
+            if (self::isTraversableNamedMember($member)) {
+                if ($sawTraversable) {
+                    continue;
+                }
+                $sawTraversable = true;
+            } elseif ($member instanceof CfgType\Literal && 'array' === strtolower($member->name)) {
+                if ($sawArray) {
+                    continue;
+                }
+                $sawArray = true;
+            }
+            $out[] = $member;
+        }
+
+        return $out;
+    }
+
+    private static function isTraversableNamedMember(CfgType $member): bool
+    {
+        if ($member instanceof CfgType\Literal) {
+            return 'traversable' === strtolower($member->name);
+        }
+        if ($member instanceof CfgType\Reference) {
+            return 'traversable' === strtolower(self::referenceTypeName($member));
+        }
+
+        return false;
     }
 
     /** Union-member pretty-print: wrap intersections for DNF (php-src zend_type_to_string). */
