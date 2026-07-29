@@ -1,15 +1,23 @@
 --TEST--
-stdlib gethostbynamel(null) — TypeError on 8.4 forward profile (#20555, re-#19098, ext/standard/dns.c)
+stdlib gethostbynamel(null) — soft-null DEP+false on 8.4 forward profile (#24966, ext/standard/dns.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+set_error_handler(static function (int $no, string $msg): bool {
+    if (E_DEPRECATED === $no) {
+        echo "DEP\n";
+        return true;
+    }
+    return false;
+});
 try {
-    gethostbynamel(null);
-    echo "uncaught\n";
+    var_export(gethostbynamel(null));
+    echo "\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
 ?>
 --EXPECT--
-gethostbynamel(): Argument #1 ($hostname) must be of type string, null given
+DEP
+false
