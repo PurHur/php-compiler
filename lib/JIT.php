@@ -12648,6 +12648,25 @@ class JIT {
                             $this->context->scope->toCall,
                             $this->context->scope->args
                         );
+                        if ($this->context->scope->toCall instanceof JIT\Call\BcMathNumberConstruct) {
+                            $thisArg = $this->context->scope->args[0] ?? null;
+                            $ct = ($thisArg instanceof Variable)
+                                ? $thisArg->compileTimeBcmathNumber
+                                : null;
+                            if (null !== $ct) {
+                                $prior->compileTimeBcmathNumber = $ct;
+                                $name = JIT\OperandName::resolve($result);
+                                if (null !== $name && '' !== $name) {
+                                    $resolved = $this->context->resolveRefAliasName($name);
+                                    if (isset($this->context->namedVariableBindings[$resolved])) {
+                                        $this->context->namedVariableBindings[$resolved]
+                                            ->compileTimeBcmathNumber = $ct;
+                                    }
+                                    $this->context->bindVariableByName($resolved, $prior);
+                                    $prior->compileTimeBcmathNumber = $ct;
+                                }
+                            }
+                        }
 
                         return;
                     }
@@ -13761,6 +13780,7 @@ class JIT {
         );
         JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
         $this->invalidateScriptGlobalCompileTimeMetadata($globalVar);
+        $this->syncCompileTimeBcmathNumber($globalVar, $value, false);
         $this->context->bindVariableByName($this->context->resolveRefAliasName($name), $globalVar);
 
         return true;
@@ -13778,6 +13798,7 @@ class JIT {
         $global->compileTimeLong = null;
         $global->compileTimeFloat = null;
         $global->compileTimeString = null;
+        $global->compileTimeBcmathNumber = null;
         $global->isNullConstant = false;
         $global->compileTimeConstantName = null;
         $global->compileTimeEnumCase = null;
@@ -14325,6 +14346,7 @@ class JIT {
             JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
             $this->preserveClosureInvokeMetadata($resultOp, $globalTarget, $value);
             $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
+            $this->syncCompileTimeBcmathNumber($globalTarget, $value, false);
             $this->context->setVariableOp($resultOp, $globalTarget);
             $globalName = JIT\OperandName::resolve($resultOp);
             if (null !== $globalName && '' !== $globalName) {
@@ -14554,6 +14576,7 @@ class JIT {
                 $value
             );
             $this->invalidateScriptGlobalCompileTimeMetadata($result);
+            $this->syncCompileTimeBcmathNumber($result, $value, false);
             $resolved = JIT\OperandName::resolve($resultOp);
             if (null !== $resolved && '' !== $resolved) {
                 $this->context->bindVariableByName(
@@ -14678,6 +14701,7 @@ class JIT {
                 JIT\JitValueBox::publishAfterWrite($this->context, $globalPtr);
                 $this->preserveClosureInvokeMetadata($resultOp, $globalTarget, $value);
                 $this->invalidateScriptGlobalCompileTimeMetadata($globalTarget);
+                $this->syncCompileTimeBcmathNumber($globalTarget, $value, false);
                 $this->context->setVariableOp($resultOp, $globalTarget);
                 $globalName = JIT\OperandName::resolve($resultOp);
                 if (null !== $globalName && '' !== $globalName) {
@@ -14814,6 +14838,7 @@ class JIT {
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
                     $this->syncCompileTimeString($result, $value, $force);
                     $this->syncCompileTimeFloat($result, $value, $force);
+                    $this->syncCompileTimeBcmathNumber($result, $value, $force);
 
                     return;
                 }
@@ -14832,6 +14857,7 @@ class JIT {
             $result->compileTimeEnumCase = $value->compileTimeEnumCase;
             $this->syncCompileTimeString($result, $value, $force);
             $this->syncCompileTimeFloat($result, $value, $force);
+            $this->syncCompileTimeBcmathNumber($result, $value, $force);
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
             if ($value->isJitGenerator) {
                 $resolved = JIT\OperandName::resolve($resultOp);
@@ -14919,6 +14945,7 @@ class JIT {
                     
                 );
                     $this->syncCompileTimeFloat($result, $value, $force);
+                    $this->syncCompileTimeBcmathNumber($result, $value, $force);
     
                     return;
                 case Variable::TYPE_NATIVE_BOOL:
@@ -15007,6 +15034,7 @@ class JIT {
                     $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
                     $result->compileTimeConstantName = $value->compileTimeConstantName;
                     $result->compileTimeEnumCase = $value->compileTimeEnumCase;
+                    $this->syncCompileTimeBcmathNumber($result, $value, $force);
 
                     return;
                 case Variable::TYPE_VALUE:
@@ -15372,6 +15400,7 @@ class JIT {
                 $value
             );
             $this->preserveClosureInvokeMetadata($resultOp, $result, $value);
+            $this->syncCompileTimeBcmathNumber($result, $value, $force);
             $this->recordListUnpackAssignSlot($resultOp, $result);
             $result->addref();
 
@@ -15719,6 +15748,17 @@ class JIT {
         }
     }
 
+    private function syncCompileTimeBcmathNumber(Variable $dest, Variable $src, bool $force): void
+    {
+        // Only propagate present metadata. Force-merge must not wipe construct-time
+        // Number value/scale used for AOT fold (#24683); script-global invalidate
+        // clears then re-syncs from the assign source.
+        if (null !== $src->compileTimeBcmathNumber) {
+            $dest->compileTimeBcmathNumber = $src->compileTimeBcmathNumber;
+        }
+    }
+
+
     private function copyValueBoxJitFlags(Variable $dest, Variable $src, bool $force = false): void
     {
         if (Variable::TYPE_VALUE !== $dest->type || Variable::TYPE_VALUE !== $src->type) {
@@ -15731,6 +15771,7 @@ class JIT {
         $dest->compileTimeLong = $src->compileTimeLong;
         $this->syncCompileTimeString($dest, $src, $force);
         $this->syncCompileTimeFloat($dest, $src, $force);
+        $this->syncCompileTimeBcmathNumber($dest, $src, $force);
     }
 
     /** Keep borrowed object-property hashtable metadata on locals ($cfg = $this->config, #848). */

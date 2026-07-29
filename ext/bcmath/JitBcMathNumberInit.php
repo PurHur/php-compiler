@@ -47,6 +47,10 @@ final class JitBcMathNumberInit
         $scaleLong = $context->getTypeFromString('int64')->constInt($scale, true);
         self::storeValueAndScale($context, $obj, $valueStr, $scaleLong);
         $context->type->object->markObjectConstructed($obj);
+        $receiver->compileTimeBcmathNumber = [
+            'value' => $canonical,
+            'scale' => $scale,
+        ];
     }
 
     public static function storeValueAndScale(
@@ -88,8 +92,12 @@ final class JitBcMathNumberInit
     }
 
     /** Allocate a constructed Number and write it into a fresh value box. */
-    public static function boxNewNumber(Context $context, Value $valueStr, Value $scaleLong): Variable
-    {
+    public static function boxNewNumber(
+        Context $context,
+        Value $valueStr,
+        Value $scaleLong,
+        ?array $compileTime = null
+    ): Variable {
         $classId = $context->type->object->lookup(self::classDisplayName());
         $obj = $context->type->object->allocate($classId);
         self::storeValueAndScale($context, $obj, $valueStr, $scaleLong);
@@ -101,6 +109,11 @@ final class JitBcMathNumberInit
             $obj
         );
 
-        return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        $var = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $slot);
+        if (null !== $compileTime) {
+            $var->compileTimeBcmathNumber = $compileTime;
+        }
+
+        return $var;
     }
 }

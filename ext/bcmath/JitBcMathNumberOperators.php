@@ -19,6 +19,9 @@ use PHPLLVM\Value;
  *
  * php-src: ext/bcmath/bcmath.c — bcmath_number_do_operation
  * VM SSOT: {@see VmBcMathNumber::tryDoOperation}
+ *
+ * Compile-time Number operands fold via {@see VmBcMathNumber::computeBinary} so AOT
+ * does not store NestedJIT __string__* results into Number::$value (#24137).
  */
 final class JitBcMathNumberOperators
 {
@@ -30,6 +33,11 @@ final class JitBcMathNumberOperators
     ): Variable {
         if (!\PHPCompiler\CompilerVersion::supportsBcmath()) {
             return JitValueNumeric::emitBoxedNumericResultPublic($context, $opType, $left, $right);
+        }
+
+        $folded = self::tryFoldCompileTime($context, $opType, $left, $right);
+        if (null !== $folded) {
+            return $folded;
         }
 
         self::ensureLinked($context);
@@ -111,6 +119,11 @@ final class JitBcMathNumberOperators
         Variable $left,
         Variable $right
     ): Variable {
+        $folded = self::tryFoldCompileTime($context, $opType, $left, $right);
+        if (null !== $folded) {
+            return $folded;
+        }
+
         self::ensureLinked($context);
 
         $numberId = $context->type->object->lookup(JitBcMathNumberInit::classDisplayName());
@@ -162,6 +175,52 @@ final class JitBcMathNumberOperators
         if (null !== $resume) {
             BasicBlockHelper::restoreInsertBlock($context, $resume);
         }
+    }
+
+
+    /**
+     * Fold Number⊙Number when both sides carry construct/fold metadata (#24683).
+     *
+     * Avoids NestedJIT __compiler_bc* string results, which cannot be stored into
+     * Number::$value and echoed under AOT (length-ok / content UAF, #24137).
+     */
+    private static function tryFoldCompileTime(
+        Context $context,
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): ?Variable {
+        $leftCt = $left->compileTimeBcmathNumber ?? null;
+        $rightCt = $right->compileTimeBcmathNumber ?? null;
+        if (null === $leftCt || null === $rightCt) {
+            return null;
+        }
+        if (
+            OpCode::TYPE_PLUS !== $opType
+            && OpCode::TYPE_MINUS !== $opType
+            && OpCode::TYPE_MUL !== $opType
+            && OpCode::TYPE_DIV !== $opType
+        ) {
+            return null;
+        }
+
+        [$outValue, $outScale] = VmBcMathNumber::computeBinary(
+            $opType,
+            $leftCt['value'],
+            $leftCt['scale'],
+            $rightCt['value'],
+            $rightCt['scale'],
+            true
+        );
+        $valueStr = $context->builder->load($context->constantStringFromString($outValue));
+        $scaleLong = $context->getTypeFromString('int64')->constInt($outScale, true);
+
+        return JitBcMathNumberInit::boxNewNumber(
+            $context,
+            $valueStr,
+            $scaleLong,
+            ['value' => $outValue, 'scale' => $outScale]
+        );
     }
 
     private static function emitNumberBinaryIntoSlot(
