@@ -679,6 +679,18 @@ final class BuiltinParamNames
                 return \PHPCompiler\CompilerVersion::supportsHex2binStrict()
                     ? ['string', 'strict']
                     : ['string'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says
+            // binary_number/hexadecimal_number/octal_number/decimal_number (#24788)
+            case 'bindec':
+                return ['binary_string'];
+            case 'hexdec':
+                return ['hex_string'];
+            case 'octdec':
+                return ['octal_string'];
+            case 'decbin':
+            case 'dechex':
+            case 'decoct':
+                return ['num'];
             case 'unpack':
                 return ['format', 'string', 'offset'];
             case 'openssl_cipher_iv_length':

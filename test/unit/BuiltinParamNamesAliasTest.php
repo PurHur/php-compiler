@@ -1423,6 +1423,40 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'hostname', 'gethostbyname'));
     }
 
+    /** @covers issue #24788 */
+    public function testRadixConvertZendStubNamedParams(): void
+    {
+        self::assertSame(['binary_string'], BuiltinParamNames::forFunction('bindec'));
+        self::assertSame(['hex_string'], BuiltinParamNames::forFunction('hexdec'));
+        self::assertSame(['octal_string'], BuiltinParamNames::forFunction('octdec'));
+        foreach (['decbin', 'dechex', 'decoct'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['num'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', $fn));
+            self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'decimal_number', $fn));
+        }
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('bindec'),
+            'binary_string',
+            'bindec'
+        ));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('bindec'),
+            'binary_number',
+            'bindec'
+        ));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('hexdec'),
+            'hexadecimal_number',
+            'hexdec'
+        ));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex(
+            BuiltinParamNames::forFunction('octdec'),
+            'octal_number',
+            'octdec'
+        ));
+    }
+
     /** @covers issue #23491 */
     public function testCrc32ZendStubNamedParams(): void
     {
