@@ -1060,9 +1060,24 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsReflectionPropertyHookProbesFalseOnReferenceProfile(): void
+    public function testSupportsReflectionPropertyHookProbesTrueOn84DevForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsReflectionPropertyHookProbes());
+        $this->assertTrue(CompilerVersion::supportsReflectionPropertyHookProbes());
+    }
+
+    public function testSupportsReflectionPropertyHookProbesFalseWhenProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyHookProbes());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsReflectionPropertyHookProbesTrueWhenProfile84(): void
@@ -2510,6 +2525,35 @@ final class CompilerVersionGateTest extends TestCase
             $this->assertNotNull($rp);
             $this->assertTrue(isset($rp->methods['isreadable']));
             $this->assertTrue(isset($rp->methods['iswritable']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersReflectionPropertyHookProbesOnForwardProfile(): void
+    {
+        $runtime = new Runtime();
+        $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+        $this->assertNotNull($rp);
+        $this->assertTrue(isset($rp->methods['isabstract']));
+        $this->assertTrue(isset($rp->methods['isvirtual']));
+        $this->assertTrue(isset($rp->methods['gethooks']));
+    }
+
+    public function testVmDoesNotRegisterReflectionPropertyHookProbesWhenProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $runtime = new Runtime();
+            $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+            $this->assertNotNull($rp);
+            $this->assertFalse(isset($rp->methods['isabstract']));
+            $this->assertFalse(isset($rp->methods['isvirtual']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

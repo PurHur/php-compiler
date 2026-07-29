@@ -1406,14 +1406,13 @@ final class CompilerVersion
      * ({hasHook,hasHooks,getHook,getHooks,isLazy,skipLazyInitialization,isFinal,isAbstract,isVirtual},
      * ext/reflection/php_reflection.c, #17493, #20511, #22309).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
-     * (methods absent). Same gate as {@see supportsPropertyHooks()} (#22371); kept separate so Reflection
-     * probes can diverge if php-src ever ships methods without hook syntax.
-     * Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     * Forward profile on 8.4.0-dev builds and stable 8.4.0+ (#24672, #6983, re-#22309).
+     * Explicit `PHP_COMPILER_PROFILE=8.2` / `8.3` keeps methods absent like Zend ≤8.3.
+     * Aligns with {@see supportsPropertyHooks()} — hook syntax is already enabled on default 8.4.0-dev.
      */
     public static function supportsReflectionPropertyHookProbes(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::isForwardProfileAtLeast('8.4.0');
     }
 
     /**
