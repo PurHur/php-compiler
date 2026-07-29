@@ -1012,9 +1012,14 @@ final class BuiltinParamNames
             case 'gzread':
                 return ['stream', 'length'];
             case 'gzwrite':
+            case 'gzputs': // alias; Reflection was empty (#24392)
                 return ['stream', 'data', 'length='];
             case 'gzclose':
+            case 'gzgetc':
+            case 'gzeof':
                 return ['stream'];
+            case 'gzgets': // InternalArgInfo length required; Zend stub length optional (#24392)
+                return ['stream', 'length='];
             case 'gzuncompress':
                 return ['data', 'max_length='];
             // php-src ext/zlib/zlib.stub.php — InternalArgInfo omits options on inflate_init (#23642)
