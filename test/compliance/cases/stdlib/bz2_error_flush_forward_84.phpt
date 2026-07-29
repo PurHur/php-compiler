@@ -1,11 +1,12 @@
 --TEST--
 stdlib bzerrno/bzerror/bzerrstr/bzflush forward 8.4 after bzopen (#22344, ext/bz2/bz2.c)
 --ENV--
+PHP_COMPILER_ENABLE_BZ2=1
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
-if (!\PHPCompiler\CompilerVersion::supportsBz2()) {
-    die('skip bz2 withheld on reference profile (#11992)');
+if (!\PHPCompiler\ext\bz2\Bz2ExtensionPolicy::advertisesExtension()) {
+    die('skip bz2 withheld (#11992/#25011)');
 }
 --FILE--
 <?php

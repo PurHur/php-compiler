@@ -711,14 +711,9 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\pgsql\PgsqlExtensionPolicy::isPgsqlComplianceCase($name)) {
                 continue;
             }
-            if (!CompilerVersion::supportsBz2()
-                && (str_contains($name, 'bz2') || str_contains($name, 'bzcompress'))
-                && !str_contains($name, 'bz2_phantom')
-                && !str_contains($name, 'bz2_error_flush_forward_84')) {
-                continue;
-            }
-            if (CompilerVersion::supportsBz2()
-                && str_contains($name, 'bz2_phantom')) {
+            // Functional bz2 cases set PHP_COMPILER_ENABLE_BZ2 via --ENV--; phantoms when withheld (#25011).
+            if (!\PHPCompiler\ext\bz2\Bz2ExtensionPolicy::runsBz2Compliance($name)
+                && \PHPCompiler\ext\bz2\Bz2ExtensionPolicy::isBz2ComplianceCase($name)) {
                 continue;
             }
             if (!CompilerVersion::supportsBrotli()
