@@ -1703,7 +1703,9 @@ final class HashTable {
             $newValues[] = $copy;
         }
 
-        $this->assignPackedList($newValues);
+        // Use assignPackedListFresh to avoid overwriting existing bucket Variables in-place,
+        // which would corrupt external by-ref aliases (php-src zval separation; #23966).
+        $this->assignPackedListFresh($newValues);
 
         return $removed;
     }
@@ -1858,6 +1860,40 @@ final class HashTable {
             $bucket->value->copyFrom($values[$i]);
             $bucket->hash = $i;
             $bucket->key = null;
+        }
+        $this->numUsed = $n;
+        $this->numElements = $n;
+        $this->nextFreeElement = $n;
+        $this->rehash();
+    }
+
+    /**
+     * Replace packed list contents with fresh bucket Variables, leaving old bucket
+     * Variable objects intact so external by-ref aliases are not corrupted (#23966).
+     *
+     * @param list<Variable> $values
+     */
+    public function assignPackedListFresh(array $values): void
+    {
+        $this->assertConsistent();
+        if ($this->numElements > 0 && !$this->isWithoutHoles()) {
+            throw new \LogicException('assignPackedListFresh() only supports packed list arrays without holes');
+        }
+        $this->assertSeparatedForWrite();
+        if ($this->flags & self::FLAG_UNINITIALIZED) {
+            $this->initMixed();
+        }
+
+        $n = \count($values);
+        while ($n > $this->indexes->size()) {
+            $this->resize();
+        }
+        while ($this->numUsed < $n) {
+            $this->resizeIfFull();
+            ++$this->numUsed;
+        }
+        for ($i = 0; $i < $n; ++$i) {
+            $this->buckets->write($i, new HashTableBucket($values[$i], $i, null));
         }
         $this->numUsed = $n;
         $this->numElements = $n;
