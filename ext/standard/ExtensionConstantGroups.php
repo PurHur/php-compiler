@@ -90,7 +90,10 @@ final class ExtensionConstantGroups
             $groups['inotify'] = InotifyConstants::registeredConstants();
         }
         $groups['curl'] = CurlConstants::registeredConstants();
-        $groups['intl'] = IntlConstants::registeredConstants();
+        // intl bucket only when host php-intl advertises — no empty/phantom GRAPHEME_EXTR_* (#24128).
+        if (\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesExtension()) {
+            $groups['intl'] = IntlConstants::registeredConstants();
+        }
         if (LdapExtensionPolicy::advertisesExtension()) {
             $groups['ldap'] = LdapConstants::registeredConstants();
         }
