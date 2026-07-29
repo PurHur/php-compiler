@@ -2680,13 +2680,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ array_replace_key() (ext/standard/array.c, issue #5650, #12826).
+     * array_replace_key() — phantom; php-src has no such function (#24003).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Always false on php-src-strict. Callers should use array_replace().
      */
     public static function supportsArrayReplaceKey(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
