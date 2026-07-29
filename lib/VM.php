@@ -15502,7 +15502,7 @@ restart:
             $name = $call->getName();
 
             return [
-                BuiltinParamNames::forFunction($name) ?? [],
+                BuiltinParamNames::paramNamesForInternalFunction($name) ?? [],
                 BuiltinParamNames::variadicParamIndexForFunction($name),
             ];
         }

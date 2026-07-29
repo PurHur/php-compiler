@@ -18552,7 +18552,7 @@ class JIT {
             if ([] !== $toCall->paramNames) {
                 return [$toCall->paramNames, $toCall->namedArgsVariadicIndex];
             }
-            $names = BuiltinParamNames::forFunction($toCall->name)
+            $names = BuiltinParamNames::paramNamesForInternalFunction($toCall->name)
                 ?? BuiltinParamNames::forClassMethod($toCall->name);
 
             return [$names ?? [], BuiltinParamNames::variadicParamIndexForFunction($toCall->name)];
@@ -18571,7 +18571,7 @@ class JIT {
                     ];
                 }
             }
-            $names = BuiltinParamNames::forFunction($name)
+            $names = BuiltinParamNames::paramNamesForInternalFunction($name)
                 ?? BuiltinParamNames::forClassMethod($name);
 
             return [
@@ -18609,7 +18609,7 @@ class JIT {
         }
         if (isset($toCall->name) && \is_string($toCall->name) && '' !== $toCall->name) {
             $names = BuiltinParamNames::forClassMethod($toCall->name)
-                ?? BuiltinParamNames::forFunction($toCall->name);
+                ?? BuiltinParamNames::paramNamesForInternalFunction($toCall->name);
 
             return [$names ?? [], BuiltinParamNames::variadicParamIndexForFunction($toCall->name)];
         }

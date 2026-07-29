@@ -586,6 +586,9 @@ final class BuiltinParamNames
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says res (#23342)
             case 'get_resource_type':
                 return ['resource'];
+            // php-src ext/standard/basic_functions.stub.php — PHP builtin; no InternalArgInfo (#24609)
+            case 'stream_isatty':
+                return ['stream'];
             case 'get_browser':
                 return ['browser_name', 'return_array'];
             case 'get_defined_constants':
