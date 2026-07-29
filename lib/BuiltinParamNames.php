@@ -268,6 +268,9 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says what/country (#23446)
             case 'timezone_identifiers_list':
                 return ['timezoneGroup', 'countryCode'];
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still gmtoffset/isdst (#24359)
+            case 'timezone_name_from_abbr':
+                return ['abbr', 'utcOffset=', 'isDST='];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says min/sec/mon (#23275)
             case 'mktime':
             case 'gmmktime':
