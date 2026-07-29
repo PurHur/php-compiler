@@ -1,5 +1,10 @@
 FROM ubuntu:22.04
 
+# The host PHP the compiler runs ON, and the interpreter every compliance case is differentially
+# compared against. Overridable so an upgrade can be built and measured before it is adopted:
+#   docker build --build-arg PHP_VERSION=8.4 -f Docker/dev/ubuntu-22.04/Dockerfile -t php-compiler:8.4-dev .
+ARG PHP_VERSION=8.2
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PHP_COMPILER_PHP=php
 ENV COMPOSER_ALLOW_SUPERUSER=1
@@ -10,8 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && add-apt-repository -y ppa:ondrej/php \
     && apt-get update && apt-get install -y --no-install-recommends \
     git curl unzip ca-certificates dpkg \
-    php8.2-cli php8.2-mbstring php8.2-xml php8.2-ffi php8.2-posix php8.2-phar \
-    php8.2-tokenizer php8.2-dom php8.2-xmlwriter \
+    php${PHP_VERSION}-cli php${PHP_VERSION}-mbstring php${PHP_VERSION}-xml \
+    php${PHP_VERSION}-ffi php${PHP_VERSION}-posix php${PHP_VERSION}-phar \
+    php${PHP_VERSION}-tokenizer php${PHP_VERSION}-dom php${PHP_VERSION}-xmlwriter \
     build-essential clang llvm-14-dev libjansson4 libpcre2-dev zlib1g-dev \
     libfreetype6 fonts-dejavu-core \
     libpq5 \
