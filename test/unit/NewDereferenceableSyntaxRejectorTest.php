@@ -111,14 +111,19 @@ PHP
         self::assertSame($src, NewDereferenceableDesugar::desugar($src));
     }
 
-    public function testAllowsCtorParensObjectDerefOnDefault84DevProfile(): void
+    public function testRejectsCtorParensObjectDerefOnDefault84DevReferenceProfile(): void
     {
         putenv('PHP_COMPILER_PROFILE');
-        if (!CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
-            self::markTestSkipped('dereferencable new forward profile unavailable');
+        if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+            self::markTestSkipped('dereferencable new unexpectedly enabled on default reference profile');
         }
 
-        $code = '<?php echo new Greeter()->hello();';
-        self::assertSame($code, NewDereferenceableSyntaxRejector::reject($code, 'ok_new.php'));
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(NewDereferenceableDesugar::REFERENCE_PROFILE_UNEXPECTED_OBJECT_OPERATOR);
+
+        NewDereferenceableSyntaxRejector::reject(
+            '<?php echo new Greeter()->hello();',
+            'default_new.php'
+        );
     }
 }
