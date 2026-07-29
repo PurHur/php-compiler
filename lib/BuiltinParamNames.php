@@ -33,6 +33,8 @@ final class BuiltinParamNames
             'reflectionmethod::getclosure' => ['object='],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says spec (#23707)
             'dateinterval::__construct' => ['duration'],
+            // php-src ext/date/php_date.stub.php — InternalArgInfo still says time (#24589)
+            'dateinterval::createfromdatestring' => ['datetime'],
             'errorexception::__construct' => ['message=', 'code=', 'severity=', 'filename=', 'line=', 'previous='],
             'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
             // php-src ext/spl/spl_array.stub.php — InternalArgInfo still says ar (#24493)

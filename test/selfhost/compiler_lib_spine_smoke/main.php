@@ -5230,6 +5230,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/ClosureBindTo.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureWithBinding.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureWithCaptures.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ContextRunStackFramesNested.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DateIntervalCreateFromDateString.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodCreateFromISO8601String.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeFormat.php';
