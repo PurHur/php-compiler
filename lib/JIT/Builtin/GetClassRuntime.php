@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_class_name_from_id via GetClassJitHelper PHP (#10222).
+ * JIT/AOT link for __phpc_class_name_from_id via GetClassJitHelper PHP (#10222, #24976).
  *
+ * Helper compile: {@see JitVmHelperLink::ensureCompiledFromSource} (per-TU class-id map;
+ * peer DefaultTimezone #24962 / HttpBuildQuery #24887 — on-disk helpers use ensureCompiled).
  * Replaces LLVM select-walk in {@see \PHPCompiler\JIT\ReflectionBuiltinHelper::classNameFromId}.
  * php-src: ext/standard/basic_functions.c — get_class / zend_get_object_classname
  */
@@ -22,6 +22,12 @@ final class GetClassRuntime
     private const CLASS_NAME_HELPER = 'PHPCompiler\\ext\\standard\\GetClassJitHelper::classNameFromClassId';
 
     private const DEBUG_TYPE_CLASS_NAME_HELPER = 'PHPCompiler\\ext\\standard\\GetClassJitHelper::debugTypeClassNameFromClassId';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::CLASS_NAME_HELPER,
+        self::DEBUG_TYPE_CLASS_NAME_HELPER,
+    ];
 
     private const ABI_NAME = '__phpc_class_name_from_id';
 
@@ -128,25 +134,15 @@ PHP;
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = strtolower(self::CLASS_NAME_HELPER);
-        if (isset($context->functions[$lc])) {
-            return;
-        }
-
         $map = $context->type->object->allClassNamesById();
         $source = self::helperSourceForMap($map);
-        $runtime = $context->runtime;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $source): void {
-            $block = $runtime->parseAndCompile($source, 'GetClassJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('GetClassJitHelper.php parseAndCompile failed (#10222)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException(self::CLASS_NAME_HELPER.' was not compiled for JIT (#10222)');
-        }
+        JitVmHelperLink::ensureCompiledFromSource(
+            $context,
+            $source,
+            'GetClassJitHelper.php',
+            self::COMPILED_HELPERS,
+            '#24976'
+        );
     }
 
     private static function probeLinked(Context $context, string $abiName): ?LlvmFunction
