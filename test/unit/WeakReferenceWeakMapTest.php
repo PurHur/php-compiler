@@ -25,6 +25,37 @@ PHP;
         $this->assertSame('1', ob_get_clean());
     }
 
+    /** @covers issue #24592 */
+    public function testFiberWeakReferenceReflectionAndNamedArgs(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+foreach ([[Fiber::class, '__construct'], [WeakReference::class, 'create']] as [$c, $m]) {
+    $r = new ReflectionMethod($c, $m);
+    $ns = [];
+    foreach ($r->getParameters() as $p) {
+        $ns[] = $p->getName();
+    }
+    echo "$c::$m arity=", $r->getNumberOfParameters(), ' [', implode(',', $ns), "]\n";
+}
+$f = new Fiber(callback: function () {});
+echo 'fiber_named=', $f->isStarted() ? 'started' : 'ok', "\n";
+$obj = new stdClass();
+$wr = WeakReference::create(object: $obj);
+echo 'wr_named=', null === $wr->get() ? 'null' : 'ok', "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'fiber_wr_named_24592.php'));
+        $this->assertSame(
+            "Fiber::__construct arity=1 [callback]\n"
+            . "WeakReference::create arity=1 [object]\n"
+            . "fiber_named=ok\n"
+            . "wr_named=ok\n",
+            ob_get_clean()
+        );
+    }
+
     public function testWeakReferenceGetNullAfterUnset(): void
     {
         $runtime = new Runtime();

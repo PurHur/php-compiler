@@ -148,6 +148,10 @@ final class BuiltinParamNames
             'finfo::buffer' => ['string', 'flags=', 'context='],
             'finfo::file' => ['filename', 'flags=', 'context='],
             'finfo::set_flags' => ['flags'],
+            // php-src Zend/zend_fibers.stub.php — InternalArgInfo empty (#24592)
+            'fiber::__construct' => ['callback'],
+            // php-src Zend/zend_weakrefs.stub.php — InternalArgInfo empty (#24592)
+            'weakreference::create' => ['object'],
             default => null,
         };
     }
