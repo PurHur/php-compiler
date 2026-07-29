@@ -38,7 +38,21 @@ final class preg_replace_callback extends Internal
             return;
         }
 
-        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
+        // Z_PARAM_STR_OR_ARR soft-null: E_DEPRECATED array|string (php_pcre.stub.php; #23587).
+        $patternRaw = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $patternRaw->type) {
+            if (\PHPCompiler\VM\InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    'preg_replace_callback(): Argument #1 ($pattern) must be of type array|string, null given'
+                );
+            }
+            VmNullStringParamDeprecation::emit($frame, 'preg_replace_callback', 0, 'pattern', 'array|string');
+            VmPregFailure::warnEmptyRegularExpression($frame, 'preg_replace_callback');
+            $frame->returnVar->null();
+
+            return;
+        }
+        // Non-null still string-coerced here (array patterns remain a follow-up).
         $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_replace_callback', 0, 'pattern');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_replace_callback', $pattern);
         $callbackVar = $frame->calledArgs[1]->resolveIndirect();
