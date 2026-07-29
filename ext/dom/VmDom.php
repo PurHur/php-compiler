@@ -2209,6 +2209,32 @@ final class VmDom
             .\chr(0x80 | ($codepoint & 0x3F));
     }
 
+    /**
+     * DOMElement::setAttribute() — php-src element.c returns the Attr via DOM_RET_OBJ;
+     * literal xmlns installs a nsDef and returns true (#24538).
+     */
+    public static function setAttribute(
+        Context $ctx,
+        ObjectEntry $element,
+        string $name,
+        string $value
+    ): Variable {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        // php-src: xmlNewNs for name=="xmlns" → RETURN_TRUE (not Attr).
+        if ('xmlns' === $name) {
+            self::setAttributeNS($ctx, $element, null, $name, $value);
+            $var = new Variable();
+            $var->bool(true);
+
+            return $var;
+        }
+        self::setAttributeNS($ctx, $element, null, $name, $value);
+
+        return self::getAttributeNode($ctx, $element, $name);
+    }
+
     public static function setAttributeNS(
         Context $ctx,
         ObjectEntry $element,
