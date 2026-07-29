@@ -1,18 +1,9 @@
 --TEST--
-stdlib get_declared_variables() returns caller local names (#4780)
+stdlib get_declared_variables() — not in php-src (#24223, re-#4780, ext/standard/basic_functions.stub.php)
 --FILE--
 <?php
-$a = 1;
-$b = 2;
-$vars = get_declared_variables();
-sort($vars);
-var_export($vars);
-echo "\n";
-var_export(in_array('a', $vars, true) && in_array('b', $vars, true));
-echo "\n";
+echo function_exists('get_declared_variables') ? "fail\n" : "ok\n";
+echo function_exists('get_defined_vars') ? "ok\n" : "fail\n";
 --EXPECT--
-array (
-  0 => 'a',
-  1 => 'b',
-)
-true
+ok
+ok

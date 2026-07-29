@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6631 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21358 |
+| Source constructs flagged (warnings) | 21356 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2910,7 +2910,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/MkdirJitHelper.php` | 0 | 1 |
 | `ext/standard/MktimeJitHelper.php` | 0 | 1 |
 | `ext/standard/ModfJitHelper.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 846 |
+| `ext/standard/Module.php` | 0 | 844 |
 | `ext/standard/ModuleRegistry.php` | 0 | 2 |
 | `ext/standard/MultisortJitHelper.php` | 0 | 2 |
 | `ext/standard/NCompareJitHelper.php` | 0 | 1 |
@@ -29252,12 +29252,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new class_constants_ (line 725)
 - new get_defined_constants_ (line 726)
 - new get_defined_vars_ (line 727)
-- new get_declared_variables_ (line 728)
 - new get_declared_interfaces_ (line 729)
 - new get_declared_classes_ (line 730)
 - new get_declared_traits_ (line 731)
 - new get_declared_attributes_ (line 733)
-- new get_declared_functions_ (line 734)
 - new get_defined_functions_ (line 735)
 - new get_included_files_ (line 736)
 - new get_included_files_ (line 737)
