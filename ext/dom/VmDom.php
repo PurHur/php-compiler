@@ -8452,6 +8452,11 @@ final class VmDom
 
             return $htmlNamedEntities ? self::escapeHtmlText($text) : self::escapeText($text);
         }
+        // libxml htmlNodeDump: CDATA → raw text (no entity escape, no <![CDATA[…]]> wrapper)
+        // — php-src ext/dom/document.c / #24580.
+        if (self::isCdataNode($entry)) {
+            return DomRegistry::state($entry)->textContent ?? '';
+        }
         if (self::isCommentNode($entry)) {
             return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }

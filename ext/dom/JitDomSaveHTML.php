@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMDocument::saveHTML() (#18268). */
+/** LLVM lowering for DOMDocument::saveHTML() (#18268, #24580). */
 final class JitDomSaveHTML
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -20,7 +20,7 @@ final class JitDomSaveHTML
         }
 
         if (JitDomSaveHTMLUserScript::shouldUse($context)) {
-            return JitDomSaveHTMLUserScript::invoke($context);
+            return JitDomSaveHTMLUserScript::invoke($context, ...$args);
         }
 
         DomSaveHTMLRuntime::ensureLinked($context);
