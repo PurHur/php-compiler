@@ -43,7 +43,6 @@ final class VmBcMathNumber
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $pub = CfgFunc::FLAG_PUBLIC;
-        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
         $entry = new ClassEntry('BcMath\\Number');
         $entry->isInternal = true;
@@ -55,9 +54,7 @@ final class VmBcMathNumber
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
 
-        $entry->methods['from'] = new NumberFrom();
-        $entry->methodVisibility['from'] = $pubStatic;
-
+        // php-src has no Number::from() — constructor is the only factory (#24613, re-#16814).
         $methods = [
             'add' => new NumberAdd(),
             'sub' => new NumberSub(),
