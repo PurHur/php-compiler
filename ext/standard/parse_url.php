@@ -32,7 +32,8 @@ final class parse_url extends Internal
         );
         $component = -1;
         if (2 === $argc) {
-            $component = VmParseUrl::resolveComponentArg($frame->calledArgs[1]);
+            // Soft-null component → DEP + 0 (PHP_URL_SCHEME); ParseUrl enum (#7260, #24942).
+            $component = VmParseUrl::resolveComponentArgForFrame($frame, 1);
         }
         if (null === $frame->returnVar) {
             return;
