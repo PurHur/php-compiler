@@ -627,6 +627,9 @@ final class BuiltinParamNames
                 return ['x', 'y'];
             case 'random_int':
                 return ['min', 'max'];
+            // php-src ext/standard/php_mt_rand.c / random.stub.php — both params optional (0 or 2 args) (#24641)
+            case 'mt_rand':
+                return ['min=', 'max='];
             case 'hex2bin':
                 return \PHPCompiler\CompilerVersion::supportsHex2binStrict()
                     ? ['string', 'strict']

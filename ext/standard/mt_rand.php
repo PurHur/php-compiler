@@ -25,9 +25,10 @@ final class mt_rand extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 0 || $argc > 2 || 1 === $argc) {
+        // Zend: 0 or 2 args; wrong arity uses "exactly 2" even though 0 is valid (php_mt_rand.c / #24641).
+        if (0 !== $argc && 2 !== $argc) {
             throw new \ArgumentCountError(
-                \sprintf('mt_rand() expects at most 2 arguments, %d given', $argc)
+                \sprintf('mt_rand() expects exactly 2 arguments, %d given', $argc)
             );
         }
         if (null === $frame->returnVar) {

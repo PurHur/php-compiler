@@ -2331,4 +2331,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('inflate_add'));
         self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('inflate_add'));
     }
+
+    /** @covers issue #24641 */
+    public function testMtRandOptionalNamedParams(): void
+    {
+        self::assertSame(['min=', 'max='], BuiltinParamNames::forFunction('mt_rand'));
+        self::assertSame(
+            ['min=', 'max='],
+            BuiltinParamNames::paramNamesForInternalFunction('mt_rand')
+        );
+        $names = BuiltinParamNames::forFunction('mt_rand');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'min', 'mt_rand'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'max', 'mt_rand'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('mt_rand'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('mt_rand'));
+    }
 }
