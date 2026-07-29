@@ -6105,7 +6105,12 @@ final class VmDom
 
     public static function appendChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): ObjectEntry
     {
+        // php-src: DocumentFragment is never a valid Attr child (even when it only holds text; #24512).
         if (self::isDocumentFragment($child)) {
+            if (self::isAttr($parent)) {
+                DomExceptionConstants::raiseHierarchyRequest();
+            }
+
             return self::appendFragmentChildren($ctx, $parent, $child);
         }
         // php-src ext/dom/node.c: Attr under Element installs via attribute map (not childNodes).
@@ -6127,6 +6132,11 @@ final class VmDom
             self::registerSubtreeElementIdsIfConnected($child);
 
             return $child;
+        }
+
+        // Legacy DOM: Attr parents accept only Text + EntityReference (#24512 / php-src node.c).
+        if (DomConstants::XML_ATTRIBUTE_NODE === $parentState->nodeType) {
+            return self::appendChildToAttribute($ctx, $parent, $child);
         }
 
         if (DomConstants::XML_ELEMENT_NODE !== $parentState->nodeType
@@ -6171,6 +6181,9 @@ final class VmDom
         }
         // php-src ext/dom/node.c dom_node_replace_child — DocumentFragment expands in place (#21976).
         if (self::isDocumentFragment($newChild)) {
+            if (self::isAttr($parent)) {
+                DomExceptionConstants::raiseHierarchyRequest();
+            }
             $parentState = DomRegistry::state($parent);
             $index = self::childIndex($parentState->childIds, $oldChild->id);
             if (null === $index) {
@@ -6206,6 +6219,7 @@ final class VmDom
                 DomExceptionConstants::HIERARCHY_REQUEST_ERR
             );
         }
+        self::assertAttrMutationChild($parent, $newChild);
         self::assertSameDocument($parent, $newChild);
         self::assertNotAncestorOfParent($parent, $newChild);
         self::unregisterSubtreeElementIdsIfConnected($oldChild);
@@ -6231,7 +6245,11 @@ final class VmDom
             self::propagateDocumentId($newChild, $parent->id);
         }
         self::syncSubtree($ctx, $parent);
-        self::registerSubtreeElementIdsIfConnected($newChild);
+        if (self::isAttr($parent)) {
+            self::refreshAttrValueFromChildren($ctx, $parent);
+        } else {
+            self::registerSubtreeElementIdsIfConnected($newChild);
+        }
 
         return $oldChild;
     }
@@ -6244,6 +6262,10 @@ final class VmDom
     ): ObjectEntry {
         self::assertMutationParent($parent);
         if (self::isDocumentFragment($newChild)) {
+            if (self::isAttr($parent)) {
+                DomExceptionConstants::raiseHierarchyRequest();
+            }
+
             return self::insertFragmentChildrenBefore($ctx, $parent, $newChild, $refChild);
         }
         // php-src: Attr + null refChild ≡ appendChild(Attr); Attr cannot be a previous sibling of a child node.
@@ -6258,6 +6280,7 @@ final class VmDom
         if (!self::isTreeMutationChild($newChild)) {
             throw new \DOMException('Hierarchy request error');
         }
+        self::assertAttrMutationChild($parent, $newChild);
         self::assertSameDocument($parent, $newChild);
         self::assertNotAncestorOfParent($parent, $newChild);
         if (null !== $refChild) {
@@ -6289,7 +6312,11 @@ final class VmDom
             self::propagateDocumentId($newChild, $parent->id);
         }
         self::syncSubtree($ctx, $parent);
-        self::registerSubtreeElementIdsIfConnected($newChild);
+        if (self::isAttr($parent)) {
+            self::refreshAttrValueFromChildren($ctx, $parent);
+        } else {
+            self::registerSubtreeElementIdsIfConnected($newChild);
+        }
 
         return $newChild;
     }
@@ -6313,6 +6340,9 @@ final class VmDom
             }
         }
         self::syncSubtree($ctx, $parent);
+        if (self::isAttr($parent)) {
+            self::refreshAttrValueFromChildren($ctx, $parent);
+        }
 
         return $child;
     }
@@ -8872,7 +8902,7 @@ final class VmDom
             $parts[] = self::escapeName($attrName).'="'.self::escapeAttr($uri).'"';
         }
         foreach ($state->attributes as $aname => $avalue) {
-            $parts[] = self::escapeName($aname).'="'.self::escapeAttr($avalue).'"';
+            $parts[] = self::escapeName($aname).'="'.self::serializeAttributeValue($state, $aname, $avalue).'"';
         }
         if ([] === $parts) {
             return '';
@@ -8881,7 +8911,7 @@ final class VmDom
         return ' '.implode(' ', $parts);
     }
 
-    /** @return non-empty-string */
+    /** @return non-empty-string|string */
     private static function serializeAttributes(DomNodeState $state): string
     {
         if ([] === $state->attributes) {
@@ -8889,10 +8919,53 @@ final class VmDom
         }
         $parts = [];
         foreach ($state->attributes as $aname => $avalue) {
-            $parts[] = self::escapeName($aname).'="'.self::escapeAttr($avalue).'"';
+            $serialized = self::serializeAttributeValue($state, $aname, $avalue);
+            $parts[] = self::escapeName($aname).'="'.$serialized.'"';
         }
 
         return ' '.implode(' ', $parts);
+    }
+
+    /**
+     * Attr dump value: when Attr has Text/EntityReference children, mirror libxml
+     * (entity refs as &name;, text escaped) — php-src saveXML; #24512.
+     */
+    private static function serializeAttributeValue(
+        DomNodeState $elementState,
+        string $aname,
+        string $avalue
+    ): string {
+        $attrId = $elementState->attributeNodeIds[$aname] ?? null;
+        if (null === $attrId) {
+            return self::escapeAttr($avalue);
+        }
+        $attr = DomRegistry::entry($attrId);
+        if (null === $attr || !self::isAttr($attr)) {
+            return self::escapeAttr($avalue);
+        }
+        $attrState = DomRegistry::state($attr);
+        if ([] === $attrState->childIds) {
+            return self::escapeAttr($avalue);
+        }
+        $parts = [];
+        $sawStructured = false;
+        foreach ($attrState->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (self::isTextNode($child)) {
+                $parts[] = self::escapeAttr(DomRegistry::state($child)->textContent ?? '');
+            } elseif (self::isEntityReference($child)) {
+                $sawStructured = true;
+                $parts[] = '&'.self::escapeName(DomRegistry::state($child)->nodeName).';';
+            }
+        }
+        if (!$sawStructured && [] === $parts) {
+            return self::escapeAttr($avalue);
+        }
+
+        return implode('', $parts);
     }
 
     /**
@@ -9815,7 +9888,20 @@ final class VmDom
             if (null !== $cachedId) {
                 $cached = DomRegistry::entry($cachedId);
                 if (null !== $cached && self::isAttr($cached)) {
-                    self::syncAttributeNodeValue($ctx, $cached, $value, true);
+                    // Value-write collapse destroys Text+EntityReference Attr children
+                    // (php-src setAttributeNode keeps them; #24512).
+                    if (self::attrHasPreservedChildStructure($cached)) {
+                        $cachedState = DomRegistry::state($cached);
+                        $cachedState->textContent = $value;
+                        if ($cached->hasProperty(self::PROP_VALUE)) {
+                            $cached->getProperty(self::PROP_VALUE)->string($value);
+                        }
+                        if ($cached->hasProperty(self::PROP_NODE_VALUE)) {
+                            $cached->getProperty(self::PROP_NODE_VALUE)->string($value);
+                        }
+                    } else {
+                        self::syncAttributeNodeValue($ctx, $cached, $value, true);
+                    }
                     $ids[] = $cachedId;
 
                     continue;
@@ -9826,6 +9912,26 @@ final class VmDom
         }
 
         return $ids;
+    }
+
+    /**
+     * Attr with EntityReference children or multiple children — must not be collapsed
+     * by syncAttributeNodeValue / ensureAttrValueTextChild (#24512).
+     */
+    private static function attrHasPreservedChildStructure(ObjectEntry $attr): bool
+    {
+        $childIds = DomRegistry::state($attr)->childIds;
+        if (\count($childIds) > 1) {
+            return true;
+        }
+        foreach ($childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && self::isEntityReference($child)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Read DOMElement::$attributes without re-entering managed-property dispatch (#17619). */
@@ -9978,6 +10084,8 @@ final class VmDom
         if (DomConstants::XML_ELEMENT_NODE !== $nodeType
             && DomConstants::XML_DOCUMENT_NODE !== $nodeType
             && DomConstants::XML_DOCUMENT_FRAG_NODE !== $nodeType
+            // Legacy DOM Attr is a valid mutation parent for Text/EntityReference (#24512).
+            && DomConstants::XML_ATTRIBUTE_NODE !== $nodeType
         ) {
             throw new \DOMException('Hierarchy request error');
         }
@@ -11224,6 +11332,83 @@ final class VmDom
         self::setAttributeNode($ctx, $parent, $attr);
 
         return $attr;
+    }
+
+    /**
+     * Attr appendChild — Text + EntityReference only (php-src ext/dom/node.c; #24512).
+     */
+    private static function appendChildToAttribute(
+        Context $ctx,
+        ObjectEntry $attr,
+        ObjectEntry $child
+    ): ObjectEntry {
+        self::assertAttrMutationChild($attr, $child);
+        self::assertSameDocument($attr, $child);
+        self::assertNotAncestorOfParent($attr, $child);
+        self::detachNodeIfAttached($ctx, $child);
+        DomRegistry::state($attr)->childIds[] = $child->id;
+        self::linkChildToParent($child, $attr);
+        self::syncSubtree($ctx, $attr);
+        self::refreshAttrValueFromChildren($ctx, $attr);
+
+        return $child;
+    }
+
+    /**
+     * Legacy DOM Attr children: XML_TEXT_NODE | XML_ENTITY_REF_NODE only (#24512).
+     */
+    private static function assertAttrMutationChild(ObjectEntry $parent, ObjectEntry $child): void
+    {
+        if (!self::isAttr($parent)) {
+            return;
+        }
+        if (!self::isTextNode($child) && !self::isEntityReference($child)) {
+            DomExceptionConstants::raiseHierarchyRequest();
+        }
+    }
+
+    /**
+     * Recompute Attr::$value from text children without collapsing the child list
+     * (unlike {@see syncAttributeNodeValue} / ensureAttrValueTextChild; #24512).
+     * EntityReference children contribute empty string to the expanded value (Zend).
+     */
+    private static function refreshAttrValueFromChildren(Context $ctx, ObjectEntry $attr): void
+    {
+        if (!self::isAttr($attr)) {
+            return;
+        }
+        $attrState = DomRegistry::state($attr);
+        $parts = [];
+        foreach ($attrState->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child || !self::isTextNode($child)) {
+                continue;
+            }
+            $parts[] = DomRegistry::state($child)->textContent ?? '';
+        }
+        $value = implode('', $parts);
+        $attrState->textContent = $value;
+        if ($attr->hasProperty(self::PROP_VALUE)) {
+            $attr->getProperty(self::PROP_VALUE)->string($value);
+        }
+        if ($attr->hasProperty(self::PROP_NODE_VALUE)) {
+            $attr->getProperty(self::PROP_NODE_VALUE)->string($value);
+        }
+        $ownerElementId = $attrState->ownerElementId;
+        if (null === $ownerElementId) {
+            return;
+        }
+        $owner = DomRegistry::entry($ownerElementId);
+        if (null === $owner || !self::isElement($owner)) {
+            return;
+        }
+        $ownerState = DomRegistry::state($owner);
+        $name = $attrState->nodeName;
+        $ownerState->attributes[$name] = $value;
+        if (CompilerVersion::supportsDomTokenList() && 'class' === $name) {
+            VmDomTokenList::invalidateForElement($owner);
+        }
+        self::syncElementAttributes($ctx, $owner);
     }
 
     private static function appendDocumentChild(Context $ctx, ObjectEntry $document, ObjectEntry $child): void
