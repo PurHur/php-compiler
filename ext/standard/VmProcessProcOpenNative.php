@@ -182,6 +182,9 @@ final class VmProcessProcOpenNative
                 'pipeHandles' => array_values($pipeHandles),
                 'childPaused' => true,
             ];
+            // Resume before return — a SIGSTOP'd fork child still holds the parent's
+            // stdout/stderr FDs; PHPUnit's harness blocks forever on EOF (#24481).
+            self::resumeChildIfPaused($ffi, self::$slots[$slot]);
 
             return [$slot, $pipeHandles];
         } catch (\Throwable) {
@@ -310,6 +313,9 @@ final class VmProcessProcOpenNative
                 'pipeHandles' => array_values($pipeHandles),
                 'childPaused' => true,
             ];
+            // Resume before return — a SIGSTOP'd fork child still holds the parent's
+            // stdout/stderr FDs; PHPUnit's harness blocks forever on EOF (#24481).
+            self::resumeChildIfPaused($ffi, self::$slots[$slot]);
 
             return [$slot, $pipeHandles];
         } catch (\Throwable) {

@@ -14,10 +14,14 @@ foreach (['shell_exec', 'system', 'passthru'] as $fn) {
 }
 
 $pipes = [];
-$result = proc_open(null, [], $pipes);
-if (!is_resource($result)) {
-    fwrite(STDERR, 'proc_open(null): expected resource, got '.var_export($result, true)."\n");
+try {
+    proc_open(null, [], $pipes);
+    fwrite(STDERR, "proc_open(null): expected TypeError\n");
     exit(1);
+} catch (TypeError $e) {
+    if (!str_contains($e->getMessage(), 'must be of type array|string, null given')) {
+        fwrite(STDERR, 'proc_open(null): unexpected message: '.$e->getMessage()."\n");
+        exit(1);
+    }
+    echo "proc_open(null): ok\n";
 }
-proc_close($result);
-echo "proc_open(null): ok\n";

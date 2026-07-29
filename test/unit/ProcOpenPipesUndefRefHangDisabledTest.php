@@ -5,35 +5,32 @@ declare(strict_types=1);
 use PHPUnit\Framework\TestCase;
 
 /**
- * Guard #24481: stdlib/proc_open_pipes_undef_ref must stay out of VMTest discovery.
+ * Guard #24481: stdlib/proc_open_pipes_undef_ref must stay discoverable and terminate.
  *
- * Sibling of exec_null_valueerror — hangs indefinitely under bin/vm.php in the
- * compliance harness (shard 3/24 timed out at 2400s during baseline discovery).
- * BaseTest/shard-compliance only pick up *.phpt — keep as *.phpt.disabled until
- * the proc_open pipes path terminates.
+ * Sibling of exec_null_valueerror — same SIGSTOP'd fork / stdout-FD hang class.
  */
 final class ProcOpenPipesUndefRefHangDisabledTest extends TestCase
 {
-    public function testHangCaseIsDisabledNotDiscovered(): void
+    public function testHangCaseIsActiveAndDiscovered(): void
     {
         $cases = dirname(__DIR__).'/compliance/cases/stdlib';
         $active = $cases.'/proc_open_pipes_undef_ref.phpt';
         $disabled = $cases.'/proc_open_pipes_undef_ref.phpt.disabled';
 
+        self::assertFileExists($active);
         self::assertFileDoesNotExist(
-            $active,
-            're-enabling as .phpt reintroduces an unbounded VMTest hang (#24481)'
+            $disabled,
+            'hang case must stay enabled as .phpt after #24481 fix'
         );
-        self::assertFileExists($disabled);
 
         $discovered = [];
         foreach (new GlobIterator($cases.'/*.phpt') as $file) {
             $discovered[] = $file->getBasename();
         }
-        self::assertNotContains(
+        self::assertContains(
             'proc_open_pipes_undef_ref.phpt',
             $discovered,
-            'GlobIterator *.phpt must not discover the disabled hang case'
+            'GlobIterator *.phpt must discover the re-enabled hang case'
         );
     }
 }

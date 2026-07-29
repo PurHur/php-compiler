@@ -1,5 +1,5 @@
 --TEST--
-DISABLED (#24481): hangs indefinitely under bin/vm.php in VMTest — do not re-enable until proc_open(null) terminates. Was: stdlib shell_exec/system/passthru/proc_open null command — ValueError/NULL not TypeError (#18676, ext/standard/exec.c, proc_open.c)
+stdlib shell_exec/system/passthru/proc_open null command — ValueError/NULL not TypeError (#18676, ext/standard/exec.c, proc_open.c)
 --FILE--
 <?php
 foreach (['shell_exec', 'system', 'passthru'] as $fn) {
