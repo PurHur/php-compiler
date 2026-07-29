@@ -1,70 +1,16 @@
-# Compliance cases that flip between runs of the SAME commit.
+# Cases that flip between runs of the SAME COMMIT on the SAME image.
 #
-# These are excluded from both sides of the baseline diff by script/compliance-baseline.sh, because
-# a flaky case in a baseline manufactures phantom regressions. That has already cost real time: an
-# e08_spread "regression" in the differential corpus turned out to be 17/30 vs 17/30 noise, and two
-# sweeps of the same master disagreed about k06/m04 (#24388).
+# Quarantined cases are excluded from both sides of the compliance diff, because a flaky case in a
+# baseline manufactures phantom regressions. Entry here is a BUG, not a resting place: every line
+# carries a measured direction and an issue.
 #
-# ENTRY HERE IS A BUG, NOT A RESTING PLACE. Every line needs a reason and an issue, and the goal is
-# to empty this file. A case that merely FAILS belongs in the baseline; only a case that both passes
-# and fails on one commit belongs here.
+# READ THIS BEFORE ADDING A LINE. The previous contents of this file were wrong. 18 entries were
+# derived from two collects taken 15 commits apart (1d57e9d37 vs d64633260), so every "flip" they
+# recorded was a CHANGE, not flakiness — and six of them were real failures made invisible (#24726).
+# A case only belongs here if two runs of ONE commit disagree about it.
 #
-# Format: <case name>    # reason (#issue)
-#
-# Nothing is listed yet on purpose. RELEASE-PLAN Phase 1.4 names hrtime_*, proc_get_status_basic,
-# interface_abstract_static_call and dnf_return_type_error as suspected flaky, but suspicion is not
-# measurement — each needs two full runs of one commit showing it on one side and not the other
-# before it is quarantined here. Adding them on reputation would hide real regressions.
+# Re-measured 2026-07-29 from two complete 24-shard CI collects at a3f32662b
+# (runs 30461221640 and 30461258793): 8,112 executed cases, and the two runs disagreed about
+# EXACTLY ONE of them. The suite is deterministic when the tree is held constant.
 
-# ---------------------------------------------------------------------------
-# Measured 2026-07-29 (#24672): two complete 24-shard VMTest runs of the SAME
-# commit, zero timeouts, differed on these 9 cases. 422 of 431 distinct failing
-# names were identical, so the suite is ~98% deterministic — these are the gap.
-#
-# Direction recorded because it decides the damage: a case in the baseline that
-# starts passing reads as a phantom FIX; one absent from it that starts failing
-# reads as a phantom REGRESSION, which is what wastes someone's afternoon.
-
-# failed in run 1, passed in run 2 (were in the baseline -> phantom fixes)
-stdlib/mt_getrandmax_jit                      # randomness (#24672)
-stdlib/stream_resolve_include_path_dot        # include-path resolution (#24672)
-stdlib/string_builtin_null_coerce_batch2      # flips in lockstep with its _jit twin (#24672)
-stdlib/string_builtin_null_coerce_batch2_jit  # flips in lockstep with the plain variant (#24672)
-
-# passed in run 1, failed in run 2 (absent from the baseline -> phantom regressions)
-language/reflection_property_is_abstract      # (#24672)
-stdlib/hrtime_nanosecond_precision            # confirms the AGENTS.md hrtime* suspicion with data (#24672)
-stdlib/mkdir                                  # filesystem state; flips with its _jit twin (#24672)
-stdlib/mkdir_jit                              # filesystem state; flips with the plain variant (#24672)
-stdlib/pcntl_setns                            # namespace availability (#24672)
-
-# ---------------------------------------------------------------------------
-# Measured 2026-07-29 (#24726): two complete mode=collect runs of the SAME commit in the CI
-# environment (GitHub runners) disagreed on 18 cases — TWICE the 9 measured on the dev box.
-# 430 of 448 distinct names were stable, so CI is ~96% deterministic vs the box's 98%.
-#
-# The runners are demonstrably noisier than a dedicated machine. Two clusters carry most of it:
-# highlight_* (7 cases, flipping in BOTH directions) and property-hook cases (6). Both smell like
-# output-formatting or timing sensitivity rather than 18 independent defects.
-
-# CI: failed in run 1, passed in run 2
-language/asymmetric_hook_write_error                          # CI-flaky (#24726)
-language/builtin_attribute_classes                            # CI-flaky (#24726)
-language/final_hooked_property                                # CI-flaky (#24726)
-stdlib/highlight_file_dir_concat                              # CI-flaky (#24726)
-stdlib/highlight_string                                       # CI-flaky (#24726)
-stdlib/highlight_string_bool_literal                          # CI-flaky (#24726)
-stdlib/highlight_string_null_profile82                        # CI-flaky (#24726)
-
-# CI: passed in run 1, failed in run 2
-language/foreach_ref_property_hook                            # CI-flaky (#24726)
-language/property_hook_assign_ref                             # CI-flaky (#24726)
-language/property_hook_foreach_ref                            # CI-flaky (#24726)
-language/property_hook_isset_empty                            # CI-flaky (#24726)
-language/property_hook_unset_throw                            # CI-flaky (#24726)
-language/property_hooks_profile_gate                          # CI-flaky (#24726)
-stdlib/array_all_internal_callback                            # CI-flaky (#24726)
-stdlib/highlight_file_br                                      # CI-flaky (#24726)
-stdlib/highlight_file_multiline_br                            # CI-flaky (#24726)
-stdlib/highlight_string_pre_wrapper                           # CI-flaky (#24726)
-stdlib/json_validate_function_exists_profile                  # CI-flaky (#24726)
+stdlib/hrtime_nanosecond_precision   # fails ~1 run in 2; nanosecond deltas under runner jitter (#24870)
