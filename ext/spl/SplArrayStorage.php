@@ -235,6 +235,22 @@ final class SplArrayStorage
     }
 
     /**
+     * php-src spl_array_get_properties_for(ZEND_PROP_PURPOSE_VAR_EXPORT) — backing storage
+     * when STD_PROP_LIST is unset (#24447); null falls through to zend_std properties.
+     */
+    public static function varExportStorageTable(ObjectEntry $object): ?HashTable
+    {
+        if (!self::hasState($object)) {
+            return null;
+        }
+        if (0 !== (self::getFlags($object) & self::FLAG_STD_PROP_LIST)) {
+            return null;
+        }
+
+        return self::getArrayCopy($object);
+    }
+
+    /**
      * php-src spl_array_object_exchange_array — replace backing array, return previous (#12964).
      *
      * Outstanding ArrayIterator / RecursiveArrayIterator instances share the live HashTable
