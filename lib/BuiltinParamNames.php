@@ -901,8 +901,9 @@ final class BuiltinParamNames
                 return ['data', 'numeric_prefix', 'arg_separator', 'encoding_type'];
             case 'json_encode':
                 return ['value', 'flags', 'depth'];
+            // php-src ext/json/json.stub.php — InternalArgInfo omits flags= (#24812)
             case 'json_decode':
-                return ['json', 'associative', 'depth', 'flags'];
+                return ['json', 'associative=', 'depth=', 'flags='];
             // php-src ext/json/json.stub.php — missing from InternalArgInfo (#23876)
             case 'json_validate':
                 return ['json', 'depth=', 'flags='];
