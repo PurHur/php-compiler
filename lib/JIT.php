@@ -12008,19 +12008,10 @@ class JIT {
         if ('__string__*' === $expected && Variable::TYPE_VALUE === $return->type) {
             return JIT\JitValueBox::readStringOrNull($this->context, $return);
         }
-        if ($return->functionStaticGlobal) {
-            $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $return);
-        } elseif (Variable::KIND_VARIABLE === $return->kind) {
-            $valuePtr = JIT\JitValueBox::pointer($this->context, $return->value);
-        } else {
-            $valuePtr = JIT\BasicBlockHelper::entryAlloca(
-                $this->context,
-                $this->context->getTypeFromString('__value__')
-            );
-            if (Variable::KIND_VALUE === $return->kind) {
-                $this->context->builder->store($retval, $valuePtr);
-            }
-        }
+        // KIND_VALUE may already hold `__value__*` (e.g. loaded `static ?\FFI $ffi`).
+        // Never `store` that pointer into an alloca `__value__` — module verify fails
+        // with "Stored value type does not match pointer operand type" (#24429 sockets).
+        $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $return);
         if ('long long' === $expected || 'int64' === $expected) {
             return $this->context->builder->call(
                 $this->context->lookupFunction('__value__readLong'),

@@ -257,7 +257,14 @@ return_string:
             || OpCode::TYPE_NOT_IDENTICAL === $opcode->type
         ) {
             $negate = OpCode::TYPE_NOT_EQUAL === $opcode->type || OpCode::TYPE_NOT_IDENTICAL === $opcode->type;
-            if (null !== $right->compileTimeString && JitValueBox::isValueOperand($left)) {
+            // Only native TYPE_STRING literals — VALUE boxes can carry compileTimeString
+            // from boxed string literals; loadValue then yields `__value__` / `__value__*`
+            // and VmStringCompare::identical structGep crashes (#24429 sockets SIGSEGV).
+            if (
+                null !== $right->compileTimeString
+                && Variable::TYPE_STRING === $right->type
+                && JitValueBox::isValueOperand($left)
+            ) {
                 $result = JitStringCompare::identicalStringToValue(
                     $this->context,
                     $rightValue,
@@ -271,7 +278,11 @@ return_string:
                 }
                 goto return_bool;
             }
-            if (null !== $left->compileTimeString && JitValueBox::isValueOperand($right)) {
+            if (
+                null !== $left->compileTimeString
+                && Variable::TYPE_STRING === $left->type
+                && JitValueBox::isValueOperand($right)
+            ) {
                 $result = JitStringCompare::identicalStringToValue(
                     $this->context,
                     $leftValue,
