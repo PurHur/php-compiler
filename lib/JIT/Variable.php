@@ -108,6 +108,13 @@ final class Variable {
     /** Builtin/user enum case when this variable is a compile-time enum singleton (#7260). */
     public ?array $compileTimeEnumCase = null;
 
+    /**
+     * BcMath\Number value/scale when constructed (or folded) from compile-time literals (#24683).
+     *
+     * @var array{value: string, scale: int}|null
+     */
+    public ?array $compileTimeBcmathNumber = null;
+
     /** Set when this variable is the PHP {@code null} constant (const-fetch). */
     public bool $isNullConstant = false;
 

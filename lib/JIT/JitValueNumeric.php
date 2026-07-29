@@ -59,6 +59,28 @@ final class JitValueNumeric
             return ArrayBuiltinHelper::arrayUnion($context, $left, $right);
         }
 
+        // BcMath\Number do_operation when either box holds a Number (#24683).
+        if (self::isArithOpcode($opType)
+            && \PHPCompiler\CompilerVersion::supportsBcmath()
+        ) {
+            return \PHPCompiler\ext\bcmath\JitBcMathNumberOperators::binaryValueValue(
+                $context,
+                $opType,
+                $left,
+                $right
+            );
+        }
+
+        return self::emitBoxedNumericResult($context, $opType, $left, $right);
+    }
+
+    /** Public wrapper for Number/scalar dual-path (#24683). */
+    public static function emitBoxedNumericResultPublic(
+        Context $context,
+        int $opType,
+        Variable $left,
+        Variable $right
+    ): Variable {
         return self::emitBoxedNumericResult($context, $opType, $left, $right);
     }
 

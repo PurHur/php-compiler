@@ -108,7 +108,54 @@ final class ValueEchoHelper
 
             return;
         }
-        $classHint = $classHint ?? $objectVar->type?->userType ?? '';
+
+        // Value-boxed objects (script globals) have no compile-time class hint. Detect
+        // BcMath\Number by runtime class_id before the generic "Object" / Error path (#24683).
+        $done = BasicBlockHelper::append($context, 'echo_object_done');
+        $fallback = BasicBlockHelper::append($context, 'echo_object_fallback');
+        $numberProxy = null;
+        $numberId = 0;
+        if (\PHPCompiler\CompilerVersion::supportsBcmath()) {
+            $numberLc = 'bcmath\\number';
+            $object = $context->type->object;
+            $numberId = $object->lookup($numberLc);
+            if (MagicMethodDispatch::hasInstanceMethod($object, $numberId, '__tostring')) {
+                $numberProxy = MagicMethodDispatch::resolveInstanceMethodProxy(
+                    $context,
+                    $numberLc,
+                    '__tostring'
+                );
+            }
+        }
+        if (null !== $numberProxy) {
+            $objPtr = $context->helper->loadValue($objectVar);
+            $map = $context->structFieldMap['__object__'];
+            $classIdVal = $context->builder->load($context->builder->structGep($objPtr, $map['class_id']));
+            $isNumber = $context->builder->icmp(
+                \PHPLLVM\Builder::INT_EQ,
+                $classIdVal,
+                $context->getTypeFromString('int64')->constInt($numberId, false)
+            );
+            $yes = BasicBlockHelper::append($context, 'echo_bcmath_number_yes');
+            $context->builder->branchIf($isNumber, $yes, $fallback);
+            $context->builder->positionAtEnd($yes);
+            $toCall = $context->resolveFunctionProxy($numberProxy);
+            $raw = $toCall->call($context, $objectVar);
+            $strPtr = (new \PHPCompiler\ext\standard\strval())->valueToString(
+                $context,
+                JitValueBox::coerceToValuePtrForStore($context, $raw)
+            );
+            self::echoStringVariable(
+                $context,
+                new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $strPtr)
+            );
+            $context->builder->branch($done);
+        } else {
+            $context->builder->branch($fallback);
+        }
+
+        $context->builder->positionAtEnd($fallback);
+        $classHint = $classHint ?? '';
         $classHint = ltrim((string) $classHint, '\\');
         if ('' !== $classHint && 'object' !== strtolower($classHint)) {
             Builtin\ErrorRaise::ensureLinked($context);
@@ -116,10 +163,12 @@ final class ValueEchoHelper
                 $context,
                 ValueEchoSupport::objectToStringErrorMessage($classHint)
             );
-
-            return;
+            $context->builder->branch($done);
+        } else {
+            self::echoLiteral($context, ValueEchoSupport::OBJECT_FALLBACK_LABEL);
+            $context->builder->branch($done);
         }
-        self::echoLiteral($context, ValueEchoSupport::OBJECT_FALLBACK_LABEL);
+        $context->builder->positionAtEnd($done);
     }
 
     public static function echoStringVariable(Context $context, Variable $stringVar): void

@@ -995,6 +995,11 @@ class Context {
         $this->functionProxies['weakmap::offsetunset'] = new Call\WeakMapMethod('offsetunset');
         $this->functionProxies['weakmap::count'] = new Call\WeakMapMethod('count');
 
+        if (CompilerVersion::supportsBcmath()) {
+            $this->functionProxies['bcmath\number::__construct'] = new Call\BcMathNumberConstruct();
+            $this->functionProxies['bcmath\number::__tostring'] = new Call\BcMathNumberToString();
+        }
+
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
         $this->functionProxies['reflectionobject::__construct'] = new Call\ReflectionObjectConstruct();
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();

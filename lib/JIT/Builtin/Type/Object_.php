@@ -3336,6 +3336,21 @@ class Object_ extends Type {
                 $this->defineMethodVisibility($id, $method, $pub);
             }
         }
+        if ('bcmath\number' === $lcname && CompilerVersion::supportsBcmath()) {
+            // php-src ext/bcmath/bcmath.stub.php — readonly value/scale (#24683, #7220).
+            $this->defineProperty($id, \PHPCompiler\ext\bcmath\VmBcMathNumber::PROP_VALUE, Variable::TYPE_STRING);
+            $this->defineProperty($id, \PHPCompiler\ext\bcmath\VmBcMathNumber::PROP_SCALE, Variable::TYPE_NATIVE_LONG);
+            $this->setClassReadonly($id, true);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'add', 'sub', 'mul', 'div', 'mod', 'divmod', 'powmod', 'pow',
+                'sqrt', 'floor', 'ceil', 'round', 'compare', '__tostring',
+                '__serialize', '__unserialize',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('weakreference' === $lcname) {
             $this->weakReferenceClassId = $id;
             $this->defineProperty($id, '__weak_target', Variable::TYPE_VALUE);
