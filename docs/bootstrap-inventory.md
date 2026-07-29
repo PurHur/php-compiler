@@ -42267,10 +42267,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/FinalPropertyOverrideCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 31)
-- new CompileError (line 193)
-- new CompileError (line 227)
-- new CompileError (line 292)
+- new self (line 33)
+- new CompileError (line 211)
+- new CompileError (line 245)
+- new CompileError (line 310)
 - 22 class method(s)
 
 ### `lib/Compiler/FunctionStaticAnonymousClassCompileCheck.php`
