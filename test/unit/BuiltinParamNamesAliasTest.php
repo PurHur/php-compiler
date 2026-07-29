@@ -2064,4 +2064,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
             BuiltinParamNames::paramNamesForInternalFunction('openssl_pkey_new')
         );
     }
+
+    /** @covers issue #24551 */
+    public function testPcntlSignalNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('pcntl_signal');
+        self::assertSame(['signal', 'handler', 'restart_syscalls'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'signal', 'pcntl_signal'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'handler', 'pcntl_signal'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'restart_syscalls', 'pcntl_signal'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'signo', 'pcntl_signal'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'handle', 'pcntl_signal'));
+        self::assertSame(
+            ['signal', 'handler', 'restart_syscalls'],
+            BuiltinParamNames::paramNamesForInternalFunction('pcntl_signal')
+        );
+    }
 }
