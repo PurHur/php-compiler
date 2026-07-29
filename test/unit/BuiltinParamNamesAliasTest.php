@@ -306,6 +306,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'index_key', 'array_column'));
     }
 
+    /** @covers issue #24489 */
+    public function testGetResourceIdNamedParameter(): void
+    {
+        $names = BuiltinParamNames::forFunction('get_resource_id');
+        self::assertSame(['resource'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'resource', 'get_resource_id'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('get_resource_id'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('get_resource_id'));
+    }
+
     /** @covers issue #24609 */
     public function testStreamIsattyNamedParameter(): void
     {
