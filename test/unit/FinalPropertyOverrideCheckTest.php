@@ -282,6 +282,33 @@ PHP;
         self::assertSame('c', ob_get_clean());
     }
 
+    /**
+     * @covers issue #24770 — ternary/branch between class decls moves the child
+     * Class_ into a successor CFG block; collect() must still see the override.
+     */
+    public function testChildCannotOverrideFinalPropertyAfterTernary(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public final string $x = 'a';
+}
+echo 'instance_isFinal=', (new ReflectionProperty('A', 'x'))->isFinal() ? '1' : '0', "\n";
+class S {
+    public final static string $s = 's';
+}
+echo 'static_isFinal=', (new ReflectionProperty('S', 's'))->isFinal() ? '1' : '0', "\n";
+class B extends A {
+    public string $x = 'b';
+}
+echo "override_allowed=1\n";
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot override final property A::$x');
+        $runtime->parseAndCompile($code, 'final_plain_override_after_ternary.php');
+    }
+
     /** @covers issue #22474 — final set does not block overriding get alone */
     public function testOverrideGetWhenOnlySetIsFinal(): void
     {

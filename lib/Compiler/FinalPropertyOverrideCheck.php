@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCfg\Block as CfgBlock;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\Cfg\OpSubBlockAccess;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ClassFinal;
 
@@ -45,9 +47,25 @@ final class FinalPropertyOverrideCheck
 
     private function collect(Script $script): void
     {
-        foreach ($script->main->cfg->children as $child) {
-            if ($child instanceof Op\Stmt\Class_) {
-                $this->collectClass($child);
+        // Class decls after ternaries/branches land in successor blocks, not only
+        // main->cfg->children (#24770). Walk the full CFG like other compile checks.
+        if (null === $script->main->cfg) {
+            return;
+        }
+        $seen = new \SplObjectStorage();
+        $queue = [$script->main->cfg];
+        while ([] !== $queue) {
+            /** @var CfgBlock $current */
+            $current = array_shift($queue);
+            if ($seen->contains($current)) {
+                continue;
+            }
+            $seen->attach($current);
+            foreach ($current->children as $child) {
+                if ($child instanceof Op\Stmt\Class_) {
+                    $this->collectClass($child);
+                }
+                OpSubBlockAccess::enqueueSubBlocks($child, $queue);
             }
         }
     }
