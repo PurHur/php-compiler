@@ -90,6 +90,48 @@ class C6 { public function __serialize(): ?array { return []; } }
 PHP,
             'C6::__serialize(): Return type must be array when declared',
         ];
+        yield '__toString int' => [
+            <<<'PHP'
+<?php
+class T1 { public function __toString(): int { return 1; } }
+PHP,
+            'T1::__toString(): Return type must be string when declared',
+        ];
+        yield '__toString void' => [
+            <<<'PHP'
+<?php
+class T2 { public function __toString(): void {} }
+PHP,
+            'T2::__toString(): Return type must be string when declared',
+        ];
+        yield '__toString nullable string' => [
+            <<<'PHP'
+<?php
+class T3 { public function __toString(): ?string { return 'x'; } }
+PHP,
+            'T3::__toString(): Return type must be string when declared',
+        ];
+        yield '__toString protected' => [
+            <<<'PHP'
+<?php
+class T4 { protected function __toString() { return 'x'; } }
+PHP,
+            'Access level to T4::__toString() must be public (as in class Stringable)',
+        ];
+        yield '__toString private' => [
+            <<<'PHP'
+<?php
+class T5 { private function __toString() { return 'x'; } }
+PHP,
+            'Access level to T5::__toString() must be public (as in class Stringable)',
+        ];
+        yield '__toString static' => [
+            <<<'PHP'
+<?php
+class T6 { public static function __toString(): string { return 'x'; } }
+PHP,
+            'Method T6::__toString() cannot be static',
+        ];
     }
 
     public function testValidMagicMethodReturnTypesCompile(): void
@@ -106,8 +148,9 @@ class Good {
     public function __clone(): void {}
     public function __debugInfo(): ?array { return null; }
     public function __destruct() {}
+    public function __toString(): string { return 'Good'; }
 }
-echo Good::class, "\n";
+echo (string) new Good(), "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'valid_magic.php');
         $this->assertNotNull($block);
