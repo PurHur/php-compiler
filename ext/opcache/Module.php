@@ -7,12 +7,18 @@ namespace PHPCompiler\ext\opcache;
 use PHPCompiler\ModuleAbstract;
 
 /**
- * opcache extension module entry (php-src ext/opcache/php_opcache.c; issue #4421).
+ * opcache extension module entry (php-src ext/opcache/zend_accelerator_module.c; issue #4421).
  *
  * Userland probes only — no Zend accelerator engine. Returns disabled status arrays.
+ * Module name is "Zend OPcache" (not bare "opcache") — php-src zend_module_entry (#24993).
  */
 class Module extends ModuleAbstract
 {
+    public function getExtensionName(): string
+    {
+        return 'Zend OPcache';
+    }
+
     public function getFunctions(): array
     {
         return [

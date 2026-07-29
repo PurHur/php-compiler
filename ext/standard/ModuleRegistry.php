@@ -165,7 +165,8 @@ final class ModuleRegistry
             self::register($module->getExtensionName(), $moduleVersion);
         }
         // opcache is both a module and a Zend extension in php-src (ZendAccelerator.c, #22248).
-        if ('opcache' === $primary) {
+        // Module name is "Zend OPcache" (#24993); keep Zend-extension registration keyed off either form.
+        if ('opcache' === $primary || 'zend opcache' === $primary) {
             self::registerZendExtension(
                 'Zend OPcache',
                 \PHPCompiler\CompilerVersion::reportedPhpVersion(),
