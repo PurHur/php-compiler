@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** get_headers JIT routes through GetHeadersJitHelper PHP, not VM-only stub (#9212). */
+/** get_headers JIT via GetHeadersJitHelper + JitVmHelperLink::ensureCompiled (#9212, #24633). */
 final class GetHeadersJitRuntimeShrinkTest extends TestCase
 {
     public function testGetHeadersJitHelperDelegatesToVmHttpFetch(): void
@@ -20,10 +20,16 @@ final class GetHeadersJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GetHeadersRuntime.php');
         $this->assertStringContainsString('GetHeadersJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
         $this->assertStringNotContainsString('VmHttpFetchPure::request', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
 
         $lineCount = \substr_count($source, "\n");
-        $this->assertLessThan(140, $lineCount, 'GetHeadersRuntime must be a thin bridge');
+        $this->assertLessThan(120, $lineCount, 'GetHeadersRuntime must be a thin bridge');
     }
 
     public function testJitGetHeadersUsesCompilerGetHeadersAbi(): void
