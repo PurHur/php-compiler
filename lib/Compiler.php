@@ -8978,6 +8978,52 @@ class Compiler {
                 $materializeEnumCase
             );
         }
+        if ($expr instanceof Op\Expr\MagicScriptConst) {
+            return $this->tryFoldMagicScriptConst($expr, $block);
+        }
+
+        return null;
+    }
+
+    /**
+     * Fold __DIR__ / __FILE__ / __LINE__ / __COMPILER_HALT_OFFSET__ in const-expr
+     * (class const, property/param defaults) — Zend zend_compile.c ZEND_AST_MAGIC_CONST (#24929).
+     */
+    protected function tryFoldMagicScriptConst(Op\Expr\MagicScriptConst $expr, Block $block): ?Variable
+    {
+        if (Op\Expr\MagicScriptConst::KIND_LINE === $expr->kind) {
+            $line = max(1, $expr->getLine());
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $value->int($line);
+
+            return $value;
+        }
+        if (Op\Expr\MagicScriptConst::KIND_HALT_OFFSET === $expr->kind) {
+            $offset = $block->haltCompilerOffset ?? $this->haltCompilerOffset;
+            if (null === $offset) {
+                return null;
+            }
+            $value = new Variable(Variable::TYPE_INTEGER);
+            $value->int($offset);
+
+            return $value;
+        }
+        $path = $block->scriptPath();
+        if ('' === $path) {
+            return null;
+        }
+        if (Op\Expr\MagicScriptConst::KIND_DIR === $expr->kind) {
+            $value = new Variable(Variable::TYPE_STRING);
+            $value->string(dirname($path));
+
+            return $value;
+        }
+        if (Op\Expr\MagicScriptConst::KIND_FILE === $expr->kind) {
+            $value = new Variable(Variable::TYPE_STRING);
+            $value->string($path);
+
+            return $value;
+        }
 
         return null;
     }
