@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\Cfg\OpSubBlockAccess;
 use PHPCompiler\CompilerVersion;
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\Operand;
@@ -25,6 +26,9 @@ final class OverrideValidator
      * Defer #[\Override] checks until all classes in the compile unit are registered (#9721).
      *
      * php-src: zend_compile_override_attribute() runs after the full class table for the unit exists.
+     *
+     * Class decls after runtime statements (e.g. {@see class_exists}) land in successor CFG
+     * blocks, not only {@see Script::$main}->cfg->children — walk the full CFG (#24790, #24770).
      */
     public static function validateScript(Script $script): void
     {
@@ -33,7 +37,7 @@ final class OverrideValidator
         }
 
         $registry = self::buildRegistry($script);
-        foreach ($script->main->cfg->children as $child) {
+        foreach (self::collectClassLikeOps($script) as $child) {
             if ($child instanceof Op\Stmt\Interface_) {
                 $name = self::staticNameFromOperand($child->name);
                 if (null === $name) {
@@ -332,7 +336,8 @@ final class OverrideValidator
     private static function buildRegistry(Script $script): ClassCompileRegistry
     {
         $registry = new ClassCompileRegistry();
-        foreach ($script->main->cfg->children as $child) {
+        $ops = self::collectClassLikeOps($script);
+        foreach ($ops as $child) {
             if ($child instanceof Op\Stmt\Trait_) {
                 $name = self::staticNameFromOperand($child->name);
                 if (null !== $name) {
@@ -348,7 +353,7 @@ final class OverrideValidator
                 $registry->registerInterface($name, self::interfaceNamesFromOperands($child->extends), $child->stmts);
             }
         }
-        foreach ($script->main->cfg->children as $child) {
+        foreach ($ops as $child) {
             if (!$child instanceof Op\Stmt\Class_) {
                 continue;
             }
@@ -372,6 +377,44 @@ final class OverrideValidator
         }
 
         return $registry;
+    }
+
+    /**
+     * Class / interface / trait decls anywhere in the main CFG (#24790).
+     *
+     * @return list<Op\Stmt\Class_|Op\Stmt\Interface_|Op\Stmt\Trait_>
+     */
+    private static function collectClassLikeOps(Script $script): array
+    {
+        if (null === $script->main->cfg) {
+            return [];
+        }
+        $ops = [];
+        $seenBlocks = new \SplObjectStorage();
+        $seenOps = new \SplObjectStorage();
+        $queue = [$script->main->cfg];
+        while ([] !== $queue) {
+            /** @var CfgBlock $current */
+            $current = array_shift($queue);
+            if ($seenBlocks->contains($current)) {
+                continue;
+            }
+            $seenBlocks->attach($current);
+            foreach ($current->children as $child) {
+                if (
+                    ($child instanceof Op\Stmt\Class_
+                        || $child instanceof Op\Stmt\Interface_
+                        || $child instanceof Op\Stmt\Trait_)
+                    && !$seenOps->contains($child)
+                ) {
+                    $seenOps->attach($child);
+                    $ops[] = $child;
+                }
+                OpSubBlockAccess::enqueueSubBlocks($child, $queue);
+            }
+        }
+
+        return $ops;
     }
 
     /**
