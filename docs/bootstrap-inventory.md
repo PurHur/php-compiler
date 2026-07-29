@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6623 |
-| Phase A inventory files (M2 ratio SSOT) | 6623 |
+| PHP files on vm.php path | 6622 |
+| Phase A inventory files (M2 ratio SSOT) | 6622 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21332 |
+| Source constructs flagged (warnings) | 21329 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -56,7 +56,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/NumberDiv.php` | 0 | 2 |
 | `ext/bcmath/NumberDivmod.php` | 0 | 3 |
 | `ext/bcmath/NumberFloor.php` | 0 | 2 |
-| `ext/bcmath/NumberFrom.php` | 0 | 2 |
 | `ext/bcmath/NumberMod.php` | 0 | 2 |
 | `ext/bcmath/NumberMul.php` | 0 | 2 |
 | `ext/bcmath/NumberPow.php` | 0 | 2 |
@@ -65,7 +64,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/NumberSqrt.php` | 0 | 1 |
 | `ext/bcmath/NumberSub.php` | 0 | 2 |
 | `ext/bcmath/NumberToString.php` | 0 | 1 |
-| `ext/bcmath/VmBcMathNumber.php` | 0 | 26 |
+| `ext/bcmath/VmBcMathNumber.php` | 0 | 25 |
 | `ext/bcmath/VmBcmath.php` | 0 | 5 |
 | `ext/bcmath/bcadd.php` | 0 | 1 |
 | `ext/bcmath/bcceil.php` | 0 | 1 |
@@ -6781,12 +6780,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 25)
 - 1 class method(s)
 
-### `ext/bcmath/NumberFrom.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 1 class method(s)
-
 ### `ext/bcmath/NumberMod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6842,29 +6835,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 43)
 - new Variable (line 44)
-- new ClassEntry (line 48)
+- new ClassEntry (line 47)
+- new ClassProperty (line 50)
 - new ClassProperty (line 51)
-- new ClassProperty (line 52)
-- new NumberConstruct (line 54)
-- new NumberFrom (line 58)
-- new NumberAdd (line 62)
-- new NumberSub (line 63)
-- new NumberMul (line 64)
-- new NumberDiv (line 65)
-- new NumberMod (line 66)
-- new NumberDivmod (line 68)
-- new NumberPow (line 69)
-- new NumberSqrt (line 70)
-- new NumberFloor (line 71)
-- new NumberCeil (line 72)
-- new NumberRound (line 73)
-- new NumberCompare (line 74)
-- new NumberToString (line 75)
-- new NumberSerialize (line 77)
-- new NumberUnserialize (line 78)
-- new ObjectEntry (line 106)
-- new Variable (line 108)
-- new Variable (line 333)
+- new NumberConstruct (line 53)
+- new NumberAdd (line 59)
+- new NumberSub (line 60)
+- new NumberMul (line 61)
+- new NumberDiv (line 62)
+- new NumberMod (line 63)
+- new NumberDivmod (line 65)
+- new NumberPow (line 66)
+- new NumberSqrt (line 67)
+- new NumberFloor (line 68)
+- new NumberCeil (line 69)
+- new NumberRound (line 70)
+- new NumberCompare (line 71)
+- new NumberToString (line 72)
+- new NumberSerialize (line 74)
+- new NumberUnserialize (line 75)
+- new ObjectEntry (line 103)
+- new Variable (line 105)
+- new Variable (line 330)
 - 19 class method(s)
 
 ### `ext/bcmath/VmBcmath.php`

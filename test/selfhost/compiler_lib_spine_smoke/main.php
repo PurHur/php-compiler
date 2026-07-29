@@ -105,7 +105,6 @@ require_once __DIR__.'/../../../ext/bcmath/NumberConstruct.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberDiv.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberDivmod.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberFloor.php';
-require_once __DIR__.'/../../../ext/bcmath/NumberFrom.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberMod.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberMul.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberPow.php';
