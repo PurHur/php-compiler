@@ -13149,10 +13149,20 @@ class JIT {
                 case OpCode::TYPE_BITWISE_NOT:
                 case OpCode::TYPE_BOOLEAN_NOT:
                 case OpCode::TYPE_CONCAT:
+                case OpCode::TYPE_SMALLER:
+                case OpCode::TYPE_GREATER:
+                case OpCode::TYPE_SMALLER_OR_EQUAL:
+                case OpCode::TYPE_GREATER_OR_EQUAL:
+                case OpCode::TYPE_SPACESHIP:
+                case OpCode::TYPE_EQUAL:
+                case OpCode::TYPE_NOT_EQUAL:
+                case OpCode::TYPE_IDENTICAL:
+                case OpCode::TYPE_NOT_IDENTICAL:
+                case OpCode::TYPE_LOGICAL_XOR:
                 case OpCode::TYPE_ARRAY_DIM_FETCH:
                 case OpCode::TYPE_PROPERTY_FETCH:
                 case OpCode::TYPE_PROPERTY_FETCH_WRITE:
-                    // Scalar class const expressions — evaluated in jitClassConstDefineValue (#5394).
+                    // Scalar class const expressions — evaluated in jitClassConstDefineValue (#5394, #24928).
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
                     $name = $block->getOperand($op->arg1);

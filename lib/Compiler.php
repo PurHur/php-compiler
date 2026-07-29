@@ -9303,6 +9303,9 @@ class Compiler {
                 OpCode::TYPE_GREATER_OR_EQUAL,
             ], true)) {
                 $result->compareOp($opCode, $left, $right);
+            } elseif (OpCode::TYPE_SPACESHIP === $opCode) {
+                // Class/file const `<=>` — zend_const_expr_to_zval (#24928).
+                $result->spaceshipOp($left, $right);
             } elseif (OpCode::TYPE_IDENTICAL === $opCode) {
                 $result->bool($left->identicalTo($right));
             } elseif (OpCode::TYPE_NOT_IDENTICAL === $opCode) {
