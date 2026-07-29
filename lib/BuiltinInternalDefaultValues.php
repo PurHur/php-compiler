@@ -104,6 +104,10 @@ final class BuiltinInternalDefaultValues
         'strtotime' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
+        'unixtojd' => [
+            0 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

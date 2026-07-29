@@ -178,6 +178,8 @@ final class BuiltinInternalArgInfo
             // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
             'date', 'gmdate' => 1 === $index ? '?int' : null,
             'strtotime' => 1 === $index ? '?int' : null,
+            // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
+            'unixtojd' => 0 === $index ? '?int' : null,
             default => null,
         };
     }

@@ -218,6 +218,9 @@ final class BuiltinParamNames
                 return ['julian_day'];
             case 'easter_date':
                 return ['year=', 'mode='];
+            // php-src ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
+            case 'unixtojd':
+                return ['timestamp='];
             case 'getdate':
                 return ['timestamp'];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says date (#23783)
