@@ -63,7 +63,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testVersionCompareOperatorNamedParamResolves(): void
     {
         $names = BuiltinParamNames::forFunction('version_compare');
-        self::assertSame(['version1', 'version2', 'operator'], $names);
+        self::assertSame(['version1', 'version2', 'operator='], $names);
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'operator', 'version_compare'));
     }
 
@@ -1529,7 +1529,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($chdir, 'directory', 'chdir'));
 
         $umask = BuiltinParamNames::forFunction('umask');
-        self::assertSame(['mask'], $umask);
+        self::assertSame(['mask='], $umask);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($umask, 'mask', 'umask'));
 
         $fnmatch = BuiltinParamNames::forFunction('fnmatch');
@@ -1688,7 +1688,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testChunkSplitStrSplitZendStubNamedParams(): void
     {
         $chunk = BuiltinParamNames::forFunction('chunk_split');
-        self::assertSame(['string', 'length', 'separator'], $chunk);
+        self::assertSame(['string', 'length=', 'separator='], $chunk);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($chunk, 'string', 'chunk_split'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($chunk, 'length', 'chunk_split'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($chunk, 'separator', 'chunk_split'));
@@ -2002,7 +2002,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     public function testSessionSetCookieParamsZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('session_set_cookie_params');
-        self::assertSame(['lifetime_or_options', 'path', 'domain', 'secure', 'httponly'], $names);
+        self::assertSame(['lifetime_or_options', 'path=', 'domain=', 'secure=', 'httponly='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'lifetime_or_options', 'session_set_cookie_params'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'lifetime', 'session_set_cookie_params'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'path', 'session_set_cookie_params'));
@@ -2813,4 +2813,67 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
         }
     }
+
+    /** @covers issue #24971 */
+    public function testPathQueryReflectionDefaultsCluster(): void
+    {
+        self::assertSame(['path', 'levels='], BuiltinParamNames::forFunction('dirname'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('dirname'));
+        self::assertSame(['path', 'suffix='], BuiltinParamNames::forFunction('basename'));
+        self::assertSame(
+            ['data', 'numeric_prefix=', 'arg_separator=', 'encoding_type='],
+            BuiltinParamNames::forFunction('http_build_query')
+        );
+        self::assertSame(['string', 'length=', 'separator='], BuiltinParamNames::forFunction('chunk_split'));
+        self::assertSame(['mask='], BuiltinParamNames::forFunction('umask'));
+        self::assertSame(['filename', 'mtime=', 'atime='], BuiltinParamNames::forFunction('touch'));
+        self::assertSame(['version1', 'version2', 'operator='], BuiltinParamNames::forFunction('version_compare'));
+        self::assertSame(
+            ['lifetime_or_options', 'path=', 'domain=', 'secure=', 'httponly='],
+            BuiltinParamNames::forFunction('session_set_cookie_params')
+        );
+
+        $cases = [
+            ['dirname', 1, 'levels', 'int', 1],
+            ['basename', 1, 'suffix', 'string', ''],
+            ['http_build_query', 1, 'numeric_prefix', 'string', ''],
+            ['http_build_query', 3, 'encoding_type', 'int', 1],
+            ['chunk_split', 1, 'length', 'int', 76],
+            ['chunk_split', 2, 'separator', 'string', "\r\n"],
+            ['get_html_translation_table', 1, 'flags', 'int', 11],
+            ['get_html_translation_table', 2, 'encoding', 'string', 'UTF-8'],
+        ];
+        foreach ($cases as [$fn, $idx, $name, $type, $expected]) {
+            $info = ['name' => $name, 'type' => $type, 'isOptional' => true];
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, $idx, $info, false), $fn.'#'.$idx);
+            $dest = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, $fn, $idx, $info), $fn.'#'.$idx);
+            if (\is_int($expected)) {
+                self::assertSame($expected, $dest->toInt(), $fn.'#'.$idx);
+            } else {
+                self::assertSame($expected, $dest->toString(), $fn.'#'.$idx);
+            }
+        }
+
+        foreach (
+            [
+                ['http_build_query', 2, 'arg_separator'],
+                ['umask', 0, 'mask'],
+                ['touch', 1, 'mtime'],
+                ['touch', 2, 'atime'],
+                ['version_compare', 2, 'operator'],
+                ['getimagesize', 1, 'image_info'],
+                ['session_set_cookie_params', 1, 'path'],
+                ['session_set_cookie_params', 3, 'secure'],
+                ['session_set_cookie_params', 4, 'httponly'],
+            ] as [$fn, $idx, $name]
+        ) {
+            $info = ['name' => $name, 'type' => '', 'isOptional' => true];
+            self::assertTrue(BuiltinInternalDefaultValues::isAvailable($fn, $idx, $info, false), $fn.'#'.$idx);
+            $dest = new Variable();
+            self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, $fn, $idx, $info), $fn.'#'.$idx);
+            self::assertSame(Variable::TYPE_NULL, $dest->type, $fn.'#'.$idx);
+        }
+    }
+
 }

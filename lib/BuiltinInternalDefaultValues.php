@@ -143,6 +143,46 @@ final class BuiltinInternalDefaultValues
         'unpack' => [
             2 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/standard stubs — Reflection optional defaults cluster (#24971)
+        'dirname' => [
+            1 => ['kind' => 'int', 'value' => 1],
+        ],
+        'basename' => [
+            1 => ['kind' => 'string', 'value' => ''],
+        ],
+        'http_build_query' => [
+            1 => ['kind' => 'string', 'value' => ''],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'int', 'value' => 1], // PHP_QUERY_RFC1738
+        ],
+        'chunk_split' => [
+            1 => ['kind' => 'int', 'value' => 76],
+            2 => ['kind' => 'string', 'value' => "\r\n"],
+        ],
+        'umask' => [
+            0 => ['kind' => 'null'],
+        ],
+        'touch' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+        ],
+        'get_html_translation_table' => [
+            0 => ['kind' => 'int', 'value' => 0],
+            1 => ['kind' => 'int', 'value' => 11], // ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML401
+            2 => ['kind' => 'string', 'value' => 'UTF-8'],
+        ],
+        'version_compare' => [
+            2 => ['kind' => 'null'],
+        ],
+        'getimagesize' => [
+            1 => ['kind' => 'null'],
+        ],
+        'session_set_cookie_params' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'null'],
+            3 => ['kind' => 'null'],
+            4 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(

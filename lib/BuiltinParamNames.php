@@ -461,8 +461,9 @@ final class BuiltinParamNames
                 return ['filename', 'context'];
             case 'chdir':
                 return ['directory'];
+            // php-src ext/standard/basic_functions.stub.php — ?int $mask = null (#24971)
             case 'umask':
-                return ['mask'];
+                return ['mask='];
             case 'fnmatch':
                 return ['pattern', 'filename', 'flags'];
             case 'sem_get':
@@ -498,8 +499,9 @@ final class BuiltinParamNames
             case 'spl_object_hash':
             case 'spl_object_id':
                 return ['object'];
+            // php-src ext/standard/file.stub.php — ?int $mtime = null, ?int $atime = null (#24971)
             case 'touch':
-                return ['filename', 'mtime', 'atime'];
+                return ['filename', 'mtime=', 'atime='];
             case 'token_get_all':
                 return ['code', 'flags'];
             // php-src ext/tokenizer/tokenizer.stub.php — InternalArgInfo still says type (#23658)
@@ -554,8 +556,9 @@ final class BuiltinParamNames
             case 'session_cache_expire':
                 return ['value='];
             // php-src ext/session/session.stub.php — lifetime → lifetime_or_options (#23846 / #24533)
+            // php-src ext/session/session.stub.php — path/domain/secure/httponly = null (#24971)
             case 'session_set_cookie_params':
-                return ['lifetime_or_options', 'path', 'domain', 'secure', 'httponly'];
+                return ['lifetime_or_options', 'path=', 'domain=', 'secure=', 'httponly='];
             case 'define':
                 return ['constant_name', 'value', 'case_insensitive'];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says const_name/name (#23434)
@@ -948,8 +951,9 @@ final class BuiltinParamNames
             case 'exit':
             case 'die':
                 return ['status='];
+            // php-src ext/standard/basic_functions.stub.php — numeric_prefix='', arg_separator=null, encoding_type=PHP_QUERY_RFC1738 (#24971)
             case 'http_build_query':
-                return ['data', 'numeric_prefix', 'arg_separator', 'encoding_type'];
+                return ['data', 'numeric_prefix=', 'arg_separator=', 'encoding_type='];
             case 'json_encode':
                 return ['value', 'flags', 'depth'];
             // php-src ext/json/json.stub.php — InternalArgInfo omits flags= (#24812)
@@ -1170,8 +1174,9 @@ final class BuiltinParamNames
             case 'htmlspecialchars':
             case 'htmlentities':
                 return ['string', 'flags', 'encoding', 'double_encode'];
+            // php-src ext/standard/basic_functions.stub.php — ?string $operator = null (#24971)
             case 'version_compare':
-                return ['version1', 'version2', 'operator'];
+                return ['version1', 'version2', 'operator='];
             case 'in_array':
                 return ['needle', 'haystack', 'strict'];
             // php-src ext/zlib/zlib.stub.php — InternalArgInfo still says zp/string/max_decoded_len (#23655)
@@ -1213,11 +1218,12 @@ final class BuiltinParamNames
                 return ['options', 'limit'];
             case 'pathinfo':
                 return ['path', 'flags'];
+            // php-src ext/standard/basic_functions.stub.php — int $levels = 1 (#24971)
             case 'dirname':
-                return ['path', 'levels'];
-            // php-src ext/standard/file.stub.php / basic_functions.stub.php / array.stub.php (#23193)
+                return ['path', 'levels='];
+            // php-src ext/standard/file.stub.php / basic_functions.stub.php — string $suffix = "" (#23193 / #24971)
             case 'basename':
-                return ['path', 'suffix'];
+                return ['path', 'suffix='];
             case 'uniqid':
                 return ['prefix', 'more_entropy'];
             case 'gettype':
@@ -1293,8 +1299,9 @@ final class BuiltinParamNames
             case 'ucwords':
                 return ['string', 'separators'];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/chunklen/ending (#23206)
+            // php-src ext/standard/string.stub.php — length=76, separator="\r\n" (#24971)
             case 'chunk_split':
-                return ['string', 'length', 'separator'];
+                return ['string', 'length=', 'separator='];
             // php-src ext/standard/string.stub.php — InternalArgInfo still says str/split_length (#23206)
             case 'str_split':
                 return ['string', 'length'];
