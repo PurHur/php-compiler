@@ -1521,6 +1521,26 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(Variable::TYPE_ARRAY, $options->type);
     }
 
+    /** @covers issue #25066 */
+    public function testIteratorToArrayZendStubTypeAndPreserveKeys(): void
+    {
+        $names = BuiltinParamNames::forFunction('iterator_to_array');
+        self::assertSame(['iterator', 'preserve_keys='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'iterator', 'iterator_to_array'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'preserve_keys', 'iterator_to_array'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('iterator_to_array'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('iterator_to_array'));
+        self::assertSame(
+            'Traversable|array',
+            BuiltinInternalArgInfo::stubParamTypeOverride('iterator_to_array', 0)
+        );
+        $info = ['name' => 'preserve_keys', 'type' => 'bool', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('iterator_to_array', 1, $info, false));
+        $keys = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($keys, 'iterator_to_array', 1, $info));
+        self::assertTrue($keys->toBool());
+    }
+
     /** @covers issue #23586 */
     public function testHashFinalZendStubNamedParams(): void
     {
