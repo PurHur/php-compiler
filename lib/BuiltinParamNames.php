@@ -984,11 +984,11 @@ final class BuiltinParamNames
             case 'preg_filter':
                 return ['pattern', 'replacement', 'subject', 'limit', 'count'];
             case 'preg_replace_callback':
-                // php-src ext/pcre/php_pcre.c — pattern/callback/subject/limit/count/flags (#19637, #19697)
-                return ['pattern', 'callback', 'subject', 'limit', 'count', 'flags'];
+                // php-src ext/pcre/php_pcre.c — pattern/callback/subject/limit/count/flags (#19637, #19697, #23587)
+                return ['pattern', 'callback', 'subject', 'limit', 'count', 'flags='];
             case 'preg_replace_callback_array':
                 // php-src ext/pcre/php_pcre.c — pattern/subject/limit/count/flags (#19697)
-                return ['pattern', 'subject', 'limit', 'count', 'flags'];
+                return ['pattern', 'subject', 'limit', 'count', 'flags='];
             case 'preg_grep':
                 return ['pattern', 'array', 'flags'];
             case 'preg_quote':

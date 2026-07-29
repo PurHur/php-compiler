@@ -2701,9 +2701,16 @@ final class ReflectionSupport
 
             // No InternalArgInfo row (missing builtin or trailing stub-only param): honor `=` on the
             // override table — do not mark required stub params optional (#24392 gzputs).
+            // Still apply stubParamTypeOverride for trailing stub params (#23587 flags).
+            $type = '';
+            $typeOverride = BuiltinInternalArgInfo::stubParamTypeOverride(strtolower($functionName), $index);
+            if (null !== $typeOverride) {
+                $type = $typeOverride;
+            }
+
             return [
                 'name' => $name,
-                'type' => '',
+                'type' => $type,
                 'isOptional' => str_ends_with($override[$index], '='),
             ];
         }

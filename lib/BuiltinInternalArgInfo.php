@@ -156,17 +156,34 @@ final class BuiltinInternalArgInfo
     {
         $lc = strtolower($name);
         $info = self::instance()->functions[$lc] ?? null;
-        if (null === $info || !isset($info['params'][$index])) {
+        if (null !== $info && isset($info['params'][$index])) {
+            $normalized = self::normalizeParamInfo($info['params'][$index]);
+            $typeOverride = self::stubParamTypeOverride($lc, $index);
+            if (null !== $typeOverride) {
+                $normalized['type'] = $typeOverride;
+            }
+
+            return $normalized;
+        }
+
+        // Trailing stub-only params missing from InternalArgInfo (#23587 preg_replace_callback $flags).
+        $typeOverride = self::stubParamTypeOverride($lc, $index);
+        if (null === $typeOverride) {
             return null;
         }
-
-        $normalized = self::normalizeParamInfo($info['params'][$index]);
-        $typeOverride = self::stubParamTypeOverride($lc, $index);
-        if (null !== $typeOverride) {
-            $normalized['type'] = $typeOverride;
+        $names = BuiltinParamNames::forFunction($name);
+        $rawName = null !== $names && isset($names[$index]) ? $names[$index] : ('arg'.$index);
+        $isOptional = str_ends_with($rawName, '=');
+        $paramName = rtrim(ltrim($rawName, '&'), '=');
+        if (str_starts_with($paramName, '...')) {
+            $paramName = substr($paramName, 3);
         }
 
-        return $normalized;
+        return [
+            'name' => $paramName,
+            'type' => $typeOverride,
+            'isOptional' => $isOptional,
+        ];
     }
 
     /**
@@ -182,6 +199,19 @@ final class BuiltinInternalArgInfo
             'unixtojd' => 0 === $index ? '?int' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
             'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
+            // ext/pcre/php_pcre.stub.php — string|array unions; &$count = null untyped (#23587)
+            'preg_replace', 'preg_filter' => match ($index) {
+                0, 1, 2 => 'array|string',
+                4 => '',
+                default => null,
+            },
+            'preg_replace_callback' => match ($index) {
+                0, 2 => 'array|string',
+                1 => 'callable',
+                4 => '',
+                5 => 'int',
+                default => null,
+            },
             default => null,
         };
     }

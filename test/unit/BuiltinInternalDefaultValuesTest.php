@@ -71,6 +71,13 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
 
         self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('str_replace', 3));
         self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('str_ireplace', 3));
+
+        // #23587 — ext/pcre/php_pcre.stub.php unions + untyped &$count
+        self::assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('preg_replace', 0));
+        self::assertSame('array|string', BuiltinInternalArgInfo::stubParamTypeOverride('preg_filter', 1));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('preg_replace', 4));
+        self::assertSame('callable', BuiltinInternalArgInfo::stubParamTypeOverride('preg_replace_callback', 1));
+        self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('preg_replace_callback', 4));
     }
 
     /** @covers issue #24896 */

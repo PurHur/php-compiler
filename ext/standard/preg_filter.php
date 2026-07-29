@@ -38,7 +38,21 @@ final class preg_filter extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
+        // Z_PARAM_STR_OR_ARR soft-null: E_DEPRECATED array|string (php_pcre.stub.php; #23587).
+        // Non-null still string-coerced here (array patterns remain a follow-up).
+        $patternRaw = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $patternRaw->type) {
+            if (\PHPCompiler\VM\InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    'preg_filter(): Argument #1 ($pattern) must be of type array|string, null given'
+                );
+            }
+            VmNullStringParamDeprecation::emit($frame, 'preg_filter', 0, 'pattern', 'array|string');
+            VmPregFailure::warnEmptyRegularExpression($frame, 'preg_filter');
+            $frame->returnVar->null();
+
+            return;
+        }
         $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_filter', 0, 'pattern');
         $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_filter() replacement', 1);
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_filter', $pattern);
