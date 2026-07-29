@@ -118,6 +118,28 @@ final class WeakRefSupport
     }
 
     /**
+     * Zend zend_weakmap_offset_get — Error when the object key is absent (#24771).
+     *
+     * Message shape: `Object {class}#{handle} not contained in WeakMap`
+     */
+    public static function missingKeyErrorMessage(Variable $key): string
+    {
+        $object = self::requireWeakMapKey($key)->toObject();
+
+        return sprintf(
+            'Object %s#%d not contained in WeakMap',
+            $object->class->name,
+            $object->id
+        );
+    }
+
+    /** @return never */
+    public static function throwMissingKeyError(Variable $key): void
+    {
+        throw new \Error(self::missingKeyErrorMessage($key));
+    }
+
+    /**
      * Stable hash-table storage key for enum case array offsets, or null when not an enum case (#9871).
      */
     public static function objectKeyIfEnumCase(Variable $key): ?string

@@ -153,6 +153,26 @@ PHP;
         $this->assertSame('42', ob_get_clean());
     }
 
+    /** Missing WeakMap key throws Error (zend_weakmap_offset_get, #24771). */
+    public function testWeakMapOffsetGetMissingKeyThrowsError(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$wm = new WeakMap();
+$o = new stdClass();
+try {
+    $wm[$o];
+    echo 'no_throw';
+} catch (Error $e) {
+    echo preg_replace('/#\d+/', '#N', $e->getMessage());
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_missing_key.php'));
+        $this->assertSame('Object stdClass#N not contained in WeakMap', ob_get_clean());
+    }
+
     public function testWeakMapCountAndOffsetExists(): void
     {
         $runtime = new Runtime();

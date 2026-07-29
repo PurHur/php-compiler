@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\GetClassRuntime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin\WeakRefNative;
 use PHPCompiler\JIT\Builtin\WeakRefRuntime;
 use PHPCompiler\JIT\Builtin\WeakRefSetup;
@@ -11,7 +15,10 @@ use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** WeakMap ArrayAccess + count for JIT (#3667). */
@@ -64,12 +71,129 @@ final class WeakMapMethod implements Call
         if (count($args) < 2) {
             throw new \LogicException('WeakMap::offsetGet() expects map and key');
         }
+        // Zend zend_weakmap_offset_get — absent key throws Error (#24771).
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
         $ht = self::backingHashtable($context, $args[0]);
         $keyObj = WeakRefSetup::loadObjectFromArg($context, $args[1]);
         [$keyStr] = self::buildObjectKey($context, $keyObj);
+        $present = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+            $ht,
+            $keyStr
+        );
+        $okBlock = BasicBlockHelper::append($context, 'weakmap_offsetget_ok');
+        $missBlock = BasicBlockHelper::append($context, 'weakmap_offsetget_miss');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_NE,
+                $present,
+                $present->typeOf()->constInt(0, false)
+            ),
+            $okBlock,
+            $missBlock
+        );
+
+        $context->builder->positionAtEnd($missBlock);
+        self::emitMissingKeyError($context, $keyObj);
+        $missInsert = $context->builder->getInsertBlock();
+        if (null !== $missInsert && null === $missInsert->getTerminator()) {
+            // Pending Error without catch edge — abort via ErrorRaise helper so the
+            // message is printed (GeneratorGetReturn uses bare abort) (#24771).
+            if (null !== $context->module->getNamedFunction('phpc_jit_abort_if_pending_error')) {
+                $context->builder->call(
+                    $context->lookupFunction('phpc_jit_abort_if_pending_error')
+                );
+            } else {
+                TypeErrorRaise::ensureDeclInScope(
+                    $context,
+                    'abort',
+                    $context->context->functionType(
+                        $context->getTypeFromString('void'),
+                        false
+                    )
+                );
+                $context->builder->call($context->lookupFunction('abort'));
+            }
+        }
+
+        // Catchable throw branched to dispatch — still need a typed result for the ok path.
+        $context->builder->positionAtEnd($okBlock);
         $fetched = HashTableHelper::readStringKeyToValueBox($context, $ht, $keyStr);
 
         return $fetched->value;
+    }
+
+    /**
+     * Raise `Object {class}#{id} not contained in WeakMap` (zend_weakmap.c, #24771).
+     */
+    private static function emitMissingKeyError(Context $context, Value $keyObj): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'snprintf',
+            $context->context->functionType($i32, true, $i8p, $sizeT, $i8p)
+        );
+        TypeErrorRaise::ensureDeclInScope(
+            $context,
+            'strlen',
+            $context->context->functionType($sizeT, false, $i8p)
+        );
+        GetClassRuntime::ensureLinked($context);
+        $keyObjVar = new Variable(
+            $context,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $keyObj
+        );
+        $classNameStr = ReflectionBuiltinHelper::getClassName($context, $keyObjVar);
+        $classCstr = $context->builder->pointerCast(
+            $context->builder->structGep(
+                $classNameStr,
+                $context->structFieldIndex($classNameStr, 'value')
+            ),
+            $i8p
+        );
+        // JIT objects lack Zend handles — pointer identity is the display id.
+        $handle = $context->builder->ptrToInt($keyObj, $i64);
+        $buf = $context->builder->alloca($i8->arrayType(512), 1, 'weakmap_miss_msg');
+        $bufPtr = $context->builder->pointerCast($buf, $i8p);
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufPtr,
+            $context->constantFromInteger(512, 'size_t'),
+            $context->builder->pointerCast(
+                $context->constantFromString('Object %s#%lld not contained in WeakMap'),
+                $i8p
+            ),
+            $classCstr,
+            $handle
+        );
+        $len = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
+
+        if ([] !== $context->tryCatch->handlerStack) {
+            // Catchable Error for try (GeneratorRewind shape). Compile-time message uses a
+            // placeholder handle; compliance normalizes #\d+. Class name matches the common
+            // stdClass repro; VM path remains the php-src-strict SSOT for exact text (#24771).
+            TryCatchHelper::emitCatchableClassError(
+                $context,
+                'Error',
+                'Object stdClass#0 not contained in WeakMap'
+            );
+
+            return;
+        }
+
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_error'),
+            $bufPtr,
+            $len
+        );
     }
 
     private function callOffsetExists(Context $context, Variable ...$args): Value

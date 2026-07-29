@@ -36,22 +36,17 @@ final class WeakMapOffsetGet extends VmClassMethod
         $key = WeakRefSupport::objectKey($frame->calledArgs[1]);
         $ht = WeakRefSupport::mapTable($map);
         if (null === $ht) {
-            $frame->returnVar->null();
-
-            return;
+            // Zend zend_weakmap_offset_get — missing key throws Error (#24771).
+            WeakRefSupport::throwMissingKeyError($frame->calledArgs[1]);
         }
         $keyVar = new Variable(Variable::TYPE_STRING);
         $keyVar->string($key);
         if (!$ht->keyExists($keyVar)) {
-            $frame->returnVar->null();
-
-            return;
+            WeakRefSupport::throwMissingKeyError($frame->calledArgs[1]);
         }
         $slot = $ht->findVariable($keyVar, false);
         if (null === $slot) {
-            $frame->returnVar->null();
-
-            return;
+            WeakRefSupport::throwMissingKeyError($frame->calledArgs[1]);
         }
         $frame->returnVar->copyFrom($slot);
     }
