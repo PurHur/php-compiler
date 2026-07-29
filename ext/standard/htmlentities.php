@@ -36,12 +36,12 @@ final class htmlentities extends Internal
         $encoding = 'UTF-8';
         $doubleEncode = true;
         if (isset($frame->calledArgs[1])) {
-            VmMath::rejectNullIntBuiltinArg($frame->calledArgs[1], 'htmlentities', 2, 'flags');
-            $flags = VmMath::parseIntBuiltinArg(
+            $flags = VmMath::parseZParamLongBuiltinArg(
                 $frame->calledArgs[1],
                 'htmlentities',
                 2,
-                'flags'
+                'flags',
+                $frame
             );
         }
         if (isset($frame->calledArgs[2])) {
