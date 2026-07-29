@@ -117,8 +117,6 @@ language/include_once_basic
 language/include_scope_inherit_nested
 language/indirect_instance_static_call_error
 language/instanceof_dynamic_typeerror
-language/interface_typed_const_inherit_error
-language/interface_typed_const_inherit_ok
 language/iterable_param_type_error
 language/lazy_ghost_basic
 language/lazy_ghost_zero_prop_isset

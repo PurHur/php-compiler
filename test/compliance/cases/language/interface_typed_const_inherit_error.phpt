@@ -6,7 +6,7 @@ if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
 if (!PHPCompiler\CompilerVersion::supportsInterfaceTypedConstants()) {
-    die('skip typed interface constants require CompilerVersion 8.3+');
+    die('skip typed interface constants require forward profile 8.3+ (#24917)');
 }
 ?>
 --FILE--

@@ -101,47 +101,86 @@ PHP;
     /** @covers issue #5982 */
     public function testIncompatibleInterfaceTypedConstantOverrideFailsCompile(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            if (!\PHPCompiler\CompilerVersion::supportsInterfaceTypedConstants()) {
+                $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 interface I { public const array X = [1]; }
 class C implements I { public const string X = 'not-array'; }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Type of C::X must be compatible with I::X of type array');
-        $runtime->parseAndCompile($code, 'interface_typed_const_inherit_bad.php');
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Type of C::X must be compatible with I::X of type array');
+            $runtime->parseAndCompile($code, 'interface_typed_const_inherit_bad.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     /** @covers issue #5982 */
     public function testCompatibleInterfaceTypedConstantOverrideCompilesAndRuns(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            if (!\PHPCompiler\CompilerVersion::supportsInterfaceTypedConstants()) {
+                $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 interface I { public const array X = [1]; }
 class C implements I { public const array X = [2, 3]; }
 echo C::X[0], "\n";
 PHP;
-        $block = $runtime->parseAndCompile($code, 'interface_typed_const_inherit_ok.php');
-        $this->assertNotNull($block);
-        ob_start();
-        $runtime->run($block);
-        $this->assertSame("2\n", ob_get_clean());
+            $block = $runtime->parseAndCompile($code, 'interface_typed_const_inherit_ok.php');
+            $this->assertNotNull($block);
+            ob_start();
+            $runtime->run($block);
+            $this->assertSame("2\n", ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     /** @covers issue #7042 */
     public function testConflictingInterfaceTypedConstantsWithoutOverrideFailsCompile(): void
     {
-        $runtime = new Runtime();
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            if (!\PHPCompiler\CompilerVersion::supportsInterfaceTypedConstants()) {
+                $this->markTestSkipped('typed interface constants require forward profile 8.3+ (#24917)');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
 <?php
 interface I { public const string X = 'a'; }
 interface J { public const int X = 1; }
 class C implements I, J {}
 echo C::X, "\n";
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('Cannot inherit previously-inherited or override constant X from interface J');
-        $runtime->parseAndCompile($code, 'interface_typed_const_multi_conflict.php');
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('Cannot inherit previously-inherited or override constant X from interface J');
+            $runtime->parseAndCompile($code, 'interface_typed_const_multi_conflict.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }
