@@ -254,8 +254,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('call_user_func'));
         self::assertSame(['callback', 'args'], BuiltinParamNames::forFunction('call_user_func_array'));
         self::assertTrue(BuiltinParamNames::forwardsNamedArgsIntoVariadic('call_user_func'));
+        self::assertTrue(BuiltinParamNames::forwardsNamedArgsIntoVariadic('ReflectionFunction::invoke'));
+        self::assertTrue(BuiltinParamNames::forwardsNamedArgsIntoVariadic('ReflectionMethod::invoke'));
         self::assertFalse(BuiltinParamNames::forwardsNamedArgsIntoVariadic('forward_static_call'));
         self::assertFalse(BuiltinParamNames::forwardsNamedArgsIntoVariadic('max'));
+        self::assertSame(0, BuiltinParamNames::variadicParamIndexForFunction('ReflectionFunction::invoke'));
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('ReflectionMethod::invoke'));
+        self::assertSame(['...args='], BuiltinParamNames::forClassMethod('ReflectionFunction::invoke'));
+        self::assertSame(['object', '...args='], BuiltinParamNames::forClassMethod('ReflectionMethod::invoke'));
     }
 
     /** @covers issue #23803 */

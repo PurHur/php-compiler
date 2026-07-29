@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ReflectionSupport;
-use PHPCompiler\VM\Variable;
 
-/** ReflectionFunction::invoke(...$args) — VM (#7039, php_reflection.c). */
+/** ReflectionFunction::invoke(...$args) — VM (#7039, #24949, php_reflection.c). */
 final class ReflectionFunctionInvoke extends VmClassMethod
 {
     public function __construct()
@@ -26,12 +26,18 @@ final class ReflectionFunctionInvoke extends VmClassMethod
             );
         }
         $reflection = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
-        $invokeArgs = [];
-        for ($i = 1; $i < $argc; ++$i) {
-            $copy = new Variable();
-            $copy->copyFrom($frame->calledArgs[$i]->resolveIndirect());
-            $invokeArgs[] = $copy;
-        }
+        $ctx = VmReflection::requireContext($frame);
+        [$paramNames, $variadicIndex, $functionName] = ReflectionSupport::functionInvokeParamMetadata(
+            $ctx,
+            $reflection
+        );
+        $invokeArgs = ReflectionSupport::invokeTrailingArgsFromCalledArgs(
+            $frame,
+            1,
+            $paramNames,
+            $variadicIndex,
+            $functionName
+        );
         $vm = VM::running();
         if (null === $vm) {
             throw new \LogicException('ReflectionFunction::invoke() requires active VM');
