@@ -1105,6 +1105,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'country', 'timezone_identifiers_list'));
     }
 
+    /** @covers issue #24359 */
+    public function testTimezoneNameFromAbbrZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('timezone_name_from_abbr');
+        self::assertSame(['abbr', 'utcOffset=', 'isDST='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'abbr', 'timezone_name_from_abbr'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'utcOffset', 'timezone_name_from_abbr'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'isDST', 'timezone_name_from_abbr'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $gmtoffset)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'gmtoffset', 'timezone_name_from_abbr'));
+    }
+
     /** @covers issue #24550 */
     public function testPhpinfoZendStubNamedFlagsParam(): void
     {
