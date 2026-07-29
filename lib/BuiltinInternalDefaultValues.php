@@ -194,6 +194,11 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'null'],
             4 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/basic_functions.stub.php — ?array = null (InternalArgInfo array → []) (#25069)
+        'stream_context_create' => [
+            0 => ['kind' => 'null'],
+            1 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
