@@ -1123,9 +1123,19 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsReflectionPropertyHookProbesTrueOn84DevForwardProfile(): void
+    public function testSupportsReflectionPropertyHookProbesFalseOnDefaultProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsReflectionPropertyHookProbes());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsReflectionPropertyHookProbes());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsReflectionPropertyHookProbesFalseWhenProfile82(): void
@@ -1660,13 +1670,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    /** Property hooks enabled unconditionally on VERSION_ID >= 80400 (#24754). */
-    public function testSupportsPropertyHooksTrueOnDefaultProfile(): void
+    /** Property hooks withheld on 8.4.0-dev reference profile — Zend 8.2 parity (#24818). */
+    public function testSupportsPropertyHooksFalseOnDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsPropertyHooks());
+            $this->assertFalse(CompilerVersion::supportsPropertyHooks());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2628,14 +2638,44 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersReflectionPropertyHookProbesOnForwardProfile(): void
+    public function testVmDoesNotRegisterReflectionPropertyHookProbesOnDefaultProfile(): void
     {
-        $runtime = new Runtime();
-        $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
-        $this->assertNotNull($rp);
-        $this->assertTrue(isset($rp->methods['isabstract']));
-        $this->assertTrue(isset($rp->methods['isvirtual']));
-        $this->assertTrue(isset($rp->methods['gethooks']));
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $runtime = new Runtime();
+            $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+            $this->assertNotNull($rp);
+            $this->assertFalse(isset($rp->methods['isabstract']));
+            $this->assertFalse(isset($rp->methods['isvirtual']));
+            $this->assertFalse(isset($rp->methods['gethooks']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersReflectionPropertyHookProbesWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+            $this->assertNotNull($rp);
+            $this->assertTrue(isset($rp->methods['isabstract']));
+            $this->assertTrue(isset($rp->methods['isvirtual']));
+            $this->assertTrue(isset($rp->methods['gethooks']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterReflectionPropertyHookProbesWhenProfile82(): void
