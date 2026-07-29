@@ -242,6 +242,11 @@ final class VmSodium
 
     private static bool $ffiUnavailable = false;
 
+    /** Separate FFI for sodium_version_* — keep core cdef free of version symbols (#24069). */
+    private static ?\FFI $ffiVersion = null;
+
+    private static bool $ffiVersionUnavailable = false;
+
     /** Separate FFI for AEGIS — must not share the core cdef (missing symbols would break load; #20518). */
     private static ?\FFI $ffiAegis = null;
 
@@ -271,6 +276,43 @@ final class VmSodium
             || \function_exists('sodium_crypto_pwhash')
             || \function_exists('sodium_crypto_pwhash_scryptsalsa208sha256')
             || null !== self::ffi();
+    }
+
+    /**
+     * SODIUM_LIBRARY_VERSION / MAJOR / MINOR from the linked libsodium (php-src #24069).
+     *
+     * Prefer host ext/sodium constants when present; otherwise probe via FFI.
+     *
+     * @return array{version: string, major: int, minor: int}
+     */
+    public static function libraryIdentity(): array
+    {
+        if (\defined('SODIUM_LIBRARY_VERSION')
+            && \defined('SODIUM_LIBRARY_MAJOR_VERSION')
+            && \defined('SODIUM_LIBRARY_MINOR_VERSION')
+        ) {
+            return [
+                'version' => (string) \constant('SODIUM_LIBRARY_VERSION'),
+                'major' => (int) \constant('SODIUM_LIBRARY_MAJOR_VERSION'),
+                'minor' => (int) \constant('SODIUM_LIBRARY_MINOR_VERSION'),
+            ];
+        }
+
+        $ffi = self::ffiVersion();
+        if (null === $ffi) {
+            throw new \LogicException('libsodium library identity is not available in this compiler build');
+        }
+
+        $version = $ffi->sodium_version_string();
+        if ($version instanceof \FFI\CData) {
+            $version = \FFI::string($version);
+        }
+
+        return [
+            'version' => (string) $version,
+            'major' => (int) $ffi->sodium_library_version_major(),
+            'minor' => (int) $ffi->sodium_library_version_minor(),
+        ];
     }
 
     /**
@@ -4352,6 +4394,45 @@ final class VmSodium
             }
         }
         self::$ffiUnavailable = true;
+
+        return null;
+    }
+
+    /**
+     * Lightweight FFI for sodium_version_string / sodium_library_version_{major,minor} (#24069).
+     */
+    private static function ffiVersion(): ?\FFI
+    {
+        if (self::$ffiVersionUnavailable) {
+            return null;
+        }
+        if (null !== self::$ffiVersion) {
+            return self::$ffiVersion;
+        }
+        if (!\extension_loaded('ffi')) {
+            self::$ffiVersionUnavailable = true;
+
+            return null;
+        }
+        $libs = [];
+        $env = \getenv('PHP_COMPILER_LIBSODIUM_SO');
+        if (\is_string($env) && '' !== $env) {
+            $libs[] = $env;
+        }
+        $libs = \array_merge($libs, ['libsodium.so.26', 'libsodium.so.23', 'libsodium.so']);
+        $cdef = 'const char *sodium_version_string(void);
+            int sodium_library_version_major(void);
+            int sodium_library_version_minor(void);';
+        foreach ($libs as $lib) {
+            try {
+                self::$ffiVersion = \FFI::cdef($cdef, $lib);
+
+                return self::$ffiVersion;
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+        self::$ffiVersionUnavailable = true;
 
         return null;
     }

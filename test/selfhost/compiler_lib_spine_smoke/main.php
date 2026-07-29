@@ -1665,6 +1665,7 @@ require_once __DIR__.'/../../../ext/soap/SoapClassMethod.php';
 require_once __DIR__.'/../../../ext/soap/SoapConstants.php';
 require_once __DIR__.'/../../../ext/soap/SoapExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/soap/SoapFaultConstruct.php';
+require_once __DIR__.'/../../../ext/soap/SoapHttpTransport.php';
 require_once __DIR__.'/../../../ext/soap/SoapSdlPayload.php';
 require_once __DIR__.'/../../../ext/soap/SoapUrlPayload.php';
 require_once __DIR__.'/../../../ext/soap/VmSoapClient.php';
