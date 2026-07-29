@@ -145,7 +145,7 @@ final class JitStringBuiltinArg
      * glob() pattern and fnmatch() pattern soft-null (#21366, ext/standard/file.c, fnmatch.c).
      * openssl_encrypt/openssl_decrypt $data soft-null (#21445, reverts #20263; ext/openssl/openssl.c).
      * openssl_digest($data) soft-null (#21517, reverts #20207; ext/openssl/openssl.c).
-     * sodium_bin2hex($string) soft-null (#21517, reverts #20196; ext/sodium).
+     * sodium_bin2hex($string) / sodium_hex2bin($string,$ignore) soft-null (#21517/#24772, reverts #20196; ext/sodium).
      * ftp_connect/ftp_ssl_connect $hostname soft-null (#21757, ext/ftp/ftp.c).
      * implode/join $separator soft-null (#21210, reverts #19894).
      * header($header), preg_quote($str), printf/fprintf($format) soft-null (#21234, reverts #19224/#20197).
