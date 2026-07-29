@@ -37,6 +37,7 @@ final class html_entity_decode extends Internal
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
         if ($argc >= 2) {
+            VmMath::rejectNullIntBuiltinArg($frame->calledArgs[1], 'html_entity_decode', 2, 'flags');
             $flags = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[1],
                 'html_entity_decode',
