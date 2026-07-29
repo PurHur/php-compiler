@@ -38,6 +38,23 @@ final class ini_set_ extends Internal
 
             return;
         }
+        $key = \strtolower($option);
+        // php-src url_rewriter.* PHP_INI_ALL — store on VmUrlRewriterOb (avoid VmIni→NestedJIT coupling, #24370).
+        if ('url_rewriter.tags' === $key || 'url_rewriter.hosts' === $key) {
+            $old = 'url_rewriter.tags' === $key
+                ? VmUrlRewriterOb::getTags()
+                : VmUrlRewriterOb::getHosts();
+            if ('url_rewriter.tags' === $key) {
+                VmUrlRewriterOb::setTags($value);
+            } else {
+                VmUrlRewriterOb::setHosts($value);
+            }
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->string($old);
+            }
+
+            return;
+        }
         $result = VmIni::set($frame->vmContext, $option, $value);
         if (null === $frame->returnVar) {
             return;

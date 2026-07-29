@@ -30,7 +30,7 @@ final class VmObOutput
             return VmObGzhandler::flushBuffer($content, $ctx);
         }
         if (VmUrlRewriterOb::HANDLER_NAME === $handler) {
-            return VmUrlRewriterOb::applyHandler($content);
+            return VmUrlRewriterFlush::applyHandler($content);
         }
 
         $callback = new Variable();

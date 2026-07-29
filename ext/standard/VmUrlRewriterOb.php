@@ -7,16 +7,22 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\OutputBuffer;
 
 /**
- * URL-Rewriter output-buffer handler registration (ext/standard/url.c, issue #12854).
+ * URL-Rewriter output-buffer registration (ext/standard/url.c, #12854, #24370).
  *
- * php-src registers php_output_handler_alias "URL-Rewriter" on first output_add_rewrite_var().
- * ob_list_handlers() / ob_get_status() expose the handler; reset clears vars only.
+ * Flush rewriting lives in {@see UrlScannerEx} / {@see VmUrlRewriterFlush} so NestedJIT of
+ * registration helpers stays free of the scanner (#21965 / #24370).
  */
 final class VmUrlRewriterOb
 {
     public const HANDLER_NAME = 'URL-Rewriter';
 
     private static bool $registered = false;
+
+    /** Mutable url_rewriter.tags (php-src PHP_INI_ALL default form=). */
+    private static string $tags = 'form=';
+
+    /** Mutable url_rewriter.hosts (php-src PHP_INI_ALL default empty). */
+    private static string $hosts = '';
 
     /** Ensure URL-Rewriter ob handler is active (idempotent). */
     public static function ensureRegistered(): void
@@ -41,11 +47,23 @@ final class VmUrlRewriterOb
         self::$registered = false;
     }
 
-    /**
-     * Flush hook for URL-Rewriter internal handler (passthrough until full url.c rewrite lands).
-     */
-    public static function applyHandler(string $content): string
+    public static function getTags(): string
     {
-        return $content;
+        return self::$tags;
+    }
+
+    public static function setTags(string $tags): void
+    {
+        self::$tags = $tags;
+    }
+
+    public static function getHosts(): string
+    {
+        return self::$hosts;
+    }
+
+    public static function setHosts(string $hosts): void
+    {
+        self::$hosts = $hosts;
     }
 }

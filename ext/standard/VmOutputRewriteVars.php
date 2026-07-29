@@ -16,16 +16,33 @@ final class VmOutputRewriteVars
     private const FIELD_SEP = "\x1E";
 
     /**
+     * Last-wins map for introspection (web drivers / ResponseContext).
+     *
      * @return array<string, string>
      */
     public static function list(): array
+    {
+        $vars = [];
+        foreach (self::listPairs() as [$name, $value]) {
+            $vars[$name] = $value;
+        }
+
+        return $vars;
+    }
+
+    /**
+     * Ordered name/value pairs including duplicate names (php-src url_scanner append semantics, #24370).
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    public static function listPairs(): array
     {
         $blob = OutputRewriteVarsJitHelper::exportBlob();
         if ('' === $blob) {
             return [];
         }
 
-        $vars = [];
+        $pairs = [];
         foreach (\explode(self::RECORD_SEP, $blob) as $record) {
             if ('' === $record) {
                 continue;
@@ -34,11 +51,12 @@ final class VmOutputRewriteVars
             if (false === $fieldSep) {
                 continue;
             }
-            $name = \substr($record, 0, $fieldSep);
-            $value = \substr($record, $fieldSep + 1);
-            $vars[$name] = $value;
+            $pairs[] = [
+                \substr($record, 0, $fieldSep),
+                \substr($record, $fieldSep + 1),
+            ];
         }
 
-        return $vars;
+        return $pairs;
     }
 }

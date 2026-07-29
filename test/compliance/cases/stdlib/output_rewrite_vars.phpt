@@ -24,6 +24,7 @@ try {
 add:yes
 reset:yes
 true
+true
 array (
   0 => 'URL-Rewriter',
 )
