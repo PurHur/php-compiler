@@ -7,13 +7,21 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\JIT\Builtin\DomCreateElementNSRuntime;
 use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMDocument::createElementNS() (#14314, #18938). */
+/**
+ * LLVM lowering for DOMDocument::createElementNS() (#14314, #18938, #24923).
+ *
+ * php-src: ext/dom/php_dom.stub.php — createElementNS(?string $namespace, …)
+ * null namespace ≠ "" (no xmlns vs xmlns="") — preserve on AOT materialization.
+ */
 final class JitDomCreateElementNS
 {
+    private const CLASS_ELEMENT = 'DOMElement';
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 3) {
@@ -21,10 +29,79 @@ final class JitDomCreateElementNS
         }
 
         if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            $nsResolved = self::isCompileTimeNullableString($args[1]);
+            $nameLit = self::compileTimeStringArg($args[2]);
+            if ($nsResolved && null !== $nameLit) {
+                $nsLit = self::compileTimeNullableStringArg($args[1]);
+                // Invalid QName / NS rules must hit helper (strictErrorChecking) (#24804 / #20594).
+                if (!self::needsHelperValidation($nsLit, $nameLit)) {
+                    $valueLit = '';
+                    if (isset($args[3])) {
+                        $vLit = self::compileTimeStringArg($args[3]);
+                        if (null === $vLit && JITVariable::TYPE_NULL !== $args[3]->type && !$args[3]->isNullConstant) {
+                            return self::invokeViaHelper($context, ...$args);
+                        }
+                        $valueLit = $vLit ?? '';
+                    }
+                    $obj = self::materializeElementNSFromLiterals($context, $nsLit, $nameLit, $valueLit);
+                    self::storeOwnerAndNullParent($context, $obj, $args[0]);
+
+                    return $obj;
+                }
+            }
+
             return self::invokeViaHelper($context, ...$args);
         }
 
         throw new \LogicException('DOMDocument::createElementNS() requires user-script AOT helper in this compiler build');
+    }
+
+    /** Namespace arg is compile-time null or string literal. */
+    private static function isCompileTimeNullableString(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return true;
+        }
+
+        return null !== self::compileTimeStringArg($arg);
+    }
+
+    /** Mirror VmDom::elementNSNameValidationError for literal gating (#24923). */
+    private static function needsHelperValidation(?string $namespace, string $qualifiedName): bool
+    {
+        if ('' === $qualifiedName) {
+            return true;
+        }
+        $pos = strpos($qualifiedName, ':');
+        if (false === $pos) {
+            if (1 !== preg_match('/^[A-Za-z_][\w.-]*$/', $qualifiedName)) {
+                return true;
+            }
+            $prefix = '';
+        } else {
+            $prefix = substr($qualifiedName, 0, $pos);
+            $local = substr($qualifiedName, $pos + 1);
+            if ('' === $prefix || '' === $local || false !== strpos($local, ':')) {
+                return true;
+            }
+            if (1 !== preg_match('/^[A-Za-z_][\w.-]*$/', $prefix)
+                || 1 !== preg_match('/^[A-Za-z_][\w.-]*$/', $local)
+            ) {
+                return true;
+            }
+        }
+        $ns = $namespace ?? '';
+        if ('' !== $prefix && '' === $ns) {
+            return true;
+        }
+        if ('xml' === $prefix && 'http://www.w3.org/XML/1998/namespace' !== $ns) {
+            return true;
+        }
+        if ('xmlns' === $prefix && 'http://www.w3.org/2000/xmlns/' !== $ns) {
+            return true;
+        }
+
+        return false;
     }
 
     private static function invokeViaHelper(Context $context, JITVariable ...$args): Value
@@ -32,7 +109,7 @@ final class JitDomCreateElementNS
         DomCreateElementNSRuntime::ensureLinked($context);
 
         $document = self::loadObjectArg($context, $args[0]);
-        $namespace = self::loadStringArg($context, $args[1]);
+        $namespace = self::loadNullableStringArg($context, $args[1]);
         $qualifiedName = self::loadStringArg($context, $args[2]);
         $value = \count($args) >= 4
             ? self::loadStringArg($context, $args[3])
@@ -55,6 +132,129 @@ final class JitDomCreateElementNS
         );
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    /**
+     * AOT-native DOMElement with NS property slots (no DomRegistry — same as createElement).
+     *
+     * @param string|null $namespace null → namespaceURI NULL; "" → empty URI + xmlns=""
+     */
+    public static function materializeElementNSFromLiterals(
+        Context $context,
+        ?string $namespace,
+        string $qualifiedName,
+        string $value = ''
+    ): Value {
+        [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        self::ensureElementNSPropertyLayout($objectType, $classId);
+
+        $obj = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($obj);
+
+        $nameStr = $context->builder->load($context->constantStringFromString($qualifiedName));
+        self::storeStringProperty($context, $obj, VmDom::PROP_NODE_NAME, $nameStr);
+        self::storeStringProperty($context, $obj, VmDom::PROP_TAG_NAME, $nameStr);
+        self::storeStringProperty(
+            $context,
+            $obj,
+            VmDom::PROP_LOCAL_NAME,
+            $context->builder->load($context->constantStringFromString($localName))
+        );
+        if ('' !== $prefix) {
+            self::storeBoxedStringProperty(
+                $context,
+                $obj,
+                VmDom::PROP_PREFIX,
+                $context->builder->load($context->constantStringFromString($prefix))
+            );
+        } else {
+            // VM/Zend expose ""; AOT null is acceptable for unprefixed (DomRegistry sync).
+            self::storeNullProperty($context, $obj, VmDom::PROP_PREFIX);
+        }
+        if (null === $namespace) {
+            self::storeNullProperty($context, $obj, VmDom::PROP_NAMESPACE_URI);
+        } else {
+            // VALUE slot (nullable) — must box via __value__writeString, not TYPE_STRING store (#24923).
+            self::storeBoxedStringProperty(
+                $context,
+                $obj,
+                VmDom::PROP_NAMESPACE_URI,
+                $context->builder->load($context->constantStringFromString($namespace))
+            );
+        }
+        self::storeNullProperty($context, $obj, VmDom::PROP_ATTRIBUTES);
+        if ('' !== $value) {
+            if (!$objectType->hasProperty($classId, VmDom::PROP_TEXT_CONTENT)) {
+                $objectType->defineProperty($classId, VmDom::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
+            }
+            self::storeStringProperty(
+                $context,
+                $obj,
+                VmDom::PROP_TEXT_CONTENT,
+                $context->builder->load($context->constantStringFromString($value))
+            );
+        }
+
+        return $obj;
+    }
+
+    /** @return array{0: string, 1: string} */
+    private static function splitQualifiedName(string $qualifiedName): array
+    {
+        $pos = strpos($qualifiedName, ':');
+        if (false === $pos) {
+            return ['', $qualifiedName];
+        }
+
+        return [substr($qualifiedName, 0, $pos), substr($qualifiedName, $pos + 1)];
+    }
+
+    private static function ensureElementNSPropertyLayout(
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        int $classId
+    ): void {
+        foreach ([
+            VmDom::PROP_NODE_NAME => JITVariable::TYPE_STRING,
+            VmDom::PROP_TAG_NAME => JITVariable::TYPE_STRING,
+            VmDom::PROP_LOCAL_NAME => JITVariable::TYPE_STRING,
+            VmDom::PROP_PREFIX => JITVariable::TYPE_VALUE,
+            VmDom::PROP_NAMESPACE_URI => JITVariable::TYPE_VALUE,
+            VmDom::PROP_ATTRIBUTES => JITVariable::TYPE_VALUE,
+            VmDom::PROP_PARENT_NODE => JITVariable::TYPE_VALUE,
+            VmDom::PROP_OWNER_DOCUMENT => JITVariable::TYPE_VALUE,
+        ] as $prop => $type) {
+            if (!$objectType->hasProperty($classId, $prop)) {
+                $objectType->defineProperty($classId, $prop, $type);
+            }
+        }
+    }
+
+    private static function storeOwnerAndNullParent(Context $context, Value $obj, JITVariable $documentArg): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        self::ensureElementNSPropertyLayout($objectType, $classId);
+
+        $nullSlot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $nullSlot)
+        );
+        $nullVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $nullSlot);
+        $docObj = self::loadObjectArg($context, $documentArg);
+        $docJit = new JITVariable($context, JITVariable::TYPE_OBJECT, JITVariable::KIND_VALUE, $docObj);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, VmDom::PROP_OWNER_DOCUMENT),
+            $docJit,
+            JITVariable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, VmDom::PROP_PARENT_NODE),
+            $nullVar,
+            JITVariable::TYPE_VALUE
+        );
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
@@ -83,7 +283,105 @@ final class JitDomCreateElementNS
                 JitValueBox::valuePtrFromVariable($context, $arg)
             );
         }
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $context->builder->load($context->constantStringFromString(''));
+        }
 
         throw new \LogicException('DOMDocument::createElementNS() string argument has invalid type');
+    }
+
+    /** ?string ABI — null constant → null __string__* (not empty string) (#24923). */
+    private static function loadNullableStringArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+
+        throw new \LogicException('DOMDocument::createElementNS() namespace argument has invalid type');
+    }
+
+    private static function compileTimeStringArg(JITVariable $arg): ?string
+    {
+        $lit = JitStringBuiltinArg::compileTimeLiteral($arg);
+        if (null !== $lit) {
+            return $lit;
+        }
+
+        return $arg->compileTimeString;
+    }
+
+    /** Compile-time null → null; compile-time string → string; else unresolved. */
+    private static function compileTimeNullableStringArg(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return null;
+        }
+
+        return self::compileTimeStringArg($arg);
+    }
+
+    private static function storeStringProperty(Context $context, Value $obj, string $prop, Value $str): void
+    {
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $propVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $owned
+        );
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, self::CLASS_ELEMENT, $prop),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
+    }
+
+    /** Store string into a TYPE_VALUE (nullable) property slot (#24923). */
+    private static function storeBoxedStringProperty(Context $context, Value $obj, string $prop, Value $str): void
+    {
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, self::CLASS_ELEMENT, $prop),
+            $propVar,
+            JITVariable::TYPE_VALUE
+        );
+    }
+
+    private static function storeNullProperty(Context $context, Value $obj, string $prop): void
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, self::CLASS_ELEMENT, $prop),
+            $propVar,
+            JITVariable::TYPE_NULL
+        );
     }
 }
