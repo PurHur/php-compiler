@@ -1354,6 +1354,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_hmac_file'));
     }
 
+    /** @covers issue #23586 */
+    public function testHashFinalZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash_final');
+        self::assertSame(['context', 'binary'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'hash_final'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'binary', 'hash_final'));
+        // Legacy InternalArgInfo name must not resolve (Zend rejects $raw_output)
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'raw_output', 'hash_final'));
+    }
+
     /** @covers issue #24459 */
     public function testImageTypeToExtensionMimeTypeZendStubNamedParams(): void
     {
