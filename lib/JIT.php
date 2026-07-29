@@ -18552,17 +18552,32 @@ class JIT {
             if ([] !== $toCall->paramNames) {
                 return [$toCall->paramNames, $toCall->namedArgsVariadicIndex];
             }
-            $names = BuiltinParamNames::forFunction($toCall->name);
+            $names = BuiltinParamNames::forFunction($toCall->name)
+                ?? BuiltinParamNames::forClassMethod($toCall->name);
 
             return [$names ?? [], null];
         }
         if ($toCall instanceof CoreFunc\Internal) {
             $name = $toCall->getName();
+            $names = BuiltinParamNames::forFunction($name)
+                ?? BuiltinParamNames::forClassMethod($name);
 
             return [
-                BuiltinParamNames::forFunction($name) ?? [],
+                $names ?? [],
                 BuiltinParamNames::variadicParamIndexForFunction($name),
             ];
+        }
+        // Custom Call proxies (Fiber::__construct, WeakReference::create, …) (#24592).
+        if (isset($toCall->paramNames) && \is_array($toCall->paramNames) && [] !== $toCall->paramNames) {
+            $variadic = $toCall->namedArgsVariadicIndex ?? null;
+
+            return [$toCall->paramNames, \is_int($variadic) ? $variadic : null];
+        }
+        if (isset($toCall->name) && \is_string($toCall->name) && '' !== $toCall->name) {
+            $names = BuiltinParamNames::forClassMethod($toCall->name)
+                ?? BuiltinParamNames::forFunction($toCall->name);
+
+            return [$names ?? [], null];
         }
 
         return [[], null];
@@ -18575,6 +18590,9 @@ class JIT {
         }
         if ($toCall instanceof CoreFunc\Internal) {
             return $toCall->getName();
+        }
+        if (isset($toCall->name) && \is_string($toCall->name) && '' !== $toCall->name) {
+            return $toCall->name;
         }
 
         return null;
@@ -18589,6 +18607,9 @@ class JIT {
     {
         if ([] === $argEntries || \is_array($argEntries[0])) {
             return 0;
+        }
+        if (isset($toCall->namedArgsReceiverPrefix) && \is_int($toCall->namedArgsReceiverPrefix)) {
+            return max(0, $toCall->namedArgsReceiverPrefix);
         }
         if (!$toCall instanceof JIT\Call\Native || [] === $toCall->argTypes) {
             return 0;

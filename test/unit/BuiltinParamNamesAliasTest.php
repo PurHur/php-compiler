@@ -666,6 +666,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($ctor, 'spec', 'DateInterval::__construct'));
     }
 
+    /** @covers issue #24592 */
+    public function testFiberWeakReferenceStubNamedParamsResolve(): void
+    {
+        $fiberCtor = BuiltinParamNames::forClassMethod('Fiber::__construct');
+        self::assertSame(['callback'], $fiberCtor);
+        self::assertSame(
+            ['callback'],
+            BuiltinParamNames::paramNamesForInternalFunction('Fiber::__construct')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($fiberCtor, 'callback', 'Fiber::__construct'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('Fiber', '__construct'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('Fiber', '__construct'));
+
+        $wrCreate = BuiltinParamNames::forClassMethod('WeakReference::create');
+        self::assertSame(['object'], $wrCreate);
+        self::assertSame(
+            ['object'],
+            BuiltinParamNames::paramNamesForInternalFunction('WeakReference::create')
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($wrCreate, 'object', 'WeakReference::create'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalMethod('WeakReference', 'create'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalMethod('WeakReference', 'create'));
+    }
+
     /** @covers issue #23685 */
     public function testDateTimeModifyStubNamedParamsResolve(): void
     {

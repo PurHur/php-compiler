@@ -14,6 +14,15 @@ use PHPLLVM\Value;
 /** Fiber::__construct(callable $callback) — JIT (#4019). */
 final class FiberConstruct implements Call
 {
+    /** Qualified name for BuiltinParamNames / named-arg resolve (#24592). */
+    public string $name = 'Fiber::__construct';
+
+    /** @var list<string> php-src Zend/zend_fibers.stub.php */
+    public array $paramNames = ['callback'];
+
+    /** Implicit $this before PHP formals on construct call sites (#24592). */
+    public int $namedArgsReceiverPrefix = 1;
+
     public function call(Context $context, Variable ...$args): Value
     {
         if (count($args) < 2) {

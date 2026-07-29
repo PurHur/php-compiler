@@ -15,6 +15,15 @@ use PHPLLVM\Value;
 
 final class WeakReferenceCreate implements Call
 {
+    /** Qualified name for BuiltinParamNames / named-arg resolve (#24592). */
+    public string $name = 'WeakReference::create';
+
+    /** @var list<string> php-src Zend/zend_weakrefs.stub.php */
+    public array $paramNames = ['object'];
+
+    /** Static factory — no implicit $this (#24592). */
+    public int $namedArgsReceiverPrefix = 0;
+
     public function call(Context $context, Variable ...$args): Value
     {
         if (count($args) < 1) {
