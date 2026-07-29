@@ -131,6 +131,7 @@ final class SplCachingIteratorStorage
      *     index: int,
      *     cached: ?Variable,
      *     cachedKey: ?Variable,
+     *     cachedToString: ?string,
      *     fullCache: HashTable,
      *     innerPinKey: string
      * }>
@@ -152,6 +153,8 @@ final class SplCachingIteratorStorage
             'index' => -1,
             'cached' => null,
             'cachedKey' => null,
+            // php-src intern->u.caching.zstr — CALL_TOSTRING / TOSTRING_USE_INNER (#24912).
+            'cachedToString' => null,
             // php-src intern->u.caching.zcache — keyed by iterator key (#19469).
             'fullCache' => new HashTable(),
             'innerPinKey' => $pinKey,
@@ -189,6 +192,7 @@ final class SplCachingIteratorStorage
         $state['index'] = -1;
         $state['cached'] = null;
         $state['cachedKey'] = null;
+        $state['cachedToString'] = null;
         $state['fullCache'] = new HashTable();
         self::next($frame, $object);
     }
@@ -235,6 +239,8 @@ final class SplCachingIteratorStorage
     public static function next(Frame $frame, ObjectEntry $object): void
     {
         $state = &self::$store[$object->id];
+        // php-src spl_dual_it_free clears caching.zstr before fetch (#24912).
+        $state['cachedToString'] = null;
         if ($state['index'] < 0) {
             $valid = SplDualIteratorStorage::callInner($frame, $state['inner'], 'valid')->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $valid->type || !$valid->toBool()) {
@@ -382,16 +388,15 @@ final class SplCachingIteratorStorage
 
             return self::stringifyVariable($frame, $state['cached']->resolveIndirect());
         }
-        // CIT_TOSTRING_USE_INNER — php-src caches zval_get_string(inner) on next into zstr.
-        if (0 !== ($flags & CachingIteratorBuiltin::TOSTRING_USE_INNER)) {
-            return self::stringifyObjectCurrent($frame, $state['inner']);
-        }
-        // CIT_CALL_TOSTRING — php-src returns cached zstr from next (current converted), else "".
-        if ($state['index'] < 0 || null === $state['cached']) {
-            return '';
+        // CIT_TOSTRING_USE_INNER / CIT_CALL_TOSTRING — php-src returns cached zstr from next (#24912).
+        if (
+            0 !== ($flags & CachingIteratorBuiltin::TOSTRING_USE_INNER)
+            || 0 !== ($flags & CachingIteratorBuiltin::CALL_TOSTRING)
+        ) {
+            return $state['cachedToString'] ?? '';
         }
 
-        return self::stringifyVariable($frame, $state['cached']->resolveIndirect());
+        return '';
     }
 
     /** convert_to_string / zval_get_string for cached current or key (#24256 / #24907). */
@@ -428,6 +433,12 @@ final class SplCachingIteratorStorage
         if (0 !== ($state['flags'] & CachingIteratorBuiltin::FULL_CACHE)) {
             // php-src spl_caching_it_next: array_set_zval_key(zcache, key, data)
             self::storeFullCacheEntry($state['fullCache'], $state['cachedKey'], $state['cached']);
+        }
+        // php-src: CIT_TOSTRING_USE_INNER → zval_get_string(inner); else CALL_TOSTRING → current (#24912).
+        if (0 !== ($state['flags'] & CachingIteratorBuiltin::TOSTRING_USE_INNER)) {
+            $state['cachedToString'] = self::stringifyObjectCurrent($frame, $state['inner']);
+        } elseif (0 !== ($state['flags'] & CachingIteratorBuiltin::CALL_TOSTRING)) {
+            $state['cachedToString'] = self::stringifyVariable($frame, $state['cached']);
         }
     }
 
