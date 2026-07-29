@@ -22,6 +22,9 @@ php_cfg_enum_implements_parser_applied() {
 patch_already_applied() {
   local patch="$1"
   case "$(basename "$patch")" in
+    php-vendor-implicit-nullable-84.patch)
+      grep -q '?Block \$prior = null' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AbstractVisitor.php" 2>/dev/null
+      ;;
     php-llvm-structgep-assert.patch)
       grep -q 'PHP_COMPILER_LLVM_ASSERT' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
@@ -6540,6 +6543,12 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-simplifier-use-chain.patch"
   apply_patch "$PATCH_DIR/php-cfg-operand-usage-dedup.patch"
 fi
+
+# PHP 8.4 implicitly-nullable params in php-cfg / php-optimizer (35 params / 23 files).
+# Must run AFTER php-cfg overlays that rewrite the same signatures (Exit_, Property, StaticVar,
+# Parser, …) — hunks are diffed against post-overlay vendor. Harmless on 8.2 (`?Type` since 7.1).
+# Matching lib/Visitor/* declarations were fixed directly (#24972).
+apply_patch "$PATCH_DIR/php-vendor-implicit-nullable-84.patch"
 
 if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_php_types_incdec_type_overlay
