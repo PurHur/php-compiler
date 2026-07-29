@@ -130,6 +130,22 @@ PHP;
         self::assertSame("XMLReader::XML(): Argument #1 (\$source) cannot be empty\n", ob_get_clean());
     }
 
+    /** @covers \PHPCompiler\ext\xmlreader\XmlReaderOpen */
+    public function test_xmlreader_open_empty_uri_value_error(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/xmlreader_open_empty_uri_message_parity.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_open_empty_uri.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "ValueError:XMLReader::open(): Argument #1 (\$uri) cannot be empty\n"
+            ."ValueError:XMLReader::XML(): Argument #1 (\$source) cannot be empty\n"
+            ."ValueError:XMLReader::open(): Argument #1 (\$uri) cannot be empty\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_xmlreader_from_factories_withheld_on_reference_profile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
