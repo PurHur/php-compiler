@@ -48,9 +48,12 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::isSqlite3ComplianceCase($name)) {
                 continue;
             }
+            // Functional str_increment*_forward* / *_profile cases set PROFILE via --ENV--; always include (#24820).
             if (!CompilerVersion::supportsStrIncrement()
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))
-                && !str_contains($name, 'str_increment_phantom')) {
+                && !str_contains($name, 'str_increment_phantom')
+                && !str_contains($name, 'str_increment_profile')
+                && !str_contains($name, 'forward')) {
                 continue;
             }
             if (CompilerVersion::supportsStrIncrement()

@@ -14,9 +14,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertSame('8.4.0-dev', CompilerVersion::VERSION);
     }
 
-    public function testSupportsStrIncrementTrueOnDefault84DevProfile(): void
+    public function testSupportsStrIncrementFalseOnDefault84DevProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsStrIncrement());
+        $this->assertFalse(CompilerVersion::supportsStrIncrement());
     }
 
     public function testSupportsStrIncrementFalseOnPhp82Profile(): void
@@ -119,9 +119,9 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testAdvertisesStrIncrementTrueOnDefault84DevProfile(): void
+    public function testAdvertisesStrIncrementFalseOnDefault84DevProfile(): void
     {
-        $this->assertTrue(CompilerVersion::advertisesStrIncrement());
+        $this->assertFalse(CompilerVersion::advertisesStrIncrement());
     }
 
     public function testAdvertisesStrIncrementFalseOnPhp82Profile(): void
@@ -2220,12 +2220,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersStrIncrementOnDefault84DevProfile(): void
+    public function testVmDoesNotRegisterStrIncrementOnDefault84DevProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertTrue(isset($ctx->functions['str_decrement']));
-        $this->assertTrue(isset($ctx->functions['str_increment']));
+        $this->assertFalse(isset($ctx->functions['str_decrement']));
+        $this->assertFalse(isset($ctx->functions['str_increment']));
     }
 
     public function testVmDoesNotRegisterStrIncrementOnPhp82Profile(): void

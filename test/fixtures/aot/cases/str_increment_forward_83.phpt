@@ -1,5 +1,7 @@
 --TEST--
 AOT str_increment() (#3102)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 echo str_increment('9'), "\n";
