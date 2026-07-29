@@ -1264,7 +1264,7 @@ final class VmDomXPath
      *     attr: ?string,
      *     attrValue: string,
      *     attrNumeric: bool,
-     *     position: ?int,
+     *     positionPred: null|array{op: string, rhs: int|string},
      *     fnPred: ?string,
      *     fnPredValue: string
      * }
@@ -1282,7 +1282,7 @@ final class VmDomXPath
                 'attr' => null,
                 'attrValue' => '',
                 'attrNumeric' => false,
-                'position' => null,
+                'positionPred' => null,
                 'fnPred' => strtolower($matches[2]),
                 'fnPredValue' => $matches[4],
             ];
@@ -1298,7 +1298,7 @@ final class VmDomXPath
                 'attr' => null,
                 'attrValue' => '',
                 'attrNumeric' => false,
-                'position' => null,
+                'positionPred' => null,
                 'fnPred' => 'text-eq',
                 'fnPredValue' => $matches[3],
             ];
@@ -1314,7 +1314,7 @@ final class VmDomXPath
                 'attr' => null,
                 'attrValue' => '',
                 'attrNumeric' => false,
-                'position' => null,
+                'positionPred' => null,
                 'fnPred' => 'contains-text',
                 'fnPredValue' => $matches[3],
             ];
@@ -1330,7 +1330,51 @@ final class VmDomXPath
                 'attr' => $matches[2],
                 'attrValue' => $matches[3],
                 'attrNumeric' => true,
-                'position' => null,
+                'positionPred' => null,
+                'fnPred' => null,
+                'fnPredValue' => '',
+            ];
+        }
+        // [last()] — context size (#25083; XPath 1.0 ≡ [position()=last()]).
+        if (preg_match('~^(.+?)\[last\(\)\]$~i', $segment, $matches)) {
+            return [
+                'test' => $matches[1],
+                'attr' => null,
+                'attrValue' => '',
+                'attrNumeric' => false,
+                'positionPred' => ['op' => '=', 'rhs' => 'last'],
+                'fnPred' => null,
+                'fnPredValue' => '',
+            ];
+        }
+        // [position()=last()] / [position()>last()] / … (#25083).
+        if (preg_match(
+            '~^(.+?)\[position\(\)\s*(=|!=|<=|>=|<|>)\s*last\(\)\]$~i',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => null,
+                'attrValue' => '',
+                'attrNumeric' => false,
+                'positionPred' => ['op' => $matches[2], 'rhs' => 'last'],
+                'fnPred' => null,
+                'fnPredValue' => '',
+            ];
+        }
+        // [position()=N] / [position()>N] / … (#25083; [n] ≡ [position()=n]).
+        if (preg_match(
+            '~^(.+?)\[position\(\)\s*(=|!=|<=|>=|<|>)\s*([+-]?\d+)\]$~i',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => null,
+                'attrValue' => '',
+                'attrNumeric' => false,
+                'positionPred' => ['op' => $matches[2], 'rhs' => (int) $matches[3]],
                 'fnPred' => null,
                 'fnPredValue' => '',
             ];
@@ -1340,12 +1384,17 @@ final class VmDomXPath
             $segment,
             $matches
         )) {
+            $positionPred = null;
+            if (isset($matches[4]) && '' !== $matches[4]) {
+                $positionPred = ['op' => '=', 'rhs' => (int) $matches[4]];
+            }
+
             return [
                 'test' => $matches[1],
                 'attr' => isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null,
                 'attrValue' => $matches[3] ?? '',
                 'attrNumeric' => false,
-                'position' => isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : null,
+                'positionPred' => $positionPred,
                 'fnPred' => null,
                 'fnPredValue' => '',
             ];
@@ -1356,7 +1405,7 @@ final class VmDomXPath
             'attr' => null,
             'attrValue' => '',
             'attrNumeric' => false,
-            'position' => null,
+            'positionPred' => null,
             'fnPred' => null,
             'fnPredValue' => '',
         ];
@@ -1416,11 +1465,13 @@ final class VmDomXPath
     }
 
     /**
-     * Apply optional [@attr='v'] / [@attr=N] / [n] / [local-name()="…"] / [text()=…] predicates
-     * (#19456, #20456, #21125, #22008, #24333).
+     * Apply optional [@attr='v'] / [@attr=N] / [n] / [position()…] / [last()] /
+     * [local-name()="…"] / [text()=…] predicates
+     * (#19456, #20456, #21125, #22008, #24333, #25083).
      *
-     * @param list<int>             $nodeIds
-     * @param array<string, string> $namespaces
+     * @param list<int>                                  $nodeIds
+     * @param array<string, string>                      $namespaces
+     * @param null|array{op: string, rhs: int|string}    $positionPred
      *
      * @return list<int>
      */
@@ -1428,7 +1479,7 @@ final class VmDomXPath
         array $nodeIds,
         ?string $attr,
         string $attrValue,
-        ?int $position,
+        ?array $positionPred,
         array $namespaces,
         ?string $fnPred = null,
         string $fnPredValue = '',
@@ -1456,15 +1507,52 @@ final class VmDomXPath
                 )
             ));
         }
-        if (null !== $position) {
-            if ($position < 1 || $position > \count($nodeIds)) {
-                return [];
-            }
-
-            return [$nodeIds[$position - 1]];
+        if (null !== $positionPred) {
+            return self::filterNodeIdsByPositionPredicate($nodeIds, $positionPred);
         }
 
         return $nodeIds;
+    }
+
+    /**
+     * XPath 1.0 proximity-position filter over a document-order node-set (#25083).
+     *
+     * @param list<int>                               $nodeIds
+     * @param array{op: string, rhs: int|string}      $positionPred
+     *
+     * @return list<int>
+     */
+    private static function filterNodeIdsByPositionPredicate(array $nodeIds, array $positionPred): array
+    {
+        $last = \count($nodeIds);
+        if (0 === $last) {
+            return [];
+        }
+        $rhs = 'last' === $positionPred['rhs'] ? $last : (int) $positionPred['rhs'];
+        $op = $positionPred['op'];
+        $out = [];
+        foreach ($nodeIds as $i => $id) {
+            $pos = $i + 1;
+            if (self::xpathPositionCompare($pos, $op, $rhs)) {
+                $out[] = $id;
+            }
+        }
+
+        return $out;
+    }
+
+    /** XPath 1.0 number comparison for position()/last() predicates (#25083). */
+    private static function xpathPositionCompare(int $pos, string $op, int $rhs): bool
+    {
+        return match ($op) {
+            '=' => $pos === $rhs,
+            '!=' => $pos !== $rhs,
+            '<' => $pos < $rhs,
+            '>' => $pos > $rhs,
+            '<=' => $pos <= $rhs,
+            '>=' => $pos >= $rhs,
+            default => false,
+        };
     }
 
     /**
@@ -1565,7 +1653,7 @@ final class VmDomXPath
             $ids,
             $parsed['attr'],
             $parsed['attrValue'],
-            $parsed['position'],
+            $parsed['positionPred'],
             $namespaces,
             $parsed['fnPred'],
             $parsed['fnPredValue'],
@@ -1596,7 +1684,7 @@ final class VmDomXPath
                 $ids,
                 $parsed['attr'],
                 $parsed['attrValue'],
-                $parsed['position'],
+                $parsed['positionPred'],
                 $namespaces,
                 $parsed['fnPred'],
                 $parsed['fnPredValue'],
@@ -1610,7 +1698,7 @@ final class VmDomXPath
             $ids,
             $parsed['attr'],
             $parsed['attrValue'],
-            $parsed['position'],
+            $parsed['positionPred'],
             $namespaces,
             $parsed['fnPred'],
             $parsed['fnPredValue'],
