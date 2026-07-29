@@ -2107,4 +2107,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
             BuiltinParamNames::paramNamesForInternalFunction('hash_update_file')
         );
     }
+
+    /** @covers issue #24566 */
+    public function testHashCopyNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('hash_copy');
+        self::assertSame(['context'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'hash_copy'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('hash_copy'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('hash_copy'));
+        self::assertSame(['context'], BuiltinParamNames::paramNamesForInternalFunction('hash_copy'));
+    }
 }
