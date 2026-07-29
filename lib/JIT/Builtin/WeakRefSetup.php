@@ -28,6 +28,12 @@ final class WeakRefSetup
                 JitValueBox::pointer($context, $slot)
             );
         }
+        if ('__value__*' === $rawTy) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                $raw
+            );
+        }
 
         throw new \LogicException('WeakRef JIT lowering expected object argument');
     }

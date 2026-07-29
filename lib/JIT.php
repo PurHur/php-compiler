@@ -8131,6 +8131,28 @@ class JIT {
                         break;
                     }
                     if (Variable::TYPE_VALUE === $value->type) {
+                        if (null !== $containerOp->type
+                            && \PHPTypes\Type::TYPE_OBJECT === $containerOp->type->type
+                            && null !== $op->arg3
+                        ) {
+                            $arrayAccess = JIT\ArrayAccessHelper::tryCompileDimFetch(
+                                $this->context,
+                                $value,
+                                $dim,
+                                $containerOp,
+                                $forWrite
+                            );
+                            if (null !== $arrayAccess) {
+                                if ($forWrite) {
+                                    $this->context->setVariableOp($resultOp, $arrayAccess);
+                                } elseif ($forceBranchMerge) {
+                                    $this->assignOperand($resultOp, $arrayAccess, true);
+                                } else {
+                                    $this->assignOperand($resultOp, $arrayAccess);
+                                }
+                                break;
+                            }
+                        }
                         $fetched = $value->dimFetch($dim, $resultOp->type, $forWrite);
                         if ($forWrite) {
                             $this->context->setVariableOp($resultOp, $fetched);
