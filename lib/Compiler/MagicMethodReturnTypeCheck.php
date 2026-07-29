@@ -9,12 +9,26 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Compile-time magic method return type rules (PHP 8.0+).
+ * Compile-time magic method return type and arity rules (PHP 8.0+).
  *
- * php-src: Zend/zend_compile.c — zend_compile_method magic return checks
+ * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
+ * (#4988 return types; #25023 zero-parameter magic methods)
  */
 final class MagicMethodReturnTypeCheck
 {
+    /**
+     * Canonical display names for magic methods that must take zero parameters.
+     *
+     * @var array<string, string> lowercase => Zend message casing
+     */
+    private const NO_ARGS_MAGIC = [
+        '__wakeup' => '__wakeup',
+        '__destruct' => '__destruct',
+        '__clone' => '__clone',
+        '__serialize' => '__serialize',
+        '__debuginfo' => '__debugInfo',
+    ];
+
     public static function validate(Script $script): void
     {
         $check = new self();
@@ -33,6 +47,13 @@ final class MagicMethodReturnTypeCheck
                 continue;
             }
             $methodLc = strtolower($member->func->name);
+            if (isset(self::NO_ARGS_MAGIC[$methodLc]) && count($member->func->params) > 0) {
+                $canonical = self::NO_ARGS_MAGIC[$methodLc];
+                $this->fatal(
+                    $member,
+                    "Method {$classDisplay}::{$canonical}() cannot take arguments"
+                );
+            }
             $returnType = $member->func->returnType;
             switch ($methodLc) {
                 case '__construct':

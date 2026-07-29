@@ -134,4 +134,56 @@ PHP;
         $runtime->run($block);
         $this->assertSame("Good\n", ob_get_clean());
     }
+
+    /**
+     * @dataProvider magicMethodWithArgsProvider
+     * @covers issue #25023
+     */
+    public function testMagicMethodWithArgsFailsAtCompileTime(string $code, string $message): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage($message);
+        $runtime->parseAndCompile($code, 'magic_with_args.php');
+    }
+
+    /** @return iterable<string, array{0: string, 1: string}> */
+    public static function magicMethodWithArgsProvider(): iterable
+    {
+        yield '__wakeup optional' => [
+            <<<'PHP'
+<?php
+class W { function __wakeup($a = null) {} }
+PHP,
+            'Method W::__wakeup() cannot take arguments',
+        ];
+        yield '__destruct optional' => [
+            <<<'PHP'
+<?php
+class D { function __destruct($a = null) {} }
+PHP,
+            'Method D::__destruct() cannot take arguments',
+        ];
+        yield '__clone optional' => [
+            <<<'PHP'
+<?php
+class Cl { function __clone($a = null) {} }
+PHP,
+            'Method Cl::__clone() cannot take arguments',
+        ];
+        yield '__serialize required' => [
+            <<<'PHP'
+<?php
+class S { function __serialize($a) {} }
+PHP,
+            'Method S::__serialize() cannot take arguments',
+        ];
+        yield '__debugInfo optional' => [
+            <<<'PHP'
+<?php
+class Di { function __debugInfo($a = null) {} }
+PHP,
+            'Method Di::__debugInfo() cannot take arguments',
+        ];
+    }
 }
