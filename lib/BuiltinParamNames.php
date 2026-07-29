@@ -727,8 +727,10 @@ final class BuiltinParamNames
             case 'dechex':
             case 'decoct':
                 return ['num'];
+            // php-src ext/standard/basic_functions.stub.php — offset=0 (#24896)
+            // InternalArgInfo only lists format/data (no offset row).
             case 'unpack':
-                return ['format', 'string', 'offset'];
+                return ['format', 'string', 'offset='];
             case 'openssl_cipher_iv_length':
             case 'openssl_cipher_key_length':
                 return ['cipher_algo'];

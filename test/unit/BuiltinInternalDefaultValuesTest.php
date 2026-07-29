@@ -72,4 +72,18 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('str_replace', 3));
         self::assertSame('', BuiltinInternalArgInfo::stubParamTypeOverride('str_ireplace', 3));
     }
+
+    /** @covers issue #24896 */
+    public function testUnpackOffsetDefaultIsZero(): void
+    {
+        $info = ['name' => 'offset', 'type' => '', 'isOptional' => true];
+        self::assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('unpack', 2, $info, false)
+        );
+        $var = new Variable();
+        self::assertTrue(
+            BuiltinInternalDefaultValues::materialize($var, 'unpack', 2, $info)
+        );
+        self::assertSame(0, $var->toInt());
+    }
 }
