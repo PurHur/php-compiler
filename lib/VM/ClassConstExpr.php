@@ -38,6 +38,7 @@ final class ClassConstExpr
             OpCode::TYPE_GREATER,
             OpCode::TYPE_SMALLER_OR_EQUAL,
             OpCode::TYPE_GREATER_OR_EQUAL,
+            OpCode::TYPE_SPACESHIP,
             OpCode::TYPE_EQUAL,
             OpCode::TYPE_NOT_EQUAL,
             OpCode::TYPE_IDENTICAL,
@@ -96,6 +97,13 @@ final class ClassConstExpr
             case OpCode::TYPE_GREATER_OR_EQUAL:
                 $frame->scope[$op->arg1]->compareOp(
                     $op->type,
+                    $frame->scope[$op->arg2],
+                    $frame->scope[$op->arg3]
+                );
+                break;
+            case OpCode::TYPE_SPACESHIP:
+                // Zend/zend_operators.c compare_function / spaceship (#24928).
+                $frame->scope[$op->arg1]->spaceshipOp(
                     $frame->scope[$op->arg2],
                     $frame->scope[$op->arg3]
                 );
