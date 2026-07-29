@@ -399,6 +399,33 @@ final class CompilerVersion
     }
 
     /**
+     * Whether the compiler's effective profile is at least $minVersion.
+     *
+     * Handles the 8.4.0-dev case: version_compare treats -dev as below stable, but the compiler
+     * IS version 8.4 and should support 8.4 language features by default — same logic as
+     * {@see builtinAdvertisementVersion()} which already maps MAJOR.MINOR >= 8.4 to '8.4.0'.
+     *
+     * Explicit PHP_COMPILER_PROFILE overrides as usual.
+     */
+    private static function isForwardProfileAtLeast(string $minVersion): bool
+    {
+        $profile = self::languageProfileVersion();
+        if (version_compare($profile, $minVersion, '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (\is_string($raw) && '' !== trim($raw)) {
+            return false;
+        }
+
+        [$minMajor, $minMinor] = array_map('intval', explode('.', $minVersion));
+
+        return self::MAJOR_VERSION > $minMajor
+            || (self::MAJOR_VERSION === $minMajor && self::MINOR_VERSION >= $minMinor);
+    }
+
+    /**
      * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518, #14709, #15026, #16292).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
@@ -1239,7 +1266,7 @@ final class CompilerVersion
      */
     public static function supportsAsymmetricVisibility(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::isForwardProfileAtLeast('8.4.0');
     }
 
     /**
@@ -3486,7 +3513,7 @@ final class CompilerVersion
      */
     public static function supportsParenthesizedAsymmetricSetModifier(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return self::isForwardProfileAtLeast('8.4.0');
     }
 
     /**
