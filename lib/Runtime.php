@@ -389,7 +389,7 @@ class Runtime {
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);
         $staticPreprocessor = new StaticClassPreprocessor();
-        [$code, $staticLines] = $staticPreprocessor->preprocess($code);
+        [$code, $staticLines] = $staticPreprocessor->preprocess($code, $filename);
         $this->staticClassAnnotator->setStaticLines($staticLines);
         [$code, $newRegistry] = (new SourcePreprocessor\PropertyHooks())->process($code, $filename);
         if (\PHPCompiler\ext\standard\VmEval::EVAL_FILENAME === $filename) {
