@@ -25,6 +25,44 @@ final class JitVmHelperLink
     }
 
     /**
+     * NestedJIT an in-memory helper source (per-TU generated maps — skip helper-runtime cache).
+     *
+     * Used by {@see Builtin\GetClassRuntime}: the class-id→name table is compile-unit-specific, so
+     * the on-disk {@see \PHPCompiler\ext\standard\GetClassJitHelper} seed stub must not win via
+     * {@see \PHPCompiler\AOT\HelperRuntimeCache::tryProvide} (#24976).
+     *
+     * @param list<string> $compiledHelpers fully-qualified logical callee names
+     */
+    public static function ensureCompiledFromSource(
+        Context $context,
+        string $source,
+        string $basename,
+        array $compiledHelpers,
+        string $compileLabel
+    ): void {
+        if ('' === $basename) {
+            throw new \InvalidArgumentException('ensureCompiledFromSource requires a basename ('.$compileLabel.')');
+        }
+        if (!self::compiledHelpersMissing($context, $compiledHelpers)) {
+            return;
+        }
+
+        // Intentionally skip HelperRuntimeCache — source is per-TU dynamic (#24976).
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        self::runNestedHelperCompile(
+            $context,
+            static function () use ($context, $source, $basename, $compileLabel): void {
+                $block = $context->runtime->parseAndCompile($source, $basename);
+                if (null === $block) {
+                    throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
+                }
+                (new \PHPCompiler\JIT($context))->compile($block);
+            }
+        );
+        self::assertCompiledHelpersPresent($context, $compiledHelpers, $compileLabel);
+    }
+
+    /**
      * NestedJIT several helper sources in one {@see NestedJitCompileScope} (#22981).
      *
      * Pack's Ieee754 → PackEngineEncode → PackJitEngine → PackJitHelper chain must share a
@@ -45,14 +83,7 @@ final class JitVmHelperLink
             throw new \InvalidArgumentException('ensureCompiledBundle requires at least one path ('.$compileLabel.')');
         }
 
-        $missing = false;
-        foreach ($compiledHelpers as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
+        if (!self::compiledHelpersMissing($context, $compiledHelpers)) {
             return;
         }
 
@@ -60,40 +91,21 @@ final class JitVmHelperLink
         // symbols as available_externally imports + helpers.o at link time,
         // skipping the nested PHP lowering below entirely.
         if (\PHPCompiler\AOT\HelperRuntimeCache::tryProvide($context, $compiledHelpers)) {
-            $missing = false;
-            foreach ($compiledHelpers as $logical) {
-                if (!isset($context->functions[\strtolower($logical)])) {
-                    $missing = true;
-                    break;
-                }
-            }
-            if (!$missing) {
+            if (!self::compiledHelpersMissing($context, $compiledHelpers)) {
                 return;
             }
         }
 
-        $runtime = $context->runtime;
         $paths = [];
         foreach ($relativeHelperPaths as $relativeHelperPath) {
             $path = self::resolveHelperPath($relativeHelperPath);
             $paths[] = [$path, \basename($path)];
         }
         NestedVmActiveContextLlvm::ensureMethod($context);
-        // Restore caller insert after NestedJIT (#21972 / peer #21965 GethostbynamelRuntime).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        // User-script standalone: clear env so nested *JitHelper compile is full NestedJIT (#15407, #20246).
-        $clearUserScriptEnv = $context->shouldClearUserScriptEnvForNestedHelperCompile();
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $paths, $compileLabel, $clearUserScriptEnv): void {
-            $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-            $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
-            if ($clearUserScriptEnv && \function_exists('putenv')) {
-                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-                putenv('PHP_COMPILER_SELFHOST_AOT=0');
-                $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
-                $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
-            }
-            try {
+        self::runNestedHelperCompile(
+            $context,
+            static function () use ($context, $paths, $compileLabel): void {
+                $runtime = $context->runtime;
                 $jit = new \PHPCompiler\JIT($context);
                 foreach ($paths as [$path, $basename]) {
                     $real = \realpath($path) ?: $path;
@@ -107,6 +119,64 @@ final class JitVmHelperLink
                     $jit->compile($block);
                     $context->markJitIncludedFileCompiled($real);
                 }
+            }
+        );
+        self::assertCompiledHelpersPresent($context, $compiledHelpers, $compileLabel);
+    }
+
+    /**
+     * @param list<string> $compiledHelpers
+     */
+    private static function compiledHelpersMissing(Context $context, array $compiledHelpers): bool
+    {
+        foreach ($compiledHelpers as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $compiledHelpers
+     */
+    private static function assertCompiledHelpersPresent(
+        Context $context,
+        array $compiledHelpers,
+        string $compileLabel
+    ): void {
+        foreach ($compiledHelpers as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT ('.$compileLabel.')');
+            }
+        }
+    }
+
+    /**
+     * User-script env clear + NestedJIT + insert restore (#15407 / #21972 / #24976).
+     *
+     * @param callable(): void $compile
+     */
+    private static function runNestedHelperCompile(Context $context, callable $compile): void
+    {
+        // Restore caller insert after NestedJIT (#21972 / peer #21965 GethostbynamelRuntime).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        // User-script standalone: clear env so nested *JitHelper compile is full NestedJIT (#15407, #20246).
+        $clearUserScriptEnv = $context->shouldClearUserScriptEnvForNestedHelperCompile();
+        NestedJitCompileScope::run($context, static function () use ($compile, $clearUserScriptEnv): void {
+            $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
+            if ($clearUserScriptEnv && \function_exists('putenv')) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+                putenv('PHP_COMPILER_SELFHOST_AOT=0');
+                $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
+                $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
+            }
+            try {
+                $compile();
             } finally {
                 if ($clearUserScriptEnv && \function_exists('putenv')) {
                     if (false === $prevUser || '' === (string) $prevUser) {
@@ -132,12 +202,6 @@ final class JitVmHelperLink
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
-        }
-        foreach ($compiledHelpers as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT ('.$compileLabel.')');
-            }
         }
     }
 

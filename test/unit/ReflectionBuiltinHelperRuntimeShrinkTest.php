@@ -24,7 +24,9 @@ final class ReflectionBuiltinHelperRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GetClassRuntime.php');
         $this->assertStringContainsString('GetClassJitHelper', $source);
         $this->assertStringContainsString('helperSourceForMap', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledFromSource', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
     }
 
     public function testGetClassJitHelperLookup(): void

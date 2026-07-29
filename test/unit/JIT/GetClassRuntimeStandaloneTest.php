@@ -19,7 +19,9 @@ final class GetClassRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('__phpc_class_name_from_id', $runtime);
         $this->assertStringContainsString('GetClassJitHelper', $runtime);
         $this->assertStringContainsString('helperSourceForMap', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledFromSource', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $runtime);
         // Mid-emit ensureLinked must restore the outer insert block (#24163).
         $this->assertStringContainsString('BasicBlockHelper::restoreInsertBlock', $runtime);
         $this->assertStringContainsString('getInsertBlock', $runtime);
