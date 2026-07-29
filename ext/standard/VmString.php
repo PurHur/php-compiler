@@ -36,7 +36,7 @@ final class VmString
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
      * wordwrap/str_pad, str_increment/str_decrement,
      * and other typed string builtins use this guard (php-src ext/standard/string.c).
-     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords are Z_PARAM_STR TypeError on 8.4 (#20080).
+     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords soft-null on 8.4 (#24598, reverts #24213/#20080).
      * strlen/strtolower/strtoupper/strrev, trim/ltrim/rtrim/chop (#21404, reverts #21350),
      * and md5/sha1/crc32/bin2hex/hash($data)/hash_hmac($data)/hash_hmac($key)/hash_update($data) coerce null with
      * deprecation on forward profile (php_trim / string.c / hash.c, re-#18850 #19983 #19998 #20007 #21181 #21209 #21557).
@@ -75,7 +75,7 @@ final class VmString
     /**
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
-     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords moved to Z_PARAM_STR TypeError (#20080).
+     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords soft-null (#24598, reverts #24213/#20080).
      * Used by strlen/strtolower/strtoupper/strrev (#20007), trim/ltrim/rtrim/chop (#21404),
      * md5/sha1/crc32/bin2hex/hash($data) (#21181),
      * hash_hmac($data)/hash_hmac($key)/hash_update($data) (#21209, #21557),

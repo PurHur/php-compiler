@@ -1,10 +1,9 @@
 <?php
 
-declare(strict_types=1);
-
 /**
- * Repro for #21428 — ucfirst/lcfirst/ucwords/str_shuffle/str_repeat(null)
- * coerce to '' under PROFILE=8.4 (reverts wrong-direction #20080 TypeError).
+ * Repro for #24598 / #21428 — ucfirst/lcfirst/ucwords/str_shuffle/str_repeat(null)
+ * coerce to '' under PROFILE=8.4 (reverts wrong-direction #24213 / #20080 TypeError).
+ * No declare(strict_types=1) — under strict_types Zend also TypeErrors.
  *
  * Run: PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/ucfirst_null_forward84_20080.php
  */

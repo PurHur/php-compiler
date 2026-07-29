@@ -1,10 +1,13 @@
 --TEST--
-AOT: str_repeat/str_shuffle/ucfirst/lcfirst/ucwords null — TypeError on 8.4 forward profile (#20080, ext/standard/string.c)
+AOT: ucfirst/lcfirst/str_repeat null — coerce on 8.4 forward profile (#24598, reverts #24213)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-str_repeat(null, 1);
+echo ucfirst(null) === '' ? 'ok' : 'bad', "\n";
+echo lcfirst(null) === '' ? 'ok' : 'bad', "\n";
+echo str_repeat(null, 1) === '' ? 'ok' : 'bad', "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+ok
+ok
+ok
