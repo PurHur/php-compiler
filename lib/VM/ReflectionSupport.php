@@ -3165,6 +3165,31 @@ final class ReflectionSupport
     }
 
     /**
+     * php-src: reflection_function_get_return_type() for internals (#22068, #25043).
+     *
+     * Stub return labels come from php-types arginfo via {@see BuiltinInternalArgInfo}.
+     */
+    public static function reflectedFunctionInternalReturnType(ObjectEntry $reflection): ?CfgType
+    {
+        $label = BuiltinInternalArgInfo::returnTypeLabelForFunction(
+            self::functionNameFromReflection($reflection)
+        );
+        if (null === $label) {
+            return null;
+        }
+
+        return ReflectionTypeSupport::cfgTypeFromLabel($label);
+    }
+
+    /** php-src: reflection_function_has_return_type() for internals (#22068, #25043). */
+    public static function reflectedFunctionHasInternalReturnType(ObjectEntry $reflection): bool
+    {
+        return null !== BuiltinInternalArgInfo::returnTypeLabelForFunction(
+            self::functionNameFromReflection($reflection)
+        );
+    }
+
+    /**
      * php-src: reflection_function_get_tentative_return_type() (#22169).
      *
      * Tentative returns are ZEND_ACC_TENTATIVE_RETURN on internal *class methods* only;
@@ -4171,8 +4196,12 @@ final class ReflectionSupport
 
     private static function internalFunctionReturnTypeDumpString(Context $ctx, ObjectEntry $reflection): ?string
     {
-        // Internal arginfo return types are not yet modeled for dumps; omit section.
-        return null;
+        $declared = self::reflectedFunctionInternalReturnType($reflection);
+        if (!self::hasDeclaredReturnType($declared)) {
+            return null;
+        }
+
+        return ReflectionTypeSupport::cfgTypeStringForDump($declared);
     }
 
     private static function formatReflectionScalar(Variable $value): ?string
