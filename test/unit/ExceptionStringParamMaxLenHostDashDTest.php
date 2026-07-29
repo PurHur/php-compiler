@@ -7,8 +7,8 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Host {@code php -d zend.exception_string_param_max_len=0 bin/vm.php} must redact
- * UnhandledMatchError string subjects (#24487).
+ * Host {@code php -d zend.exception_string_param_max_len=N bin/vm.php} must redact
+ * UnhandledMatchError subjects (#24487) and Throwable::getTraceAsString string args (#24486).
  */
 final class ExceptionStringParamMaxLenHostDashDTest extends TestCase
 {
@@ -82,6 +82,96 @@ final class ExceptionStringParamMaxLenHostDashDTest extends TestCase
         $result = $this->runCommand($cmd, $repoRoot);
         $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
         $this->assertSame("Unhandled match case 'secret-subject'\n15\n", $result['stdout']);
+    }
+
+    /** Host {@code -d …=0} → getTraceAsString shows {@code g('...')} (#24486). */
+    public function testHostDashDZeroRedactsGetTraceAsStringArg(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        $script = realpath($repoRoot.'/test/repro/issue_24486_exception_string_param_max_len_trace.php');
+        if (false === $vm || false === $script) {
+            $this->markTestSkipped('vm or repro missing');
+        }
+
+        $cmd = [
+            PHP_BINARY,
+            '-d',
+            'zend.exception_ignore_args=0',
+            '-d',
+            'zend.exception_string_param_max_len=0',
+            '-d',
+            'display_errors=0',
+            $vm,
+            $script,
+        ];
+        $result = $this->runCommand($cmd, $repoRoot);
+        $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+        $this->assertMatchesRegularExpression(
+            "/^#0 .+g\\('\\.\\.\\.'\\)\\n0\\n\\z/",
+            $result['stdout']
+        );
+    }
+
+    /** Host {@code -d …=3} → getTraceAsString shows {@code g('hel...')} (#24486). */
+    public function testHostDashDThreeTruncatesGetTraceAsStringArg(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        $script = realpath($repoRoot.'/test/repro/issue_24486_exception_string_param_max_len_trace.php');
+        if (false === $vm || false === $script) {
+            $this->markTestSkipped('vm or repro missing');
+        }
+
+        $cmd = [
+            PHP_BINARY,
+            '-d',
+            'zend.exception_ignore_args=0',
+            '-d',
+            'zend.exception_string_param_max_len=3',
+            '-d',
+            'display_errors=0',
+            $vm,
+            $script,
+        ];
+        $result = $this->runCommand($cmd, $repoRoot);
+        $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+        $this->assertMatchesRegularExpression(
+            "/^#0 .+g\\('hel\\.\\.\\.'\\)\\n3\\n\\z/",
+            $result['stdout']
+        );
+    }
+
+    /** Guest argv {@code -d} beats host for getTraceAsString truncation (#24486). */
+    public function testGuestDashDOverrideBeatsHostForGetTraceAsString(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        $script = realpath($repoRoot.'/test/repro/issue_24486_exception_string_param_max_len_trace.php');
+        if (false === $vm || false === $script) {
+            $this->markTestSkipped('vm or repro missing');
+        }
+
+        // Host 0, guest 15 → 'hello' fits without truncation.
+        $cmd = [
+            PHP_BINARY,
+            '-d',
+            'zend.exception_ignore_args=0',
+            '-d',
+            'zend.exception_string_param_max_len=0',
+            '-d',
+            'display_errors=0',
+            $vm,
+            '-d',
+            'zend.exception_string_param_max_len=15',
+            $script,
+        ];
+        $result = $this->runCommand($cmd, $repoRoot);
+        $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+        $this->assertMatchesRegularExpression(
+            "/^#0 .+g\\('hello'\\)\\n15\\n\\z/",
+            $result['stdout']
+        );
     }
 
     /**
