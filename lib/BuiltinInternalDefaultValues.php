@@ -206,6 +206,13 @@ final class BuiltinInternalDefaultValues
         'fgets' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/file.stub.php — ?int length=null; separator/enclosure/escape strings (#24826)
+        'fgetcsv' => [
+            1 => ['kind' => 'null'],
+            2 => ['kind' => 'string', 'value' => ','],
+            3 => ['kind' => 'string', 'value' => '"'],
+            4 => ['kind' => 'string', 'value' => '\\'],
+        ],
     ];
 
     public static function isAvailable(
