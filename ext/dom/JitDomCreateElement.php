@@ -209,18 +209,28 @@ final class JitDomCreateElement
         \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
         int $classId
     ): void {
-        foreach ([self::PROP_NODE_NAME, self::PROP_TAG_NAME, self::PROP_ATTRIBUTES] as $prop) {
+        // Predeclare every thin-AOT slot that later lowering may defineProperty().
+        // allocate() bakes prop count at IR-gen time; growing the class mid-function
+        // leaves earlier objects undersized so tagName/isEqualNode reads OOB (#24973).
+        foreach ([
+            self::PROP_NODE_NAME => JITVariable::TYPE_STRING,
+            self::PROP_TAG_NAME => JITVariable::TYPE_STRING,
+            self::PROP_ATTRIBUTES => JITVariable::TYPE_VALUE,
+            // #21687: contains()/getRootNode without DomRegistry.
+            VmDom::PROP_PARENT_NODE => JITVariable::TYPE_VALUE,
+            VmDom::PROP_OWNER_DOCUMENT => JITVariable::TYPE_VALUE,
+            // initTextContentSlot / saveXML / getElementById helpers.
+            VmDom::PROP_TEXT_CONTENT => JITVariable::TYPE_STRING,
+            // DomNodeLiveMutationRuntime::syncElementNavSlots (appendChild path).
+            VmDom::PROP_FIRST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,
+            VmDom::PROP_LAST_ELEMENT_CHILD => JITVariable::TYPE_VALUE,
+            VmDom::PROP_CHILD_ELEMENT_COUNT => JITVariable::TYPE_NATIVE_LONG,
+            VmDom::PROP_NEXT_ELEMENT_SIBLING => JITVariable::TYPE_VALUE,
+            VmDom::PROP_PREVIOUS_ELEMENT_SIBLING => JITVariable::TYPE_VALUE,
+        ] as $prop => $type) {
             if (!$objectType->hasProperty($classId, $prop)) {
-                $type = self::PROP_ATTRIBUTES === $prop ? JITVariable::TYPE_VALUE : JITVariable::TYPE_STRING;
                 $objectType->defineProperty($classId, $prop, $type);
             }
-        }
-        // #21687: parentNode / ownerDocument for contains()/getRootNode without DomRegistry.
-        if (!$objectType->hasProperty($classId, VmDom::PROP_PARENT_NODE)) {
-            $objectType->defineProperty($classId, VmDom::PROP_PARENT_NODE, JITVariable::TYPE_VALUE);
-        }
-        if (!$objectType->hasProperty($classId, VmDom::PROP_OWNER_DOCUMENT)) {
-            $objectType->defineProperty($classId, VmDom::PROP_OWNER_DOCUMENT, JITVariable::TYPE_VALUE);
         }
     }
 
