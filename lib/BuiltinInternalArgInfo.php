@@ -197,6 +197,8 @@ final class BuiltinInternalArgInfo
             'strtotime' => 1 === $index ? '?int' : null,
             // ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             'unixtojd' => 0 === $index ? '?int' : null,
+            // Zend/zend_builtin_functions.stub.php — object $object (InternalArgInfo omits row) (#25016)
+            'get_mangled_object_vars' => 0 === $index ? 'object' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
             'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
             // ext/pcre/php_pcre.stub.php — string|array unions; &$count = null untyped (#23587)
