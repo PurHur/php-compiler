@@ -13,11 +13,10 @@ use PHPCfg\Script;
  * Compile-time rejection of static magic methods that Zend forbids.
  *
  * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
- * ("Method …::…() cannot be static") (#25026)
+ * ("Method …::…() cannot be static") (#25026, #25027)
  *
  * `__construct` / `__destruct` / `__clone` are already rejected by nikic/php-parser
- * at parse time. Sibling "cannot be static" methods (__get/__set/…) are tracked
- * separately (#25027).
+ * at parse time.
  */
 final class MagicMethodStaticCheck
 {
@@ -30,6 +29,12 @@ final class MagicMethodStaticCheck
         '__sleep' => true,
         '__wakeup' => true,
         '__invoke' => true,
+        '__get' => true,
+        '__set' => true,
+        '__isset' => true,
+        '__unset' => true,
+        '__call' => true,
+        '__tostring' => true,
     ];
 
     public static function validate(Script $script): void

@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #25026 */
+/** @covers issues #25026, #25027 */
 final class MagicMethodStaticCheckTest extends TestCase
 {
     /**
@@ -45,13 +45,55 @@ class I { static function __invoke() { return 1; } }
 PHP,
             'Method I::__invoke() cannot be static',
         ];
-        yield 'namespaced __sleep' => [
+        yield '__get' => [
+            <<<'PHP'
+<?php
+class G { public static function __get($n) { return 1; } }
+PHP,
+            'Method G::__get() cannot be static',
+        ];
+        yield '__set' => [
+            <<<'PHP'
+<?php
+class S { public static function __set($n, $v) {} }
+PHP,
+            'Method S::__set() cannot be static',
+        ];
+        yield '__isset' => [
+            <<<'PHP'
+<?php
+class Is { public static function __isset($n) { return false; } }
+PHP,
+            'Method Is::__isset() cannot be static',
+        ];
+        yield '__unset' => [
+            <<<'PHP'
+<?php
+class U { public static function __unset($n) {} }
+PHP,
+            'Method U::__unset() cannot be static',
+        ];
+        yield '__call' => [
+            <<<'PHP'
+<?php
+class C { public static function __call($n, $a) { return null; } }
+PHP,
+            'Method C::__call() cannot be static',
+        ];
+        yield '__toString' => [
+            <<<'PHP'
+<?php
+class T { public static function __toString() { return 'x'; } }
+PHP,
+            'Method T::__toString() cannot be static',
+        ];
+        yield 'namespaced __get' => [
             <<<'PHP'
 <?php
 namespace N;
-class Sl { public static function __sleep() { return []; } }
+class G { public static function __get($n) { return 1; } }
 PHP,
-            'Method N\\Sl::__sleep() cannot be static',
+            'Method N\\G::__get() cannot be static',
         ];
     }
 
@@ -64,15 +106,25 @@ class Ok {
     public function __sleep() { return []; }
     public function __wakeup() {}
     public function __invoke() { return 7; }
+    public function __get($n) { return "g:$n"; }
+    public function __set($n, $v) {}
+    public function __isset($n) { return $n === 'yes'; }
+    public function __unset($n) {}
+    public function __call($n, $a) { return "c:$n"; }
+    public function __toString() { return 'str'; }
 }
 $o = new Ok();
 echo $o(), "\n";
+echo $o->missing, "\n";
+echo isset($o->yes) ? '1' : '0', "\n";
+echo $o->hello(), "\n";
+echo (string) $o, "\n";
 echo serialize($o), "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'valid_static_magic.php');
         $this->assertNotNull($block);
         ob_start();
         $runtime->run($block);
-        $this->assertSame("7\nO:2:\"Ok\":0:{}\n", ob_get_clean());
+        $this->assertSame("7\ng:missing\n1\nc:hello\nstr\nO:2:\"Ok\":0:{}\n", ob_get_clean());
     }
 }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
-use PHPCfg\Func as CfgFunc;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
@@ -139,12 +138,7 @@ final class MagicMethodReturnTypeCheck
         string $classDisplay,
         ?Op\Type $returnType
     ): void {
-        if (0 !== ($member->func->flags & CfgFunc::FLAG_STATIC)) {
-            $this->fatal(
-                $member,
-                "Method {$classDisplay}::__toString() cannot be static"
-            );
-        }
+        // Static __toString is rejected by MagicMethodStaticCheck (#25027).
         if (!MethodVisibility::isPublic(MethodVisibility::mask($member->func->flags))) {
             // Zend emits E_WARNING then the Stringable access-level fatal.
             $this->compileWarning(
