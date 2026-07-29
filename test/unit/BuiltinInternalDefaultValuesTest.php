@@ -248,4 +248,18 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
+    /** @covers issue #25066 */
+    public function testIteratorToArrayPreserveKeysDefaultTrue(): void
+    {
+        $info = ['name' => 'preserve_keys', 'type' => 'bool', 'isOptional' => true];
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable('iterator_to_array', 1, $info, false));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize($dest, 'iterator_to_array', 1, $info));
+        self::assertTrue($dest->toBool());
+        self::assertSame(
+            'Traversable|array',
+            BuiltinInternalArgInfo::stubParamTypeOverride('iterator_to_array', 0)
+        );
+    }
+
 }

@@ -1110,8 +1110,9 @@ final class BuiltinParamNames
             case 'is_subclass_of':
             case 'is_a':
                 return ['object_or_class', 'class', 'allow_string'];
+            // php-src ext/spl/spl.stub.php — preserve_keys = true (#25066)
             case 'iterator_to_array':
-                return ['iterator', 'preserve_keys'];
+                return ['iterator', 'preserve_keys='];
             case 'generator_to_array':
                 return ['generator', 'preserve_keys'];
             case 'hrtime':

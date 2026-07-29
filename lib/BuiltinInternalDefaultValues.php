@@ -226,6 +226,10 @@ final class BuiltinInternalDefaultValues
         'rmdir' => [
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/spl/spl.stub.php — bool $preserve_keys = true (bool infer defaults false) (#25066)
+        'iterator_to_array' => [
+            1 => ['kind' => 'bool', 'value' => true],
+        ],
     ];
 
     public static function isAvailable(

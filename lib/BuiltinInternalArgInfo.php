@@ -240,6 +240,8 @@ final class BuiltinInternalArgInfo
             'fgetcsv' => 1 === $index ? '?int' : null,
             // ext/standard/file.stub.php — ?int $length = null (#24814)
             'file_get_contents' => 4 === $index ? '?int' : null,
+            // ext/spl/spl.stub.php — Traversable|array (InternalArgInfo says traversable) (#25066)
+            'iterator_to_array' => 0 === $index ? 'Traversable|array' : null,
             default => null,
         };
     }
