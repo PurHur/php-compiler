@@ -129,6 +129,7 @@ final class VmString
      * ini_get/ini_set $option and putenv $assignment soft-null (#21312, reverts #20361/#21004 TypeError).
      * parse_str $string / trigger_error|user_error $message soft-null (#21480).
      * error_log($message), gethostbyname($hostname), dns_get_record($hostname) soft-null (#24965, re-#24178, reverts #23858).
+     * gethostbynamel($hostname) soft-null (#24966, sibling of #24965; php-src ext/standard/dns.c).
      * gettext/_/dgettext/ngettext msgid + domain soft-null (#21581, reverts #20209 TypeError; ext/gettext/gettext.c).
      */
     public static function coerceTrimFamilyStringArg(

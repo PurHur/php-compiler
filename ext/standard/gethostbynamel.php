@@ -16,7 +16,8 @@ use PHPLLVM\Value;
 /**
  * gethostbynamel() — IPv4 address list for hostname (ext/standard/dns.c parity, #3707).
  *
- * Z_PARAM_STR $hostname — null TypeError on 8.4 forward profile (#20555, re-#19098).
+ * Z_PARAM_STR $hostname — null TypeError under caller strict_types only; PROFILE=8.4 soft-null DEP+false
+ * (#24966 / sibling of #24965 gethostbyname; php-src ext/standard/dns.c).
  *
  * VM: VmDns (libc FFI, #4928). JIT/AOT: GethostbynamelRuntime → GethostbynamelJitHelper PHP (#9382).
  *
@@ -34,12 +35,7 @@ final class gethostbynamel extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('gethostbynamel() requires exactly one argument in this compiler build');
         }
-        $hostname = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'gethostbynamel',
-            0,
-            'hostname'
-        );
+        $hostname = VmString::trimFamilyStringArgForFrame($frame, 0, 'gethostbynamel', 0, 'hostname');
         if (null === $frame->returnVar) {
             return;
         }
@@ -60,7 +56,7 @@ final class gethostbynamel extends Internal
         $hostnameArg = $args[0];
         $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
             || ($hostnameArg->isNullConstant ?? false);
-        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
+        if ($nullOperand && $context->callerStrictTypes) {
             JitStringBuiltinArg::lowerZparamStr(
                 $context,
                 $hostnameArg,
@@ -73,8 +69,13 @@ final class gethostbynamel extends Internal
             return JitValueBox::pointer($context, $slot);
         }
 
+        // Compile-time null → false without DNS helper / DEP IR (AOT-safe fold; VM emits DEP) (#24966).
+        if ($nullOperand) {
+            return self::boxedFalse($context);
+        }
+
         GethostbynamelRuntime::ensureLinked($context);
-        $hostname = JitStringBuiltinArg::lowerZparamStr(
+        $hostname = JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $hostnameArg,
             'gethostbynamel',
@@ -83,5 +84,14 @@ final class gethostbynamel extends Internal
         );
 
         return JitGethostbynamel::invoke($context, $hostname);
+    }
+
+    private static function boxedFalse(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 }
