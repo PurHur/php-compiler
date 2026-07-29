@@ -347,16 +347,56 @@ final class SplCachingIteratorStorage
     }
 
     /**
-     * php-src CachingIterator::__toString / CIT_CALL_TOSTRING — convert_to_string on current (#24256).
+     * php-src CachingIterator::__toString (spl_iterators.c) — flag gate + TOSTRING_USE_* / CALL_TOSTRING (#24907, #24256).
+     *
+     * Without CIT_CALL_TOSTRING|CIT_TOSTRING_USE_KEY|CURRENT|INNER → BadMethodCallException
+     * (FULL_CACHE alone must not stringify).
      */
     public static function toString(Frame $frame, ObjectEntry $object): string
     {
         $state = self::state($object);
+        $flags = $state['flags'];
+        $fetchMask = CachingIteratorBuiltin::CALL_TOSTRING
+            | CachingIteratorBuiltin::TOSTRING_USE_KEY
+            | CachingIteratorBuiltin::TOSTRING_USE_CURRENT
+            | CachingIteratorBuiltin::TOSTRING_USE_INNER;
+        if (0 === ($flags & $fetchMask)) {
+            // php-src: "%s does not fetch string value (see CachingIterator::__construct)"
+            throw new \BadMethodCallException(
+                $object->class->name.' does not fetch string value (see CachingIterator::__construct)'
+            );
+        }
+
+        // php-src: CIT_TOSTRING_USE_KEY takes precedence over USE_CURRENT / CALL_TOSTRING zstr.
+        if (0 !== ($flags & CachingIteratorBuiltin::TOSTRING_USE_KEY)) {
+            if ($state['index'] < 0 || null === $state['cachedKey']) {
+                return '';
+            }
+
+            return self::stringifyVariable($frame, $state['cachedKey']->resolveIndirect());
+        }
+        if (0 !== ($flags & CachingIteratorBuiltin::TOSTRING_USE_CURRENT)) {
+            if ($state['index'] < 0 || null === $state['cached']) {
+                return '';
+            }
+
+            return self::stringifyVariable($frame, $state['cached']->resolveIndirect());
+        }
+        // CIT_TOSTRING_USE_INNER — php-src caches zval_get_string(inner) on next into zstr.
+        if (0 !== ($flags & CachingIteratorBuiltin::TOSTRING_USE_INNER)) {
+            return self::stringifyObjectCurrent($frame, $state['inner']);
+        }
+        // CIT_CALL_TOSTRING — php-src returns cached zstr from next (current converted), else "".
         if ($state['index'] < 0 || null === $state['cached']) {
             return '';
         }
-        $resolved = $state['cached']->resolveIndirect();
 
+        return self::stringifyVariable($frame, $state['cached']->resolveIndirect());
+    }
+
+    /** convert_to_string / zval_get_string for cached current or key (#24256 / #24907). */
+    private static function stringifyVariable(Frame $frame, Variable $resolved): string
+    {
         return match ($resolved->type) {
             Variable::TYPE_STRING => $resolved->toString(),
             Variable::TYPE_INTEGER => (string) $resolved->toInt(),
