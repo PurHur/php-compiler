@@ -32,7 +32,10 @@ SUITE="VMTest"
 SHARDS=24
 SHARD=0
 LIST_ONLY=0
-: "${SHARD_TIMEOUT:=3600}"
+# A normal shard is ~315s (measured over 21 clean shards of a 24-way VMTest run), so an hour buys
+# nothing but a longer stall when a case hangs. Each hang cost 40 minutes at the old 2400s in the
+# first discovery run; 900s is ~3x a normal shard and still bounds the damage.
+: "${SHARD_TIMEOUT:=900}"
 : "${PHP_BIN:=php}"
 
 for arg in "$@"; do
