@@ -43,9 +43,12 @@ script/compliance-baseline.sh --collect --suite=VMTest            # all shards -
 script/compliance-baseline.sh --diff    --suite=VMTest            # current vs committed baseline
 ```
 
-Shards are round-robin by sorted case index — `stdlib` is 63% of the corpus, so contiguous slicing
-would leave one shard entirely inside it. Each shard writes a `.failed` file of case **names**;
-`--diff` reports regressions and fixes as set differences and exits non-zero only on regressions.
+Shards are assigned by a **stable hash of the case name** (`crc32(name) % SHARDS`, #24498) — not by
+sorted-list index. Adding, removing or disabling one case moves only that case; other membership is
+unchanged. Contiguous slicing is still wrong (`stdlib` is 63% of the corpus), which is why hashing
+replaced index round-robin rather than range slices. Each shard writes a `.failed` file of case
+**names**; `--diff` reports regressions and fixes as set differences and exits non-zero only on
+regressions.
 
 Three things the tooling refuses to do, each because it has burned someone:
 
@@ -59,11 +62,9 @@ flip between two runs of **the same commit**, proven by two runs — not for cas
 for flakiness. A flaky case inside a baseline manufactures phantom regressions; one in the
 differential corpus already produced a "regression" that measured 17/30 vs 17/30 (#24226).
 
-**Do not change the corpus while a multi-shard run is in flight** (#24498). Shard membership is
-`index % SHARDS` over the sorted case list, so adding, removing or disabling one case reshuffles
-every case sorting after it. Disable a hanging case *after* the run, then re-run **all** shards —
-not just the one that stalled. Cases sorting before the change are unaffected, so a spot check on
-early entries will show nothing wrong.
+Still avoid changing `--shards=N` mid-run (that re-partitions everything). Disabling a hanging case
+mid-run is now membership-safe for the *other* cases (#24498); re-run the shard that owned the
+disabled case (and any shard that gains it if you re-enable later), not necessarily the full set.
 
 ### 3. Silent wrong output is the characteristic failure mode
 
