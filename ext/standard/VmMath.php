@@ -1526,4 +1526,61 @@ final class VmMath
         }
         $result->copyFrom($value);
     }
+
+    /**
+     * C strtol() semantics: stops at first non-digit character, no 0o prefix.
+     *
+     * php-src: ZEND_STRTOL → strtol(3) — used by intval() runtime path.
+     * Unlike baseToZval() this does NOT skip invalid characters.
+     */
+    public static function zendStrtol(string $str, int $base): int
+    {
+        $len = \strlen($str);
+        $i = 0;
+
+        while ($i < $len && \ctype_space($str[$i])) {
+            ++$i;
+        }
+
+        $negative = false;
+        if ($i < $len && ('+' === $str[$i] || '-' === $str[$i])) {
+            $negative = '-' === $str[$i];
+            ++$i;
+        }
+
+        if (0 === $base) {
+            if ($i < $len && '0' === $str[$i]) {
+                if ($i + 1 < $len && ('x' === $str[$i + 1] || 'X' === $str[$i + 1])) {
+                    $base = 16;
+                    $i += 2;
+                } elseif ($i + 1 < $len && ('b' === $str[$i + 1] || 'B' === $str[$i + 1])) {
+                    $base = 2;
+                    $i += 2;
+                } else {
+                    $base = 8;
+                }
+            } else {
+                $base = 10;
+            }
+        } elseif ($i + 1 < $len && '0' === $str[$i]) {
+            if (16 === $base && ('x' === $str[$i + 1] || 'X' === $str[$i + 1])) {
+                $i += 2;
+            } elseif (2 === $base && ('b' === $str[$i + 1] || 'B' === $str[$i + 1])) {
+                $i += 2;
+            }
+        }
+
+        $num = 0;
+        $parsed = false;
+        for (; $i < $len; ++$i) {
+            $digit = self::radixDigit($str[$i], $base);
+            if (null === $digit) {
+                break;
+            }
+            $parsed = true;
+            $num = $num * $base + $digit;
+        }
+
+        return $negative ? -$num : $num;
+    }
 }

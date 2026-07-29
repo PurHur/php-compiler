@@ -45,21 +45,17 @@ final class intval extends Internal
         }
         if (Variable::TYPE_STRING === $v->type) {
             $str = $v->toString();
-            if (0 === $base) {
-                $base = VmMath::autodetectBase($str);
-            }
-            if ($base < 2 || $base > 36) {
+            if ($base < 2 && 0 !== $base || $base > 36) {
                 $frame->returnVar->int(0);
 
                 return;
             }
-            if (10 !== $base) {
-                $result = VmMath::baseToZval($str, $base);
-                $frame->returnVar->int((int) $result);
+            if (10 === $base) {
+                $frame->returnVar->int((int) $str);
 
                 return;
             }
-            $frame->returnVar->int((int) $str);
+            $frame->returnVar->int(VmMath::zendStrtol($str, $base));
 
             return;
         }
