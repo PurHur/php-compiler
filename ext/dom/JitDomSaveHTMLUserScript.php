@@ -7,9 +7,17 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** User-script standalone AOT: pure-LLVM DOMDocument::saveHTML() (#18268). */
+/**
+ * User-script standalone AOT: pure-LLVM DOMDocument::saveHTML() (#18268, #24580).
+ *
+ * loadHTML() fixtures stay compile-time HTML constants. loadXML() literals (including
+ * CDATA) are folded through host DOMDocument::saveHTML() so CDATA dumps as text like
+ * php-src / libxml htmlNodeDump — without a DomRegistry tree.
+ */
 final class JitDomSaveHTMLUserScript
 {
     private const DOCTYPE = '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">';
@@ -19,7 +27,10 @@ final class JitDomSaveHTMLUserScript
         return JitDomLoadHTMLUserScript::shouldUse($context);
     }
 
-    public static function invoke(Context $context): Value
+    /**
+     * @param JITVariable ...$args document [, node]
+     */
+    public static function tryInvoke(Context $context, JITVariable ...$args): ?Value
     {
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         $options = JitDomLoadHTMLUserScript::lastCompileTimeOptions() ?? 0;
@@ -34,7 +45,78 @@ final class JitDomSaveHTMLUserScript
             return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral($htmlLit, $options));
         }
 
-        return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral('', $options));
+        $xmlLit = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $xmlLit && '' !== trim($xmlLit)) {
+            $nodeScoped = \count($args) >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]);
+            $html = self::htmlDumpFromXmlLiteral($xmlLit, $nodeScoped);
+            if (null !== $html) {
+                return self::boxConstantString($context, $html);
+            }
+        }
+
+        return null;
+    }
+
+    public static function invoke(Context $context, JITVariable ...$args): Value
+    {
+        $result = self::tryInvoke($context, ...$args);
+        if (null !== $result) {
+            return $result;
+        }
+
+        return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral('', 0));
+    }
+
+    /**
+     * Fold loadXML literal → HTML via host Zend DOM (php-src htmlNodeDump; #24580).
+     *
+     * Node-scoped: when the root has a single child, dump that child (matches
+     * saveHTML($documentElement->firstChild) for CDATA/text fixtures).
+     */
+    private static function htmlDumpFromXmlLiteral(string $xml, bool $nodeScoped): ?string
+    {
+        set_error_handler(static function (): bool {
+            return true;
+        });
+        try {
+            $doc = new \DOMDocument();
+            if (!@$doc->loadXML($xml)) {
+                restore_error_handler();
+
+                return null;
+            }
+            if (!$nodeScoped) {
+                $html = $doc->saveHTML();
+                restore_error_handler();
+
+                return false === $html ? null : $html;
+            }
+            $root = $doc->documentElement;
+            if (null === $root || !($root instanceof \DOMElement)) {
+                restore_error_handler();
+
+                return null;
+            }
+            if (1 !== $root->childNodes->length) {
+                restore_error_handler();
+
+                return null;
+            }
+            $child = $root->firstChild;
+            if (null === $child) {
+                restore_error_handler();
+
+                return null;
+            }
+            $html = $doc->saveHTML($child);
+            restore_error_handler();
+
+            return false === $html ? null : $html;
+        } catch (\Throwable) {
+            restore_error_handler();
+
+            return null;
+        }
     }
 
     private static function formatSaveHtmlCompileTimeLiteral(string $htmlLit, int $options): string
