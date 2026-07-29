@@ -137,8 +137,17 @@ final class JitPathinfo
         if (null === $slot) {
             return null;
         }
+        $mask = self::slotPathinfoMask($context, $block, $slot, []);
+        if (null === $mask) {
+            return null;
+        }
+        if (0 === $mask && isset($block->constants[$slot])
+            && \PHPCompiler\VM\Variable::TYPE_NULL === $block->constants[$slot]->type
+        ) {
+            self::emitNullFlagsDeprecation($context);
+        }
 
-        return self::slotPathinfoMask($context, $block, $slot, []);
+        return $mask;
     }
 
     /**
@@ -153,6 +162,10 @@ final class JitPathinfo
 
         if (isset($block->constants[$slot])) {
             $const = $block->constants[$slot];
+            // php-src: null flags coerce to 0 (#24941)
+            if (\PHPCompiler\VM\Variable::TYPE_NULL === $const->type) {
+                return 0;
+            }
             if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $const->type) {
                 return $const->toInt() & 15;
             }
@@ -249,4 +262,16 @@ final class JitPathinfo
     {
         return StringPathinfo::invokeFilename($context, $path);
     }
+    private static function emitNullFlagsDeprecation(Context $context): void
+    {
+        // Thin standalone AOT: skip DEP IR mid-fold (#21593); VM/JIT still warn.
+        if (NestedJitCompileScope::isActive() || $context->isUserScriptAot()) {
+            return;
+        }
+        JitBuiltinWarning::emitDeprecated(
+            $context,
+            VmNullNumberParamDeprecation::message('pathinfo', 2, 'flags', 'int')
+        );
+    }
+
 }
