@@ -130,6 +130,7 @@ final class SplHeapBuiltin
     public static function insert(ObjectEntry $object, Variable $value, Frame $frame): void
     {
         self::ensureInit($object);
+        self::assertNotCorrupted($object);
         $state = &self::$store[$object->id];
         $copy = new Variable();
         $copy->copyFrom($value->resolveIndirect());
@@ -138,6 +139,18 @@ final class SplHeapBuiltin
     }
 
     public static function extract(ObjectEntry $object, Frame $frame): Variable
+    {
+        self::ensureInit($object);
+        self::assertNotCorrupted($object);
+
+        return self::extractUnchecked($object, $frame);
+    }
+
+    /**
+     * Delete top without corruption gate — SplHeap::next() on php-src 8.2 does not check
+     * SPL_HEAP_CORRUPTED (unlike extract/insert/top); iterator move_forward does.
+     */
+    public static function extractUnchecked(ObjectEntry $object, Frame $frame): Variable
     {
         self::ensureInit($object);
         $state = &self::$store[$object->id];
@@ -161,6 +174,7 @@ final class SplHeapBuiltin
     public static function top(ObjectEntry $object): Variable
     {
         self::ensureInit($object);
+        self::assertNotCorrupted($object);
         $state = self::state($object);
         if ([] === $state['elements']) {
             throw new \RuntimeException("Can't peek at an empty heap");
@@ -198,9 +212,23 @@ final class SplHeapBuiltin
         return self::state($object)['iterPos'] >= 0 && self::count($object) > 0;
     }
 
+    /**
+     * SplHeap::current() peeks without consistency checks (php-src; unlike top()).
+     */
     public static function current(ObjectEntry $object): Variable
     {
-        return self::top($object);
+        self::ensureInit($object);
+        $state = self::state($object);
+        if ([] === $state['elements']) {
+            $null = new Variable();
+            $null->null();
+
+            return $null;
+        }
+        $result = new Variable();
+        $result->copyFrom($state['elements'][0]);
+
+        return $result;
     }
 
     public static function key(ObjectEntry $object): int
@@ -216,7 +244,8 @@ final class SplHeapBuiltin
             return;
         }
         // php-src: iterating SplHeap extracts elements (heap empties under foreach).
-        self::extract($object, $frame);
+        // Method next() skips corruption gate on 8.2 (spl_heap.c PHP_METHOD SplHeap::next).
+        self::extractUnchecked($object, $frame);
         $n = self::count($object);
         self::$store[$object->id]['iterPos'] = $n > 0 ? $n - 1 : -1;
     }
@@ -275,6 +304,9 @@ final class SplHeapBuiltin
      * Bare SplMinHeap/SplMaxHeap use KIND_MIN/KIND_MAX fast path; user subclasses
      * of those (and SplHeap) are KIND_USER and dispatch to the instance method so
      * overridden compare() is honored.
+     *
+     * User compare() throw sets SPL_HEAP_CORRUPTED (php-src spl_ptr_heap_insert /
+     * delete_top; #24312) — element stays in the heap; further insert/extract/top fail.
      */
     public static function compareElements(ObjectEntry $object, Variable $a, Variable $b, Frame $frame): int
     {
@@ -285,9 +317,28 @@ final class SplHeapBuiltin
             return $kind < 0 ? -$cmp : $cmp;
         }
 
-        $result = self::vm($frame)->invokeInstanceMethod($object, 'compare', $a, $b)->resolveIndirect();
+        try {
+            $result = self::vm($frame)->invokeInstanceMethod($object, 'compare', $a, $b)->resolveIndirect();
+        } catch (\Throwable $e) {
+            self::markCorrupted($object);
+            throw $e;
+        }
 
         return $result->toInt();
+    }
+
+    /** php-src spl_heap_consistency_validations — corrupted heap blocks write/peek ops. */
+    public static function assertNotCorrupted(ObjectEntry $object): void
+    {
+        if (self::isCorrupted($object)) {
+            throw new \RuntimeException('Heap is corrupted, heap properties are no longer ensured.');
+        }
+    }
+
+    public static function markCorrupted(ObjectEntry $object): void
+    {
+        self::ensureInit($object);
+        self::$store[$object->id]['corrupted'] = true;
     }
 
     /** True when $object is exactly SplMinHeap / SplMaxHeap (not a user subclass). */
@@ -524,6 +575,7 @@ final class SplPriorityQueueBuiltin
 
     public static function insert(ObjectEntry $object, Variable $data, Variable $priority, Frame $frame): void
     {
+        self::assertNotCorrupted($object);
         $state = &self::$store[$object->id];
         $dataCopy = new Variable();
         $dataCopy->copyFrom($data->resolveIndirect());
@@ -534,6 +586,14 @@ final class SplPriorityQueueBuiltin
     }
 
     public static function extract(ObjectEntry $object, Frame $frame): Variable
+    {
+        self::assertNotCorrupted($object);
+
+        return self::extractUnchecked($object, $frame);
+    }
+
+    /** @see SplHeapBuiltin::extractUnchecked — next() skips corruption gate on 8.2. */
+    public static function extractUnchecked(ObjectEntry $object, Frame $frame): Variable
     {
         $state = &self::$store[$object->id];
         $n = \count($state['elements']);
@@ -553,6 +613,7 @@ final class SplPriorityQueueBuiltin
 
     public static function top(ObjectEntry $object): Variable
     {
+        self::assertNotCorrupted($object);
         $state = self::state($object);
         if ([] === $state['elements']) {
             throw new \RuntimeException("Can't peek at an empty heap");
@@ -583,9 +644,18 @@ final class SplPriorityQueueBuiltin
         return self::state($object)['iterPos'] >= 0 && self::count($object) > 0;
     }
 
+    /** SplPriorityQueue::current() — no corruption gate (php-src). */
     public static function current(ObjectEntry $object): Variable
     {
-        return self::top($object);
+        $state = self::state($object);
+        if ([] === $state['elements']) {
+            $null = new Variable();
+            $null->null();
+
+            return $null;
+        }
+
+        return self::formatElement($object, $state['elements'][0]);
     }
 
     public static function key(ObjectEntry $object): int
@@ -593,12 +663,12 @@ final class SplPriorityQueueBuiltin
         return self::state($object)['iterPos'];
     }
 
-    public static function next(ObjectEntry $object): void
+    public static function next(ObjectEntry $object, Frame $frame): void
     {
         if (!self::valid($object)) {
             return;
         }
-        self::extract($object);
+        self::extractUnchecked($object, $frame);
         $n = self::count($object);
         self::$store[$object->id]['iterPos'] = $n > 0 ? $n - 1 : -1;
     }
@@ -606,6 +676,18 @@ final class SplPriorityQueueBuiltin
     public static function isCorrupted(ObjectEntry $object): bool
     {
         return self::state($object)['corrupted'];
+    }
+
+    public static function assertNotCorrupted(ObjectEntry $object): void
+    {
+        if (self::isCorrupted($object)) {
+            throw new \RuntimeException('Heap is corrupted, heap properties are no longer ensured.');
+        }
+    }
+
+    public static function markCorrupted(ObjectEntry $object): void
+    {
+        self::$store[$object->id]['corrupted'] = true;
     }
 
     public static function recoverFromCorruption(ObjectEntry $object): bool
@@ -687,6 +769,7 @@ final class SplPriorityQueueBuiltin
     /**
      * php-src SplPriorityQueue::compare / spl_ptr_pqueue_elem_cmp (#24328).
      * Exact SplPriorityQueue uses spaceship; subclasses dispatch to overridden compare().
+     * User compare() throw marks corrupted (#24312).
      */
     private static function comparePriority(ObjectEntry $object, Variable $a, Variable $b, Frame $frame): int
     {
@@ -696,9 +779,14 @@ final class SplPriorityQueueBuiltin
         if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
             throw new \LogicException('SplPriorityQueue::compare() requires VM runtime');
         }
-        $result = $frame->vmContext->runtime->vm
-            ->invokeInstanceMethod($object, 'compare', $a, $b)
-            ->resolveIndirect();
+        try {
+            $result = $frame->vmContext->runtime->vm
+                ->invokeInstanceMethod($object, 'compare', $a, $b)
+                ->resolveIndirect();
+        } catch (\Throwable $e) {
+            self::markCorrupted($object);
+            throw $e;
+        }
 
         return $result->toInt();
     }
@@ -1367,7 +1455,7 @@ final class SplPriorityQueueNext extends VmClassMethod
             SplPriorityQueueBuiltin::CLASS_LC,
             'SplPriorityQueue::next()'
         );
-        SplPriorityQueueBuiltin::next($object);
+        SplPriorityQueueBuiltin::next($object, $frame);
     }
 }
 
