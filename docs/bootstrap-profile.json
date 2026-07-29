@@ -6198,7 +6198,6 @@
         "lib/VM/Builtin/ReflectionExtensionToString.php",
         "lib/VM/Builtin/ReflectionFiberConstruct.php",
         "lib/VM/Builtin/ReflectionFiberGetCallable.php",
-        "lib/VM/Builtin/ReflectionFiberGetExecutingFiber.php",
         "lib/VM/Builtin/ReflectionFiberGetExecutingFile.php",
         "lib/VM/Builtin/ReflectionFiberGetExecutingLine.php",
         "lib/VM/Builtin/ReflectionFiberGetFiber.php",
@@ -6873,9 +6872,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6639,
+        "inventory_files": 6638,
         "excluded": 0,
-        "eligible": 6639,
+        "eligible": 6638,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -1,20 +1,6 @@
 <?php
-declare(strict_types=1);
-
-echo 'class=', (int) class_exists('ReflectionFiber'), "\n";
-
-var_export(ReflectionFiber::getExecutingFiber());
-echo "\n";
-
-$fiber = new Fiber(function (): void {
-    $rf = ReflectionFiber::getExecutingFiber();
-    var_export($rf instanceof ReflectionFiber);
-    echo "\n";
-    Fiber::suspend('step');
-});
-
-var_export($fiber->isStarted());
-echo "\n";
-$fiber->start();
-var_export($fiber->isSuspended());
-echo "\n";
+/**
+ * Issue #25058 — ReflectionFiber::getExecutingFiber is not in php-src.
+ * Run: php bin/vm.php test/repro/maintainer_reflection_fiber_get_executing.php
+ */
+echo 'method=', method_exists('ReflectionFiber', 'getExecutingFiber') ? '1' : '0', "\n";
