@@ -8225,7 +8225,7 @@ class Compiler {
     }
 
     /**
-     * Zend 8.2 rejects typed interface constants at parse time; enable at 8.3+ (#5980, #7042).
+     * Zend 8.2 rejects typed interface constants at parse time; enable at 8.3+ forward/stable (#5980, #7042, #24917).
      */
     protected function rejectTypedInterfaceConstantIfUnsupported(Operand $nameOp): void
     {

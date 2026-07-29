@@ -65,6 +65,35 @@ PHP;
         }
     }
 
+    /** Issue #24917 — interface typed consts share the class-form withholding on the reference profile. */
+    public function testTypedInterfaceConstantRejectedOnDefaultDevProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            if (CompilerVersion::supportsInterfaceTypedConstants()) {
+                $this->markTestSkipped('default profile unexpectedly enables typed interface constants (#24917)');
+            }
+            $code = <<<'PHP'
+<?php
+interface I {
+    public const string X = 'a';
+}
+echo I::X;
+PHP;
+            $runtime = new Runtime();
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage('syntax error, unexpected identifier "X", expecting "="');
+            $runtime->parseAndCompile($code, 'issue_24917_typed_interface_const_default.php');
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testTypedClassConstantCompilesOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');

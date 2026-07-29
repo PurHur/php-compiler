@@ -2016,9 +2016,72 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsInterfaceTypedConstantsTrueOn83Target(): void
+    public function testSupportsInterfaceTypedConstantsFalseOnDefaultDevProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            // Same withholding as typed class constants (#24917, re-#24809).
+            $this->assertFalse(CompilerVersion::supportsInterfaceTypedConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsInterfaceTypedConstantsFalseWhenProfile82(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsInterfaceTypedConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsInterfaceTypedConstantsTrueWhenProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsInterfaceTypedConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsInterfaceTypedConstantsTracksTypedClassConstants(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        foreach ([null, '8.2', '8.3', '8.4'] as $profile) {
+            if (null === $profile) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$profile);
+            }
+            $this->assertSame(
+                CompilerVersion::supportsTypedClassConstants(),
+                CompilerVersion::supportsInterfaceTypedConstants(),
+                'interface typed-const gate must match class gate (profile='.($profile ?? 'unset').')'
+            );
+        }
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
     }
 
     public function testSupportsOverrideAttributeFalseOnUnsetReferenceProfile(): void
