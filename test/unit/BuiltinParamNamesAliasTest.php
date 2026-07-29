@@ -427,6 +427,39 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($tokenName, 'type', 'token_name'));
     }
 
+    /** @covers issue #24373 */
+    public function testSocketBindConnectReadWriteSetOptionZendStubNamedParams(): void
+    {
+        $bind = BuiltinParamNames::forFunction('socket_bind');
+        self::assertSame(['socket', 'address', 'port='], $bind);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($bind, 'socket', 'socket_bind'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($bind, 'address', 'socket_bind'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bind, 'addr', 'socket_bind'));
+        self::assertSame(['socket', 'address', 'port='], BuiltinParamNames::forFunction('socket_connect'));
+        self::assertSame(
+            ['socket', 'address', 'port='],
+            BuiltinParamNames::paramNamesForInternalFunction('socket_bind')
+        );
+
+        $read = BuiltinParamNames::forFunction('socket_read');
+        self::assertSame(['socket', 'length', 'mode='], $read);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($read, 'mode', 'socket_read'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($read, 'type', 'socket_read'));
+
+        $write = BuiltinParamNames::forFunction('socket_write');
+        self::assertSame(['socket', 'data', 'length='], $write);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($write, 'data', 'socket_write'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($write, 'buf', 'socket_write'));
+
+        $setopt = BuiltinParamNames::forFunction('socket_set_option');
+        self::assertSame(['socket', 'level', 'option', 'value'], $setopt);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($setopt, 'option', 'socket_set_option'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($setopt, 'value', 'socket_set_option'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($setopt, 'optname', 'socket_set_option'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($setopt, 'optval', 'socket_set_option'));
+        self::assertSame(['socket', 'level', 'option', 'value'], BuiltinParamNames::forFunction('socket_setopt'));
+    }
+
     /** @covers issue #10045 */
     public function testFileGetContentsFilenameNamedParameter(): void
     {
