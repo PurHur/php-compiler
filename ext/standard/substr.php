@@ -47,8 +47,7 @@ final class substr extends Internal
                 $argc
             ));
         }
-        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21189; reverts #18980 TypeError).
-        $string = VmString::coerceTrimFamilyStringArg($frame->calledArgs[0], 'substr', 0, 'string');
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'substr', 0, 'string');
         $offset = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -105,11 +104,7 @@ final class substr extends Internal
         if (null === $strLit
             && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
         ) {
-            if ($context->callerStrictTypes) {
-                $strLit = null;
-            } else {
-                $strLit = '';
-            }
+            $strLit = null;
         }
         if (null !== $strLit) {
             $offsetLit = self::compileTimeSignedLong($context, $args[1]);
@@ -145,7 +140,7 @@ final class substr extends Internal
         if ($context->callerStrictTypes) {
             $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr', 0, 'string');
         } else {
-            $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'substr', 0, 'string');
+            $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr', 0, 'string');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'substr_str_cont');
         $structName = $str->typeOf()->getElementType()->getName();
