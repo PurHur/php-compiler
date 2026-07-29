@@ -306,6 +306,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'index_key', 'array_column'));
     }
 
+    /** @covers issue #24488 */
+    public function testStreamWrapperFilterRegisterNamedParameters(): void
+    {
+        $wrapper = BuiltinParamNames::forFunction('stream_wrapper_register');
+        self::assertSame(['protocol', 'class', 'flags'], $wrapper);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($wrapper, 'protocol', 'stream_wrapper_register'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($wrapper, 'class', 'stream_wrapper_register'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($wrapper, 'classname', 'stream_wrapper_register'));
+
+        $filter = BuiltinParamNames::forFunction('stream_filter_register');
+        self::assertSame(['filter_name', 'class'], $filter);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($filter, 'filter_name', 'stream_filter_register'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($filter, 'class', 'stream_filter_register'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($filter, 'filtername', 'stream_filter_register'));
+    }
+
     /** @covers issue #24534 */
     public function testFtruncateNamedParameters(): void
     {

@@ -576,6 +576,11 @@ final class BuiltinParamNames
             // php-src stream context stubs — InternalArgInfo still says options (#23939)
             case 'stream_context_set_params':
                 return ['context', 'params'];
+            // php-src ext/standard/streamsfuncs.stub.php — InternalArgInfo still says classname (#24488)
+            case 'stream_wrapper_register':
+                return ['protocol', 'class', 'flags'];
+            case 'stream_filter_register':
+                return ['filter_name', 'class'];
             // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says context (#24584)
             case 'stream_context_get_options':
                 return ['stream_or_context'];
