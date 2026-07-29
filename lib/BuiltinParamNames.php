@@ -271,6 +271,13 @@ final class BuiltinParamNames
             // php-src ext/date/php_date.stub.php — InternalArgInfo still gmtoffset/isdst (#24359)
             case 'timezone_name_from_abbr':
                 return ['abbr', 'utcOffset=', 'isDST='];
+            // php-src ext/date/php_date.stub.php — procedural wrappers; transitions arg order/names (#24360)
+            case 'timezone_location_get':
+                return ['object'];
+            case 'timezone_offset_get':
+                return ['object', 'datetime'];
+            case 'timezone_transitions_get':
+                return ['object', 'timestampBegin=', 'timestampEnd='];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says min/sec/mon (#23275)
             case 'mktime':
             case 'gmmktime':

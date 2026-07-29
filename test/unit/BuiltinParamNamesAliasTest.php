@@ -1117,6 +1117,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'gmtoffset', 'timezone_name_from_abbr'));
     }
 
+    /** @covers issue #24360 */
+    public function testTimezoneProceduralZendStubNamedParams(): void
+    {
+        self::assertSame(['object'], BuiltinParamNames::forFunction('timezone_location_get'));
+        self::assertSame(['object', 'datetime'], BuiltinParamNames::forFunction('timezone_offset_get'));
+        $names = BuiltinParamNames::forFunction('timezone_transitions_get');
+        self::assertSame(['object', 'timestampBegin=', 'timestampEnd='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'object', 'timezone_transitions_get'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timestampBegin', 'timezone_transitions_get'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'timestampEnd', 'timezone_transitions_get'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp_begin', 'timezone_transitions_get'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp_end', 'timezone_transitions_get'));
+    }
+
     /** @covers issue #24550 */
     public function testPhpinfoZendStubNamedFlagsParam(): void
     {
