@@ -41,13 +41,13 @@ final class stream_set_blocking extends Internal
             1
         );
         if (InternalStrictArg::isCallerStrict($frame)) {
-            $mode = InternalStrictArg::requireBool($frame, 1, $fn, 'mode')->toBool();
+            $mode = InternalStrictArg::requireBool($frame, 1, $fn, 'enable')->toBool();
         } else {
             $mode = VmMath::parseBoolBuiltinArg(
                 $frame->calledArgs[1]->resolveIndirect(),
                 $fn,
                 2,
-                'mode'
+                'enable'
             );
         }
         if (null === $frame->returnVar) {
@@ -63,9 +63,9 @@ final class stream_set_blocking extends Internal
             throw new \LogicException($fn.'() requires exactly two arguments in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
-        JitInternalStrictArg::requireBool($context, $args[1], $fn, 'mode', 2);
+        JitInternalStrictArg::requireBool($context, $args[1], $fn, 'enable', 2);
         $mode = $context->builder->zExt(
-            JitBoolArg::lower($context, $args[1], $fn.'(): Argument #2 ($mode)'),
+            JitBoolArg::lower($context, $args[1], $fn.'(): Argument #2 ($enable)'),
             $i64
         );
 

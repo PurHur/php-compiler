@@ -374,6 +374,34 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('stream_isatty'));
     }
 
+    /** @covers issue #23658 */
+    public function testStreamMetaBlockingFilterTokenZendStubNamedParams(): void
+    {
+        $meta = BuiltinParamNames::forFunction('stream_get_meta_data');
+        self::assertSame(['stream'], $meta);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($meta, 'stream', 'stream_get_meta_data'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($meta, 'fp', 'stream_get_meta_data'));
+        self::assertSame(['stream'], BuiltinParamNames::forFunction('socket_get_status'));
+
+        $blocking = BuiltinParamNames::forFunction('stream_set_blocking');
+        self::assertSame(['stream', 'enable'], $blocking);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($blocking, 'stream', 'stream_set_blocking'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($blocking, 'enable', 'stream_set_blocking'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($blocking, 'socket', 'stream_set_blocking'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($blocking, 'mode', 'stream_set_blocking'));
+        self::assertSame(['stream', 'enable'], BuiltinParamNames::forFunction('socket_set_blocking'));
+
+        $filterId = BuiltinParamNames::forFunction('filter_id');
+        self::assertSame(['name'], $filterId);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($filterId, 'name', 'filter_id'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($filterId, 'filtername', 'filter_id'));
+
+        $tokenName = BuiltinParamNames::forFunction('token_name');
+        self::assertSame(['id'], $tokenName);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($tokenName, 'id', 'token_name'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($tokenName, 'type', 'token_name'));
+    }
+
     /** @covers issue #10045 */
     public function testFileGetContentsFilenameNamedParameter(): void
     {
