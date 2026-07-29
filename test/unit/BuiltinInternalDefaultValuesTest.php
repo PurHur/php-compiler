@@ -94,6 +94,20 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame(0, $var->toInt());
     }
 
+    /** @covers issue #25070 */
+    public function testRangeStepDefaultIsOne(): void
+    {
+        $info = ['name' => 'step', 'type' => 'int', 'isOptional' => true];
+        self::assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('range', 2, $info, false)
+        );
+        $var = new Variable();
+        self::assertTrue(
+            BuiltinInternalDefaultValues::materialize($var, 'range', 2, $info)
+        );
+        self::assertSame(1, $var->toInt());
+    }
+
     /** @covers issue #24971 */
     public function testPathQueryClusterDefaults(): void
     {
