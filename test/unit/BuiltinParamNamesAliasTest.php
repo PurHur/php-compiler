@@ -152,14 +152,30 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #11577 */
+    /** @covers issue #11577 / #24896 */
     public function testUnpackNamedFormatStringParamsResolve(): void
     {
         $names = BuiltinParamNames::forFunction('unpack');
-        self::assertSame(['format', 'string', 'offset'], $names);
+        self::assertSame(['format', 'string', 'offset='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'format', 'unpack'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'unpack'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'unpack'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('unpack'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('unpack'));
+        self::assertTrue(BuiltinInternalDefaultValues::isAvailable(
+            'unpack',
+            2,
+            ['name' => 'offset', 'type' => '', 'isOptional' => true],
+            false
+        ));
+        $dest = new Variable();
+        self::assertTrue(BuiltinInternalDefaultValues::materialize(
+            $dest,
+            'unpack',
+            2,
+            ['name' => 'offset', 'type' => '', 'isOptional' => true]
+        ));
+        self::assertSame(0, $dest->toInt());
     }
 
     /** @covers issue #16887 */
