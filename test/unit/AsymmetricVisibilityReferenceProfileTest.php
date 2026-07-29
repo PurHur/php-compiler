@@ -26,8 +26,8 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(AsymmetricVisibilityRejector::PARSE_MESSAGE);
         AsymmetricVisibilityRejector::reject(
-            file_get_contents(__DIR__.'/../repro/maintainer_gap_private_set_reference_profile.php'),
-            'maintainer_gap_private_set_reference_profile.php'
+            file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_visibility_reference_profile.php'),
+            'maintainer_gap_asymmetric_visibility_reference_profile.php'
         );
     }
 
@@ -39,8 +39,8 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(
-                file_get_contents(__DIR__.'/../repro/maintainer_gap_private_set_reference_profile.php'),
-                'maintainer_gap_private_set_reference_profile.php'
+                file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_visibility_reference_profile.php'),
+                'maintainer_gap_asymmetric_visibility_reference_profile.php'
             );
             $this->fail('Expected compile failure');
         } catch (\PHPCompiler\Compiler\CompileFatal $e) {
