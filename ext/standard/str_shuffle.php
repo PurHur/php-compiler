@@ -49,7 +49,8 @@ final class str_shuffle extends Internal
             return InternalStrictArg::requireString($frame, 0, 'str_shuffle', 'string')->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null — coerce+deprecate on forward profile (#24598, reverts #24213; string.c).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'str_shuffle',
             0,
@@ -57,13 +58,13 @@ final class str_shuffle extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20080, ext/standard/string.c). */
+    /** Soft-null DEP+coerce on forward profile (#24598, reverts #24213; ext/standard/string.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'str_shuffle', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'str_shuffle', 0, 'string');
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'str_shuffle', 0, 'string');
     }
 }

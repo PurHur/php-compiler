@@ -145,7 +145,8 @@ final class lcfirst extends Internal
             return InternalStrictArg::requireString($frame, 0, 'lcfirst', 'string')->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null — coerce+deprecate on forward profile (#24598, reverts #24213; string.c).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'lcfirst',
             0,
@@ -153,13 +154,13 @@ final class lcfirst extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20080, ext/standard/string.c). */
+    /** Soft-null DEP+coerce on forward profile (#24598, reverts #24213; ext/standard/string.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'lcfirst', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'lcfirst', 0, 'string');
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'lcfirst', 0, 'string');
     }
 }
