@@ -2445,6 +2445,36 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['context'], BuiltinParamNames::paramNamesForInternalFunction('hash_copy'));
     }
 
+    /** @covers issue #23786 */
+    public function testHtmlHashObNamedParamsResolve(): void
+    {
+        $html = BuiltinParamNames::forFunction('get_html_translation_table');
+        self::assertSame(['table=', 'flags=', 'encoding='], $html);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($html, 'table', 'get_html_translation_table'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('get_html_translation_table'));
+
+        $update = BuiltinParamNames::forFunction('hash_update');
+        self::assertSame(['context', 'data'], $update);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($update, 'context', 'hash_update'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($update, 'data', 'hash_update'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('hash_update'));
+
+        $stream = BuiltinParamNames::forFunction('hash_update_stream');
+        self::assertSame(['context', 'stream', 'length='], $stream);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($stream, 'stream', 'hash_update_stream'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($stream, 'handle', 'hash_update_stream'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('hash_update_stream'));
+        self::assertSame(
+            ['context', 'stream', 'length='],
+            BuiltinParamNames::paramNamesForInternalFunction('hash_update_stream')
+        );
+
+        $ob = BuiltinParamNames::forFunction('ob_get_status');
+        self::assertSame(['full_status='], $ob);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ob, 'full_status', 'ob_get_status'));
+        self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('ob_get_status'));
+    }
+
     /** @covers issue #24591 */
     public function testClosureBindCallBindToNamedParamsResolve(): void
     {

@@ -868,9 +868,19 @@ final class BuiltinParamNames
             // php-src ext/hash/hash.stub.php — InternalArgInfo omits stream_context (#24563)
             case 'hash_update_file':
                 return ['context', 'filename', 'stream_context='];
+            // php-src ext/hash/hash.stub.php — InternalArgInfo still says handle (#23786)
+            case 'hash_update':
+                return ['context', 'data'];
+            case 'hash_update_stream':
+                return ['context', 'stream', 'length='];
             // php-src ext/hash/hash.stub.php — Reflection OK, named binder missing (#24566)
             case 'hash_copy':
                 return ['context'];
+            // php-src ext/standard/html.stub.php / basic_functions.stub.php (#23786)
+            case 'get_html_translation_table':
+                return ['table=', 'flags=', 'encoding='];
+            case 'ob_get_status':
+                return ['full_status='];
             // php-src ext/standard/image.stub.php — InternalArgInfo still says imagefile/info (#23343)
             case 'getimagesize':
                 return ['filename', 'image_info='];
