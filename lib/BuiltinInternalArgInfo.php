@@ -160,7 +160,26 @@ final class BuiltinInternalArgInfo
             return null;
         }
 
-        return self::normalizeParamInfo($info['params'][$index]);
+        $normalized = self::normalizeParamInfo($info['params'][$index]);
+        $typeOverride = self::stubParamTypeOverride($lc, $index);
+        if (null !== $typeOverride) {
+            $normalized['type'] = $typeOverride;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * php-src stub types when InternalArgInfo omits nullability (#24845).
+     */
+    public static function stubParamTypeOverride(string $callableLc, int $index): ?string
+    {
+        return match ($callableLc) {
+            // ext/date/php_date.stub.php — ?int $timestamp / $baseTimestamp = null
+            'date', 'gmdate' => 1 === $index ? '?int' : null,
+            'strtotime' => 1 === $index ? '?int' : null,
+            default => null,
+        };
     }
 
     /**

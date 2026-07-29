@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\BuiltinInternalArgInfo;
 use PHPCompiler\BuiltinParamNames;
 use PHPUnit\Framework\TestCase;
 
@@ -516,11 +517,11 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
-    /** @covers issue #9647 */
+    /** @covers issue #9647 / #24845 */
     public function testDateNamedParameters(): void
     {
         $names = BuiltinParamNames::forFunction('date');
-        self::assertSame(['format', 'timestamp'], $names);
+        self::assertSame(['format', 'timestamp='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'format', 'date'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp', 'date'));
     }
@@ -1053,7 +1054,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($getdate, 'timestamp', 'getdate'));
 
         $gmdate = BuiltinParamNames::forFunction('gmdate');
-        self::assertSame(['format', 'timestamp'], $gmdate);
+        self::assertSame(['format', 'timestamp='], $gmdate);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gmdate, 'format', 'gmdate'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($gmdate, 'timestamp', 'gmdate'));
 
@@ -1063,16 +1064,29 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($substrCount, 'needle', 'substr_count'));
     }
 
-    /** @covers issue #23216 */
+    /** @covers issue #23216 / #24845 */
     public function testStrtotimeZendStubNamedParams(): void
     {
         $names = BuiltinParamNames::forFunction('strtotime');
-        self::assertSame(['datetime', 'baseTimestamp'], $names);
+        self::assertSame(['datetime', 'baseTimestamp='], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'datetime', 'strtotime'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'baseTimestamp', 'strtotime'));
         // Legacy InternalArgInfo names must not resolve (Zend rejects $time / $now)
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'time', 'strtotime'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'now', 'strtotime'));
+    }
+
+    /** @covers issue #24845 */
+    public function testDateGmdateStrtotimeNullableTimestampTypeOverride(): void
+    {
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('date', 1));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('gmdate', 1));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('strtotime', 1));
+        self::assertNull(BuiltinInternalArgInfo::stubParamTypeOverride('date', 0));
+        $info = BuiltinInternalArgInfo::paramInfoForFunction('date', 1);
+        self::assertNotNull($info);
+        self::assertSame('?int', $info['type']);
+        self::assertTrue($info['isOptional']);
     }
 
     /** @covers issue #23276 */

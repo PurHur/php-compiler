@@ -208,7 +208,8 @@ final class BuiltinParamNames
                 return ['string', 'width', 'break', 'cut_long_words'];
             case 'date':
             case 'gmdate':
-                return ['format', 'timestamp'];
+                // php-src ext/date/php_date.stub.php — ?int $timestamp = null (#24845)
+                return ['format', 'timestamp='];
             // php-src ext/date/php_date.stub.php — Reflection OK but BuiltinParamNames missing (#23462)
             case 'checkdate':
                 return ['month', 'day', 'year'];
@@ -224,9 +225,9 @@ final class BuiltinParamNames
                 return ['datetime'];
             case 'date_parse_from_format':
                 return ['format', 'datetime'];
-            // php-src ext/date/php_date.stub.php — InternalArgInfo still says time/now (#23216)
+            // php-src ext/date/php_date.stub.php — ?int $baseTimestamp = null (#23216 / #24845)
             case 'strtotime':
-                return ['datetime', 'baseTimestamp'];
+                return ['datetime', 'baseTimestamp='];
             // php-src ext/date/php_date.stub.php — Reflection had empty params (#23276)
             case 'date_create':
             case 'date_create_immutable':
