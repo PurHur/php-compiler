@@ -13,7 +13,7 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sodium_bin2hex() — binary to hex (php-src ext/sodium/libsodium.c; #3438, #20196). */
+/** sodium_bin2hex() — binary to hex (php-src ext/sodium/libsodium.c; #3438, #21517/#24772). */
 final class sodium_bin2hex extends Internal
 {
     public function __construct()
@@ -24,7 +24,7 @@ final class sodium_bin2hex extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, $this->getName(), 1);
-        // Z_PARAM_STR $string — soft-null DEP+coerce on forward profile (#21517, reverts #20196;
+        // Z_PARAM_STR $string — soft-null DEP+coerce on forward profile (#21517/#24772, reverts #20196;
         // php-src ext/sodium — Zend 8.4 still deprecates null → '').
         $string = VmString::trimFamilyStringArgForFrame($frame, 0, 'sodium_bin2hex', 0, 'string');
         $result = VmSodium::bin2hex($string);
