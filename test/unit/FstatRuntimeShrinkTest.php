@@ -10,7 +10,7 @@ use PHPCompiler\ext\standard\VmPhpMemoryStream;
 use PHPCompiler\ext\standard\VmStreamFstat;
 use PHPUnit\Framework\TestCase;
 
-/** fstat() JIT routes through FstatJitHelper PHP not stream_path+stat LLVM (#10460). */
+/** fstat() JIT via FstatJitHelper + JitVmHelperLink::ensureCompiled (#10460, #24586). */
 final class FstatRuntimeShrinkTest extends TestCase
 {
     public function testFstatJitRoutesThroughStreamFstatRuntime(): void
@@ -27,6 +27,13 @@ final class FstatRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamFstatRuntime.php');
         $this->assertStringContainsString('FstatJitHelper', $source);
         $this->assertStringContainsString('__compiler_fstat', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('JitVmHelperLink::lookupCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertLessThan(150, \substr_count($source, "\n"), 'StreamFstatRuntime must stay thin');
     }
 
