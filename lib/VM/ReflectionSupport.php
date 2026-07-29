@@ -3279,6 +3279,74 @@ final class ReflectionSupport
     }
 
     /**
+     * Collect Reflection*::invoke() trailing args, expanding named variadic packs (#24949).
+     *
+     * Z_PARAM_VARIADIC_WITH_NAMED packs unknown names into one array (call_user_func shape);
+     * resolve those entries against the reflected callee like invokeArgs / zend_call_function.
+     *
+     * @param list<string> $paramNames
+     *
+     * @return array<int, Variable>
+     */
+    public static function invokeTrailingArgsFromCalledArgs(
+        Frame $frame,
+        int $firstTrailingIndex,
+        array $paramNames,
+        ?int $variadicParamIndex,
+        ?string $functionName
+    ): array {
+        $argc = \count($frame->calledArgs);
+        if ($argc <= $firstTrailingIndex) {
+            return [];
+        }
+        $trailingCount = $argc - $firstTrailingIndex;
+        if (1 === $trailingCount) {
+            $sole = $frame->calledArgs[$firstTrailingIndex]->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $sole->type && self::invokeArrayArgShouldUnpack($sole)) {
+                return self::invokeArgsFromArray(
+                    $sole,
+                    'Reflection::invoke',
+                    1,
+                    $paramNames,
+                    $variadicParamIndex,
+                    $functionName
+                );
+            }
+        }
+        $entries = [];
+        for ($i = $firstTrailingIndex; $i < $argc; ++$i) {
+            $copy = new Variable();
+            $copy->copyFrom($frame->calledArgs[$i]->resolveIndirect());
+            $entries[] = ['p', $copy];
+        }
+        $resolved = NamedArgs::resolve($entries, $paramNames, $variadicParamIndex, $functionName);
+        ksort($resolved);
+
+        return $resolved;
+    }
+
+    /** Named-arg lowering packs string keys; list arrays are single value args (#24949 / #14829). */
+    private static function invokeArrayArgShouldUnpack(Variable $arrayVar): bool
+    {
+        if ($arrayVar->namedVariadicPack) {
+            return true;
+        }
+        foreach ($arrayVar->toArray()->iterateKeyed(false) as $pair) {
+            [$keyVar, ] = $pair;
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            $keyStr = $key->toString();
+            if ('' !== $keyStr && !ctype_digit($keyStr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Unpack a Reflection *Args array parameter (php-src-strict Argument #N message).
      *
      * Without param metadata, values are taken in iteration order (legacy / newInstanceArgs).

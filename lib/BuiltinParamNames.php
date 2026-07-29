@@ -31,6 +31,9 @@ final class BuiltinParamNames
             'datetimezone::gettransitions' => ['timestampBegin=', 'timestampEnd='],
             // php-src ext/reflection/php_reflection.stub.php — InternalArgInfo marks object required (#24433)
             'reflectionmethod::getclosure' => ['object='],
+            // php-src ext/reflection/php_reflection.stub.php — ...$args; Z_PARAM_VARIADIC_WITH_NAMED (#24949)
+            'reflectionfunction::invoke' => ['...args='],
+            'reflectionmethod::invoke' => ['object', '...args='],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says spec (#23707)
             'dateinterval::__construct' => ['duration'],
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says time (#24589)
@@ -1681,12 +1684,17 @@ final class BuiltinParamNames
     /**
      * Internals that use Z_PARAM_VARIADIC_WITH_NAMED and forward unknown names to the callee (#23772).
      *
-     * Most internal variadics reject unknown named args (#23449); call_user_func is the exception
-     * (php-src ext/standard/basic_functions.c — zif_call_user_func). forward_static_call does not.
+     * Most internal variadics reject unknown named args (#23449); exceptions forward into the
+     * variadic pack (php-src call_user_func; ReflectionFunction/Method::invoke, #24949).
+     * forward_static_call does not.
      */
     public static function forwardsNamedArgsIntoVariadic(string $name): bool
     {
-        return 'call_user_func' === strtolower($name);
+        $lc = strtolower($name);
+
+        return 'call_user_func' === $lc
+            || 'reflectionfunction::invoke' === $lc
+            || 'reflectionmethod::invoke' === $lc;
     }
 
     /**

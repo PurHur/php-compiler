@@ -250,7 +250,13 @@ final class BuiltinInternalArgInfo
     public static function variadicParamIndexForFunction(string $name): ?int
     {
         $lc = strtolower($name);
-        $info = self::instance()->functions[$lc] ?? null;
+        if (str_contains($lc, '::')) {
+            [$classLc, $methodLc] = explode('::', $lc, 2);
+            $methods = self::instance()->methods[$classLc]['methods'] ?? [];
+            $info = $methods[$methodLc] ?? null;
+        } else {
+            $info = self::instance()->functions[$lc] ?? null;
+        }
         if (null === $info) {
             return null;
         }
