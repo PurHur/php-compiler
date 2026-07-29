@@ -17,7 +17,7 @@ final class HighlightEngine
     private const COLOR_DEFAULT = '#000000';
 
     /** Zend highlight_file() on unreadable path with $return=true (ext/standard/url.c, #12032). */
-    public const EMPTY_HIGHLIGHT_HTML = '<pre><code style="color: '.self::COLOR_DEFAULT.'"></code></pre>';
+    public const EMPTY_HIGHLIGHT_HTML = '<code><span style="color: '.self::COLOR_DEFAULT.'"></span>'."\n".'</code>';
 
     private const COLOR_KEYWORD = '#007700';
 
@@ -39,8 +39,8 @@ final class HighlightEngine
         $tokens = LanguageScanner::tokenize($code);
         $body = self::renderTokens($tokens);
 
-        // php-src ext/standard/php_highlight.h — Zend 8.4 <pre><code> wrapper, literal spaces (#23733, #10308).
-        return '<pre><code style="color: '.self::COLOR_DEFAULT.'">'.$body.'</code></pre>';
+        // php-src Zend/zend_highlight.c — <code><span> wrapper, &nbsp; for spaces, <br /> for newlines.
+        return '<code><span style="color: '.self::COLOR_DEFAULT.'">'.$body.'</span>'."\n".'</code>';
     }
 
     /**
@@ -144,7 +144,11 @@ final class HighlightEngine
 
     private static function escapeAndFormat(string $text): string
     {
-        return \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
+        $escaped = \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
+        $escaped = \str_replace(' ', '&nbsp;', $escaped);
+        $escaped = \str_replace("\n", '<br />', $escaped);
+
+        return $escaped;
     }
 
     /** @return array<string, int> */
