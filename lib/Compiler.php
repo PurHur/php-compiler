@@ -121,6 +121,13 @@ class Compiler {
     /** @var SplObjectStorage<Op\Stmt\JumpIf, true> ?: return `null !== $p ? $p : null` rewritten (#8563) */
     private SplObjectStorage $rewrittenNeNullReturnJumpIf;
 
+    /**
+     * File-level ({main}) function decls early-bound at entry — skip at original CFG site (#24807).
+     *
+     * @var SplObjectStorage<Op\Stmt\Function_, true>
+     */
+    private SplObjectStorage $earlyBoundFunctionOps;
+
     private ?string $debugLastPhaseInputFile = null;
     /** Source text for the current compile() call — `new Foo()` paren detection (#9116). */
     private ?string $compileSourceCode = null;
@@ -538,6 +545,7 @@ class Compiler {
         $this->ternaryMergeVarSlots = new SplObjectStorage;
         $this->ternaryMergePhiRhsSlots = new SplObjectStorage;
         $this->rewrittenNeNullReturnJumpIf = new SplObjectStorage;
+        $this->earlyBoundFunctionOps = new SplObjectStorage;
         $this->debugWriteLastPhase('Compiler::compile enter');
 
         Compiler\InheritanceVariance::validateScript(
@@ -628,6 +636,7 @@ class Compiler {
         $this->ternaryMergeVarSlots = new SplObjectStorage;
         $this->ternaryMergePhiRhsSlots = new SplObjectStorage;
         $this->rewrittenNeNullReturnJumpIf = new SplObjectStorage;
+        $this->earlyBoundFunctionOps = new SplObjectStorage;
         $block = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
         $this->seen = null;
         if (null === $block && null !== $this->compileAbortDetail && '' !== $this->compileAbortDetail) {
@@ -917,6 +926,18 @@ class Compiler {
             }
             if ([] !== $closureUseVars) {
                 $this->registerClosureUseCapturesOnBlock($new, $closureUseVars);
+            }
+            // Zend early-binds top-level function decls in {main} for the whole compile unit
+            // (not nested in if/try/switch/loop). php-cfg places those Stmt_Function in later
+            // merge blocks after try/if, so per-block hoist alone misses call sites inside the
+            // control-flow body that appear textually before the declaration (#24807).
+            if (
+                null !== $func
+                && '{main}' === $func->name
+                && null === $func->class
+                && $block === $func->cfg
+            ) {
+                $this->emitEarlyBoundFunctionDefs($block, $new);
             }
             $this->compileBlock($new);
             foreach ($this->deferredArrayLiteralKeepSlots as $slot => $_) {
@@ -2166,6 +2187,10 @@ class Compiler {
         foreach ($ops as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
+                    // Already emitted at {main} entry for Zend early-binding (#24807).
+                    if ($this->earlyBoundFunctionOps->contains($child)) {
+                        break;
+                    }
                     $block->addOpCode($this->compileFunction($child, $block));
                     break;
                 case Op\Terminal\Const_::class:
@@ -10519,6 +10544,134 @@ class Compiler {
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'function');
         AttributeNames::assertDeprecatedTargetAllowed($return->attributeNames, 'function');
         return $return;
+    }
+
+    /**
+     * Emit FUNCDEF for Zend early-bound file-level decls at {main} entry (#24807).
+     *
+     * Declarations nested in if/else/try/catch/finally/switch/loop stay at their CFG site
+     * (runtime registration when that path runs). Merge blocks after try/if that hold a
+     * top-level `function` are early-bound — matching zend_compile.c for non-conditional decls.
+     */
+    private function emitEarlyBoundFunctionDefs(CfgBlock $entry, Block $dest): void
+    {
+        $delayed = $this->collectDelayedDeclarationCfgBlocks($entry);
+        /** @var list<Op\Stmt\Function_> $funcs */
+        $funcs = [];
+        $seenBlocks = new SplObjectStorage();
+        $queue = [$entry];
+        while ([] !== $queue) {
+            $cfg = array_shift($queue);
+            if ($seenBlocks->contains($cfg)) {
+                continue;
+            }
+            $seenBlocks[$cfg] = true;
+            foreach ($cfg->children as $child) {
+                if ($child instanceof Op\Stmt\Function_ && !$delayed->contains($cfg)) {
+                    $funcs[] = $child;
+                }
+                foreach ($this->cfgOpSuccessorBlocks($child) as $succ) {
+                    $queue[] = $succ;
+                }
+            }
+        }
+        usort(
+            $funcs,
+            static function (Op\Stmt\Function_ $a, Op\Stmt\Function_ $b): int {
+                return ((int) ($a->getAttribute('startLine') ?? 0))
+                    <=> ((int) ($b->getAttribute('startLine') ?? 0));
+            }
+        );
+        foreach ($funcs as $fn) {
+            $this->earlyBoundFunctionOps[$fn] = true;
+            $dest->addOpCode($this->compileFunction($fn, $dest));
+        }
+    }
+
+    /**
+     * CFG blocks that are exclusive bodies of delayed declaration contexts (Zend: not early-bound).
+     *
+     * @return SplObjectStorage<CfgBlock, true>
+     */
+    private function collectDelayedDeclarationCfgBlocks(CfgBlock $entry): SplObjectStorage
+    {
+        $delayed = new SplObjectStorage();
+        $seenBlocks = new SplObjectStorage();
+        $queue = [$entry];
+        while ([] !== $queue) {
+            $cfg = array_shift($queue);
+            if ($seenBlocks->contains($cfg)) {
+                continue;
+            }
+            $seenBlocks[$cfg] = true;
+            foreach ($cfg->children as $child) {
+                if ($child instanceof Op\Stmt\JumpIf) {
+                    $this->markDelayedDeclBlockIfExclusiveArm($delayed, $child->if);
+                    $this->markDelayedDeclBlockIfExclusiveArm($delayed, $child->else);
+                } elseif ($child instanceof Op\Stmt\TryCatch) {
+                    $delayed[$child->try] = true;
+                    foreach ($child->catches as $catchBlock) {
+                        if ($catchBlock instanceof CfgBlock) {
+                            $delayed[$catchBlock] = true;
+                        }
+                    }
+                    if ($child->finally instanceof CfgBlock) {
+                        $delayed[$child->finally] = true;
+                    }
+                    if ($child->else instanceof CfgBlock) {
+                        $delayed[$child->else] = true;
+                    }
+                } elseif ($child instanceof Op\Stmt\Switch_) {
+                    foreach ($child->targets as $target) {
+                        $this->markDelayedDeclBlockIfExclusiveArm($delayed, $target);
+                    }
+                    $this->markDelayedDeclBlockIfExclusiveArm($delayed, $child->default);
+                }
+                foreach ($this->cfgOpSuccessorBlocks($child) as $succ) {
+                    $queue[] = $succ;
+                }
+            }
+        }
+
+        return $delayed;
+    }
+
+    /**
+     * Exclusive branch/case arm (single CFG parent) — not a merge that also continues top-level code.
+     *
+     * @param SplObjectStorage<CfgBlock, true> $delayed
+     */
+    private function markDelayedDeclBlockIfExclusiveArm(SplObjectStorage $delayed, ?CfgBlock $arm): void
+    {
+        if (!$arm instanceof CfgBlock) {
+            return;
+        }
+        if (\count($arm->parents) < 2) {
+            $delayed[$arm] = true;
+        }
+    }
+
+    /** @return list<CfgBlock> */
+    private function cfgOpSuccessorBlocks(Op $op): array
+    {
+        if (!method_exists($op, 'getSubBlocks')) {
+            return [];
+        }
+        $out = [];
+        foreach ($op->getSubBlocks() as $name) {
+            $val = $op->{$name} ?? null;
+            if ($val instanceof CfgBlock) {
+                $out[] = $val;
+            } elseif (\is_array($val)) {
+                foreach ($val as $block) {
+                    if ($block instanceof CfgBlock) {
+                        $out[] = $block;
+                    }
+                }
+            }
+        }
+
+        return $out;
     }
 
     protected function compileOp(Op $op, Block $block) {
