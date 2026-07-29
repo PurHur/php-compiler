@@ -95,4 +95,12 @@ final class IconvNativeTest extends TestCase
         $this->assertSame('hi', VmIconv::iconv('', 'UTF-8', 'hi'));
         $this->assertSame('hi', VmIconv::iconv('UTF-8', '', 'hi'));
     }
+
+    public function testIconvImplVersionIdentityIsHonestCharsetEngine(): void
+    {
+        $registered = \PHPCompiler\ext\iconv\IconvConstants::registeredConstants();
+        $this->assertSame('php-compiler', $registered['ICONV_IMPL']);
+        $this->assertSame('1.0', $registered['ICONV_VERSION']);
+        $this->assertSame(1, $registered['ICONV_MIME_DECODE_STRICT']);
+    }
 }

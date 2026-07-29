@@ -16,12 +16,14 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
-        foreach ([
-            'ICONV_MIME_DECODE_STRICT' => IconvConstants::MIME_DECODE_STRICT,
-            'ICONV_MIME_DECODE_CONTINUE_ON_ERROR' => IconvConstants::MIME_DECODE_CONTINUE_ON_ERROR,
-        ] as $name => $value) {
+        // registeredConstants() includes ICONV_IMPL / ICONV_VERSION strings (#24053).
+        foreach (IconvConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
-            $var->int($value);
+            if (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int((int) $value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
     }
