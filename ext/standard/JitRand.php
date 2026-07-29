@@ -19,7 +19,7 @@ final class JitRand
     public static function call(Context $context, bool $mtRand, string $fn = 'rand', JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 0 || $argc > 2 || 1 === $argc) {
+        if (0 !== $argc && 2 !== $argc) {
             throw new \LogicException(\sprintf('%s() expects 0 or 2 arguments', $fn));
         }
         RandBuiltin::ensureLinked($context);
