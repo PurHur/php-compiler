@@ -483,6 +483,17 @@ class Block {
                     return $paramSlot;
                 }
             }
+            // Prefer CV assign-dest over a stale in-scope SSA binding (#24540): coalesce-for-assign
+            // may leave Temporary/$local mappings on fresh slots before the CV is registered.
+            $namedDest = $this->slotForNamedAssignDest($operand);
+            if (null !== $namedDest) {
+                $this->scope[$operand] = $namedDest;
+                if ($this->shouldRegisterInheritedArg($operand)) {
+                    $this->args[$operand] = $namedDest;
+                }
+
+                return $namedDest;
+            }
             if ($this->scope->contains($operand)) {
                 $existing = $this->scope[$operand];
                 if ($this->shouldRegisterInheritedArg($operand)) {
@@ -491,19 +502,16 @@ class Block {
 
                 return $existing;
             }
-            $namedDest = $this->slotForNamedAssignDest($operand);
-            if (null === $namedDest) {
-                if (null !== $name && '' !== $name) {
-                    $namedDest = $this->slotIndexForVariableName($name);
-                }
-            }
-            if (null !== $namedDest) {
-                $this->scope[$operand] = $namedDest;
-                if ($this->shouldRegisterInheritedArg($operand)) {
-                    $this->args[$operand] = $namedDest;
-                }
+            if (null !== $name && '' !== $name) {
+                $namedDest = $this->slotIndexForVariableName($name);
+                if (null !== $namedDest) {
+                    $this->scope[$operand] = $namedDest;
+                    if ($this->shouldRegisterInheritedArg($operand)) {
+                        $this->args[$operand] = $namedDest;
+                    }
 
-                return $namedDest;
+                    return $namedDest;
+                }
             }
         }
         if ($this->scope->contains($operand)) {

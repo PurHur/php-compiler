@@ -4170,6 +4170,19 @@ class Compiler {
 
         $block = $this->compileCoalesce($coalesce, $block, $resultOverride);
 
+        // Tail `$local = $… ?? …` skips the Assign that would registerNamedAssignDest (#24540).
+        // Without that CV binding, later SSA reads of $local (is_array ? … / if bodies) allocate
+        // fresh undefined slots while the coalesce merge slot still holds the value.
+        if (null !== $resultOverride) {
+            $varRoot = Block::cfgVarRoot($resultOverride);
+            $cvName = null !== $varRoot ? Block::resolveVariableName($varRoot) : null;
+            if (null !== $varRoot && null !== $cvName && '' !== $cvName) {
+                $cvSlot = $this->coalesceResultSlots[spl_object_id($coalesce)]
+                    ?? $this->compileOperand($resultOverride, $block, false);
+                $block->registerNamedAssignDest($varRoot, (int) $cvSlot);
+            }
+        }
+
         // php-cfg keeps a separate coalesce result temp when ??= is an expression (#5337, #17458).
         // Skip when echo reads resultOverride directly — syncing would null the override slot (TYPE_ASSIGN).
         if (
