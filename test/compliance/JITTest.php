@@ -54,6 +54,11 @@ class JITTest extends BaseTest {
                 continue;
             }
             // extension_loaded / class_exists sqlite3 phantoms — VM-only (JIT module-verify; #22791).
+            // extension_loaded / class_exists zip phantoms — VM-only (JIT module-verify; #18137/#25010).
+            if (str_contains($name, 'extension_loaded_zip_phantom')
+                || str_contains($name, 'zip/extension_loaded_zip_phantom')) {
+                continue;
+            }
             if (str_contains($name, 'extension_loaded_sqlite3_phantom')
                 || str_contains($name, 'sqlite3_reference_profile')
                 || str_contains($name, 'sqlite3_forward_profile_surface')) {
@@ -928,11 +933,9 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'snmp_phantom')) {
                 continue;
             }
-            if (!CompilerVersion::supportsZip()
-                && (str_contains($name, 'zip')
-                    || str_contains($name, 'ziparchive'))
-                && !str_starts_with($name, 'zlib/')
-                && !str_contains($name, 'extension_loaded_zip')) {
+            // Functional zip cases set PHP_COMPILER_ENABLE_ZIP via --ENV--; phantoms when withheld (#25010).
+            if (!\PHPCompiler\ext\zip\ZipExtensionPolicy::runsZipCompliance($name)
+                && \PHPCompiler\ext\zip\ZipExtensionPolicy::isZipComplianceCase($name)) {
                 continue;
             }
             if (!CompilerVersion::supportsUri()

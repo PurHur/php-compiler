@@ -2,9 +2,11 @@
 zip procedural API round-trip (ext/zip/php_zip.c, #6370)
 --SKIPIF--
 <?php
-if (!\PHPCompiler\CompilerVersion::supportsZip()) {
-    die('skip zip withheld on reference profile (#18137)');
+if (!\PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension()) {
+    die('skip zip withheld (#18137/#25010)');
 }
+--ENV--
+PHP_COMPILER_ENABLE_ZIP=1
 --FILE--
 <?php
 $tmpdir = sys_get_temp_dir() . '/phpc_zip_proc_' . bin2hex(random_bytes(4));

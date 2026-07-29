@@ -1,5 +1,7 @@
 --TEST--
 ZipArchive::setArchiveFlag/getArchiveFlag + AFL_* (#21831, ext/zip/php_zip.c)
+--ENV--
+PHP_COMPILER_ENABLE_ZIP=1
 --FILE--
 <?php
 declare(strict_types=1);

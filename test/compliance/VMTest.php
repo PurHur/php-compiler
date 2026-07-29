@@ -790,15 +790,9 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'snmp_phantom')) {
                 continue;
             }
-            if (!CompilerVersion::supportsZip()
-                && (str_contains($name, 'zip')
-                    || str_contains($name, 'ziparchive'))
-                && !str_starts_with($name, 'zlib/')
-                && !str_contains($name, 'extension_loaded_zip')
-                // Phar ZIP via ZipEngine (pure PHP) — not ZipArchive advertisement (#21675/#21676/#21678).
-                && !str_contains($name, 'phar_convert_to_data_zip')
-                && !str_contains($name, 'phar_data_zip_open')
-                && !str_contains($name, 'phar_convert_to_executable_zip')) {
+            // Functional zip cases set PHP_COMPILER_ENABLE_ZIP via --ENV--; phantoms when withheld (#25010).
+            if (!\PHPCompiler\ext\zip\ZipExtensionPolicy::runsZipCompliance($name)
+                && \PHPCompiler\ext\zip\ZipExtensionPolicy::isZipComplianceCase($name)) {
                 continue;
             }
             if (!CompilerVersion::supportsUri()

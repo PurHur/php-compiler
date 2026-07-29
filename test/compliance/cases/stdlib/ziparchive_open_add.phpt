@@ -2,9 +2,11 @@
 stdlib ZipArchive open/addFromString/getFromName round-trip (#3337, ext/zip/php_zip.c)
 --SKIPIF--
 <?php
-if (!\PHPCompiler\CompilerVersion::supportsZip()) {
-    die('skip zip withheld on reference profile (#18137)');
+if (!\PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension()) {
+    die('skip zip withheld (#18137/#25010)');
 }
+--ENV--
+PHP_COMPILER_ENABLE_ZIP=1
 --FILE--
 <?php
 declare(strict_types=1);

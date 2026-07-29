@@ -2,9 +2,11 @@
 zip_entry_compressedsize / zip_entry_compressionmethod (ext/zip/php_zip.c, #20485)
 --SKIPIF--
 <?php
-if (!\PHPCompiler\CompilerVersion::supportsZip()) {
-    die('skip zip withheld on reference profile (#18137)');
+if (!\PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension()) {
+    die('skip zip withheld (#18137/#25010)');
 }
+--ENV--
+PHP_COMPILER_ENABLE_ZIP=1
 --FILE--
 <?php
 $tmpdir = sys_get_temp_dir() . '/phpc_zip_meta_' . bin2hex(random_bytes(4));
