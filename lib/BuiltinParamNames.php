@@ -844,6 +844,9 @@ final class BuiltinParamNames
                 return ['process'];
             case 'proc_terminate':
                 return ['process', 'signal'];
+            // php-src ext/pcntl/pcntl.stub.php — InternalArgInfo still says signo/handle (#24551)
+            case 'pcntl_signal':
+                return ['signal', 'handler', 'restart_syscalls'];
             case 'getopt':
                 return ['short_options', 'long_options', 'rest_index'];
             case 'call_user_func':

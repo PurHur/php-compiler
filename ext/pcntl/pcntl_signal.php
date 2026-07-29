@@ -39,7 +39,14 @@ final class pcntl_signal extends Internal
         $handler = null;
         if (Variable::TYPE_NULL !== $handlerArg->resolveIndirect()->type) {
             $handler = $handlerArg;
-            VmPcntlArg::requireCallable($frame->vmContext, $handler, 'pcntl_signal', 1);
+            // php-src: callable|int — SIG_DFL / SIG_IGN are int dispositions, not callables (#24551)
+            $resolved = $handlerArg->resolveIndirect();
+            $isDisposition = Variable::TYPE_INTEGER === $resolved->type
+                && (PcntlConstants::SIG_DFL === $resolved->toInt()
+                    || PcntlConstants::SIG_IGN === $resolved->toInt());
+            if (!$isDisposition) {
+                VmPcntlArg::requireCallable($frame->vmContext, $handler, 'pcntl_signal', 1);
+            }
         }
         $frame->returnVar->bool(VmPcntl::signal($signo, $handler));
     }
