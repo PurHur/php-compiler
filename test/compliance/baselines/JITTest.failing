@@ -321,7 +321,6 @@ stdlib/highlight_string_null_forward84
 stdlib/highlight_string_null_forward84_jit
 stdlib/highlight_string_pre_wrapper
 stdlib/hrtime_as_number_float
-stdlib/hrtime_nanosecond_precision
 stdlib/html_null_forward84
 stdlib/html_null_forward84_jit
 stdlib/implode_non_array_arg

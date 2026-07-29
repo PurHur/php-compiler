@@ -48,7 +48,7 @@ final class VmHrtimeTest extends TestCase
     public function testNanosecondSubMicrosecondPrecision(): void
     {
         $anyNonZeroMod = false;
-        for ($i = 0; $i < 10; ++$i) {
+        for ($i = 0; $i < 64; ++$i) {
             $pair = VmHrtimeNative::readClock(VmHrtimeNative::CLOCK_REALTIME);
             $this->assertIsArray($pair);
             [, $nsec] = $pair;
@@ -60,19 +60,30 @@ final class VmHrtimeTest extends TestCase
         }
         $this->assertTrue($anyNonZeroMod, 'readClock(REALTIME) nsec % 1000 should be non-zero with microtime');
 
-        $a = VmHrtimeNative::readClock(VmHrtimeNative::CLOCK_REALTIME)[1];
-        $b = VmHrtimeNative::readClock(VmHrtimeNative::CLOCK_REALTIME)[1];
-        $this->assertNotSame($a, $b, 'consecutive realtime nanoseconds should differ');
+        // Poll total ns — consecutive nsec-within-second samples often match (#24870).
+        $a = VmHrtimeNative::readClock(VmHrtimeNative::CLOCK_REALTIME);
+        $this->assertIsArray($a);
+        $aTotal = $a[0] * VmHrtimeNative::NS_PER_SEC + $a[1];
+        $bTotal = $aTotal;
+        for ($i = 0; $i < 10000; ++$i) {
+            $b = VmHrtimeNative::readClock(VmHrtimeNative::CLOCK_REALTIME);
+            $this->assertIsArray($b);
+            $bTotal = $b[0] * VmHrtimeNative::NS_PER_SEC + $b[1];
+            if ($bTotal !== $aTotal) {
+                break;
+            }
+        }
+        $this->assertNotSame($aTotal, $bTotal, 'realtime clock total ns should advance');
     }
 
-    /** Issue #12279 — monotonic path exposes sub-ms nanoseconds via microtime refinement. */
+    /** Issue #12279 / #24870 — monotonic path exposes sub-ms nanoseconds via microtime refinement. */
     public function testMonotonicNanosecondSubMillisecondPrecision(): void
     {
         if ('Linux' !== \PHP_OS_FAMILY || !\is_readable('/proc/uptime')) {
             $this->markTestSkipped('/proc/uptime unavailable');
         }
         $anyNonZeroMod = false;
-        for ($i = 0; $i < 10; ++$i) {
+        for ($i = 0; $i < 64; ++$i) {
             [, $nsec] = VmHrtime::hrtime(false);
             if (0 !== $nsec % 1000) {
                 $anyNonZeroMod = true;
@@ -81,5 +92,15 @@ final class VmHrtimeTest extends TestCase
             }
         }
         $this->assertTrue($anyNonZeroMod, 'hrtime()[1] % 1000 should be non-zero with microtime refinement');
+
+        $a = VmHrtime::hrtime(true);
+        $b = $a;
+        for ($i = 0; $i < 10000; ++$i) {
+            $b = VmHrtime::hrtime(true);
+            if ($b !== $a) {
+                break;
+            }
+        }
+        $this->assertNotSame($a, $b, 'hrtime(true) should advance within a bounded poll (#24870)');
     }
 }

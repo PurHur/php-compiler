@@ -11,9 +11,9 @@
 #
 # Re-measured 2026-07-29 from two complete 24-shard CI collects at a3f32662b
 # (runs 30461221640 and 30461258793): 8,112 executed cases, and the two runs disagreed about
-# EXACTLY ONE of them. The suite is deterministic when the tree is held constant.
+# EXACTLY ONE of them (stdlib/hrtime_nanosecond_precision). That case was fixed in #24870 by
+# widening the assertion (poll total ns / larger mod1000 window); quarantine is empty again.
 
-# Lines may be scoped to a suite as SUITE:name. Flakiness is suite-specific: hrtime flips
-# between VMTest runs of one commit, but fails STABLY under JITTest in both runs of e7de99700,
-# so an unscoped entry would drop a real JITTest failure from that baseline.
-VMTest:stdlib/hrtime_nanosecond_precision   # fails ~1 run in 2; nanosecond deltas under runner jitter (#24870)
+# Lines may be scoped to a suite as SUITE:name. Flakiness is suite-specific: an unscoped entry
+# hides the case under every suite, which can drop a stable failure from another suite's baseline
+# (#24870 / #24726). Prefer SUITE:name when only one suite flips.
