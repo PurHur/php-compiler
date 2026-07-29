@@ -32,7 +32,7 @@ abstract class GettextFunction extends Internal
         };
     }
 
-    protected function requireArgCount(Frame $frame, int $expected, int $max = null): void
+    protected function requireArgCount(Frame $frame, int $expected, ?int $max = null): void
     {
         $argc = \count($frame->calledArgs);
         $max ??= $expected;

@@ -21,7 +21,7 @@ use PHPLLVM\Value;
 
 abstract class Internal extends Func implements Handler, Call
 {
-    public function __construct(string $name = null)
+    public function __construct(?string $name = null)
     {
         if (null === $name) {
             $parts = explode('\\', get_class($this));

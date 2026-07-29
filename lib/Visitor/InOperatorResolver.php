@@ -18,7 +18,7 @@ final class InOperatorResolver extends AbstractVisitor
 {
     private const MARKER = '__phpcLangIn';
 
-    public function enterBlock(Block $block, Block $prior = null): void
+    public function enterBlock(Block $block, ?Block $prior = null): void
     {
         foreach ($block->children as $i => $op) {
             if (!$op instanceof FuncCall || !$this->isMarkerCall($op)) {

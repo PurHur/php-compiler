@@ -16,7 +16,7 @@ use PHPCompiler\Ast\VoidCastDesugar;
  */
 final class VoidCastResolver extends AbstractVisitor
 {
-    public function enterBlock(Block $block, Block $prior = null): void
+    public function enterBlock(Block $block, ?Block $prior = null): void
     {
         foreach ($block->children as $i => $op) {
             if (!$op instanceof FuncCall || !$this->isMarkerCall($op)) {

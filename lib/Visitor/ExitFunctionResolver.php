@@ -17,7 +17,7 @@ use PHPCompiler\Ast\ExitFunctionDesugar;
  */
 final class ExitFunctionResolver extends AbstractVisitor
 {
-    public function enterBlock(Block $block, Block $prior = null): void
+    public function enterBlock(Block $block, ?Block $prior = null): void
     {
         foreach ($block->children as $op) {
             if ($op instanceof FuncCall && $this->isMarkerName($op->name)) {
