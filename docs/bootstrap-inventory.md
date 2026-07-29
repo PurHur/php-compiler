@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6622 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21329 |
+| Source constructs flagged (warnings) | 21328 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -5341,7 +5341,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringPregQuote.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPrintR.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPropertyExists.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringQuotPrint.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringQuotPrint.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 1 |
@@ -45513,7 +45513,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringQuotPrint.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 109)
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/StringQuotemeta.php`
