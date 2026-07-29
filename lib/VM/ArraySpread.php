@@ -73,10 +73,15 @@ final class ArraySpread
 
     private static function spreadFromGenerator(VM $vm, Variable $genVar, HashTable $dest): void
     {
+        // Zend zend_generator_rewind opens at the first yield; collect current then next
+        // (same shape as Iterator::current/next). resume-first dropped the opening value (#24645).
         $gen = $genVar->toObject()->generatorState;
         $gen->rewind();
-        while ($vm->resumeGenerator($gen)) {
+        while (!$gen->done && $gen->hasCurrent) {
             self::spreadEntry($dest, $gen->currentKey, $gen->currentValue);
+            if (!$vm->resumeGenerator($gen)) {
+                break;
+            }
         }
     }
 
