@@ -199,7 +199,27 @@ final class BuiltinInternalArgInfo
             return null;
         }
 
-        return self::normalizeParamInfo($info['params'][$index]);
+        $normalized = self::normalizeParamInfo($info['params'][$index]);
+        $typeOverride = self::stubParamTypeOverrideForClassMethod($classLc, $methodLc, $index);
+        if (null !== $typeOverride) {
+            $normalized['type'] = $typeOverride;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * php-src stub nullability when InternalArgInfo omits `?` on class methods (#24923).
+     */
+    public static function stubParamTypeOverrideForClassMethod(string $classLc, string $methodLc, int $index): ?string
+    {
+        return match ($classLc.'::'.$methodLc) {
+            // ext/dom/php_dom.stub.php — createElementNS(?string $namespace, …)
+            'domdocument::createelementns' => 0 === $index ? '?string' : null,
+            // ext/dom/php_dom.stub.php — createAttributeNS(?string $namespace, …)
+            'domdocument::createattributens' => 0 === $index ? '?string' : null,
+            default => null,
+        };
     }
 
     public static function methodIsVariadic(string $class, string $method): bool
