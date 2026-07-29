@@ -1,0 +1,10 @@
+<?php
+var_dump(intval("0o17", 8));   // Expected: int(0)
+var_dump(intval("0o17", 0));   // Expected: int(0)
+var_dump(intval("017", 8));    // Expected: int(15)
+var_dump(intval("017", 0));    // Expected: int(15)
+var_dump(intval("0x1A", 16));  // Expected: int(26)
+var_dump(intval("0x1A", 0));   // Expected: int(26)
+var_dump(intval("0b1010", 2)); // Expected: int(10)
+var_dump(intval("0b1010", 0)); // Expected: int(10)
+var_dump(intval("-17", 8));    // Expected: int(-15)
