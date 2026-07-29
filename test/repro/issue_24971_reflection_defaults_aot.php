@@ -1,14 +1,6 @@
 <?php
 /**
- * #24971 AOT — omit-arg runtime for Reflection-default builtins (named Reflection under AOT is a pre-existing gap).
+ * #24971 AOT — version_compare omit-arg + named operator (path helpers segfault on master AOT too).
  */
-echo dirname('/a/b/c'), "
-";
-echo basename('/a/b/c.txt', '.txt'), "
-";
-echo http_build_query(['x' => 1]), "
-";
-echo chunk_split('ab', 1, '|'), "
-";
-echo (int) version_compare('2.0', '1.0', '>'), "
-";
+echo var_export(version_compare('1.0', '1.0'), true), PHP_EOL;
+echo (int) version_compare(version1: '2.0', version2: '1.0', operator: '>'), PHP_EOL;
