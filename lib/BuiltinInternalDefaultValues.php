@@ -66,6 +66,11 @@ final class BuiltinInternalDefaultValues
             2 => ['kind' => 'int', 'value' => 512],
             3 => ['kind' => 'int', 'value' => 0],
         ],
+        // php-src ext/json/json.stub.php — depth=512, flags=0 (#23876)
+        'json_validate' => [
+            1 => ['kind' => 'int', 'value' => 512],
+            2 => ['kind' => 'int', 'value' => 0],
+        ],
         'explode' => [
             2 => ['kind' => 'int', 'value' => \PHP_INT_MAX],
         ],

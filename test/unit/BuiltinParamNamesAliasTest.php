@@ -2346,4 +2346,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::requiredParamCountForInternalFunction('mt_rand'));
         self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('mt_rand'));
     }
+
+    /** @covers issue #23876 */
+    public function testJsonValidateNamedParamsResolve(): void
+    {
+        self::assertSame(['json', 'depth=', 'flags='], BuiltinParamNames::forFunction('json_validate'));
+        $names = BuiltinParamNames::forFunction('json_validate');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'json', 'json_validate'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'depth', 'json_validate'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'json_validate'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('json_validate'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('json_validate'));
+    }
 }

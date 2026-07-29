@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -28,16 +29,24 @@ final class json_validate extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
+        if (!isset($frame->calledArgs[0])) {
             throw new \LogicException('json_validate() requires at least one argument');
+        }
+        // Sparse named optionals (e.g. flags: without depth) — isset, not count (#23876 / #10032).
+        foreach (\array_keys($frame->calledArgs) as $idx) {
+            if ($idx < 0 || $idx > 2) {
+                throw new \ArgumentCountError(\sprintf(
+                    'json_validate() expects at most 3 arguments, %d given',
+                    $idx + 1
+                ));
+            }
         }
         if (null === $frame->returnVar) {
             return;
         }
         $json = JsonStringOperandArg::vmJson($frame, 'json_validate');
         $depth = 512;
-        if ($argc > 1) {
+        if (isset($frame->calledArgs[1])) {
             $depthVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $depthVar->type) {
                 throw new \LogicException('json_validate() argument #2 must be an integer in this compiler build');
@@ -45,15 +54,12 @@ final class json_validate extends Internal
             $depth = $depthVar->toInt();
         }
         $flags = 0;
-        if ($argc > 2) {
+        if (isset($frame->calledArgs[2])) {
             $flagsVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \LogicException('json_validate() argument #3 must be an integer in this compiler build');
             }
             $flags = $flagsVar->toInt();
-        }
-        if ($argc > 3) {
-            throw new \LogicException('json_validate() accepts at most three arguments');
         }
         $frame->returnVar->bool(VmJsonValidate::validate($json, $depth, $flags));
     }
@@ -67,9 +73,9 @@ final class json_validate extends Internal
         if ($argc > 3) {
             throw new \LogicException('json_validate() accepts at most three arguments');
         }
-        $flags = self::resolveFlagsArg($context, $args, $argc);
+        $flags = self::resolveFlagsArg($context, $args);
         $depth = 512;
-        if ($argc > 1) {
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             if (JITVariable::TYPE_NATIVE_LONG === $args[1]->type && JITVariable::KIND_VALUE === $args[1]->kind) {
                 $depth = (int) $context->llvm->lib->LLVMConstIntGetZExtValue($args[1]->value->value);
                 if ($depth < 1) {
@@ -104,9 +110,9 @@ final class json_validate extends Internal
     /**
      * @param list<JITVariable> $args
      */
-    private static function resolveFlagsArg(Context $context, array $args, int $argc): ?int
+    private static function resolveFlagsArg(Context $context, array $args): ?int
     {
-        if ($argc <= 2) {
+        if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             return 0;
         }
         $flagsArg = $args[2];
