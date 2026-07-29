@@ -108,6 +108,7 @@ require_once __DIR__.'/../../../ext/bcmath/NumberFloor.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberMod.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberMul.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberPow.php';
+require_once __DIR__.'/../../../ext/bcmath/NumberPowmod.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberRound.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberSerialize.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberSqrt.php';
