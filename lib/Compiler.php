@@ -35373,6 +35373,11 @@ class Compiler {
         if (!\in_array($callee, ['date_sunrise', 'date_sunset', 'date_sun_info'], true)) {
             return null;
         }
+        // Named calls must keep ARG_SEND labels so BuiltinParamNames can reject legacy
+        // time:/format:/gmt_offset: like Zend (#24363). Hoist path is positional-only.
+        if ($this->callIncludesNamedParameter($cfgCallOp)) {
+            return null;
+        }
         $blockOpsAtEntry = \count($block->opCodes);
         $producerOps = [];
         $timeArgSlot = null;
