@@ -195,6 +195,11 @@ abstract class BaseTest extends TestCase {
         PhptWebSections::applyToEnv($env, $sections);
         // JIT/VM children must run llvm-env preload; PHPUnit parent skips it (#98, #2055).
         unset($env['PHP_COMPILER_SKIP_LLVM_PRELOAD']);
+        // php-src run-tests.php: honor --SKIPIF-- before executing FILE (#24888).
+        $skipReason = self::evaluatePhptSkipIf($sections, $env, $this->phpCommand(), $repoRoot);
+        if (null !== $skipReason) {
+            $this->markTestSkipped($skipReason);
+        }
         $runfile = isset($sections['RUNFILE']) ? trim($sections['RUNFILE']) : '';
         if ('' !== $runfile) {
             $runPath = realpath(($sections['__phpt_dir'] ?? $repoRoot) . '/' . $runfile);
@@ -354,6 +359,102 @@ abstract class BaseTest extends TestCase {
                 throw new \LogicException("Invalid ENV line: {$line}");
             }
             $env[$parts[0]] = $parts[1];
+        }
+    }
+
+    /**
+     * Evaluate a PHPT --SKIPIF-- section under host PHP (php-src run-tests.php semantics).
+     *
+     * Returns the skip message when output begins with "skip" (case-insensitive), or null when
+     * the case should run. Prepends vendor/autoload.php so SKIPIF can call CompilerVersion /
+     * extension policies. Cwd is the PHPT directory.
+     *
+     * @param array<string, string> $sections
+     * @param array<string, string> $env
+     * @param list<string>          $phpCommand
+     */
+    public static function evaluatePhptSkipIf(
+        array $sections,
+        array $env,
+        array $phpCommand,
+        string $repoRoot
+    ): ?string {
+        if (!isset($sections['SKIPIF'])) {
+            return null;
+        }
+        $skipif = $sections['SKIPIF'];
+        if ('' === trim($skipif)) {
+            return null;
+        }
+        $cwd = $sections['__phpt_dir'] ?? $repoRoot;
+        $autoload = $repoRoot . '/vendor/autoload.php';
+        $tmp = tempnam(sys_get_temp_dir(), 'phpt-skipif-');
+        if (false === $tmp) {
+            throw new \RuntimeException('Failed to allocate temp file for SKIPIF');
+        }
+        $skipifPath = $tmp . '.php';
+        rename($tmp, $skipifPath);
+        try {
+            // auto_prepend_file loads Composer so SKIPIF may reference PHPCompiler\* (#24888).
+            $body = $skipif;
+            if (!preg_match('/^\s*<\?php/i', $body)) {
+                $body = "<?php\n" . $body;
+            }
+            if (!file_put_contents($skipifPath, $body)) {
+                throw new \RuntimeException("Failed to write SKIPIF temp file: {$skipifPath}");
+            }
+            $cmd = $phpCommand;
+            if (is_file($autoload)) {
+                $cmd[] = '-d';
+                $cmd[] = 'auto_prepend_file=' . $autoload;
+            }
+            foreach (self::phptIniArgvFlags($sections) as $flag) {
+                $cmd[] = $flag;
+            }
+            $cmd[] = $skipifPath;
+            $descriptorSpec = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+            $pipes = [];
+            $proc = proc_open($cmd, $descriptorSpec, $pipes, $cwd, $env);
+            if (!\is_resource($proc)) {
+                throw new \RuntimeException('Failed to spawn SKIPIF subprocess');
+            }
+            fclose($pipes[0]);
+            $stdout = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exitCode = proc_close($proc);
+            $out = is_string($stdout) ? $stdout : '';
+            // php-src: SKIPIF may print to stdout; treat stderr-only when stdout empty.
+            if ('' === trim($out) && is_string($stderr) && '' !== trim($stderr)) {
+                $out = $stderr;
+            }
+            $trimmed = ltrim($out);
+            if (0 === strncasecmp($trimmed, 'skip', 4)) {
+                return trim($out);
+            }
+            if (0 !== $exitCode) {
+                $detail = trim($out);
+                if ('' === $detail && is_string($stderr)) {
+                    $detail = trim($stderr);
+                }
+                if ('' === $detail) {
+                    $detail = "(exit {$exitCode})";
+                }
+                throw new \RuntimeException("SKIPIF bork for PHPT: {$detail}");
+            }
+            // Non-empty output that is not a skip message → bork (php-src run-tests.php).
+            if ('' !== trim($out)) {
+                throw new \RuntimeException('SKIPIF bork for PHPT: ' . trim($out));
+            }
+
+            return null;
+        } finally {
+            @unlink($skipifPath);
         }
     }
 
