@@ -2142,4 +2142,31 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('hash_copy'));
         self::assertSame(['context'], BuiltinParamNames::paramNamesForInternalFunction('hash_copy'));
     }
+
+    /** @covers issue #24591 */
+    public function testClosureBindCallBindToNamedParamsResolve(): void
+    {
+        $bind = BuiltinParamNames::forClassMethod('Closure::bind');
+        self::assertSame(['closure', 'newThis', 'newScope='], $bind);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($bind, 'closure', 'Closure::bind'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($bind, 'newThis', 'Closure::bind'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($bind, 'newScope', 'Closure::bind'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bind, 'old', 'Closure::bind'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bind, 'to', 'Closure::bind'));
+
+        $call = BuiltinParamNames::forClassMethod('Closure::call');
+        self::assertSame(['newThis', '...args'], $call);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($call, 'newThis', 'Closure::call'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($call, 'args', 'Closure::call'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($call, 'to', 'Closure::call'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($call, 'parameter', 'Closure::call'));
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('closure::call'));
+
+        $bindTo = BuiltinParamNames::forClassMethod('Closure::bindTo');
+        self::assertSame(['newThis', 'newScope='], $bindTo);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($bindTo, 'newThis', 'Closure::bindTo'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($bindTo, 'newScope', 'Closure::bindTo'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bindTo, 'new', 'Closure::bindTo'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($bindTo, 'old', 'Closure::bindTo'));
+    }
 }
