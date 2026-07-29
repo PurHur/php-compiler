@@ -41612,8 +41612,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1732)
-- new ArgumentCountError (line 1743)
+- new ArgumentCountError (line 1739)
+- new ArgumentCountError (line 1750)
 - 18 class method(s)
 - 1 closure(s)
 
@@ -42436,15 +42436,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/MagicMethodReturnTypeCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 34)
-- new CompileFatal (line 171)
-- 10 class method(s)
+- new self (line 36)
+- new CompileFatal (line 244)
+- 13 class method(s)
 
 ### `lib/Compiler/MagicMethodStaticCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 37)
-- new CompileFatal (line 72)
+- new self (line 48)
+- new CompileFatal (line 89)
 - 5 class method(s)
 
 ### `lib/Compiler/NewCtorParens.php`

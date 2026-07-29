@@ -10,10 +10,11 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Compile-time rejection of static magic methods that Zend forbids.
+ * Compile-time static-ness checks for magic methods (Zend parity).
  *
  * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
- * ("Method …::…() cannot be static") (#25026, #25027)
+ * - "Method …::…() cannot be static" (#25026, #25027)
+ * - "Method …::…() must be static" for __callStatic / __set_state (#25028)
  *
  * `__construct` / `__destruct` / `__clone` are already rejected by nikic/php-parser
  * at parse time. `__toString` is also covered by MagicMethodReturnTypeCheck (#25025);
@@ -38,6 +39,16 @@ final class MagicMethodStaticCheck
         '__tostring' => true,
     ];
 
+    /**
+     * Magic methods that must be declared static.
+     *
+     * @var array<string, true>
+     */
+    private const MUST_BE_STATIC = [
+        '__callstatic' => true,
+        '__set_state' => true,
+    ];
+
     public static function validate(Script $script): void
     {
         $check = new self();
@@ -60,16 +71,22 @@ final class MagicMethodStaticCheck
                 continue;
             }
             $methodLc = strtolower($methodName);
-            if (!isset(self::CANNOT_BE_STATIC[$methodLc])) {
+            $isStatic = 0 !== ($member->func->flags & Func::FLAG_STATIC);
+            if (isset(self::CANNOT_BE_STATIC[$methodLc])) {
+                if ($isStatic) {
+                    $this->fatal(
+                        $member,
+                        "Method {$classDisplay}::{$methodName}() cannot be static"
+                    );
+                }
                 continue;
             }
-            if (0 === ($member->func->flags & Func::FLAG_STATIC)) {
-                continue;
+            if (isset(self::MUST_BE_STATIC[$methodLc]) && !$isStatic) {
+                $this->fatal(
+                    $member,
+                    "Method {$classDisplay}::{$methodName}() must be static"
+                );
             }
-            $this->fatal(
-                $member,
-                "Method {$classDisplay}::{$methodName}() cannot be static"
-            );
         }
     }
 
