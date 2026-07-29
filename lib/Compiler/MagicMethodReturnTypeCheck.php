@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCfg\Func as CfgFunc;
 use PHPCfg\Op;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\MethodVisibility;
 
 /**
  * Compile-time magic method return type and arity rules (PHP 8.0+).
  *
  * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation
- * (#4988 return types; #25023 zero-parameter magic methods)
+ * (#4988 return types; #25023 zero-parameter magic methods; #25025 __toString)
  */
 final class MagicMethodReturnTypeCheck
 {
@@ -120,8 +122,59 @@ final class MagicMethodReturnTypeCheck
                         );
                     }
                     break;
+                case '__tostring':
+                    $this->validateToString($member, $classDisplay, $returnType);
+                    break;
             }
         }
+    }
+
+    /**
+     * Zend: public (or default) visibility; return type string or never when declared.
+     *
+     * php-src: Zend/zend_compile.c — zend_check_magic_method_implementation (__toString)
+     */
+    private function validateToString(
+        Op\Stmt\ClassMethod $member,
+        string $classDisplay,
+        ?Op\Type $returnType
+    ): void {
+        if (0 !== ($member->func->flags & CfgFunc::FLAG_STATIC)) {
+            $this->fatal(
+                $member,
+                "Method {$classDisplay}::__toString() cannot be static"
+            );
+        }
+        if (!MethodVisibility::isPublic(MethodVisibility::mask($member->func->flags))) {
+            // Zend emits E_WARNING then the Stringable access-level fatal.
+            $this->compileWarning(
+                $member,
+                "The magic method {$classDisplay}::__toString() must have public visibility"
+            );
+            $this->fatal(
+                $member,
+                "Access level to {$classDisplay}::__toString() must be public (as in class Stringable)"
+            );
+        }
+        if ($this->hasExplicitReturnType($returnType) && !$this->isExactStringOrNeverType($returnType)) {
+            $this->fatal(
+                $member,
+                "{$classDisplay}::__toString(): Return type must be string when declared"
+            );
+        }
+    }
+
+    private function compileWarning(Op\Stmt\ClassMethod $method, string $message): void
+    {
+        $file = $method->getFile();
+        $line = max(1, $method->getLine());
+        $text = sprintf("Warning: %s in %s on line %d\n", $message, $file, $line);
+        if (\defined('STDERR') && \is_resource(STDERR)) {
+            @fwrite(STDERR, $text);
+
+            return;
+        }
+        @trigger_error($message, E_USER_WARNING);
     }
 
     private function hasExplicitReturnType(?Op\Type $type): bool
@@ -164,6 +217,26 @@ final class MagicMethodReturnTypeCheck
         return null !== $sig
             && 'array' === $sig->builtinScalar
             && null === $sig->classLc;
+    }
+
+    /**
+     * Exact `string` or `never` (Zend accepts never as a bottom return for __toString).
+     */
+    private function isExactStringOrNeverType(Op\Type $type): bool
+    {
+        $sig = TypeSig::fromCfgType($type);
+        if (null === $sig) {
+            return false;
+        }
+        if ($sig->never) {
+            return true;
+        }
+
+        return 'string' === $sig->builtinScalar
+            && !$sig->nullable
+            && null === $sig->classLc
+            && null === $sig->unionMembers
+            && null === $sig->intersectionMembers;
     }
 
     private function fatal(Op\Stmt\ClassMethod $method, string $message): void
