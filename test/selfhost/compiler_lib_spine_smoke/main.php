@@ -103,6 +103,7 @@ require_once __DIR__.'/../../../ext/bcmath/NumberCeil.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberCompare.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberConstruct.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberDiv.php';
+require_once __DIR__.'/../../../ext/bcmath/NumberDivmod.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberFloor.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberFrom.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberMod.php';
