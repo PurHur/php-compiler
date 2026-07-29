@@ -19,8 +19,6 @@ use PHPLLVM\Value;
  *
  * php-src: ext/bcmath/bcmath.c — bcmath_number_do_operation
  * VM SSOT: {@see VmBcMathNumber::tryDoOperation}
- *
- * Uses existing {@see __compiler_bcadd} etc. (no NestedJIT Number helpers).
  */
 final class JitBcMathNumberOperators
 {
@@ -90,13 +88,7 @@ final class JitBcMathNumberOperators
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($ok);
-        self::emitNumberBinaryIntoSlot(
-            $context,
-            $opType,
-            $leftObj,
-            $rightObj,
-            $resultSlot
-        );
+        self::emitNumberBinaryIntoSlot($context, $opType, $leftObj, $rightObj, $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($scalarBlock);
@@ -113,9 +105,6 @@ final class JitBcMathNumberOperators
         return new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $resultSlot);
     }
 
-    /**
-     * OBJECT ⊙ OBJECT — main-script temps stay typed as objects after `new` (#24683).
-     */
     public static function binaryObjectObject(
         Context $context,
         int $opType,
@@ -184,41 +173,23 @@ final class JitBcMathNumberOperators
     ): void {
         $leftRecv = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $leftObj);
         $rightRecv = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $rightObj);
-        $leftVal = JitBcMathNumberInit::loadValueString($context, $leftRecv);
-        $rightVal = JitBcMathNumberInit::loadValueString($context, $rightRecv);
+        $leftStrVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            JitBcMathNumberInit::loadValueString($context, $leftRecv)
+        );
+        $rightStrVar = new Variable(
+            $context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            JitBcMathNumberInit::loadValueString($context, $rightRecv)
+        );
         $leftScale = JitBcMathNumberInit::loadScaleLong($context, $leftRecv);
         $rightScale = JitBcMathNumberInit::loadScaleLong($context, $rightRecv);
-        [$outVal, $outScale] = self::emitBinaryBc(
-            $context,
-            $opType,
-            $leftVal,
-            $leftScale,
-            $rightVal,
-            $rightScale
-        );
-        $boxed = JitBcMathNumberInit::boxNewNumber($context, $outVal, $outScale);
-        JitValueBox::copyFromPointer(
-            $context,
-            $resultSlot,
-            JitValueBox::valuePtrFromVariable($context, $boxed)
-        );
-    }
-
-    /**
-     * @return array{0: Value, 1: Value}
-     */
-    private static function emitBinaryBc(
-        Context $context,
-        int $opType,
-        Value $leftVal,
-        Value $leftScale,
-        Value $rightVal,
-        Value $rightScale
-    ): array {
         $i64 = $context->getTypeFromString('int64');
-        $hasScale = $i64->constInt(1, true);
-        $round = $i64->constInt(0, true);
-        $hasRound = $i64->constInt(-1, true);
+        $left = \PHPCompiler\JIT\JitStringBuiltinArg::lower($context, $leftStrVar, 'bcmath_number', 0, 'num1');
+        $right = \PHPCompiler\JIT\JitStringBuiltinArg::lower($context, $rightStrVar, 'bcmath_number', 1, 'num2');
         switch ($opType) {
             case OpCode::TYPE_PLUS:
             case OpCode::TYPE_MINUS:
@@ -228,48 +199,39 @@ final class JitBcMathNumberOperators
                     $rightScale
                 );
                 $fn = OpCode::TYPE_PLUS === $opType ? '__compiler_bcadd' : '__compiler_bcsub';
-                $out = $context->builder->call(
-                    $context->lookupFunction($fn),
-                    $leftVal,
-                    $rightVal,
-                    $scale,
-                    $hasScale,
-                    $round,
-                    $hasRound
-                );
-
-                return [$out, $scale];
+                break;
             case OpCode::TYPE_MUL:
                 $scale = $context->builder->add($leftScale, $rightScale);
-                $out = $context->builder->call(
-                    $context->lookupFunction('__compiler_bcmul'),
-                    $leftVal,
-                    $rightVal,
-                    $scale,
-                    $hasScale,
-                    $round,
-                    $hasRound
-                );
-
-                return [$out, $scale];
+                $fn = '__compiler_bcmul';
+                break;
             case OpCode::TYPE_DIV:
                 $scale = $context->builder->add(
                     $leftScale,
                     $i64->constInt(VmBcMathNumber::EXPAND_SCALE, true)
                 );
-                $out = $context->builder->call(
-                    $context->lookupFunction('__compiler_bcdiv'),
-                    $leftVal,
-                    $rightVal,
-                    $scale,
-                    $hasScale,
-                    $round,
-                    $hasRound
-                );
-
-                return [$out, $scale];
+                $fn = '__compiler_bcdiv';
+                break;
             default:
                 throw new \LogicException('BcMath\\Number JIT op not supported: '.$opType);
         }
+        $outVal = $context->builder->call(
+            $context->lookupFunction($fn),
+            $left,
+            $right,
+            $scale,
+            $i64->constInt(1, true),
+            $i64->constInt(0, true),
+            $i64->constInt(-1, true)
+        );
+        $outVal = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $outVal
+        );
+        $boxed = JitBcMathNumberInit::boxNewNumber($context, $outVal, $scale);
+        JitValueBox::copyFromPointer(
+            $context,
+            $resultSlot,
+            JitValueBox::valuePtrFromVariable($context, $boxed)
+        );
     }
 }
