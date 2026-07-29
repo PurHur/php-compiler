@@ -78,12 +78,12 @@ final class FilterConstants
     public static function registeredConstants(): array
     {
         $out = [
+            // php-src filter.stub.php: INPUT_GET…INPUT_SERVER only — no INPUT_SESSION (#24358).
             'INPUT_POST' => VmFilter::INPUT_POST,
             'INPUT_GET' => VmFilter::INPUT_GET,
             'INPUT_COOKIE' => VmFilter::INPUT_COOKIE,
             'INPUT_ENV' => VmFilter::INPUT_ENV,
             'INPUT_SERVER' => VmFilter::INPUT_SERVER,
-            'INPUT_SESSION' => VmFilter::INPUT_SESSION,
             'FILTER_FLAG_NONE' => VmFilter::FILTER_FLAG_NONE,
             'FILTER_REQUIRE_SCALAR' => VmFilter::FILTER_REQUIRE_SCALAR,
             'FILTER_REQUIRE_ARRAY' => VmFilter::FILTER_REQUIRE_ARRAY,

@@ -97,8 +97,6 @@ final class VmFilter
 
     public const INPUT_SERVER = 5;
 
-    public const INPUT_SESSION = 6;
-
     /**
      * Profile-correct FILTER_FLAG_GLOBAL_RANGE bit (php-src filter_private.h; #24065).
      */
@@ -680,6 +678,8 @@ final class VmFilter
         $var = $var->resolveIndirect();
         $fromEnum = self::tryPhpInputFilterInt($var);
         if (null !== $fromEnum) {
+            self::assertValidInputType($fromEnum, $fn);
+
             return $fromEnum;
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
@@ -690,7 +690,10 @@ final class VmFilter
             ));
         }
         if (Variable::TYPE_INTEGER === $var->type) {
-            return $var->toInt();
+            $type = $var->toInt();
+            self::assertValidInputType($type, $fn);
+
+            return $type;
         }
 
         throw new \TypeError(sprintf(
@@ -717,6 +720,25 @@ final class VmFilter
         return $entry->backingValue->resolveIndirect()->toInt();
     }
 
+    public static function assertValidInputType(int $type, string $fn): void
+    {
+        if (!\in_array($type, [
+            self::INPUT_POST,
+            self::INPUT_GET,
+            self::INPUT_COOKIE,
+            self::INPUT_ENV,
+            self::INPUT_SERVER,
+        ], true)) {
+            // php-src php_filter_get_storage — ValueError when type is not an INPUT_* constant.
+            $arg = 'filter_has_var' === $fn ? 'input_type' : 'type';
+            throw new \ValueError(sprintf(
+                '%s(): Argument #1 ($%s) must be an INPUT_* constant',
+                $fn,
+                $arg
+            ));
+        }
+    }
+
     public static function inputSuperglobalName(int $type): string
     {
         return match ($type) {
@@ -725,7 +747,6 @@ final class VmFilter
             self::INPUT_COOKIE => '_COOKIE',
             self::INPUT_ENV => '_ENV',
             self::INPUT_SERVER => '_SERVER',
-            self::INPUT_SESSION => '_SESSION',
             default => throw new \LogicException(
                 'filter_input() type '.$type.' is not supported in this compiler build'
             ),

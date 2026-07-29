@@ -77,11 +77,6 @@ final class filter_has_var extends Internal
             $typeVal,
             $i64->constInt(VmFilter::INPUT_SERVER, false)
         );
-        $isSession = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeVal,
-            $i64->constInt(VmFilter::INPUT_SESSION, false)
-        );
 
         $id = 'fhv'.spl_object_id($context);
         $pickPostBlock = BasicBlockHelper::append($context, 'filter_has_var_pick_post_'.$id);
@@ -90,14 +85,12 @@ final class filter_has_var extends Internal
         $cookieBlock = BasicBlockHelper::append($context, 'filter_has_var_cookie_'.$id);
         $envBlock = BasicBlockHelper::append($context, 'filter_has_var_env_'.$id);
         $serverBlock = BasicBlockHelper::append($context, 'filter_has_var_server_'.$id);
-        $sessionBlock = BasicBlockHelper::append($context, 'filter_has_var_session_'.$id);
         $badTypeBlock = BasicBlockHelper::append($context, 'filter_has_var_bad_type_'.$id);
         $doneBlock = BasicBlockHelper::append($context, 'filter_has_var_done_'.$id);
 
         $cookieBodyBlock = BasicBlockHelper::append($context, 'filter_has_var_cookie_body_'.$id);
         $envBodyBlock = BasicBlockHelper::append($context, 'filter_has_var_env_body_'.$id);
         $serverBodyBlock = BasicBlockHelper::append($context, 'filter_has_var_server_body_'.$id);
-        $sessionBodyBlock = BasicBlockHelper::append($context, 'filter_has_var_session_body_'.$id);
 
         $context->builder->branchIf($isGet, $getBlock, $pickPostBlock);
         $context->builder->positionAtEnd($pickPostBlock);
@@ -117,18 +110,12 @@ final class filter_has_var extends Internal
         $envTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
+        // No INPUT_SESSION in php-src — unknown types fall through to badType (#24358).
         $context->builder->positionAtEnd($serverBlock);
-        $context->builder->branchIf($isServer, $serverBodyBlock, $sessionBlock);
+        $context->builder->branchIf($isServer, $serverBodyBlock, $badTypeBlock);
         $context->builder->positionAtEnd($serverBodyBlock);
         $serverResult = self::hasVarInSuperglobal($context, '_SERVER', $keyVar);
         $serverTail = $context->builder->getInsertBlock();
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($sessionBlock);
-        $context->builder->branchIf($isSession, $sessionBodyBlock, $badTypeBlock);
-        $context->builder->positionAtEnd($sessionBodyBlock);
-        $sessionResult = self::hasVarInSuperglobal($context, '_SESSION', $keyVar);
-        $sessionTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($badTypeBlock);
@@ -153,7 +140,6 @@ final class filter_has_var extends Internal
         $phi->addIncoming($cookieResult, $cookieTail);
         $phi->addIncoming($envResult, $envTail);
         $phi->addIncoming($serverResult, $serverTail);
-        $phi->addIncoming($sessionResult, $sessionTail);
 
         return $phi;
     }
