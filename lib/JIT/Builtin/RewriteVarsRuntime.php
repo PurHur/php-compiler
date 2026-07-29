@@ -90,6 +90,7 @@ final class RewriteVarsRuntime
     private static function ensureJitHelperCompiled(Context $context): void
     {
         // VmUrlRewriterOb first — OutputRewriteVarsJitHelper::add calls ensureRegistered (#21965/#21968).
+        // Scanner/flush stay out of this NestedJIT (VmUrlRewriterFlush / UrlScannerEx, #24370).
         JitVmHelperLink::ensureCompiled(
             $context,
             self::URL_REWRITER_PATH,

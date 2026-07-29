@@ -3213,6 +3213,8 @@ require_once __DIR__.'/../../../ext/standard/VmUnameNative.php';
 require_once __DIR__.'/../../../ext/standard/VmUnamePure.php';
 require_once __DIR__.'/../../../ext/standard/VmUnserializeFormat.php';
 require_once __DIR__.'/../../../ext/standard/VmUrlRewriterOb.php';
+require_once __DIR__.'/../../../ext/standard/UrlScannerEx.php';
+require_once __DIR__.'/../../../ext/standard/VmUrlRewriterFlush.php';
 require_once __DIR__.'/../../../ext/standard/VmUserCall.php';
 require_once __DIR__.'/../../../ext/standard/VmUserStream.php';
 require_once __DIR__.'/../../../ext/standard/VmVarDump.php';

@@ -30,6 +30,17 @@ final class ini_get_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        $key = \strtolower($option);
+        if ('url_rewriter.tags' === $key) {
+            $frame->returnVar->string(VmUrlRewriterOb::getTags());
+
+            return;
+        }
+        if ('url_rewriter.hosts' === $key) {
+            $frame->returnVar->string(VmUrlRewriterOb::getHosts());
+
+            return;
+        }
         $result = VmIni::get($frame->vmContext, $option);
         if (false === $result) {
             $frame->returnVar->bool(false);
