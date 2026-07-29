@@ -14330,6 +14330,14 @@ restart:
         if (null === $classLc) {
             return null;
         }
+        // Trait methods: resolve to composing class for protected/public (#24732),
+        // keep trait scope only for private (#4834).
+        if (isset($this->context->classes[$classLc]) && $this->context->classes[$classLc]->isTrait) {
+            $composing = $this->resolveTraitComposingClassLc($frame, $classLc);
+            if (null !== $composing) {
+                $classLc = $composing;
+            }
+        }
         $traitLc = $this->traitScopeLcForFrameMethod($frame, $classLc);
 
         return $traitLc ?? $classLc;
@@ -14360,7 +14368,40 @@ restart:
         return null === $state->boundScopeClass || '' === $state->boundScopeClass;
     }
 
-    /** Trait-sourced methods use trait scope for private member access (#4834, zend_compile.c). */
+    /**
+     * When executing inside a trait method, resolve the composing (using) class from $this or
+     * calledClass — Zend rebinds trait methods into the using class's scope (#24732).
+     */
+    private function resolveTraitComposingClassLc(Frame $frame, string $traitClassLc): ?string
+    {
+        // Prefer the object's actual class from $this.
+        if (!empty($frame->scope)) {
+            foreach ($frame->scope as $var) {
+                if (Variable::TYPE_OBJECT === $var->type) {
+                    $objClassLc = strtolower($var->toObject()->class->name);
+                    if ($objClassLc !== $traitClassLc
+                        && (!isset($this->context->classes[$objClassLc]) || !$this->context->classes[$objClassLc]->isTrait)) {
+                        return $objClassLc;
+                    }
+                }
+                break; // slot 0 is $this
+            }
+        }
+        if (null !== $frame->calledClass && '' !== $frame->calledClass) {
+            $calledLc = strtolower($frame->calledClass);
+            if ($calledLc !== $traitClassLc
+                && (!isset($this->context->classes[$calledLc]) || !$this->context->classes[$calledLc]->isTrait)) {
+                return $calledLc;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Trait-sourced methods use trait scope for private member access (#4834, zend_compile.c).
+     * Protected/public trait methods use the composing class scope (#24732, Zend/zend_inheritance.c).
+     */
     private function traitScopeLcForFrameMethod(Frame $frame, string $classLc): ?string
     {
         if (!isset($this->context->classes[$classLc])) {
@@ -14371,8 +14412,13 @@ restart:
             return null;
         }
         $methodLc = strtolower((string) $func->name);
-        $traitName = $this->context->classes[$classLc]->traitMethodSources[$methodLc] ?? null;
+        $classEntry = $this->context->classes[$classLc];
+        $traitName = $classEntry->traitMethodSources[$methodLc] ?? null;
         if (null === $traitName) {
+            return null;
+        }
+        $vis = $classEntry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        if (($vis & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
             return null;
         }
 
