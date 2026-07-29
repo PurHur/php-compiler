@@ -10552,6 +10552,11 @@ class Compiler {
      * Declarations nested in if/else/try/catch/finally/switch/loop stay at their CFG site
      * (runtime registration when that path runs). Merge blocks after try/if that hold a
      * top-level `function` are early-bound — matching zend_compile.c for non-conditional decls.
+     *
+     * php-cfg's ClassMethod extends Function_, and ClassLike::getSubBlocks() exposes the
+     * class stmts block — so a naive instanceof Function_ walk also picks up interface/abstract
+     * methods (null cfg) and concrete methods. Exact-class match only; methods stay on the
+     * DECLARE_METHOD path (#24836 TypeError / prior SIGSEGV on ext/spl spine chunks).
      */
     private function emitEarlyBoundFunctionDefs(CfgBlock $entry, Block $dest): void
     {
@@ -10567,8 +10572,16 @@ class Compiler {
             }
             $seenBlocks[$cfg] = true;
             foreach ($cfg->children as $child) {
-                if ($child instanceof Op\Stmt\Function_ && !$delayed->contains($cfg)) {
+                // ClassMethod extends Function_ — do not early-bind methods as FUNCDEF (#24836).
+                if (
+                    Op\Stmt\Function_::class === \get_class($child)
+                    && !$delayed->contains($cfg)
+                ) {
                     $funcs[] = $child;
+                }
+                // Do not walk into class/interface/trait/enum bodies — only file-level decls.
+                if ($child instanceof Op\Stmt\ClassLike) {
+                    continue;
                 }
                 foreach ($this->cfgOpSuccessorBlocks($child) as $succ) {
                     $queue[] = $succ;
