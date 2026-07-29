@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\calendar;
 
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -21,16 +22,26 @@ final class jdtojewish extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
+        if ($argc < 1 || $argc > 3) {
             throw new \ArgumentCountError(
-                'jdtojewish() expects 1 or 2 arguments, '.$argc.' given'
+                'jdtojewish() expects at most 3 arguments, '.$argc.' given'
             );
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $julday = CalendarArgs::requireInt($frame, 'jdtojewish', 1, 'julday');
-        $mode = CalendarArgs::optionalInt($frame, 'jdtojewish', 2, 'mode') ?? 0;
+        // php-src calendar.stub.php — int $julian_day, bool $hebrew = false, int $flags = 0 (#24362)
+        $julday = CalendarArgs::requireInt($frame, 'jdtojewish', 1, 'julian_day');
+        $hebrew = false;
+        $flags = 0;
+        if ($argc >= 2) {
+            $hebrew = VmMath::parseBoolBuiltinArgForFrame($frame, 1, 'jdtojewish', 2, 'hebrew');
+        }
+        if ($argc >= 3) {
+            $flags = CalendarArgs::requireInt($frame, 'jdtojewish', 3, 'flags');
+        }
+        // Hebrew formatting flags are accepted for arity/named-arg parity; numeric form ignores them today.
+        $mode = $hebrew ? $flags : 0;
         $frame->returnVar->string(VmJewishFrenchCalendar::jdtojewish($julday, $mode));
     }
 

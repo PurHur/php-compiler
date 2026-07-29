@@ -35,7 +35,7 @@ final class easter_days extends Internal
         self::assertEasterYear($year);
         $method = 1 === $argc
             ? CalendarConstants::CAL_EASTER_DEFAULT
-            : CalendarArgs::requireInt($frame, 'easter_days', 2, 'method');
+            : CalendarArgs::requireInt($frame, 'easter_days', 2, 'mode');
         $frame->returnVar->int(VmCalendar::easterDays($year, $method));
     }
 

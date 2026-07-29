@@ -28,7 +28,7 @@ final class jdtofrench extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $julday = CalendarArgs::requireInt($frame, 'jdtofrench', 1, 'julday');
+        $julday = CalendarArgs::requireInt($frame, 'jdtofrench', 1, 'julian_day');
         $frame->returnVar->string(VmJewishFrenchCalendar::jdtofrench($julday));
     }
 
