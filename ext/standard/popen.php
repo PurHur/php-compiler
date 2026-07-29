@@ -33,7 +33,7 @@ final class popen extends Internal
             return;
         }
         $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'popen', 'command', false);
-        VmString::rejectEmptyBuiltinStringArg($command, 'popen', 0, 'command');
+        // php-src PHP_FUNCTION(popen) — empty command allowed (unlike php_exec; #24940 / re-#24688).
         $mode = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'popen',
@@ -56,12 +56,7 @@ final class popen extends Internal
         }
 
         $command = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'popen', 0, 'command', 'string', null, false);
-        JitStringBuiltinArg::rejectEmpty(
-            $context,
-            $args[0],
-            $command,
-            'popen(): Argument #1 ($command) cannot be empty'
-        );
+        // php-src PHP_FUNCTION(popen) — empty command allowed (#24940).
 
         return JitPopen::invoke(
             $context,
