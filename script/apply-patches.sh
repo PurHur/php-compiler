@@ -5960,6 +5960,114 @@ PY
   echo "Applied php-llvm-no-closures-array-map.patch (overlay)"
 }
 
+# PHP 8.4 implicitly-nullable params in php-cfg / php-optimizer — surgical overlay.
+# The committed .patch hunks go stale whenever php-cfg overlays rewrite the same
+# signatures (Func blank-line drift, Property lazy fields, Parser ctor context).
+# Prefer this overlay over git apply so apply-patches stays green after overlays (#25042).
+apply_php_vendor_implicit_nullable_84_overlay() {
+  if patch_already_applied "$PATCH_DIR/php-vendor-implicit-nullable-84.patch"; then
+    echo "Skip php-vendor-implicit-nullable-84.patch (already applied)"
+    return 0
+  fi
+  python3 - "$ROOT" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+files = [
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/AbstractVisitor.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Block.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Func.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ArrayDimFetch.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ClassConstFetch.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/ConstFetch.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Exit_.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Param.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Yield_.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Class_.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/Property.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/Return_.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Terminal/StaticVar.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand/Temporary.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Printer.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Traverser.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/DeadBlockEliminator.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/DebugVisitor.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/VariableFinder.php",
+    "vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor.php",
+    "vendor/ircmaxell/php-optimizer/lib/PHPOptimizer/Visitor/JumpBlockEliminator.php",
+]
+param_typed = re.compile(
+    r"(?<![?\w\\\\])((?:\\\\)?(?:self|static|parent|[A-Za-z_][\w\\\\]*))\s+(\$[A-Za-z_][\w]*)\s*=\s*null\b"
+)
+
+def transform(text: str) -> str:
+    """Rewrite Type $x = null → ?Type $x = null inside function parameter lists only."""
+    out = []
+    i = 0
+    n = len(text)
+    while i < n:
+        m = re.search(r"\bfunction\b", text[i:])
+        if not m:
+            out.append(text[i:])
+            break
+        start = i + m.start()
+        out.append(text[i:start])
+        paren = text.find("(", start)
+        if paren < 0:
+            out.append(text[start : start + 8])
+            i = start + 8
+            continue
+        depth = 0
+        j = paren
+        while j < n:
+            c = text[j]
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    break
+            j += 1
+        else:
+            out.append(text[start:])
+            break
+        params = text[paren + 1 : j]
+        new_params = param_typed.sub(
+            lambda mm: f"?{mm.group(1)} {mm.group(2)} = null", params
+        )
+        out.append(text[start : paren + 1] + new_params + ")")
+        i = j + 1
+    return "".join(out)
+
+changed = 0
+for rel in files:
+    path = root / rel
+    if not path.is_file():
+        continue
+    old = path.read_text()
+    new = transform(old)
+    if "?public" in new or "?protected" in new or "?private" in new:
+        sys.stderr.write(f"php-vendor-implicit-nullable-84: refused property rewrite in {rel}\n")
+        raise SystemExit(1)
+    if new != old:
+        path.write_text(new)
+        changed += 1
+
+marker = root / "vendor/ircmaxell/php-cfg/lib/PHPCfg/AbstractVisitor.php"
+if not marker.is_file() or "?Block $prior = null" not in marker.read_text():
+    sys.stderr.write(
+        "php-vendor-implicit-nullable-84: AbstractVisitor ?Block $prior marker missing after overlay\n"
+    )
+    raise SystemExit(1)
+print(f"nullable-84 overlay touched {changed} file(s)", file=sys.stderr)
+PY
+  echo "Applied php-vendor-implicit-nullable-84.patch (overlay)"
+}
+
 record_patch_failure() {
   local patch_name="$1"
   local detail="${2:-}"
@@ -6066,6 +6174,11 @@ apply_patch() {
   fi
   if [[ "$(basename "$patch")" == "php-cfg-incdec-expr.patch" ]]; then
     apply_php_cfg_incdec_expr_overlay
+    return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-vendor-implicit-nullable-84.patch" ]]; then
+    # Hunks go stale after php-cfg overlays rewrite the same signatures (#25042).
+    apply_php_vendor_implicit_nullable_84_overlay
     return $?
   fi
   if [[ "$(basename "$patch")" == "php-cfg-loop-resolver-continue-switch-warning.patch" ]]; then
