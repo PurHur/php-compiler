@@ -1,5 +1,7 @@
 --TEST--
 stdlib str_increment() — backed enum case TypeError (#6233, ext/standard/string.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 enum E: string { case A = 'x'; }

@@ -1,5 +1,7 @@
 --TEST--
 str_decrement(): empty string throws ValueError (#18061, ext/standard/string.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 try {

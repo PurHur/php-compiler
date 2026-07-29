@@ -1,5 +1,7 @@
 --TEST--
 str_decrement(): single-char underflow throws ValueError (#16864, ext/standard/string.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 try {

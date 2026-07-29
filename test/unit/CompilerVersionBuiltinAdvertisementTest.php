@@ -241,10 +241,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testStrIncrementAdvertisedOnDefault84DevProfile(): void
+    public function testStrIncrementWithheldOnDefault84DevProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsStrIncrement());
-        $this->assertTrue(CompilerVersion::advertisesStrIncrement());
+        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+        $this->assertFalse(CompilerVersion::advertisesStrIncrement());
     }
 
     public function testStrIncrementWithheldOnPhp82Profile(): void
