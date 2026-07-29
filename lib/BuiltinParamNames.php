@@ -1024,8 +1024,9 @@ final class BuiltinParamNames
                 return ['key', 'array'];
             case 'extract':
                 return ['array', 'flags', 'prefix'];
+            // php-src ext/standard/file.stub.php — InternalArgInfo has context; bare table truncated it (#24454)
             case 'file':
-                return ['filename', 'flags'];
+                return ['filename', 'flags', 'context'];
             // php-src ext/fileinfo/fileinfo.stub.php — InternalArgInfo still says options/arg (#23645)
             case 'finfo_open':
                 return ['flags=', 'magic_database='];

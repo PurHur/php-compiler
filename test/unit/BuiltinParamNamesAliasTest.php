@@ -105,12 +105,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'substr_compare'));
     }
 
-    /** @covers issue #10474 */
+    /** @covers issue #10474 / #24454 */
     public function testFileFlagsNamedParamResolves(): void
     {
         $names = BuiltinParamNames::forFunction('file');
-        self::assertSame(['filename', 'flags'], $names);
+        self::assertSame(['filename', 'flags', 'context'], $names);
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'file'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'context', 'file'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('file'));
     }
 
     /** @covers issue #9565 */
