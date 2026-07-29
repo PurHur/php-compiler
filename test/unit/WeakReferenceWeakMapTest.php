@@ -393,6 +393,36 @@ PHP;
         $this->assertSame('0', ob_get_clean());
     }
 
+    /**
+     * unset($o) on {main} must not clear WeakMap while foreach $k still holds the key (#24784).
+     *
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_weakrefs.c
+     */
+    public function testWeakMapCountSurvivesUnsetWhileForeachKeyLive(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$wm = new WeakMap();
+$o = new stdClass;
+$wm[$o] = 1;
+foreach ($wm as $k => $v) {
+}
+echo 'k_same=', ($k === $o) ? 'yes' : 'no', "\n";
+unset($o);
+echo 'count_with_k=', count($wm), "\n";
+unset($k);
+gc_collect_cycles();
+echo 'count_after_k=', count($wm), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_foreach_key_unset.php'));
+        $this->assertSame(
+            "k_same=yes\ncount_with_k=1\ncount_after_k=0\n",
+            ob_get_clean()
+        );
+    }
+
     /** probe_weakreference: get() in if() must not leak a strong ref to the referent (#14103). */
     public function testWeakReferenceClearedAfterIfGetComparison(): void
     {

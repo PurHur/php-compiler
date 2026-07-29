@@ -879,10 +879,9 @@ class Context {
             return;
         }
         $global = $this->globalVars[$name];
-        if (Variable::TYPE_OBJECT === $global->resolveIndirect()->type) {
-            $object = $global->resolveIndirect()->toObject();
-            WeakRefRegistry::clearForObject($object->id);
-        }
+        // Variable::reset() clears WeakMap/WeakReference only when this was the last
+        // strong ref (refCount <= 1). Unconditional clearForObject here dropped map
+        // entries while foreach $k (or any other live zval) still held the key (#24784).
         $global->reset();
         $global->type = Variable::TYPE_UNDEFINED;
         $this->clearGlobalEverAssigned($name);
@@ -896,9 +895,8 @@ class Context {
     {
         if (isset($this->globalVars[$name])) {
             $global = $this->globalVars[$name];
-            if (Variable::TYPE_OBJECT === $global->resolveIndirect()->type) {
-                WeakRefRegistry::clearForObject($global->resolveIndirect()->toObject()->id);
-            }
+            // Same last-strong-ref rule as clearGlobalByName / Variable::reset (#24784).
+            $global->reset();
             unset($this->globalVars[$name]);
         }
         if (null === $this->globalsSuperglobal) {
