@@ -19629,7 +19629,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/PgsqlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 9 class method(s)
 
 ### `ext/pgsql/PgsqlSerializeDeny.php`
 
@@ -42443,8 +42443,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/MagicMethodStaticCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 48)
-- new CompileFatal (line 89)
+- new self (line 54)
+- new CompileFatal (line 95)
 - 5 class method(s)
 
 ### `lib/Compiler/NewCtorParens.php`
