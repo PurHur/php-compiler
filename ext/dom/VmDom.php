@@ -4230,7 +4230,35 @@ final class VmDom
             return false;
         }
 
-        return self::loadXML($ctx, $document, $contents, $frame, $options);
+        if (!self::loadXML($ctx, $document, $contents, $frame, $options)) {
+            return false;
+        }
+        // php-src / libxml: document URL is the loaded filename (needed for relative
+        // XInclude href + xml:base fixup; loadXML alone stamps cwd) (#24775, #14468).
+        DomRegistry::state($document)->documentUri = self::normalizeLoadedDocumentUri($filename);
+
+        return true;
+    }
+
+    /** Absolute path form for {@see DomNodeState::$documentUri} after DOMDocument::load(). */
+    private static function normalizeLoadedDocumentUri(string $filename): string
+    {
+        if ('' === $filename) {
+            return self::defaultDocumentUri();
+        }
+        if (str_starts_with($filename, 'file://')) {
+            $filename = substr($filename, 7);
+        }
+        if (1 === preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*:#', $filename)) {
+            return $filename;
+        }
+        if (str_starts_with($filename, '/')) {
+            return $filename;
+        }
+        $base = self::defaultDocumentUri();
+        $resolved = self::resolveUri($base, $filename);
+
+        return str_starts_with($resolved, 'file://') ? substr($resolved, 7) : $resolved;
     }
 
     public static function loadHTMLFile(
@@ -12782,16 +12810,115 @@ final class VmDom
 
             return null;
         }
+        // libxml stamps the included doc URL to the resolved href so xmlNodeGetBase differs
+        // from the include site — loadXML alone would leave default cwd (#24775).
+        if ('' !== $path) {
+            DomRegistry::state($tmpDoc)->documentUri = $path;
+        }
         $rootVar = $tmpDoc->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $rootVar->type) {
             self::replaceNodeWithNodes($ctx, $include, []);
 
             return 1;
         }
-        $imported = self::importNodeEntry($ctx, $document, $rootVar->toObject(), true);
+        $sourceRoot = $rootVar->toObject();
+        // Capture bases before import — after reparent, readBaseUri follows the target doc (#24775).
+        $sourceBase = self::readBaseUri($sourceRoot);
+        $targetBase = self::readBaseUri($include);
+        $imported = self::importNodeEntry($ctx, $document, $sourceRoot, true);
+        self::applyXIncludeBaseFixup($ctx, $imported, $sourceBase, $targetBase);
         self::replaceNodeWithNodes($ctx, $include, [$imported]);
 
         return 1;
+    }
+
+    /**
+     * libxml {@code xmlXIncludeBaseFixup} — set relative {@code xml:base} when the included
+     * node's base differs from the include site and the relative form contains {@code /}
+     * (libxml2 xinclude.c; php-src ext/dom/document.c; #24775).
+     */
+    private static function applyXIncludeBaseFixup(
+        Context $ctx,
+        ObjectEntry $copy,
+        string $sourceBase,
+        string $targetBase
+    ): void {
+        if (!self::isElement($copy)) {
+            return;
+        }
+        if ('' !== $sourceBase && $sourceBase !== $targetBase) {
+            $relBase = self::buildRelativeUri($sourceBase, $targetBase);
+            // libxml: omit when relative has no slash (same directory).
+            if ('' !== $relBase && str_contains($relBase, '/')) {
+                self::setAttributeNS($ctx, $copy, DomConstants::XML_NS_URI, 'xml:base', $relBase);
+
+                return;
+            }
+        }
+        // Bases equal or relative has no slash — drop any copied xml:base.
+        self::removeAttributeNS($ctx, $copy, DomConstants::XML_NS_URI, 'base');
+    }
+
+    /**
+     * libxml {@code xmlBuildRelativeURI}(uri, base) — URI expressed relative to base (#24775).
+     */
+    private static function buildRelativeUri(string $uri, string $base): string
+    {
+        if ('' === $uri) {
+            return '';
+        }
+        if ('' === $base) {
+            return $uri;
+        }
+        $u = parse_url($uri);
+        $b = parse_url($base);
+        if (!\is_array($u)) {
+            $u = [];
+        }
+        if (!\is_array($b)) {
+            $b = [];
+        }
+        // Bare filesystem paths (documentURI / loadXML defaults) — not scheme-bearing URLs.
+        if (!isset($u['scheme']) && str_starts_with($uri, '/')) {
+            $u = ['path' => $uri];
+        }
+        if (!isset($b['scheme']) && '' !== $base && 1 !== preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*:#', $base)) {
+            $b = ['path' => $base];
+        }
+        $uScheme = $u['scheme'] ?? '';
+        $bScheme = $b['scheme'] ?? '';
+        $uHost = $u['host'] ?? '';
+        $bHost = $b['host'] ?? '';
+        if ($uScheme !== $bScheme || $uHost !== $bHost) {
+            return $uri;
+        }
+        $up = $u['path'] ?? '';
+        $bp = $b['path'] ?? '';
+        if ('' === $bp) {
+            $bp = '/';
+        }
+        if (!str_ends_with($bp, '/')) {
+            $slash = strrpos($bp, '/');
+            $bp = false === $slash ? '/' : substr($bp, 0, $slash + 1);
+        }
+        $uSeg = ('/' === $up || '' === $up) ? [] : explode('/', trim($up, '/'));
+        $bSeg = ('/' === $bp || '' === $bp) ? [] : explode('/', trim($bp, '/'));
+        $i = 0;
+        $uCount = \count($uSeg);
+        $bCount = \count($bSeg);
+        while ($i < $uCount && $i < $bCount && $uSeg[$i] === $bSeg[$i]) {
+            ++$i;
+        }
+        $rel = array_merge(array_fill(0, $bCount - $i, '..'), array_slice($uSeg, $i));
+        $out = implode('/', $rel);
+        if (isset($u['query'])) {
+            $out .= '?'.$u['query'];
+        }
+        if (isset($u['fragment'])) {
+            $out .= '#'.$u['fragment'];
+        }
+
+        return '' === $out ? '.' : $out;
     }
 
     private static function resolveXIncludeHref(ObjectEntry $include, string $href): string
