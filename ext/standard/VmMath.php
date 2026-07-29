@@ -144,6 +144,23 @@ final class VmMath
         );
     }
 
+    /**
+     * Strict bool param — null is TypeError (php-src Z_PARAM_BOOL on non-nullable typed params).
+     */
+    public static function parseBoolBuiltinArgStrict(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): bool {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            throw new \TypeError(self::boolBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+        }
+
+        return self::parseBoolBuiltinArg($var, $function, $argIndex, $paramName);
+    }
+
     public static function parseBoolBuiltinArg(
         Variable $var,
         string $function,

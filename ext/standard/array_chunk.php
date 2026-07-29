@@ -42,7 +42,12 @@ final class array_chunk extends Internal
         }
         $preserveKeys = false;
         if (3 === $argc) {
-            $preserveKeys = $frame->calledArgs[2]->resolveIndirect()->toBool();
+            $preserveKeys = VmMath::parseBoolBuiltinArgStrict(
+                $frame->calledArgs[2],
+                'array_chunk',
+                3,
+                'preserve_keys'
+            );
         }
         $result = $array->chunkCopy($chunkSize, $preserveKeys);
         if (null === $frame->returnVar) {
