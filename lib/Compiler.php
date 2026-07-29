@@ -1133,6 +1133,28 @@ class Compiler {
             && $elseTail instanceof Op\Expr\Cast\Bool_;
     }
 
+    /**
+     * `&&` short-circuit: php-cfg puts (bool) cast on JumpIf->if and literal `false` on ->else.
+     * Lower if before else so the cast arm records the phi slot (#24506) — the opposite of `||`.
+     */
+    private function jumpIfTargetsLogicalAndShortCircuitCastIf(Op\Stmt\JumpIf $stmt): bool
+    {
+        $ifMerge = $this->branchJumpMergeTarget($stmt->if);
+        $elseMerge = $this->branchJumpMergeTarget($stmt->else);
+        if (null === $ifMerge || $ifMerge !== $elseMerge) {
+            return false;
+        }
+        if (!$this->mergeCfgBlockUsesLogicalShortCircuit($ifMerge)) {
+            return false;
+        }
+        $ifTail = $this->branchTailExprBeforeJump($stmt->if);
+        $elseTail = $this->branchTailExprBeforeJump($stmt->else);
+
+        return $ifTail instanceof Op\Expr\Cast\Bool_
+            && $elseTail instanceof Op\Expr\Assign
+            && $elseTail->expr instanceof Operand\Literal;
+    }
+
     /** Both ?: arms jump to a merge block ending in RETURN (#4280, #8563). */
     private function jumpIfTargetsReturnMerge(Op\Stmt\JumpIf $stmt): bool
     {
@@ -1780,6 +1802,10 @@ class Compiler {
             $child = $children[$i];
             if ($child instanceof Op\Expr\Assign) {
                 return $child->var;
+            }
+            // && / || long arm: (bool) cast writes the phi; earlier assigns are RHS side effects (#24506).
+            if ($child instanceof Op\Expr\Cast\Bool_) {
+                return null;
             }
             if (!$child instanceof Op\Expr) {
                 break;
@@ -10566,12 +10592,17 @@ class Compiler {
             if ($rewriteNeNull) {
                 $op->block1 = $this->compileCfgBranch($stmt->else, $block);
                 $op->block2 = $this->compileCfgBranch($stmt->if, $block);
-            } elseif ($this->jumpIfTargetsTernaryMerge($stmt)) {
-                // Lower else before if so merge blocks record both branch phi slots (#3790, #5510).
-                $op->block2 = $this->compileCfgBranch($stmt->else, $block);
-                $op->block1 = $this->compileCfgBranch($stmt->if, $block);
             } elseif ($this->jumpIfTargetsLogicalOrShortCircuitLiteralIf($stmt)) {
                 // `||` literal-true arm must reuse bool-cast phi slot from the long arm (#12745).
+                $op->block2 = $this->compileCfgBranch($stmt->else, $block);
+                $op->block1 = $this->compileCfgBranch($stmt->if, $block);
+            } elseif ($this->jumpIfTargetsLogicalAndShortCircuitCastIf($stmt)) {
+                // `&&` literal-false arm must reuse bool-cast phi from the long (if) arm (#24506).
+                // Do not take ternary else-first order — that seeds phi before `$x = …` and aliases slots.
+                $op->block1 = $this->compileCfgBranch($stmt->if, $block);
+                $op->block2 = $this->compileCfgBranch($stmt->else, $block);
+            } elseif ($this->jumpIfTargetsTernaryMerge($stmt)) {
+                // Lower else before if so merge blocks record both branch phi slots (#3790, #5510).
                 $op->block2 = $this->compileCfgBranch($stmt->else, $block);
                 $op->block1 = $this->compileCfgBranch($stmt->if, $block);
             } else {
