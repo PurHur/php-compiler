@@ -1941,13 +1941,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ class_constants() (ext/standard/basic_functions.c, #7309, #12448).
+     * class_constants() — phantom; php-src has no such function (#24200).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Always false on php-src-strict. Use ReflectionClass::getConstants() instead.
      */
     public static function supportsClassConstants(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     /**
