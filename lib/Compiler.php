@@ -12222,6 +12222,7 @@ class Compiler {
             // Zend auto-captures outer locals/parameters (zend_compile.c); nested fn-in-fn needs
             // explicit closureCaptures so VM/JIT bind at creation time (#4944, #4952).
             $seenCaptureSlots = [];
+            $seenCaptureNames = [];
             foreach ($funcBlock->args as $captureOperand) {
                 $slot = (int) $funcBlock->args[$captureOperand];
                 if (isset($seenCaptureSlots[$slot])) {
@@ -12235,6 +12236,7 @@ class Compiler {
                     continue;
                 }
                 $seenCaptureSlots[$slot] = true;
+                $seenCaptureNames[$name] = true;
                 $funcBlock->closureCaptureSlots[$slot] = true;
                 $funcBlock->closureCaptureSlotNames[$slot] = $name;
                 $op->closureCaptures[] = [
@@ -12242,6 +12244,39 @@ class Compiler {
                     'slot' => $slot,
                     'byRef' => false,
                 ];
+            }
+            // Transitive capture: nested arrow functions may reference variables from
+            // grandparent+ scopes that this arrow function doesn't directly use. Propagate
+            // those captures upward so the VM can bind them at creation time (#24690).
+            foreach ($funcBlock->opCodes as $innerOp) {
+                if (OpCode::TYPE_CLOSURE !== $innerOp->type || [] === $innerOp->closureCaptures) {
+                    continue;
+                }
+                foreach ($innerOp->closureCaptures as $innerCapture) {
+                    $capName = $innerCapture['name'];
+                    if (isset($seenCaptureNames[$capName])) {
+                        continue;
+                    }
+                    if (in_array($capName, $funcBlock->paramNames, true)) {
+                        continue;
+                    }
+                    $seenCaptureNames[$capName] = true;
+                    $syntheticOp = new \PHPCfg\Operand\Variable(
+                        new \PHPCfg\Operand\Literal($capName)
+                    );
+                    $slot = $funcBlock->getVarSlot($syntheticOp, true);
+                    if (isset($seenCaptureSlots[$slot])) {
+                        continue;
+                    }
+                    $seenCaptureSlots[$slot] = true;
+                    $funcBlock->closureCaptureSlots[$slot] = true;
+                    $funcBlock->closureCaptureSlotNames[$slot] = $capName;
+                    $op->closureCaptures[] = [
+                        'name' => $capName,
+                        'slot' => $slot,
+                        'byRef' => $innerCapture['byRef'],
+                    ];
+                }
             }
         }
 
