@@ -8,7 +8,7 @@ use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** throw in class constant expressions (#6580). */
+/** throw/cast/silence/match in class constant expressions (#6580, #24904, #24905). */
 final class ThrowInClassConstCompileCheckTest extends TestCase
 {
     public function testThrowInClassConstCompileErrors(): void
@@ -134,6 +134,72 @@ PHP);
 class A {
     public const X = match(1) { default => "x" };
 }
+PHP);
+    }
+
+    public function testCastIntInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class A {
+    public const X = (int) "5";
+}
+PHP);
+    }
+
+    public function testCastStringInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class A {
+    public const X = (string) 1;
+}
+PHP);
+    }
+
+    public function testCastBoolInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class A {
+    public const X = (bool) 1;
+}
+PHP);
+    }
+
+    public function testSilenceInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class A {
+    public const X = @1;
+}
+PHP);
+    }
+
+    public function testSilenceExprInClassConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class A {
+    public const X = @(1 + 2);
+}
+PHP);
+    }
+
+    public function testCastInGlobalConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+const X = (int) "5";
+PHP);
+    }
+
+    public function testSilenceInGlobalConstCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+const X = @1;
 PHP);
     }
 
