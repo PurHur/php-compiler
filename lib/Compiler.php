@@ -61,6 +61,7 @@ use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\PseudoClassTypeHintCompileCheck;
 use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
+use PHPCompiler\Compiler\NonAbstractMethodBodyCheck;
 use PHPCompiler\Compiler\NonEnumBuiltinInterfaceCompileCheck;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
@@ -561,6 +562,7 @@ class Compiler {
         ThrowInClassConstCompileCheck::validate($script);
         NewWithoutParensCompileCheck::validate($script, $this->compileSourceCode);
         FunctionStaticAnonymousClassCompileCheck::validate($script);
+        NonAbstractMethodBodyCheck::validate($script);
 
         /** @var mixed $main */
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
@@ -959,35 +961,6 @@ class Compiler {
         }
 
         return $out;
-    }
-
-    /**
-     * @param list<Op\Expr\Param> $params
-     */
-    protected function compileEmptyConcreteMethodBlock(array $params, ?CfgFunc $func): Block
-    {
-        $block = new Block(null);
-        if (null !== $func) {
-            $block->func = $func;
-            $block->strictTypes = isset($func->strictTypes) ? (bool) $func->strictTypes : false;
-            $this->applyReturnTypeFromFunc($block, $func);
-        }
-        if ([] !== $params) {
-            $this->assertNoDuplicateParameterNames($params);
-            $this->assertNoDuplicateParameterAttributes($params);
-            $this->assertReadonlyParamOnlyInConstructor($params, $func);
-            $this->assertVariadicParamIsLast($params);
-        }
-        $paramIdx = 0;
-        foreach ($params as $param) {
-            $block->addOpCode($this->compileParam($param, $block, $paramIdx++));
-        }
-        if (null !== $func && '__construct' === $func->name && null !== $func->class) {
-            $this->compileCtorPromotionAssignments($block, $params);
-        }
-        $block->addOpCode(new OpCode(OpCode::TYPE_RETURN_VOID));
-
-        return $block;
     }
 
     /**
@@ -6445,10 +6418,9 @@ class Compiler {
             NoDiscardMetadata::applyToBlock($methodBlock, $child);
             $this->markGeneratorIfNeeded($child, $methodBlock);
             $declare->block1 = $methodBlock;
-        } elseif (0 === ($child->func->flags & CfgFunc::FLAG_ABSTRACT)) {
-            // php-cfg omits cfg for `{}` method bodies; concrete methods still need block1 (#4758).
-            $declare->block1 = $this->compileEmptyConcreteMethodBlock($child->func->params, $child->func);
         }
+        // null cfg: abstract / interface methods — NonAbstractMethodBodyCheck rejects
+        // non-abstract class/trait/enum `function f();` (#24906). Empty `{}` has cfg.
         $this->assignAttributeMetadata($declare, $child);
         $this->assignSourceMetadata($declare, $child);
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($declare->attributeNames, 'method');
