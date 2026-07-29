@@ -45299,15 +45299,26 @@ class Compiler {
                         }
                     }
                 } elseif (null === $fccInlineArgSlot && 1 === (int) $argIndex) {
-                    $haystackProducer = $this->leadingCallbackFirstHaystackFuncCallBeforeCfgCall($cfgCallOp, $block);
-                    if ($haystackProducer instanceof Op\Expr\FuncCall
-                        || $haystackProducer instanceof Op\Expr\NsFuncCall) {
-                        $fccInlineArgSlot = $block->slotForOperand($haystackProducer->result);
-                        if (null === $fccInlineArgSlot) {
-                            foreach ($this->compileExpr($haystackProducer, $block) as $op) {
-                                $sends[] = $op;
-                            }
+                    // array_map(fn, $named) after sort()/var_dump() — preceding stmt FuncCall is not
+                    // an inline haystack (str_split(...)); only dead temps are (#24730, #15487).
+                    $haystackArgProbe = $cfgCallOp->args[1] ?? $arg;
+                    if (
+                        $haystackArgProbe instanceof Operand
+                        && $this->callArgIsDeadInlineTemporary($haystackArgProbe)
+                    ) {
+                        $haystackProducer = $this->leadingCallbackFirstHaystackFuncCallBeforeCfgCall(
+                            $cfgCallOp,
+                            $block
+                        );
+                        if ($haystackProducer instanceof Op\Expr\FuncCall
+                            || $haystackProducer instanceof Op\Expr\NsFuncCall) {
                             $fccInlineArgSlot = $block->slotForOperand($haystackProducer->result);
+                            if (null === $fccInlineArgSlot) {
+                                foreach ($this->compileExpr($haystackProducer, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $fccInlineArgSlot = $block->slotForOperand($haystackProducer->result);
+                            }
                         }
                     }
                 }
