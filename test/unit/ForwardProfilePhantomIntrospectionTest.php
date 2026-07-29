@@ -74,10 +74,25 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testNoDiscardAttributeClassAdvertisedOnForwardProfile84(): void
+    public function testNoDiscardAttributeClassNotAdvertisedOnProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::advertisesNoDiscardAttributeClass());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testNoDiscardAttributeClassAdvertisedOnForwardProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $this->assertTrue(CompilerVersion::advertisesNoDiscardAttributeClass());
 

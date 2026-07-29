@@ -12,7 +12,7 @@ final class VoidCastDesugarTest extends TestCase
 {
     protected function setUp(): void
     {
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.5');
     }
 
     protected function tearDown(): void

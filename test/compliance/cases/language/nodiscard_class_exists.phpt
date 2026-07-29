@@ -1,7 +1,7 @@
 --TEST--
 Language: builtin NoDiscard attribute class exists and is internal (#6992)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 var_export(class_exists('NoDiscard', false));
