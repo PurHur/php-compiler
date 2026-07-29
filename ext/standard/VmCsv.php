@@ -31,7 +31,8 @@ final class VmCsv
 
         $delim = '' === $separator ? ',' : $separator[0];
         $enc = '' === $enclosure ? '"' : $enclosure[0];
-        $esc = '' === $escape ? '\\' : $escape[0];
+        // php-src file.h PHP_CSV_NO_ESCAPE — empty $escape disables proprietary escaping (#24561 / #4164).
+        $esc = '' === $escape ? null : $escape[0];
 
         $fields = [];
         $len = \strlen($line);
@@ -56,6 +57,8 @@ final class VmCsv
 
     /**
      * Parse one CSV field; advances $offset past the field (php-src ext/standard/file.c 2A/2B).
+     *
+     * @param string|null $esc escape byte, or null for PHP_CSV_NO_ESCAPE
      */
     private static function parseField(
         string $line,
@@ -63,7 +66,7 @@ final class VmCsv
         int $len,
         string $delim,
         string $enc,
-        string $esc,
+        ?string $esc,
     ): string {
         $i = $offset;
         $j = $i;
@@ -76,7 +79,8 @@ final class VmCsv
             $closed = false;
             while ($i < $len) {
                 $c = $line[$i];
-                if ($esc !== $enc && $c === $esc && $i + 1 < $len) {
+                // Escape only when enabled and distinct from enclosure (php-src state 1).
+                if (null !== $esc && $esc !== $enc && $c === $esc && $i + 1 < $len) {
                     $field .= $esc.$line[$i + 1];
                     $i += 2;
                     continue;
@@ -93,6 +97,14 @@ final class VmCsv
                 }
                 $field .= $c;
                 ++$i;
+            }
+            // php-src quit_loop_2/3 — bytes after the closing enclosure until the delimiter
+            // remain part of the same field (e.g. `"ab"c,d` → `abc`).
+            if ($closed) {
+                while ($i < $len && $line[$i] !== $delim) {
+                    $field .= $line[$i];
+                    ++$i;
+                }
             }
             $offset = $i;
             // php-src ext/standard/file.c PHP 8.2 — unterminated empty enclosure yields NUL (#18592).
@@ -148,7 +160,8 @@ final class VmCsv
     ): string {
         $delim = '' === $separator ? ',' : $separator[0];
         $enc = '' === $enclosure ? '"' : $enclosure[0];
-        $esc = '' === $escape ? '\\' : $escape[0];
+        // php-src PHP_CSV_NO_ESCAPE — empty $escape does not treat '\' as special (#24561).
+        $esc = '' === $escape ? null : $escape[0];
 
         $parts = [];
         foreach ($fields as $field) {
@@ -158,12 +171,13 @@ final class VmCsv
         return \implode($delim, $parts);
     }
 
-    private static function formatField(string $field, string $delim, string $enc, string $esc): string
+    /** @param string|null $esc escape byte, or null for PHP_CSV_NO_ESCAPE */
+    private static function formatField(string $field, string $delim, string $enc, ?string $esc): string
     {
         $needsQuotes = false;
         for ($i = 0, $len = \strlen($field); $i < $len; ++$i) {
             $c = $field[$i];
-            if ($c === $delim || $c === $enc || $c === $esc || "\n" === $c || "\r" === $c) {
+            if ($c === $delim || $c === $enc || (null !== $esc && $c === $esc) || "\n" === $c || "\r" === $c) {
                 $needsQuotes = true;
                 break;
             }
