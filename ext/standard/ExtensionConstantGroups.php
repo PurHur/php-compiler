@@ -94,7 +94,9 @@ final class ExtensionConstantGroups
             $groups['ldap'] = LdapConstants::registeredConstants();
         }
         $groups['random'] = RandomConstants::registeredConstants();
-        $groups['uuid'] = UuidConstants::registeredConstants();
+        if (\PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension()) {
+            $groups['uuid'] = UuidConstants::registeredConstants();
+        }
         $groups['xml'] = XmlConstants::registeredConstants();
         $groups['sockets'] = SocketConstants::registeredConstants();
         $groups['fileinfo'] = FileinfoConstants::registeredConstants();

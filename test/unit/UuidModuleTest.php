@@ -7,15 +7,39 @@ namespace PHPCompiler;
 use PHPCompiler\ext\standard\ModuleRegistry;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\ext\uuid\UuidConstants;
+use PHPCompiler\ext\uuid\UuidExtensionPolicy;
 use PHPUnit\Framework\TestCase;
 
 /**
- * uuid module registration (issue #5910 / #22228).
+ * uuid module registration (issue #5910 / #22228 / #23962).
  *
  * @group uuid_module
  */
 final class UuidModuleTest extends TestCase
 {
+    private string|false $savedProfile = false;
+
+    protected function setUp(): void
+    {
+        $this->savedProfile = getenv('PHP_COMPILER_PROFILE');
+        // Functional uuid surface needs forward profile when host lacks pecl-uuid (#23962).
+        if (!UuidExtensionPolicy::advertisesExtension()) {
+            putenv('PHP_COMPILER_PROFILE=8.4');
+            $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        if (false === $this->savedProfile || null === $this->savedProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+            unset($_ENV['PHP_COMPILER_PROFILE']);
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->savedProfile);
+            $_ENV['PHP_COMPILER_PROFILE'] = $this->savedProfile;
+        }
+    }
+
     public function test_uuid_module_registration(): void
     {
         $runtime = new Runtime();

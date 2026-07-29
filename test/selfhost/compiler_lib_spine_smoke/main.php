@@ -4177,6 +4177,7 @@ require_once __DIR__.'/../../../ext/uri/UriExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/uri/VmUri.php';
 require_once __DIR__.'/../../../ext/uuid/Module.php';
 require_once __DIR__.'/../../../ext/uuid/UuidConstants.php';
+require_once __DIR__.'/../../../ext/uuid/UuidExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/uuid/UuidFunction.php';
 require_once __DIR__.'/../../../ext/uuid/VmUuid.php';
 require_once __DIR__.'/../../../ext/uuid/uuid_create.php';

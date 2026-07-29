@@ -38,6 +38,11 @@ class VMTest extends BaseTest {
                 && \PHPCompiler\ext\gmp\GmpExtensionPolicy::isGmpComplianceCase($name)) {
                 continue;
             }
+            // Host/profile without pecl-uuid: withhold functional uuid_* cases; keep phantom (#23962).
+            if (!\PHPCompiler\ext\uuid\UuidExtensionPolicy::runsUuidCompliance($name)
+                && \PHPCompiler\ext\uuid\UuidExtensionPolicy::isUuidComplianceCase($name)) {
+                continue;
+            }
             // Host/profile without sqlite3: withhold functional sqlite3_* cases; keep phantom (#22791).
             if (!\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::runsSqlite3Compliance($name)
                 && \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::isSqlite3ComplianceCase($name)) {
