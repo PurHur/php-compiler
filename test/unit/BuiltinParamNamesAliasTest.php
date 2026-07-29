@@ -2297,6 +2297,62 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($toFile, 'config_args', 'openssl_pkey_export_to_file'));
     }
 
+    /** @covers issue #24663 */
+    public function testOpensslX509ParseCsrNewPkcs7SignNamedParamsResolve(): void
+    {
+        $parse = BuiltinParamNames::forFunction('openssl_x509_parse');
+        self::assertSame(['certificate', 'short_names='], $parse);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($parse, 'certificate', 'openssl_x509_parse'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($parse, 'short_names', 'openssl_x509_parse'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($parse, 'x509', 'openssl_x509_parse'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($parse, 'shortnames', 'openssl_x509_parse'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('openssl_x509_parse'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_x509_parse'));
+        self::assertSame(
+            ['certificate', 'short_names='],
+            BuiltinParamNames::paramNamesForInternalFunction('openssl_x509_parse')
+        );
+
+        $csr = BuiltinParamNames::forFunction('openssl_csr_new');
+        self::assertSame(['distinguished_names', 'private_key', 'options=', 'extra_attributes='], $csr);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($csr, 'distinguished_names', 'openssl_csr_new'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($csr, 'private_key', 'openssl_csr_new'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($csr, 'options', 'openssl_csr_new'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($csr, 'extra_attributes', 'openssl_csr_new'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($csr, 'dn', 'openssl_csr_new'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($csr, 'privkey', 'openssl_csr_new'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($csr, 'configargs', 'openssl_csr_new'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($csr, 'extraattribs', 'openssl_csr_new'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('openssl_csr_new'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_csr_new'));
+
+        $sign = BuiltinParamNames::forFunction('openssl_pkcs7_sign');
+        self::assertSame(
+            [
+                'input_filename',
+                'output_filename',
+                'certificate',
+                'private_key',
+                'headers',
+                'flags=',
+                'untrusted_certificates_filename=',
+            ],
+            $sign
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($sign, 'input_filename', 'openssl_pkcs7_sign'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($sign, 'output_filename', 'openssl_pkcs7_sign'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($sign, 'certificate', 'openssl_pkcs7_sign'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($sign, 'private_key', 'openssl_pkcs7_sign'));
+        self::assertSame(6, BuiltinParamNames::lookupNamedParamIndex($sign, 'untrusted_certificates_filename', 'openssl_pkcs7_sign'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sign, 'infile', 'openssl_pkcs7_sign'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sign, 'outfile', 'openssl_pkcs7_sign'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sign, 'signcert', 'openssl_pkcs7_sign'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sign, 'signkey', 'openssl_pkcs7_sign'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($sign, 'extracertsfilename', 'openssl_pkcs7_sign'));
+        self::assertSame(7, BuiltinParamNames::paramCountForInternalFunction('openssl_pkcs7_sign'));
+        self::assertSame(5, BuiltinParamNames::requiredParamCountForInternalFunction('openssl_pkcs7_sign'));
+    }
+
     /** @covers issue #23343 */
     public function testGetimagesizeNamedParamsResolve(): void
     {
