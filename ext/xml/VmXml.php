@@ -185,10 +185,24 @@ final class VmXml
             return 0;
         }
 
+        // Fire SAX as complete tokens arrive — do not wait for document well-formedness (#24657).
+        if (null !== $parserObject) {
+            $state = VmXmlSaxDispatcher::dispatchIncremental(
+                $ctx,
+                $parserObject,
+                self::$parsers[$parser],
+                $isFinal,
+                $frame
+            );
+            self::$parsers[$parser] = $state;
+        }
+
         $error = self::validateWellFormed($accumulated);
         if (null === $error) {
             self::recordSuccessfulParse($parser, $accumulated);
             $state = self::$parsers[$parser];
+            // Fallback for parses with no handlers previously registered mid-stream, or
+            // when incremental could not run (no parser object): full-document dispatch once.
             if (null !== $parserObject && empty($state['saxDispatched'])) {
                 VmXmlSaxDispatcher::dispatch($ctx, $parserObject, $accumulated, $frame);
                 $state['saxDispatched'] = true;
