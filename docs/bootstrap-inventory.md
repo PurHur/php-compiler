@@ -26347,7 +26347,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitErrorLog.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/JitErrorReporting.php`
 
@@ -32946,8 +32946,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1821)
-- new Error (line 1832)
+- new Error (line 1822)
+- new Error (line 1833)
 - 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -34358,7 +34358,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/dns_get_record.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 113)
+- new Variable (line 121)
 - 3 class method(s)
 
 ### `ext/standard/doubleval.php`
@@ -35045,7 +35045,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/gethostbyname.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/gethostbynamel.php`
 
@@ -47979,7 +47979,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 500)
+- new Variable (line 501)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`

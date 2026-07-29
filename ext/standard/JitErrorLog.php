@@ -126,27 +126,6 @@ final class JitErrorLog
 
         return JitStringBuiltinArg::lowerTrimFamilyString($context, $message, 'error_log', 0, 'message');
     }
-        $flags = $context->getTypeFromString('int64')->constInt(self::FILE_APPEND, false);
-        $result = JitFilePutContents::invoke($context, $pathStr, $msgStr, $flags);
-        $i64 = $context->getTypeFromString('int64');
-        $written = $context->builder->call(
-            $context->lookupFunction('__value__readLong'),
-            $result
-        );
-        $msgLen = $context->builder->call(
-            $context->lookupFunction('__string__strlen'),
-            $msgStr
-        );
-        $minusOne = $i64->constInt(-1, false);
-        $openFail = $context->builder->icmp(Builder::INT_EQ, $written, $minusOne);
-        $lenOk = $context->builder->icmp(Builder::INT_EQ, $written, $msgLen);
-        $ok = $context->builder->and(
-            $context->builder->not($openFail),
-            $lenOk
-        );
-
-        return self::boolFromI1($context, $ok);
-    }
 
     private static function tryCompileTimeMessageType(Context $context, ?JITVariable $arg): ?int
     {
