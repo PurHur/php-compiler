@@ -236,7 +236,11 @@ final class ScopeBuiltinJitHelper
     /**
      * get_defined_vars() snapshot — caller locals + file-scope auto globals (#3135).
      *
+     * Compile-allocated CV slots start as TYPE_NULL (main-script globals) without an
+     * assign — Zend's active symbol table only has assigned symbols (#24660).
+     *
      * @param list<array{0: string, 1: int}> $namedSlots from Frame::block->eachNamedScopeSlot()
+     * @param array<int, true> $initializedSlots Frame::$initializedSlots (assigned CVs)
      * @param array<string, Variable> $dynamicLocals
      * @param list<string> $autoGlobalNames
      */
@@ -246,10 +250,15 @@ final class ScopeBuiltinJitHelper
         array $dynamicLocals,
         array $autoGlobalNames,
         ?callable $resolveAutoGlobal = null,
+        array $initializedSlots = [],
     ): HashTable {
         $result = new HashTable();
         foreach ($namedSlots as [$name, $slot]) {
             if ('this' === $name || !isset($scopeBySlot[$slot])) {
+                continue;
+            }
+            // php-src zend_get_defined_vars / EG(active_symbol_table): unassigned CVs omitted (#24660).
+            if (!isset($initializedSlots[$slot])) {
                 continue;
             }
             $value = $scopeBySlot[$slot];

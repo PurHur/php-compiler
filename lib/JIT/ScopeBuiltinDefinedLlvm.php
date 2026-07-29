@@ -101,9 +101,18 @@ final class ScopeBuiltinDefinedLlvm
         foreach ($names as $i => $name) {
             $dest = $named[$name];
             $context->builder->positionAtEnd($blocks[$i]);
-            $isSet = IssetHelper::compile($context, $dest, null);
+            // Match VM initializedSlots — omit compile-allocated unassigned CVs (#24660).
+            $assignedBlock = BasicBlockHelper::append($context, $tag.'_assigned_'.$i);
             $storeBlock = BasicBlockHelper::append($context, $tag.'_store_'.$i);
             $nextBlock = ($i < $n - 1) ? $blocks[$i + 1] : $done;
+            $isAssigned = ScopeVariableAssignedFlags::isAssignedCondition(
+                $context,
+                ScopeVariableAssignedFlags::flagKey($context, $name)
+            );
+            $context->builder->branchIf($isAssigned, $assignedBlock, $nextBlock);
+
+            $context->builder->positionAtEnd($assignedBlock);
+            $isSet = IssetHelper::compile($context, $dest, null);
             $context->builder->branchIf($isSet, $storeBlock, $nextBlock);
 
             $context->builder->positionAtEnd($storeBlock);
