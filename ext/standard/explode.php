@@ -45,6 +45,7 @@ final class explode extends Internal
                 $argc
             ));
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'explode', 'separator', 0, $frame);
         $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'explode', 0, 'separator');
         // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21189).
         $string = VmString::trimFamilyStringArgForFrame($frame, 1, 'explode', 1, 'string');
@@ -82,6 +83,24 @@ final class explode extends Internal
                 $argc
             ));
         }
+        // Z_PARAM_STR: null separator is always TypeError (php-src string.c, #24695).
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            $err = BasicBlockHelper::append($context, 'explode_null_sep_err');
+            $after = BasicBlockHelper::append($context, 'explode_null_sep_after');
+            $context->builder->branch($err);
+            $context->builder->positionAtEnd($err);
+            TypeErrorRaise::emitRaise(
+                $context,
+                'explode(): Argument #1 ($separator) must be of type string, null given'
+            );
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->positionAtEnd($after);
+
+            return HashTableHelper::alloc($context);
+        }
+
         if ('' === ($args[0]->compileTimeString ?? null)) {
             TypeErrorRaise::registerDeclarations($context);
             TypeErrorRaise::ensureLinked($context);
