@@ -2358,4 +2358,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('json_validate'));
         self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('json_validate'));
     }
+
+    /** @covers issue #24577 */
+    public function testStrIncdecNamedParamsResolve(): void
+    {
+        foreach (['str_increment', 'str_decrement'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn), $fn);
+            self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction($fn), $fn);
+            self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction($fn), $fn);
+        }
+    }
 }
