@@ -12,6 +12,7 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\StringPathinfo;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\OpCode;
 use PHPCfg\Operand;
@@ -24,6 +25,9 @@ final class JitPathinfo
         $pathVal = JitFilestatArg::lowerPathComponentFilename($context, $path, 'pathinfo', 0, 'path');
         $maskConst = 15;
         if (null !== $flags) {
+            if (JITVariable::TYPE_NULL === $flags->type || ($flags->isNullConstant ?? false)) {
+                self::emitNullFlagsDeprecation($context);
+            }
             $resolved = self::tryResolveFlags($context, $flags);
             if (null === $resolved) {
                 throw new \LogicException(
@@ -33,8 +37,9 @@ final class JitPathinfo
             $maskConst = $resolved;
         }
         $mask = $maskConst & 15;
+        // php-src php_pathinfo(): options==0 → empty string (not empty array). #24941
         if (0 === $mask) {
-            return self::buildAllArray($context, []);
+            return $context->builder->load($context->constantStringFromString(''));
         }
 
         $literal = $path->compileTimeString ?? null;
@@ -93,6 +98,10 @@ final class JitPathinfo
 
     public static function tryResolveFlags(Context $context, JITVariable $flags): ?int
     {
+        // php-src: null flags deprecate+coerce to 0 (#24941)
+        if (JITVariable::TYPE_NULL === $flags->type || ($flags->isNullConstant ?? false)) {
+            return 0;
+        }
         $constName = $flags->compileTimeConstantName ?? null;
         if (null !== $constName) {
             $lookup = strtolower($constName);
@@ -128,8 +137,17 @@ final class JitPathinfo
         if (null === $slot) {
             return null;
         }
+        $mask = self::slotPathinfoMask($context, $block, $slot, []);
+        if (null === $mask) {
+            return null;
+        }
+        if (0 === $mask && isset($block->constants[$slot])
+            && \PHPCompiler\VM\Variable::TYPE_NULL === $block->constants[$slot]->type
+        ) {
+            self::emitNullFlagsDeprecation($context);
+        }
 
-        return self::slotPathinfoMask($context, $block, $slot, []);
+        return $mask;
     }
 
     /**
@@ -144,6 +162,10 @@ final class JitPathinfo
 
         if (isset($block->constants[$slot])) {
             $const = $block->constants[$slot];
+            // php-src: null flags coerce to 0 (#24941)
+            if (\PHPCompiler\VM\Variable::TYPE_NULL === $const->type) {
+                return 0;
+            }
             if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $const->type) {
                 return $const->toInt() & 15;
             }
@@ -240,4 +262,16 @@ final class JitPathinfo
     {
         return StringPathinfo::invokeFilename($context, $path);
     }
+    private static function emitNullFlagsDeprecation(Context $context): void
+    {
+        // Thin standalone AOT: skip DEP IR mid-fold (#21593); VM/JIT still warn.
+        if (NestedJitCompileScope::isActive() || $context->isUserScriptAot()) {
+            return;
+        }
+        JitBuiltinWarning::emitDeprecated(
+            $context,
+            VmNullNumberParamDeprecation::message('pathinfo', 2, 'flags', 'int')
+        );
+    }
+
 }

@@ -5694,8 +5694,9 @@ final class VmString
             : self::byteSlice($basename, 0, $lastDot);
 
         $mask = $flags & 15;
+        // php-src php_pathinfo(): options==0 → empty string (not empty array). #24941
         if (0 === $mask) {
-            return [];
+            return '';
         }
 
         $parts = [];
