@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\tokenizer\LanguageScanner;
 use PHPCompiler\ext\tokenizer\TokenConstantsData;
 
 /**
  * Native syntax highlighter for highlight_string() / highlight_file() (#4824).
  *
- * php-src: ext/standard/php_highlight.h — tokenizer → HTML color spans.
+ * php-src: Zend/zend_highlight.c — tokenizer → HTML color spans.
+ * PHP 8.3+ wire format (GH-11913 / #24874): {@code <pre><code>}, literal spaces/newlines.
+ * Pre-8.3: {@code <code><span>}, {@code &nbsp;} spaces, {@code <br />} newlines.
  */
 final class HighlightEngine
 {
     private const COLOR_DEFAULT = '#000000';
-
-    /** Zend highlight_file() on unreadable path with $return=true (ext/standard/url.c, #12032). */
-    public const EMPTY_HIGHLIGHT_HTML = '<code><span style="color: '.self::COLOR_DEFAULT.'"></span>'."\n".'</code>';
 
     private const COLOR_KEYWORD = '#007700';
 
@@ -31,15 +31,46 @@ final class HighlightEngine
     /** @var array<string, int> */
     private static ?array $tokenIds = null;
 
+    /**
+     * Zend highlight_file() on unreadable path with $return=true (ext/standard/url.c, #12032).
+     *
+     * Profile-gated empty shell (#24874).
+     */
+    public static function emptyHighlightHtml(): string
+    {
+        if (self::usesPreCodeWrapper()) {
+            return '<pre><code style="color: '.self::COLOR_DEFAULT.'"></code></pre>';
+        }
+
+        return '<code><span style="color: '.self::COLOR_DEFAULT.'"></span>'."\n".'</code>';
+    }
+
+    /**
+     * PHP 8.3+ highlight HTML (zend_highlight.c GH-11913).
+     *
+     * Default {@see CompilerVersion::VERSION} {@code 8.4.0-dev} compares ≥ 8.3.0, so the
+     * default profile emits the modern wire format even when the host Zend is 8.2 (#24874).
+     * Set {@code PHP_COMPILER_PROFILE=8.2} for the legacy {@code <code><span>} / {@code &nbsp;} shape.
+     */
+    public static function usesPreCodeWrapper(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.3.0', '>=');
+    }
+
     public static function render(string $code): string
     {
         if ('' === $code) {
-            return self::EMPTY_HIGHLIGHT_HTML;
+            return self::emptyHighlightHtml();
         }
         $tokens = LanguageScanner::tokenize($code);
         $body = self::renderTokens($tokens);
 
-        // php-src Zend/zend_highlight.c — <code><span> wrapper, &nbsp; for spaces, <br /> for newlines.
+        if (self::usesPreCodeWrapper()) {
+            // php-src Zend/zend_highlight.c since 8.3 — <pre><code>, literal whitespace (#24874).
+            return '<pre><code style="color: '.self::COLOR_DEFAULT.'">'.$body.'</code></pre>';
+        }
+
+        // Pre-8.3 — <code><span>, &nbsp; for spaces, <br /> for newlines (#24662 / #24750).
         return '<code><span style="color: '.self::COLOR_DEFAULT.'">'.$body.'</span>'."\n".'</code>';
     }
 
@@ -144,7 +175,15 @@ final class HighlightEngine
 
     private static function escapeAndFormat(string $text): string
     {
+        if (self::usesPreCodeWrapper()) {
+            // PHP 8.3+: tabs → four literal spaces; spaces/newlines unchanged (GH-11913).
+            $text = \str_replace("\t", '    ', $text);
+
+            return \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
+        }
+
         $escaped = \htmlspecialchars($text, \ENT_QUOTES | \ENT_SUBSTITUTE, 'UTF-8');
+        $escaped = \str_replace("\t", '&nbsp;&nbsp;&nbsp;&nbsp;', $escaped);
         $escaped = \str_replace(' ', '&nbsp;', $escaped);
         $escaped = \str_replace("\n", '<br />', $escaped);
 

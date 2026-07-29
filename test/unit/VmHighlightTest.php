@@ -22,33 +22,75 @@ final class VmHighlightTest extends TestCase
     public function testHighlightEngineProducesCodeSpan(): void
     {
         $html = HighlightEngine::render('<?php echo 1; ?>');
-        $this->assertStringContainsString('<code>', $html);
+        $this->assertStringContainsString('<code', $html);
         $this->assertStringContainsString('<span', $html);
         $this->assertStringContainsString('echo', $html);
         $this->assertGreaterThan(20, \strlen($html));
     }
 
-    public function testHighlightEngineMatchesZendByteLength(): void
+    public function testHighlightEngineDefaultProfileUsesPreCodeWrapper(): void
     {
-        $html = HighlightEngine::render('<?php echo 1; ?>');
-        $zend = \highlight_string('<?php echo 1; ?>', true);
-        $this->assertIsString($zend);
-        $this->assertSame($zend, $html);
+        // Default 8.4.0-dev ≥ 8.3 → modern wire format (#24874), not host Zend 8.2.
+        $this->assertTrue(HighlightEngine::usesPreCodeWrapper());
+        $html = HighlightEngine::render('<?php echo 1;');
+        $expected = '<pre><code style="color: #000000"><span style="color: #0000BB">&lt;?php </span><span style="color: #007700">echo </span><span style="color: #0000BB">1</span><span style="color: #007700">;</span></code></pre>';
+        $this->assertSame($expected, $html);
+        $this->assertStringNotContainsString('&nbsp;', $html);
     }
 
-    public function testHighlightEngineUsesBrBetweenLines(): void
+    public function testHighlightEngineLegacyProfileUsesCodeSpanNbsp(): void
     {
-        $code = "<?php\nline1\nline2\n";
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(HighlightEngine::usesPreCodeWrapper());
+            $html = HighlightEngine::render('<?php echo 1; ?>');
+            $this->assertMatchesRegularExpression('/<code><span/', $html);
+            $this->assertStringContainsString('&nbsp;', $html);
+            $this->assertStringNotContainsString('<pre>', $html);
+            // Host Zend 8.2 inserts newlines around the outer span; we omit them (#24874).
+            // Shape parity (wrapper / nbsp / no pre) is the gate — not byte identity.
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testHighlightEngineLegacyUsesBrBetweenLines(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $code = "<?php\nline1\nline2\n";
+            $html = HighlightEngine::render($code);
+            $this->assertGreaterThanOrEqual(2, substr_count($html, '<br'));
+            $this->assertStringNotContainsString("line1\n", $html);
+            $this->assertStringContainsString('<code>', $html);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testHighlightEngineModernPreservesRawNewlines(): void
+    {
+        $code = "line1\nline2\n";
         $html = HighlightEngine::render($code);
-        $this->assertGreaterThanOrEqual(2, substr_count($html, '<br'));
-        $this->assertStringNotContainsString("line1\n", $html);
-        $this->assertStringContainsString('<code>', $html);
+        $this->assertSame(0, substr_count($html, '<br'));
+        $this->assertStringContainsString("line1\nline2", $html);
+        $this->assertStringContainsString('<pre>', $html);
     }
 
     public function testVmHighlightReturnMode(): void
     {
         $html = VmHighlight::highlightString('<?php echo 1; ?>', true);
         $this->assertIsString($html);
-        $this->assertStringContainsString('<code>', $html);
+        $this->assertStringContainsString('<code', $html);
     }
 }
