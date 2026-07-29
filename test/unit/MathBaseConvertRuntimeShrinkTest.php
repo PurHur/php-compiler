@@ -33,7 +33,7 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitBaseToZvalCore', $source);
         $this->assertStringNotContainsString('emitDigitValue', $source);
         $this->assertStringNotContainsString('sgen_loop_head', $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
     }
 
     public function testMathBaseConvertJitHelperMatchesVmMath(): void

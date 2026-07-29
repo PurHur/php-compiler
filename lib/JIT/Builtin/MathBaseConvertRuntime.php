@@ -8,6 +8,9 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
+use PHPCompiler\ext\standard\VmMath;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -30,12 +33,15 @@ final class MathBaseConvertRuntime
 
     private const LAST_DOUBLE = 'PHPCompiler\\ext\\standard\\MathBaseConvertJitHelper::lastDouble';
 
+    private const LAST_INVALID_CHARS = 'PHPCompiler\\ext\\standard\\MathBaseConvertJitHelper::lastInvalidChars';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::BASE_CONVERT,
         self::PARSE_BASE_TO_ZVAL,
         self::LAST_LONG,
         self::LAST_DOUBLE,
+        self::LAST_INVALID_CHARS,
     ];
 
     /** @var list<string> */
@@ -128,6 +134,7 @@ final class MathBaseConvertRuntime
             $fromI64,
             $toI64
         );
+        self::emitInvalidRadixCharsDeprecationIfNeeded($context);
         $context->builder->returnValue($result);
     }
 
@@ -147,6 +154,7 @@ final class MathBaseConvertRuntime
             $fn->getParam(0),
             $baseI64
         );
+        self::emitInvalidRadixCharsDeprecationIfNeeded($context);
 
         $outLong = $fn->getParam(2);
         $outDouble = $fn->getParam(3);
@@ -209,6 +217,25 @@ final class MathBaseConvertRuntime
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnValue($tag);
+    }
+
+    /** php-src math.c invalid-digit E_DEPRECATED after NestedJIT parse (#24950). */
+    private static function emitInvalidRadixCharsDeprecationIfNeeded(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        StringTriggerErrorJit::implement($context);
+        $i32 = $context->getTypeFromString('int32');
+        $had = $context->builder->call(self::helperFunction($context, self::LAST_INVALID_CHARS));
+        $isSet = $context->builder->icmp(Builder::INT_NE, $had, $i32->constInt(0, false));
+        $warn = BasicBlockHelper::append($context, 'mbc_invalid_radix_dep');
+        $cont = BasicBlockHelper::append($context, 'mbc_invalid_radix_cont');
+        $context->builder->branchIf($isSet, $warn, $cont);
+        $context->builder->positionAtEnd($warn);
+        JitBuiltinWarning::emitDeprecated($context, VmMath::INVALID_RADIX_CHARS_MESSAGE);
+        $context->builder->branch($cont);
+        $context->builder->positionAtEnd($cont);
     }
 
     public static function baseToZvalCall(Context $context, $strDataPtr, int $base)

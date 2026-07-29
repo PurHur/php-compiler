@@ -3078,6 +3078,7 @@ require_once __DIR__.'/../../../ext/standard/VmLocaleCollate.php';
 require_once __DIR__.'/../../../ext/standard/VmLocalePure.php';
 require_once __DIR__.'/../../../ext/standard/VmMail.php';
 require_once __DIR__.'/../../../ext/standard/VmMath.php';
+require_once __DIR__.'/../../../ext/standard/VmMathRadixDeprecation.php';
 require_once __DIR__.'/../../../ext/standard/VmMemory.php';
 require_once __DIR__.'/../../../ext/standard/VmMetaTags.php';
 require_once __DIR__.'/../../../ext/standard/VmMetaphone.php';
