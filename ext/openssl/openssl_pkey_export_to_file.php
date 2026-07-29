@@ -14,6 +14,9 @@ use PHPLLVM\Value;
 
 /**
  * openssl_pkey_export_to_file() — write private key PEM to path (php-src ext/openssl/openssl.c; #20287).
+ *
+ * Reflection / named-arg params match Zend stub `key,output_filename,passphrase,options`
+ * (not InternalArgInfo `outfilename`/`config_args`; #24492).
  */
 final class openssl_pkey_export_to_file extends Internal
 {
