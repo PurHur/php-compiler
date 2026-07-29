@@ -3933,7 +3933,6 @@
         "ext/standard/lcg_value.php",
         "ext/standard/lchgrp_.php",
         "ext/standard/lchown_.php",
-        "ext/standard/ldexp.php",
         "ext/standard/levenshtein.php",
         "ext/standard/link_.php",
         "ext/standard/linkinfo.php",
@@ -6856,9 +6855,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6622,
+        "inventory_files": 6621,
         "excluded": 0,
-        "eligible": 6622,
+        "eligible": 6621,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

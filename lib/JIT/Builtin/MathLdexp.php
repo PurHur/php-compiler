@@ -9,11 +9,10 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for ldexp() via LdexpJitHelper PHP (#15073).
+ * Internal JIT/AOT link for VmMath::ldexp via LdexpJitHelper PHP (#15073, #24607).
  *
- * Replaces libc `ldexp` LLVM lookup in ext/standard/ldexp.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
- * php-src: ext/standard/math.c — PHP_FUNCTION(ldexp)
+ * Userland ldexp() is not registered (absent from php-src math.stub.php). This bridge
+ * remains for internal/helper use; SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
  */
 final class MathLdexp
 {

@@ -8,18 +8,19 @@ use PHPCompiler\ext\standard\LdexpJitHelper;
 use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** ldexp() JIT routes through LdexpJitHelper PHP not libc LLVM (#15073). */
+/**
+ * Internal ldexp math stays PHP-in-PHP via LdexpJitHelper (#15073).
+ * Userland ldexp() was a phantom vs php-src and was unregistered (#24607).
+ */
 final class LdexpRuntimeShrinkTest extends TestCase
 {
-    public function testLdexpUsesJitHelperNotLibcLookup(): void
+    public function testMathLdexpBridgeUsesJitHelperNotLibcLookup(): void
     {
-        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/ldexp.php');
-        $this->assertStringContainsString('MathLdexp::invoke', $builtin);
-        $this->assertStringNotContainsString("lookupFunction('ldexp')", $builtin);
-
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathLdexp.php');
         $this->assertStringContainsString('LdexpJitHelper', $bridge);
         $this->assertStringContainsString('phpc_ldexp', $bridge);
+        $this->assertStringNotContainsString("lookupFunction('ldexp')", $bridge);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/ldexp.php');
     }
 
     public function testLdexpJitHelperDelegatesToVmMath(): void
@@ -42,5 +43,6 @@ final class LdexpRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('LdexpJitHelper.php', $spine);
         $this->assertStringContainsString('MathLdexp.php', $spine);
+        $this->assertStringNotContainsString('ext/standard/ldexp.php', $spine);
     }
 }

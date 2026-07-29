@@ -130,7 +130,7 @@ class Module extends ModuleAbstract
             new atan2(),
             new fmod(),
             new modf(),
-            new ldexp(),
+            // ldexp() — phantom vs php-src math.stub.php (#24607); keep VmMath::ldexp / MathLdexp internal.
             new frexp(),
             new fdiv(),
             ...(CompilerVersion::supportsFpow() ? [new fpow(), new fmin(), new fmax(), new fadd(), new fsub(), new fmul()] : []),
@@ -1234,7 +1234,6 @@ class Module extends ModuleAbstract
         $doublePtr = $context->getTypeFromString('double*');
         $i32Ptr = $context->getTypeFromString('int32*');
         foreach ([
-            'ldexp' => [$double, $i32],
             'modf' => [$double, $doublePtr],
             'frexp' => [$double, $i32Ptr],
         ] as $name => $params) {
