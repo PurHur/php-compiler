@@ -335,7 +335,7 @@ final class SplFileInfoConstruct extends VmClassMethod
             $frame->calledArgs[1],
             'SplFileInfo::__construct',
             0,
-            'file_name'
+            'filename'
         );
         SplFileInfoStorage::init($object, $pathname);
     }
