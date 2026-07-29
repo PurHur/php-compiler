@@ -2629,6 +2629,22 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('json_validate'));
     }
 
+    /** @covers issue #24812 */
+    public function testJsonDecodeFlagsOptionalNamedParamsResolve(): void
+    {
+        self::assertSame(
+            ['json', 'associative=', 'depth=', 'flags='],
+            BuiltinParamNames::forFunction('json_decode')
+        );
+        $names = BuiltinParamNames::forFunction('json_decode');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'json', 'json_decode'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'associative', 'json_decode'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'depth', 'json_decode'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'json_decode'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('json_decode'));
+        self::assertSame(4, BuiltinParamNames::paramCountForInternalFunction('json_decode'));
+    }
+
     /** @covers issue #24577 */
     public function testStrIncdecNamedParamsResolve(): void
     {
