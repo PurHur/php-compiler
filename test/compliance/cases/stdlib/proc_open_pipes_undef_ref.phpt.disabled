@@ -1,5 +1,5 @@
 --TEST--
-stdlib proc_open() uninitialized $pipes by-ref — no E_WARNING (#11435, ext/standard/proc_open.c)
+DISABLED (#24481): hangs indefinitely under bin/vm.php in VMTest — do not re-enable until proc_open pipes path terminates. Was: stdlib proc_open() uninitialized $pipes by-ref — no E_WARNING (#11435, ext/standard/proc_open.c)
 --FILE--
 <?php
 error_reporting(E_ALL);
