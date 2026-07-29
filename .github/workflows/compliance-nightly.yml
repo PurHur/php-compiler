@@ -40,7 +40,10 @@ concurrency:
   # Keyed on the suite too: a JITTest collect must not cancel a VMTest nightly on the same ref.
   # On `schedule` there are no inputs, so this falls back to VMTest — which is what the cron runs.
   group: compliance-nightly-${{ github.ref }}-${{ github.event.inputs.suite || 'VMTest' }}
-  cancel-in-progress: true
+  # Never cancel a manual run. The two-run baseline protocol needs two collects of the SAME commit,
+  # and with cancel-in-progress those two runs kill each other the moment they overlap — leaving one
+  # result and no way to tell flaky from changed. Scheduled runs still supersede each other.
+  cancel-in-progress: ${{ github.event_name == 'schedule' }}
 
 env:
   # Single source of truth for the suite. `schedule` supplies no inputs, so the cron nightly is
@@ -126,6 +129,19 @@ jobs:
       #
       # Run it TWICE and quarantine anything that flips: a single run was measured wrong in 9 places
       # (#24672). The artifact is uploaded rather than committed — a human decides what lands.
+      #
+      # BOTH RUNS MUST BE THE SAME COMMIT. The quarantine landed in #24778 was derived from two
+      # collects 15 commits apart, so every flip it recorded was a CHANGE, not flakiness: 0ae0f941c
+      # (highlight_string wire format) fixed four highlight_* cases and broke three, and 6af97e0b4
+      # (property hooks on the default profile) made six property_hook_* cases start executing at
+      # all — VMTest.php gates them on CompilerVersion::supportsPropertyHooks(), so before that
+      # commit the provider never yielded them. A case that goes from unyielded to failing is
+      # indistinguishable from a flaky one in a diff of failing NAMES. Result: 18 real failures were
+      # quarantined into invisibility (#24726).
+      #
+      # workflow_dispatch resolves a branch to its head AT DISPATCH TIME, so two dispatches minutes
+      # apart on a branch that merges ~4 commits/hour are not the same tree. Cut a ref that does not
+      # move and dispatch both runs against it.
       - name: Collect a baseline from this environment
         if: github.event.inputs.mode == 'collect'
         run: |
