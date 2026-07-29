@@ -645,10 +645,10 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
-    /** PHP 8.4+ #[\NoDiscard] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
+    /** PHP 8.5+ #[\NoDiscard] — absent from Zend 8.4 (#24946, zend_attributes.stub.php). */
     public static function advertisesNoDiscardAttributeClass(): bool
     {
-        return self::advertisesForwardProfile84BuiltinAttributeClass();
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
@@ -704,10 +704,10 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.6.0', '>=');
     }
 
-    /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class advertisement (#11902). */
+    /** PHP 8.5+ #[\DelayedTargetValidation] — absent from Zend 8.4 (#24946). */
     public static function advertisesDelayedTargetValidationAttributeClass(): bool
     {
-        return self::advertisesForwardProfile84BuiltinAttributeClass();
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /** PHP 8.4+ #[\CompileTime] builtin attribute class advertisement (#11902). */
@@ -737,32 +737,25 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ #[\NoDiscard] unused-return E_WARNING (Zend/zend_attributes.c, #6992, #23038).
-     *
-     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference / PROFILE=8.2 match Zend 8.2
-     * (attribute inert; no unused-return warning). Forward profile: `PHP_COMPILER_PROFILE=8.4`
-     * or stable 8.4.0+.
+     * PHP 8.5+ #[\NoDiscard] unused-return E_WARNING — absent from Zend 8.4 (#24946).
      */
     public static function supportsNoDiscardAttribute(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
-     * PHP 8.4+ `(void)` cast (`T_VOID_CAST`) — Zend/zend_language_scanner.l (#23037, re-#9779).
-     *
-     * Withheld on 8.4.0-dev reference / PROFILE=8.2 (parse error like Zend ≤8.3). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4`.
+     * PHP 8.5+ `(void)` cast (`T_VOID_CAST`) — absent from Zend 8.4 (#24946, #23037).
      */
     public static function supportsVoidCast(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
-    /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class (Zend/zend_attributes.c, issue #7101). */
+    /** PHP 8.5+ #[\DelayedTargetValidation] builtin attribute class — absent from Zend 8.4 (#24946). */
     public static function supportsDelayedTargetValidationAttribute(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /** PHP 8.4+ #[\CompileTime] builtin attribute class (zend_attributes.stub.php, issue #7101). */

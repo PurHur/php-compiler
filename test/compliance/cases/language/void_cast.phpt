@@ -1,7 +1,7 @@
 --TEST--
 Language: (void) cast evaluates operand and yields null (#7421, zend_execute.c)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 $x = (void)(1 + 2);

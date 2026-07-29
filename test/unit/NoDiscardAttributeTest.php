@@ -13,7 +13,7 @@ final class NoDiscardAttributeTest extends TestCase
 {
     protected function setUp(): void
     {
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.5');
     }
 
     protected function tearDown(): void
@@ -36,7 +36,7 @@ final class NoDiscardAttributeTest extends TestCase
     public function testBareCallRecordsWarning(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $runtime = new Runtime();
             $code = <<<'PHP'
@@ -67,7 +67,7 @@ PHP;
     public function testUsedReturnDoesNotWarn(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $runtime = new Runtime();
             $code = <<<'PHP'
@@ -95,7 +95,7 @@ PHP;
     public function testVoidCastSuppressesWarning(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.5');
         try {
             $runtime = new Runtime();
             $code = <<<'PHP'

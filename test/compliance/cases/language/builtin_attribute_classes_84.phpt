@@ -1,5 +1,7 @@
 --TEST--
-Language: PHP 8.4 builtin attribute classes class_exists and isInternal (#7101)
+Language: PHP 8.5 builtin attribute classes class_exists and isInternal (#7101, #24946)
+--ENV--
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 declare(strict_types=1);

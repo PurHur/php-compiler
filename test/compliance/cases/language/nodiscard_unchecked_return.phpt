@@ -1,7 +1,7 @@
 --TEST--
 Language: #[\NoDiscard] unchecked return warns; (void) cast suppresses (#7346)
 --ENV--
-PHP_COMPILER_PROFILE=8.4
+PHP_COMPILER_PROFILE=8.5
 --FILE--
 <?php
 ini_set('error_reporting', '32767');

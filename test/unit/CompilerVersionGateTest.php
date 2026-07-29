@@ -369,13 +369,13 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    /** @covers issue #23038 */
-    public function testSupportsNoDiscardAttributeTrueOnForwardProfile84(): void
+    /** @covers issue #23038, #24946 */
+    public function testSupportsNoDiscardAttributeFalseOnProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::supportsNoDiscardAttribute());
+            $this->assertFalse(CompilerVersion::supportsNoDiscardAttribute());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -1086,12 +1086,12 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
     }
 
-    public function testAdvertisesDelayedTargetValidationAttributeClassTrueWhenProfile84(): void
+    public function testAdvertisesDelayedTargetValidationAttributeClassFalseOnProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
-            $this->assertTrue(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
+            $this->assertFalse(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
