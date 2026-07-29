@@ -2,9 +2,9 @@
 # stderr — which the compliance harness compares, so on an 8.4 host every case whose path
 # touches one of these would differ from Zend on stderr alone.
 #
-# 35 parameters across 23 files in php-cfg / php-optimizer. `?Type` has been valid since PHP
-# 7.1 and these declarations already accepted null, so behaviour is unchanged on every
-# supported version. The matching declarations in lib/Visitor/* were fixed directly (#24972).
+# Regenerated against post-overlay vendor — must apply AFTER php-cfg / php-optimizer overlays.
+# `?Type` valid since PHP 7.1; these declarations already accepted null.
+#
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/AbstractVisitor.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/AbstractVisitor.php
 @@ -34,15 +34,15 @@
@@ -213,25 +213,6 @@
      {
          if ($this->seen->contains($block)) {
              $this->event('skipBlock', [$block, $prior]);
---- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor.php
-+++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor.php
-@@ -25,13 +25,13 @@
- 
-     public function leaveFunc(Func $func);
- 
--    public function enterBlock(Block $block, Block $prior = null);
-+    public function enterBlock(Block $block, ?Block $prior = null);
- 
-     public function enterOp(Op $op, Block $block);
- 
-     public function leaveOp(Op $op, Block $block);
- 
--    public function leaveBlock(Block $block, Block $prior = null);
-+    public function leaveBlock(Block $block, ?Block $prior = null);
- 
--    public function skipBlock(Block $block, Block $prior = null);
-+    public function skipBlock(Block $block, ?Block $prior = null);
- }
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/DeadBlockEliminator.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/DeadBlockEliminator.php
 @@ -17,7 +17,7 @@
@@ -291,6 +272,25 @@
      {
          foreach ($block->phi as $phi) {
              $this->enterOp($phi, $block);
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor.php
+@@ -25,13 +25,13 @@
+ 
+     public function leaveFunc(Func $func);
+ 
+-    public function enterBlock(Block $block, Block $prior = null);
++    public function enterBlock(Block $block, ?Block $prior = null);
+ 
+     public function enterOp(Op $op, Block $block);
+ 
+     public function leaveOp(Op $op, Block $block);
+ 
+-    public function leaveBlock(Block $block, Block $prior = null);
++    public function leaveBlock(Block $block, ?Block $prior = null);
+ 
+-    public function skipBlock(Block $block, Block $prior = null);
++    public function skipBlock(Block $block, ?Block $prior = null);
+ }
 --- vendor/ircmaxell/php-optimizer/lib/PHPOptimizer/Visitor/JumpBlockEliminator.php
 +++ vendor/ircmaxell/php-optimizer/lib/PHPOptimizer/Visitor/JumpBlockEliminator.php
 @@ -17,7 +17,7 @@
