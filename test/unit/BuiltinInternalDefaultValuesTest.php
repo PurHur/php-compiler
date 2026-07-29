@@ -154,4 +154,21 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_create', 1));
     }
 
+    /** @covers issue #24846 */
+    public function testFwriteFgetsLengthDefaultNull(): void
+    {
+        $info = ['name' => 'length', 'type' => 'int', 'isOptional' => true];
+        $var = new Variable();
+        self::assertTrue(
+            BuiltinInternalDefaultValues::materialize($var, 'fwrite', 2, $info)
+        );
+        self::assertSame(Variable::TYPE_NULL, $var->type);
+        self::assertTrue(
+            BuiltinInternalDefaultValues::materialize($var, 'fgets', 1, $info)
+        );
+        self::assertSame(Variable::TYPE_NULL, $var->type);
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('fwrite', 2));
+        self::assertSame('?int', BuiltinInternalArgInfo::stubParamTypeOverride('fgets', 1));
+    }
+
 }

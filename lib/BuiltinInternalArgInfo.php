@@ -231,6 +231,9 @@ final class BuiltinInternalArgInfo
                 0, 1 => '?array',
                 default => null,
             },
+            // ext/standard/file.stub.php — ?int $length = null (#24846)
+            'fwrite' => 2 === $index ? '?int' : null,
+            'fgets' => 1 === $index ? '?int' : null,
             default => null,
         };
     }

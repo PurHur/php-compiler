@@ -199,6 +199,13 @@ final class BuiltinInternalDefaultValues
             0 => ['kind' => 'null'],
             1 => ['kind' => 'null'],
         ],
+        // php-src ext/standard/file.stub.php — ?int $length = null (InternalArgInfo int → 0) (#24846)
+        'fwrite' => [
+            2 => ['kind' => 'null'],
+        ],
+        'fgets' => [
+            1 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
