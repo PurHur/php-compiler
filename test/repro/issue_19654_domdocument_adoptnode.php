@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+// Real adoptNode requires PHP 8.3+ (#24995). Run with PHP_COMPILER_PROFILE=8.3 (or 8.4).
+
 $d1 = new DOMDocument();
 $d1->loadXML('<a><n>t</n></a>');
 $d2 = new DOMDocument();

@@ -3405,6 +3405,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ real DOMDocument::adoptNode() (ext/dom/document.c, #24995, re-#19654).
+     *
+     * Method exists on Zend 8.2 but throws {@code Error: Not yet implemented}. Enable the real
+     * reparent via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Reference / PROFILE=8.2 keeps the Zend 8.2 stub Error.
+     */
+    public static function supportsDomDocumentAdoptNode(): bool
+    {
+        return self::supportsDomApiSince('8.3.0');
+    }
+
+    /**
      * PHP 8.3+ legacy DOMElement::$id / $className virtual HTML attributes
      * (php-src ext/dom/php_dom.stub.php / php_dom.c prop handlers; #22457).
      *

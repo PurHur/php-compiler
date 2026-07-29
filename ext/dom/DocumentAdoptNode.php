@@ -8,7 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
 /**
- * DOMDocument::adoptNode() — cross-document reparent (php-src ext/dom/document.c; #19654).
+ * DOMDocument::adoptNode() — cross-document reparent (php-src ext/dom/document.c; #19654, #24995).
+ *
+ * Real reparent is gated to PHP 8.3+ ({@see \PHPCompiler\CompilerVersion::supportsDomDocumentAdoptNode()});
+ * reference / PROFILE&lt;8.3 throws Zend 8.2's {@code Error: Not yet implemented}.
  */
 final class DocumentAdoptNode extends DomClassMethod
 {

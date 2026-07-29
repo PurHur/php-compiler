@@ -1,5 +1,7 @@
 --TEST--
-DOMDocument::adoptNode() moves node across documents (#19654, ext/dom/document.c)
+DOMDocument::adoptNode() moves node across documents — PHP 8.3+ (#19654, #24995, ext/dom/document.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --FILE--
 <?php
 $d1 = new DOMDocument();
