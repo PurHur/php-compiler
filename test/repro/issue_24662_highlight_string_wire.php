@@ -1,32 +1,31 @@
 <?php
 /**
- * Repro for #24662: highlight_string() HTML wire must match Zend.
+ * Repro for #24662 / #24874: default profile emits PHP 8.3+ highlight wire format.
  *
- * Zend: <code><span…> wrapper, &nbsp; for spaces, no <pre>.
+ * Legacy PROFILE=8.2 shape is covered by VmHighlightTest::testHighlightEngineLegacyProfileMatchesHostZend
+ * (putenv inside bin/vm.php does not reach host HighlightEngine).
  */
 
 $errors = 0;
+
 $z = highlight_string("<?php echo 1;", true);
-
-if (!str_contains($z, "&nbsp;")) {
-    echo "FAIL: missing &nbsp;\n";
+if (!str_contains($z, "<pre><code")) {
+    echo "FAIL: missing <pre><code\n";
     $errors++;
 } else {
-    echo "OK: contains &nbsp;\n";
+    echo "OK: <pre><code shape\n";
 }
-
+if (str_contains($z, "&nbsp;")) {
+    echo "FAIL: unexpected &nbsp;\n";
+    $errors++;
+} else {
+    echo "OK: no &nbsp;\n";
+}
 if (str_contains($z, "<pre>")) {
-    echo "FAIL: should not contain <pre>\n";
-    $errors++;
+    echo "OK: has <pre>\n";
 } else {
-    echo "OK: no <pre>\n";
-}
-
-if (!preg_match('/<code><span/', $z)) {
-    echo "FAIL: should match <code><span\n";
+    echo "FAIL: missing <pre>\n";
     $errors++;
-} else {
-    echo "OK: <code><span shape\n";
 }
 
 exit($errors > 0 ? 1 : 0);

@@ -272,14 +272,11 @@ stdlib/getprotobynumber_jit
 stdlib/gettype_object_resource
 stdlib/glob_enum_pattern_typeerror
 stdlib/glob_enum_pattern_typeerror_jit
-stdlib/highlight_file_br
-stdlib/highlight_file_multiline_br
 stdlib/highlight_file_php_memory
 stdlib/highlight_file_php_memory_no_warning
 stdlib/highlight_string_null_84
 stdlib/highlight_string_null_forward84
 stdlib/highlight_string_null_forward84_jit
-stdlib/highlight_string_pre_wrapper
 stdlib/hrtime_as_number_float
 stdlib/html_null_forward84
 stdlib/html_null_forward84_jit
