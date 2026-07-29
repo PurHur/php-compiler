@@ -83,7 +83,9 @@ final class VmBcMathNumber
     public static function initObject(ObjectEntry $entry, string $value, ?int $scale = null): void
     {
         VmBcmath::assertValidNumber($value);
-        $entry->getProperty(self::PROP_VALUE)->string($value);
+        // Store Zend-canonical value ("" / null→"" / "00.00" → "0" / "0.00"), not the raw operand (#24140).
+        $canonical = VmBcmath::canonicalNumberString($value);
+        $entry->getProperty(self::PROP_VALUE)->string($canonical);
         $entry->getProperty(self::PROP_SCALE)->int($scale ?? VmBcmath::decimalScale($value));
         $entry->constructed = true;
     }
@@ -206,7 +208,15 @@ final class VmBcMathNumber
             return $asString;
         }
 
-        return VmString::coerceStringBuiltinArg($var, $method, $argNum, $paramName);
+        // $argNum is 1-based (Zend Argument #N); coerceStringBuiltinArg expects 0-based (#24140).
+        // Z_PARAM_STR_OR_LONG soft-null deprecation type is string|int (bcmath.stub.php).
+        return VmString::coerceStringBuiltinArg(
+            $var,
+            $method,
+            $argNum - 1,
+            $paramName,
+            'string|int'
+        );
     }
 
     public static function optionalScaleArg(Variable $var, string $method, int $argNum, ?Frame $frame = null): ?int

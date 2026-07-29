@@ -360,6 +360,23 @@ final class VmBcmath
         self::parse($num);
     }
 
+    /**
+     * Canonical BcMath\Number::$value string (php-src bc_num stringification; #24140).
+     *
+     * Strips leading integer zeros, keeps fractional digits (incl. trailing zeros), and
+     * maps empty / lone-sign / lone-dot inputs to {@see "0"} after {@see parse()}.
+     */
+    public static function canonicalNumberString(string $num): string
+    {
+        $parsed = self::parse($num);
+        $sign = $parsed['sign'] < 0 ? '-' : '';
+        if ('' === $parsed['frac']) {
+            return $sign.$parsed['int'];
+        }
+
+        return $sign.$parsed['int'].'.'.$parsed['frac'];
+    }
+
     /** Decimal places after the radix point for a validated operand (#7220). */
     public static function decimalScale(string $num): int
     {
