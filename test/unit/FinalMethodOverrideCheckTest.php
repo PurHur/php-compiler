@@ -66,4 +66,62 @@ PHP;
         $this->expectExceptionMessage('Cannot override final method Base::foo()');
         $runtime->parseAndCompile($code, 'trait_override_final.php');
     }
+
+    /** @covers issue #24884 — cross-eval must hit inheritFromParent, not only same-script FinalMethodOverrideCheck */
+    public function testEvalCannotOverrideFinalParentMethod(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    final public function f(): void {}
+}
+eval('class B extends A { public function f(): void {} }');
+echo "EVAL_OK\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_method_eval_override.php');
+        $this->assertNotNull($block);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot override final method A::f()');
+        $runtime->run($block);
+    }
+
+    /** @covers issue #24884 */
+    public function testEvalTraitCannotOverrideFinalParentMethod(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    final public function f(): void {}
+}
+eval('trait T { public function f(): void {} } class B extends A { use T; }');
+echo "EVAL_OK\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_method_eval_trait_override.php');
+        $this->assertNotNull($block);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot override final method A::f()');
+        $runtime->run($block);
+    }
+
+    /** @covers issue #24884 */
+    public function testEvalCannotOverrideFinalGrandparentMethod(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    final public function f(): void {}
+}
+class M extends A {}
+eval('class C extends M { public function f(): void {} }');
+echo "EVAL_OK\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'final_method_eval_grandparent.php');
+        $this->assertNotNull($block);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot override final method A::f()');
+        $runtime->run($block);
+    }
 }

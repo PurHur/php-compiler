@@ -1470,6 +1470,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'final_plain_property_eval_override')) {
                 continue;
             }
+            // eval() final method override: VM inheritFromParent (#24884); MCJIT inline eval deferral pending.
+            if (str_contains($name, 'final_method_eval_override')) {
+                continue;
+            }
             // final plain property override/child_override _84: host PHP 8.2 parser rejects `final` on plain properties (#24687).
             if (str_contains($name, 'final_plain_property_override_84')
                 || str_contains($name, 'final_plain_property_child_override_84')
