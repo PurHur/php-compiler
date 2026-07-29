@@ -19,21 +19,28 @@ final class VmSprintf
 
     /**
      * @param list<Variable> $args
+     * @param int            $nbAdditionalParameters php-src formatted_print.c — fixed args before
+     *                                               value argv (sprintf/printf=1, fprintf=2);
+     *                                               ignored when $arrayArgs (vsprintf family = -1)
      */
-    public static function format(string $format, array $args, ?Frame $frame = null, bool $arrayArgs = false): string
-    {
+    public static function format(
+        string $format,
+        array $args,
+        ?Frame $frame = null,
+        bool $arrayArgs = false,
+        int $nbAdditionalParameters = 1
+    ): string {
         $out = '';
         $argIdx = 0;
         $argCount = \count($args);
+        // php-src max_missing_argnum — defer ArgumentCountError until end of format (#24661).
+        $maxMissingArgnum = -1;
         $len = VmString::byteLength($format);
         for ($pos = 0; $pos < $len; ++$pos) {
             $ch = $format[$pos];
             if ('%' !== $ch) {
                 $out .= $ch;
                 continue;
-            }
-            if ($pos + 1 >= $len) {
-                throw new \LogicException('sprintf() trailing % in format string');
             }
             $parsed = self::parseConversionSpec($format, $pos + 1, $len);
             $pos = $parsed['nextPos'] - 1;
@@ -45,17 +52,48 @@ final class VmSprintf
             $width = $parsed['width'];
             if ($parsed['widthFromArg']) {
                 // php-src formatted_print.c — width * uses *N$ or sequential currarg, not value argnum (#22834).
-                $widthVarIdx = self::resolveArgIndex($parsed['widthPositional'], $argIdx, $argCount, $arrayArgs);
+                $widthVarIdx = self::resolveArgIndexOrMissing(
+                    $parsed['widthPositional'],
+                    $argIdx,
+                    $argCount,
+                    $maxMissingArgnum
+                );
+                if (null === $widthVarIdx) {
+                    // php-src: missing width → continue without reserving the value arg.
+                    continue;
+                }
                 $width = self::argToWidth($args[$widthVarIdx], $frame);
             }
 
             $precision = $parsed['precision'];
             if ($parsed['precisionFromArg']) {
-                $precVarIdx = self::resolveArgIndex($parsed['precisionPositional'], $argIdx, $argCount, $arrayArgs);
+                $precVarIdx = self::resolveArgIndexOrMissing(
+                    $parsed['precisionPositional'],
+                    $argIdx,
+                    $argCount,
+                    $maxMissingArgnum
+                );
+                if (null === $precVarIdx) {
+                    // php-src: missing precision → continue without reserving the value arg.
+                    continue;
+                }
                 $precision = self::argToPrecision($args[$precVarIdx], $frame);
             }
 
-            $varIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount, $arrayArgs);
+            // php-src: value arg is reserved before the type specifier; incomplete trailing %
+            // therefore reports ArgumentCountError first, else ValueError (#24661).
+            $varIdx = self::resolveArgIndexOrMissing(
+                $parsed['positional'],
+                $argIdx,
+                $argCount,
+                $maxMissingArgnum
+            );
+            if (null === $varIdx) {
+                continue;
+            }
+            if ($parsed['incomplete']) {
+                throw new \ValueError('Missing format specifier at end of string');
+            }
             $converted = self::applyConversion(
                 $parsed['spec'],
                 $args[$varIdx],
@@ -75,6 +113,15 @@ final class VmSprintf
             }
         }
 
+        if ($maxMissingArgnum >= 0) {
+            self::throwTooFewArgs(
+                $arrayArgs,
+                $maxMissingArgnum + 1,
+                $argCount,
+                $nbAdditionalParameters
+            );
+        }
+
         return $out;
     }
 
@@ -84,6 +131,7 @@ final class VmSprintf
      * @return array{
      *     nextPos: int,
      *     literalPercent: bool,
+     *     incomplete: bool,
      *     spec: string,
      *     positional: ?int,
      *     leftAdjust: bool,
@@ -104,6 +152,7 @@ final class VmSprintf
             return [
                 'nextPos' => $pos + 1,
                 'literalPercent' => true,
+                'incomplete' => false,
                 'spec' => '',
                 'positional' => null,
                 'leftAdjust' => false,
@@ -193,13 +242,30 @@ final class VmSprintf
             }
         }
 
+        // php-src case '\0' when format_len==0 — Missing format specifier (#24661).
         if ($pos >= $len) {
-            throw new \LogicException('sprintf() trailing % in format string');
+            return [
+                'nextPos' => $len,
+                'literalPercent' => false,
+                'incomplete' => true,
+                'spec' => '',
+                'positional' => $positional,
+                'leftAdjust' => $leftAdjust,
+                'padding' => $padding,
+                'showSign' => $showSign,
+                'width' => $width,
+                'widthFromArg' => $widthFromArg,
+                'widthPositional' => $widthPositional,
+                'precision' => $precision,
+                'precisionFromArg' => $precisionFromArg,
+                'precisionPositional' => $precisionPositional,
+            ];
         }
 
         return [
             'nextPos' => $pos + 1,
             'literalPercent' => false,
+            'incomplete' => false,
             'spec' => $format[$pos],
             'positional' => $positional,
             'leftAdjust' => $leftAdjust,
@@ -241,24 +307,42 @@ final class VmSprintf
         return [$argnum, $pos + 1];
     }
 
-    private static function resolveArgIndex(?int $positional, int &$sequentialIdx, int $argCount, bool $arrayArgs): int
-    {
+    /**
+     * Resolve a value/width/precision arg index, or record a deferred missing slot (php-src).
+     *
+     * @param-out int $maxMissingArgnum 0-based highest missing arg index (-1 if none)
+     */
+    private static function resolveArgIndexOrMissing(
+        ?int $positional,
+        int &$sequentialIdx,
+        int $argCount,
+        int &$maxMissingArgnum
+    ): ?int {
         if (null !== $positional) {
             if ($positional > $argCount) {
-                self::throwTooFewArgs($arrayArgs, $positional, $argCount);
+                $maxMissingArgnum = \max($maxMissingArgnum, $positional - 1);
+
+                return null;
             }
 
             return $positional - 1;
         }
-        if ($sequentialIdx >= $argCount) {
-            self::throwTooFewArgs($arrayArgs, $sequentialIdx + 1, $argCount);
+        $idx = $sequentialIdx++;
+        if ($idx >= $argCount) {
+            $maxMissingArgnum = \max($maxMissingArgnum, $idx);
+
+            return null;
         }
 
-        return $sequentialIdx++;
+        return $idx;
     }
 
-    private static function throwTooFewArgs(bool $arrayArgs, int $requiredValueArgs, int $givenValueArgs): void
-    {
+    private static function throwTooFewArgs(
+        bool $arrayArgs,
+        int $requiredValueArgs,
+        int $givenValueArgs,
+        int $nbAdditionalParameters = 1
+    ): void {
         if ($arrayArgs) {
             throw new \ValueError(\sprintf(
                 'The arguments array must contain %d items, %d given',
@@ -267,10 +351,11 @@ final class VmSprintf
             ));
         }
 
+        // php-src: required = max_missing_argnum + nb_additional_parameters + 1
         throw new \ArgumentCountError(\sprintf(
             '%d arguments are required, %d given',
-            $requiredValueArgs + 1,
-            $givenValueArgs + 1
+            $requiredValueArgs + $nbAdditionalParameters,
+            $givenValueArgs + $nbAdditionalParameters
         ));
     }
 

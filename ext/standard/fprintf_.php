@@ -8,8 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -37,13 +35,17 @@ final class fprintf_ extends Internal
         );
         // Z_PARAM_STR — Zend 8.4 DEP+coerces null (#21234, formatted_print.c).
         $format = VmString::trimFamilyStringArgForFrame($frame, 1, 'fprintf', 1, 'format');
-        $argsHt = new HashTable();
+        // Variadic value args — not an array (vsprintf). nb_additional_parameters=2 for
+        // stream+format so trailing-% ArgumentCountError matches Zend (#24661).
+        $values = [];
         for ($i = 2; $i < $argc; ++$i) {
-            $argsHt->append($frame->calledArgs[$i]->resolveIndirect());
+            $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $argsVar = new Variable();
-        $argsVar->array($argsHt);
-        $written = VmVprintf::vfprintf($handle, $format, $argsVar, $frame);
+        $out = VmSprintf::format($format, $values, $frame, false, 2);
+        $written = VmFs::fwrite($handle, $out, null);
+        if (false === $written) {
+            throw new \LogicException('fprintf() failed to write to stream in this compiler build');
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($written);
         }

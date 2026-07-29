@@ -88,7 +88,147 @@ final class SprintfJitHelper
             return $sequential;
         }
 
+        // php-src formatted_print.c — incomplete trailing % (#24661). Fast paths above
+        // return null / miss; do not echo the raw format string.
+        self::throwIfIncompleteTrailingPercent($format, $fmtLen, $packedArgs, $packLen);
+
         return $format;
+    }
+
+    /**
+     * php-src: value arg reserved before type specifier; insufficient args → ArgumentCountError,
+     * else ValueError "Missing format specifier at end of string" (#24661).
+     *
+     * NestedJIT-safe: no VmSprintf / Variable; walk format with ++$cursor only.
+     */
+    private static function throwIfIncompleteTrailingPercent(
+        string $format,
+        int $fmtLen,
+        string $packedArgs,
+        int $packLen
+    ): void {
+        $argIdx = 0;
+        $pos = 0;
+        while ($pos < $fmtLen) {
+            if ('%' !== $format[$pos]) {
+                ++$pos;
+                continue;
+            }
+            ++$pos;
+            if ($pos >= $fmtLen) {
+                self::throwIncompletePercent($packedArgs, $packLen, $argIdx + 1);
+            }
+            if ('%' === $format[$pos]) {
+                ++$pos;
+                continue;
+            }
+            // Skip optional N$ / flags / width / precision like VmSprintf (subset).
+            while ($pos < $fmtLen) {
+                $flag = $format[$pos];
+                if ('-' === $flag || ' ' === $flag || '0' === $flag || '+' === $flag) {
+                    ++$pos;
+                    continue;
+                }
+                if ("'" === $flag) {
+                    ++$pos;
+                    if ($pos >= $fmtLen) {
+                        throw new \ValueError('Missing padding character');
+                    }
+                    ++$pos;
+                    continue;
+                }
+                break;
+            }
+            if ($pos < $fmtLen && '*' === $format[$pos]) {
+                ++$pos;
+                // width * consumes a sequential arg
+                if ($argIdx >= self::countPackedArgs($packedArgs, $packLen)) {
+                    self::throwTooFewPackedArgs($argIdx + 1, self::countPackedArgs($packedArgs, $packLen));
+                }
+                ++$argIdx;
+                while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    ++$pos;
+                }
+                if ($pos < $fmtLen && '$' === $format[$pos]) {
+                    ++$pos;
+                }
+            } elseif ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    ++$pos;
+                }
+                if ($pos < $fmtLen && '$' === $format[$pos]) {
+                    ++$pos;
+                    // positional — ignore for incomplete scan; sequential width digits were N$
+                }
+                // else digits were width — already consumed
+            }
+            if ($pos < $fmtLen && '.' === $format[$pos]) {
+                ++$pos;
+                if ($pos < $fmtLen && '*' === $format[$pos]) {
+                    ++$pos;
+                    if ($argIdx >= self::countPackedArgs($packedArgs, $packLen)) {
+                        self::throwTooFewPackedArgs($argIdx + 1, self::countPackedArgs($packedArgs, $packLen));
+                    }
+                    ++$argIdx;
+                    while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                        ++$pos;
+                    }
+                    if ($pos < $fmtLen && '$' === $format[$pos]) {
+                        ++$pos;
+                    }
+                } elseif ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                    while ($pos < $fmtLen && self::isDigitByte($format[$pos])) {
+                        ++$pos;
+                    }
+                }
+            }
+            if ($pos >= $fmtLen) {
+                self::throwIncompletePercent($packedArgs, $packLen, $argIdx + 1);
+            }
+            // type specifier present — consume one value arg for scan accounting
+            ++$argIdx;
+            ++$pos;
+        }
+    }
+
+    private static function throwIncompletePercent(string $packedArgs, int $packLen, int $requiredValueArgs): void
+    {
+        $argc = self::countPackedArgs($packedArgs, $packLen);
+        if ($argc < $requiredValueArgs) {
+            self::throwTooFewPackedArgs($requiredValueArgs, $argc);
+        }
+        throw new \ValueError('Missing format specifier at end of string');
+    }
+
+    private static function throwTooFewPackedArgs(int $requiredValueArgs, int $givenValueArgs): void
+    {
+        // nb_additional_parameters = 1 (sprintf/printf); message without sprintf().
+        $req = $requiredValueArgs + 1;
+        $got = $givenValueArgs + 1;
+        throw new \ArgumentCountError(
+            ((string) $req).' arguments are required, '.((string) $got).' given'
+        );
+    }
+
+    private static function countPackedArgs(string $packed, int $packLen): int
+    {
+        // NestedJIT: do not use by-ref skipPackedArgAt for counting (#23871 / #24661 hang).
+        $offset = 0;
+        $n = 0;
+        while ($offset < $packLen) {
+            $size = self::packedArgByteSizeAtOffset($packed, $packLen, $offset);
+            if (null === $size || $size <= 0) {
+                break;
+            }
+            $k = 0;
+            while ($k < $size) {
+                ++$offset;
+                ++$k;
+            }
+            ++$n;
+        }
+
+        return $n;
     }
 
     /**
@@ -113,7 +253,8 @@ final class SprintfJitHelper
                 continue;
             }
             if ($pos + 1 >= $fmtLen) {
-                return null;
+                // Trailing incomplete % — ArgumentCountError or ValueError (#24661).
+                self::throwIncompletePercent($packedArgs, $packLen, $argIdx + 1);
             }
             if ('%' === $format[$pos + 1]) {
                 $out .= '%';
