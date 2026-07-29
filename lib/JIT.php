@@ -10101,6 +10101,12 @@ class JIT {
                             $this->context->freeDeadVariables($func, $branchBlock, $block);
                         }
                         $builder->branchIf($condition, $ifEntry, $elseEntry);
+                        if (null !== $ternaryMergeReturn) {
+                            unset($this->context->coalesceAssignTargets[$ternaryMergeReturn]);
+                        }
+                        $this->clearTernaryEchoLiteralMergeState();
+                        $this->context->ternarySharedReturnOperand = $savedTernarySharedReturn;
+                        $this->context->ternarySharedReturnSlot = $savedTernarySharedReturnSlot;
 
                         return $origBasicBlock;
                     }

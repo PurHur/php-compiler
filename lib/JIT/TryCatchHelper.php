@@ -606,7 +606,12 @@ final class TryCatchHelper
                 return;
             }
             $obj = self::loadThrownObject($context, $thrown);
-            self::emitUncaughtUserHandlerOrAbort($context, $obj);
+            if (self::isNonMainUserFunction($block)) {
+                $builder->call($context->lookupFunction('phpc_jit_set_throw_pending'), $obj);
+                self::emitPropagateReturn($context, $func);
+            } else {
+                self::emitUncaughtUserHandlerOrAbort($context, $obj);
+            }
 
             return;
         }
@@ -1161,6 +1166,53 @@ final class TryCatchHelper
             return $builder->getInsertBlock();
         } catch (\Throwable) {
             return null;
+        }
+    }
+
+    /**
+     * Non-main user function: throw propagates via throw-pending + return (#24680).
+     */
+    private static function isNonMainUserFunction(Block $block): bool
+    {
+        if (null === $block->func) {
+            return false;
+        }
+
+        return '{main}' !== $block->func->name;
+    }
+
+    /**
+     * Return from the current LLVM function after setting throw-pending (#24680).
+     *
+     * The return value is irrelevant — the caller checks throw-pending before using it.
+     */
+    private static function emitPropagateReturn(Context $context, Function_ $func): void
+    {
+        $builder = $context->builder;
+        if (BasicBlockHelper::isVoidLlvmFunctionValue($func)) {
+            $builder->returnVoid();
+
+            return;
+        }
+        $sig = BasicBlockHelper::llvmFunctionSignatureType($func);
+        if (null === $sig) {
+            $builder->returnValue($context->constantFromInteger(0));
+
+            return;
+        }
+        $retType = $sig->getReturnType();
+        $kind = $retType->getKind();
+        if (\PHPLLVM\Type::KIND_STRUCT === $kind) {
+            $slot = JitValueBox::alloc($context);
+            $builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $slot)
+            );
+            $builder->returnValue($builder->load($slot));
+        } elseif (\PHPLLVM\Type::KIND_POINTER === $kind) {
+            $builder->returnValue($retType->constNull());
+        } else {
+            $builder->returnValue($context->constantFromInteger(0));
         }
     }
 }
