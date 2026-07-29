@@ -136,6 +136,7 @@ LOG_DIR="build/compliance-shards"
 mkdir -p "$LOG_DIR"
 LOG="${LOG_DIR}/${SUITE}-${SHARD}-of-${SHARDS}.log"
 FAILED_FILE="${LOG_DIR}/${SUITE}-${SHARD}-of-${SHARDS}.failed"
+EXECUTED_FILE="${LOG_DIR}/${SUITE}-${SHARD}-of-${SHARDS}.executed"
 
 echo "shard-compliance: ${SUITE} shard ${SHARD}/${SHARDS} — ${count} of ${total} cases, timeout ${SHARD_TIMEOUT}s"
 
@@ -154,6 +155,14 @@ rc=$?
 # the comment.
 executed="$(grep -c "^##teamcity\[testStarted" "$LOG" 2>/dev/null || true)"
 executed="${executed:-0}"
+# The executed NAMES, not just the count. VMTest::providePHPTests() gates cases on
+# CompilerVersion::supports*(), so a profile-flipping commit silently changes which cases the
+# provider yields at all. Without this set, a case that stopped executing is indistinguishable from
+# one that started passing, and regenerating the baseline drops it from tracking forever — which is
+# how the #24778 quarantine buried 18 real failures (#24726).
+grep -oE "^##teamcity\[testStarted name='[^']*'" "$LOG" 2>/dev/null \
+    | sed "s/.*name='//; s/'$//" \
+    | LC_ALL=C sort -u > "$EXECUTED_FILE"
 grep -oE "^##teamcity\[testFailed name='[^']*'" "$LOG" 2>/dev/null \
     | sed "s/.*name='//; s/'$//" \
     | LC_ALL=C sort -u > "$FAILED_FILE"
