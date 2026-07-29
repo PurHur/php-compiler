@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -22,6 +23,7 @@ use PHPLLVM\Value;
  * VM uses ResponseContext only — no host Zend setrawcookie() delegation (bootstrap/M5; #5344 phase 3).
  * php-src: ext/standard/head.c — PHP_FUNCTION(setrawcookie) / Z_PARAM_STR $name
  * Null → E_DEPRECATED + empty name ValueError on 8.4 forward profile (#21233, re-#21003).
+ * AOT densify pads omitted named slots with null — skip via isOmittedOptional (#24968 AOT).
  */
 final class setrawcookie extends Internal
 {
@@ -56,8 +58,16 @@ final class setrawcookie extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc >= 3 && JitSetcookieOptions::isOptionsArrayArg($args[2])) {
-            return JitSetcookieOptions::invoke($context, 'setrawcookie', ...$args);
+        if (
+            isset($args[2])
+            && !NamedOptionalCallArgs::isOmittedOptional($args[2])
+            && JitSetcookieOptions::isOptionsArrayArg($args[2])
+        ) {
+            $valueArg = (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1]))
+                ? $args[1]
+                : self::emptyStringArg($context);
+
+            return JitSetcookieOptions::invoke($context, 'setrawcookie', $args[0], $valueArg, $args[2]);
         }
         if ($argc < 1 || $argc > 7) {
             throw new \LogicException('setrawcookie() accepts one to seven arguments');
@@ -73,11 +83,11 @@ final class setrawcookie extends Internal
             'setrawcookie(): Argument #1 ($name) cannot be empty'
         );
         $valuePtr = $context->builder->load($context->constantStringFromString(''));
-        if ($argc >= 2) {
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             $valuePtr = JitStringBuiltinArg::lower($context, $args[1], 'setrawcookie', 1, 'value');
         }
         $expiresI64 = $i64->constInt(0, false);
-        if ($argc >= 3) {
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
                 if ($context->callerStrictTypes) {
                     throw new \LogicException(
@@ -90,28 +100,28 @@ final class setrawcookie extends Internal
             }
         }
         $pathPtr = $context->builder->load($context->constantStringFromString(''));
-        if ($argc >= 4) {
+        $hasPath = isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3]);
+        if ($hasPath) {
             $pathPtr = JitStringBuiltinArg::lower($context, $args[3], 'setrawcookie', 3, 'path');
         }
         $domainPtr = $context->builder->load($context->constantStringFromString(''));
-        if ($argc >= 5) {
+        if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             $domainPtr = JitStringBuiltinArg::lower($context, $args[4], 'setrawcookie', 4, 'domain');
         }
         $secureI32 = $i32->constInt(0, false);
-        if ($argc >= 6) {
+        if (isset($args[5]) && !NamedOptionalCallArgs::isOmittedOptional($args[5])) {
             $secureI32 = $context->builder->zExt(
                 $this->jitBool($context, $args[5], 'setrawcookie() secure'),
                 $i32
             );
         }
         $httponlyI32 = $i32->constInt(0, false);
-        if ($argc >= 7) {
+        if (isset($args[6]) && !NamedOptionalCallArgs::isOmittedOptional($args[6])) {
             $httponlyI32 = $context->builder->zExt(
                 $this->jitBool($context, $args[6], 'setrawcookie() httponly'),
                 $i32
             );
         }
-
         $samesitePtr = $strPtr->constNull();
         $partitionedI32 = $i32->constInt(0, false);
 
@@ -141,10 +151,23 @@ final class setrawcookie extends Internal
             $context,
             $namePtr,
             $valuePtr,
-            $argc >= 4 ? $pathPtr : null
+            $hasPath ? $pathPtr : null
         );
 
         return $context->constantFromBool(true);
+    }
+
+    private static function emptyStringArg(Context $context): JITVariable
+    {
+        $str = new JITVariable(
+            $context,
+            JITVariable::TYPE_STRING,
+            JITVariable::KIND_VALUE,
+            $context->builder->load($context->constantStringFromString(''))
+        );
+        $str->compileTimeString = '';
+
+        return $str;
     }
 
     /**
@@ -154,13 +177,12 @@ final class setrawcookie extends Internal
      */
     private static function compileTimeArgs(array $args): ?array
     {
-        $argc = \count($args);
         $name = JitStringArg::compileTimeLiteral($args[0]);
         if (null === $name) {
             return null;
         }
         $value = '';
-        if ($argc >= 2) {
+        if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             $v = JitStringArg::compileTimeLiteral($args[1]);
             if (null === $v) {
                 return null;
@@ -168,7 +190,7 @@ final class setrawcookie extends Internal
             $value = $v;
         }
         $expires = 0;
-        if ($argc >= 3) {
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
                 return null;
             }
@@ -176,15 +198,14 @@ final class setrawcookie extends Internal
             $expires = null === $e ? 0 : $e;
         }
         $path = '';
-        if ($argc >= 4) {
+        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             $p = JitStringArg::compileTimeLiteral($args[3]);
             if (null === $p) {
                 return null;
             }
             $path = $p;
         }
-        $domain = '';
-        if ($argc >= 5) {
+        if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             return null;
         }
         $secure = false;
@@ -195,7 +216,7 @@ final class setrawcookie extends Internal
             'value' => $value,
             'expires' => $expires,
             'path' => $path,
-            'domain' => $domain,
+            'domain' => '',
             'secure' => $secure,
             'httponly' => $httponly,
         ];
