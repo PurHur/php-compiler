@@ -21,9 +21,10 @@ use PHPCfg\Op\Stmt\JumpIf;
 use PHPCfg\Op\Terminal\Const_ as ConstTerminal;
 use PHPCfg\Operand;
 use PHPCfg\Script;
+use PHPCompiler\CompilerVersion;
 
 /**
- * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904, #24905).
+ * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904, #24905, #24947).
  *
  * php-src: Zend/zend_ast.c — zend_ast_validate(); Zend/zend_compile.c zend_compile_const_expr().
  * Distinct from runtime throw expressions (#3802) and property/param defaults (#3803).
@@ -31,8 +32,10 @@ use PHPCfg\Script;
  * {@code match} is never a constant expression (no ZEND_AST_MATCH in the allow-list); php-cfg
  * lowers it to a result-seed Assign plus Identical/JumpIf (or default-only Assign+Jump).
  *
- * Casts ({@code ZEND_AST_CAST}) and silence ({@code ZEND_AST_SILENCE} → php-cfg
- * {@see ErrorSuppressBlock}) are also outside the const-expr allow-list (#24905).
+ * Silence ({@code ZEND_AST_SILENCE} → php-cfg {@see ErrorSuppressBlock}) is always outside the
+ * allow-list (#24905). Scalar/(array) casts ({@code ZEND_AST_CAST}) are allowed on PHP 8.5+
+ * ({@see CompilerVersion::supportsCastsInConstantExpressions}); (object)/(void)/(unset) stay
+ * rejected. On ≤8.4 every cast remains invalid (#24905).
  */
 final class ThrowInClassConstCompileCheck
 {
@@ -95,8 +98,10 @@ final class ThrowInClassConstCompileCheck
                 || $op instanceof FuncCall
                 || $op instanceof MethodCall
                 || $op instanceof StaticCall
-                || $op instanceof Cast
             ) {
+                throw new \CompileError(self::MESSAGE);
+            }
+            if ($op instanceof Cast && !self::isAllowedConstExprCast($op)) {
                 throw new \CompileError(self::MESSAGE);
             }
             if ($op instanceof Jump && $op->target instanceof ErrorSuppressBlock) {
@@ -165,5 +170,23 @@ final class ThrowInClassConstCompileCheck
         $value = $expr->value;
 
         return null === $value || '' === $value;
+    }
+
+    /**
+     * PHP 8.5+ allow-list: (int)/(float)/(string)/(bool)/(array). (object)/(void)/(unset) never.
+     *
+     * @see CompilerVersion::supportsCastsInConstantExpressions()
+     */
+    private static function isAllowedConstExprCast(Cast $op): bool
+    {
+        if (!CompilerVersion::supportsCastsInConstantExpressions()) {
+            return false;
+        }
+
+        return $op instanceof Cast\Int_
+            || $op instanceof Cast\Double
+            || $op instanceof Cast\String_
+            || $op instanceof Cast\Bool_
+            || $op instanceof Cast\Array_;
     }
 }

@@ -1051,6 +1051,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ casts in constant expressions — Zend/zend_ast.c / zend_compile.c (#24947).
+     *
+     * Scalar/(array) casts are allowed; (object)/(void)/(unset) remain invalid. Withheld on
+     * reference / PROFILE≤8.4 (matches Zend; #24905). Enable via stable 8.5.0+ or
+     * `PHP_COMPILER_PROFILE=8.5`.
+     */
+    public static function supportsCastsInConstantExpressions(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ clone-with syntax (`clone $obj with { }`, `clone($obj, [...])`, `clone ($obj, with: [...])`).
      *
      * Zend landed clone-with in 8.5 (RFC); PROFILE=8.4 must reject like Zend 8.4 (#23877, re-#16676/#12987).

@@ -8,7 +8,7 @@ use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** throw/cast/silence/match in class constant expressions (#6580, #24904, #24905). */
+/** throw/cast/silence/match in class constant expressions (#6580, #24904, #24905, #24947). */
 final class ThrowInClassConstCompileCheckTest extends TestCase
 {
     public function testThrowInClassConstCompileErrors(): void
@@ -165,6 +165,71 @@ class A {
     public const X = (bool) 1;
 }
 PHP);
+    }
+
+    public function testObjectCastInClassConstCompileErrorsEvenOn85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->expectCompileError(<<<'PHP'
+<?php
+class A {
+    public const X = (object) [];
+}
+PHP);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testCastIntInClassConstAllowedOn85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class A {
+    public const X = (int) "5";
+}
+PHP, 'class_const_cast_int_85.php');
+            $this->assertNotNull($block);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testCastInGlobalAndTypedClassConstAllowedOn85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+const X = (int) "42";
+class C {
+    public const int Y = (int) "7";
+}
+PHP, 'const_cast_85.php');
+            $this->assertNotNull($block);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSilenceInClassConstCompileErrors(): void
