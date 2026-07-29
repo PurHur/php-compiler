@@ -93,52 +93,71 @@ final class JitParseUrl
             return $ptr;
         }
 
-        $comp = self::compileTimeLong($context, $component);
-        if (null === $comp) {
-            throw new \LogicException('parse_url() component must be a compile-time integer in this compiler build');
-        }
-        $comp = VmParseUrl::normalizeRawComponentInt($comp);
-        $urlLiteral = $url->compileTimeString ?? null;
-        if (
-            null === $urlLiteral
-            && (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false))
-        ) {
-            $urlLiteral = '';
-        }
-        if (null !== $urlLiteral) {
-            $result = VmString::parseUrl($urlLiteral, $comp);
-            if (\is_array($result)) {
-                return self::materializeVmArray($context, $result);
+        $compConst = self::tryCompileTimeComponentInt($context, $component);
+        if (null !== $compConst) {
+            $comp = VmParseUrl::normalizeRawComponentInt($compConst);
+            $urlLiteral = $url->compileTimeString ?? null;
+            if (
+                null === $urlLiteral
+                && (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false))
+            ) {
+                $urlLiteral = '';
+            }
+            if (null !== $urlLiteral) {
+                $result = VmString::parseUrl($urlLiteral, $comp);
+                if (\is_array($result)) {
+                    return self::materializeVmArray($context, $result);
+                }
+
+                return self::materializeVmResult($context, $result);
             }
 
-            return self::materializeVmResult($context, $result);
-        }
+            $urlStr = self::jitUrlArg($context, $url);
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            if (-1 === $comp) {
+                $context->builder->call(
+                    $context->lookupFunction('__phpc_parse_url_assoc'),
+                    $urlStr,
+                    $ptr
+                );
 
-        $urlStr = self::jitUrlArg($context, $url);
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        if (-1 === $comp) {
+                return $ptr;
+            }
+            $i64 = $context->getTypeFromString('int64');
             $context->builder->call(
-                $context->lookupFunction('__phpc_parse_url_assoc'),
+                $context->lookupFunction('__phpc_parse_url_component'),
                 $urlStr,
+                $i64->constInt($comp, false),
                 $ptr
             );
+            if (\in_array($comp, [\PHP_URL_SCHEME, \PHP_URL_HOST, \PHP_URL_USER, \PHP_URL_PASS, \PHP_URL_PATH, \PHP_URL_QUERY, \PHP_URL_FRAGMENT], true)) {
+                return $context->builder->call(
+                    $context->lookupFunction('__value__readString'),
+                    $ptr
+                );
+            }
 
             return $ptr;
         }
-        $i64 = $context->getTypeFromString('int64');
+
+        // Runtime component — Z_PARAM_LONG soft-null DEP+0 via JitIntdiv (#24942).
+        $compVal = JitIntdiv::lowerIntBuiltinArgForCaller(
+            $context,
+            $component,
+            'parse_url',
+            2,
+            'component'
+        );
+        $urlStr = self::jitUrlArg($context, $url);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__phpc_parse_url_component'),
             $urlStr,
-            $i64->constInt($comp, false),
+            $compVal,
             $ptr
         );
-        if (\in_array($comp, [\PHP_URL_SCHEME, \PHP_URL_HOST, \PHP_URL_USER, \PHP_URL_PASS, \PHP_URL_PATH, \PHP_URL_QUERY, \PHP_URL_FRAGMENT], true)) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readString'),
-                $ptr
-            );
-        }
 
         return $ptr;
     }
@@ -196,24 +215,44 @@ final class JitParseUrl
         return $ptr;
     }
 
-    private static function compileTimeLong(Context $context, JITVariable $var): int
+    /** @return ?int null when component must be lowered at runtime */
+    private static function tryCompileTimeComponentInt(Context $context, JITVariable $var): ?int
     {
         $fromEnum = self::tryResolveComponent($context, $var);
         if (null !== $fromEnum) {
             return $fromEnum;
         }
+        // Soft-null → DEP + 0 (PHP_URL_SCHEME); AOT skips DEP IR mid-fold (#24942, #21593).
+        if (JITVariable::TYPE_NULL === $var->type || ($var->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                \PHPCompiler\JIT\InternalStrictArg::requireInt(
+                    $context,
+                    $var,
+                    'parse_url',
+                    'component',
+                    2
+                );
+
+                return null;
+            }
+            if (!$context->isUserScriptAot()) {
+                JitIntdiv::emitNullIntDeprecation($context, 'parse_url', 2, 'component');
+            }
+
+            return 0;
+        }
         if (JITVariable::TYPE_NATIVE_LONG !== $var->type) {
-            throw new \LogicException('parse_url() component must be an integer in this compiler build');
+            return null;
         }
         if (JITVariable::KIND_VALUE !== $var->kind) {
-            throw new \LogicException('parse_url() component must be a compile-time integer in this compiler build');
+            return null;
         }
         $lib = $context->llvm->lib;
         if (null !== $lib->LLVMIsAConstantInt($var->value->value)) {
             return (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
         }
 
-        throw new \LogicException('parse_url() component must be a compile-time integer in this compiler build');
+        return null;
     }
 
     /**
@@ -250,6 +289,7 @@ final class JitParseUrl
 
         if (isset($block->constants[$slot])) {
             $const = $block->constants[$slot];
+            // Leave TYPE_NULL unresolved so parseUrl()/compileTimeLong emits soft-null DEP (#24942).
             if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $const->type) {
                 return VmParseUrl::componentFromBacking($const->toInt());
             }

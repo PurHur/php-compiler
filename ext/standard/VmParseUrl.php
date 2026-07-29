@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
  * parse_url() component resolution — ParseUrl enum + legacy PHP_URL_* ints (#7260).
  *
  * php-src: ext/standard/basic_functions.stub.php — enum ParseUrl: int
+ * php-src: ext/standard/url.c — Z_PARAM_LONG soft-null → E_DEPRECATED + 0 (#24942)
  */
 final class VmParseUrl
 {
@@ -22,6 +25,37 @@ final class VmParseUrl
     public const PHP_URL_PATH = 5;
     public const PHP_URL_QUERY = 6;
     public const PHP_URL_FRAGMENT = 7;
+
+    /**
+     * Frame-aware component resolve — soft-null DEP+0 unless caller strict_types (#24942).
+     */
+    public static function resolveComponentArgForFrame(Frame $frame, int $argIndex): int
+    {
+        $var = $frame->calledArgs[$argIndex]->resolveIndirect();
+        $fromEnum = self::tryParseUrlComponentInt($var);
+        if (null !== $fromEnum) {
+            return $fromEnum;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                'parse_url(): Argument #2 ($component) must be of type int|ParseUrl, %s given',
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    'parse_url(): Argument #2 ($component) must be of type int|ParseUrl, null given'
+                );
+            }
+            // Z_PARAM_LONG: E_DEPRECATED then coerce to 0 → PHP_URL_SCHEME (php-src url.c; #24942).
+            VmNullNumberParamDeprecation::emit($frame, 'parse_url', 2, 'component', 'int');
+
+            return self::validateUserComponentInt(0);
+        }
+
+        return self::resolveComponentArg($var);
+    }
 
     public static function resolveComponentArg(Variable $var): int
     {
@@ -35,6 +69,12 @@ final class VmParseUrl
                 'parse_url(): Argument #2 ($component) must be of type int|ParseUrl, %s given',
                 EnumCaseSupport::typeNameForVariable($var)
             ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            // No frame: soft-coerce like Z_PARAM_LONG without strict_types (#24942).
+            VmNullNumberParamDeprecation::emit(null, 'parse_url', 2, 'component', 'int');
+
+            return self::validateUserComponentInt(0);
         }
         if (Variable::TYPE_INTEGER !== $var->type) {
             throw new \TypeError(sprintf(
