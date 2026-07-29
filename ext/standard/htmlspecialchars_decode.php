@@ -38,12 +38,12 @@ final class htmlspecialchars_decode extends Internal
         }
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         if ($argc >= 2) {
-            VmMath::rejectNullIntBuiltinArg($frame->calledArgs[1], 'htmlspecialchars_decode', 2, 'flags');
-            $flags = VmMath::parseIntBuiltinArg(
+            $flags = VmMath::parseZParamLongBuiltinArg(
                 $frame->calledArgs[1],
                 'htmlspecialchars_decode',
                 2,
-                'flags'
+                'flags',
+                $frame
             );
         }
         $frame->returnVar->string(VmString::htmlspecialchars_decode($string, $flags));
