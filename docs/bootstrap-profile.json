@@ -41,6 +41,7 @@
         "ext/bcmath/NumberCompare.php",
         "ext/bcmath/NumberConstruct.php",
         "ext/bcmath/NumberDiv.php",
+        "ext/bcmath/NumberDivmod.php",
         "ext/bcmath/NumberFloor.php",
         "ext/bcmath/NumberMod.php",
         "ext/bcmath/NumberMul.php",
@@ -6855,9 +6856,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6621,
+        "inventory_files": 6622,
         "excluded": 0,
-        "eligible": 6621,
+        "eligible": 6622,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
