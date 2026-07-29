@@ -19,11 +19,12 @@ on:
     - cron: '17 3 * * *'
   workflow_dispatch:
     inputs:
-      shards:
-        description: 'Number of shards (must match across the run)'
+      mode:
+        description: 'diff against the committed baseline, or collect a new one'
         required: false
-        default: '24'
-        type: string
+        default: 'diff'
+        type: choice
+        options: ['diff', 'collect']
 
 concurrency:
   group: compliance-nightly-${{ github.ref }}
@@ -92,9 +93,33 @@ jobs:
           path: build/compliance-shards
 
       - name: Compare failing case names against the committed baseline
+        if: github.event.inputs.mode != 'collect'
         run: |
           ls -la build/compliance-shards/ || true
           # compliance-baseline.sh refuses a partial set, a mixed --shards=N set, or any set
           # containing a .timeout marker — so reaching a verdict at all means the run was whole.
           # It exits non-zero only on NEW failing names, never on the ~422 known ones.
           bash script/compliance-baseline.sh --diff --suite=VMTest
+
+      # A baseline is only valid for the environment that produced it (#24726). The first nightly
+      # diffed a dev-box baseline from a runner and reported 23 "regressions" that conflate genuine
+      # breakage with host differences (proc status, readdir order, pspell availability). Collect
+      # mode produces a baseline HERE so the reference and the comparison share a machine.
+      #
+      # Run it TWICE and quarantine anything that flips: a single run was measured wrong in 9 places
+      # (#24672). The artifact is uploaded rather than committed — a human decides what lands.
+      - name: Collect a baseline from this environment
+        if: github.event.inputs.mode == 'collect'
+        run: |
+          ls -la build/compliance-shards/ || true
+          bash script/compliance-baseline.sh --collect --suite=VMTest
+          echo "--- collected ---"
+          head -5 test/compliance/baselines/VMTest.failing
+
+      - name: Upload collected baseline
+        if: github.event.inputs.mode == 'collect'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VMTest-baseline-${{ github.sha }}
+          path: test/compliance/baselines/VMTest.failing
+          retention-days: 30
