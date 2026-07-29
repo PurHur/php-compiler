@@ -57,6 +57,7 @@ final class NewDereferenceableSyntaxRejectorTest extends TestCase
 
     public function testRejectsDereferencableNewOnReferenceProfile(): void
     {
+        putenv('PHP_COMPILER_PROFILE=8.2');
         if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
             self::markTestSkipped('dereferencable new enabled on PHP 8.4.0+ target');
         }
@@ -72,6 +73,7 @@ final class NewDereferenceableSyntaxRejectorTest extends TestCase
 
     public function testReferenceProfileSyntaxErrorLineAndMessage(): void
     {
+        putenv('PHP_COMPILER_PROFILE=8.2');
         if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
             self::markTestSkipped('dereferencable new enabled on PHP 8.4.0+ target');
         }
@@ -89,6 +91,7 @@ PHP
 
     public function testNoOpForParenthesizedNew(): void
     {
+        putenv('PHP_COMPILER_PROFILE=8.2');
         if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
             self::markTestSkipped('dereferencable new enabled on PHP 8.4.0+ target');
         }
@@ -99,11 +102,23 @@ PHP
 
     public function testDesugarNoOpWhenDisabled(): void
     {
+        putenv('PHP_COMPILER_PROFILE=8.2');
         if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
             self::markTestSkipped('dereferencable new enabled on PHP 8.4.0+ target');
         }
 
         $src = '<?php echo new Greeter()->greet();';
         self::assertSame($src, NewDereferenceableDesugar::desugar($src));
+    }
+
+    public function testAllowsCtorParensObjectDerefOnDefault84DevProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE');
+        if (!CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+            self::markTestSkipped('dereferencable new forward profile unavailable');
+        }
+
+        $code = '<?php echo new Greeter()->hello();';
+        self::assertSame($code, NewDereferenceableSyntaxRejector::reject($code, 'ok_new.php'));
     }
 }
