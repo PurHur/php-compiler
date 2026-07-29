@@ -34,7 +34,7 @@ class session_cache_limiter_ extends Internal
                     $frame->calledArgs[0],
                     'session_cache_limiter',
                     1,
-                    'new_cache_limiter'
+                    'value'
                 );
                 VmSession::setCacheLimiter($frame, $newLimiter);
             }
@@ -46,7 +46,7 @@ class session_cache_limiter_ extends Internal
                 $frame->calledArgs[0],
                 'session_cache_limiter',
                 1,
-                'new_cache_limiter'
+                'value'
             );
             $previous = VmSession::setCacheLimiter($frame, $newLimiter);
             if (false === $previous) {

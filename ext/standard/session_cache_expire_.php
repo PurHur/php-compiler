@@ -34,7 +34,7 @@ class session_cache_expire_ extends Internal
                 0,
                 'session_cache_expire',
                 1,
-                'new_cache_expire'
+                'value'
             );
             VmSession::setCacheExpire($minutes);
         }

@@ -522,6 +522,11 @@ final class BuiltinParamNames
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says arg_num (#24456)
             case 'func_get_arg':
                 return ['position'];
+            // php-src ext/session/session.stub.php — InternalArgInfo still new_cache_* (#24583)
+            case 'session_cache_limiter':
+                return ['value='];
+            case 'session_cache_expire':
+                return ['value='];
             // php-src ext/session/session.stub.php — Reflection OK but forFunction empty (#23846)
             case 'session_set_cookie_params':
                 return ['lifetime', 'path', 'domain', 'secure', 'httponly'];
