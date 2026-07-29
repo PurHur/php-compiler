@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\exif;
 
 use PHPCompiler\ext\standard\VmExif;
 use PHPCompiler\ext\standard\VmImage;
+use PHPCompiler\ext\standard\VmString;
 
 /**
  * EXIF metadata read helpers — php-src ext/exif/exif.c (issue #3400).
@@ -195,9 +196,12 @@ final class VmExifRead
     }
 
     /**
-     * exif_read_data() — IFD0 tag map keyed by tag name (#3400).
+     * exif_read_data() — file section + optional IFD0 tags + COMPUTED (#3400, #24582).
      *
-     * @return array<string, int|string>|false
+     * php-src ext/exif/exif.c returns FILE.* keys and COMPUTED for parseable JPEG/TIFF even
+     * when no APP1 EXIF segment is present (SectionsFound empty, Width/Height from getimagesize).
+     *
+     * @return array<string, array<string, int|string>|int|string>|false
      */
     public static function readData(string $filename)
     {
@@ -206,20 +210,102 @@ final class VmExifRead
             return false;
         }
 
-        return self::readDataFromBytes($bytes);
+        return self::readDataFromBytes($bytes, $filename);
     }
 
     /**
-     * @return array<string, int|string>|false
+     * @return array<string, array<string, int|string>|int|string>|false
      */
-    public static function readDataFromBytes(string $bytes)
+    public static function readDataFromBytes(string $bytes, ?string $filename = null)
     {
-        $segment = self::extractJpegExifSegment($bytes);
-        if (null === $segment) {
+        $imageSize = VmImage::getImageSizeFromBytes($bytes);
+        if (false === $imageSize) {
+            return false;
+        }
+        $imageType = (int) $imageSize[2];
+        if (!self::isExifReadableImageType($imageType)) {
             return false;
         }
 
-        return self::parseTiffIfd0($segment);
+        $exifTags = [];
+        $sectionsFound = '';
+        $segment = self::extractJpegExifSegment($bytes);
+        if (null !== $segment) {
+            $parsed = self::parseTiffIfd0($segment);
+            if (false !== $parsed) {
+                $exifTags = $parsed;
+                $sectionsFound = 'ANY_TAG, IFD0';
+            }
+        }
+
+        $width = (int) $imageSize[0];
+        $height = (int) $imageSize[1];
+        $result = self::buildFileSection($filename, $bytes, $imageType, $sectionsFound);
+        $result['COMPUTED'] = self::buildComputedSection($width, $height);
+        foreach ($exifTags as $key => $value) {
+            $result[$key] = $value;
+        }
+
+        return $result;
+    }
+
+    private static function isExifReadableImageType(int $imageType): bool
+    {
+        return \in_array($imageType, [
+            VmImage::IMAGETYPE_JPEG,
+            VmImage::IMAGETYPE_TIFF_II,
+            VmImage::IMAGETYPE_TIFF_MM,
+        ], true);
+    }
+
+    /**
+     * FILE section keys — php-src exif_read_from_file() (#24582).
+     *
+     * @return array<string, int|string>
+     */
+    private static function buildFileSection(
+        ?string $filename,
+        string $bytes,
+        int $imageType,
+        string $sectionsFound
+    ): array {
+        $fileName = null !== $filename ? VmString::basename($filename) : '';
+        $fileDateTime = 0;
+        $fileSize = \strlen($bytes);
+        if (null !== $filename) {
+            $mtime = \PHPCompiler\ext\standard\VmFs::fileMtime($filename);
+            if (false !== $mtime) {
+                $fileDateTime = $mtime;
+            }
+            $size = \PHPCompiler\ext\standard\VmFs::fileSize($filename);
+            if (false !== $size) {
+                $fileSize = $size;
+            }
+        }
+
+        return [
+            'FileName' => $fileName,
+            'FileDateTime' => $fileDateTime,
+            'FileSize' => $fileSize,
+            'FileType' => $imageType,
+            'MimeType' => VmImage::imageTypeToMimeType($imageType),
+            'SectionsFound' => $sectionsFound,
+        ];
+    }
+
+    /**
+     * COMPUTED section — php-src exif build COMputed array via getimagesize dimensions.
+     *
+     * @return array<string, int|string>
+     */
+    private static function buildComputedSection(int $width, int $height): array
+    {
+        return [
+            'html' => \sprintf('width="%d" height="%d"', $width, $height),
+            'Height' => $height,
+            'Width' => $width,
+            'IsColor' => 1,
+        ];
     }
 
     private static function extractJpegExifSegment(string $data): ?string

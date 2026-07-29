@@ -60,15 +60,33 @@ final class exif_read_data extends Internal
         }
         $ht = new HashTable();
         foreach ($data as $key => $value) {
-            $slot = new Variable();
-            if (\is_int($value)) {
-                $slot->int($value);
-            } else {
-                $slot->string($value);
-            }
-            $ht->add($key, $slot);
+            $ht->add((string) $key, self::exifValueToVariable($value));
         }
         $frame->returnVar->array($ht);
+    }
+
+    /**
+     * @param array<string, int|string>|int|string $value
+     */
+    private static function exifValueToVariable(array|int|string $value): Variable
+    {
+        $slot = new Variable();
+        if (\is_array($value)) {
+            $nested = new HashTable();
+            foreach ($value as $nestedKey => $nestedValue) {
+                $nested->add((string) $nestedKey, self::exifValueToVariable($nestedValue));
+            }
+            $slot->array($nested);
+
+            return $slot;
+        }
+        if (\is_int($value)) {
+            $slot->int($value);
+        } else {
+            $slot->string($value);
+        }
+
+        return $slot;
     }
 
     public function call(Context $context, JITVariable ...$args): Value
