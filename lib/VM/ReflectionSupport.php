@@ -2130,12 +2130,6 @@ final class ReflectionSupport
         return !self::parameterIsPassedByReference($ctx, $reflection);
     }
 
-    /** php-src: ReflectionParameter::isNamed() — PHP 8.0+ always true for declared parameters. */
-    public static function parameterIsNamed(ObjectEntry $reflection): bool
-    {
-        return '' !== self::paramNameFromReflection($reflection);
-    }
-
     /**
      * E_DEPRECATED for legacy ReflectionParameter type probes (php-src ZEND_ACC_DEPRECATED; #22408).
      */

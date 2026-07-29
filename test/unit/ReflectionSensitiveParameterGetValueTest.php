@@ -8,26 +8,22 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #5127 */
+/** @covers issue #5127 / #25057 — SensitiveParameter attribute; no ReflectionParameter::getValue */
 #[Group('reflection_sensitive_parameter')]
 final class ReflectionSensitiveParameterGetValueTest extends TestCase
 {
-    public function testReflectionParameterGetValueUnwrapsSensitiveParameter(): void
+    public function testReflectionParameterGetValueIsPhantomVsZend(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 function f(#[\SensitiveParameter] string $secret) {}
-$r = new ReflectionFunction('f');
-$p = $r->getParameters()[0];
-$v = $p->getValue(['secret' => 'pw']);
-var_export($v);
-echo "\n";
-var_export(get_debug_type($v));
+$p = (new ReflectionFunction('f'))->getParameters()[0];
+echo method_exists($p, 'getValue') ? "yes" : "no";
 PHP;
         ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'reflection_sensitive_parameter_getvalue.php'));
-        $this->assertSame("'pw'\n'string'", ob_get_clean());
+        $runtime->run($runtime->parseAndCompile($code, 'reflection_parameter_getvalue_phantom.php'));
+        $this->assertSame('no', ob_get_clean());
     }
 
     public function testSensitiveParameterAttributeOnFunctionParameter(): void

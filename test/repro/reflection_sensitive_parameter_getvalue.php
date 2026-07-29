@@ -2,7 +2,7 @@
 function f(#[\SensitiveParameter] string $secret) {}
 $r = new ReflectionFunction('f');
 $p = $r->getParameters()[0];
-$v = $p->getValue(['secret' => 'pw']);
-var_export($v);
-echo "\n";
-var_export(get_debug_type($v));
+echo method_exists($p, 'getValue') ? "getvalue=yes\n" : "getvalue=no\n";
+$attrs = $p->getAttributes('SensitiveParameter');
+echo count($attrs), "\n";
+echo $attrs[0]->getName(), "\n";

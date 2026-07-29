@@ -362,14 +362,12 @@ use PHPCompiler\VM\Builtin\ReflectionParameterGetDefaultValueConstantName;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetName;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetPosition;
 use PHPCompiler\VM\Builtin\ReflectionParameterGetType;
-use PHPCompiler\VM\Builtin\ReflectionParameterGetValue;
 use PHPCompiler\VM\Builtin\ReflectionParameterHasType;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsArray;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsCallable;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsDefaultValueAvailable;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsDefaultValueConstant;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsDeprecated;
-use PHPCompiler\VM\Builtin\ReflectionParameterIsNamed;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsOptional;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsPassedByReference;
 use PHPCompiler\VM\Builtin\ReflectionParameterIsPromoted;
@@ -769,8 +767,7 @@ final class BuiltinClasses
         $rparam->methodVisibility['gettype'] = $pub;
         $rparam->methods['hastype'] = new ReflectionParameterHasType();
         $rparam->methodVisibility['hastype'] = $pub;
-        $rparam->methods['getvalue'] = new ReflectionParameterGetValue();
-        $rparam->methodVisibility['getvalue'] = $pub;
+        // php-src ReflectionParameter has no getValue/isNamed — phantoms vs Zend (#25057, re-#5127/#18073).
         $rparam->methods['getdefaultvalue'] = new ReflectionParameterGetDefaultValue();
         $rparam->methodVisibility['getdefaultvalue'] = $pub;
         $rparam->methods['getdefaultvalueconstantname'] = new ReflectionParameterGetDefaultValueConstantName();
@@ -791,8 +788,6 @@ final class BuiltinClasses
         $rparam->methodVisibility['canbepassedbyvalue'] = $pub;
         $rparam->methods['ispassedbyreference'] = new ReflectionParameterIsPassedByReference();
         $rparam->methodVisibility['ispassedbyreference'] = $pub;
-        $rparam->methods['isnamed'] = new ReflectionParameterIsNamed();
-        $rparam->methodVisibility['isnamed'] = $pub;
         $rparam->methods['isvariadic'] = new ReflectionParameterIsVariadic();
         $rparam->methodVisibility['isvariadic'] = $pub;
         // isSensitive / isSensitiveParameter: PHP 8.4+ only (Zend 8.2 absent) — #22899, #16130, #7072
