@@ -28,17 +28,28 @@ MODE=""
 : "${BASELINE_DIR:=test/compliance/baselines}"
 : "${QUARANTINE:=test/compliance/quarantine.txt}"
 
+BEFORE_DIR=""
+AFTER_DIR=""
+
 for arg in "$@"; do
     case "$arg" in
-        --suite=*) SUITE="${arg#*=}" ;;
-        --collect) MODE="collect" ;;
-        --diff)    MODE="diff" ;;
+        --suite=*)  SUITE="${arg#*=}" ;;
+        --collect)  MODE="collect" ;;
+        --diff)     MODE="diff" ;;
+        --compare)  MODE="compare" ;;
+        --before=*) BEFORE_DIR="${arg#*=}" ;;
+        --after=*)  AFTER_DIR="${arg#*=}" ;;
         *) echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
 
 if [ -z "$MODE" ]; then
-    echo "usage: $0 (--collect|--diff) [--suite=VMTest]" >&2
+    echo "usage: $0 (--collect|--diff|--compare --before=DIR --after=DIR) [--suite=VMTest]" >&2
+    exit 2
+fi
+
+if [ "$MODE" = "compare" ] && { [ -z "$BEFORE_DIR" ] || [ -z "$AFTER_DIR" ]; }; then
+    echo "compliance-baseline: --compare needs both --before=DIR and --after=DIR" >&2
     exit 2
 fi
 
@@ -84,8 +95,9 @@ quarantined() {
 # the quarantine matched nothing and silently excluded zero cases while still reporting success —
 # caught only because the regenerated baseline count did not drop by the expected amount.
 current_failing() {
+    local dir="${1:-$SHARD_DIR}"
     local files
-    files=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.failed" 2>/dev/null | LC_ALL=C sort)
+    files=$(find "$dir" -name "${SUITE}-*-of-*.failed" 2>/dev/null | LC_ALL=C sort)
     if [ -z "$files" ]; then
         return 1
     fi
@@ -106,8 +118,9 @@ current_failing() {
 # diff called FIXED (asymmetric_visibility_write, asymmetric_visibility_public_protected_set,
 # static_asymmetric_visibility, match_typed_class_const) do not execute at all.
 current_executed() {
+    local dir="${1:-$SHARD_DIR}"
     local files
-    files=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.executed" 2>/dev/null | LC_ALL=C sort)
+    files=$(find "$dir" -name "${SUITE}-*-of-*.executed" 2>/dev/null | LC_ALL=C sort)
     if [ -z "$files" ]; then
         return 1
     fi
@@ -123,8 +136,9 @@ current_executed() {
 # was gated out by VMTest::providePHPTests(). Both must be distinguishable from FIXED, because
 # PHPUnit emits testStarted for a skipped case too.
 current_skipped() {
+    local dir="${1:-$SHARD_DIR}"
     local files
-    files=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.skipped" 2>/dev/null | LC_ALL=C sort)
+    files=$(find "$dir" -name "${SUITE}-*-of-*.skipped" 2>/dev/null | LC_ALL=C sort)
     if [ -z "$files" ]; then
         return 1
     fi
@@ -139,8 +153,9 @@ current_skipped() {
 # cases and omit others, and the coverage check would compare against whichever N happened to sort
 # first. Refuse rather than silently produce a wrong baseline.
 shard_coverage() {
+    local dir="${1:-$SHARD_DIR}"
     local widths
-    widths=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.failed" 2>/dev/null \
+    widths=$(find "$dir" -name "${SUITE}-*-of-*.failed" 2>/dev/null \
         | sed -E 's/.*-of-([0-9]+)\.failed/\1/' | LC_ALL=C sort -u)
     local distinct
     distinct=$(printf '%s\n' "$widths" | grep -c '^[0-9]' || true)
@@ -149,42 +164,163 @@ shard_coverage() {
         return
     fi
     local n
-    n=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.failed" 2>/dev/null | wc -l | tr -d ' ')
+    n=$(find "$dir" -name "${SUITE}-*-of-*.failed" 2>/dev/null | wc -l | tr -d ' ')
     echo "${n:-0} ${widths:-0}"
 }
 
-if ! current_failing > /tmp/.cb_current 2>/dev/null; then
-    echo "compliance-baseline: no ${SUITE} shard results under ${SHARD_DIR}/" >&2
-    echo "  run script/shard-compliance.sh --suite=${SUITE} --shards=N --shard=i for every i first" >&2
-    exit 2
-fi
+# Every guard that makes a result set trustworthy, applied to ONE directory. Factored out so both
+# sides of a --compare get validated identically — a merge-base run with a timed-out shard would
+# otherwise make the PR look like it fixed everything that shard never reached.
+validate_shard_dir() {
+    local dir="$1"
+    local label="$2"
 
-read -r have want <<< "$(shard_coverage)"
-if [ "$have" = "MIXED" ]; then
-    echo "compliance-baseline: MIXED shard widths present (${want}) under ${SHARD_DIR}/" >&2
-    echo "  Results from different --shards=N runs cannot be unioned. Remove the stale ones." >&2
-    exit 2
-fi
-timeouts=$(find "$SHARD_DIR" -name "${SUITE}-*-of-*.timeout" 2>/dev/null | LC_ALL=C sort)
-if [ -n "$timeouts" ]; then
-    echo "compliance-baseline: TIMED-OUT SHARDS present — the result set is incomplete:" >&2
-    for t in $timeouts; do
-        echo "  $(basename "$t"): $(grep '^stalled_on=' "$t" 2>/dev/null | cut -d= -f2-)" >&2
-    done
-    echo "  A timed-out shard writes a .failed file that LOOKS complete; every case it never" >&2
-    echo "  reached would read as newly-passing on the next diff. Fix or disable the hanging case," >&2
-    echo "  then re-run those shards." >&2
-    exit 2
-fi
+    if ! current_failing "$dir" > /dev/null 2>&1; then
+        echo "compliance-baseline: no ${SUITE} shard results under ${dir}/ (${label})" >&2
+        echo "  run script/shard-compliance.sh --suite=${SUITE} --shards=N --shard=i for every i first" >&2
+        exit 2
+    fi
 
-if [ "$want" -gt 0 ] && [ "$have" -lt "$want" ]; then
-    # A partial set looks exactly like "these cases got fixed" on the next diff. Refuse it.
-    echo "compliance-baseline: INCOMPLETE — ${have} of ${want} shards have results." >&2
-    echo "  Diffing a partial run reports every unrun case as newly-passing. Finish the run first." >&2
-    exit 2
+    local have want
+    read -r have want <<< "$(shard_coverage "$dir")"
+    if [ "$have" = "MIXED" ]; then
+        echo "compliance-baseline: MIXED shard widths present (${want}) under ${dir}/ (${label})" >&2
+        echo "  Results from different --shards=N runs cannot be unioned. Remove the stale ones." >&2
+        exit 2
+    fi
+
+    local timeouts
+    timeouts=$(find "$dir" -name "${SUITE}-*-of-*.timeout" 2>/dev/null | LC_ALL=C sort)
+    if [ -n "$timeouts" ]; then
+        echo "compliance-baseline: TIMED-OUT SHARDS in ${label} — the result set is incomplete:" >&2
+        for t in $timeouts; do
+            echo "  $(basename "$t"): $(grep '^stalled_on=' "$t" 2>/dev/null | cut -d= -f2-)" >&2
+        done
+        echo "  A timed-out shard writes a .failed file that LOOKS complete; every case it never" >&2
+        echo "  reached would read as newly-passing. Fix or disable the hanging case, then re-run." >&2
+        exit 2
+    fi
+
+    if [ "$want" -gt 0 ] && [ "$have" -lt "$want" ]; then
+        # A partial set looks exactly like "these cases got fixed". Refuse it.
+        echo "compliance-baseline: INCOMPLETE ${label} — ${have} of ${want} shards have results." >&2
+        echo "  Diffing a partial run reports every unrun case as newly-passing. Finish the run first." >&2
+        exit 2
+    fi
+
+    SHARD_WIDTH="$want"
+}
+
+if [ "$MODE" != "compare" ]; then
+    validate_shard_dir "$SHARD_DIR" "shard results"
+    want="$SHARD_WIDTH"
+    current_failing > /tmp/.cb_current
 fi
 
 quarantined > /tmp/.cb_quarantine || true
+
+# --------------------------------------------------------------------------------------------
+# compare: two shard directories from the SAME CI run — merge-base vs PR head.
+#
+# This is what the committed baseline could never be. master merges ~12 commits/hour, so a
+# baseline file is stale the moment it is written: a diff against it conflates what the PR did
+# with everything that landed since it was collected. That conflation is not hypothetical — it
+# produced 23 phantom regressions (#24726), a quarantine of 26 entries of which 25 were not flaky,
+# and 6 real failures hidden as a result.
+#
+# Comparing two runs of the same CI job removes the confound entirely: same image, same corpus,
+# same host libraries, differing only by the PR's own commits.
+# --------------------------------------------------------------------------------------------
+if [ "$MODE" = "compare" ]; then
+    validate_shard_dir "$BEFORE_DIR" "merge-base"
+    validate_shard_dir "$AFTER_DIR" "head"
+
+    current_failing  "$BEFORE_DIR" > /tmp/.cb_bfail
+    current_failing  "$AFTER_DIR"  > /tmp/.cb_afail
+    current_executed "$BEFORE_DIR" > /tmp/.cb_bran 2>/dev/null || : > /tmp/.cb_bran
+    current_executed "$AFTER_DIR"  > /tmp/.cb_aran 2>/dev/null || : > /tmp/.cb_aran
+    current_skipped  "$AFTER_DIR"  > /tmp/.cb_askip 2>/dev/null || : > /tmp/.cb_askip
+
+    LC_ALL=C comm -23 /tmp/.cb_bfail /tmp/.cb_quarantine > /tmp/.cb_bfail_net
+    LC_ALL=C comm -23 /tmp/.cb_afail /tmp/.cb_quarantine > /tmp/.cb_afail_net
+
+    regressions=$(LC_ALL=C comm -13 /tmp/.cb_bfail_net /tmp/.cb_afail_net)
+    resolved=$(LC_ALL=C comm -23 /tmp/.cb_bfail_net /tmp/.cb_afail_net)
+
+    echo "compliance-baseline: ${SUITE} — merge-base vs head"
+    echo "  merge-base failing : $(wc -l < /tmp/.cb_bfail_net | tr -d ' ')"
+    echo "  head       failing : $(wc -l < /tmp/.cb_afail_net | tr -d ' ')"
+    echo "  merge-base ran     : $(wc -l < /tmp/.cb_bran | tr -d ' ')"
+    echo "  head       ran     : $(wc -l < /tmp/.cb_aran | tr -d ' ')"
+    echo "  quarantined        : $(wc -l < /tmp/.cb_quarantine | tr -d ' ')"
+
+    # Same four-way split as --diff: a case that stopped failing may have been fixed, skipped, or
+    # dropped from the corpus, and only the first is good news.
+    if [ -n "$resolved" ]; then
+        printf '%s\n' $resolved | grep -v '^$' | LC_ALL=C sort -u > /tmp/.cb_resolved
+        r_fixed=$(LC_ALL=C comm -12 /tmp/.cb_resolved /tmp/.cb_aran)
+        LC_ALL=C comm -23 /tmp/.cb_resolved /tmp/.cb_aran > /tmp/.cb_rnotrun
+        r_skipped=$(LC_ALL=C comm -12 /tmp/.cb_rnotrun /tmp/.cb_askip)
+        r_dropped=$(LC_ALL=C comm -23 /tmp/.cb_rnotrun /tmp/.cb_askip)
+
+        if [ -n "$r_fixed" ]; then
+            echo
+            echo "FIXED by this change (failed at merge-base, ran and passes at head):"
+            printf '  %s\n' $r_fixed
+        fi
+        if [ -n "$r_skipped" ]; then
+            echo
+            echo "SKIPPED at head (failed at merge-base, --SKIPIF-- skipped it now) — not fixed:"
+            printf '  %s\n' $r_skipped
+        fi
+        if [ -n "$r_dropped" ]; then
+            echo
+            echo "DROPPED at head (failed at merge-base, NEITHER run NOR skipped) — not fixed:"
+            printf '  %s\n' $r_dropped
+            echo "  This change removed them from the corpus. That is a coverage loss."
+        fi
+    fi
+
+    newly_run=$(LC_ALL=C comm -13 /tmp/.cb_bran /tmp/.cb_aran)
+    if [ -n "$newly_run" ]; then
+        echo
+        echo "NEWLY EXECUTED at head — $(printf '%s\n' $newly_run | wc -l | tr -d ' ') case(s) the merge-base did not run."
+        echo "  Any of these appearing under REGRESSIONS are NEW COVERAGE, not new breakage."
+    fi
+
+    if [ -n "$regressions" ]; then
+        printf '%s\n' $regressions | grep -v '^$' | LC_ALL=C sort -u > /tmp/.cb_regr
+        # Split the regressions the same way, so "this case only started running here" is visible
+        # rather than being read as breakage.
+        new_cov=$(LC_ALL=C comm -12 /tmp/.cb_regr <(printf '%s\n' $newly_run | grep -v '^$' | LC_ALL=C sort -u))
+        genuine=$(LC_ALL=C comm -23 /tmp/.cb_regr <(printf '%s\n' $newly_run | grep -v '^$' | LC_ALL=C sort -u))
+
+        if [ -n "$genuine" ]; then
+            echo >&2
+            echo "REGRESSIONS introduced by this change (ran at merge-base, fails at head):" >&2
+            printf '  %s\n' $genuine >&2
+        fi
+        if [ -n "$new_cov" ]; then
+            echo >&2
+            echo "FAILING BUT NEWLY EXECUTED (did not run at merge-base) — new coverage, not new breakage:" >&2
+            printf '  %s\n' $new_cov >&2
+        fi
+        if [ -n "$genuine" ]; then
+            echo >&2
+            echo "Both sides came from the same CI run, so host differences and commit drift are" >&2
+            echo "excluded by construction. A name above is this change's doing." >&2
+            exit 1
+        fi
+        echo
+        echo "no regressions (only newly-executed cases fail)"
+        exit 0
+    fi
+
+    echo
+    echo "no regressions"
+    exit 0
+fi
+
 LC_ALL=C comm -23 /tmp/.cb_current /tmp/.cb_quarantine > /tmp/.cb_current_net
 
 current_executed > /tmp/.cb_executed 2>/dev/null || : > /tmp/.cb_executed
