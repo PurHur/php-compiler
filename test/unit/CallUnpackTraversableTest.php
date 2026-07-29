@@ -29,6 +29,21 @@ PHP;
         self::assertSame('6', ob_get_clean());
     }
 
+    /** Fresh Generator from a call expression must not drop the opening yield (#24646). */
+    public function testVmUnpacksGeneratorCallExpression(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function g(): Generator { yield 1; yield 2; yield 3; }
+function sum(int $a, int $b, int $c): int { return $a + $b + $c; }
+echo sum(...g());
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'call_unpack_generator_call.php'));
+        self::assertSame('6', ob_get_clean());
+    }
+
     public function testVmUnpacksIteratorAggregate(): void
     {
         $runtime = new Runtime();
@@ -49,6 +64,44 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'call_unpack_iterator_aggregate.php'));
         self::assertSame('15', ob_get_clean());
+    }
+
+    /** IteratorAggregate yielding two values — first must not be skipped (#24646). */
+    public function testVmUnpacksIteratorAggregatePair(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class PairAgg implements IteratorAggregate {
+    public function getIterator(): Generator {
+        yield 1;
+        yield 2;
+    }
+}
+function s(int $a, int $b): int { return $a + $b; }
+echo s(...(new PairAgg()));
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'call_unpack_iterator_aggregate_pair.php'));
+        self::assertSame('3', ob_get_clean());
+    }
+
+    /** Named yield keys from a Generator bind as named call args (#24646). */
+    public function testVmUnpacksGeneratorNamedKeys(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function s(int $a, int $b): void { echo "$a,$b"; }
+$gen = (function (): Generator {
+    yield 'a' => 1;
+    yield 'b' => 2;
+})();
+s(...$gen);
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'call_unpack_generator_named.php'));
+        self::assertSame('1,2', ob_get_clean());
     }
 
     public function testVmRejectsGeneratorWithStringKeys(): void

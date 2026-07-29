@@ -126,14 +126,19 @@ final class CallUnpack
         ?string $functionName = null
     ): array {
         $gen = $genVar->toObject()->generatorState;
+        // rewind() opens an unstarted generator onto the first yield (Zend
+        // ZEND_GENERATOR_AT_FIRST_YIELD / #23713). Collect that yield before any
+        // resume — resumeGenerator advances past the current value (#24646).
         $gen->rewind();
         $pairs = [];
-        while ($vm->resumeGenerator($gen)) {
-            $value = new Variable();
-            $value->copyFrom($gen->currentValue);
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($gen->currentKey);
-            $pairs[] = [$keyCopy, $value];
+        if ($gen->hasCurrent && !$gen->done) {
+            do {
+                $value = new Variable();
+                $value->copyFrom($gen->currentValue);
+                $keyCopy = new Variable();
+                $keyCopy->copyFrom($gen->currentKey);
+                $pairs[] = [$keyCopy, $value];
+            } while ($vm->resumeGenerator($gen));
         }
 
         return self::entriesFromKeyedPairs($pairs, $paramNames, $variadicParamIndex, $functionName, true);
