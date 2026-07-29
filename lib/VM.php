@@ -6376,10 +6376,20 @@ restart:
                             goto restart;
                         }
                     }
+                    // Empty finally may fuse with merge and end in TYPE_RETURN instead of JUMP (#24728).
+                    // Check exception-unwind completion BEFORE beginReturnFinallyUnwind so the
+                    // pending exception propagates to the outer catch instead of being swallowed
+                    // by a spurious return-finally chain.
+                    if (null !== $this->context->pendingException && $this->completeActiveFinallyUnwind($frame)) {
+                        goto restart;
+                    }
                     $returnValue = $this->resolveVmReturnValue($frame, $op);
                     $finallyFrame = $this->beginReturnFinallyUnwind($frame, $returnValue, false);
                     if (null !== $finallyFrame) {
                         $frame = $finallyFrame;
+                        goto restart;
+                    }
+                    if ($this->completeActiveFinallyUnwind($frame)) {
                         goto restart;
                     }
                     goto return_value_complete;
@@ -11589,7 +11599,9 @@ restart:
         }
         $this->context->completedFinallyHandlers[$handlerId] = true;
         $this->context->pendingCatchResumeHandler = $resumeCatchAfter ? $handler : null;
-
+        // When the finally block is fused with the try-merge block, prevent
+        // popTryHandlerIfAtMergeBlock from removing an outer handler (#24728).
+        unset($this->context->tryMergeBlockIds[spl_object_id($finallyOp->block1)]);
         return $finallyOp->block1->getFrame($this->context, $handler);
     }
 
