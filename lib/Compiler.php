@@ -47,6 +47,7 @@ use PHPCompiler\Ast\LazyPropertyRewriter;
 use PHPCompiler\Ast\GeneratorYieldSourceMarker;
 use PHPCompiler\Compiler\AbstractMethodBodyCheck;
 use PHPCompiler\Compiler\AbstractMethodVisibilityCheck;
+use PHPCompiler\Compiler\InterfaceConstAmbiguityCheck;
 use PHPCompiler\Compiler\InterfaceConstVisibilityCheck;
 use PHPCompiler\Compiler\InterfaceMethodBodyCheck;
 use PHPCompiler\Compiler\InterfaceMethodVisibilityCheck;
@@ -583,6 +584,7 @@ class Compiler {
         TypedClassConstInheritCheck::validate($script);
         ClassConstVisibilityInheritCheck::validate($script);
         InterfaceConstVisibilityCheck::validate($script);
+        InterfaceConstAmbiguityCheck::validate($script);
         InterfaceMethodVisibilityCheck::validate($script);
         InterfaceMethodBodyCheck::validate($script);
         AbstractMethodBodyCheck::validate($script);
