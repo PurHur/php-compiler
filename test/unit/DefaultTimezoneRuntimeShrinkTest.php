@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\DefaultTimezoneJitHelper;
 use PHPCompiler\ext\standard\VmDate;
 use PHPUnit\Framework\TestCase;
 
-/** DefaultTimezoneRuntime routes through DefaultTimezoneJitHelper PHP not LLVM globals (#9243). */
+/** DefaultTimezoneRuntime routes through DefaultTimezoneJitHelper PHP not LLVM globals (#9243, #24962). */
 final class DefaultTimezoneRuntimeShrinkTest extends TestCase
 {
     public function testDefaultTimezoneJitHelperDelegatesToVmDate(): void
@@ -23,10 +23,16 @@ final class DefaultTimezoneRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DefaultTimezoneRuntime.php');
         $this->assertStringContainsString('DefaultTimezoneJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringNotContainsString('parseAndCompile', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT;', $source);
+        $this->assertStringNotContainsString('use PHPCompiler\\JIT\\NestedJitCompileScope;', $source);
         $this->assertStringNotContainsString('phpc_default_timezone_ptr', $source);
         $this->assertStringNotContainsString("lookupFunction('access')", $source);
         $this->assertStringNotContainsString('ZONEINFO_PREFIX', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(190, \substr_count($source, "\n") + 1);
     }
 
     public function testDefaultTimezoneJitHelperSemanticsMatchVmDate(): void
