@@ -65,7 +65,8 @@ final class VmBcmath
             \strlen($a['frac']),
             self::unscaledDigits($b),
             \strlen($b['frac']),
-            $scale
+            $scale,
+            $a['sign'] * $b['sign']
         );
 
         return self::formatBinaryResult($quotient, $scale, $roundingMode);
@@ -689,11 +690,16 @@ final class VmBcmath
     /**
      * @return array{sign:int,int:string,frac:string}
      */
-    private static function divDigitStrings(string $aDigits, int $aScale, string $bDigits, int $bScale, int $outScale): array
-    {
+    private static function divDigitStrings(
+        string $aDigits,
+        int $aScale,
+        string $bDigits,
+        int $bScale,
+        int $outScale,
+        int $sign = 1
+    ): array {
         $aDigits = self::stripLeadingZeros($aDigits);
         $bDigits = self::stripLeadingZeros($bDigits);
-        $sign = 1;
         $shift = $outScale + $bScale - $aScale;
         if ($shift >= 0) {
             $aDigits .= \str_repeat('0', $shift + 1);
@@ -729,12 +735,22 @@ final class VmBcmath
     }
 
     /**
+     * True when the decimal has a non-zero fractional digit (php-src raisemod;
+     * trailing-zero-only fractions like "1.0" are integers — #24612).
+     */
+    public static function hasNonZeroFraction(string $num): bool
+    {
+        return self::hasFractionalValue(self::parse($num));
+    }
+
+    /**
      * @return array{sign:int,int:string,frac:string}
      */
     private static function parseInteger(string $num, int $argNum): array
     {
         $parsed = self::parse($num);
-        if ('' !== $parsed['frac']) {
+        // Match php-src: only non-zero fractional digits reject (allow "1.0" / "2.00").
+        if (self::hasFractionalValue($parsed)) {
             throw new \ValueError(\sprintf(
                 'bcpowmod(): Argument #%d ($%s) cannot have a fractional part',
                 $argNum,
