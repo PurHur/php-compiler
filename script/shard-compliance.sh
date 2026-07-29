@@ -137,6 +137,7 @@ mkdir -p "$LOG_DIR"
 LOG="${LOG_DIR}/${SUITE}-${SHARD}-of-${SHARDS}.log"
 FAILED_FILE="${LOG_DIR}/${SUITE}-${SHARD}-of-${SHARDS}.failed"
 EXECUTED_FILE="${LOG_DIR}/${SUITE}-${SHARD}-of-${SHARDS}.executed"
+SKIPPED_FILE="${LOG_DIR}/${SUITE}-${SHARD}-of-${SHARDS}.skipped"
 
 echo "shard-compliance: ${SUITE} shard ${SHARD}/${SHARDS} — ${count} of ${total} cases, timeout ${SHARD_TIMEOUT}s"
 
@@ -160,9 +161,19 @@ executed="${executed:-0}"
 # provider yields at all. Without this set, a case that stopped executing is indistinguishable from
 # one that started passing, and regenerating the baseline drops it from tracking forever — which is
 # how the #24778 quarantine buried 18 real failures (#24726).
+# A SKIPPED case emits testStarted AND testIgnored, so testStarted alone is NOT "ran". With
+# --SKIPIF-- now honoured (#24888), a case that becomes skipped would otherwise leave the failing
+# set while staying in the executed set — i.e. read as FIXED, the exact confusion this set exists
+# to prevent. Measured on the first post-SKIPIF collect: 58 cases stopped failing and ZERO stopped
+# executing. So executed = started MINUS ignored, and skips get their own set.
+grep -oE "^##teamcity\[testIgnored name='[^']*'" "$LOG" 2>/dev/null \
+    | sed "s/.*name='//; s/'$//" \
+    | LC_ALL=C sort -u > "$SKIPPED_FILE"
 grep -oE "^##teamcity\[testStarted name='[^']*'" "$LOG" 2>/dev/null \
     | sed "s/.*name='//; s/'$//" \
-    | LC_ALL=C sort -u > "$EXECUTED_FILE"
+    | LC_ALL=C sort -u > "${EXECUTED_FILE}.started"
+LC_ALL=C comm -23 "${EXECUTED_FILE}.started" "$SKIPPED_FILE" > "$EXECUTED_FILE"
+rm -f "${EXECUTED_FILE}.started"
 grep -oE "^##teamcity\[testFailed name='[^']*'" "$LOG" 2>/dev/null \
     | sed "s/.*name='//; s/'$//" \
     | LC_ALL=C sort -u > "$FAILED_FILE"
@@ -186,6 +197,8 @@ if [ "$rc" -eq 124 ]; then
     exit 124
 fi
 
+# Stays on testStarted, NOT on started-minus-skipped: this guard means "the filter matched
+# nothing", and a shard whose cases all legitimately skip is not that failure.
 if [ "$executed" -eq 0 ]; then
     echo "shard-compliance: NO TESTS EXECUTED — the filter matched nothing." >&2
     echo "  PHPUnit exits 0 in this case, so it would otherwise read as success. Check the filter" >&2
@@ -193,8 +206,12 @@ if [ "$executed" -eq 0 ]; then
     exit 1
 fi
 
-echo "shard-compliance: ${SUITE} shard ${SHARD}/${SHARDS} — ${executed} executed, ${failed} failed"
+skipped="$(wc -l < "$SKIPPED_FILE" | tr -d ' ')"
+ran="$(wc -l < "$EXECUTED_FILE" | tr -d ' ')"
+echo "shard-compliance: ${SUITE} shard ${SHARD}/${SHARDS} — ${executed} started, ${skipped} skipped, ${ran} ran, ${failed} failed"
 echo "  failing names: ${FAILED_FILE}"
+echo "  ran names:     ${EXECUTED_FILE}"
+echo "  skipped names: ${SKIPPED_FILE}"
 echo "  full log:      ${LOG}"
 
 # Deliberately exit 0 on test failures: neither suite is green, so a non-zero exit here would mean
