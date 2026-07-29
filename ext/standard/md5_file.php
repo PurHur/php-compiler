@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 

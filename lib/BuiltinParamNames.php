@@ -789,6 +789,10 @@ final class BuiltinParamNames
             case 'md5':
             case 'sha1':
                 return ['string', 'binary'];
+            // php-src ext/standard/basic_functions.stub.php — InternalArgInfo still says raw_output (#24549)
+            case 'md5_file':
+            case 'sha1_file':
+                return ['filename', 'binary'];
             // php-src ext/hash/hash.stub.php — Reflection was empty without this map (#23290)
             case 'hash_hkdf':
                 return ['algo', 'key', 'length', 'info', 'salt'];
