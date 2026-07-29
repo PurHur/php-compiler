@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -19,6 +21,44 @@ use PHPLLVM\Value;
 /** LLVM lowering for stream_get_contents() via __compiler_stream_get_contents (#3142). */
 final class JitStreamGetContents
 {
+    /** php-src ext/standard/file.c — PHP_FUNCTION(stream_get_contents) length range (#24560). */
+    private const LENGTH_RANGE_ERROR = 'stream_get_contents(): Argument #2 ($length) must be greater than or equal to -1';
+
+    /**
+     * Runtime/compile-time guard: length must be >= -1 (null already lowered to -1).
+     *
+     * php-src file.c: if (maxlength < -1) zend_argument_value_error(2, …).
+     * Catchable ValueError inside try (JitStrictIntArg / #24560); pending abort otherwise.
+     */
+    public static function emitRuntimeLengthRangeGuard(Context $context, Value $length): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $minusOne = $i64->constInt(-1, true);
+        $ok = $context->builder->icmp(Builder::INT_SGE, $length, $minusOne);
+        $okBlock = BasicBlockHelper::append($context, 'stream_gc_len_range_ok');
+        $errBlock = BasicBlockHelper::append($context, 'stream_gc_len_range_err');
+        $context->builder->branchIf($ok, $okBlock, $errBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $llvmFunc = BasicBlockHelper::parentFunction($context);
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'ValueError', self::LENGTH_RANGE_ERROR);
+            $dead = $llvmFunc->appendBasicBlock('stream_gc_len_range_catch_dead');
+            $context->builder->positionAtEnd($dead);
+            $context->builder->positionAtEnd($okBlock);
+
+            return;
+        }
+        TypeErrorRaise::emitValueError($context, self::LENGTH_RANGE_ERROR);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+        }
+        $context->builder->positionAtEnd($okBlock);
+    }
+
     /** Z_PARAM_LONG_OR_NULL parity for $length (#6008, ext/standard/streamsfuncs.c). */
     public static function lowerLengthArg(Context $context, JITVariable $arg): Value
     {
