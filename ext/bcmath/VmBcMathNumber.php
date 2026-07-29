@@ -71,11 +71,16 @@ final class VmBcMathNumber
             'round' => new NumberRound(),
             'compare' => new NumberCompare(),
             '__tostring' => new NumberToString(),
+            // php-src value-only serialize payload — scale recovered on wakeup (#24614).
+            '__serialize' => new NumberSerialize(),
+            '__unserialize' => new NumberUnserialize(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
         }
+        $entry->methodNames['__serialize'] = '__serialize';
+        $entry->methodNames['__unserialize'] = '__unserialize';
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }

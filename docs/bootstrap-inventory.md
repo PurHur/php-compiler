@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6621 |
-| Phase A inventory files (M2 ratio SSOT) | 6621 |
+| PHP files on vm.php path | 6622 |
+| Phase A inventory files (M2 ratio SSOT) | 6622 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21320 |
+| Source constructs flagged (warnings) | 21329 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -60,10 +60,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/NumberMul.php` | 0 | 2 |
 | `ext/bcmath/NumberPow.php` | 0 | 2 |
 | `ext/bcmath/NumberRound.php` | 0 | 1 |
+| `ext/bcmath/NumberSerialize.php` | 0 | 7 |
 | `ext/bcmath/NumberSqrt.php` | 0 | 1 |
 | `ext/bcmath/NumberSub.php` | 0 | 2 |
 | `ext/bcmath/NumberToString.php` | 0 | 1 |
-| `ext/bcmath/VmBcMathNumber.php` | 0 | 23 |
+| `ext/bcmath/VmBcMathNumber.php` | 0 | 25 |
 | `ext/bcmath/VmBcmath.php` | 0 | 5 |
 | `ext/bcmath/bcadd.php` | 0 | 1 |
 | `ext/bcmath/bcceil.php` | 0 | 1 |
@@ -6801,6 +6802,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/bcmath/NumberSerialize.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Variable (line 37)
+- new HashTable (line 39)
+- new ArgumentCountError (line 58)
+- new Error (line 75)
+- new Exception (line 84)
+- 2 class method(s)
+
 ### `ext/bcmath/NumberSqrt.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6839,9 +6851,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new NumberRound (line 71)
 - new NumberCompare (line 72)
 - new NumberToString (line 73)
-- new ObjectEntry (line 97)
-- new Variable (line 99)
-- new Variable (line 316)
+- new NumberSerialize (line 75)
+- new NumberUnserialize (line 76)
+- new ObjectEntry (line 104)
+- new Variable (line 106)
+- new Variable (line 331)
 - 19 class method(s)
 
 ### `ext/bcmath/VmBcmath.php`
@@ -6851,7 +6865,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DivisionByZeroError (line 84)
 - new DivisionByZeroError (line 201)
 - new DivisionByZeroError (line 296)
-- 49 class method(s)
+- 50 class method(s)
 
 ### `ext/bcmath/bcadd.php`
 
@@ -41474,8 +41488,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1495)
-- new ArgumentCountError (line 1506)
+- new ArgumentCountError (line 1514)
+- new ArgumentCountError (line 1525)
 - 18 class method(s)
 - 1 closure(s)
 
@@ -42657,12 +42671,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\VmCoerceVariableToString (line 17685)
 - new JIT\Call\IncludePathResolverResolve (line 17982)
 - new JIT\Call\RuntimeIndirectStaticMethodCall (line 18206)
-- new VM (line 19214)
-- new VM\Variable (line 19223)
-- new Variable (line 19244)
-- new Variable (line 19290)
-- new Variable (line 19834)
-- 391 class method(s)
+- new VM (line 19286)
+- new VM\Variable (line 19295)
+- new Variable (line 19316)
+- new Variable (line 19362)
+- new Variable (line 19906)
+- 392 class method(s)
 - 7 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -48900,62 +48914,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 15177)
 - new Variable (line 15307)
 - new Variable (line 15349)
-- new Variable (line 15525)
-- new Variable (line 15541)
-- new Variable (line 15586)
-- new Variable (line 15727)
-- new Variable (line 15804)
-- new Variable (line 15968)
-- new VM\PropertyIsInitializedHandler (line 15977)
-- new Error (line 16128)
-- new VM\EnumFromHandler (line 16154)
-- new CompileError (line 16894)
-- new VM\ClassProperty (line 17119)
-- new Variable (line 17439)
-- new CompileError (line 17468)
-- new Variable (line 17714)
-- new Variable (line 17716)
-- new ClassEntry (line 17759)
-- new Func\PHP (line 17766)
-- new VM\ClassProperty (line 17861)
-- new Func\PHP (line 18079)
-- new Variable (line 18155)
-- new Variable (line 18162)
-- new Variable (line 18168)
-- new Variable (line 18205)
-- new Variable (line 18234)
-- new Variable (line 18422)
-- new Variable (line 18468)
-- new VM\ClassProperty (line 18538)
-- new Error (line 18589)
-- new Error (line 18624)
+- new Variable (line 15528)
+- new Variable (line 15544)
+- new Variable (line 15589)
+- new Variable (line 15730)
+- new Variable (line 15807)
+- new Variable (line 15971)
+- new VM\PropertyIsInitializedHandler (line 15980)
+- new Error (line 16131)
+- new VM\EnumFromHandler (line 16157)
+- new CompileError (line 16897)
+- new VM\ClassProperty (line 17122)
+- new Variable (line 17442)
+- new CompileError (line 17471)
+- new Variable (line 17717)
+- new Variable (line 17719)
+- new ClassEntry (line 17762)
+- new Func\PHP (line 17769)
+- new VM\ClassProperty (line 17864)
+- new Func\PHP (line 18082)
+- new Variable (line 18158)
+- new Variable (line 18165)
+- new Variable (line 18171)
+- new Variable (line 18208)
+- new Variable (line 18237)
+- new Variable (line 18425)
+- new Variable (line 18471)
+- new VM\ClassProperty (line 18541)
+- new Error (line 18592)
 - new Error (line 18627)
 - new Error (line 18630)
 - new Error (line 18633)
-- new ObjectEntry (line 18635)
-- new Error (line 18648)
+- new Error (line 18636)
+- new ObjectEntry (line 18638)
 - new Error (line 18651)
 - new Error (line 18654)
-- new Error (line 18675)
-- new ObjectEntry (line 18680)
-- new Variable (line 18682)
-- new Variable (line 18700)
-- new Variable (line 18713)
-- new Variable (line 18734)
-- new Variable (line 18747)
-- new Error (line 18887)
-- new Error (line 18892)
-- new VM\ObjectEntry (line 18896)
-- new Variable (line 19040)
-- new Variable (line 19058)
-- new NoDiscardMetadata (line 19227)
-- new Variable (line 19424)
-- new Variable (line 19426)
-- new CompileError (line 19454)
-- new CompileError (line 19481)
-- new CompileError (line 19514)
-- new CompileError (line 19521)
-- new Variable (line 19701)
+- new Error (line 18657)
+- new Error (line 18678)
+- new ObjectEntry (line 18683)
+- new Variable (line 18685)
+- new Variable (line 18703)
+- new Variable (line 18716)
+- new Variable (line 18737)
+- new Variable (line 18750)
+- new Error (line 18890)
+- new Error (line 18895)
+- new VM\ObjectEntry (line 18899)
+- new Variable (line 19043)
+- new Variable (line 19061)
+- new NoDiscardMetadata (line 19230)
+- new Variable (line 19427)
+- new Variable (line 19429)
+- new CompileError (line 19457)
+- new CompileError (line 19484)
+- new CompileError (line 19517)
+- new CompileError (line 19524)
+- new Variable (line 19704)
 - 546 class method(s)
 - 27 closure(s)
 
@@ -53188,20 +53202,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new AttributeEntry (line 1874)
 - new Variable (line 2422)
 - new ParameterMetadata (line 2428)
-- new Variable (line 3226)
-- new Variable (line 3265)
-- new ObjectEntry (line 3510)
-- new SourceLocation (line 3538)
-- new ParameterMetadata (line 4018)
-- new ObjectEntry (line 4086)
-- new ObjectEntry (line 4103)
-- new ObjectEntry (line 4321)
-- new ObjectEntry (line 4334)
-- new Variable (line 4414)
-- new ObjectEntry (line 4536)
-- new ObjectEntry (line 4556)
-- new Variable (line 4743)
-- new Variable (line 4928)
+- new Variable (line 3235)
+- new Variable (line 3274)
+- new ObjectEntry (line 3519)
+- new SourceLocation (line 3547)
+- new ParameterMetadata (line 4027)
+- new ObjectEntry (line 4095)
+- new ObjectEntry (line 4112)
+- new ObjectEntry (line 4330)
+- new ObjectEntry (line 4343)
+- new Variable (line 4423)
+- new ObjectEntry (line 4545)
+- new ObjectEntry (line 4565)
+- new Variable (line 4752)
+- new Variable (line 4937)
 - 252 class method(s)
 - 3 closure(s)
 
