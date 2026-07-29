@@ -540,6 +540,9 @@ final class BuiltinParamNames
             case 'rewind':
             case 'fflush':
                 return ['stream'];
+            // php-src ext/standard/file.stub.php — InternalArgInfo still says fp (#24534)
+            case 'ftruncate':
+                return ['stream', 'size'];
             case 'fseek':
                 return ['stream', 'offset', 'whence'];
             case 'socket_select':
