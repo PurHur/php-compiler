@@ -1,6 +1,7 @@
 --TEST--
 ext/pgsql PHP 8.4 helpers withheld on PROFILE=8.2 (#22543, re-#7083)
 --ENV--
+PHP_COMPILER_ENABLE_PGSQL=1
 PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php

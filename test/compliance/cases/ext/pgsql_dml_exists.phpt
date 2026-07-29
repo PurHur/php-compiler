@@ -2,8 +2,16 @@
 ext/pgsql pg_insert/update/delete/select + DML constants exist (#20637)
 --SKIPIF--
 <?php
-if (!function_exists('pg_connect')) die('skip no pg_connect (libpq FFI)');
+// Host Zend often lacks ext/pgsql; in-tree path uses PHP_COMPILER_ENABLE_PGSQL (#24994).
+if (!extension_loaded('pgsql')) {
+    $en = getenv('PHP_COMPILER_ENABLE_PGSQL');
+    if (!is_string($en) || '' === trim($en) || in_array(strtolower(trim($en)), ['0', 'false', 'off', 'no'], true)) {
+        die('skip pgsql withheld');
+    }
+}
 ?>
+--ENV--
+PHP_COMPILER_ENABLE_PGSQL=1
 --FILE--
 <?php
 declare(strict_types=1);

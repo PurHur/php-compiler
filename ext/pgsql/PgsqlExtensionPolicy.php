@@ -5,14 +5,28 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\pgsql;
 
 /**
- * ext/pgsql advertisement — php-src ext/pgsql/pgsql.c (#3741).
+ * ext/pgsql advertisement — php-src ext/pgsql/pgsql.c (#3741, #24994, #24627).
  *
- * Gate on libpq FFI so extension_loaded('pgsql') matches builds that can connect.
+ * In-tree libpq FFI ({@see VmPgsqlNative}) must not flip {@code extension_loaded('pgsql')} /
+ * {@code function_exists('pg_*')} when host Zend has no ext/pgsql — same host-module gate as
+ * gd/intl (#22740 / #22691). Forward {@code PHP_COMPILER_PROFILE=8.4} alone must not invent the
+ * optional module (#24627).
+ *
+ * Enable via host {@code extension_loaded('pgsql')}, or explicit
+ * {@code PHP_COMPILER_ENABLE_PGSQL=1} when libpq FFI is available (functional PHPT / local runs).
  */
 final class PgsqlExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
+        if (\extension_loaded('pgsql')) {
+            return true;
+        }
+
+        if (!self::explicitEnableRequested()) {
+            return false;
+        }
+
         return VmPgsqlNative::available();
     }
 
@@ -71,5 +85,51 @@ final class PgsqlExtensionPolicy
             '8.3.0',
             '>='
         );
+    }
+
+    /** Compliance filenames that exercise pg_* / PgSql\\* / extension_loaded('pgsql'). */
+    public static function isPgsqlComplianceCase(string $testFileName): bool
+    {
+        return str_contains($testFileName, 'pgsql_')
+            || str_contains($testFileName, 'extension_loaded_pgsql')
+            || str_contains($testFileName, 'pdo_pgsql');
+    }
+
+    /**
+     * Phantom-registration guards that assert pgsql is withheld (#24994 / #24627).
+     *
+     * Excludes version-helper phantoms ({@code pgsql_*_phantom_profile82}) that need ENABLE + PROFILE.
+     */
+    public static function isPgsqlModulePhantomComplianceCase(string $testFileName): bool
+    {
+        return str_contains($testFileName, 'extension_loaded_pgsql_phantom');
+    }
+
+    /**
+     * Functional pgsql cases set {@code PHP_COMPILER_ENABLE_PGSQL} via {@code --ENV--}; module
+     * phantom guards run only when pgsql is withheld (#24994).
+     */
+    public static function runsPgsqlCompliance(string $testFileName): bool
+    {
+        if (self::isPgsqlModulePhantomComplianceCase($testFileName)) {
+            return !self::advertisesExtension();
+        }
+
+        return true;
+    }
+
+    /**
+     * Explicit side-load / functional-test opt-in when host Zend lacks ext/pgsql (#24994).
+     */
+    private static function explicitEnableRequested(): bool
+    {
+        $raw = getenv('PHP_COMPILER_ENABLE_PGSQL');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        $v = strtolower(trim($raw));
+
+        return !\in_array($v, ['0', 'false', 'off', 'no'], true);
     }
 }

@@ -131,7 +131,9 @@ final class ExtensionConstantGroups
             $groups['soap'] = SoapConstants::registeredConstants();
         }
         $groups['tidy'] = TidyConstants::registeredConstants();
-        $groups['pgsql'] = PgsqlConstants::registeredConstants();
+        if (\PHPCompiler\ext\pgsql\PgsqlExtensionPolicy::advertisesExtension()) {
+            $groups['pgsql'] = PgsqlConstants::registeredConstants();
+        }
         $groups['pspell'] = PspellConstants::registeredConstants();
         $groups['odbc'] = OdbcConstants::registeredConstants();
         $groups['sysvmsg'] = SysvmsgConstants::registeredConstants();
