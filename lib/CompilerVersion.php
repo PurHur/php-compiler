@@ -1872,13 +1872,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ clock_gettime() / ClockInterface (ext/standard/hrtime.c, #11624, #12470).
+     * PHP 8.5+ clock_gettime() / ClockInterface (ext/standard/hrtime.c, #11624, #12470, #24201).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Gated on profile ≥8.5.0 — php-src registers these in 8.5, not 8.2/8.4.
      */
     public static function supportsClockGettime(): bool
     {
-        return self::supportsBuiltinStubEnums();
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**
