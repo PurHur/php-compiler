@@ -211,6 +211,8 @@ final class BuiltinInternalArgInfo
                 2 => 'int',
                 default => null,
             },
+            // ext/hash/hash.stub.php — trailing array $options = [] omitted from InternalArgInfo (#25068)
+            'hash' => 3 === $index ? 'array' : null,
             // ext/standard/string.stub.php — &$count = null (untyped; InternalArgInfo int) (#24886)
             'str_replace', 'str_ireplace' => 3 === $index ? '' : null,
             // ext/pcre/php_pcre.stub.php — string|array unions; &$count = null untyped (#23587)

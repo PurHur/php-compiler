@@ -873,8 +873,9 @@ final class BuiltinParamNames
                 return ['share_handle', 'option', 'value'];
             case 'curl_strerror':
                 return ['error_code'];
+            // php-src ext/hash/hash.stub.php — options missing from InternalArgInfo (#25068)
             case 'hash':
-                return ['algo', 'data', 'binary', 'options'];
+                return ['algo', 'data', 'binary=', 'options='];
             case 'hash_hmac':
                 return ['algo', 'data', 'key', 'binary'];
             // php-src ext/hash/hash.stub.php — InternalArgInfo still says raw_output (#24377)
