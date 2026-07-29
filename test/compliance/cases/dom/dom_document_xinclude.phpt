@@ -47,7 +47,9 @@ $doc2 = new DOMDocument();
 $doc2->loadXML($xmlXml);
 $n2 = $doc2->xinclude();
 $out2 = $doc2->saveXML();
-echo 'xml_n=', var_export($n2, true), ' has=', (str_contains($out2, '<child>ok</child>') ? 'yes' : 'no'), "\n";
+// libxml may stamp xml:base on the included root (#24775) — match content, not exact attrs.
+$xmlHas = str_contains($out2, '<child') && str_contains($out2, '>ok</child>');
+echo 'xml_n=', var_export($n2, true), ' has=', ($xmlHas ? 'yes' : 'no'), "\n";
 
 $doc3 = new DOMDocument();
 $doc3->loadXML('<r/>');
