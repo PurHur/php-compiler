@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Thin standalone AOT preg routes through PregJitHelper NestedJIT — no Kernel stubs (#21212).
+ * Thin standalone AOT preg routes through PregJitHelper via ensureCompiledBundle — no Kernel stubs (#21212, #24943).
  */
 final class PregMatchUserScriptLlvmTest extends TestCase
 {
@@ -16,7 +16,9 @@ final class PregMatchUserScriptLlvmTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PregMatchRuntime.php');
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
-        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiledBundle', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringNotContainsString('JitPregMatchKernel', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('PregMatchUserScriptLlvm', $source);
