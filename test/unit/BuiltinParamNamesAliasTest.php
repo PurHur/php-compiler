@@ -1906,6 +1906,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gcm, 'class', 'get_class_methods'));
     }
 
+    /** @covers issue #25016 */
+    public function testGetMangledObjectVarsZendStubNamedParams(): void
+    {
+        $names = BuiltinParamNames::forFunction('get_mangled_object_vars');
+        self::assertSame(['object'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'object', 'get_mangled_object_vars'));
+        self::assertSame(1, BuiltinParamNames::paramCountForInternalFunction('get_mangled_object_vars'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('get_mangled_object_vars'));
+        self::assertSame(
+            'object',
+            BuiltinInternalArgInfo::stubParamTypeOverride('get_mangled_object_vars', 0)
+        );
+    }
+
     /** @covers issue #23947 */
     public function testGetClassVarsZendStubNamedParams(): void
     {

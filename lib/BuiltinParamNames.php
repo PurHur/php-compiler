@@ -1069,6 +1069,9 @@ final class BuiltinParamNames
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says obj/class (#23401)
             case 'get_object_vars':
                 return ['object'];
+            // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo omits this row (#25016)
+            case 'get_mangled_object_vars':
+                return ['object'];
             case 'get_class_methods':
                 return ['object_or_class'];
             // php-src Zend/zend_builtin_functions.stub.php — InternalArgInfo still says class_name (#23947)
