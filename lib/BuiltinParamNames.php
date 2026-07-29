@@ -726,6 +726,23 @@ final class BuiltinParamNames
                     'encoding',
                     'untrusted_certificates_filename',
                 ];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says x509/shortnames (#24663)
+            case 'openssl_x509_parse':
+                return ['certificate', 'short_names='];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says dn/privkey/configargs (#24663)
+            case 'openssl_csr_new':
+                return ['distinguished_names', 'private_key', 'options=', 'extra_attributes='];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says infile/outfile/signcert (#24663)
+            case 'openssl_pkcs7_sign':
+                return [
+                    'input_filename',
+                    'output_filename',
+                    'certificate',
+                    'private_key',
+                    'headers',
+                    'flags=',
+                    'untrusted_certificates_filename=',
+                ];
             // php-src ext/curl/curl.stub.php — InternalArgInfo still says ch/mh/sh (#23594)
             case 'curl_close':
             case 'curl_copy_handle':
