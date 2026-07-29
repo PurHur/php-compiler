@@ -1,11 +1,11 @@
 {
     "version": 1,
-    "generated_at": "2026-07-29T15:57:01+00:00",
+    "generated_at": "2026-07-29T19:03:05+00:00",
     "arch": "x86_64-linux",
     "role": "committed per-arch split-compilation helper units (#15889) \u2014 consumed via PHP_COMPILER_HELPER_RUNTIME_O=1; stale units are skipped per fingerprint and recompiled locally",
     "core_fingerprint": "52fde2a204d1033f0b54",
     "llvm_identity_token": "lib:df0be984ee08e28d74ef02207ab33225a55ab237986747d6fe995028e2ec67b4",
-    "unit_count": 293,
-    "total_bytes": 337175389,
+    "unit_count": 299,
+    "total_bytes": 344142627,
     "refresh": "php script/emit-helper-runtime-object.php --prelink (pinned env)"
 }
