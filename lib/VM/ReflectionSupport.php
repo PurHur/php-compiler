@@ -2639,11 +2639,11 @@ final class ReflectionSupport
                     ];
                 }
 
-                // Zend stub has trailing optionals not present in legacy InternalArgInfo (#23391).
+                // No InternalArgInfo row: honor `=` markers on the override table (#24392 / #23391).
                 return [
                     'name' => $name,
                     'type' => '',
-                    'isOptional' => true,
+                    'isOptional' => str_ends_with($override[$index], '='),
                 ];
             }
 
@@ -2665,11 +2665,12 @@ final class ReflectionSupport
                 ];
             }
 
-            // Zend stub has trailing optionals not present in legacy InternalArgInfo (#23181, #23608).
+            // No InternalArgInfo row (missing builtin or trailing stub-only param): honor `=` on the
+            // override table — do not mark required stub params optional (#24392 gzputs).
             return [
                 'name' => $name,
                 'type' => '',
-                'isOptional' => true,
+                'isOptional' => str_ends_with($override[$index], '='),
             ];
         }
 

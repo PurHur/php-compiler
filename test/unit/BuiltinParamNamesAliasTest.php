@@ -2275,4 +2275,36 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('gzwrite'));
         self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('gzwrite'));
     }
+
+    /** @covers issue #24392 */
+    public function testGzLineNamedParamsResolve(): void
+    {
+        self::assertSame(['stream', 'length='], BuiltinParamNames::forFunction('gzgets'));
+        self::assertSame(['stream'], BuiltinParamNames::forFunction('gzgetc'));
+        self::assertSame(['stream'], BuiltinParamNames::forFunction('gzeof'));
+        self::assertSame(['stream', 'data', 'length='], BuiltinParamNames::forFunction('gzputs'));
+
+        $gzgets = BuiltinParamNames::forFunction('gzgets');
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($gzgets, 'stream', 'gzgets'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($gzgets, 'length', 'gzgets'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gzgets, 'zp', 'gzgets'));
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('gzgets'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('gzgets'));
+
+        $gzputs = BuiltinParamNames::forFunction('gzputs');
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($gzputs, 'data', 'gzputs'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gzputs, 'zp', 'gzputs'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($gzputs, 'string', 'gzputs'));
+        self::assertSame(3, BuiltinParamNames::paramCountForInternalFunction('gzputs'));
+        self::assertSame(2, BuiltinParamNames::requiredParamCountForInternalFunction('gzputs'));
+
+        self::assertSame(
+            ['stream', 'length='],
+            BuiltinParamNames::paramNamesForInternalFunction('gzgets')
+        );
+        self::assertSame(
+            ['stream', 'data', 'length='],
+            BuiltinParamNames::paramNamesForInternalFunction('gzputs')
+        );
+    }
 }
