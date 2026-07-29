@@ -221,6 +221,21 @@ final class BuiltinParamNames
             // php-src ext/calendar/calendar.stub.php — ?int $timestamp = null (#24863)
             case 'unixtojd':
                 return ['timestamp='];
+            // php-src ext/calendar/calendar.stub.php — pre-stub InternalArgInfo names (#24362)
+            case 'cal_from_jd':
+                return ['julian_day', 'calendar'];
+            case 'easter_days':
+                return ['year=', 'mode='];
+            case 'jdtogregorian':
+            case 'jdtojulian':
+            case 'jdtofrench':
+                return ['julian_day'];
+            case 'jdtojewish':
+                return ['julian_day', 'hebrew=', 'flags='];
+            case 'jddayofweek':
+                return ['julian_day', 'mode='];
+            case 'jdmonthname':
+                return ['julian_day', 'mode'];
             case 'getdate':
                 return ['timestamp'];
             // php-src ext/date/php_date.stub.php — InternalArgInfo still says date (#23783)
