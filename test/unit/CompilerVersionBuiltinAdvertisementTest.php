@@ -241,10 +241,26 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testStrIncrementWithheldOnReferenceProfile(): void
+    public function testStrIncrementAdvertisedOnDefault84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsStrIncrement());
-        $this->assertFalse(CompilerVersion::advertisesStrIncrement());
+        $this->assertTrue(CompilerVersion::supportsStrIncrement());
+        $this->assertTrue(CompilerVersion::advertisesStrIncrement());
+    }
+
+    public function testStrIncrementWithheldOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsStrIncrement());
+            $this->assertFalse(CompilerVersion::advertisesStrIncrement());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testStrIncrementAdvertisedOnForwardProfile(): void

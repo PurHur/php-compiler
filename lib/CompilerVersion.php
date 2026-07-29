@@ -326,9 +326,9 @@ final class CompilerVersion
      * Version profile for builtin advertisement / function_exists parity (#11842).
      *
      * On the 8.4 development line, advertise implemented forward-compat builtins
-     * (array_find family, …) even while VERSION is 8.4.0-dev — version_compare treats
-     * -dev below stable (#12327, #12328). Profile-gated 8.3+ surfaces such as
-     * json_validate / str_increment still withhold on the unset-PROFILE reference harness (#22544).
+     * (array_find family, str_increment, …) even while VERSION is 8.4.0-dev —
+     * version_compare treats -dev below stable (#12327, #12328). Explicit
+     * `PHP_COMPILER_PROFILE=8.2` still withholds 8.3+ surfaces (#22544, #24746).
      */
     public static function builtinAdvertisementVersion(): string
     {
@@ -400,10 +400,10 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518, #14709, #15026, #16292).
+     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518, #14709, #15026, #16292, #24746).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Enabled on 8.4.0-dev by default via {@see isForwardProfileAtLeast()}. Withheld when
+     * `PHP_COMPILER_PROFILE=8.2` (matches Zend 8.2 function_exists gate).
      */
     public static function supportsStrIncrement(): bool
     {
@@ -411,40 +411,15 @@ final class CompilerVersion
             return false;
         }
 
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return self::isForwardProfileAtLeast('8.3.0');
     }
 
     /**
-     * str_increment()/str_decrement() visible to function_exists() — stable runtime or forward 8.3+ (#16292, #18614).
-     *
-     * Callable under forward profile via {@see supportsStrIncrement()}; withheld on 8.4.0-dev reference harness
-     * (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
+     * str_increment()/str_decrement() visible to function_exists() — same gate as registration (#16292, #18614, #24746).
      */
     public static function advertisesStrIncrement(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        if (!self::supportsStrIncrement()) {
-            return false;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return self::supportsStrIncrement();
     }
 
     /**

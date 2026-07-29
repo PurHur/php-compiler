@@ -14,9 +14,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertSame('8.4.0-dev', CompilerVersion::VERSION);
     }
 
-    public function testSupportsStrIncrementFalseOnReferenceProfile(): void
+    public function testSupportsStrIncrementTrueOnDefault84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+        $this->assertTrue(CompilerVersion::supportsStrIncrement());
+    }
+
+    public function testSupportsStrIncrementFalseOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsStrIncrement());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsHashContextDebugInfoFalseOnReferenceProfile(): void
@@ -104,9 +119,24 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testAdvertisesStrIncrementFalseOnReferenceProfile(): void
+    public function testAdvertisesStrIncrementTrueOnDefault84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::advertisesStrIncrement());
+        $this->assertTrue(CompilerVersion::advertisesStrIncrement());
+    }
+
+    public function testAdvertisesStrIncrementFalseOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::advertisesStrIncrement());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testAdvertisesStrIncrementTrueOnForwardProfile(): void
@@ -1978,12 +2008,30 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmDoesNotRegisterStrIncrementOnReferenceProfile(): void
+    public function testVmRegistersStrIncrementOnDefault84DevProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertFalse(isset($ctx->functions['str_decrement']));
-        $this->assertFalse(isset($ctx->functions['str_increment']));
+        $this->assertTrue(isset($ctx->functions['str_decrement']));
+        $this->assertTrue(isset($ctx->functions['str_increment']));
+    }
+
+    public function testVmDoesNotRegisterStrIncrementOnPhp82Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertFalse(isset($ctx->functions['str_decrement']));
+            $this->assertFalse(isset($ctx->functions['str_increment']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmRegistersStrIncrementOnForwardProfile(): void
