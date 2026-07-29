@@ -49,6 +49,9 @@ final class VmFs
     /** @var array<int, string> zip_open() archive placeholders — state in VmZipProcedural (#6370) */
     private static array $zipArchivePlaceholders = [];
 
+    /** @var array<int, string> tmpfile() paths to unlink on fclose (#24786, php-src file.c) */
+    private static array $tmpfileUnlinkPaths = [];
+
     /** @var array<int, int> zip_read() entry placeholders — parent archive handle (#6370) */
     private static array $zipEntryPlaceholders = [];
 
@@ -1488,8 +1491,10 @@ final class VmFs
         }
 
         VmPersistentSocket::forgetResource($fp);
+        $closed = @fclose($fp);
+        self::releaseTmpfilePath($handle);
 
-        return @fclose($fp);
+        return $closed;
     }
 
     /**
@@ -2773,6 +2778,26 @@ final class VmFs
         if ($handle > 0 && '' !== $path) {
             self::$handlePaths[$handle] = $path;
         }
+    }
+
+    /**
+     * tmpfile() — defer unlink until fclose so meta uri stays path-visible (#24786).
+     */
+    public static function registerTmpfileUnlinkOnClose(int $handle, string $path): void
+    {
+        if ($handle > 0 && '' !== $path) {
+            self::$tmpfileUnlinkPaths[$handle] = $path;
+        }
+    }
+
+    private static function releaseTmpfilePath(int $handle): void
+    {
+        $path = self::$tmpfileUnlinkPaths[$handle] ?? null;
+        if (null === $path) {
+            return;
+        }
+        unset(self::$tmpfileUnlinkPaths[$handle]);
+        VmFsUnlink::unlink($path);
     }
 
     public static function clearStreamPath(int $handle): void
