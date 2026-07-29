@@ -43,7 +43,6 @@ final class SelfHostBuiltinPolicy
         'hrtime' => 'numeric',
         'clock_gettime' => 'array',
         'getdate' => 'numeric',
-        'gmgetdate' => 'numeric',
         'gmmktime' => 'numeric',
         'mktime' => 'numeric',
         'localtime' => 'numeric',

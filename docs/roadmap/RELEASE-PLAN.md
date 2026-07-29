@@ -3,6 +3,39 @@
 Written 2026-07-26. Every claim below was measured this session; sources are named so each can be
 re-checked rather than believed.
 
+## Status at 2026-07-29
+
+What changed since the plan was written, all measured:
+
+| item | state |
+|---|---|
+| **P1.1** CI on `lib/`, `ext/` | **done** — `compiler-gate.yml` (#24275): nikic preflight → `aot-smoke.sh` → VM sweep, green on master |
+| **P1.3** suites runnable | **done** — `shard-compliance.sh` (#24445) + `compliance-baseline.sh` (#24469); 8,846 cases, 24 shards, ~315 s each |
+| **P1.4** flaky quarantine | mechanism done, list **deliberately empty** until two-run evidence exists |
+| **P2.5** side-loadable extensions | boundary measured (#24285), `Module` declares deps + default-enabled (#24387), load list generated (#24418), build-time selection (#24421) |
+| **P3.9** spine split-TU | **blocked**, root cause mapped (#24429) |
+
+Three corrections the plan needed, each from measurement rather than reasoning:
+
+1. **Phase 2.5 buys nothing for user binaries.** Unused extensions are already never linked: a
+   hello-world built with 76 extensions vs 6 differs by **360 bytes**. The justification is
+   extensibility and the compiler's own build cost, not user binary size (#24421).
+2. **"~20 min sharded" assumes parallel runners.** On one box shards must run sequentially —
+   concurrent containers corrupt each other's caches — so 24 shards is ~2 h.
+3. **"Clone and compile hello world" was ~9 minutes**, not seconds: the corpus warmup ignored the
+   committed cache. Now 5 s and gated by `cold-build-check.sh` (#24302, #24351, #24361).
+
+### The pattern worth carrying forward
+
+Nearly every problem found this week was a **check that reported success without executing**: a
+hardcoded `emit_path=native` string, a precondition gate green through an outage,
+`external_method_stubs=0` from a build that aborted first, `grep -c … || echo 0` disabling its own
+guard, a timed-out shard writing a `.failed` file that looked complete, and a partition silently
+reshuffled by a `git pull` mid-run.
+
+None was a wrong answer; all were absent answers wearing a clean result. So: **validate a gate by
+making it fail**, and distrust any zero or clean result until you know the check ran.
+
 ## Diagnosis
 
 The project has a great deal of verification **ceremony** — gates, stamps, spine sync, generated-doc

@@ -391,8 +391,6 @@ final class BuiltinParamNames
                 return ['num', 'precision', 'mode'];
             case 'frexp':
                 return ['arg1', 'exp'];
-            case 'ldexp':
-                return ['num', 'exp'];
             case 'clearstatcache':
                 return ['clear_realpath_cache', 'filename'];
             case 'mkdir':

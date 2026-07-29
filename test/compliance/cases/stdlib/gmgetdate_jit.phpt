@@ -1,16 +1,9 @@
 --TEST--
-stdlib gmgetdate()/gmmktime() JIT/AOT path
+stdlib gmmktime() JIT/AOT path (gmgetdate phantom removed, #24608)
 --FILE--
 <?php
-$d = gmgetdate(946684800);
-echo $d['year'], '-', $d['mon'], '-', $d['mday'], "\n";
-echo $d['hours'], ':', $d['minutes'], ':', $d['seconds'], "\n";
-echo $d['wday'], ' ', $d['weekday'], ' ', $d['month'], "\n";
-echo $d['yday'], ' ', $d[0], "\n";
+echo function_exists('gmgetdate') ? '1' : '0', "\n";
 echo gmmktime(22, 13, 20, 11, 14, 2023), "\n";
 --EXPECT--
-2000-1-1
-0:0:0
-6 Saturday January
-0 946684800
+0
 1700000000

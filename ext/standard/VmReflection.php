@@ -623,7 +623,6 @@ final class VmReflection
         'get_declared_attributes',
         'get_declared_functions',
         'get_declared_variables',
-        'ldexp',
         'memcmp',
         'modf',
         'vfscanf',

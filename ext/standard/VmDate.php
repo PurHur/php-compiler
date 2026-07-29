@@ -640,7 +640,7 @@ final class VmDate
     }
 
     /**
-     * gmgetdate() — UTC getdate() breakdown (php-src userland pattern; pairs #6706, #7001).
+     * UTC getdate()-shaped breakdown (internal helper; not exported — php-src has no gmgetdate, #24608).
      */
     public static function gmgetdate(?int $timestamp = null): HashTable
     {
