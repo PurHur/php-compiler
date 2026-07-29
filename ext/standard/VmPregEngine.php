@@ -501,7 +501,8 @@ final class VmPregEngine
         if ('.' === $ch) {
             $this->advance(1);
 
-            return new VmPregAstAnyNode($this->dotall);
+            // PCRE2_UTF: `.` matches one code point (byte offsets still used in ovector) (#24785).
+            return new VmPregAstAnyNode($this->dotall, $this->utf);
         }
         if ('^' === $ch) {
             $this->advance(1);
@@ -1876,8 +1877,10 @@ final class VmPregAstCharNode implements VmPregAstNode
 
 final class VmPregAstAnyNode implements VmPregAstNode
 {
-    public function __construct(private readonly bool $dotall)
-    {
+    public function __construct(
+        private readonly bool $dotall,
+        private readonly bool $utf = false
+    ) {
     }
 
     public function match(
@@ -1893,6 +1896,16 @@ final class VmPregAstAnyNode implements VmPregAstNode
         }
         if (!$this->dotall && "\n" === $subject[$pos]) {
             return false;
+        }
+        if ($this->utf) {
+            $decoded = VmPregUtf8::codepointAt($subject, $pos, $len);
+            if (null === $decoded) {
+                return false;
+            }
+            $width = $decoded[1];
+            $captures[0] = [$pos, $pos + $width];
+
+            return true;
         }
         $captures[0] = [$pos, $pos + 1];
 
