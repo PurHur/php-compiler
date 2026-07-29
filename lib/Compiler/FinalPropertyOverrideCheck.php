@@ -22,7 +22,7 @@ use PHPCompiler\VM\ClassFinal;
  */
 final class FinalPropertyOverrideCheck
 {
-    /** @var array<string, array{display: string, extends: ?string, properties: array<string, array{final: bool, fromFlags: bool, display: string}>}> */
+    /** @var array<string, array{display: string, extends: ?string, properties: array<string, array{final: bool, fromFlags: bool, display: string, file: string, line: int}>}> */
     private array $classes = [];
 
     /**
@@ -90,7 +90,7 @@ final class FinalPropertyOverrideCheck
     /**
      * Instance + static properties (PHP 8.4 allows final static; pre-8.4 rejects all finals, #23403).
      *
-     * @return array<string, array{final: bool, fromFlags: bool, display: string}>
+     * @return array<string, array{final: bool, fromFlags: bool, display: string, file: string, line: int}>
      */
     private function collectProperties(Op\Stmt\Class_ $class, string $classLc): array
     {
@@ -102,10 +102,13 @@ final class FinalPropertyOverrideCheck
                 $fromFlags = $this->isFinalFromFlags($member);
                 $fromPrivateSet = !$member->static && $this->isImplicitlyFinalFromPrivateSet($member);
                 $fromRegistry = !$member->static && $this->isFinalFromHookRegistry($classLc, $propDisplay);
+                $file = $member->getFile();
                 $properties[$propLc] = [
                     'final' => $fromFlags || $fromPrivateSet || $fromRegistry,
                     'fromFlags' => $fromFlags,
                     'display' => $propDisplay,
+                    'file' => '' !== $file ? $file : 'unknown',
+                    'line' => max(1, $member->getLine()),
                 ];
                 continue;
             }
@@ -132,10 +135,13 @@ final class FinalPropertyOverrideCheck
                 $isFinal = $fromMarker || $fromField || $fromPrivateSet;
                 // Always record promoted props so a non-final child redeclaration can
                 // trip "Cannot override final property" against a final parent (#22451).
+                $file = $param->getFile();
                 $properties[$propLc] = [
                     'final' => $isFinal,
                     'fromFlags' => $fromMarker || $fromField,
                     'display' => $propDisplay,
+                    'file' => '' !== $file ? $file : 'unknown',
+                    'line' => max(1, $param->getLine()),
                 ];
             }
         }
@@ -207,12 +213,16 @@ final class FinalPropertyOverrideCheck
         foreach ($this->classes as $class) {
             foreach ($class['properties'] as $prop) {
                 if (!empty($prop['fromFlags'])) {
-                    // Zend 8.2 Fatal (zend_compile.c) — #22308.
-                    throw new \CompileError(sprintf(
-                        'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
-                        $class['display'],
-                        $prop['display']
-                    ));
+                    // Zend 8.2 Fatal (zend_compile.c) — #24895 / #22308.
+                    throw new CompileFatal(
+                        $prop['file'] ?? 'unknown',
+                        max(1, (int) ($prop['line'] ?? 1)),
+                        sprintf(
+                            'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
+                            $class['display'],
+                            $prop['display']
+                        )
+                    );
                 }
             }
         }

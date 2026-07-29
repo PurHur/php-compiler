@@ -7602,13 +7602,22 @@ class Compiler {
                             )
                         );
                     if ($explicitFinal && !CompilerVersion::supportsFinalProperties()) {
-                        // php-src Zend/zend_compile.c — pre-8.4 (#22308, re-#22241, #23403).
+                        // php-src Zend/zend_compile.c — pre-8.4 (#24895, re-#24822/#22308).
+                        // CompileFatal → Zend-shaped "Fatal error: … in file on line N" on CLI.
                         $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
-                        $this->throwCompileError(sprintf(
-                            'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
-                            $classDisplay,
-                            $propName
-                        ));
+                        $sourceFile = $child->getFile();
+                        if ('' === $sourceFile) {
+                            $sourceFile = 'unknown';
+                        }
+                        throw new CompileFatal(
+                            $sourceFile,
+                            max(1, $child->getLine()),
+                            sprintf(
+                                'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
+                                $classDisplay,
+                                $propName
+                            )
+                        );
                     }
                     $this->assignAttributeMetadata($declare, $child);
                     AttributeTargetValidator::assertEntriesForTarget(
@@ -8351,16 +8360,24 @@ class Compiler {
         $declare->propertyFinal = $explicitFinal
             || PropertyVisibility::isImplicitlyFinalFromPrivateSet((int) $declare->propertySetVisibility);
         if ($explicitFinal && !CompilerVersion::supportsFinalProperties()) {
-            // php-src Zend/zend_compile.c — pre-8.4 (#22451, re-#22308).
+            // php-src Zend/zend_compile.c — pre-8.4 (#24895, re-#22451/#22308).
             $classDisplay = $this->compilingClassDisplayName ?? '{unknown}';
             $propName = $param->name instanceof Operand\Literal && is_string($param->name->value)
                 ? $param->name->value
                 : 'property';
-            $this->throwCompileError(sprintf(
-                'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
-                $classDisplay,
-                $propName
-            ));
+            $sourceFile = $param->getFile();
+            if ('' === $sourceFile) {
+                $sourceFile = 'unknown';
+            }
+            throw new CompileFatal(
+                $sourceFile,
+                max(1, $param->getLine()),
+                sprintf(
+                    'Cannot declare property %s::$%s final, the final modifier is allowed only for methods, classes, and class constants',
+                    $classDisplay,
+                    $propName
+                )
+            );
         }
         $declare->propertyAsymmetricExplicitRead = Ast\AsymmetricVisibilityRewriter::hasExplicitReadModifierFromAttributes(
             $param->getAttributes()

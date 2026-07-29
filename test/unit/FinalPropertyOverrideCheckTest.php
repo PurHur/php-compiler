@@ -51,11 +51,16 @@ class C {
     public final string $x = 'a';
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(
-            'Cannot declare property C::$x final, the final modifier is allowed only for methods, classes, and class constants'
-        );
-        $runtime->parseAndCompile($code, 'final_plain_reject_ref.php');
+        try {
+            $runtime->parseAndCompile($code, 'final_plain_reject_ref.php');
+            $this->fail('Expected CompileFatal on reference profile');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            self::assertStringContainsString(
+                'Cannot declare property C::$x final, the final modifier is allowed only for methods, classes, and class constants',
+                $e->getMessage()
+            );
+            self::assertStringStartsWith('Fatal error:', $e->zendStderrLine());
+        }
     }
 
     /**
@@ -79,7 +84,7 @@ echo "declare=ok value={$o->x}\n";
 $o->x = 'b';
 echo "write={$o->x}\n";
 PHP;
-        $this->expectException(\CompileError::class);
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(
             'Cannot declare property C::$x final, the final modifier is allowed only for methods, classes, and class constants'
         );
@@ -100,7 +105,7 @@ class A {
     public final static $x = 1;
 }
 PHP;
-        $this->expectException(\CompileError::class);
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(
             'Cannot declare property A::$x final, the final modifier is allowed only for methods, classes, and class constants'
         );

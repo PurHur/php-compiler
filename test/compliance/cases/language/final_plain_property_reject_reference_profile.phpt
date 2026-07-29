@@ -1,10 +1,9 @@
 --TEST--
-Language: final plain property rejected on 8.2 reference profile (#24316, re-#22308/#22241, Zend/zend_compile.c)
+Language: final plain property rejected on default 8.4.0-dev reference profile (#24895, re-#24822/#24316, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 // Key off PROFILE env — not supportsFinalProperties(). If the gate wrongly
-// returns true on the reference profile, skipping would hide the regression
-// (#24316 "gate did not stick" / re-#24216 family).
+// returns true on the reference profile, skipping would hide the regression (#24895).
 $raw = getenv('PHP_COMPILER_PROFILE');
 if (is_string($raw) && '' !== trim($raw)) {
     $v = trim($raw);
@@ -19,13 +18,10 @@ if (is_string($raw) && '' !== trim($raw)) {
 --FILE--
 <?php
 class C {
-    final public string $x = 'a';
+    public final int $x = 1;
 }
-$o = new C();
-echo "declare=ok value={$o->x}\n";
-$o->x = 'b';
-echo "write={$o->x}\n";
+echo "parsed\n";
 --EXPECT_EXIT--
 255
 --EXPECTF--
-parseAndCompile failure: target=%s: Cannot declare property C::$x final, the final modifier is allowed only for methods, classes, and class constants
+Fatal error: Cannot declare property C::$x final, the final modifier is allowed only for methods, classes, and class constants in %s on line %d
