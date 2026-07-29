@@ -131,4 +131,27 @@ final class BuiltinInternalDefaultValuesTest extends TestCase
         self::assertSame(Variable::TYPE_NULL, $dest->type);
     }
 
+    /** @covers issue #25069 */
+    public function testStreamContextCreateOptionsParamsDefaultNull(): void
+    {
+        $info = ['name' => 'options', 'type' => 'array', 'isOptional' => true];
+        self::assertTrue(
+            BuiltinInternalDefaultValues::isAvailable('stream_context_create', 0, $info, false)
+        );
+        $var = new Variable();
+        self::assertTrue(
+            BuiltinInternalDefaultValues::materialize($var, 'stream_context_create', 0, $info)
+        );
+        self::assertSame(Variable::TYPE_NULL, $var->type);
+
+        $params = ['name' => 'params', 'type' => 'array', 'isOptional' => true];
+        self::assertTrue(
+            BuiltinInternalDefaultValues::materialize($var, 'stream_context_create', 1, $params)
+        );
+        self::assertSame(Variable::TYPE_NULL, $var->type);
+
+        self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_create', 0));
+        self::assertSame('?array', BuiltinInternalArgInfo::stubParamTypeOverride('stream_context_create', 1));
+    }
+
 }

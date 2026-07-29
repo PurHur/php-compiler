@@ -226,6 +226,11 @@ final class BuiltinInternalArgInfo
                 5 => 'int',
                 default => null,
             },
+            // ext/standard/basic_functions.stub.php — ?array $options/$params = null (#25069)
+            'stream_context_create' => match ($index) {
+                0, 1 => '?array',
+                default => null,
+            },
             default => null,
         };
     }
