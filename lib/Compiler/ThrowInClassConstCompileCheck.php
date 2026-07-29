@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCfg\Block;
+use PHPCfg\ErrorSuppressBlock;
 use PHPCfg\Op;
 use PHPCfg\Op\Expr\ArrowFunction;
 use PHPCfg\Op\Expr\Assign;
 use PHPCfg\Op\Expr\BinaryOp\Identical;
+use PHPCfg\Op\Expr\Cast;
 use PHPCfg\Op\Expr\Closure;
 use PHPCfg\Op\Expr\FuncCall;
 use PHPCfg\Op\Expr\MethodCall;
@@ -20,13 +23,16 @@ use PHPCfg\Operand;
 use PHPCfg\Script;
 
 /**
- * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904).
+ * Reject disallowed expressions in constant initializers (#6580, #6843, #8809, #24904, #24905).
  *
  * php-src: Zend/zend_ast.c — zend_ast_validate(); Zend/zend_compile.c zend_compile_const_expr().
  * Distinct from runtime throw expressions (#3802) and property/param defaults (#3803).
  *
  * {@code match} is never a constant expression (no ZEND_AST_MATCH in the allow-list); php-cfg
  * lowers it to a result-seed Assign plus Identical/JumpIf (or default-only Assign+Jump).
+ *
+ * Casts ({@code ZEND_AST_CAST}) and silence ({@code ZEND_AST_SILENCE} → php-cfg
+ * {@see ErrorSuppressBlock}) are also outside the const-expr allow-list (#24905).
  */
 final class ThrowInClassConstCompileCheck
 {
@@ -37,7 +43,7 @@ final class ThrowInClassConstCompileCheck
         $check = new self();
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof ConstTerminal) {
-                $check->walkOps($child->valueBlock->children ?? []);
+                $check->walkConstValueBlock($child->valueBlock);
                 continue;
             }
             if ($child instanceof Op\Stmt\Class_
@@ -54,9 +60,24 @@ final class ThrowInClassConstCompileCheck
     {
         foreach ($class->stmts->children as $stmt) {
             if ($stmt instanceof Op\Terminal\Const_) {
-                $this->walkOps($stmt->valueBlock->children ?? []);
+                $this->walkConstValueBlock($stmt->valueBlock);
             }
         }
+    }
+
+    /**
+     * After php-cfg Simplifier, {@code @} may collapse so {@see ConstTerminal::$valueBlock}
+     * itself is an {@see ErrorSuppressBlock} (no outer Jump remains).
+     */
+    private function walkConstValueBlock(?Block $valueBlock): void
+    {
+        if (null === $valueBlock) {
+            return;
+        }
+        if ($valueBlock instanceof ErrorSuppressBlock) {
+            throw new \CompileError(self::MESSAGE);
+        }
+        $this->walkOps($valueBlock->children ?? []);
     }
 
     /**
@@ -74,11 +95,19 @@ final class ThrowInClassConstCompileCheck
                 || $op instanceof FuncCall
                 || $op instanceof MethodCall
                 || $op instanceof StaticCall
+                || $op instanceof Cast
             ) {
                 throw new \CompileError(self::MESSAGE);
             }
-            foreach ($op->getSubBlocks() as $sub) {
-                if (null !== $sub && property_exists($sub, 'children') && is_array($sub->children)) {
+            if ($op instanceof Jump && $op->target instanceof ErrorSuppressBlock) {
+                throw new \CompileError(self::MESSAGE);
+            }
+            foreach ($op->getSubBlocks() as $name) {
+                $sub = is_string($name) && property_exists($op, $name) ? $op->{$name} : $name;
+                if ($sub instanceof ErrorSuppressBlock) {
+                    throw new \CompileError(self::MESSAGE);
+                }
+                if ($sub instanceof Block && property_exists($sub, 'children') && is_array($sub->children)) {
                     $this->walkOps($sub->children);
                 }
             }
