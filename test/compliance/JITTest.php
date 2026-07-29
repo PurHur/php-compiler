@@ -1470,6 +1470,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'final_plain_property_eval_override')) {
                 continue;
             }
+            // eval() final static property override: VM inheritFromParent (#24992); MCJIT inline eval deferral pending.
+            if (str_contains($name, 'final_static_property_eval_override')) {
+                continue;
+            }
             // eval() final method override: VM inheritFromParent (#24884); MCJIT inline eval deferral pending.
             if (str_contains($name, 'final_method_eval_override')) {
                 continue;

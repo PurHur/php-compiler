@@ -17594,30 +17594,41 @@ restart:
             $entry->methodNames[$name] = $parent->methodNames[$name] ?? $name;
         }
         foreach ($parent->staticProperties as $name => $storage) {
-            if (!isset($entry->staticProperties[$name])) {
-                // Inherited statics share parent storage (class-declared #4668; trait-composed #4670).
-                $entry->staticProperties[$name] = $storage;
-                if (isset($parent->traitStaticPropertyNames[$name])) {
-                    $entry->traitStaticPropertyNames[$name] = true;
+            if (isset($entry->staticProperties[$name])) {
+                // Child redeclared a parent final static — same-script compile is covered by
+                // FinalPropertyOverrideCheck; cross-eval needs this runtime path (#24992, #22988).
+                // php-src zend_inheritance.c — "Cannot override final property %s::$%s".
+                $vis = $parent->staticPropertyVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) === 0
+                    && !empty($parent->staticPropertyFinal[$name])
+                ) {
+                    $this->rejectChildOverrideOfFinalStaticProperty($entry, $parent, $name);
                 }
-                if (isset($parent->staticPropertyVisibility[$name])) {
-                    $entry->staticPropertyVisibility[$name] = $parent->staticPropertyVisibility[$name];
-                }
-                if (isset($parent->staticPropertySetVisibility[$name])) {
-                    $entry->staticPropertySetVisibility[$name] = $parent->staticPropertySetVisibility[$name];
-                }
-                if (isset($parent->staticPropertyGetVisibility[$name])) {
-                    $entry->staticPropertyGetVisibility[$name] = $parent->staticPropertyGetVisibility[$name];
-                }
-                if (isset($parent->staticPropertyAsymmetricExplicitRead[$name])) {
-                    $entry->staticPropertyAsymmetricExplicitRead[$name] = $parent->staticPropertyAsymmetricExplicitRead[$name];
-                }
-                if (isset($parent->staticPropertyDeclaringClassLc[$name])) {
-                    $entry->staticPropertyDeclaringClassLc[$name] = $parent->staticPropertyDeclaringClassLc[$name];
-                }
-                if (isset($parent->staticPropertyFinal[$name])) {
-                    $entry->staticPropertyFinal[$name] = true;
-                }
+
+                continue;
+            }
+            // Inherited statics share parent storage (class-declared #4668; trait-composed #4670).
+            $entry->staticProperties[$name] = $storage;
+            if (isset($parent->traitStaticPropertyNames[$name])) {
+                $entry->traitStaticPropertyNames[$name] = true;
+            }
+            if (isset($parent->staticPropertyVisibility[$name])) {
+                $entry->staticPropertyVisibility[$name] = $parent->staticPropertyVisibility[$name];
+            }
+            if (isset($parent->staticPropertySetVisibility[$name])) {
+                $entry->staticPropertySetVisibility[$name] = $parent->staticPropertySetVisibility[$name];
+            }
+            if (isset($parent->staticPropertyGetVisibility[$name])) {
+                $entry->staticPropertyGetVisibility[$name] = $parent->staticPropertyGetVisibility[$name];
+            }
+            if (isset($parent->staticPropertyAsymmetricExplicitRead[$name])) {
+                $entry->staticPropertyAsymmetricExplicitRead[$name] = $parent->staticPropertyAsymmetricExplicitRead[$name];
+            }
+            if (isset($parent->staticPropertyDeclaringClassLc[$name])) {
+                $entry->staticPropertyDeclaringClassLc[$name] = $parent->staticPropertyDeclaringClassLc[$name];
+            }
+            if (isset($parent->staticPropertyFinal[$name])) {
+                $entry->staticPropertyFinal[$name] = true;
             }
         }
         foreach ($parent->staticPropertyHooks as $name => $hooks) {
@@ -19621,6 +19632,35 @@ restart:
             'Cannot override final property %s::$%s',
             $ownerDisplay,
             $parentProperty->name
+        ));
+    }
+
+    /**
+     * php-src zend_inheritance.c — final static property override (#24992, #23403).
+     * Mirror of {@see rejectChildOverrideOfFinalProperty()} for ClassEntry::$staticPropertyFinal.
+     */
+    private function rejectChildOverrideOfFinalStaticProperty(
+        ClassEntry $entry,
+        ClassEntry $parent,
+        string $propLc
+    ): void {
+        $declaringLc = $parent->staticPropertyDeclaringClassLc[$propLc]
+            ?? strtolower(ltrim($parent->name, '\\'));
+        $ownerDisplay = $declaringLc;
+        if (isset($this->context->classes[$ownerDisplay])) {
+            $ownerDisplay = $this->context->classes[$ownerDisplay]->name;
+        }
+        if ('' === $ownerDisplay) {
+            $ownerDisplay = $parent->name !== '' ? $parent->name : 'parent';
+        }
+        $storage = $parent->staticProperties[$propLc] ?? null;
+        $propDisplay = ($storage instanceof Variable && null !== $storage->objectPropertyName)
+            ? $storage->objectPropertyName
+            : $propLc;
+        throw new \CompileError(sprintf(
+            'Cannot override final property %s::$%s',
+            $ownerDisplay,
+            $propDisplay
         ));
     }
 
