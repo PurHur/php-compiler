@@ -1,5 +1,7 @@
 --TEST--
 stdlib ldap_count/first/next/parse_reference helpers (#22181, ext/ldap/ldap.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1,5 +1,7 @@
 --TEST--
 ext ldap ldap_dn2ufn / ldap_explode_dn DN helpers (issue #22212, php-src ext/ldap/ldap.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo function_exists('ldap_dn2ufn') ? "dn2ufn_yes\n" : "dn2ufn_NO\n";

@@ -1,5 +1,7 @@
 --TEST--
 stdlib ldap_mod_* / ldap_rename registration + guards (#21853, ext/ldap/ldap.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);

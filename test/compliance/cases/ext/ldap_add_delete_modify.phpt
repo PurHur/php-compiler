@@ -1,5 +1,7 @@
 --TEST--
 stdlib ldap_add/delete/modify/modify_batch + *_ext registration (#22196, ext/ldap/ldap.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);

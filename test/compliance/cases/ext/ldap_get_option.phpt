@@ -1,5 +1,7 @@
 --TEST--
 stdlib ldap_get_option registration + set/get round-trip (#21851, ext/ldap/ldap.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);
