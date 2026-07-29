@@ -213,6 +213,18 @@ final class BuiltinInternalDefaultValues
             3 => ['kind' => 'string', 'value' => '"'],
             4 => ['kind' => 'string', 'value' => '\\'],
         ],
+        // php-src ext/standard/file.stub.php — context=null, ?int length=null (#24814)
+        'file_get_contents' => [
+            2 => ['kind' => 'null'],
+            4 => ['kind' => 'null'],
+        ],
+        // Same context=null metadata hole as #24814/#24885
+        'fopen' => [
+            3 => ['kind' => 'null'],
+        ],
+        'rmdir' => [
+            1 => ['kind' => 'null'],
+        ],
     ];
 
     public static function isAvailable(
