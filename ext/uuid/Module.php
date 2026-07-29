@@ -9,13 +9,16 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * uuid extension module entry (php/pecl-networking-uuid; #5910 / #22228).
+ * uuid extension module entry (php/pecl-networking-uuid; #5910 / #22228 / #23962).
  */
 class Module extends ModuleAbstract
 {
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        if (!UuidExtensionPolicy::advertisesExtension()) {
+            return;
+        }
         foreach (UuidConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -25,6 +28,10 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        if (!UuidExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
         return [
             new uuid_create(),
             new uuid_generate(),

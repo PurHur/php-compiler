@@ -234,6 +234,9 @@ final class BuiltinIntrospectionPolicy
         if (str_starts_with($lc, 'gmp_')) {
             return \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();
         }
+        if (str_starts_with($lc, 'uuid_')) {
+            return \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();
+        }
         if (\in_array($lc, ['class_has_method', 'class_has_property', 'class_has_constant'], true)) {
             return CompilerVersion::supportsClassHasFunctions();
         }
@@ -306,6 +309,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('gmp' === $ext) {
             return \PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();
+        }
+        if ('uuid' === $ext) {
+            return \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();
         }
 
         return true;

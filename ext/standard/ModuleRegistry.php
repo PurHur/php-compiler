@@ -156,8 +156,10 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExtension();
         $withholdGmpSurface = 'gmp' === $primary
             && !\PHPCompiler\ext\gmp\GmpExtensionPolicy::advertisesExtension();
+        $withholdUuidSurface = 'uuid' === $primary
+            && !\PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension();
 
-        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface && !$withholdYamlSurface && !$withholdRedisSurface && !$withholdMongodbSurface && !$withholdSnmpSurface && !$withholdFfiSurface && !$withholdSoapSurface && !$withholdGmpSurface) {
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface && !$withholdYamlSurface && !$withholdRedisSurface && !$withholdMongodbSurface && !$withholdSnmpSurface && !$withholdFfiSurface && !$withholdSoapSurface && !$withholdGmpSurface && !$withholdUuidSurface) {
             self::register($module->getExtensionName(), $moduleVersion);
         } elseif ($registerSqlite3ExtensionLoaded) {
             self::register($module->getExtensionName(), $moduleVersion);
@@ -184,7 +186,7 @@ final class ModuleRegistry
                 continue;
             }
             $fnName = strtolower($func->getName());
-            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface || $withholdWddxSurface || $withholdYamlSurface || $withholdRedisSurface || $withholdMongodbSurface || $withholdSnmpSurface || $withholdFfiSurface || $withholdSoapSurface || $withholdGmpSurface) {
+            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface || $withholdWddxSurface || $withholdYamlSurface || $withholdRedisSurface || $withholdMongodbSurface || $withholdSnmpSurface || $withholdFfiSurface || $withholdSoapSurface || $withholdGmpSurface || $withholdUuidSurface) {
                 self::registerBuiltinLookup($fnName);
 
                 continue;

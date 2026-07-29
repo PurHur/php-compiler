@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6628 |
-| Phase A inventory files (M2 ratio SSOT) | 6628 |
+| PHP files on vm.php path | 6629 |
+| Phase A inventory files (M2 ratio SSOT) | 6629 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21351 |
+| Source constructs flagged (warnings) | 21352 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3882,7 +3882,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/json_encode.php` | 0 | 3 |
 | `ext/standard/json_last_error_.php` | 0 | 1 |
 | `ext/standard/json_last_error_msg_.php` | 0 | 1 |
-| `ext/standard/json_validate.php` | 0 | 1 |
+| `ext/standard/json_validate.php` | 0 | 2 |
 | `ext/standard/key.php` | 0 | 3 |
 | `ext/standard/krsort_.php` | 0 | 1 |
 | `ext/standard/ksort_.php` | 0 | 1 |
@@ -4404,6 +4404,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uri/VmUri.php` | 0 | 9 |
 | `ext/uuid/Module.php` | 0 | 13 |
 | `ext/uuid/UuidConstants.php` | 0 | 1 |
+| `ext/uuid/UuidExtensionPolicy.php` | 0 | 1 |
 | `ext/uuid/UuidFunction.php` | 0 | 1 |
 | `ext/uuid/UuidStringArg.php` | 0 | 2 |
 | `ext/uuid/VmUuid.php` | 0 | 1 |
@@ -4428,7 +4429,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
 | `ext/xml/Module.php` | 0 | 23 |
 | `ext/xml/VmXml.php` | 0 | 1 |
-| `ext/xml/VmXmlSaxDispatcher.php` | 0 | 14 |
+| `ext/xml/VmXmlSaxDispatcher.php` | 0 | 15 |
 | `ext/xml/VmXmlStructBuilder.php` | 0 | 18 |
 | `ext/xml/XmlConstants.php` | 0 | 1 |
 | `ext/xml/XmlFunction.php` | 0 | 1 |
@@ -5266,10 +5267,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringFilterDomain.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringFilterDomain.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterEmail.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterInt.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringFilterIp.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringFilterIp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterMac.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterSanitize.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterUrl.php` | 0 | 2 |
@@ -6845,31 +6846,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/VmBcMathNumber.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 43)
-- new Variable (line 44)
-- new ClassEntry (line 47)
-- new ClassProperty (line 50)
-- new ClassProperty (line 51)
-- new NumberConstruct (line 53)
-- new NumberAdd (line 59)
-- new NumberSub (line 60)
-- new NumberMul (line 61)
-- new NumberDiv (line 62)
-- new NumberMod (line 63)
-- new NumberDivmod (line 65)
-- new NumberPowmod (line 67)
-- new NumberPow (line 68)
-- new NumberSqrt (line 69)
-- new NumberFloor (line 70)
-- new NumberCeil (line 71)
-- new NumberRound (line 72)
-- new NumberCompare (line 73)
-- new NumberToString (line 74)
-- new NumberSerialize (line 76)
-- new NumberUnserialize (line 77)
-- new ObjectEntry (line 105)
-- new Variable (line 107)
-- new Variable (line 332)
+- new Variable (line 45)
+- new Variable (line 46)
+- new ClassEntry (line 49)
+- new ClassProperty (line 52)
+- new ClassProperty (line 53)
+- new NumberConstruct (line 55)
+- new NumberAdd (line 61)
+- new NumberSub (line 62)
+- new NumberMul (line 63)
+- new NumberDiv (line 64)
+- new NumberMod (line 65)
+- new NumberDivmod (line 67)
+- new NumberPowmod (line 69)
+- new NumberPow (line 70)
+- new NumberSqrt (line 71)
+- new NumberFloor (line 72)
+- new NumberCeil (line 73)
+- new NumberRound (line 74)
+- new NumberCompare (line 75)
+- new NumberToString (line 76)
+- new NumberSerialize (line 78)
+- new NumberUnserialize (line 79)
+- new ObjectEntry (line 107)
+- new Variable (line 109)
+- new Variable (line 353)
 - 19 class method(s)
 
 ### `ext/bcmath/VmBcmath.php`
@@ -35695,6 +35696,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/json_validate.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 38)
 - 3 class method(s)
 
 ### `ext/standard/key.php`
@@ -35902,7 +35904,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/mt_rand.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/standard/mt_srand.php`
@@ -39073,24 +39075,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/uuid/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 20)
-- new uuid_create (line 29)
-- new uuid_generate (line 30)
-- new uuid_is_valid (line 31)
-- new uuid_parse (line 32)
-- new uuid_unparse (line 33)
-- new uuid_compare (line 34)
-- new uuid_is_null (line 35)
-- new uuid_type (line 36)
-- new uuid_variant (line 37)
-- new uuid_time (line 38)
-- new uuid_mac (line 39)
+- new VM\Variable (line 23)
+- new uuid_create (line 36)
+- new uuid_generate (line 37)
+- new uuid_is_valid (line 38)
+- new uuid_parse (line 39)
+- new uuid_unparse (line 40)
+- new uuid_compare (line 41)
+- new uuid_is_null (line 42)
+- new uuid_type (line 43)
+- new uuid_variant (line 44)
+- new uuid_time (line 45)
+- new uuid_mac (line 46)
 - 2 class method(s)
 
 ### `ext/uuid/UuidConstants.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/uuid/UuidExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/uuid/UuidFunction.php`
 
@@ -39252,25 +39259,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 40 class method(s)
+- 41 class method(s)
 
 ### `ext/xml/VmXmlSaxDispatcher.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 51)
-- new Variable (line 86)
-- new Variable (line 224)
-- new Variable (line 226)
-- new Variable (line 240)
-- new Variable (line 254)
-- new Variable (line 268)
-- new Variable (line 270)
-- new Variable (line 286)
-- new HashTable (line 342)
-- new Variable (line 350)
-- new Variable (line 366)
-- new Variable (line 372)
-- 20 class method(s)
+- new self (line 42)
+- new self (line 82)
+- new Variable (line 281)
+- new Variable (line 419)
+- new Variable (line 421)
+- new Variable (line 435)
+- new Variable (line 449)
+- new Variable (line 463)
+- new Variable (line 465)
+- new Variable (line 481)
+- new HashTable (line 537)
+- new Variable (line 545)
+- new Variable (line 561)
+- new Variable (line 567)
+- 22 class method(s)
 
 ### `ext/xml/VmXmlStructBuilder.php`
 
@@ -39314,12 +39322,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/XmlParserHandlers.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 224)
-- new Variable (line 226)
-- new Variable (line 229)
-- new Variable (line 234)
-- new Variable (line 242)
-- new Variable (line 263)
+- new HashTable (line 236)
+- new Variable (line 238)
+- new Variable (line 241)
+- new Variable (line 246)
+- new Variable (line 254)
+- new Variable (line 275)
 - 15 class method(s)
 
 ### `ext/xml/XmlParserSerializeDeny.php`
@@ -41237,7 +41245,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/AOT/ExternalMethodBind.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 83)
+- new Call\Native (line 84)
 - 7 class method(s)
 
 ### `lib/AOT/HelperRuntimeCache.php`
@@ -41542,8 +41550,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1523)
-- new ArgumentCountError (line 1534)
+- new ArgumentCountError (line 1549)
+- new ArgumentCountError (line 1560)
 - 18 class method(s)
 - 1 closure(s)
 
@@ -41924,165 +41932,165 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 15513)
 - new Operand\Temporary (line 15515)
 - new OpCode (line 15566)
-- new Operand\Temporary (line 18610)
-- new Operand\Temporary (line 18649)
-- new Temporary (line 18904)
-- new Operand\Temporary (line 33880)
-- new Operand\Temporary (line 33885)
-- new Operand\Temporary (line 33958)
-- new Operand\Temporary (line 33963)
-- new OpCode (line 34119)
-- new OpCode (line 34237)
-- new OpCode (line 34369)
-- new OpCode (line 34441)
-- new OpCode (line 34544)
-- new OpCode (line 34618)
-- new OpCode (line 34761)
-- new OpCode (line 34864)
-- new OpCode (line 34958)
-- new OpCode (line 35039)
-- new OpCode (line 35124)
-- new OpCode (line 35214)
-- new Variable (line 35265)
-- new Operand\Temporary (line 35272)
-- new Operand\Temporary (line 35277)
-- new OpCode (line 35337)
-- new Variable (line 38050)
-- new Variable (line 38152)
-- new OpCode (line 38181)
-- new Operand\Temporary (line 39105)
-- new OpCode (line 39107)
-- new OpCode (line 39168)
-- new OpCode (line 39187)
-- new OpCode (line 39195)
-- new OpCode (line 39202)
-- new OpCode (line 39214)
-- new OpCode (line 39231)
-- new OpCode (line 39237)
-- new OpCode (line 39243)
-- new OpCode (line 39248)
+- new Operand\Temporary (line 18613)
+- new Operand\Temporary (line 18652)
+- new Temporary (line 18907)
+- new Operand\Temporary (line 33976)
+- new Operand\Temporary (line 33981)
+- new Operand\Temporary (line 34054)
+- new Operand\Temporary (line 34059)
+- new OpCode (line 34215)
+- new OpCode (line 34333)
+- new OpCode (line 34465)
+- new OpCode (line 34537)
+- new OpCode (line 34640)
+- new OpCode (line 34714)
+- new OpCode (line 34857)
+- new OpCode (line 34960)
+- new OpCode (line 35054)
+- new OpCode (line 35135)
+- new OpCode (line 35220)
+- new OpCode (line 35310)
+- new Variable (line 35361)
+- new Operand\Temporary (line 35368)
+- new Operand\Temporary (line 35373)
+- new OpCode (line 35433)
+- new Variable (line 38146)
+- new Variable (line 38248)
+- new OpCode (line 38277)
+- new Operand\Temporary (line 39201)
+- new OpCode (line 39203)
 - new OpCode (line 39264)
-- new OpCode (line 39277)
-- new Variable (line 39290)
-- new Operand\Literal (line 39292)
-- new OpCode (line 39295)
-- new OpCode (line 39328)
-- new OpCode (line 39332)
-- new OpCode (line 39349)
-- new OpCode (line 39410)
-- new OpCode (line 39421)
-- new OpCode (line 39434)
-- new OpCode (line 39611)
-- new CompileFatal (line 39673)
-- new Operand\Variable (line 40024)
-- new Operand\Literal (line 40024)
-- new OpCode (line 40049)
-- new OpCode (line 40072)
-- new OpCode (line 40098)
-- new OpCode (line 40107)
-- new OpCode (line 40113)
-- new Variable (line 40143)
-- new Temporary (line 40145)
-- new Variable (line 40153)
-- new Temporary (line 40155)
+- new OpCode (line 39283)
+- new OpCode (line 39291)
+- new OpCode (line 39298)
+- new OpCode (line 39310)
+- new OpCode (line 39327)
+- new OpCode (line 39333)
+- new OpCode (line 39339)
+- new OpCode (line 39344)
+- new OpCode (line 39360)
+- new OpCode (line 39373)
+- new Variable (line 39386)
+- new Operand\Literal (line 39388)
+- new OpCode (line 39391)
+- new OpCode (line 39424)
+- new OpCode (line 39428)
+- new OpCode (line 39445)
+- new OpCode (line 39506)
+- new OpCode (line 39517)
+- new OpCode (line 39530)
+- new OpCode (line 39707)
+- new CompileFatal (line 39769)
+- new Operand\Variable (line 40120)
+- new Operand\Literal (line 40120)
+- new OpCode (line 40145)
+- new OpCode (line 40168)
+- new OpCode (line 40194)
 - new OpCode (line 40203)
-- new Operand\Temporary (line 40235)
-- new Operand\Temporary (line 40241)
-- new Operand\Temporary (line 40247)
-- new Operand\Temporary (line 40253)
-- new Operand\Temporary (line 40270)
-- new Operand\Temporary (line 40279)
-- new Operand\Temporary (line 42786)
-- new Variable (line 43345)
-- new Variable (line 43349)
-- new Variable (line 43357)
-- new Variable (line 43361)
-- new Variable (line 43645)
-- new OpCode (line 43747)
-- new OpCode (line 43783)
-- new OpCode (line 44046)
-- new OpCode (line 44070)
-- new OpCode (line 44103)
-- new OpCode (line 44163)
-- new OpCode (line 44193)
-- new OpCode (line 44224)
-- new OpCode (line 44272)
+- new OpCode (line 40209)
+- new Variable (line 40239)
+- new Temporary (line 40241)
+- new Variable (line 40249)
+- new Temporary (line 40251)
+- new OpCode (line 40299)
+- new Operand\Temporary (line 40331)
+- new Operand\Temporary (line 40337)
+- new Operand\Temporary (line 40343)
+- new Operand\Temporary (line 40349)
+- new Operand\Temporary (line 40366)
+- new Operand\Temporary (line 40375)
+- new Operand\Temporary (line 42882)
+- new Variable (line 43441)
+- new Variable (line 43445)
+- new Variable (line 43453)
+- new Variable (line 43457)
+- new Variable (line 43741)
+- new OpCode (line 43843)
+- new OpCode (line 43879)
+- new OpCode (line 44142)
+- new OpCode (line 44166)
+- new OpCode (line 44199)
+- new OpCode (line 44259)
 - new OpCode (line 44289)
-- new OpCode (line 44308)
-- new OpCode (line 44328)
-- new OpCode (line 44342)
-- new Operand\Temporary (line 44364)
-- new OpCode (line 44398)
-- new OpCode (line 44435)
-- new Operand\Temporary (line 44439)
-- new OpCode (line 44455)
-- new OpCode (line 44501)
-- new OpCode (line 44556)
-- new OpCode (line 44572)
-- new OpCode (line 44596)
-- new OpCode (line 44613)
-- new OpCode (line 44627)
-- new OpCode (line 44649)
-- new OpCode (line 44671)
-- new OpCode (line 44680)
-- new OpCode (line 44700)
-- new OpCode (line 44799)
-- new OpCode (line 44812)
-- new OpCode (line 44825)
-- new OpCode (line 44830)
-- new OpCode (line 44847)
-- new OpCode (line 44893)
-- new OpCode (line 44942)
-- new OpCode (line 45065)
-- new OpCode (line 45104)
-- new OpCode (line 45182)
-- new OpCode (line 45203)
-- new OpCode (line 45238)
-- new OpCode (line 45271)
-- new OpCode (line 45363)
-- new OpCode (line 45417)
-- new OpCode (line 45439)
-- new Operand\Temporary (line 47227)
-- new Operand\Temporary (line 47758)
-- new Operand\Temporary (line 47944)
-- new Operand\Temporary (line 47976)
-- new Operand\Temporary (line 48079)
-- new Operand\Temporary (line 48208)
-- new OpCode (line 48210)
-- new OpCode (line 49855)
-- new Operand\Temporary (line 50326)
-- new OpCode (line 50931)
-- new Operand\Literal (line 51296)
-- new Variable (line 51298)
-- new OpCode (line 51344)
-- new OpCode (line 51559)
-- new OpCode (line 51569)
-- new OpCode (line 51572)
-- new Operand\Temporary (line 51599)
-- new Operand\Temporary (line 51636)
-- new OpCode (line 51638)
-- new OpCode (line 51649)
-- new Operand\Temporary (line 51652)
-- new OpCode (line 51654)
-- new OpCode (line 51662)
+- new OpCode (line 44320)
+- new OpCode (line 44368)
+- new OpCode (line 44385)
+- new OpCode (line 44404)
+- new OpCode (line 44424)
+- new OpCode (line 44438)
+- new Operand\Temporary (line 44460)
+- new OpCode (line 44494)
+- new OpCode (line 44531)
+- new Operand\Temporary (line 44535)
+- new OpCode (line 44551)
+- new OpCode (line 44597)
+- new OpCode (line 44652)
+- new OpCode (line 44668)
+- new OpCode (line 44692)
+- new OpCode (line 44709)
+- new OpCode (line 44723)
+- new OpCode (line 44745)
+- new OpCode (line 44767)
+- new OpCode (line 44776)
+- new OpCode (line 44796)
+- new OpCode (line 44895)
+- new OpCode (line 44908)
+- new OpCode (line 44921)
+- new OpCode (line 44926)
+- new OpCode (line 44943)
+- new OpCode (line 44989)
+- new OpCode (line 45038)
+- new OpCode (line 45161)
+- new OpCode (line 45200)
+- new OpCode (line 45278)
+- new OpCode (line 45299)
+- new OpCode (line 45334)
+- new OpCode (line 45367)
+- new OpCode (line 45459)
+- new OpCode (line 45513)
+- new OpCode (line 45535)
+- new Operand\Temporary (line 47323)
+- new Operand\Temporary (line 47854)
+- new Operand\Temporary (line 48040)
+- new Operand\Temporary (line 48072)
+- new Operand\Temporary (line 48175)
+- new Operand\Temporary (line 48304)
+- new OpCode (line 48306)
+- new OpCode (line 49968)
+- new Operand\Temporary (line 50439)
+- new OpCode (line 51044)
+- new Operand\Literal (line 51409)
+- new Variable (line 51411)
+- new OpCode (line 51457)
 - new OpCode (line 51672)
-- new OpCode (line 51680)
-- new OpCode (line 51683)
-- new OpCode (line 51810)
-- new OpCode (line 51838)
-- new OpCode (line 51864)
-- new OpCode (line 51882)
-- new OpCode (line 51889)
-- new Operand\Literal (line 52677)
-- new OpCode (line 54234)
-- new Literal (line 54396)
-- new OpCode (line 54495)
-- new Variable (line 54502)
-- new Temporary (line 54504)
-- new OpCode (line 54507)
-- new CompileFatal (line 54842)
-- new CompileFatal (line 55097)
-- 1107 class method(s)
+- new OpCode (line 51682)
+- new OpCode (line 51685)
+- new Operand\Temporary (line 51712)
+- new Operand\Temporary (line 51749)
+- new OpCode (line 51751)
+- new OpCode (line 51762)
+- new Operand\Temporary (line 51765)
+- new OpCode (line 51767)
+- new OpCode (line 51775)
+- new OpCode (line 51785)
+- new OpCode (line 51793)
+- new OpCode (line 51796)
+- new OpCode (line 51923)
+- new OpCode (line 51951)
+- new OpCode (line 51977)
+- new OpCode (line 51995)
+- new OpCode (line 52002)
+- new Operand\Literal (line 52790)
+- new OpCode (line 54347)
+- new Literal (line 54510)
+- new OpCode (line 54609)
+- new Variable (line 54616)
+- new Temporary (line 54618)
+- new OpCode (line 54621)
+- new CompileFatal (line 54956)
+- new CompileFatal (line 55211)
+- 1109 class method(s)
 - 51 closure(s)
 
 ### `lib/Compiler/AbstractMethodBodyCheck.php`
@@ -42470,7 +42478,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 269 class method(s)
+- 270 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -45133,7 +45141,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFilterDomain.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 126)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFilterEmail.php`
@@ -45150,7 +45157,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFilterIp.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 125)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFilterMac.php`
@@ -49040,7 +49046,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ArraySpread.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 100)
+- new Variable (line 105)
 - 5 class method(s)
 
 ### `lib/VM/AttributeNewInstanceJitHelper.php`
@@ -52192,12 +52198,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 100)
-- new Variable (line 132)
-- new Variable (line 134)
-- new Variable (line 160)
-- new Error (line 193)
-- new Error (line 225)
-- new Error (line 228)
+- new Variable (line 136)
+- new Variable (line 138)
+- new Variable (line 165)
+- new Error (line 198)
+- new Error (line 230)
+- new Error (line 233)
 - 7 class method(s)
 
 ### `lib/VM/CallUnpackJitHelper.php`
@@ -53254,20 +53260,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new AttributeEntry (line 1874)
 - new Variable (line 2422)
 - new ParameterMetadata (line 2428)
-- new Variable (line 3235)
-- new Variable (line 3274)
-- new ObjectEntry (line 3519)
-- new SourceLocation (line 3547)
-- new ParameterMetadata (line 4027)
-- new ObjectEntry (line 4095)
-- new ObjectEntry (line 4112)
-- new ObjectEntry (line 4330)
-- new ObjectEntry (line 4343)
-- new Variable (line 4423)
-- new ObjectEntry (line 4545)
-- new ObjectEntry (line 4565)
-- new Variable (line 4752)
-- new Variable (line 4937)
+- new Variable (line 3236)
+- new Variable (line 3275)
+- new ObjectEntry (line 3520)
+- new SourceLocation (line 3548)
+- new ParameterMetadata (line 4028)
+- new ObjectEntry (line 4096)
+- new ObjectEntry (line 4113)
+- new ObjectEntry (line 4331)
+- new ObjectEntry (line 4344)
+- new Variable (line 4424)
+- new ObjectEntry (line 4546)
+- new ObjectEntry (line 4566)
+- new Variable (line 4753)
+- new Variable (line 4938)
 - 252 class method(s)
 - 3 closure(s)
 

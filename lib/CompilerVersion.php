@@ -3102,6 +3102,18 @@ final class CompilerVersion
     }
 
     /**
+     * pecl-networking-uuid uuid_* / UUID_* — withheld on reference profile (#23962 / #5910).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
+     * Zend without pecl-uuid. Enable forward profile via `PHP_COMPILER_PROFILE=8.4`
+     * or install host ext/uuid ({@see \PHPCompiler\ext\uuid\UuidExtensionPolicy::advertisesExtension()}).
+     */
+    public static function supportsUuid(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/soap SoapClient/SoapServer/SoapFault — withheld on reference profile (#22859 / #3724).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches
