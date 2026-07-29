@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6638 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 21404 |
+| Source constructs flagged (warnings) | 21408 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -6451,7 +6451,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/ReflectionPropertyTypeSupport.php` | 0 | 3 |
 | `lib/VM/ReflectionReferenceSupport.php` | 0 | 1 |
 | `lib/VM/ReflectionSupport.php` | 0 | 52 |
-| `lib/VM/ReflectionTypeSupport.php` | 0 | 17 |
+| `lib/VM/ReflectionTypeSupport.php` | 0 | 21 |
 | `lib/VM/ReservedBuiltinClass.php` | 0 | 2 |
 | `lib/VM/ResourceSupport.php` | 0 | 3 |
 | `lib/VM/SapiOutput.php` | 0 | 1 |
@@ -10112,46 +10112,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 618)
 - new DOMException (line 697)
 - new DOMException (line 1174)
-- new DOMException (line 1671)
-- new DOMException (line 1811)
-- new DOMException (line 1820)
-- new DOMException (line 1830)
-- new DOMException (line 1878)
-- new DOMException (line 1904)
+- new DOMException (line 1759)
+- new DOMException (line 1899)
+- new DOMException (line 1908)
 - new DOMException (line 1918)
-- new DOMException (line 1927)
-- new DOMException (line 1936)
-- new DOMException (line 1993)
-- new DOMException (line 2010)
-- new DOMException (line 2040)
-- new DOMException (line 2055)
-- new DOMException (line 2069)
-- new DOMException (line 2082)
-- new DOMException (line 2096)
-- new DOMException (line 2111)
-- new DOMException (line 2126)
-- new DOMException (line 2140)
-- new DOMException (line 2149)
-- new DOMException (line 2153)
-- new DOMException (line 2177)
-- new DOMException (line 2874)
-- new DOMException (line 2881)
-- new Error (line 2894)
-- new Variable (line 2898)
-- new Variable (line 2908)
-- new Variable (line 3040)
-- new DOMException (line 3047)
-- new Error (line 3106)
-- new Variable (line 3141)
-- new Variable (line 3147)
-- new Variable (line 3159)
-- new Variable (line 3171)
-- new Variable (line 3192)
-- new HashTable (line 3203)
-- new Variable (line 3209)
-- new Variable (line 3213)
-- new Variable (line 3251)
-- 98 class method(s)
+- new DOMException (line 1966)
+- new DOMException (line 1992)
+- new DOMException (line 2006)
+- new DOMException (line 2015)
+- new DOMException (line 2024)
+- new DOMException (line 2081)
+- new DOMException (line 2098)
+- new DOMException (line 2128)
+- new DOMException (line 2143)
+- new DOMException (line 2157)
+- new DOMException (line 2170)
+- new DOMException (line 2184)
+- new DOMException (line 2199)
+- new DOMException (line 2214)
+- new DOMException (line 2228)
+- new DOMException (line 2237)
+- new DOMException (line 2241)
+- new DOMException (line 2265)
+- new DOMException (line 2962)
+- new DOMException (line 2969)
+- new Error (line 2982)
+- new Variable (line 2986)
+- new Variable (line 2996)
+- new Variable (line 3128)
+- new DOMException (line 3135)
+- new Error (line 3194)
+- new Variable (line 3229)
+- new Variable (line 3235)
+- new Variable (line 3247)
+- new Variable (line 3259)
+- new Variable (line 3280)
+- new HashTable (line 3291)
+- new Variable (line 3297)
+- new Variable (line 3301)
+- new Variable (line 3339)
+- 100 class method(s)
 - 4 closure(s)
 
 ### `ext/dom/XPathConstruct.php`
@@ -39317,7 +39317,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 41 class method(s)
+- 44 class method(s)
 
 ### `ext/xml/VmXmlSaxDispatcher.php`
 
@@ -41593,7 +41593,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinInternalArgInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new InternalArgInfo (line 424)
+- new InternalArgInfo (line 436)
 - 21 class method(s)
 
 ### `lib/BuiltinInternalDefaultValues.php`
@@ -53379,20 +53379,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 28)
 - new CfgType\Literal (line 50)
-- new CfgType\Mixed_ (line 200)
-- new CfgType\Never_ (line 203)
-- new CfgType\Void_ (line 206)
-- new CfgType\Nullable (line 211)
-- new CfgType\Union_ (line 228)
-- new CfgType\Intersection (line 245)
-- new CfgType\Literal (line 248)
-- new ObjectEntry (line 291)
-- new CfgType\Union_ (line 296)
-- new ObjectEntry (line 354)
-- new CfgType\Intersection (line 357)
-- new ObjectEntry (line 373)
-- new Variable (line 397)
-- 21 class method(s)
+- new CfgType\Union_ (line 58)
+- new CfgType\Union_ (line 184)
+- new CfgType\Literal (line 205)
+- new CfgType\Literal (line 209)
+- new CfgType\Mixed_ (line 261)
+- new CfgType\Never_ (line 264)
+- new CfgType\Void_ (line 267)
+- new CfgType\Nullable (line 272)
+- new CfgType\Union_ (line 289)
+- new CfgType\Intersection (line 306)
+- new CfgType\Literal (line 309)
+- new ObjectEntry (line 352)
+- new CfgType\Union_ (line 357)
+- new ObjectEntry (line 415)
+- new CfgType\Intersection (line 418)
+- new ObjectEntry (line 434)
+- new Variable (line 458)
+- 23 class method(s)
 - 1 closure(s)
 
 ### `lib/VM/ReservedBuiltinClass.php`
