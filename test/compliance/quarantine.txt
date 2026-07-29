@@ -67,4 +67,3 @@ stdlib/array_all_internal_callback                            # CI-flaky (#24726
 stdlib/highlight_file_br                                      # CI-flaky (#24726)
 stdlib/highlight_file_multiline_br                            # CI-flaky (#24726)
 stdlib/highlight_string_pre_wrapper                           # CI-flaky (#24726)
-stdlib/json_validate_function_exists_profile                  # CI-flaky (#24726)

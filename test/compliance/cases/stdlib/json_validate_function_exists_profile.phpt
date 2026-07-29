@@ -1,5 +1,5 @@
 --TEST--
-stdlib json_validate() — withheld on default 8.4.0-dev reference (#16091, #22544, ext/json/php_json.c)
+stdlib json_validate() — withheld on default 8.4.0-dev reference (#16091, #22544, #24808, ext/json/php_json.c)
 --FILE--
 <?php
 declare(strict_types=1);

@@ -1767,11 +1767,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15026, #15196, #15241, #16091, #22544).
+     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15026, #15196, #15241, #16091, #22544, #24808).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate when reported
      * PHP_VERSION is the 8.2 reference string). Enable via stable 8.4.0+ or explicit
-     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#16091, #17007).
+     * `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile (#16091, #17007, #22544).
+     *
+     * Do not use {@see isForwardProfileAtLeast()} here — that would re-advertise on unset PROFILE
+     * while {@see phpversion()} still reports {@see REFERENCE_PHP_VERSION} (#24745 regression / #24808).
      */
     public static function supportsJsonValidate(): bool
     {
@@ -1779,21 +1782,20 @@ final class CompilerVersion
             return false;
         }
 
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (\is_string($raw) && '' !== trim($raw)) {
-            return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
-        }
-
-        // 8.4.0-dev is a pre-release of 8.4 — MINOR_VERSION bypasses version_compare '-dev' trap.
-        if (self::MAJOR_VERSION > 8 || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 3)) {
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
             return true;
         }
 
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
-     * json_validate() visible to function_exists() — stable runtime or forward 8.3+ (#17007, #22544).
+     * json_validate() visible to function_exists() — same gate as registration (#17007, #22544, #24808).
      *
      * Withheld on 8.4.0-dev reference harness (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
      */
