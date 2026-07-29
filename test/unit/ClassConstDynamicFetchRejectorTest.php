@@ -96,6 +96,28 @@ PHP;
         }
     }
 
+    /** Issue #24823: PROFILE=8.2 must match Zend 8.2 parse error (not evaluate). */
+    public function testProfile82RejectsDynamicFetch(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsDynamicClassConstFetch());
+            $this->expectException(CompileFatal::class);
+            $this->expectExceptionMessage('unexpected token ","');
+            ClassConstDynamicFetchRejector::reject(
+                "<?php\nclass C { public const X = 7; }\n\$n = 'X';\necho C::{\$n}, \"\\n\";\n",
+                'dyn_class_const_profile82_parity.php'
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     /** Issue #23760 Done-when: ClassName::{$expr}, $obj::{$expr}, undefined → Error. */
     public function testForwardProfileIssue23760ObjectAndUndefined(): void
     {
