@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
-/** BcMath\Number::__construct(string|int $num) — VM (#7220). */
+/** BcMath\Number::__construct(string|int $num) — VM (#7220); float→int ZPP (#24625). */
 final class NumberConstruct extends BcMathNumberMethod
 {
     public function __construct()

@@ -8,9 +8,11 @@ use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmNullNumberParamDeprecation;
 use PHPCompiler\ext\standard\VmStreamArg;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
@@ -212,6 +214,25 @@ final class VmBcMathNumber
             VmBcmath::assertValidNumber($asString);
 
             return $asString;
+        }
+        // Z_PARAM_STR_OR_LONG: finite float→long (+ E_DEPRECATED on precision loss) → string (#24625).
+        // Non-finite floats follow convert_to_string ("NAN"/"INF") like Zend STR_OR_LONG (#22947).
+        if (Variable::TYPE_FLOAT === $var->type) {
+            $float = $var->toFloat();
+            if (\is_finite($float)) {
+                $vm = VM::running();
+                if (null !== $vm) {
+                    VmMath::warnFloatToIntPrecisionLoss(
+                        $float,
+                        $vm->context,
+                        $vm->currentExecutingFrame()
+                    );
+                }
+                $asString = (string) VmMath::floatToZendLong($float);
+                VmBcmath::assertValidNumber($asString);
+
+                return $asString;
+            }
         }
 
         // $argNum is 1-based (Zend Argument #N); coerceStringBuiltinArg expects 0-based (#24140).
