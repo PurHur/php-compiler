@@ -81,12 +81,9 @@ final class PropertyVisibility
             if (null === $callerClassLc) {
                 self::denyRead($readVis, $asymmetricGet, $declaringClassDisplay, $propertyName, $scopeLabel);
             }
-            if (!$isSameOrSubclassOf($callerClassLc, $declaringClassLc)) {
-                self::denyRead($readVis, $asymmetricGet, $declaringClassDisplay, $propertyName, $scopeLabel);
-            }
             if (
-                $objectClassLc !== $callerClassLc
-                && !$isSameOrSubclassOf($objectClassLc, $callerClassLc)
+                !$isSameOrSubclassOf($callerClassLc, $declaringClassLc)
+                && !$isSameOrSubclassOf($declaringClassLc, $callerClassLc)
             ) {
                 self::denyRead($readVis, $asymmetricGet, $declaringClassDisplay, $propertyName, $scopeLabel);
             }
