@@ -15,12 +15,27 @@ use PHPUnit\Framework\TestCase;
  */
 final class ZipArchiveTest extends TestCase
 {
+    private ?string $zipEnablePrev = null;
+
     protected function setUp(): void
     {
         parent::setUp();
-        if (!CompilerVersion::supportsZip()) {
-            self::markTestSkipped('ZipArchive withheld on reference profile (#18137); set PHP_COMPILER_PROFILE=8.4');
+        $prev = getenv('PHP_COMPILER_ENABLE_ZIP');
+        $this->zipEnablePrev = false === $prev ? null : $prev;
+        putenv('PHP_COMPILER_ENABLE_ZIP=1');
+        if (!\PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension()) {
+            self::markTestSkipped('ZipArchive withheld (#18137/#25010)');
         }
+    }
+
+    protected function tearDown(): void
+    {
+        if (null === $this->zipEnablePrev) {
+            putenv('PHP_COMPILER_ENABLE_ZIP');
+        } else {
+            putenv('PHP_COMPILER_ENABLE_ZIP='.$this->zipEnablePrev);
+        }
+        parent::tearDown();
     }
 
     public function test_zip_archive_methods_and_constants_registered(): void

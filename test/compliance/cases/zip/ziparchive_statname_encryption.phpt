@@ -1,14 +1,15 @@
 --TEST--
 ZipArchive::statName/setPassword/setEncryptionName + EM_* (#19873, ext/zip/php_zip.c)
 --ENV--
+PHP_COMPILER_ENABLE_ZIP=1
 PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
-if (!PHPCompiler\CompilerVersion::supportsZip()) {
-    die('skip ZipArchive withheld on reference profile (#18137)');
+if (!PHPCompiler\ext\zip\ZipExtensionPolicy::advertisesExtension()) {
+    die('skip zip withheld (#18137/#25010)');
 }
 ?>
 --FILE--
