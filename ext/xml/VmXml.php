@@ -178,6 +178,7 @@ final class VmXml
 
                 return 1;
             }
+            $error = self::expatAdjustLibxmlError($error);
             self::recordParserError($parser, $error, $accumulated);
             \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
             self::$parsers[$parser]['finished'] = true;
@@ -222,6 +223,7 @@ final class VmXml
             return 1;
         }
 
+        $error = self::expatAdjustLibxmlError($error);
         self::recordParserError($parser, $error, $accumulated);
         \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
         if ($isFinal) {
@@ -298,6 +300,7 @@ final class VmXml
 
         $error = self::validateWellFormed($data);
         if (null !== $error) {
+            $error = self::expatAdjustLibxmlError($error);
             self::recordParserError($parser, $error, $data);
             \PHPCompiler\ext\libxml\VmLibxml::recordError($error);
 
@@ -367,7 +370,8 @@ final class VmXml
 
     /**
      * libxml may emit multiple FATAL errors for one malformed document (e.g. unclosed start tag
-     * plus premature end in outer element — php-src ext/dom/document.c via libxml2; #18332).
+     * plus premature end in outer element — php-src ext/dom/document.c via libxml2; #18332 /
+     * tag mismatch then premature end — #25064).
      *
      * @return list<array{level: int, code: int, column: int, message: string, file: string, line: int}>
      */
@@ -383,6 +387,13 @@ final class VmXml
             // ltrim only — trailing newlines are significant for EOF line/column (#24319).
             $secondary = self::detectPrematureEnd(ltrim($data));
             if (null !== $secondary && self::XML_ERR_UNCLOSED_NODE_TAG === $secondary['code']) {
+                $records[] = $secondary;
+            }
+        } elseif (self::XML_ERR_TAG_NAME_MISMATCH === $primary['code']) {
+            // libxml2 recovers by popping the expected element, then may still leave ancestors
+            // open → XML_ERR_UNCLOSED_NODE_TAG at the mismatch locus (#25064).
+            $secondary = self::detectPrematureEndAfterMismatchRecovery(ltrim($data));
+            if (null !== $secondary) {
                 $records[] = $secondary;
             }
         }
@@ -1102,7 +1113,10 @@ final class VmXml
     }
 
     /**
-     * Detect mismatched end tags (libxml XML_ERR_TAG_NAME_MISMATCH / expat code 76; #18120).
+     * Detect mismatched end tags (libxml XML_ERR_TAG_NAME_MISMATCH; #18120 / #25064).
+     *
+     * Message embeds the **open line** of the expected element (1-based, libxml2). Expat's
+     * xml_parse() libxml bridge rewrites that to "line 0" via {@see expatAdjustLibxmlError}.
      *
      * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex: int}
      */
@@ -1112,28 +1126,27 @@ final class VmXml
             return null;
         }
 
-        /** @var list<string> $stack */
-        $stack = [$open[1]];
+        /** @var list<array{name: string, openLine: int}> $stack */
+        $stack = [['name' => $open[1], 'openLine' => 1 + substr_count(substr($content, 0, $pos), "\n")]];
         $scan = $pos + \strlen($open[0]);
         $len = \strlen($content);
         while ($scan < $len && [] !== $stack) {
             if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/s', $content, $close, 0, $scan)) {
                 $name = $close[1];
-                if ([] === $stack || end($stack) !== $name) {
+                $top = $stack[\count($stack) - 1];
+                if ($top['name'] !== $name) {
                     $line = 1 + substr_count(substr($content, 0, $scan), "\n");
                     $byteIndex = $scan + \strlen($close[0]);
-                    $expected = [] !== $stack ? (string) end($stack) : '';
-                    $expatLine = $line - 1;
                     $message = \sprintf(
                         "Opening and ending tag mismatch: %s line %d and %s\n",
-                        $expected,
-                        $expatLine,
+                        $top['name'],
+                        $top['openLine'],
                         $name
                     );
 
                     return self::errorRecord(
                         $line,
-                        $byteIndex + 1,
+                        self::columnOnLine($content, $byteIndex),
                         $message,
                         self::XML_ERR_TAG_NAME_MISMATCH,
                         LibxmlConstants::LIBXML_ERR_FATAL,
@@ -1154,7 +1167,8 @@ final class VmXml
                 continue;
             }
             if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $content, $nested, 0, $scan)) {
-                $stack[] = $nested[1];
+                $openLine = 1 + substr_count(substr($content, 0, $scan), "\n");
+                $stack[] = ['name' => $nested[1], 'openLine' => $openLine];
                 $scan += \strlen($nested[0]);
 
                 continue;
@@ -1181,6 +1195,149 @@ final class VmXml
         }
 
         return null;
+    }
+
+    /**
+     * After XML_ERR_TAG_NAME_MISMATCH, libxml2 pops the expected element and continues; if the
+     * stack is still non-empty at EOF, it emits XML_ERR_UNCLOSED_NODE_TAG at the last mismatch
+     * locus (php-src / libxml2; #25064).
+     *
+     * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
+     */
+    private static function detectPrematureEndAfterMismatchRecovery(string $data): ?array
+    {
+        $len = \strlen($data);
+        if ($len < 1 || '<' !== $data[0]) {
+            return null;
+        }
+
+        /** @var list<array{name: string, openLine: int}> $stack */
+        $stack = [];
+        $scan = 0;
+        $lastMismatchLine = null;
+        $lastMismatchColumn = null;
+        while ($scan < $len) {
+            if ('<' !== $data[$scan]) {
+                ++$scan;
+
+                continue;
+            }
+            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/s', $data, $close, 0, $scan)) {
+                $name = $close[1];
+                $closeEnd = $scan + \strlen($close[0]);
+                if ([] === $stack || end($stack)['name'] !== $name) {
+                    // Recovery: pop expected top (if any), consume the close token, keep going.
+                    if ([] !== $stack) {
+                        array_pop($stack);
+                    }
+                    $lastMismatchLine = 1 + substr_count(substr($data, 0, $scan), "\n");
+                    $lastMismatchColumn = self::columnOnLine($data, $closeEnd);
+                    $scan = $closeEnd;
+
+                    continue;
+                }
+                array_pop($stack);
+                $scan = $closeEnd;
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/s', $data, $sc, 0, $scan)) {
+                $scan += \strlen($sc[0]);
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $data, $open, 0, $scan)) {
+                $openLine = 1 + substr_count(substr($data, 0, $scan), "\n");
+                $stack[] = ['name' => $open[1], 'openLine' => $openLine];
+                $scan += \strlen($open[0]);
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)/s', $data, $partial, 0, $scan)) {
+                break;
+            }
+            $cdata = self::parseCdataSectionAt($data, $scan);
+            if (null !== $cdata) {
+                $scan = $cdata['end'];
+
+                continue;
+            }
+            $comment = self::parseCommentAt($data, $scan);
+            if (null !== $comment) {
+                $scan = $comment['end'];
+
+                continue;
+            }
+            $pi = self::parseProcessingInstructionAt($data, $scan);
+            if (null !== $pi) {
+                $scan = $pi['end'];
+
+                continue;
+            }
+            ++$scan;
+        }
+
+        if ([] === $stack) {
+            return null;
+        }
+
+        $top = $stack[\count($stack) - 1];
+        if (null !== $lastMismatchLine && null !== $lastMismatchColumn) {
+            $line = $lastMismatchLine;
+            $column = $lastMismatchColumn;
+        } elseif ($len > 0 && "\n" === $data[$len - 1]) {
+            $line = 1 + substr_count($data, "\n");
+            $column = 1;
+        } else {
+            $lastNl = strrpos($data, "\n");
+            $line = 1 + substr_count($data, "\n");
+            $column = false === $lastNl ? $len + 1 : $len - $lastNl;
+        }
+
+        return self::errorRecord(
+            $line,
+            $column,
+            "Premature end of data in tag {$top['name']} line {$top['openLine']}\n",
+            self::XML_ERR_UNCLOSED_NODE_TAG,
+            LibxmlConstants::LIBXML_ERR_FATAL
+        );
+    }
+
+    /**
+     * 1-based column within the current line for a byte index past the last consumed byte
+     * (libxml2 xmlerror.c; #25064).
+     */
+    private static function columnOnLine(string $content, int $byteIndex): int
+    {
+        if ($byteIndex <= 0) {
+            return 1;
+        }
+        $prefix = substr($content, 0, $byteIndex);
+        $lastNl = strrpos($prefix, "\n");
+
+        return false === $lastNl ? $byteIndex + 1 : $byteIndex - $lastNl;
+    }
+
+    /**
+     * Expat's libxml bridge embeds "line 0" in tag-mismatch detail (php-src ext/xml/xml.c; #18138).
+     * DOM/libxml2 uses the element's open line — keep that in {@see detectTagMismatch}, rewrite here.
+     *
+     * @param array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex?: int} $error
+     *
+     * @return array{level: int, code: int, column: int, message: string, file: string, line: int, byteIndex?: int}
+     */
+    private static function expatAdjustLibxmlError(array $error): array
+    {
+        if (self::XML_ERR_TAG_NAME_MISMATCH !== $error['code']) {
+            return $error;
+        }
+        $error['message'] = (string) preg_replace(
+            '/^(Opening and ending tag mismatch: \S+ line )\d+( and \S+)/',
+            '${1}0${2}',
+            $error['message']
+        );
+
+        return $error;
     }
 
     /** @return null|int byte offset after one element starting at $pos */
