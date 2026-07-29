@@ -747,6 +747,9 @@ final class BuiltinParamNames
             // php-src ext/hash/hash.stub.php — Reflection OK, named binder missing (#24566)
             case 'hash_copy':
                 return ['context'];
+            // php-src ext/standard/image.stub.php — InternalArgInfo still says imagefile/info (#23343)
+            case 'getimagesize':
+                return ['filename', 'image_info='];
             // php-src ext/standard/image.stub.php — InternalArgInfo still says imagetype (#24459)
             case 'image_type_to_extension':
                 return ['image_type', 'include_dot='];

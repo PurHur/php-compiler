@@ -2227,4 +2227,21 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($toFile, 'outfilename', 'openssl_pkey_export_to_file'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($toFile, 'config_args', 'openssl_pkey_export_to_file'));
     }
+
+    /** @covers issue #23343 */
+    public function testGetimagesizeNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('getimagesize');
+        self::assertSame(['filename', 'image_info='], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'getimagesize'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'image_info', 'getimagesize'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'imagefile', 'getimagesize'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'info', 'getimagesize'));
+        self::assertSame(
+            ['filename', 'image_info='],
+            BuiltinParamNames::paramNamesForInternalFunction('getimagesize')
+        );
+        self::assertSame(2, BuiltinParamNames::paramCountForInternalFunction('getimagesize'));
+        self::assertSame(1, BuiltinParamNames::requiredParamCountForInternalFunction('getimagesize'));
+    }
 }
