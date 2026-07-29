@@ -632,6 +632,9 @@ final class BuiltinParamNames
                 return ['data', 'signature', 'private_key', 'algorithm'];
             case 'openssl_verify':
                 return ['data', 'signature', 'public_key', 'algorithm'];
+            // php-src ext/openssl/openssl.stub.php — InternalArgInfo still says configargs (#24491)
+            case 'openssl_pkey_new':
+                return ['options'];
             case 'openssl_encrypt':
                 // php-src ext/openssl/openssl.stub.php (#21135)
                 return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad', 'tag_length'];

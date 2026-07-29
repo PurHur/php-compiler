@@ -2049,4 +2049,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($verify, 'key', 'openssl_verify'));
         self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($verify, 'method', 'openssl_verify'));
     }
+
+    /** @covers issue #24491 */
+    public function testOpensslPkeyNewNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('openssl_pkey_new');
+        self::assertSame(['options'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'options', 'openssl_pkey_new'));
+        self::assertFalse(BuiltinParamNames::lookupNamedParamIndex($names, 'configargs', 'openssl_pkey_new'));
+        self::assertSame(
+            ['options'],
+            BuiltinParamNames::paramNamesForInternalFunction('openssl_pkey_new')
+        );
+    }
 }

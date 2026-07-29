@@ -12,6 +12,8 @@ use PHPLLVM\Value;
 
 /**
  * openssl_pkey_new() — generate asymmetric key (php-src ext/openssl/openssl.c; #6295, #22335).
+ *
+ * Reflection / named-arg param is Zend stub `options` (not InternalArgInfo `configargs`; #24491).
  */
 final class openssl_pkey_new extends Internal
 {
